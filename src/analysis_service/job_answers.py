@@ -25,7 +25,7 @@ import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import partial
-from typing import Any
+from typing import Any, NoReturn
 
 import anyio.to_thread
 
@@ -400,6 +400,20 @@ class JobAnswers:
             raise NoSuchJob(job_id)
         return record
 
+    async def missing(self, record: JobRecord, part: str) -> NoReturn:
+        """Raise for the ``part`` of ``record`` that a read after :meth:`owned`
+        did not find.
+
+        **The one reader of "why is a part of an owned job missing".** A
+        delete can remove the job after the first read, and then the job
+        reads as missing: :class:`NoSuchJob`. Else the job's status promises
+        the part, and :class:`JobDataMissing` reports this service's defect.
+        """
+        if await self.store.owned(record.id, record.owner_id) is None:
+            raise NoSuchJob(record.id)
+        logger.error("%s job %s holds no %s", record.status, record.id, part)
+        raise JobDataMissing(record.id)
+
     async def parsable(self, job_id: str, owner_id: str) -> JobRecord:
         """The owned job, where this service can parse what its record holds.
 
@@ -424,7 +438,7 @@ class JobAnswers:
         # The envelope leaves the sources out, and the answers compose with them.
         sources = await store.sources(job_id, owner_id)
         if sources is None:
-            raise NoSuchJob(job_id)
+            await self.missing(record, "sources")
         record.sources = sources
         if record.status == "awaiting-answers":
             # The questions are read off what the head built, so they answer
@@ -434,8 +448,7 @@ class JobAnswers:
                 raise Withheld(result)
             held = await store.checkpoint(job_id, owner_id)
             if held is None:
-                logger.error("waiting job %s holds no checkpoint", record.id)
-                raise JobDataMissing(record.id)
+                await self.missing(record, "checkpoint")
             resumed_by = await store.resumed_by(job_id, owner_id)
             return Answerable(
                 record, held.system_model, held.assertions, [], resumed_by
@@ -443,8 +456,7 @@ class JobAnswers:
         self.servable(record)
         report = await store.report(job_id, owner_id)
         if report is None:
-            logger.error("completed job %s has no report attached", record.id)
-            raise JobDataMissing(record.id)
+            await self.missing(record, "report")
         # The envelope leaves the resumption out, and it says whether the
         # report is final: a report its follow-up wrote asks nothing (ADR 0054).
         record.resumption = await store.resumption(job_id, owner_id)

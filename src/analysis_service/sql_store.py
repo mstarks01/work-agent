@@ -18,7 +18,9 @@ The rules this module keeps:
 * **A digest check on each object read.** A missing object, or one whose
   digest does not match its row, raises :class:`CorruptObject` after one log
   line with the job ID and the owner ID, and the API answers ``500`` with no
-  detail.
+  detail. A read can find a row, and then a delete can remove the row and its
+  objects before the read gets an object. So where an object is missing, the
+  read reads the row again, and a row that is gone reads as a missing job.
 * **The service writes a report once.** A save never writes a second report
   over the one a row names.
 * **One code path for each database.** SQLAlchemy 2.0 async Core, with the
@@ -85,6 +87,7 @@ from typing_extensions import override
 
 from analysis_service import migrations
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.aws_identity import platform_session
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import UnknownKey
 from analysis_service.fact_answers import FactAnswer, SkipKey
@@ -418,18 +421,18 @@ class DatabaseIam:
 def _rds_token(url: URL, env: Mapping[str, str]) -> Callable[[], Awaitable[str]]:
     """An RDS IAM token for each new connection (#1525).
 
-    ``boto3`` signs the token locally with the credentials that its chain
-    finds. A token lasts 15 minutes, and RDS checks it only when a connection
-    opens. The signature runs in a worker thread, because the first one can
-    fetch the credentials over the network. ``url`` holds the port that the
-    connection uses (:func:`_postgres`).
+    ``boto3`` signs the token locally with the credentials of the platform
+    identity (:func:`~analysis_service.aws_identity.platform_session`), so a
+    static key pair stops the startup. A token lasts 15 minutes, and RDS
+    checks it only when a connection opens. The signature runs in a worker
+    thread, because a refresh of the credentials goes over the network.
+    ``url`` holds the port that the connection uses (:func:`_postgres`).
     """
     region = env.get(_REGION, "").strip()
     if not region:
         raise StoreConfigError(f"set {_REGION} for an RDS IAM token")
-    import boto3
-
-    client = boto3.client("rds", region_name=region)
+    session = platform_session("the rds token of the database")
+    client = session.client("rds", region_name=region)
 
     async def token() -> str:
         return await asyncio.to_thread(
@@ -803,9 +806,23 @@ class SqlJobStore:
             )
         await self._objects.check()
 
-    async def _object(self, row: Row[Any], name: ObjectName, digest: str) -> bytes:
-        """The object ``name`` of the job ``row`` names, checked against ``digest``."""
+    async def _object(
+        self, row: Row[Any], name: ObjectName, digest: str
+    ) -> bytes | None:
+        """The object ``name`` of the job ``row`` names, checked against ``digest``.
+
+        ``None`` where the object is missing because a delete removed the row
+        after the caller read it. A delete changes the row first, so a row
+        that is still there names an object that must be there.
+        """
         data = await self._objects.get(object_key(row.owner_id, row.id, name))
+        if data is None:
+            async with self._transaction() as connection:
+                held = await connection.scalar(
+                    select(jobs.c.id).where(jobs.c.id == row.id)
+                )
+            if held is None:
+                return None
         if data is None or not hmac.compare_digest(object_digest(data), digest):
             logger.error(
                 "job %s of owner %s: its %s object is missing or fails its digest"
@@ -927,12 +944,16 @@ class SqlJobStore:
             parent = parent_of(record)
             if parent is not None:
                 await self._lock(connection, parent)
+                revision = await connection.scalar(
+                    select(jobs.c.revision).where(
+                        jobs.c.id == parent, jobs.c.owner_id == record.owner_id
+                    )
+                )
+                if revision is None:
+                    return Admission(outcome="parent_missing", active=0)
                 if await self._resumed_by(connection, parent) is not None:
                     return Admission(outcome="resumed_already", active=0)
-                revision = await connection.scalar(
-                    select(jobs.c.revision).where(jobs.c.id == parent)
-                )
-                if revision is not None and revision != record.parent_revision:
+                if revision != record.parent_revision:
                     return Admission(outcome="parent_moved", active=0)
             counted = await connection.execute(_counted(budget.window_start()))
             held = [UsageRow(**row._mapping) for row in counted]
@@ -993,9 +1014,13 @@ class SqlJobStore:
         if not whole:
             return _record(row, None, None, texts)
         sources = await self._object(row, "sources.json", row.sources_sha256)
+        if sources is None:
+            return None
         report = None
         if _names(row, "report.json"):
             report = await self._object(row, "report.json", row.report_sha256)
+            if report is None:
+                return None
         return _record(row, sources, report, texts)
 
     async def get(self, job_id: str) -> JobRecord | None:
@@ -1022,7 +1047,7 @@ class SqlJobStore:
         if row is None:
             return None
         data = await self._object(row, "sources.json", row.sources_sha256)
-        return _SOURCES.validate_json(data)
+        return None if data is None else _SOURCES.validate_json(data)
 
     async def _report(self, job_id: str, owner_id: str) -> bytes | None:
         async with self._transaction() as connection:

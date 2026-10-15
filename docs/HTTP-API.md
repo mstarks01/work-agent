@@ -892,7 +892,9 @@ that CA only. For Amazon RDS, give it the RDS `global-bundle.pem`.
   each child process.
 - `iam`: the deployment holds no password. `ANALYSIS_DATABASE_IAM` names the
   provider of the token. The provider today is `rds`: the service signs an
-  Amazon RDS IAM token with the AWS credentials of its platform identity. It
+  Amazon RDS IAM token with the AWS credentials of its platform identity.
+  The service accepts the same identities as the `iam` mode of the `s3`
+  object store, and refuses the same static credentials. It
   needs `ANALYSIS_DATABASE_REGION` and the `aws` extra
   (`pip install 'analysis-service[sql,aws]'`). Without the extra, the startup
   stops with a message that names it. The database user needs the
@@ -960,8 +962,12 @@ for a store that does not resolve `<bucket>.<host>`.
 `ANALYSIS_OBJECT_CREDENTIALS` declares the credential mode:
 
 - `iam`: the service gives no key. `boto3` finds the identity in its own
-  chain, for example a role that the platform attaches to the service. A key
-  file setting stops the startup.
+  chain, and the service accepts only an identity that the platform issues:
+  the role of an ECS task or an EKS pod, the role of an EC2 instance, or a
+  web identity token (`AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_ROLE_ARN`). A
+  static key pair in `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, a
+  profile, an SSO login and a credential process each stop the startup. So
+  does a key file setting.
 - `api_key`: the service reads a static key pair from two files.
   `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE` names the file that holds the access
   key ID, and `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` names the file that

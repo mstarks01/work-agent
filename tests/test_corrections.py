@@ -31,16 +31,26 @@ def finished(store, *, final: bool = True) -> str:
     from tests.test_api import admit
 
     report = sample_report([asking_threat(ASKED)])
+    parent = JobRecord.create(
+        owner_id="alice",
+        sources=[Source.description(DESCRIPTION_TEXT)],
+        frameworks=sample_selection(),
+    )
+    parent.transition("running")
+    parent.report = report
+    parent.transition("completed")
+    asyncio.run(admit(store, parent))
     record = JobRecord.create(
         owner_id="alice",
         sources=[Source.description(DESCRIPTION_TEXT)],
         frameworks=sample_selection(),
         answers=AnswerSet(facts=(ANSWER,)),
         resumption=Resumption(
-            parent_id="parent",
+            parent_id=parent.id,
             checkpoint=Checkpoint(system_model=report.system_model, assertions=None),
             follow_up=final,
         ),
+        parent_revision=parent.revision,
     )
     record.transition("running")
     record.report = report

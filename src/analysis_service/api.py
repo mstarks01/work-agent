@@ -506,8 +506,7 @@ async def _servable_report(
     store: JobStore = request.app.state.store
     payload = await store.report_json(job_id, owner_id)
     if payload is None:
-        logger.error("completed job %s has no report attached", record.id)
-        raise HTTPException(status_code=500, detail="an internal error occurred")
+        await answers.missing(record, "report")
     return payload
 
 
@@ -636,8 +635,9 @@ def _status_view(record: JobRecord) -> JobStatusView:
 # A table because the machinery has one entry per bound, which is what
 # ``AGENTS.md`` says to key — and because a missing key raises here rather than
 # falling through to a message about the wrong bound. Each entry carries its
-# status: a bound that clears with time is a 429, and a job that already has
-# its resumed job is a 409.
+# status: a bound that clears with time is a 429, a job that already has its
+# resumed job is a 409, and a parent that a delete removed reads as a missing
+# job, with its 404.
 _REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
     "at_ceiling": (
         429,
@@ -682,6 +682,7 @@ _REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
             " questions again"
         ),
     ),
+    "parent_missing": (404, lambda admission, ceiling: "job not found"),
     "principal_exists": (
         409,
         lambda admission, ceiling: (
@@ -1059,7 +1060,8 @@ def create_app(
         than this service's.
         """
         answers = _answers(request)
-        answers.servable(await answers.parsable(job_id, owner_id))
+        record = await answers.parsable(job_id, owner_id)
+        answers.servable(record)
         store: JobStore = request.app.state.store
         # The envelope leaves the resumption out, so it is read by name.
         resumption = await store.resumption(job_id, owner_id)
@@ -1070,17 +1072,18 @@ def create_app(
             )
         try:
             parent = await answers.parsable(resumption.parent_id, owner_id)
+            answers.servable(parent)
+            before = await store.report(parent.id, owner_id)
+            if before is None:
+                await answers.missing(parent, "report")
         except NoSuchJob:
             raise HTTPException(
                 status_code=409,
                 detail="the report this follow-up's answers came from is no longer held",
             ) from None
-        answers.servable(parent)
-        before = await store.report(resumption.parent_id, owner_id)
         after = await store.report(job_id, owner_id)
-        if before is None or after is None:
-            logger.error("follow-up %s or its parent has no report attached", job_id)
-            raise HTTPException(status_code=500, detail="an internal error occurred")
+        if after is None:
+            await answers.missing(record, "report")
         changes = await anyio.to_thread.run_sync(report_changes, before, after)
         return JSONResponse(
             {

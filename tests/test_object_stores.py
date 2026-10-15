@@ -10,16 +10,19 @@ API in the test process, so no test reaches a network.
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import get_args
 
 import boto3
 import pytest
 from moto.core import set_initial_no_auth_action_count
 
+from analysis_service.aws_identity import PLATFORM_METHODS, platform_session
 from analysis_service.objects import (
     ObjectStore,
     ObjectStoreName,
@@ -107,6 +110,53 @@ def test_the_filesystem_listing_enters_and_holds_no_symbolic_link(tmp_path):
     (root / "linked-owner").symlink_to(outside / SOURCES.split("/")[0])
     (root / KEY).parent.joinpath("sources.json").symlink_to(outside / SOURCES)
     assert set(asyncio.run(listing(objects))) == {KEY}
+
+
+class TestTheFilesystemFollowsNoLink:
+    """No put, read or delete passes through a symbolic link at a folder of a
+    key, so none reaches the files the link points to."""
+
+    @pytest.fixture(params=["owner", "job"])
+    def linked(self, request, tmp_path):
+        """A store whose owner folder or job folder of ``KEY`` is a link to a
+        folder outside the root that holds ``KEY``'s file."""
+        outside = tmp_path / "outside"
+        (outside / KEY).parent.mkdir(parents=True)
+        (outside / KEY).write_bytes(b"secret")
+        objects = build_object_store(filesystem_env(tmp_path))
+        owner, job, _ = KEY.split("/")
+        root = tmp_path / "objects"
+        if request.param == "owner":
+            (root / owner).symlink_to(outside / owner)
+        else:
+            (root / owner).mkdir(mode=0o700)
+            (root / owner / job).symlink_to(outside / owner / job)
+        return objects, outside
+
+    def files(self, outside: Path) -> dict[str, bytes]:
+        return {
+            path.relative_to(outside).as_posix(): path.read_bytes()
+            for path in outside.rglob("*")
+            if path.is_file()
+        }
+
+    def test_a_put_is_refused(self, linked):
+        objects, outside = linked
+        beside = KEY.replace("report.json", "sources.json")
+        with pytest.raises(OSError):
+            asyncio.run(objects.put(beside, b"data"))
+        assert self.files(outside) == {KEY: b"secret"}
+
+    def test_a_read_is_refused(self, linked):
+        objects, _ = linked
+        with pytest.raises(OSError):
+            asyncio.run(objects.get(KEY))
+
+    def test_a_delete_is_refused(self, linked):
+        objects, outside = linked
+        with pytest.raises(OSError):
+            asyncio.run(objects.delete(KEY))
+        assert self.files(outside) == {KEY: b"secret"}
 
 
 def test_the_s3_listing_reads_every_page(env):
@@ -202,23 +252,69 @@ class TestTheSettings:
     def test_a_usable_store_starts(self, env, addressing):
         start(changed(env, {"ANALYSIS_OBJECT_ADDRESSING": addressing}))
 
-    def test_iam_reads_the_identity_of_the_platform(self, env):
-        """moto puts a key pair in the environment, as a platform would."""
-        start(
-            changed(
-                env,
-                {
-                    "ANALYSIS_OBJECT_CREDENTIALS": "iam",
-                    **dict.fromkeys(KEY_FILES.values()),
-                },
-            )
-        )
-
     def test_an_endpoint_from_the_environment_is_ignored(self, env, monkeypatch):
         """``boto3`` would send each request to it, and pass by the https check."""
         monkeypatch.setenv("AWS_ENDPOINT_URL", "http://127.0.0.1:9")
         monkeypatch.setenv("AWS_ENDPOINT_URL_S3", "http://127.0.0.1:9")
         start(env)
+
+
+def iam(env: dict[str, str]) -> dict[str, str]:
+    """``env`` in the ``iam`` mode, with no key file."""
+    return changed(
+        env,
+        {"ANALYSIS_OBJECT_CREDENTIALS": "iam", **dict.fromkeys(KEY_FILES.values())},
+    )
+
+
+class TestTheIamMode:
+    """``iam`` reads only a credential that a platform issued."""
+
+    def test_a_web_identity_starts(self, env, no_static_key, monkeypatch, tmp_path):
+        """moto serves ``AssumeRoleWithWebIdentity`` in the test process."""
+        token = tmp_path / "token"
+        token.write_text("a-workload-token")
+        monkeypatch.setenv("AWS_WEB_IDENTITY_TOKEN_FILE", str(token))
+        monkeypatch.setenv("AWS_ROLE_ARN", "arn:aws:iam::123456789012:role/analysis")
+        start(iam(env))
+
+    def test_a_static_pair_in_the_environment_stops_the_startup(self, env):
+        """moto puts a static key pair in the environment."""
+        with pytest.raises(StoreConfigError, match="found credentials from env$"):
+            build_store(iam(env))
+
+    def test_a_static_profile_stops_the_startup(
+        self, env, no_static_key, monkeypatch, tmp_path
+    ):
+        profile = tmp_path / "credentials"
+        profile.write_text(
+            "[default]\n"
+            f"aws_access_key_id = {TEST_KEYS['aws_access_key_id']}\n"
+            f"aws_secret_access_key = {TEST_KEYS['aws_secret_access_key']}\n"
+        )
+        monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(profile))
+        with pytest.raises(
+            StoreConfigError, match="found credentials from shared-credentials-file$"
+        ) as refused:
+            build_store(iam(env))
+        assert TEST_KEYS["aws_secret_access_key"] not in str(refused.value)
+
+    def test_no_credentials_stop_the_startup(self, env, no_static_key):
+        with pytest.raises(StoreConfigError, match="found no credentials$"):
+            build_store(iam(env))
+
+    @pytest.mark.parametrize("method", sorted(PLATFORM_METHODS))
+    def test_each_platform_method_passes(self, method, monkeypatch):
+        credentials = SimpleNamespace(method=method)
+        monkeypatch.setattr(boto3.Session, "get_credentials", lambda _: credentials)
+        assert platform_session("a label").get_credentials() is credentials
+
+    def test_the_api_key_mode_reads_the_files(self, env):
+        """moto's pair in the environment differs from the pair in the files."""
+        assert os.environ["AWS_ACCESS_KEY_ID"] != TEST_KEYS["aws_access_key_id"]
+        store = build_object_store(env)
+        frozen = store._client._request_signer._credentials.get_frozen_credentials()
+        assert frozen.access_key == TEST_KEYS["aws_access_key_id"]
 
 
 class TestTheStartupCheck:

@@ -78,6 +78,16 @@ def moto_s3(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         yield
 
 
+@pytest.fixture
+def no_static_key(moto_s3: None) -> Iterator[None]:
+    """Remove the key pair that moto puts in the environment, and put it back
+    before moto restores the environment."""
+    names = ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN")
+    held = {name: os.environ.pop(name) for name in names if name in os.environ}
+    yield
+    os.environ.update(held)
+
+
 @pytest.fixture(scope="session")
 def corpus_case():
     """The first corpus case, loaded once, for the tests that drive a real one.
