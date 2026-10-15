@@ -44,6 +44,7 @@ from analysis_service.early_questions import capability_questions
 from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.fact_writes import answered_model
 from analysis_service.frameworks import PACKAGES
+from analysis_service.parsing import signer
 from analysis_service.system_model import CapabilityStatement, SystemModel
 
 __all__ = [
@@ -93,18 +94,17 @@ class FixtureError(ValueError):
     """A fixture no reader can trust, naming the file and the field."""
 
 
-def _checked(path: Path, raw: Mapping[str, Any]) -> None:
+def _refuse_untrusted(path: Path, raw: Mapping[str, Any]) -> None:
     """Refuse a fixture whose signer, labels or truth no reader can trust.
 
     A blank signer reads as signed, a label outside the rule's states counts as
     neither right nor wrong, and a truth key that names no capability answers
     nothing.
     """
-    signed_by = raw["signed_by"]
-    if signed_by is not None and (
-        not isinstance(signed_by, str) or (signed_by and not signed_by.strip())
-    ):
-        raise FixtureError(f"{path}: signed_by {signed_by!r} names nobody")
+    try:
+        signer(raw["signed_by"])
+    except ValueError as exc:
+        raise FixtureError(f"{path}: {exc}") from exc
     for field in ("expected", "truth"):
         if not isinstance(raw.get(field, {}), dict):
             raise FixtureError(f"{path}: {field} is not an object")
@@ -129,7 +129,7 @@ def load_fixtures(directory: Path = FIXTURES_DIR) -> tuple[Fixture, ...]:
     fixtures = []
     for path in sorted(directory.glob("*.json")):
         raw = json.loads(path.read_text(encoding="utf-8"))
-        _checked(path, raw)
+        _refuse_untrusted(path, raw)
         fixtures.append(
             Fixture(
                 name=path.stem,

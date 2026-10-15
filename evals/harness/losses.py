@@ -76,6 +76,7 @@ from typing import Any, Literal, get_args
 
 from analysis_service.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.parsing import strings
 from evals.harness.identity import FlowMap, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore, Standing
@@ -325,8 +326,7 @@ def _proposed_at(
         for claim in claims
         if isinstance(claim, dict)
         and isinstance(claim.get("verb"), str)
-        and isinstance(claim.get("affected_element_ids"), list)
-        and all(isinstance(ref, str) for ref in claim["affected_element_ids"])
+        and strings(claim.get("affected_element_ids"))
         and same_action(claim["verb"], verb)
         and endpoint_subset(reference_ids, claim["affected_element_ids"], flows)
     ]

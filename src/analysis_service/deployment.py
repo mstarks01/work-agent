@@ -413,7 +413,7 @@ class Deployment:
             capability_reader=(
                 self.capability_reader
                 and entry in READING_ENTRIES
-                and any(reads_capabilities(name) for name in selection)
+                and reads_capabilities(selection)
             ),
         )
 

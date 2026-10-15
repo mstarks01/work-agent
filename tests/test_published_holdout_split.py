@@ -1,12 +1,12 @@
 """The published page prints held-out figures apart from development ones (#1093).
 
-A figure pooled over tuned and held-out cases lets a fix shaped by the tuned
-cases borrow the held-out ones' credit. Each published reader therefore takes
-a :class:`~evals.harness.instruments.Cases` and counts only what it selects,
-and the page prints one table per selection. The tests drive each reader on a
-sweep that holds one held-out case, then the page, then hold the per-row
-readers against the sweep's own aggregates on the sealed Baselines, where no
-case is held out and the two must agree.
+A figure pooled over development and held-out cases lets a fix shaped by the
+development cases borrow the held-out ones' credit. Each published reader
+therefore takes a :class:`~evals.harness.instruments.Cases` and counts only
+what it selects, and the page prints one table per part. The tests drive
+each reader on a sweep that holds one held-out case, then the page, then hold
+the per-row readers against the sweep's own aggregates on the sealed
+Baselines, where no case is held out and the two must agree.
 """
 
 from __future__ import annotations

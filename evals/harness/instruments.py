@@ -273,7 +273,7 @@ class Cases:
     """Which of a sweep's cases one published figure reads.
 
     The table prints development figures and held-out figures apart (#1093).
-    A figure pooled over both would let a fix shaped by the tuned cases borrow
+    A figure pooled over both would let a fix shaped by the development cases borrow
     the held-out ones' credit, so every reader takes this and counts only the
     cases it selects.
     """

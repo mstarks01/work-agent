@@ -1020,10 +1020,10 @@ def diagnosable(case: GoldenCase) -> bool:
     # Imported here because the audit module loads the corpus through this one.
     from evals.harness.audit import held_out
 
-    return not held_out(case.id, case.meta.holdout)
+    return not held_out(case.id, flagged=case.meta.holdout)
 
 
-def tuning_cases(cases: Sequence[GoldenCase]) -> tuple[GoldenCase, ...]:
+def development_cases(cases: Sequence[GoldenCase]) -> tuple[GoldenCase, ...]:
     """The cases a diagnosis command reads: every case but the holdout ones."""
     return tuple(case for case in cases if diagnosable(case))
 

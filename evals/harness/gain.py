@@ -172,7 +172,7 @@ READERS: Mapping[FrameworkName, Readers] = MappingProxyType(
 
 
 @dataclass(frozen=True)
-class Selection:
+class CaseSplit:
     """Which cases one reading counts in each artifact, and what it says of them."""
 
     held_out: bool
@@ -186,13 +186,13 @@ class Selection:
         return "held-out cases" if self.held_out else "development cases"
 
 
-def select(
+def split(
     baseline: Mapping[str, Any],
     candidate: Mapping[str, Any],
     *,
     held_out: bool,
     ledger: Sequence[audit.Experiment] | None = None,
-) -> Selection:
+) -> CaseSplit:
     """The cases a reading counts, through the one reader of the split.
 
     A development reading counts an exhausted holdout and names it. A held-out
@@ -207,7 +207,7 @@ def select(
     }
     if not held_out:
         line = audit.exhausted_line(flagged, ledger)
-        return Selection(
+        return CaseSplit(
             held_out=False,
             baseline=Cases(held["baseline"], holdout=False),
             candidate=Cases(held["candidate"], holdout=False),
@@ -239,7 +239,7 @@ def select(
             for case in read
         )
     )
-    return Selection(
+    return CaseSplit(
         held_out=True,
         baseline=Cases(held["baseline"], holdout=True),
         candidate=Cases(held["candidate"], holdout=True),
@@ -294,14 +294,14 @@ def read(
     *,
     spread: Mapping[str, float] = MappingProxyType({}),
     held_out: bool = False,
-) -> tuple[Reading, ...]:
-    """Every gate, read on each artifact's development or held-out cases.
+) -> tuple[tuple[Reading, ...], CaseSplit]:
+    """Every gate, read on each artifact's development or held-out cases, and the split.
 
     Raises :class:`IncomparableError` first where the two do not compare, and
     :class:`RefusedError` where a held-out reading has no case to read.
     """
     refuse_incomparable(baseline, candidate)
-    cases = select(baseline, candidate, held_out=held_out)
+    cases = split(baseline, candidate, held_out=held_out)
     readings = []
     for name, gate in GATES.items():
         reader = _reader(framework, name)
@@ -315,7 +315,7 @@ def read(
         before = reader(baseline, cases.baseline)
         after = reader(candidate, cases.candidate)
         readings.append(_decide(name, gate, before, after, spread.get(name)))
-    return tuple(readings)
+    return tuple(readings), cases
 
 
 def _decide(
@@ -353,7 +353,7 @@ def _decide(
 
 
 def render(
-    readings: Sequence[Reading], framework: FrameworkName, cases: Selection
+    readings: Sequence[Reading], framework: FrameworkName, cases: CaseSplit
 ) -> str:
     """The gate table, as text. It reports no promotion of its own."""
     lines = [
@@ -423,10 +423,9 @@ def command_gain(args: argparse.Namespace) -> int:
         print(f"cannot read: {error}", file=sys.stderr)
         return 1
     try:
-        readings = read(
+        readings, cases = read(
             baseline, candidate, args.framework, spread=spread, held_out=args.held_out
         )
-        cases = select(baseline, candidate, held_out=args.held_out)
     except RefusedError as error:
         print(f"refused: {error}", file=sys.stderr)
         return 1

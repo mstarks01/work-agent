@@ -70,7 +70,7 @@ from evals.harness.calibration import (
     measure_merges,
 )
 from evals.harness.identity import MechanicalIdentity, SubsetVerbIdentity
-from evals.harness.reference import flows_by_case, load_corpus, tuning_cases
+from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.replay import unsigned_rows
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -254,7 +254,7 @@ def _exemplar_verbs() -> Mapping[str, object]:
         "undemonstrated": len(rows),
         "must_find": sum(1 for row in rows if row.tier == "must-find"),
         "cases": len({row.case for row in rows}),
-        "tuned": len(tuning_cases(corpus)),
+        "development": len(development_cases(corpus)),
         "near": len(near),
         "alone": len(alone),
         "first": by_verb.most_common(1)[0][1],
@@ -659,7 +659,8 @@ FIGURES: tuple[Figure, ...] = (
                 "evals/harness/exemplar_verbs.py",
                 (
                     "{must_find} of the {undemonstrated} are ``must-find``, and"
-                    " {cases} of the {tuned} tuned cases carry at least one."
+                    " {cases} of the {development} development cases carry at"
+                    " least one."
                 ),
                 1,
             ),

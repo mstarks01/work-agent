@@ -67,7 +67,7 @@ class TestTheNegativeControl:
             _gained(_baseline(), added=6, voted=False),
             "stride",
             spread=SPREAD,
-        )
+        )[0]
 
         verdicts = _verdicts(readings)
         assert verdicts["volume"] == "fail"
@@ -80,7 +80,7 @@ class TestTheNegativeControl:
             _gained(_baseline(), added=6, voted=True),
             "stride",
             spread=SPREAD,
-        )
+        )[0]
 
         assert _verdicts(readings)["volume"] == "fail"
 
@@ -89,7 +89,9 @@ class TestTheNegativeControl:
         for row in candidate["scores"]:
             row["metrics"]["rejected_rate"] += 0.2
 
-        verdicts = _verdicts(gain.read(_baseline(), candidate, "stride", spread=SPREAD))
+        verdicts = _verdicts(
+            gain.read(_baseline(), candidate, "stride", spread=SPREAD)[0]
+        )
         assert verdicts["rejected-rate"] == "fail"
 
 
@@ -100,7 +102,7 @@ class TestThePositiveControl:
             _gained(_baseline(), added=0, voted=True),
             "stride",
             spread=SPREAD,
-        )
+        )[0]
 
         assert set(_verdicts(readings).values()) == {"pass"}
 
@@ -110,14 +112,14 @@ class TestThePositiveControl:
             _gained(_baseline(), added=1, voted=True),
             "stride",
             spread=SPREAD,
-        )
+        )[0]
 
         assert _verdicts(readings)["volume"] == "pass"
 
 
 class TestAnUnreadGateIsNotAPass:
     def test_without_a_spread_the_sd_gates_are_unread(self):
-        verdicts = _verdicts(gain.read(_baseline(), _baseline(), "stride"))
+        verdicts = _verdicts(gain.read(_baseline(), _baseline(), "stride")[0])
 
         assert verdicts["volume"] == "inconclusive"
         assert verdicts["rejected-rate"] == "inconclusive"
@@ -126,11 +128,11 @@ class TestAnUnreadGateIsNotAPass:
         """The sealed artifact counts its findings unvoted, so the gain waits."""
         raw = json.loads(SEALED.read_text("utf-8"))
 
-        assert _verdicts(gain.read(raw, raw, "stride"))["reviewed"] == "fail"
+        assert _verdicts(gain.read(raw, raw, "stride")[0])["reviewed"] == "fail"
 
     def test_a_package_with_no_vote_reading_says_so(self):
         readings = {
-            one.gate: one for one in gain.read(SAME, SAME, "asvs", spread=SPREAD)
+            one.gate: one for one in gain.read(SAME, SAME, "asvs", spread=SPREAD)[0]
         }
 
         assert readings["reviewed"].verdict == "inconclusive"
@@ -147,7 +149,7 @@ class TestAnUnreadGateIsNotAPass:
         trimmed = copy.deepcopy(baseline)
         trimmed["scores"] = baseline["scores"][1:]
 
-        verdicts = _verdicts(gain.read(trimmed, candidate, "stride", spread=SPREAD))
+        verdicts = _verdicts(gain.read(trimmed, candidate, "stride", spread=SPREAD)[0])
         assert verdicts["volume"] == "pass"
         assert verdicts["reviewed"] == "pass"
 
@@ -165,7 +167,7 @@ def test_the_asvs_volume_reads_what_the_run_applied_unlisted():
         ],
     }
 
-    readings = gain.read(blocks, blocks, "asvs", spread=SPREAD)
+    readings = gain.read(blocks, blocks, "asvs", spread=SPREAD)[0]
     assert {one.gate: one.measured for one in readings}["volume"] == 1.5
 
 
@@ -216,20 +218,22 @@ class TestAnIncomparablePairIsRefused:
     def test_a_part_that_differs_is_refused_by_name(self, part, value):
         part_name = "corpus" if part == "corpus_digest" else part
         with pytest.raises(gain.IncomparableError, match=part_name):
-            gain.read(SAME, {**SAME, part: value}, "stride", spread=SPREAD)
+            gain.read(SAME, {**SAME, part: value}, "stride", spread=SPREAD)[0]
 
     def test_a_pair_nobody_can_show_comparable_is_refused(self):
         with pytest.raises(gain.IncomparableError, match="corpus None"):
-            gain.read({}, {}, "stride", spread=SPREAD)
+            gain.read({}, {}, "stride", spread=SPREAD)[0]
 
     def test_a_re_scored_artifact_compares_on_the_corpus_it_was_scored_on(self):
         """The figures follow ``scored``, so a re-score on one corpus compares."""
         moved = "e" * 64
         rescored = {**SAME, "scored": {"corpus_digest": moved}}
 
-        gain.read(rescored, {**SAME, "corpus_digest": moved}, "stride", spread=SPREAD)
+        gain.read(rescored, {**SAME, "corpus_digest": moved}, "stride", spread=SPREAD)[
+            0
+        ]
         with pytest.raises(gain.IncomparableError, match="corpus"):
-            gain.read(rescored, SAME, "stride", spread=SPREAD)
+            gain.read(rescored, SAME, "stride", spread=SPREAD)[0]
 
     def test_the_sealed_baselines_on_two_corpora_are_refused(self):
         """The real case: two merged Baselines that sit in different groups."""
@@ -241,7 +245,7 @@ class TestAnIncomparablePairIsRefused:
             ).read_text("utf-8")
         )
         with pytest.raises(gain.IncomparableError, match="corpus"):
-            gain.read(older, _baseline(), "stride", spread=SPREAD)
+            gain.read(older, _baseline(), "stride", spread=SPREAD)[0]
 
     def test_the_command_refuses_and_exits_non_zero(self, tmp_path, capsys):
         path = tmp_path / "candidate.json"
@@ -322,9 +326,11 @@ class TestHeldOutConfirmation:
         baseline = _flagged(_baseline(), *HELD)
         candidate = self._flood(baseline, HELD[0])
 
-        development = _verdicts(gain.read(baseline, candidate, "stride", spread=SPREAD))
+        development = _verdicts(
+            gain.read(baseline, candidate, "stride", spread=SPREAD)[0]
+        )
         held = _verdicts(
-            gain.read(baseline, candidate, "stride", spread=SPREAD, held_out=True)
+            gain.read(baseline, candidate, "stride", spread=SPREAD, held_out=True)[0]
         )
 
         assert development["volume"] == "pass"
@@ -336,7 +342,7 @@ class TestHeldOutConfirmation:
         candidate = self._flood(baseline, "01-payments-checkout")
 
         held = _verdicts(
-            gain.read(baseline, candidate, "stride", spread=SPREAD, held_out=True)
+            gain.read(baseline, candidate, "stride", spread=SPREAD, held_out=True)[0]
         )
 
         assert held["volume"] == "pass"
@@ -346,13 +352,13 @@ class TestHeldOutConfirmation:
         baseline = _flagged(_baseline(), *HELD)
         candidate = self._flood(baseline, HELD[0])
 
-        selection = gain.select(baseline, candidate, held_out=True)
+        split = gain.split(baseline, candidate, held_out=True)
         held = _verdicts(
-            gain.read(baseline, candidate, "stride", spread=SPREAD, held_out=True)
+            gain.read(baseline, candidate, "stride", spread=SPREAD, held_out=True)[0]
         )
 
-        assert HELD[0] not in selection.candidate.held_out
-        assert any(f"refused: {HELD[0]} is exhausted" in one for one in selection.notes)
+        assert HELD[0] not in split.candidate.held_out
+        assert any(f"refused: {HELD[0]} is exhausted" in one for one in split.notes)
         assert held["volume"] == "pass"
 
     def test_no_case_left_to_confirm_on_is_refused(self, ledger):
@@ -360,7 +366,7 @@ class TestHeldOutConfirmation:
         baseline = _flagged(_baseline(), HELD[0])
 
         with pytest.raises(gain.RefusedError, match="no held-out case"):
-            gain.read(baseline, baseline, "stride", spread=SPREAD, held_out=True)
+            gain.read(baseline, baseline, "stride", spread=SPREAD, held_out=True)[0]
 
     def test_the_command_tells_the_user_to_record_each_read(
         self, ledger, tmp_path, capsys

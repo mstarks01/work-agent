@@ -86,6 +86,7 @@ from typing import Any, Literal, get_args
 
 from analysis_service.frameworks import FrameworkName
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
+from analysis_service.parsing import strings
 from evals.harness.identity import (
     ClaimPair,
     DirectionState,
@@ -297,7 +298,7 @@ class CalibrationResult:
 def _strings(entry: Mapping[str, Any], name: str) -> tuple[str, ...]:
     """A list of strings as a tuple; a string or other shape raises ``TypeError``."""
     value = entry[name]
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+    if not strings(value):
         raise TypeError(f"{name} is not a list of strings")
     return tuple(value)
 

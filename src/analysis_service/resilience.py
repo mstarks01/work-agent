@@ -104,6 +104,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.config_files import read_toml
+from analysis_service.parsing import is_version
 from analysis_service.retry import RetryBudget, RetryPolicy
 from analysis_service.sources import SourceLimits
 from analysis_service.vendors import UPSTREAM_SLUG
@@ -327,7 +328,7 @@ def load_resilience(
     raw = read_toml(path, ResilienceConfigError)
 
     version = raw.get("version")
-    if type(version) is not int or version != SUPPORTED_VERSION:
+    if not is_version(version, SUPPORTED_VERSION):
         raise ResilienceConfigError(
             f"{path}: unsupported version {version!r};"
             f" expected {SUPPORTED_VERSION}, which carries 'attempts',"

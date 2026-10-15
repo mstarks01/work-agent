@@ -24,7 +24,7 @@ grouping makes the invalid comparison hard to make by accident.
 
 Held-out cases print apart. Each framework block has a table over the
 development cases and a table over the held-out ones, and no figure pools the
-two. A fix shaped by the tuned cases would otherwise borrow the held-out
+two. A fix shaped by the development cases would otherwise borrow the held-out
 cases' credit, and the page could not show it (#1093).
 
 A spread prints beside every mean. ``TUNING.md`` records three findings
@@ -137,7 +137,7 @@ def _series_blocks(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def flagged_cases(blocks: Mapping[str, Any]) -> frozenset[str]:
     """Every case a sweep scored as a holdout, by the flag on its own rows.
 
-    Read from the rows rather than from today's corpus, because a tuned case
+    Read from the rows rather than from today's corpus, because a development case
     can be flagged after the sweep ran, and the sweep's figure was taken under
     the flag it carried then. Framework-neutral: any per-case block whose rows
     carry ``holdout`` answers. A row written before the field existed carries
@@ -161,10 +161,7 @@ def held_out_cases(
     (:func:`~evals.harness.audit.held_out`). ``None`` reads the ledger on
     record.
     """
-    ledger = audit.load() if ledger is None else ledger
-    return frozenset(
-        case for case in flagged_cases(blocks) if audit.held_out(case, True, ledger)
-    )
+    return audit.still_held_out(flagged_cases(blocks), ledger)
 
 
 def _format(values: list[float]) -> str:
@@ -229,7 +226,7 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
         for blocks in sweeps
         for case in flagged_cases(blocks)
     )
-    held_out = frozenset(case for case in flagged if audit.held_out(case, True, ledger))
+    held_out = audit.still_held_out(flagged, ledger)
     spent = audit.exhausted(ledger)
     cells: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
     for series, sweeps in per_series.items():

@@ -227,7 +227,7 @@ somewhere else.
 | `harness/early_policies.py` | Compares orders of early questions for a job that selects more than one framework. Each framework is scored on its own archived reports, with every framework the case's reports hold selected. At each budget of owner choices it counts the conditional findings whose every open fact is answered, and the units whose every missing capability is answered. The orders are a table, `POLICIES`: the shipped list, two merges of each framework's own ranking, and `group-question`, which charges a group's parts once for every element a list shows it for (ADR 0081). `run.py early-policies`, no credentials. |
 | `harness/schema_paths.py` | Counts, per node, how its schema reached the provider (`schema_path`), each refusal that moved its tier down the ladder (`schema_fallback`) and its schema re-asks (`reasks`), over every archived report under `--root` (ADR 0058). A report written before those fields existed reads as no schema and no re-ask. `run.py schema-paths`, no credentials. |
 | `harness/early_rounds.py` | Replays rounds of early questions on archived extracted models, with the service's own question set, admission and writer. Four answerers answer each round: from the case's blessed model, every capability yes or no, and every control none or a named mechanism. It counts the questions at the floor at the start, those asked in all, and those an answer added or took away. `run.py early-rounds`, no credentials. |
-| `harness/question_prior.py` | Counts the early-question prior: how often a framework's findings cite each attribute or question kind, per element of one type, over a sweep's tuned cases. It reads the reports' verdicts, or with `--replay` the rulings of critic replays of that sweep. It writes that framework's row of `src/analysis_service/question_prior.json` with the runs it read, and keeps the other rows. `run.py question-prior`, no credentials. |
+| `harness/question_prior.py` | Counts the early-question prior: how often a framework's findings cite each attribute or question kind, per element of one type, over a sweep's development cases. It reads the reports' verdicts, or with `--replay` the rulings of critic replays of that sweep. It writes that framework's row of `src/analysis_service/question_prior.json` with the runs it read, and keeps the other rows. `run.py question-prior`, no credentials. |
 | `harness/withheld.py` | A case's answers file, `evals/answers/<case>.json`: who signed it, its answers, and for the withheld-sentence test the phrases taken out of the sources, the model fields set back and the assumption records dropped. One reader parses, checks and applies it for the `answered` and `withheld` modes, and each check fails closed: a phrase must occur once, and afterwards no withheld phrase may remain in a source or a model field, and every excerpt must still pass the validity gate's citation check, which reads `…` as a cut between fragments. |
 | `harness/descendants.py` | The stages after a lane, run again on the archive: the fan-in re-run over a sweep's `<case>.proposals.json` with any injected proposal added to its lane, each kept draft carrying its archived critic ruling by title, and every draft no critic ruled on bounded both ways (`lower` rejected, `upper` accepted). Answers whether a finding would have survived had a lane proposed it, for no provider call. Assembly is not re-run. `run.py descendants`. |
 | `harness/near_misses.py` | The near-miss ballot. `run.py near-misses` reads a scored sweep's `losses` rows and writes one row per missed must-find that a free same-lane draft may state with another verb or place, leaving out a draft that matched its own reference, one a person voted down, and any reading already ruled. `run.py near-miss-rulings` checks a returned ballot against the issued one and writes each `same` and `different` answer into the case's `rulings.json`, signed with the reader's login; a ruling that does not load undoes the whole write. Offline. |
@@ -653,11 +653,11 @@ the next sitting, and only the rate over it is a score.
   on its own tells you nothing about which of those two is happening.
 - **near/far exemplar delta** — see below.
 - **holdout split** — coverage on the **Holdout Case**s beside coverage on the
-  tuned ones (`holdout_split`, and `applicability_holdout_split` for ASVS).
+  development ones (`holdout_split`, and `applicability_holdout_split` for ASVS).
   Absent while no holdout case is scored. No diagnosis command reads a holdout
-  case, so a gain on the tuned cases that the holdout does not repeat was
+  case, so a gain on the development cases that the holdout does not repeat was
   shaped by the cases it was read on. A holdout the experiment ledger read
-  `HOLDOUT_READS` times is exhausted and counts as a tuned case, and the
+  `HOLDOUT_READS` times is exhausted and counts as a development case, and the
   split's printers name it with its read count.
 
 The **grounds** measurements each watch a prompt rule that nothing enforces
@@ -831,7 +831,7 @@ doesn't justify.
 
 Cases `14` and `15` are **Holdout Case**s (`holdout: true`). Every sweep
 scores them and reports them apart in the holdout split, and no diagnosis
-command reads them. A gain that the tuned cases show and the holdout cases do
+command reads them. A gain that the development cases show and the holdout cases do
 not was shaped by the cases it was read on.
 
 The corpus checks in `verify_corpus.py` are deterministic and need no

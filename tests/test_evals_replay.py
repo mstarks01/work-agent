@@ -1293,7 +1293,9 @@ class TestTheArchivedEmissionsReplay:
         # the replay (#744), so it is not among the emissions graded. An
         # exhausted holdout is a development case, and is graded.
         holdouts = {
-            case.id for case in corpus if audit.held_out(case.id, case.meta.holdout)
+            case.id
+            for case in corpus
+            if audit.held_out(case.id, flagged=case.meta.holdout)
         }
         assert pool["emissions"] == sum(
             1

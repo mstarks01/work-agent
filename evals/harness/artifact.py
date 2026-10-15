@@ -33,6 +33,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.certification import CertifyResult
 from analysis_service.identity import IDENTITY_VERSION
+from analysis_service.parsing import is_version
 from analysis_service.system_model import FLOW_ID_VERSION
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
 from evals.harness.provenance import (
@@ -242,7 +243,7 @@ def load_artifact(path: Path | str) -> EvalArtifact:
         raise ProvenanceError(f"{path}: not an eval artifact (expected a JSON object)")
 
     version = raw.get("artifact_version")
-    if type(version) is not int or version != ARTIFACT_VERSION:
+    if not is_version(version, ARTIFACT_VERSION):
         raise ProvenanceError(
             f"{path}: unsupported artifact_version {version!r}; expected"
             f" {ARTIFACT_VERSION}. An artifact without one predates recorded"

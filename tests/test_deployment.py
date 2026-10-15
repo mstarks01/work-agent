@@ -390,7 +390,7 @@ def test_the_flag_puts_the_pass_into_every_graph_that_prepares():
 
 def test_an_install_that_sets_nothing_runs_the_capability_reader():
     """On by default once its promotion gate passed (ADR 0087)."""
-    reader = next(name for name in PACKAGES if reads_capabilities(name))
+    reader = next(name for name in PACKAGES if reads_capabilities((name,)))
     deployment = Deployment.from_env(env=VERTEX_ENV)
 
     assert deployment.capability_reader is True
@@ -399,7 +399,7 @@ def test_an_install_that_sets_nothing_runs_the_capability_reader():
 
 @pytest.mark.parametrize("value", ["false", "0", "off", "no"])
 def test_a_negative_value_turns_the_capability_reader_off(value):
-    reader = next(name for name in PACKAGES if reads_capabilities(name))
+    reader = next(name for name in PACKAGES if reads_capabilities((name,)))
     deployment = Deployment.from_env(env=VERTEX_ENV | {CAPABILITY_READER_VAR: value})
 
     assert deployment.capability_reader is False
@@ -407,8 +407,8 @@ def test_a_negative_value_turns_the_capability_reader_off(value):
 
 
 def test_the_flag_puts_the_reader_into_every_graph_that_extracts_for_a_reader():
-    reader = next(name for name in PACKAGES if reads_capabilities(name))
-    others = tuple(name for name in PACKAGES if not reads_capabilities(name))
+    reader = next(name for name in PACKAGES if reads_capabilities((name,)))
+    others = tuple(name for name in PACKAGES if not reads_capabilities((name,)))
     deployment = Deployment.from_env(env=VERTEX_ENV | {CAPABILITY_READER_VAR: "true"})
 
     production = deployment.pipeline((reader,))

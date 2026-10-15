@@ -1,4 +1,4 @@
-"""Reading a number out of a string or a file this service does not control.
+"""Reading a value out of a string or a file this service does not control.
 
 One rule, one reader. Three call sites parse an integer out of somebody else's
 string — an HTTP header a client sets, and a version segment read back off a
@@ -19,6 +19,13 @@ A number a JSON file holds has its own question: is it a finite amount of zero
 or more? ``bool`` is an ``int`` subclass, and ``json`` reads ``NaN`` and
 ``Infinity``, so ``isinstance`` alone is not that question either.
 :func:`non_negative` answers it.
+
+Three more questions about a file's values have one reader each here.
+:func:`is_version` asks whether a version is the integer a loader expects,
+because TOML and JSON read ``9.0`` and ``true`` as values equal to an integer.
+:func:`strings` asks whether a value is a list of strings, because a string
+in that place reads one character at a time. :func:`signer` asks who signed a
+file, because a value of spaces reads as a signature.
 """
 
 from __future__ import annotations
@@ -54,3 +61,27 @@ def non_negative(value: object) -> TypeGuard[int | float]:
         and math.isfinite(value)
         and value >= 0
     )
+
+
+def is_version(value: object, expected: int) -> bool:
+    """Whether ``value`` is the integer ``expected``, and not a float or a bool."""
+    return type(value) is int and value == expected
+
+
+def strings(value: object) -> TypeGuard[list[str]]:
+    """Whether ``value`` is a list that holds strings only."""
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def signer(value: object) -> str | None:
+    """Who ``value`` names as a signer, or ``None`` where nobody signed.
+
+    ``None`` and ``""`` are unsigned. Any other value that names nobody, a
+    non-string or a string of whitespace, raises ``ValueError``: it reads as
+    signed and names no person.
+    """
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"signed_by {value!r} names nobody")
+    return value

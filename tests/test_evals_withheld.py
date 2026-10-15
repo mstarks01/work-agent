@@ -13,7 +13,7 @@ import pytest
 
 from evals.harness import modes, run
 from evals.harness.provenance import REPO_ROOT
-from evals.harness.reference import load_corpus, tuning_cases
+from evals.harness.reference import development_cases, load_corpus
 from evals.harness.withheld import AnswerFile, load_answer_file, withheld_case
 from evals.verify_corpus import CORPUS_DIR
 from tests.test_evals_modes import case  # noqa: F401  (fixture)
@@ -147,7 +147,7 @@ class TestAnswersWithinSaves:
 
 
 @pytest.mark.parametrize(
-    "golden", tuning_cases(load_corpus(CORPUS_DIR)), ids=lambda golden: golden.id
+    "golden", development_cases(load_corpus(CORPUS_DIR)), ids=lambda golden: golden.id
 )
 def test_every_case_applies_with_nothing_withheld(golden):
     """An excerpt the gate accepts is one the withheld check accepts.
@@ -235,7 +235,7 @@ def test_every_answers_file_applies_once_signed(draft, tmp_path):
     path.write_text(json.dumps(raw), encoding="utf-8")
     golden = next(
         golden
-        for golden in tuning_cases(load_corpus(CORPUS_DIR))
+        for golden in development_cases(load_corpus(CORPUS_DIR))
         if golden.id == raw["case"]
     )
     withheld_case(golden, load_answer_file(path))

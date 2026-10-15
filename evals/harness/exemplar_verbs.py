@@ -13,7 +13,7 @@ STRIDE ships 19 exemplars, and the corpus holds 285 reference claims. No
 exemplar is read from a holdout case (#744), and no case is still held out, so
 this reads all 285.
 51 of those claims name a verb no exemplar in their lane demonstrates.
-21 of the 51 are ``must-find``, and 15 of the 16 tuned cases carry at least one.
+21 of the 51 are ``must-find``, and 15 of the 16 development cases carry at least one.
 
 They split into two populations, and each wants a different answer:
 
@@ -66,7 +66,7 @@ from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.skills import lane_exemplars_doc
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import endpoint_subset
-from evals.harness.reference import MUST_FIND, GoldenCase, tuning_cases
+from evals.harness.reference import MUST_FIND, GoldenCase, development_cases
 
 __all__ = [
     "Collision",
@@ -230,15 +230,15 @@ def corpus_undemonstrated(
 ) -> tuple[Undemonstrated, ...]:
     """The same reading over every package that composes a verb, in registry order.
 
-    Over the tuned cases only. This reading says which verbs the exemplars
+    Over the development cases only. This reading says which verbs the exemplars
     should demonstrate next, and an exemplar is never derived from a holdout
     case's reference set (#744).
     """
-    tuned = tuning_cases(cases)
+    development = development_cases(cases)
     return tuple(
         entry
         for framework in verb_keyed_frameworks()
-        for entry in undemonstrated(tuned, framework)
+        for entry in undemonstrated(development, framework)
     )
 
 

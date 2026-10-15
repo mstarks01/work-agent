@@ -97,7 +97,7 @@ def llm_calls_for(frameworks: Sequence[FrameworkSelection]) -> int:
     prose goes stale when a package changes the fan-out. A package registered
     tomorrow moves this number with no edit here.
     """
-    reader = any(reads_capabilities(selection.name) for selection in frameworks)
+    reader = reads_capabilities(selection.name for selection in frameworks)
     return (
         _SHARED_LLM_CALLS
         + (_READER_CALLS if reader else 0)

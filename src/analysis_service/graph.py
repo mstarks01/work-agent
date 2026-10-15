@@ -3207,7 +3207,7 @@ def build_pipeline(
             f"entry {entry!r} extracts no model to pass on, so nothing would read"
             " a capability reader"
         )
-    if capability_reader and not any(reads_capabilities(f) for f in frameworks):
+    if capability_reader and not reads_capabilities(frameworks):
         raise ValueError(
             "no selected framework applies its units by a rule over capabilities,"
             " so nothing would read a capability reader"

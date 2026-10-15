@@ -652,7 +652,7 @@ class TestAHoldoutIsReadAFixedNumberOfTimes:
         with pytest.raises(audit.ExperimentError, match="no longer unseen"):
             audit.admit(_reader(9), ledger, (), holdouts=frozenset({HOLDOUT}))
 
-    def test_a_tuned_case_is_not_a_holdout_read(self):
+    def test_a_development_case_is_not_a_holdout_read(self):
         with pytest.raises(audit.ExperimentError, match="not a holdout case"):
             audit.admit(
                 _reader(1, "01-payments-checkout"),

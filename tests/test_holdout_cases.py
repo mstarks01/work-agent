@@ -3,7 +3,7 @@
 Two halves. The rule has one reader, :func:`~evals.harness.reference.diagnosable`,
 and these tests hold what calls it. The lint below finds every site that loads
 the corpus by reading the modules, so a diagnosis command added tomorrow either
-filters through :func:`~evals.harness.reference.tuning_cases` or says here why
+filters through :func:`~evals.harness.reference.development_cases` or says here why
 it reads a holdout case.
 """
 
@@ -22,18 +22,18 @@ from evals.harness import applicability, audit, comparison, early_policies, scor
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import (
     CorpusError,
+    development_cases,
     diagnosable,
     load_case,
     load_corpus,
     refuse_holdout,
-    tuning_cases,
 )
 
 CORPUS = REPO_ROOT / "evals" / "corpus"
 
 #: The functions that load the corpus and read holdout cases, and why. Every
 #: other caller of ``load_corpus`` outside the tests filters through
-#: ``tuning_cases``.
+#: ``development_cases``.
 HOLDOUT_READERS = {
     "evals/harness/run.py:command_run": "a sweep scores every case",
     "evals/harness/run.py:command_score": "scoring reports holdout figures apart",
@@ -66,7 +66,7 @@ def _loaders() -> set[str]:
             wrapped = {
                 id(argument)
                 for call in ast.walk(function)
-                if isinstance(call, ast.Call) and _name(call) == "tuning_cases"
+                if isinstance(call, ast.Call) and _name(call) == "development_cases"
                 for argument in call.args
             }
             for call in ast.walk(function):
@@ -112,7 +112,7 @@ def test_every_corpus_loader_filters_the_holdout_or_says_why_not():
 
     assert not unfiltered, (
         "these load the corpus and read holdout cases; wrap the call in"
-        f" tuning_cases or add the site to HOLDOUT_READERS: {sorted(unfiltered)}"
+        f" development_cases or add the site to HOLDOUT_READERS: {sorted(unfiltered)}"
     )
 
 
@@ -158,11 +158,11 @@ def test_the_holdout_cases_are_the_ones_744_authored():
 
 def test_a_holdout_case_is_loaded_and_left_out_of_tuning(holdout_corpus):
     cases = load_corpus(holdout_corpus)
-    tuned = tuning_cases(cases)
+    development = development_cases(cases)
 
     assert "01-payments-checkout" in {case.id for case in cases}
-    assert "01-payments-checkout" not in {case.id for case in tuned}
-    assert len(tuned) == sum(diagnosable(case) for case in cases)
+    assert "01-payments-checkout" not in {case.id for case in development}
+    assert len(development) == sum(diagnosable(case) for case in cases)
 
 
 def test_a_replay_of_a_holdout_case_is_refused_by_name(holdout_corpus):
@@ -222,9 +222,9 @@ def test_the_stride_split_reports_holdout_coverage_apart():
     split = scorer.holdout_split(scores)
 
     assert split == {
-        "tuned_coverage": 0.7,
+        "development_coverage": 0.7,
         "holdout_coverage": 0.3,
-        "tuned_must_find_coverage": 0.7,
+        "development_must_find_coverage": 0.7,
         "holdout_must_find_coverage": 0.3,
     }
     assert scorer.holdout_split(scores[:2]) is None
@@ -238,7 +238,7 @@ def test_the_asvs_split_reports_holdout_recall_apart():
     scores = [Score("a", False, 0.5), Score("b", False, 1.0), Score("c", True, 0.25)]
 
     assert applicability.holdout_split(scores) == {
-        "tuned_recall": 0.75,
+        "development_recall": 0.75,
         "holdout_recall": 0.25,
     }
     assert applicability.holdout_split(scores[:2]) is None
@@ -309,13 +309,18 @@ class TestTheOneReader:
     def test_a_case_is_held_out_while_flagged_and_unexhausted(
         self, flagged, reads, expected
     ):
-        assert audit.held_out(SPENT, flagged, _reads(SPENT, reads)) is expected
+        assert (
+            audit.held_out(SPENT, flagged=flagged, ledger=_reads(SPENT, reads))
+            is expected
+        )
 
     def test_exhaustion_counts_each_case_apart(self):
         ledger = _reads(SPENT, audit.HOLDOUT_READS)
 
         assert audit.exhausted(ledger) == {SPENT: audit.HOLDOUT_READS}
-        assert audit.held_out("15-multitenant-invoicing", True, ledger)
+        assert audit.still_held_out({SPENT, "15-multitenant-invoicing"}, ledger) == {
+            "15-multitenant-invoicing"
+        }
 
 
 class TestEverySiteAsksTheOneReader:
@@ -326,13 +331,13 @@ class TestEverySiteAsksTheOneReader:
     """
 
     def test_the_reader_itself(self, exhausted):
-        assert not audit.held_out(SPENT, True)
+        assert not audit.held_out(SPENT, flagged=True)
 
     def test_a_diagnosis_reads_an_exhausted_case(self, exhausted):
         case = load_case(CORPUS / SPENT)
 
         assert diagnosable(case)
-        assert SPENT in {one.id for one in tuning_cases(load_corpus(CORPUS))}
+        assert SPENT in {one.id for one in development_cases(load_corpus(CORPUS))}
         refuse_holdout(SPENT)
 
     def test_the_corpus_still_names_its_flagged_holdouts(self, exhausted):
@@ -349,7 +354,7 @@ class TestEverySiteAsksTheOneReader:
         split = scorer.holdout_split(scores)
 
         assert split is not None
-        assert split["tuned_coverage"] == 0.5
+        assert split["development_coverage"] == 0.5
         assert split["holdout_coverage"] == 0.3
 
     def test_the_asvs_split_counts_it_as_development(self, exhausted):
@@ -364,7 +369,7 @@ class TestEverySiteAsksTheOneReader:
         ]
 
         assert applicability.holdout_split(scores) == {
-            "tuned_recall": 0.75,
+            "development_recall": 0.75,
             "holdout_recall": 0.25,
         }
 
