@@ -142,11 +142,11 @@ def _merged_baselines(root: Path) -> list[tuple[Path, dict[str, Any]]]:
     baselines = []
     for path in sorted(directory.glob("*/baseline.json")):
         try:
-            baselines.append(
-                (path.parent, json.loads(path.read_text(encoding="utf-8")))
-            )
+            manifest = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue  # verify() is what refuses a broken Baseline, not the gate
+        if not baseline.manifest_problems(manifest):
+            baselines.append((path.parent, manifest))
     return baselines
 
 

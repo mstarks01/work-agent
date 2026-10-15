@@ -63,7 +63,7 @@ from collections.abc import Collection, Container, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, get_args
 
 from analysis_service.answer_forms import (
     YES_NO,
@@ -92,6 +92,7 @@ from analysis_service.open_facts import (
     open_attribute,
     prepared_model,
 )
+from analysis_service.parsing import non_negative
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
 from analysis_service.system_model import Element, SystemModel
 
@@ -101,6 +102,7 @@ __all__ = [
     "QUESTION_PRIOR",
     "QUESTION_PRIOR_PATH",
     "EarlyQuestion",
+    "PriorError",
     "PriorRow",
     "asked_parent",
     "capability_questions",
@@ -144,9 +146,44 @@ class PriorRow:
         }
 
 
+#: The element types a prior row may key its rates by.
+_ELEMENT_TYPES = frozenset(kind.__name__ for kind in get_args(Element))
+
+
+class PriorError(ValueError):
+    """A prior file no list can be ranked from, naming the file and the key."""
+
+
+def _refuse_prior(path: Path, raw: object) -> None:
+    """Refuse a prior a list could not be ranked from, naming the file and the key.
+
+    A framework outside ``PACKAGES`` or an element type no model holds would
+    load and then rank nothing, so the list would shrink without a word.
+    """
+    if not isinstance(raw, dict):
+        raise PriorError(f"{path}: the prior is not a JSON object")
+    for name, row in raw.items():
+        if name not in PACKAGES:
+            raise PriorError(f"{path}: {name!r} is not a framework package")
+        rates = row.get("rates") if isinstance(row, dict) else None
+        if not isinstance(rates, dict):
+            raise PriorError(f"{path}: {name}: rates is not an object")
+        for kind, fields in rates.items():
+            if kind not in _ELEMENT_TYPES:
+                raise PriorError(f"{path}: {name}: {kind!r} is not an element type")
+            if not isinstance(fields, dict) or not all(
+                non_negative(rate) for rate in fields.values()
+            ):
+                raise PriorError(
+                    f"{path}: {name}: {kind}: a rate is not a finite number of"
+                    " zero or more"
+                )
+
+
 def load_prior(path: Path = QUESTION_PRIOR_PATH) -> Mapping[FrameworkName, PriorRow]:
     """The prior table, one row per framework the file holds."""
     raw = json.loads(path.read_text(encoding="utf-8"))
+    _refuse_prior(path, raw)
     return MappingProxyType(
         {
             name: PriorRow(

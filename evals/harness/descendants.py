@@ -177,7 +177,19 @@ def replay_artifact(
     cases: Sequence[GoldenCase],
     injected: Mapping[str, Mapping[str, Sequence[Mapping[str, Any]]]] = {},
 ) -> list[Replayed]:
-    """Every case of a sweep that archived its proposals, replayed."""
+    """Every case of a sweep that archived its proposals, replayed.
+
+    Each injected case is one of ``cases``, and each injected lane one of the
+    package's, so a misspelled key is refused rather than injecting nothing.
+    """
+    known = {case.id for case in cases}
+    for case_id, lanes in injected.items():
+        if case_id not in known:
+            raise EvalRunError(f"injected case {case_id!r} is not a replayed case")
+        if stray := sorted(set(lanes) - set(PACKAGES[FRAMEWORK].lanes)):
+            raise EvalRunError(
+                f"injected case {case_id}: {stray} is not a {FRAMEWORK} lane"
+            )
     directory = reports_dir(artifact)
     rows = []
     for case in cases:

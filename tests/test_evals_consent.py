@@ -183,6 +183,25 @@ class TestTheEstimate:
         assert estimate.amount_usd == pytest.approx(0.60)
         assert "exact configuration" in " ".join(estimate.lines)
 
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("unit_prices", [{"model": "m", "input_per_token": "0.1"}]),
+            ("unpriced", "m"),
+        ],
+    )
+    def test_a_manifest_of_the_wrong_shape_prices_nothing(
+        self, tmp_path, priced, field, value
+    ):
+        """verify() names the fault; the gate reads past it and never raises."""
+        directory = merged(tmp_path, "one", IDENTITY, actual=0.60)
+        path = directory / "baseline.json"
+        manifest = json.loads(path.read_text("utf-8"))
+        manifest["sweeps"][0]["cost"][field] = value
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        assert consent.estimate(IDENTITY, ROUTES, tmp_path).label != "recorded"
+
     def test_another_baseline_lends_its_tokens_as_a_guess(self, tmp_path, priced):
         merged(tmp_path, "other", {**IDENTITY, "repo_commit": "e" * 40}, actual=0.60)
         estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)

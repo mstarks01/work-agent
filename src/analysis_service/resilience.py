@@ -327,7 +327,7 @@ def load_resilience(
     raw = read_toml(path, ResilienceConfigError)
 
     version = raw.get("version")
-    if version != SUPPORTED_VERSION:
+    if type(version) is not int or version != SUPPORTED_VERSION:
         raise ResilienceConfigError(
             f"{path}: unsupported version {version!r};"
             f" expected {SUPPORTED_VERSION}, which carries 'attempts',"

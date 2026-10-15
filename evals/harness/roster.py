@@ -99,7 +99,7 @@ def load(path: Path | str = DEFAULT_ROSTER_PATH) -> Roster:
 
     if unknown := set(raw) - {"version", "voters"}:
         raise RosterError(f"{path}: unknown keys: {', '.join(sorted(unknown))}")
-    if raw.get("version") != VERSION:
+    if type(raw.get("version")) is not int or raw["version"] != VERSION:
         raise RosterError(
             f"{path}: version {raw.get('version')!r} is not {VERSION}; an old"
             " shape fails the load rather than inheriting a meaning"

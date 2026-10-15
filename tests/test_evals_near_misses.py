@@ -149,6 +149,16 @@ def test_a_returned_ballot_that_does_not_fit_is_refused(tmp_path, answer, messag
         near_misses.returned_rows(issued, returned)
 
 
+def test_a_returned_row_short_of_a_cell_is_refused(tmp_path):
+    """``csv`` fills a missing cell with ``None``, which no answer can be."""
+    case = load_case(CORPUS_DIR / CASE)
+    issued = _issue(tmp_path, case, _tampering_draft(case, 3))
+    returned = tmp_path / "returned.csv"
+    returned.write_text("n,verdict,note\n1,same\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="one cell per column"):
+        near_misses.returned_rows(issued, returned)
+
+
 @pytest.mark.parametrize("verdict", ["same", "different"])
 def test_a_ruled_row_is_written_once_and_loads(tmp_path, corpus, verdict):
     case = load_case(corpus / CASE)

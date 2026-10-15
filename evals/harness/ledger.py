@@ -163,6 +163,23 @@ class LedgerError(ValueError):
     """A vote is malformed, or the ledger cannot be read."""
 
 
+#: The fields of a :class:`Vote` that hold a string. A ``sitting`` of another
+#: type compares unequal to every sitting, so the vote drops out of the queue.
+_TEXT_FIELDS = (
+    "fingerprint",
+    "content",
+    "prose",
+    "case",
+    "verdict",
+    "voter",
+    "recorded",
+    "claim_text",
+    "config",
+    "note",
+    "sitting",
+)
+
+
 @dataclass(frozen=True)
 class Vote:
     """One reviewer's answer on one finding, at one moment.
@@ -206,6 +223,11 @@ class Vote:
         is worth what its worst row is, and a row nobody can interpret is worse
         than a missing one because it still counts in a denominator.
         """
+        for name in _TEXT_FIELDS:
+            if not isinstance(getattr(self, name), str):
+                raise LedgerError(
+                    f"vote {name} {getattr(self, name)!r} is not a string"
+                )
         if self.verdict not in ("up", "down", "unsure", "needs-evidence"):
             raise LedgerError(f"{self.verdict!r} is not a verdict")
         if not self.voter.strip():

@@ -242,7 +242,7 @@ def load_artifact(path: Path | str) -> EvalArtifact:
         raise ProvenanceError(f"{path}: not an eval artifact (expected a JSON object)")
 
     version = raw.get("artifact_version")
-    if version != ARTIFACT_VERSION:
+    if type(version) is not int or version != ARTIFACT_VERSION:
         raise ProvenanceError(
             f"{path}: unsupported artifact_version {version!r}; expected"
             f" {ARTIFACT_VERSION}. An artifact without one predates recorded"
@@ -288,11 +288,14 @@ def load_artifact(path: Path | str) -> EvalArtifact:
             " derived from; the artifact has been edited and will not be promoted"
         )
     provenance.verify()
+    trusted = raw.get("trusted", False)
+    if not isinstance(trusted, bool):
+        raise ProvenanceError(f"{path}: trusted is {trusted!r}, not true or false")
     return EvalArtifact(
         path=path,
         mode=str(raw.get("mode", "")),
         cases=tuple(str(case) for case in raw.get("cases", ())),
-        trusted=bool(raw.get("trusted", False)),
+        trusted=trusted,
         structural_failures=tuple(
             str(failure) for failure in raw.get("structural_failures", ())
         ),

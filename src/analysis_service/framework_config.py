@@ -53,7 +53,7 @@ def load_frameworks(
         raise FrameworkConfigError(f"{path}: {exc}") from exc
 
     version = raw.get("version")
-    if version != SUPPORTED_VERSION:
+    if type(version) is not int or version != SUPPORTED_VERSION:
         raise FrameworkConfigError(
             f"{path}: unsupported version {version!r}; expected {SUPPORTED_VERSION}"
         )

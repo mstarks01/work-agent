@@ -248,11 +248,11 @@ def _stride_record_issues(
         yield f"{where} cites no elements"
 
     severity = record["severity"]
-    if severity.keys() != {"likelihood", "impact"}:
+    if not isinstance(severity, dict) or severity.keys() != {"likelihood", "impact"}:
         yield f"{where} severity must carry likelihood and impact only"
         return
     for field, rating in severity.items():
-        if rating not in RATINGS:
+        if not isinstance(rating, str) or rating not in RATINGS:
             yield f"{where} severity {field} {rating!r} is not a legal rating"
 
 
@@ -814,18 +814,49 @@ def _check_declared_frameworks(meta: dict) -> Iterator[str]:
                 f" extra {sorted(unexpected)}"
             )
             continue
-        if entry["name"] not in PACKAGES:
-            yield f"{where} names {entry['name']!r}, which this build does not carry"
-        elif entry["name"] in seen:
-            yield f"{where} declares {entry['name']!r} twice"
-        seen.add(entry["name"])
+        name = entry["name"]
+        if not isinstance(name, str) or name not in PACKAGES:
+            yield f"{where} names {name!r}, which this build does not carry"
+        elif name in seen:
+            yield f"{where} declares {name!r} twice"
+        else:
+            seen.add(name)
         if not isinstance(entry["options"], dict):
             yield f"{where} options must be an object"
-        if entry["exemplar_proximity"] not in EXEMPLAR_PROXIMITY:
-            yield (
-                f"{where} exemplar_proximity"
-                f" {entry['exemplar_proximity']!r} is not near/far"
-            )
+        proximity = entry["exemplar_proximity"]
+        if not isinstance(proximity, str) or proximity not in EXEMPLAR_PROXIMITY:
+            yield f"{where} exemplar_proximity {proximity!r} is not near/far"
+
+
+#: The record fields that hold a string, wherever a record carries one.
+_TEXT_FIELDS = (
+    "claim",
+    "tier",
+    "notes",
+    "verb",
+    "category",
+    "chapter",
+    "requirement",
+    "disposition",
+)
+
+
+def _wrong_shapes(record: dict) -> list[str]:
+    """The fields of one reference record that do not hold the shape they must.
+
+    A field read against a set must be a string first: a list raises when it
+    is looked up, and a string where a list of IDs belongs is read one
+    character at a time.
+    """
+    wrong = [
+        field
+        for field in _TEXT_FIELDS
+        if field in record and not isinstance(record[field], str)
+    ]
+    ids = record.get("affected_element_ids", [])
+    if not isinstance(ids, list) or not all(isinstance(item, str) for item in ids):
+        wrong.append("affected_element_ids")
+    return wrong
 
 
 def _check_claims(
@@ -848,6 +879,7 @@ def _check_claims(
 
     fields = RECORD_FIELDS[framework]
     optional = OPTIONAL_RECORD_FIELDS[framework]
+    shaped: list[dict] = []
     for index, record in enumerate(records):
         where = f"{framework}[{index}]"
         if not isinstance(record, dict):
@@ -860,6 +892,10 @@ def _check_claims(
             continue
         if unexpected:
             yield f"{where} has unexpected fields: {sorted(unexpected)}"
+        if wrong := _wrong_shapes(record):
+            yield f"{where} fields of the wrong shape: {wrong}"
+            continue
+        shaped.append(record)
 
         if record["tier"] not in TIERS:
             yield f"{where} tier {record['tier']!r} is not must-find/expected"
@@ -891,7 +927,7 @@ def _check_claims(
     # a lane be measured *somewhere*; this asks that no case quietly grades five
     # of six. :data:`LANES_REQUIRED_PER_CASE` says why ASVS is exempt.
     lane_of = RECORD_LANE[framework]
-    seen_lanes = {lane_of(record) for record in records if isinstance(record, dict)}
+    seen_lanes = {lane_of(record) for record in shaped}
     stray = sorted(str(lane) for lane in seen_lanes - set(PACKAGES[framework].lanes))
     if stray:
         yield f"{where_file} names lanes {framework} does not declare: {stray}"
@@ -930,9 +966,11 @@ def declared_options(meta: dict) -> dict[str, Mapping[str, Any]]:
     if not isinstance(declared, list):
         return {}
     return {
-        entry["name"]: entry.get("options") or {}
+        entry["name"]: entry["options"]
         for entry in declared
-        if isinstance(entry, dict) and isinstance(entry.get("name"), str)
+        if isinstance(entry, dict)
+        and isinstance(entry.get("name"), str)
+        and isinstance(entry.get("options"), dict)
     }
 
 
@@ -1459,7 +1497,9 @@ def main() -> int:
             must_find_lanes.setdefault(name, set()).update(
                 RECORD_LANE[name](record)
                 for record in records
-                if isinstance(record, dict) and record.get("tier") == MUST_FIND
+                if isinstance(record, dict)
+                and record.get("tier") == MUST_FIND
+                and not _wrong_shapes(record)
             )
         for problem in problems:
             print(f"{case_dir.name}: {problem}")

@@ -667,6 +667,29 @@ class TestAssembleAndVerify:
         problems = verify(directory, root=tmp_path)
         assert any("more than one sweep entry" in problem for problem in problems)
 
+    @pytest.mark.parametrize(
+        ("change", "named"),
+        [
+            (lambda m: m["sweeps"][0]["cost"].update(unpriced="gpt"), "unpriced"),
+            (lambda m: m["sweeps"][0]["cost"].update(fallbacks=["a"]), "fallbacks"),
+            (lambda m: m["sweeps"][0]["cost"].update(unit_prices=[1]), "unit_prices"),
+            (lambda m: m["sweeps"][0].update(artifact=7), "artifact"),
+            (lambda m: m.update(sweeps={"a": 1}), "sweeps"),
+        ],
+    )
+    def test_a_field_of_the_wrong_shape_is_a_problem_not_a_raise(
+        self, tmp_path, priced, change, named
+    ):
+        """A string ``unpriced`` would read as one model per character."""
+        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
+        path = directory / "baseline.json"
+        manifest = json.loads(path.read_text("utf-8"))
+        change(manifest)
+        path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+        problems = verify(directory, root=tmp_path)
+        assert any(named in problem for problem in problems), problems
+
     def test_a_renamed_directory_is_refused(self, tmp_path, priced):
         directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
         renamed = directory.with_name("7c3a007-hand-typed-00000000")

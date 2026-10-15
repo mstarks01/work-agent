@@ -17,10 +17,16 @@ import pytest
 
 from analysis_service.report import Report
 from evals.harness.artifact import ARTIFACT_VERSION, corpus_digest, load_artifact
-from evals.harness.bundle import reports_dir, stride_threats, write_reports
+from evals.harness.bundle import (
+    reports_dir,
+    runs_from_reports,
+    stride_threats,
+    write_reports,
+)
 from evals.harness.content import prose, structural
 from evals.harness.fingerprint import components_for
 from evals.harness.ledger import append
+from evals.harness.modes import EvalRunError
 from evals.harness.reference import load_case
 from evals.harness.run import main
 from tests.eval_factories import cast
@@ -548,6 +554,14 @@ class TestItRefusesRatherThanScoringHalf:
                     str(roster_path),
                 ]
             )
+
+    def test_drafts_under_a_framework_no_package_names_are_refused(self, swept, case):
+        path = reports_dir(swept) / f"{case.id}.drafts.json"
+        drafts = json.loads(path.read_text(encoding="utf-8"))
+        path.write_text(json.dumps({**drafts, "strid": []}), encoding="utf-8")
+
+        with pytest.raises(EvalRunError, match="'strid'"):
+            runs_from_reports(swept, [case])
 
     def test_an_artifact_with_no_reports_directory_is_refused(
         self, swept, tmp_path, roster_path

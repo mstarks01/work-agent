@@ -715,6 +715,16 @@ class TestTheVoteRecordsWhatItJudged:
         with pytest.raises(LedgerError, match="malformed vote"):
             Vote.from_json(raw)
 
+    @pytest.mark.parametrize(
+        ("field", "value"), [("sitting", ["s1"]), ("voter", 7), ("note", None)]
+    )
+    def test_a_field_that_is_not_a_string_is_refused_by_name(self, field, value):
+        """A list ``sitting`` drops the vote from the queue without a word."""
+        raw = {**self._vote().to_json(), field: value}
+
+        with pytest.raises(LedgerError, match=field):
+            Vote.from_json(raw)
+
     def test_a_rekey_leaves_them_alone(self, tmp_path):
         """A version move re-keys the topic. What a person judged is not a key
         and never recomputes."""

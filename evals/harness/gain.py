@@ -51,7 +51,7 @@ from evals.harness import audit
 from evals.harness.artifact import figures_corpus
 from evals.harness.comparison import flagged_cases, held_out_cases
 from evals.harness.instruments import Cases
-from evals.harness.promotion import Reading, in_spreads
+from evals.harness.promotion import Reading, in_spreads, read_spread
 
 #: One figure, read from one artifact over the cases a selector keeps, or
 #: ``None`` where the artifact carries no such figure.
@@ -418,9 +418,7 @@ def command_gain(args: argparse.Namespace) -> int:
     try:
         baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
         candidate = json.loads(args.candidate.read_text(encoding="utf-8"))
-        spread = (
-            {} if args.spread is None else json.loads(args.spread.read_text("utf-8"))
-        )
+        spread = {} if args.spread is None else read_spread(args.spread, GATES)
     except (OSError, ValueError) as error:
         print(f"cannot read: {error}", file=sys.stderr)
         return 1

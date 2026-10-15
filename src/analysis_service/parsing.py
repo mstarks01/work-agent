@@ -1,4 +1,4 @@
-"""Reading a number out of a string this service does not control.
+"""Reading a number out of a string or a file this service does not control.
 
 One rule, one reader. Three call sites parse an integer out of somebody else's
 string — an HTTP header a client sets, and a version segment read back off a
@@ -14,11 +14,18 @@ length, and ``int`` refuses a string past 4300 digits by raising.
 Both refusals surface as a traceback where the caller wanted a decision: a 500
 on a header a client controls, or an unhandled ``ValueError`` in a preflight
 that meant to report a malformed value by name.
+
+A number a JSON file holds has its own question: is it a finite amount of zero
+or more? ``bool`` is an ``int`` subclass, and ``json`` reads ``NaN`` and
+``Infinity``, so ``isinstance`` alone is not that question either.
+:func:`non_negative` answers it.
 """
 
 from __future__ import annotations
 
+import math
 import re
+from typing import TypeGuard
 
 _ASCII_DIGITS = re.compile(r"[0-9]+")
 
@@ -37,3 +44,13 @@ def ascii_int(value: str, *, max_digits: int) -> int | None:
     if len(value) > max_digits or _ASCII_DIGITS.fullmatch(value) is None:
         return None
     return int(value)
+
+
+def non_negative(value: object) -> TypeGuard[int | float]:
+    """Whether ``value`` is a finite number of zero or more, and not a bool."""
+    return (
+        isinstance(value, int | float)
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and value >= 0
+    )

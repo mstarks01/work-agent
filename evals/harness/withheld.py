@@ -101,11 +101,14 @@ def load_answer_file(path: Path) -> AnswerFile | None:
     if not path.is_file():
         return None
     raw: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    if not raw.get("signed_by"):
+    signed_by = raw.get("signed_by")
+    if signed_by is None or signed_by == "":
         return None
+    if not isinstance(signed_by, str) or not signed_by.strip():
+        raise EvalRunError(f"{path}: signed_by {signed_by!r} names nobody")
     withheld = raw.get("withheld", {})
     return AnswerFile(
-        signed_by=raw["signed_by"],
+        signed_by=signed_by,
         drafted_by=raw.get("drafted_by", ""),
         answers=tuple(FactAnswer.model_validate(entry) for entry in raw["answers"]),
         withheld_text=tuple(

@@ -45,6 +45,16 @@ def test_an_unsigned_copy_is_refused(case, tmp_path):  # noqa: F811
         run.signed_answers([case], tmp_path)
 
 
+@pytest.mark.parametrize("signer", [" ", True, ["mstarks01"]])
+def test_a_signer_that_names_nobody_is_refused(tmp_path, signer):
+    raw = json.loads(DRAFT.read_text(encoding="utf-8"))
+    raw["signed_by"] = signer
+    path = tmp_path / DRAFT.name
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(modes.EvalRunError, match="signed_by"):
+        load_answer_file(path)
+
+
 def test_the_facts_leave_the_sources_and_the_model(case, tmp_path):  # noqa: F811
     withheld = withheld_case(case, signed_copy(tmp_path))
     assert NO_MFA in case.sources[0].text

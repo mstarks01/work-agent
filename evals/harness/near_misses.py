@@ -192,6 +192,10 @@ def returned_rows(issued: Path, returned: Path) -> list[dict[str, str]]:
         )
     merged = []
     for answer in answers:
+        if None in answer or None in answer.values():
+            raise ValueError(
+                f"{returned}: row {answer['n']} does not hold one cell per column"
+            )
         row = issued_rows[answer["n"]]
         changed = [
             column

@@ -107,8 +107,9 @@ def _issues() -> list[str]:
         issues += [
             f"{row['id']}: {issue}" for issue in expression_issues(row["applies_if"])
         ]
-        if not str(row.get("rationale", "")).strip():
-            issues.append(f"{row['id']}: no rationale")
+        rationale = row.get("rationale")
+        if not isinstance(rationale, str) or not rationale.strip():
+            issues.append(f"{row['id']}: the rationale is not a non-blank string")
     return issues
 
 

@@ -186,6 +186,21 @@ def test_the_command_prints_the_table(tmp_path, capsys):
     assert "is not a promotion" in printed
 
 
+def test_the_command_refuses_a_negative_spread(tmp_path, capsys):
+    path = tmp_path / "candidate.json"
+    path.write_text(json.dumps(_gained(_baseline(), added=6, voted=False)), "utf-8")
+    spread = tmp_path / "spread.json"
+    spread.write_text(json.dumps({**SPREAD, "volume": -1.5}), "utf-8")
+    parser = __import__("argparse").ArgumentParser()
+    COMMANDS["gain"].arguments(parser)
+
+    args = parser.parse_args(
+        [str(SEALED), str(path), "--framework", "stride", "--spread", str(spread)]
+    )
+    assert COMMANDS["gain"].run(args) == 1
+    assert "volume" in capsys.readouterr().err
+
+
 class TestAnIncomparablePairIsRefused:
     """A gain read across two corpora measures the corpus change, not the fix."""
 
