@@ -36,7 +36,6 @@ The rules this module keeps:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import hmac
 import json
 import logging
@@ -103,7 +102,9 @@ from analysis_service.jobs import (
     check_save,
     is_follow_up,
     locks_its_parent,
+    object_digest,
     parent_of,
+    stored_report,
 )
 from analysis_service.objects import (
     ObjectName,
@@ -269,12 +270,13 @@ def _names(row: Row[Any], name: ObjectName) -> bool:
     return row._mapping[DIGEST_COLUMNS[name]] is not None
 
 
-def _object_keys(row: Row[Any]) -> list[str]:
-    """The key of each object that the job row ``row`` names."""
+def _object_keys(row: Row[Any], *, unnamed: bool = False) -> list[str]:
+    """The key of each object that the job row ``row`` names. With
+    ``unnamed``, the key of each object that its job can hold, named or not."""
     return [
         object_key(row.owner_id, row.id, name)
         for name in DIGEST_COLUMNS
-        if _names(row, name)
+        if unnamed or _names(row, name)
     ]
 
 
@@ -313,33 +315,37 @@ def _job_row(record: JobRecord) -> dict[str, Any]:
     return row
 
 
+#: The parts of a job row that the schema version covers, which an envelope
+#: leaves out.
+_COVERED_COLUMNS = frozenset({"checkpoint", "resumption"})
+#: The columns that the restart scan changes when it fails a job: what
+#: :meth:`JobRecord.transition` sets, and the error.
+_FAILED_COLUMNS = ("status", "measured_tokens", "updated_at", "error")
+
+
 def _record(
     row: Row[Any],
-    sources: bytes,
+    sources: bytes | None,
     report: bytes | None,
     events: Sequence[str],
-    *,
-    whole: bool,
 ) -> JobRecord:
-    """The record a row and its objects hold. An envelope, where not ``whole``,
-    leaves the report, the checkpoint and the resumption behind."""
-    data = {
-        name: json.loads(row._mapping[name])
-        if name in _JSON_FIELDS
-        else row._mapping[name]
-        for name in JobRecord.model_fields
-        if name not in _OUTSIDE_THE_ROW
-    }
-    if not whole:
-        data |= {"checkpoint": None, "resumption": None}
-    data["sources"] = json.loads(sources)
+    """The record a row and its objects hold. An envelope, where ``sources``
+    is ``None``, leaves out each part that the schema version covers, and
+    never parses one."""
+    envelope = sources is None
+    data: dict[str, Any] = {}
+    for name in JobRecord.model_fields.keys() - _OUTSIDE_THE_ROW:
+        value = row._mapping[name]
+        if envelope and name in _COVERED_COLUMNS:
+            data[name] = None
+        elif name in _JSON_FIELDS:
+            data[name] = json.loads(value)
+        else:
+            data[name] = value
+    data["sources"] = None if sources is None else json.loads(sources)
     data["report"] = None if report is None else json.loads(report)
     data["events"] = [json.loads(text) for text in events]
     return JobRecord.model_validate(data)
-
-
-def _digest(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
 
 
 def _event_rows(job_id: str, events: Sequence[JobEvent]) -> list[dict[str, Any]]:
@@ -800,7 +806,7 @@ class SqlJobStore:
     async def _object(self, row: Row[Any], name: ObjectName, digest: str) -> bytes:
         """The object ``name`` of the job ``row`` names, checked against ``digest``."""
         data = await self._objects.get(object_key(row.owner_id, row.id, name))
-        if data is None or not hmac.compare_digest(_digest(data), digest):
+        if data is None or not hmac.compare_digest(object_digest(data), digest):
             logger.error(
                 "job %s of owner %s: its %s object is missing or fails its digest"
                 " check",
@@ -848,10 +854,10 @@ class SqlJobStore:
         if held is not None:
             return Admission(outcome="duplicate", active=0)
         objects: dict[ObjectName, bytes] = {
-            "sources.json": _SOURCES.dump_json(record.sources)
+            "sources.json": _SOURCES.dump_json(record.whole_sources())
         }
         if record.report is not None:
-            objects["report.json"] = record.report.model_dump_json().encode()
+            objects["report.json"] = stored_report(record.report)
         keys = []
         try:
             for name, data in objects.items():
@@ -863,7 +869,7 @@ class SqlJobStore:
                 ceiling=ceiling,
                 budget=budget,
                 principal=principal,
-                digests={name: _digest(data) for name, data in objects.items()},
+                digests={name: object_digest(data) for name, data in objects.items()},
             )
         except BaseException:
             await self._remove(keys)
@@ -984,11 +990,13 @@ class SqlJobStore:
                 .order_by(job_events.c.seq)
             )
             texts = events.all()
+        if not whole:
+            return _record(row, None, None, texts)
         sources = await self._object(row, "sources.json", row.sources_sha256)
         report = None
-        if whole and _names(row, "report.json"):
+        if _names(row, "report.json"):
             report = await self._object(row, "report.json", row.report_sha256)
-        return _record(row, sources, report, texts, whole=whole)
+        return _record(row, sources, report, texts)
 
     async def get(self, job_id: str) -> JobRecord | None:
         return await self._load(select(jobs).where(jobs.c.id == job_id), whole=True)
@@ -996,10 +1004,25 @@ class SqlJobStore:
     async def owned(self, job_id: str, owner_id: str) -> JobRecord | None:
         """The record ``owner_id`` owns, as an envelope, or ``None``.
 
-        The owner is checked on the row, before any object is read.
+        It reads no object, and parses no part that the schema version covers.
         """
         query = select(jobs).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
         return await self._load(query, whole=False)
+
+    async def sources(self, job_id: str, owner_id: str) -> list[Source] | None:
+        """The owned job's sources. The owner is checked on the row, before
+        the object is read."""
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(jobs.c.id, jobs.c.owner_id, jobs.c.sources_sha256).where(
+                    jobs.c.id == job_id, jobs.c.owner_id == owner_id
+                )
+            )
+            row = found.one_or_none()
+        if row is None:
+            return None
+        data = await self._object(row, "sources.json", row.sources_sha256)
+        return _SOURCES.validate_json(data)
 
     async def _report(self, job_id: str, owner_id: str) -> bytes | None:
         async with self._transaction() as connection:
@@ -1096,7 +1119,7 @@ class SqlJobStore:
         check_save(record, row.report_sha256, held)
         values = _job_row(record)
         if record.report is not None and not _names(row, "report.json"):
-            data = record.report.model_dump_json().encode()
+            data = stored_report(record.report)
             key = object_key(row.owner_id, row.id, "report.json")
             try:
                 await self._objects.put(key, data)
@@ -1106,7 +1129,12 @@ class SqlJobStore:
                 # keeps the new object.
                 await self._objects.delete(key)
                 await self._objects.put(key, data)
-            values["report_sha256"] = _digest(data)
+            values["report_sha256"] = object_digest(data)
+        await self._write(record, values)
+
+    async def _write(self, record: JobRecord, values: Mapping[str, Any]) -> None:
+        """Write ``values`` to the job row of ``record``, and the events that
+        ``record`` gained, in one write transaction."""
         async with self._transaction(writes=True) as connection:
             await connection.execute(
                 update(jobs).where(jobs.c.id == record.id).values(values)
@@ -1288,13 +1316,8 @@ class SqlJobStore:
             for start in range(0, len(job_ids), _ID_BATCH):
                 batch = job_ids[start : start + _ID_BATCH]
                 for row in await connection.execute(query.where(jobs.c.id.in_(batch))):
-                    if row.status in TERMINAL_STATUSES:
-                        kept.update(_object_keys(row))
-                    else:
-                        kept.update(
-                            object_key(row.owner_id, row.id, name)
-                            for name in DIGEST_COLUMNS
-                        )
+                    in_flight = row.status not in TERMINAL_STATUSES
+                    kept.update(_object_keys(row, unnamed=in_flight))
         return kept
 
     async def sweep_orphans(self, before: datetime) -> int:
@@ -1332,22 +1355,26 @@ class SqlJobStore:
 
         The restart scan (#1529), through :meth:`JobRecord.transition` as on
         every store, so each failed job keeps its full charge and gets a
-        status event.
+        status event. It reads each job as an envelope and writes only the
+        columns that the transition and the error change, so it fails a job
+        of any schema version. A job in flight holds no report.
         """
         async with self._transaction() as connection:
-            found = await connection.scalars(
-                select(jobs.c.id)
+            found = await connection.execute(
+                select(jobs.c.id, jobs.c.owner_id)
                 .where(jobs.c.status.not_in(sorted(TERMINAL_STATUSES)))
                 .order_by(jobs.c.created_at, jobs.c.id)
             )
-            job_ids = found.all()
+            in_flight = found.all()
         failed = []
-        for job_id in job_ids:
-            record = await self.get(job_id)
+        for job_id, owner_id in in_flight:
+            record = await self.owned(job_id, owner_id)
             if record is None:
                 continue
             record.transition("failed")
             record.error = RESTART_FAILURE_MESSAGE
-            await self.save(record)
+            await self._write(
+                record, {name: getattr(record, name) for name in _FAILED_COLUMNS}
+            )
             failed.append(job_id)
         return failed

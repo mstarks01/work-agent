@@ -1472,6 +1472,18 @@ class TestTheRestartScan:
         outcome = reserve(store, new_record(reserved=300), budget=budget).outcome
         assert outcome == "over_owner_budget"
 
+    def test_a_failed_job_keeps_every_part_the_scan_does_not_change(self, store):
+        parent = completed(store)
+        child = follow_up(parent)
+        child.transition("running")
+        asyncio.run(admit(store, child))
+        before = asyncio.run(store.get(child.id))
+        assert asyncio.run(store.fail_in_flight()) == [child.id]
+        after = asyncio.run(store.get(child.id))
+        changed = {"status", "measured_tokens", "updated_at", "error", "events"}
+        assert after.model_dump(exclude=changed) == before.model_dump(exclude=changed)
+        assert after.events[:-1] == before.events
+
     def test_a_failed_job_frees_its_slot(self, store):
         reserve(store, new_record(), ceiling=1)
         asyncio.run(store.fail_in_flight())
@@ -1504,6 +1516,26 @@ class TestTheSchemaVersion:
             *asyncio.run(store.owned_jobs("alice")),
         ]
         assert {read.schema_version for read in reads} == {version}
+
+    def test_an_envelope_holds_no_part_the_version_covers(self, store):
+        """Each part is read by name, after :func:`same_schema` (#1532)."""
+        job = final(store, completed(store))
+        whole = asyncio.run(store.get(job))
+        envelope = asyncio.run(store.owned(job, "alice"))
+        listed = asyncio.run(store.owned_jobs("alice"))[-1]
+        for read in (envelope, listed):
+            covered = (read.sources, read.report, read.checkpoint, read.resumption)
+            assert covered == (None, None, None, None)
+        assert asyncio.run(store.sources(job, "alice")) == whole.sources
+        assert asyncio.run(store.sources(job, "mallory")) is None
+
+    def test_a_save_never_writes_an_envelope(self, store):
+        job = completed(store)
+        envelope = asyncio.run(store.owned(job, "alice"))
+        before = asyncio.run(store.get(job))
+        with pytest.raises(ValueError, match="envelope"):
+            asyncio.run(store.save(envelope))
+        assert asyncio.run(store.get(job)) == before
 
     def test_the_restart_scan_keeps_the_version_of_a_job_it_fails(self, store):
         record = new_record()

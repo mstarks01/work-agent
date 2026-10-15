@@ -339,9 +339,8 @@ class Workspace:
 
     async def jobs(self) -> list[JobRecord]:
         """Every job of the operator, as envelopes, oldest first."""
-        try:
-            owner_id = await self.owner_id("")
-        except NoSuchJob:
+        owner_id = await self.answers.held_owner_id(OPERATOR)
+        if owner_id is None:
             return []
         return await self.store.owned_jobs(owner_id)
 
@@ -399,8 +398,7 @@ class Workspace:
 
     async def parent_of(self, record: JobRecord) -> str | None:
         """The job this one resumes or amends: :func:`parent_of` over the
-        record with its resumption, which an envelope leaves out for its
-        weight.
+        record with its resumption, which an envelope leaves out.
 
         The resumption is read only where :func:`same_schema` accepts the
         record. A record of another schema version names only the job it
@@ -985,8 +983,11 @@ def create_app(
             {"name": selection.name, "options": dict(selection.options)}
             for selection in record.frameworks
         ]
+        sources = await store.sources(record.id, owner_id)
+        if sources is None:
+            return no_such_run()
         payload["description"] = "\n\n".join(
-            source.text for source in record.sources if source.kind != "answers"
+            source.text for source in sources if source.kind != "answers"
         )
         payload["error"] = record.error
         payload["issues"] = [
@@ -1190,12 +1191,16 @@ def create_app(
         report = answerable.report
         if report is None:
             return PlainTextResponse("no such report", status_code=404)
+        # The page compares with the report before it where the store holds
+        # that report under this service's schema version, and else shows
+        # none, as for a parent that is gone.
         resumption = answerable.record.resumption
-        previous = (
-            None
-            if resumption is None
-            else await workspace.store.report(resumption.parent_id, owner_id)
+        parent = (
+            None if resumption is None else await workspace.owned(resumption.parent_id)
         )
+        previous = None
+        if parent is not None and same_schema(parent.schema_version):
+            previous = await workspace.store.report(parent.id, owner_id)
         return response(render_report(report, answerable.state(), previous))
 
     @app.post("/correct/{run_id}")

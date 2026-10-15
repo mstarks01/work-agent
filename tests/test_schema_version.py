@@ -143,7 +143,7 @@ def call(client, method: str, job: str, route: str, body, token: str = "alice-to
 
 
 @pytest.mark.parametrize(("seed", "method", "route", "body", "ok"), PARSING_ROUTES)
-def test_a_parsing_route_refuses_a_record_of_an_older_major(
+def test_a_parsing_route_refuses_a_record_of_another_schema_version(
     seed, method, route, body, ok
 ):
     client, store = catalog_client()
@@ -173,7 +173,7 @@ def test_a_record_of_this_version_is_served(seed, method, route, body, ok):
     assert response.status_code == ok, response.text
 
 
-def test_a_submission_refuses_to_carry_answers_from_a_record_of_an_older_major():
+def test_a_submission_refuses_to_carry_answers_from_a_record_of_another_version():
     client, store = catalog_client()
     earlier = waiting(store)
     aged(store, earlier, OLDER)
@@ -188,7 +188,7 @@ def test_a_submission_refuses_to_carry_answers_from_a_record_of_an_older_major()
     assert "submit the job again" in response.json()["detail"]
 
 
-def test_the_report_and_the_status_serve_a_record_of_an_older_major():
+def test_the_report_and_the_status_serve_a_record_of_another_schema_version():
     """The report route returns what the store holds for any version (#1532)."""
     client, store = catalog_client()
     job = completed(store)
@@ -202,7 +202,7 @@ def test_the_report_and_the_status_serve_a_record_of_an_older_major():
     assert status.status_code == 200, status.text
 
 
-def test_another_owner_reads_a_record_of_an_older_major_as_missing():
+def test_another_owner_reads_a_record_of_another_version_as_missing():
     client, store = catalog_client()
     job = waiting(store)
     aged(store, job, OLDER)

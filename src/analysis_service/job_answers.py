@@ -253,7 +253,7 @@ class Answerable:
             analyses=self.analyses,
             waiting=record.status == "awaiting-answers",
             final=record.final(),
-            sources=record.sources,
+            sources=record.whole_sources(),
             answers=record.answers,
             shown=record.shown_early,
             skipped=record.skipped_early,
@@ -416,12 +416,16 @@ class JobAnswers:
     async def answerable(self, job_id: str, owner_id: str) -> Answerable:
         """What this caller may ask or answer about, read once.
 
-        **The one reader of "what does this job ask about".** Each heavy field
-        is read by name, once: the envelope carries neither, so a status read
-        never pays for them.
+        **The one reader of "what does this job ask about".** Each part that
+        the envelope leaves out is read by name, once, after :meth:`parsable`.
         """
         record = await self.parsable(job_id, owner_id)
         store = self.store
+        # The envelope leaves the sources out, and the answers compose with them.
+        sources = await store.sources(job_id, owner_id)
+        if sources is None:
+            raise NoSuchJob(job_id)
+        record.sources = sources
         if record.status == "awaiting-answers":
             # The questions are read off what the head built, so they answer
             # to the head's verdict as a report answers to its run's.
@@ -610,17 +614,25 @@ class JobAnswers:
             ),
         )
 
+    async def held_owner_id(self, identity: Identity) -> str | None:
+        """The owner ID of ``identity``'s principal, or ``None`` where it holds
+        none.
+
+        **The one read of a caller's owner ID.** A read creates no principal.
+        """
+        held = await self.store.principal(identity)
+        return None if held is None else held.owner_id
+
     async def owner_id(self, identity: Identity, job_id: str) -> str:
         """The owner ID of ``identity``'s principal, for a read of ``job_id``.
 
-        **The one read of a caller's owner ID.** A read creates no principal:
-        where ``identity`` holds none, it owns no job, so ``job_id`` raises
-        :class:`NoSuchJob`.
+        Where ``identity`` holds no principal, it owns no job, so ``job_id``
+        raises :class:`NoSuchJob`.
         """
-        held = await self.store.principal(identity)
-        if held is None:
+        owner_id = await self.held_owner_id(identity)
+        if owner_id is None:
             raise NoSuchJob(job_id)
-        return held.owner_id
+        return owner_id
 
     async def submitter(self, identity: Identity) -> Submitter:
         """The owner a submission by ``identity`` names, read once.
