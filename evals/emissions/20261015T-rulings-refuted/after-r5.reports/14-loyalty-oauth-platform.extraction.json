@@ -1,0 +1,1022 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "A member of the grocery loyalty programme.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Members collect points when they shop",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:member-phone",
+        "name": "member phone",
+        "description": "A phone used by a member to run the mobile app and retain a refresh token.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "The app keeps a refresh token on the phone.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:member-phones"
+      },
+      {
+        "id": "entity:partner-app",
+        "name": "partner app",
+        "description": "A web application run by another company, such as a meal-planning service that shows a member's points.",
+        "assets": [
+          "business-critical-data",
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "Partner apps are web applications that other companies run on their own servers",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:partner-servers"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "mobile app",
+        "description": "The mobile app used by members to sign in and call the rewards API.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Members use our mobile app.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:authorization-server",
+        "name": "authorization server",
+        "description": "The server that authenticates members, issues authorization codes, refresh tokens and access tokens, and handles partner consent.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The app signs a member in through our authorization server",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:rewards-api",
+        "name": "rewards API",
+        "description": "The API that reads and writes the points ledger and handles gift-card redemptions.",
+        "assets": [
+          "business-critical-data",
+          "credentials",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The rewards API reads and writes the points ledger",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:support-console",
+        "name": "support console",
+        "description": "A web application used to close a member's account.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The support console is a web app that closes a member's account.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:member-browser",
+        "name": "member browser",
+        "description": "A browser used for member sign-in and for returning an authorization code to a partner app.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The member's sign-in on the authorization server is kept in a cookie for thirty days.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:identity-database",
+        "name": "identity database",
+        "description": "The database containing member accounts, email addresses, password hashes, authorization codes, refresh tokens and consents.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The authorization server keeps member accounts, email addresses and password hashes in the identity database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:points-ledger",
+        "name": "points ledger",
+        "description": "The ledger containing every member's balance and every points transaction.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "the points ledger, which holds every member's balance and every points transaction",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:api-log-store",
+        "name": "API log store",
+        "description": "The store receiving every request to the rewards API, including headers.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The rewards API also writes every request it receives, headers included, to the API log store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:mobile-app>use-mobile-app",
+        "name": "use mobile app",
+        "description": "A member uses the mobile app.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Members use our mobile app.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:mobile-app",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:authorization-server>sign-in",
+        "name": "sign-in",
+        "description": "The mobile app signs the member in through the authorization server using the authorization code flow.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The app signs a member in through our authorization server with the authorization code flow",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody wrote down whether the app sends a PKCE challenge.",
+        "source": "process:mobile-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "authorization code flow",
+        "data_description": "member sign-in and authorization-code credentials",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:rewards-api>call-rewards-api",
+        "name": "call rewards API",
+        "description": "The mobile app calls the rewards API using an access token.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "then calls the rewards API with the access token it gets back",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "bearer access token",
+        "data_description": "access token and rewards API request",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:member>process:member-browser>use-browser",
+        "name": "use browser",
+        "description": "A member uses a browser to sign in and approve consent.",
+        "assets": [
+          "pii",
+          "credentials"
+        ],
+        "source_excerpt": "A member who connects a partner app signs in on the authorization server's sign-in page in their browser",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:member-browser",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "member sign-in and consent",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:member-browser>process:authorization-server>sign-in",
+        "name": "sign-in",
+        "description": "The browser accesses the authorization server sign-in page and consent screen.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "signs in on the authorization server's sign-in page in their browser and approves a consent screen",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:member-browser",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "authorization server sign-in",
+        "data_description": "member credentials and consent",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:partner-app>process:authorization-server>request-tokens",
+        "name": "request tokens",
+        "description": "A partner app sends token requests containing its client secret.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The partner app sends that secret in the body of its token requests.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:partner-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "client secret",
+        "data_description": "client ID, client secret and token request",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:member-browser>entity:partner-app>return-code",
+        "name": "return code",
+        "description": "The browser returns an authorization code to the partner app's redirect URI.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "The browser then returns to the partner app's redirect URI with an authorization code.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:member-browser",
+        "destination": "entity:partner-app",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "authorization code",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>store:identity-database>store-identity-data",
+        "name": "store identity data",
+        "description": "The authorization server reads and writes member identity and authorization data.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The authorization server keeps member accounts, email addresses and password hashes in the identity database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "member accounts, email addresses, password hashes, authorization codes, refresh tokens and consents",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:mobile-app>store:identity-database>disconnect-partner",
+        "name": "disconnect partner",
+        "description": "The mobile app causes a partner app's refresh token to be deleted from the identity database.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "Members can disconnect a partner app from the settings screen of the mobile app, which deletes that app's refresh token from the identity database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "store:identity-database",
+        "protocol": "HTTPS",
+        "authentication": "bearer access token",
+        "data_description": "partner app refresh token deletion",
+        "encryption_in_transit": "HTTPS",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:rewards-api>store:points-ledger>read-write-ledger",
+        "name": "read-write ledger",
+        "description": "The rewards API reads and writes the points ledger.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The rewards API reads and writes the points ledger",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:points-ledger",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "member balances and points transactions",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:rewards-api>store:api-log-store>write-requests",
+        "name": "write requests",
+        "description": "The rewards API writes every received request, including headers, to the API log store.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The rewards API also writes every request it receives, headers included, to the API log store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:api-log-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "requests and headers",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:support-console>process:authorization-server>take-access-tokens",
+        "name": "take access tokens",
+        "description": "The support console takes access tokens from the authorization server.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "It takes access tokens from the same authorization server",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "access tokens",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:support-console>store:identity-database>close-account",
+        "name": "close account",
+        "description": "The support console marks a member's account closed in the identity database.",
+        "assets": [
+          "pii",
+          "credentials"
+        ],
+        "source_excerpt": "Closing an account marks it closed in the identity database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "bearer access token",
+        "data_description": "member account closure and refresh-token records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:own-cloud-account",
+        "name": "own cloud account",
+        "description": "The organisation's own cloud account where the platform components and stores run.",
+        "assets": [],
+        "source_excerpt": "Everything below runs in our own cloud account",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:member-phones",
+        "name": "member phones",
+        "description": "The members' phones, which are outside the organisation's cloud account.",
+        "assets": [],
+        "source_excerpt": "apart from the members' phones",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:partner-servers",
+        "name": "partner servers",
+        "description": "Servers run by other companies for their partner applications.",
+        "assets": [],
+        "source_excerpt": "other companies run on their own servers",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The identity database contains confidential data because it stores member identity information, password hashes, tokens and consents.",
+        "element_id": "store:identity-database",
+        "attribute": "data_classification",
+        "basis": "The source states that it stores member accounts, email addresses, password hashes, authorization codes, refresh tokens and consents."
+      },
+      {
+        "assumption": "The points ledger contains confidential data because it stores member balances and points transactions.",
+        "element_id": "store:points-ledger",
+        "attribute": "data_classification",
+        "basis": "The source states that the ledger holds every member's balance and every points transaction."
+      },
+      {
+        "assumption": "The API log store contains confidential data because request headers may contain credentials and requests may contain member-related data.",
+        "element_id": "store:api-log-store",
+        "attribute": "data_classification",
+        "basis": "The source states that every request, headers included, is written to the API log store."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "A member of the grocery loyalty programme.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Members collect points when they shop",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:member-phone",
+        "name": "member phone",
+        "description": "A phone used by a member to run the mobile app and retain a refresh token.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "The app keeps a refresh token on the phone.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:member-phones"
+      },
+      {
+        "id": "entity:partner-app",
+        "name": "partner app",
+        "description": "A web application run by another company, such as a meal-planning service that shows a member's points.",
+        "assets": [
+          "business-critical-data",
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "Partner apps are web applications that other companies run on their own servers",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:partner-servers"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "mobile app",
+        "description": "The mobile app used by members to sign in and call the rewards API.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Members use our mobile app.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:authorization-server",
+        "name": "authorization server",
+        "description": "The server that authenticates members, issues authorization codes, refresh tokens and access tokens, and handles partner consent.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The app signs a member in through our authorization server",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:rewards-api",
+        "name": "rewards API",
+        "description": "The API that reads and writes the points ledger and handles gift-card redemptions.",
+        "assets": [
+          "business-critical-data",
+          "credentials",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The rewards API reads and writes the points ledger",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:support-console",
+        "name": "support console",
+        "description": "A web application used to close a member's account.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The support console is a web app that closes a member's account.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:member-browser",
+        "name": "member browser",
+        "description": "A browser used for member sign-in and for returning an authorization code to a partner app.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The member's sign-in on the authorization server is kept in a cookie for thirty days.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:identity-database",
+        "name": "identity database",
+        "description": "The database containing member accounts, email addresses, password hashes, authorization codes, refresh tokens and consents.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The authorization server keeps member accounts, email addresses and password hashes in the identity database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:points-ledger",
+        "name": "points ledger",
+        "description": "The ledger containing every member's balance and every points transaction.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "the points ledger, which holds every member's balance and every points transaction",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:api-log-store",
+        "name": "API log store",
+        "description": "The store receiving every request to the rewards API, including headers.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The rewards API also writes every request it receives, headers included, to the API log store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:own-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:mobile-app>use-mobile-app",
+        "name": "use mobile app",
+        "description": "A member uses the mobile app.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Members use our mobile app.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:mobile-app",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:authorization-server>sign-in",
+        "name": "sign-in",
+        "description": "The mobile app signs the member in through the authorization server using the authorization code flow.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The app signs a member in through our authorization server with the authorization code flow",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody wrote down whether the app sends a PKCE challenge.",
+        "source": "process:mobile-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "authorization code flow",
+        "data_description": "member sign-in and authorization-code credentials",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:rewards-api>call-rewards-api",
+        "name": "call rewards API",
+        "description": "The mobile app calls the rewards API using an access token.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "then calls the rewards API with the access token it gets back",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "bearer access token",
+        "data_description": "access token and rewards API request",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:member>process:member-browser>use-browser",
+        "name": "use browser",
+        "description": "A member uses a browser to sign in and approve consent.",
+        "assets": [
+          "pii",
+          "credentials"
+        ],
+        "source_excerpt": "A member who connects a partner app signs in on the authorization server's sign-in page in their browser",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:member-browser",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "member sign-in and consent",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:member-browser>process:authorization-server>sign-in",
+        "name": "sign-in",
+        "description": "The browser accesses the authorization server sign-in page and consent screen.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "signs in on the authorization server's sign-in page in their browser and approves a consent screen",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:member-browser",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "authorization server sign-in",
+        "data_description": "member credentials and consent",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:partner-app>process:authorization-server>request-tokens",
+        "name": "request tokens",
+        "description": "A partner app sends token requests containing its client secret.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The partner app sends that secret in the body of its token requests.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:partner-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "client secret",
+        "data_description": "client ID, client secret and token request",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:member-browser>entity:partner-app>return-code",
+        "name": "return code",
+        "description": "The browser returns an authorization code to the partner app's redirect URI.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "The browser then returns to the partner app's redirect URI with an authorization code.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:member-browser",
+        "destination": "entity:partner-app",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "authorization code",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>store:identity-database>store-identity-data",
+        "name": "store identity data",
+        "description": "The authorization server reads and writes member identity and authorization data.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The authorization server keeps member accounts, email addresses and password hashes in the identity database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "member accounts, email addresses, password hashes, authorization codes, refresh tokens and consents",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:mobile-app>store:identity-database>disconnect-partner",
+        "name": "disconnect partner",
+        "description": "The mobile app causes a partner app's refresh token to be deleted from the identity database.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "Members can disconnect a partner app from the settings screen of the mobile app, which deletes that app's refresh token from the identity database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "store:identity-database",
+        "protocol": "HTTPS",
+        "authentication": "bearer access token",
+        "data_description": "partner app refresh token deletion",
+        "encryption_in_transit": "HTTPS",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:rewards-api>store:points-ledger>read-write-ledger",
+        "name": "read-write ledger",
+        "description": "The rewards API reads and writes the points ledger.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The rewards API reads and writes the points ledger",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:points-ledger",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "member balances and points transactions",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:rewards-api>store:api-log-store>write-requests",
+        "name": "write requests",
+        "description": "The rewards API writes every received request, including headers, to the API log store.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "The rewards API also writes every request it receives, headers included, to the API log store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:api-log-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "requests and headers",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:support-console>process:authorization-server>take-access-tokens",
+        "name": "take access tokens",
+        "description": "The support console takes access tokens from the authorization server.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "It takes access tokens from the same authorization server",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "access tokens",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:support-console>store:identity-database>close-account",
+        "name": "close account",
+        "description": "The support console marks a member's account closed in the identity database.",
+        "assets": [
+          "pii",
+          "credentials"
+        ],
+        "source_excerpt": "Closing an account marks it closed in the identity database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "bearer access token",
+        "data_description": "member account closure and refresh-token records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:own-cloud-account",
+        "name": "own cloud account",
+        "description": "The organisation's own cloud account where the platform components and stores run.",
+        "assets": [],
+        "source_excerpt": "Everything below runs in our own cloud account",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:member-phones",
+        "name": "member phones",
+        "description": "The members' phones, which are outside the organisation's cloud account.",
+        "assets": [],
+        "source_excerpt": "apart from the members' phones",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:partner-servers",
+        "name": "partner servers",
+        "description": "Servers run by other companies for their partner applications.",
+        "assets": [],
+        "source_excerpt": "other companies run on their own servers",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The identity database contains confidential data because it stores member identity information, password hashes, tokens and consents.",
+        "element_id": "store:identity-database",
+        "attribute": "data_classification",
+        "basis": "The source states that it stores member accounts, email addresses, password hashes, authorization codes, refresh tokens and consents."
+      },
+      {
+        "assumption": "The points ledger contains confidential data because it stores member balances and points transactions.",
+        "element_id": "store:points-ledger",
+        "attribute": "data_classification",
+        "basis": "The source states that the ledger holds every member's balance and every points transaction."
+      },
+      {
+        "assumption": "The API log store contains confidential data because request headers may contain credentials and requests may contain member-related data.",
+        "element_id": "store:api-log-store",
+        "attribute": "data_classification",
+        "basis": "The source states that every request, headers included, is written to the API log store."
+      }
+    ],
+    "capabilities": []
+  },
+  "issues": [
+    {
+      "code": "invalid-reference",
+      "message": "flow source 'process:partner-app' does not reference an existing External Entity, Process, or Data Store",
+      "element_id": "flow:process:partner-app>process:authorization-server>request-tokens",
+      "field": "source"
+    }
+  ],
+  "repair": null
+}
