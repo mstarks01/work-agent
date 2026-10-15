@@ -496,6 +496,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -527,6 +528,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -558,6 +560,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -589,6 +592,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -620,6 +624,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -642,6 +647,7 @@
         "value": "principal:another-team",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -664,6 +670,7 @@
         "value": "boundary:internal-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -686,6 +693,7 @@
         "value": "boundary:internal-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -708,6 +716,7 @@
         "value": "boundary:internal-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -730,6 +739,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -752,6 +762,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -774,6 +785,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [],
         "premises": [],
@@ -788,6 +800,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [],
         "premises": [],
@@ -802,6 +815,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -824,6 +838,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -846,6 +861,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [],
         "premises": [],
@@ -860,6 +876,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -882,6 +899,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -904,6 +922,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [],
         "premises": [],
@@ -918,6 +937,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [],
         "premises": [],
@@ -932,6 +952,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [],
         "premises": [],

@@ -92,6 +92,7 @@ class TestJoinDrafts:
             predicate="mfa-requirement",
             value=ABSENT,
             basis="inferred",
+            origin="assertion-pass",
             explanation="password login only",
         )
         held = AssertionCatalog(
@@ -989,6 +990,7 @@ class TestAGroundIsAboutTheClaimsElements:
             predicate="authentication-mechanism",
             value="a hardware token",
             basis="inferred",
+            origin="assertion-pass",
             explanation="fixture",
         )
         catalog = AssertionCatalog(

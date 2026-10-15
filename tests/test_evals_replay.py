@@ -292,7 +292,12 @@ def fact(
 ) -> Assertion:
     """One stated row, with only what a matcher test reads."""
     return Assertion(
-        subject=subject, predicate=predicate, value=value, basis="stated", **overrides
+        subject=subject,
+        predicate=predicate,
+        value=value,
+        basis="stated",
+        origin="assertion-pass",
+        **overrides,
     )
 
 
@@ -743,6 +748,7 @@ class TestEveryReferenceRowTakesOneFate:
             predicate="storage-encryption",
             value="nothing at rest",
             basis="stated",
+            origin="assertion-pass",
         )
         entries = [*reference.entries[1:], extra]
 
@@ -1079,7 +1085,11 @@ class TestAnArchivedCatalogIsRedrawnFromItsLabels:
 
     def row(self, subject, predicate, value):
         return Assertion(
-            subject=subject, predicate=predicate, value=value, basis="stated"
+            subject=subject,
+            predicate=predicate,
+            value=value,
+            basis="stated",
+            origin="assertion-pass",
         )
 
     def test_a_layer_own_subject_is_redrawn_from_its_label(self):

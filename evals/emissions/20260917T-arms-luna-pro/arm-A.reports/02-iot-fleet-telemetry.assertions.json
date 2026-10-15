@@ -400,6 +400,7 @@
         "value": "pre-shared key",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -422,6 +423,7 @@
         "value": "credential:pre-shared-key",
         "scope": [],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -444,6 +446,7 @@
         "value": "credential:pre-shared-key",
         "scope": [],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -466,6 +469,7 @@
         "value": "shared",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -488,6 +492,7 @@
         "value": "not-rotated",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -519,6 +524,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -541,6 +547,7 @@
         "value": "internet-facing",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -572,6 +579,7 @@
           }
         ],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -594,6 +602,7 @@
         "value": "absent",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -616,6 +625,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -638,6 +648,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -660,6 +671,7 @@
         "value": "unknown",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": "hedged",
         "support": [
           {
@@ -691,6 +703,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -713,6 +726,7 @@
         "value": "company SSO",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -744,6 +758,7 @@
           }
         ],
         "basis": "inferred",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -766,6 +781,7 @@
         "value": "boundary:analytics-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {
@@ -788,6 +804,7 @@
         "value": "boundary:corporate-network",
         "scope": [],
         "basis": "stated",
+        "origin": "assertion-pass",
         "reason": null,
         "support": [
           {

@@ -39,6 +39,7 @@ ABSENCE = Assertion(
     predicate="mfa-requirement",
     value=ABSENT,
     basis="inferred",
+    origin="assertion-pass",
     explanation="the description names password login only",
 )
 MECHANISM = Assertion(
@@ -46,6 +47,7 @@ MECHANISM = Assertion(
     predicate="authentication-mechanism",
     value="a hardware token",
     basis="inferred",
+    origin="assertion-pass",
     explanation="fixture",
 )
 REVIEWER = "human:reviewer-1"
@@ -227,6 +229,7 @@ class TestSameNamedSubjects:
             value=value,
             scope=scope,
             basis="inferred",
+            origin="assertion-pass",
             explanation="fixture",
         )
 
@@ -268,6 +271,7 @@ class TestSameNamedSubjects:
                 Qualifier(kind="operation", value="write"),
             ],
             basis="inferred",
+            origin="assertion-pass",
             explanation="fixture",
         )
         held = self.catalog(self.mfa(ABSENT), grant)

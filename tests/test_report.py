@@ -124,6 +124,7 @@ def _contradicting_record() -> AssertionRecord:
                     predicate="authentication-mechanism",
                     value=ABSENT,
                     basis="inferred",
+                    origin="assertion-pass",
                     explanation="the description names no login step",
                 )
             ],
@@ -521,6 +522,7 @@ class TestReportInvariants:
             predicate="mfa-requirement",
             value=ABSENT,
             basis="inferred",
+            origin="assertion-pass",
             explanation="the description names password login only",
         )
         record = AssertionRecord(

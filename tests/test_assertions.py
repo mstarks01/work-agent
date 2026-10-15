@@ -50,6 +50,7 @@ from analysis_service.assertions import (
     _named,
     admissible,
     answer,
+    answered,
     apply_projection,
     assertion_id,
     catalog_issues,
@@ -73,6 +74,7 @@ from analysis_service.assertions import (
 from analysis_service.claims import Ground
 from analysis_service.deployment import DEFAULT_PROMPTS_DIR
 from analysis_service.evidence import evidence_catalog, unknown_evidence_ref
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import UNKNOWN, SystemModel, all_attribute_names
 
 SOURCE_LABEL = "System description"
@@ -298,6 +300,7 @@ class TestAssertionIdentity:
             "predicate": "authentication-mechanism",
             "value": "email and password",
             "basis": "stated",
+            "origin": "assertion-pass",
             "support": span_for("sign in with email and password"),
         }
         return Assertion(**{**fields, **overrides})
@@ -350,6 +353,7 @@ class TestAssertionIdentity:
             predicate="mfa-requirement",
             value=ABSENT,
             basis="inferred",
+            origin="assertion-pass",
             premises=["assertion:x"],
             explanation="nobody mentioned a second factor",
         )
@@ -408,6 +412,7 @@ def stated(**overrides):
         "predicate": "authentication-mechanism",
         "value": "email and password",
         "basis": "stated",
+        "origin": "assertion-pass",
         "support": span_for("sign in with email and password"),
     }
     return Assertion(**{**fields, **overrides})
@@ -515,6 +520,7 @@ REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
                     predicate="mfa-requirement",
                     value="probably",
                     basis="stated",
+                    origin="assertion-pass",
                     support=span_for("MFA"),
                 )
             ]
@@ -530,6 +536,7 @@ REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
                     predicate="transport-encryption",
                     value=UNKNOWN,
                     basis="stated",
+                    origin="assertion-pass",
                 )
             ]
         ),
@@ -549,6 +556,7 @@ REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
                     predicate="authorization-grant",
                     value="reads every column",
                     basis="stated",
+                    origin="assertion-pass",
                     support=span_for("reads over TLS"),
                 )
             ],
@@ -630,6 +638,7 @@ REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
                     predicate="represented-by",
                     value="entity:shopper",
                     basis="inferred",
+                    origin="assertion-pass",
                     explanation="the names look alike",
                 )
             ],
@@ -703,6 +712,7 @@ class TestWhatTheGateRefuses:
             predicate="transport-encryption",
             value=UNKNOWN,
             basis="stated",
+            origin="assertion-pass",
             reason="silent",
         )
         assert catalog_issues(catalog([row]), sources=SOURCES) == []
@@ -719,6 +729,7 @@ class TestConflictsAreDerived:
             "predicate": "transport-encryption",
             "value": "TLS",
             "basis": "stated",
+            "origin": "assertion-pass",
             "support": span_for("over TLS"),
         }
         return Assertion(**{**fields, **overrides})
@@ -767,6 +778,7 @@ class TestTheAuditProbes:
             "predicate": "mfa-requirement",
             "value": ABSENT,
             "basis": "stated",
+            "origin": "assertion-pass",
             "support": span_for("we have not rolled out MFA"),
         }
         return Assertion(**{**fields, **overrides})
@@ -810,6 +822,7 @@ class TestTheAuditProbes:
             predicate="authentication-mechanism",
             value=UNKNOWN,
             basis="stated",
+            origin="assertion-pass",
             reason="silent",
         )
         borrowed = Assertion(
@@ -817,6 +830,7 @@ class TestTheAuditProbes:
             predicate="authentication-mechanism",
             value="its own service account",
             basis="stated",
+            origin="assertion-pass",
             support=span_for("with its own\nservice account"),
         )
         held = catalog([unknown, borrowed], rows=rows)
@@ -844,6 +858,7 @@ class TestWhatAConsumerMayRestOn:
             "predicate": "mfa-requirement",
             "value": ABSENT,
             "basis": "stated",
+            "origin": "assertion-pass",
             "support": span_for("we have not rolled out MFA"),
         }
         return Assertion(**{**fields, **overrides})
@@ -880,6 +895,7 @@ class TestWhatAConsumerMayRestOn:
             predicate="mfa-requirement",
             value=UNKNOWN,
             basis="stated",
+            origin="assertion-pass",
             reason="silent",
         )
         held = catalog([self.row(value="required"), unknown], rows=rows)
@@ -936,6 +952,7 @@ class TestWhatAConsumerMayRestOn:
             predicate=max(REGISTRY, key=len),
             value="y" * 200,
             basis="stated",
+            origin="assertion-pass",
             scope=[Qualifier(kind="principal", value="z")],
         )
         bound = next(
@@ -973,6 +990,7 @@ class TestTheCatalogRoundTrips:
                     predicate="mfa-requirement",
                     value=ABSENT,
                     basis="stated",
+                    origin="assertion-pass",
                     support=span_for("not rolled out MFA"),
                     scope=[Qualifier(kind="principal", value="shopper accounts")],
                 )
@@ -983,6 +1001,71 @@ class TestTheCatalogRoundTrips:
     def test_an_unexpected_field_is_refused(self):
         with pytest.raises(ValidationError):
             AssertionCatalog.model_validate({"entries": [], "notes": "hello"})
+
+
+class TestARowNamesItsWriter:
+    """``origin`` says who wrote a row, and :func:`answered` reads only it."""
+
+    ANSWERS_TEXT = "Shopper accounts: MFA is required."
+
+    def span(self, source):
+        if source == "answers":
+            return support_span(self.ANSWERS_TEXT, ANSWERS_LABEL, self.ANSWERS_TEXT)
+        (span,) = span_for("we have not rolled out MFA")
+        return span
+
+    def raw(self, origin, *sources):
+        return {
+            "subject": FLOW,
+            "predicate": "mfa-requirement",
+            "value": "required",
+            "basis": "stated",
+            "support": [self.span(source).model_dump() for source in sources],
+            "origin": origin,
+        }
+
+    def test_the_schema_states_the_closed_set(self):
+        schema = Assertion.model_json_schema()
+        assert schema["properties"]["origin"]["enum"] == ["answer", "assertion-pass"]
+        assert "origin" in schema["required"]
+
+    def test_a_row_states_its_origin(self):
+        raw = self.raw("assertion-pass", "description")
+        del raw["origin"]
+        with pytest.raises(ValidationError, match="origin"):
+            Assertion.model_validate(raw)
+
+    @pytest.mark.parametrize(
+        ("origin", "sources"),
+        [
+            ("assertion-pass", ("answers",)),
+            ("assertion-pass", ("description", "answers")),
+            ("answer", ("description",)),
+            ("answer", ("answers", "description")),
+            ("answer", ()),
+        ],
+    )
+    def test_a_row_whose_origin_and_support_disagree_is_refused(self, origin, sources):
+        with pytest.raises(ValidationError, match="answers Source"):
+            Assertion.model_validate(self.raw(origin, *sources))
+
+    def test_a_pass_row_that_quotes_the_answers_is_no_answer(self):
+        """The label is not the reader: only ``origin`` makes a row an answer."""
+        written = Assertion.model_validate(self.raw("answer", "answers"))
+        row = Assertion.model_construct(**{**dict(written), "origin": "assertion-pass"})
+        assert row.support[0].source_label == ANSWERS_LABEL
+        assert not answered(row)
+
+    def test_an_answer_row_is_an_answer(self):
+        row = Assertion.model_validate(self.raw("answer", "answers"))
+        assert answered(row)
+
+    def test_a_merge_of_an_answer_and_a_pass_row_is_refused(self):
+        """A merge that joined the two would hide which spans the answer wrote."""
+        pass_row = Assertion.model_validate(self.raw("assertion-pass", "description"))
+        answer_row = Assertion.model_validate(self.raw("answer", "answers"))
+        with pytest.raises(ValidationError, match="answers Source"):
+            merged(catalog([pass_row]), catalog([answer_row]))
 
 
 class TestResolvingAProposal:
@@ -1068,6 +1151,23 @@ class TestResolvingAProposal:
         held, issues = self.resolve(self.row())
         assert issues == []
         assert catalog_issues(held, model=self.model(), sources=SOURCES) == []
+
+    def test_a_resolved_row_names_the_pass_as_its_writer(self):
+        held, _ = self.resolve(self.row())
+        assert [entry.origin for entry in held.entries] == ["assertion-pass"]
+
+    def test_a_quote_of_the_answers_source_locates_nothing(self):
+        """A job submitted with link answers shows the pass the answers Source.
+        The pass writes no answer, so its quote there supports no row."""
+        answers = "Customer accounts: sign in with email and password"
+        quoting = self.row(
+            quotes=[QuoteProposal(source_label=ANSWERS_LABEL, quote=answers)]
+        )
+        held, issues = self.resolve(
+            quoting, sources={**SOURCES, ANSWERS_LABEL: answers}
+        )
+        assert held.entries == []
+        assert [issue.code for issue in issues] == ["unsupported-assertion"]
 
     def test_the_subject_table_is_derived_from_the_rows(self):
         """A model that listed subjects too would have two places to spell one."""
@@ -1351,6 +1451,7 @@ class TestTheProjection:
             "predicate": "transport-encryption",
             "value": "TLS",
             "basis": "stated",
+            "origin": "assertion-pass",
             "support": span_for("Shoppers sign in"),
         }
         return Assertion(**{**fields, **overrides})
@@ -1464,6 +1565,7 @@ class TestTheProjection:
                     predicate="credential-rotation",
                     value="not-rotated",
                     basis="stated",
+                    origin="assertion-pass",
                     support=span_for("Shoppers sign in"),
                 )
             ],
@@ -1496,6 +1598,7 @@ class TestWhatAProjectionWillNotReach:
                     predicate="authentication-mechanism",
                     value="a service account",
                     basis="stated",
+                    origin="assertion-pass",
                     support=span_for("Shoppers sign in"),
                 )
             ],
@@ -1512,6 +1615,7 @@ class TestWhatAProjectionWillNotReach:
                     predicate="storage-encryption",
                     value="a customer-managed key",
                     basis="stated",
+                    origin="assertion-pass",
                     support=span_for("Shoppers sign in"),
                 )
             ],
@@ -1529,6 +1633,7 @@ class TestWhatAProjectionWillNotReach:
                     predicate="transport-encryption",
                     value="TLS",
                     basis="stated",
+                    origin="assertion-pass",
                     support=span_for("Shoppers sign in"),
                 )
             ],
@@ -1703,6 +1808,7 @@ class TestTheOneReaderOfAReferentType:
             predicate="mfa-requirement",
             value="sometimes",
             basis="inferred",
+            origin="assertion-pass",
             explanation="x",
         )
         assert codes(catalog_issues(catalog([row]))) == ["illegal-value"]
@@ -1821,6 +1927,7 @@ class TestTheProjectionBecomesTheGraphsValue:
                     predicate=predicate,
                     value=value,
                     basis=basis,
+                    origin="assertion-pass",
                     explanation="" if basis == "stated" else "no login step is named",
                     support=span_for("sign in with email and password")
                     if basis == "stated"
@@ -1890,6 +1997,7 @@ class TestTheProjectionBecomesTheGraphsValue:
                     predicate="credential-presented",
                     value="credential:api-key",
                     basis="stated",
+                    origin="assertion-pass",
                     support=span_for("sign in with email and password"),
                 ),
             ],
@@ -1933,6 +2041,7 @@ class TestTheProjectionBecomesTheGraphsValue:
                     predicate="network-membership",
                     value="boundary:nowhere",
                     basis="stated",
+                    origin="assertion-pass",
                     support=span_for("sign in with email and password"),
                 )
             ],

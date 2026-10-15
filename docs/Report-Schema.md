@@ -31,7 +31,7 @@ framework's own findings sit in its own block under `analyses`.
 
 ```python
 class Report:
-    schema_version: str  # "3.1"
+    schema_version: str  # "3.2"
     disclaimer: str  # the SERVICE's: AI-generated, not human-reviewed
     job: Job  # id, status="completed", timestamps, revise_rounds, frameworks
     input: InputRef  # system_name + one ref per submitted source
@@ -1228,4 +1228,12 @@ version before it. Read it when you load an archived report.
   `basis`, the element and the rule that prove it. A statement of another
   origin carries no `basis`. Additive for a consumer that reads only the 3.0
   fields. A route that parses a stored 3.0 job record answers `409` (see
+  [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
+- **Version 3.2:** each row in `assertions.catalog.entries` carries the
+  required `origin`, which names the writer of the row. `assertion-pass` is a
+  row the resolver builds from the assertion pass's proposal, and `answer` is a
+  row code writes from a submitter's answer. Every span of an `answer` row
+  quotes the answers Source, and no span of another row quotes it. Additive
+  for a consumer that reads only the 3.1 fields. A route that parses a stored
+  3.1 job record answers `409` (see
   [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).

@@ -28,6 +28,7 @@ ABSENCE = Assertion(
     predicate="mfa-requirement",
     value=ABSENT,
     basis="inferred",
+    origin="assertion-pass",
     explanation="the description names password login only",
 )
 ON_ROW = Ground(kind="assertion", assertion=assertion_id(ABSENCE))

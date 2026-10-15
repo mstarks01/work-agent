@@ -190,6 +190,7 @@ def _row(**overrides) -> Assertion:
         "predicate": "authentication-mechanism",
         "value": "password",
         "basis": "inferred",
+        "origin": "assertion-pass",
         "explanation": "fixture",
     }
     return Assertion(**{**fields, **overrides})

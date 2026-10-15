@@ -37,6 +37,7 @@ def result(case_id: str = "01-payments-checkout", **overrides) -> modes.Assertio
                         predicate="storage-encryption",
                         value="absent",
                         basis="stated",
+                        origin="assertion-pass",
                     )
                 ],
             ),

@@ -401,7 +401,8 @@ def _link_rows(
     An answer reaches every principal subject whose name folds to its own, and
     replaces any ``represented-by`` row already on it. An answer that reaches no
     principal, or names a component this model does not hold, writes nothing
-    and comes back as an issue, so a reader sees why it did nothing.
+    and comes back as an issue, so a reader sees why it did nothing. Each row
+    written here has the origin ``answer``.
     """
     if not links:
         return catalog, []
@@ -451,6 +452,7 @@ def _link_rows(
                 predicate="represented-by",
                 value=value,
                 basis="stated",
+                origin="answer",
                 support=[span],
             )
     kept = [

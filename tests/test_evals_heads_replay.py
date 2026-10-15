@@ -34,6 +34,7 @@ def catalog() -> AssertionCatalog:
                 predicate="storage-encryption",
                 value="absent",
                 basis="stated",
+                origin="assertion-pass",
             )
         ],
     )

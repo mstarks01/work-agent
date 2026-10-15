@@ -382,6 +382,7 @@ SHOPPERS_ROW = Assertion(
     predicate="mfa-requirement",
     value=ABSENT,
     basis="inferred",
+    origin="assertion-pass",
     explanation="the description names password login and nothing else",
 )
 
@@ -552,6 +553,7 @@ def test_prepare_reads_no_row_the_gate_refused(domain_loader, package_loaders):
         predicate="authentication-mechanism",
         value="a browser login",
         basis="stated",
+        origin="assertion-pass",
         support=[
             support_span(
                 "customers log in from the browser",
