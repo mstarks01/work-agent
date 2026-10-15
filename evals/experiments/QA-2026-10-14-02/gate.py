@@ -1,10 +1,13 @@
-"""The promotion gate of ADR 0086: the capability reader as it ships, once on each holdout case.
+"""The promotion gate of ADR 0086: the capability reader's prompt and check, once on each holdout case.
 
 The node's own instruction (``compose_capabilities_prompt``), the job's
 sources rendered as the service renders them (``render_sources``), and the
 node's own check (``with_stated_capabilities``) over the case's reference
-model. The one difference from a job: the call asks for a JSON object, where
-the service asks through the node's schema.
+model. It differs from a job in three ways: the call asks for a JSON object
+where a job sends the node's schema; it sends the prompt as one user message
+where a job sends it as a system message; and the check reads the reference
+model, which states no capability, where a job reads the Valid System Model with
+the capabilities that closed fields prove.
 
 Usage: gate.py <out.json> <model route> <case> [<case> ...]
 """

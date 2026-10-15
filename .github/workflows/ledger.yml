@@ -1,0 +1,48 @@
+# Ledger rows and grants go to main in their own pull request, so a reverted
+# candidate keeps its record. This check fails a pull request that changes a
+# file of ledger rows or grants under evals/experiments/ and also changes code.
+# evals/harness/ledger_isolation.py holds which paths count as code.
+#
+# Its own workflow, so it runs in seconds and needs no dependency install.
+name: Ledger
+
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  isolation:
+    name: Ledger rows in their own pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The base branch's copy of the script, so a pull request that edits the
+      # script is not checked by its own edit. Where the base branch has no
+      # copy, the pull request's copy runs. A rename lists both of its paths.
+      # The diff goes to a file and not through a pipe, so a failed git diff
+      # fails the step and does not pass an empty list.
+      - name: Ledger rows and code apart
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          script=evals/harness/ledger_isolation.py
+          check="$RUNNER_TEMP/ledger_isolation.py"
+          if git cat-file -e "$BASE_SHA:$script" 2>/dev/null; then
+            git show "$BASE_SHA:$script" > "$check"
+          else
+            cp "$script" "$check"
+          fi
+          paths="$RUNNER_TEMP/paths"
+          git diff -z --name-only --no-renames "$BASE_SHA...$HEAD_SHA" > "$paths"
+          python3 "$check" < "$paths"
