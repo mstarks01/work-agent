@@ -513,6 +513,8 @@ class JobRecord(BaseModel):
 # than a caller error. ``principal_exists`` says another admission created the
 # principal of this job's identity after the caller read that it had none, so
 # the caller submits again under the owner ID that admission created.
+# ``parent_missing`` says the owner holds no job under the ID that the record's
+# parent names: a delete removed it after the caller read it.
 AdmissionOutcome = Literal[
     "admitted",
     "at_ceiling",
@@ -522,6 +524,7 @@ AdmissionOutcome = Literal[
     "duplicate",
     "resumed_already",
     "parent_moved",
+    "parent_missing",
     "principal_exists",
 ]
 
@@ -889,7 +892,9 @@ class InMemoryJobStore:
         row keeps it. The principal is settled next, and the store keeps a new
         principal with the record it admits, in the same step. A record whose
         owner holds no principal where none is given is the caller's defect
-        too, and it raises. :func:`check_bounds` then checks the bounds.
+        too, and it raises. Then the parent: the owner must hold it, no other
+        child may lock it, and its revision must be the record's. Last,
+        :func:`check_bounds` checks the bounds.
         """
         if principal is not None and principal.owner_id != record.owner_id:
             raise ValueError(f"job {record.id} names another owner than its principal")
@@ -901,14 +906,14 @@ class InMemoryJobStore:
         elif self._principals.find(principal.identity) is not None:
             return Admission(outcome="principal_exists", active=0)
         parent = parent_of(record)
-        if parent is not None and self._resumed_by(parent) is not None:
-            return Admission(outcome="resumed_already", active=0)
-        parent_record = None if parent is None else self._records.get(parent)
-        if (
-            parent_record is not None
-            and parent_record.revision != record.parent_revision
-        ):
-            return Admission(outcome="parent_moved", active=0)
+        if parent is not None:
+            parent_record = self._records.get(parent)
+            if parent_record is None or parent_record.owner_id != record.owner_id:
+                return Admission(outcome="parent_missing", active=0)
+            if self._resumed_by(parent) is not None:
+                return Admission(outcome="resumed_already", active=0)
+            if parent_record.revision != record.parent_revision:
+                return Admission(outcome="parent_moved", active=0)
 
         admission = check_bounds(record, self._rows(), ceiling=ceiling, budget=budget)
         if admission.outcome == "admitted":

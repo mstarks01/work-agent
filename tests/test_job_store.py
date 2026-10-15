@@ -30,6 +30,7 @@ from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
     JobStatus,
+    JobStore,
     Resumption,
     same_schema,
 )
@@ -148,6 +149,37 @@ def held(request, tmp_path_factory, monkeypatch):
     return JOB_STORES[env["ANALYSIS_JOB_STORE"]].build(env, objects), objects
 
 
+class DeletingReads:
+    """An object store that deletes the job of each key in ``deleting``
+    through ``store`` before it reads that key: a delete that commits between
+    the store's row read and its object read."""
+
+    def __init__(self, objects: ObjectStore) -> None:
+        self._objects = objects
+        self.store: JobStore | None = None
+        self.deleting: set[str] = set()
+
+    def __getattr__(self, name: str):
+        return getattr(self._objects, name)
+
+    async def get(self, key: str) -> bytes | None:
+        if key in self.deleting:
+            owner_id, job_id, _ = key.split("/")
+            assert self.store is not None
+            assert await self.store.delete(job_id, owner_id) is not None
+        return await self._objects.get(key)
+
+
+@pytest.fixture(params=[_param(pair) for pair in OBJECT_PAIRS])
+def racing(request, tmp_path_factory, monkeypatch):
+    """A fresh store of a pair that keeps objects, and its object store, which
+    can delete a job during a read."""
+    env = _settings(request, tmp_path_factory, monkeypatch)()
+    objects = DeletingReads(build_object_store(env))
+    objects.store = JOB_STORES[env["ANALYSIS_JOB_STORE"]].build(env, objects)
+    return objects.store, objects
+
+
 def new_record(subject: str = "alice", reserved: int = 0) -> JobRecord:
     return JobRecord.create(
         owner_id=subject,
@@ -257,6 +289,10 @@ class TestReadsAndSaves:
         # An owner ID is a part of each object key, so it takes that shape.
         record = test_resume.TestTheResumedRun().resumed_job()
         record.owner_id = "alice"
+        record.resumption = record.resumption.model_copy(
+            update={"parent_id": completed(store)}
+        )
+        record.parent_revision = 0
         asyncio.run(admit(store, record))
         assert asyncio.run(store.get(record.id)).resumption == record.resumption
 
@@ -296,12 +332,15 @@ class TestReadsAndSaves:
         each a whole model and catalog, and the envelope reads neither (run 11,
         finding 2). The one route that needs a checkpoint asks for it by name."""
 
+        parent = completed(store)
+
         async def scenario():
             held = Checkpoint(system_model=valid_model(), assertions=None)
             record = new_record()
             record.resumption = Resumption(
-                follow_up=False, parent_id="parent", checkpoint=held
+                follow_up=False, parent_id=parent, checkpoint=held
             )
+            record.parent_revision = 0
             await admit(store, record)
             record.transition("running")
             record.checkpoint = held
@@ -324,7 +363,7 @@ class TestReadsAndSaves:
         assert envelope.resumption is None
         assert asked is not None and asked.system_model == valid_model()
         assert foreign is None
-        assert resumption is not None and resumption.parent_id == "parent"
+        assert resumption is not None and resumption.parent_id == parent
         assert foreign_resumption is None
 
     def test_report_is_one_copy_and_rechecks_ownership(self, store):
@@ -761,6 +800,27 @@ class TestTheParentLock:
         assert moved == Admission(outcome="parent_moved", active=0)
         asyncio.run(admit(store, amendment(parent, revision=1)))
 
+    @pytest.mark.parametrize("child", [follow_up, amendment])
+    def test_a_child_of_a_deleted_parent_is_refused(self, store, child):
+        """A delete that commits after the route read the parent leaves no
+        parent for the child."""
+        parent = waiting(store) if child is amendment else completed(store)
+        assert asyncio.run(store.delete(parent, "alice")) is not None
+        orphan = child(parent)
+        refused = reserve(store, orphan)
+        assert refused == Admission(outcome="parent_missing", active=0)
+        assert asyncio.run(store.owned(orphan.id, "alice")) is None
+
+    @pytest.mark.parametrize("child", [follow_up, amendment])
+    def test_a_child_of_another_owners_job_is_refused(self, store, child):
+        parent = (
+            waiting(store, owner="mallory")
+            if child is amendment
+            else completed(store, "mallory")
+        )
+        refused = reserve(store, child(parent))
+        assert refused == Admission(outcome="parent_missing", active=0)
+
     def test_a_save_and_an_amendment_never_both_land(self, store):
         """Each one locks the parent's row, so the second one sees the first."""
         parent = waiting(store)
@@ -1171,12 +1231,58 @@ class TestAFailedObjectDelete:
         assert asyncio.run(store.sweep_orphans(later())) == 1
         assert asyncio.run(objects.get(sources)) is None
 
+    def test_a_child_of_a_deleted_parent_leaves_no_object(self, held):
+        store, objects = held
+        parent = completed(store)
+        asyncio.run(store.delete(parent, "alice"))
+        orphan = follow_up(parent)
+        assert reserve(store, orphan).outcome == "parent_missing"
+        sources = object_key("alice", orphan.id, "sources.json")
+        assert asyncio.run(objects.get(sources)) is None
+
     def test_an_admission_that_raises_keeps_its_own_error(self, held):
         store, objects = held
         stranger = new_record("mallory")
         objects.failing = {object_key("mallory", stranger.id, "sources.json")}
         with pytest.raises(ValueError, match="holds no principal"):
             asyncio.run(store.reserve(stranger, ceiling=100, budget=POLICY))
+
+
+class TestADeleteDuringARead:
+    """A delete that commits between the row read and the object read leaves
+    a missing job, never a corrupt object."""
+
+    @pytest.mark.parametrize(
+        ("read", "name"),
+        [
+            ("sources", "sources.json"),
+            ("report", "report.json"),
+            ("report_json", "report.json"),
+        ],
+    )
+    def test_an_owned_read_finds_no_job(self, racing, read, name, caplog):
+        store, objects = racing
+        job_id = completed(store)
+        objects.deleting = {object_key("alice", job_id, name)}
+        with caplog.at_level(logging.ERROR):
+            assert asyncio.run(getattr(store, read)(job_id, "alice")) is None
+        assert not caplog.records
+
+    @pytest.mark.parametrize("name", ["sources.json", "report.json"])
+    def test_a_whole_read_finds_no_job(self, racing, name):
+        store, objects = racing
+        job_id = completed(store)
+        objects.deleting = {object_key("alice", job_id, name)}
+        assert asyncio.run(store.get(job_id)) is None
+
+    @pytest.mark.parametrize("read", ["sources", "report", "report_json"])
+    def test_a_missing_object_of_a_row_that_stays_is_corrupt(self, racing, read):
+        store, objects = racing
+        job_id = completed(store)
+        for name in ("sources.json", "report.json"):
+            asyncio.run(objects.delete(object_key("alice", job_id, name)))
+        with pytest.raises(sql_store.CorruptObject):
+            asyncio.run(getattr(store, read)(job_id, "alice"))
 
 
 class TestARepeatedSave:

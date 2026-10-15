@@ -857,6 +857,7 @@ _ADMISSION_MESSAGES: dict[str, str] = {
     "resumed_already": "These answers already started an analysis. Open its"
     " report, or answer again only if it fails.",
     "parent_moved": _STALE_MESSAGE,
+    "parent_missing": "This analysis was deleted.",
     "principal_exists": "Another analysis started at the same moment. Start"
     " this one again.",
 }

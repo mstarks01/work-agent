@@ -42,6 +42,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
+from analysis_service.aws_identity import platform_session
 from analysis_service.store_settings import StoreConfigError, closed_setting
 from analysis_service.vendors import (
     CredentialMode,
@@ -62,8 +63,8 @@ KEY_FILES: dict[str, str] = {
 Addressing = Literal["virtual", "path"]
 
 
-def _key_pair(env: Mapping[str, str]) -> dict[str, str]:
-    """``api_key``: the static key pair, from the two files only."""
+def _key_pair(env: Mapping[str, str]) -> boto3.Session:
+    """``api_key``: a session on the static key pair, from the two files only."""
     pair = {}
     for argument, var in KEY_FILES.items():
         try:
@@ -76,31 +77,32 @@ def _key_pair(env: Mapping[str, str]) -> dict[str, str]:
                 " it is unset, or its file is empty"
             )
         pair[argument] = value
-    return pair
+    return boto3.Session(**pair)
 
 
-def _platform_identity(env: Mapping[str, str]) -> dict[str, str]:
-    """``iam``: no key material. ``boto3`` resolves the identity from its own
-    chain, for example an attached role. A key file stops the startup, so a
-    static key works only where the deployment declares ``api_key``."""
+def _platform_identity(env: Mapping[str, str]) -> boto3.Session:
+    """``iam``: a session on the identity of the platform, by
+    :func:`~analysis_service.aws_identity.platform_session`. A key file stops
+    the startup too, so a static key works only where the deployment declares
+    ``api_key``."""
     for var in KEY_FILES.values():
         if env.get(var, "").strip():
             raise StoreConfigError(
                 f"the iam mode of the s3 object store reads no static key;"
                 f" unset {var}, or set ANALYSIS_OBJECT_CREDENTIALS=api_key"
             )
-    return {}
+    return platform_session("the iam mode of the s3 object store")
 
 
-#: The ``boto3`` credential arguments of each ``ANALYSIS_OBJECT_CREDENTIALS``
-#: value. The table answers for every :class:`CredentialMode`.
-CREDENTIALS: dict[CredentialMode, Callable[[Mapping[str, str]], dict[str, str]]] = {
+#: The ``boto3`` session of each ``ANALYSIS_OBJECT_CREDENTIALS`` value. The
+#: table answers for every :class:`CredentialMode`.
+CREDENTIALS: dict[CredentialMode, Callable[[Mapping[str, str]], boto3.Session]] = {
     CredentialMode.API_KEY: _key_pair,
     CredentialMode.IAM: _platform_identity,
 }
 
 
-def _credentials(env: Mapping[str, str]) -> dict[str, str]:
+def _session(env: Mapping[str, str]) -> boto3.Session:
     for var in KEY_FILES.values():
         bare = refused_var(var)
         if env.get(bare, "").strip():
@@ -196,7 +198,7 @@ class S3ObjectStore:
             "ANALYSIS_OBJECT_ADDRESSING",
             dict.fromkeys(get_args(Addressing)),
         )
-        client = boto3.Session().client(
+        client = _session(env).client(
             "s3",
             region_name=region,
             endpoint_url=_endpoint(env),
@@ -206,7 +208,6 @@ class S3ObjectStore:
                 # pass by the ``https`` check of ``ANALYSIS_OBJECT_ENDPOINT``.
                 ignore_configured_endpoint_urls=True,
             ),
-            **_credentials(env),
         )
         return cls(client, bucket)
 

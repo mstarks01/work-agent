@@ -184,6 +184,22 @@ class StubRds:
         return f"token-{len(self.requests)}"
 
 
+def stub_boto3(monkeypatch, rds: StubRds, clients: list | None = None) -> None:
+    """Put in place a ``boto3`` whose session holds the role of an instance,
+    and whose RDS client is ``rds``. Each client it builds goes in ``clients``."""
+
+    class Session:
+        def get_credentials(self) -> types.SimpleNamespace:
+            return types.SimpleNamespace(method="iam-role")
+
+        def client(self, service: str, region_name: str) -> StubRds:
+            if clients is not None:
+                clients.append((service, region_name))
+            return rds
+
+    monkeypatch.setitem(sys.modules, "boto3", types.SimpleNamespace(Session=Session))
+
+
 class TestTheIamCredentials:
     @pytest.mark.parametrize(
         ("change", "message"),
@@ -206,6 +222,22 @@ class TestTheIamCredentials:
         with pytest.raises(StoreConfigError, match=message):
             engine_for(iam_env)
 
+    def test_a_static_pair_in_the_environment_stops_the_startup(self, iam_env, moto_s3):
+        """moto puts a static key pair in the environment."""
+        with pytest.raises(StoreConfigError, match="found credentials from env$"):
+            engine_for(iam_env)
+
+    def test_a_web_identity_signs_the_token(
+        self, iam_env, no_static_key, monkeypatch, tmp_path
+    ):
+        """moto serves ``AssumeRoleWithWebIdentity`` in the test process."""
+        token = tmp_path / "token"
+        token.write_text("a-workload-token")
+        monkeypatch.setenv("AWS_WEB_IDENTITY_TOKEN_FILE", str(token))
+        monkeypatch.setenv("AWS_ROLE_ARN", "arn:aws:iam::123456789012:role/analysis")
+        signed = asyncio.run(connect_args(iam_env)["password"]())
+        assert signed.startswith("db.internal:5432/?Action=connect")
+
     def test_a_missing_boto3_names_the_aws_extra(self, iam_env, monkeypatch):
         monkeypatch.setitem(sys.modules, "boto3", None)
         with pytest.raises(
@@ -215,13 +247,8 @@ class TestTheIamCredentials:
 
     def test_each_call_signs_a_new_rds_token_for_the_url(self, iam_env, monkeypatch):
         rds = StubRds()
-        clients = []
-
-        def client(service: str, region_name: str) -> StubRds:
-            clients.append((service, region_name))
-            return rds
-
-        monkeypatch.setitem(sys.modules, "boto3", types.SimpleNamespace(client=client))
+        clients: list[tuple[str, str]] = []
+        stub_boto3(monkeypatch, rds, clients)
         token = connect_args(iam_env)["password"]
         assert [asyncio.run(token()), asyncio.run(token())] == ["token-1", "token-2"]
         assert clients == [("rds", "eu-west-1")]
@@ -236,8 +263,7 @@ class TestTheIamCredentials:
         self, iam_env, monkeypatch
     ):
         rds = StubRds()
-        stub = types.SimpleNamespace(client=lambda service, region_name: rds)
-        monkeypatch.setitem(sys.modules, "boto3", stub)
+        stub_boto3(monkeypatch, rds)
         monkeypatch.setenv("PGPORT", "6543")
         iam_env["ANALYSIS_DATABASE_URL"] = (
             "postgresql+asyncpg://analysis@db.internal/jobs"

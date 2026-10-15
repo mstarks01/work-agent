@@ -33,11 +33,13 @@ from analysis_service.jobs import (
     JobRecord,
     JobStore,
     Resumption,
+    parent_of,
 )
+from analysis_service.objects import build_object_store, object_key
 from analysis_service.report import NodeRun
 from analysis_service.sources import Source
 from analysis_service.sql_store import METADATA, CorruptObject
-from analysis_service.store_backends import build_store
+from analysis_service.store_backends import JOB_STORES, build_store
 from analysis_service.store_settings import StoreConfigError
 from analysis_service.validation import ValidationIssue
 from tests.factories import (
@@ -57,6 +59,7 @@ from tests.test_api import (
     auth,
     submission,
 )
+from tests.test_job_store import DeletingReads
 from tests.test_resume import LINK
 from tests.test_webapp_questions import PausingRunner
 
@@ -316,6 +319,52 @@ class TestARestart:
         assert carried.links == (LINK,)
 
 
+class TestADeleteBeforeTheAdmission:
+    """A delete of the parent that commits after the route read it, and
+    before the store admits the child."""
+
+    @pytest.mark.parametrize(
+        ("route", "body"),
+        [
+            ("answers", {"links": [LINK.model_dump()], "revision": 0}),
+            (
+                "amendments",
+                {"text": "The database is on a private network.", "revision": 0},
+            ),
+        ],
+    )
+    def test_the_child_reads_as_missing_and_no_run_starts(self, env, route, body):
+        store = build_store(env)
+        runner = PausingRunner()
+        started = []
+        run = runner.run
+
+        async def counting(job, on_node):
+            started.append(job.id)
+            return await run(job, on_node)
+
+        reserve = store.reserve
+
+        async def deleting_first(record, **bounds):
+            parent = parent_of(record)
+            if parent is not None:
+                assert await store.delete(parent, record.owner_id) is not None
+            return await reserve(record, **bounds)
+
+        runner.run = counting
+        with TestClient(app_over(store, runner)) as client:
+            job = client.post(
+                "/v1/jobs", json=submission(questions=True), headers=auth()
+            ).json()["job_id"]
+            owner_id = asyncio.run(store.get(job)).owner_id
+            store.reserve = deleting_first
+            response = client.post(f"/v1/jobs/{job}/{route}", json=body, headers=auth())
+            parent = client.get(f"/v1/jobs/{job}", headers=auth())
+        assert (response.status_code, parent.status_code) == (404, 404)
+        assert started == [job]
+        assert asyncio.run(store.owned_jobs(owner_id)) == []
+
+
 def every_field(owner_id: str = "alice") -> JobRecord:
     """A record whose every field holds a value other than its default."""
     held = Checkpoint(system_model=valid_model(), assertions=None)
@@ -370,6 +419,13 @@ class TestTheJsonRoundTrip:
     def test_every_field_survives_a_save_and_a_read(self, env):
         store = build_store(env)
         record = every_field()
+        parent = JobRecord.create(
+            owner_id="alice",
+            sources=[Source.description("a web app storing orders")],
+            frameworks=sample_selection(),
+        )
+        update = {"id": parent_of(record), "revision": record.parent_revision}
+        asyncio.run(admit(store, parent.model_copy(update=update)))
         first = record.model_copy(
             update={"status": "queued", "report": None, "events": record.events[:1]}
         )
@@ -447,6 +503,19 @@ class TestTheDigestCheck:
             response = client.get(f"/v1/jobs/{record.id}/report", headers=auth())
         assert response.status_code == 500
         assert response.json()["detail"] == "an internal error occurred"
+
+    @pytest.mark.parametrize(
+        ("path", "name"),
+        [("report", "report.json"), ("questions", "sources.json")],
+    )
+    def test_a_delete_during_the_read_answers_404(self, env, path, name):
+        objects = DeletingReads(build_object_store(env))
+        store = objects.store = JOB_STORES["sql"].build(env, objects)
+        record = completed_job(store)
+        objects.deleting = {object_key("alice", record.id, name)}
+        with TestClient(app_over(store), raise_server_exceptions=False) as client:
+            response = client.get(f"/v1/jobs/{record.id}/{path}", headers=auth())
+        assert response.status_code == 404
 
     def test_a_foreign_read_never_reaches_the_object(self, env):
         """The owner is checked on the row first, so a foreign read of a job

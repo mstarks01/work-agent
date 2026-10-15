@@ -144,10 +144,14 @@ class TestTheChangesRoute:
         assert "not a follow-up" in response.text
 
     def test_a_follow_up_whose_earlier_report_is_gone_is_refused(self):
+        import asyncio
+
         from tests.test_api import auth, make_client
 
         client, store = make_client()
-        child = _completed(store, sample_report([]), _follow_up_of("gone"))
+        parent = _completed(store, sample_report([]))
+        child = _completed(store, sample_report([]), _follow_up_of(parent))
+        assert asyncio.run(store.delete(parent, "alice")) is not None
 
         response = client.get(f"/v1/jobs/{child}/changes", headers=auth())
 

@@ -18,7 +18,7 @@ import contextlib
 import os
 import re
 import stat
-from collections.abc import AsyncIterator, Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol, cast, get_args
@@ -130,8 +130,9 @@ class FilesystemObjectStore:
 
     ``ANALYSIS_OBJECT_ROOT`` names the directory. Each directory this store
     makes is ``0700`` and each file ``0600``. A put creates its file
-    exclusively, and no read or write opens a file through a symbolic link.
-    The listing enters no symbolic link.
+    exclusively. No put, read or delete passes through a symbolic link in any
+    part of a key (:func:`_folder`), so each one stays under the root. The
+    listing enters no symbolic link.
     Only the service user can make an entry under the root, which
     :meth:`check` holds.
     """
@@ -154,28 +155,17 @@ class FilesystemObjectStore:
         or open to a group or to others."""
         check_private(self._root, "the object root", directory=True)
 
-    def _path(self, key: str) -> Path:
-        return self._root.joinpath(*key.split("/"))
-
     async def put(self, key: str, data: bytes) -> None:
         await asyncio.to_thread(_write, self._root, key.split("/"), data)
 
     async def get(self, key: str) -> bytes | None:
         try:
-            return await asyncio.to_thread(_read, self._path(key))
+            return await asyncio.to_thread(_read, self._root, key.split("/"))
         except FileNotFoundError:
             return None
 
     async def delete(self, key: str) -> bool:
-        path = self._path(key)
-        try:
-            await asyncio.to_thread(path.unlink)
-        except FileNotFoundError:
-            return False
-        # The job's directory goes with its last object.
-        with contextlib.suppress(OSError):
-            await asyncio.to_thread(path.parent.rmdir)
-        return True
+        return await asyncio.to_thread(_delete, self._root, key.split("/"))
 
     async def list(self) -> AsyncIterator[tuple[str, datetime]]:
         for listed in await asyncio.to_thread(_walk, self._root):
@@ -204,21 +194,65 @@ def _walk(root: Path) -> list[tuple[str, datetime]]:
     return found
 
 
+_DIRECTORY = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
+@contextlib.contextmanager
+def _folder(root: Path, folders: Sequence[str], *, create: bool) -> Iterator[int]:
+    """A descriptor of the directory ``root/folders``.
+
+    **The one walk of a key.** Each step opens one name under the descriptor
+    of the step before, with ``O_NOFOLLOW``, so a symbolic link at the root or
+    at any folder raises :class:`OSError` and its target stays untouched. No
+    step checks a path and then opens it, so no link can take the place of a
+    folder between the two. With ``create``, a missing folder is made
+    ``0700``; else it raises :class:`FileNotFoundError`.
+    """
+    descriptor = os.open(root, _DIRECTORY)
+    try:
+        for folder in folders:
+            if create:
+                with contextlib.suppress(FileExistsError):
+                    os.mkdir(folder, 0o700, dir_fd=descriptor)
+            parent = descriptor
+            descriptor = os.open(folder, _DIRECTORY, dir_fd=parent)
+            os.close(parent)
+        yield descriptor
+    finally:
+        os.close(descriptor)
+
+
 def _write(root: Path, parts: list[str], data: bytes) -> None:
     *folders, name = parts
-    path = root
-    for folder in folders:
-        path = path / folder
-        with contextlib.suppress(FileExistsError):
-            path.mkdir(mode=0o700)
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
-    with os.fdopen(os.open(path / name, flags, 0o600), "wb") as file:
-        file.write(data)
+    with _folder(root, folders, create=True) as folder:
+        file = os.open(name, flags, 0o600, dir_fd=folder)
+    with os.fdopen(file, "wb") as opened:
+        opened.write(data)
 
 
-def _read(path: Path) -> bytes:
-    with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW), "rb") as file:
-        return file.read()
+def _read(root: Path, parts: list[str]) -> bytes:
+    *folders, name = parts
+    with _folder(root, folders, create=False) as folder:
+        file = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=folder)
+    with os.fdopen(file, "rb") as opened:
+        return opened.read()
+
+
+def _delete(root: Path, parts: list[str]) -> bool:
+    *folders, name = parts
+    try:
+        with _folder(root, folders, create=False) as folder:
+            os.unlink(name, dir_fd=folder)
+    except FileNotFoundError:
+        return False
+    # The job's directory goes with its last object.
+    with (
+        contextlib.suppress(OSError),
+        _folder(root, folders[:-1], create=False) as parent,
+    ):
+        os.rmdir(folders[-1], dir_fd=parent)
+    return True
 
 
 def _s3_store(env: Mapping[str, str]) -> ObjectStore:
