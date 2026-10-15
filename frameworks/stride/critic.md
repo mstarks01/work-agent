@@ -22,7 +22,7 @@ Judge a draft's lane against the scope definitions in the digest below, which ar
 
 ## The judgements this framework's rulings carry
 
-Beyond a verdict, a STRIDE ruling carries a **confidence** rating. Run it, and the recommendation reading below, over the drafts that survived the three gating steps.
+Beyond a verdict, a STRIDE ruling carries a **confidence** rating. Run it, and the recommendation reading below, over the drafts that survived the two gating steps.
 
 **Confidence.** Rate how firmly the surviving threat is grounded in stated model facts: **high** when every load-bearing claim is stated outright, **medium** when the chain is sound but an intermediate step is inferred from the model rather than stated, **low** when the threat rests largely on an `unknown`. Confidence is about grounding, not about severity or about how likely the attack is.
 

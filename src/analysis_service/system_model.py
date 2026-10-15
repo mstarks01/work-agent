@@ -24,7 +24,7 @@ from collections import Counter
 from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import ClassVar, Literal, get_args, get_origin
+from typing import Any, ClassVar, Literal, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,6 +58,22 @@ CORE_ASSET_TAGS = frozenset(
         "business-critical-data",
     }
 )
+
+
+def assets_field() -> Any:
+    """The ``assets`` field, with :data:`CORE_ASSET_TAGS` stated to the provider.
+
+    The enum sits in the schema and not in a validator, so a tag outside the
+    set still reaches the gate as ``illegal-asset-tag`` on its element.
+    """
+    return Field(
+        default_factory=list,
+        max_length=len(CORE_ASSET_TAGS) * 4,
+        json_schema_extra={
+            "items": {"type": "string", "enum": [*sorted(CORE_ASSET_TAGS)]}
+        },
+    )
+
 
 _NON_SLUG_CHARS_RE = re.compile(r"[^a-z0-9]+")
 
@@ -385,7 +401,7 @@ class _Element(BaseModel):
     id: str = Field(max_length=300, pattern=ELEMENT_ID)
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
-    assets: list[str] = Field(default_factory=list, max_length=len(CORE_ASSET_TAGS) * 4)
+    assets: list[str] = assets_field()
     source_excerpt: str = Field(default="", max_length=1000)
     # Which Source the *excerpt* came from — the quote, not the element. A
     # verbatim quote has exactly one origin by construction, so this field can
