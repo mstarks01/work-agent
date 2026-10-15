@@ -104,7 +104,6 @@ from analysis_service.jobs import (
     is_follow_up,
     locks_its_parent,
     parent_of,
-    report_digest,
 )
 from analysis_service.objects import (
     ObjectName,
@@ -1107,7 +1106,7 @@ class SqlJobStore:
                 # keeps the new object.
                 await self._objects.delete(key)
                 await self._objects.put(key, data)
-            values["report_sha256"] = report_digest(record.report)
+            values["report_sha256"] = _digest(data)
         async with self._transaction(writes=True) as connection:
             await connection.execute(
                 update(jobs).where(jobs.c.id == record.id).values(values)
