@@ -200,7 +200,9 @@ The app keeps its runs in a job store. It reads the store settings of the
 does, with one difference: where `ANALYSIS_JOB_STORE` is unset, the app uses
 `memory`. So the first run needs no setting, and a restart loses every run.
 The service's table states each setting and its values. An unusable setting
-stops the startup, and the app does not fall back to `memory`.
+stops the startup, and the app does not fall back to `memory`. At startup, the
+app logs one line that tells whether a restart keeps your runs, and the form
+page shows the same line.
 
 To keep your runs in SQLite and a directory, install the `sql` extra, make the
 directory, run the migration step once, then start the app:

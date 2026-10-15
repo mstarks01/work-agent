@@ -437,18 +437,18 @@ The app can ask you questions before the analysis, and after the report.
   already answered, "I don't know" included.
 
 Where your description names a protocol that is secure by its own definition, such as SFTP's encryption or WireGuard's peer authentication, the app records that property and does not ask about it. An answer settles its fact, even where your description said otherwise. A run
-that waits for your answers is kept in the app's memory, like every other
+that waits for your answers is kept in the app's job store, like every other
 run, and the app never removes it to make room. When every run the app holds
 waits for answers, the app refuses a new run until you answer or continue
-one. A restart of the app loses it.
+one. With the `memory` store, a restart of the app loses it.
 
 **Reuse the answers of an earlier analysis.** With questions on, choose an
 earlier analysis under **Reuse answers from**, then click **Prepare
 analysis**. The new analysis takes each earlier answer that one of its own
 questions still asks. It lists the other answers as answers that do not fit
 this system model. An answer about a part of your system carries only where
-the new description gives that part the same name. The list holds the
-analyses of this app session, so a restart clears it.
+the new description gives that part the same name. The list shows each
+analysis that the app holds. With the `memory` store, a restart clears it.
 
 ## Next steps
 

@@ -102,12 +102,33 @@ def payload(page: str, block: str) -> dict:
     return json.loads(match.group(1))
 
 
+def assert_store_is_named(tiers, caplog, restart: str) -> None:
+    """The startup log and each of the page's three hints carry one note."""
+    with caplog.at_level(logging.INFO, logger="webapp"):
+        client = app(tiers)
+    with client:
+        page = client.get("/").text
+    [note] = [line for line in caplog.messages if "restart" in line]
+    assert restart in note
+    assert page.count(note) == 3
+
+
 class TestTheSettings:
     def test_with_no_store_setting_a_restart_loses_every_run(self, tiers):
         with app(tiers) as client:
             run_to_completion(client)
         with app(tiers) as client:
             assert client.get("/workspace/runs").json() == []
+
+    def test_the_log_and_the_page_say_a_restart_clears_a_memory_store(
+        self, tiers, caplog
+    ):
+        assert_store_is_named(tiers, caplog, "a restart clears them")
+
+    def test_the_log_and_the_page_say_a_restart_keeps_a_sql_store(
+        self, tiers, caplog, durable
+    ):
+        assert_store_is_named(tiers, caplog, "a restart keeps them")
 
     @pytest.mark.parametrize(
         ("setting", "value", "message"),
