@@ -761,7 +761,7 @@ class TestTheParentLock:
         assert moved == Admission(outcome="parent_moved", active=0)
         asyncio.run(admit(store, amendment(parent, revision=1)))
 
-    def test_a_saved_round_and_an_amendment_never_both_land(self, store):
+    def test_a_save_and_an_amendment_never_both_land(self, store):
         """Each one locks the parent's row, so the second one sees the first."""
         parent = waiting(store)
 
@@ -789,7 +789,7 @@ class TestTheSaves:
         assert not save(0)
         assert save(1)
 
-    def test_a_saved_round_keeps_its_answers_and_its_checkpoint(self, store):
+    def test_a_save_keeps_its_answers_and_its_checkpoint(self, store):
         job = waiting(store)
         given = AnswerSet(facts=(FactAnswer(key=KEY, value="unknown"),))
         assert asyncio.run(store.save_answers(job, "alice", given, [KEY], [], 0))
@@ -799,7 +799,7 @@ class TestTheSaves:
         assert saved.shown_early == [KEY]
         assert saved.checkpoint is not None
 
-    def test_a_round_is_refused_on_a_foreign_finished_or_locked_job(self, store):
+    def test_a_save_is_refused_on_a_foreign_finished_or_locked_job(self, store):
         job = waiting(store)
         assert not asyncio.run(
             store.save_answers(job, "mallory", NO_ANSWERS, [], [], 0)

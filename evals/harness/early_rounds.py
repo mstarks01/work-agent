@@ -4,8 +4,8 @@ A paused job asks its early questions in one adaptive list (ADR 0078). This
 command answers the list offline, save after save, and records how many
 questions reach the floor at the start, how many a submitter answers in all,
 and how many the answers add or remove. No model runs: each list is built by
-:func:`~analysis_service.answer_round.question_set`, admitted by
-:meth:`~analysis_service.answer_round.QuestionSet.admit` and written by
+:func:`~analysis_service.answer_state.question_set`, admitted by
+:meth:`~analysis_service.answer_state.QuestionSet.admit` and written by
 :func:`~analysis_service.fact_writes.answered_model`, as the service does.
 A save is one request; the interactions a person makes are the ``asked``
 questions and their ``decisions``, counted apart from the saves.
@@ -41,13 +41,13 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.analysis import control_state
-from analysis_service.answer_round import (
+from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import (
     Answers,
     AnswerState,
     SavedAnswers,
     passes_floor,
 )
-from analysis_service.answer_sets import AnswerSet
 from analysis_service.assertions import UNKNOWN
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
@@ -179,7 +179,7 @@ class Replay:
     skipped: int
     repeats: int
     stop: str
-    #: What the stop leaves open (:class:`~analysis_service.answer_round.PauseSummary`,
+    #: What the stop leaves open (:class:`~analysis_service.answer_state.PauseSummary`,
     #: ADR 0068): the questions under a floor and held back by a limit, and
     #: for each framework and band its units by applicability state.
     below_floor: int = 0

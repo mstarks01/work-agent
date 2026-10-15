@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from analysis_service.answer_forms import YES_NO, answer_choices
-from analysis_service.answer_round import EARLY_RULES, passes_floor
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_state import EARLY_RULES, passes_floor
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import (
@@ -439,7 +439,7 @@ def _with_interfaces(kind, *, protocols=None):
 
 
 def _paused(model, selection, answers=()):
-    from analysis_service.answer_round import question_set
+    from analysis_service.answer_state import question_set
 
     return question_set(
         model,
@@ -536,7 +536,7 @@ class TestTheFrameworkGates:
         """The gate question is the list; the framework's own questions wait
         under ``gate-undecided``, at or above the floor, so a page can say
         what a gate answer unlocks (ADR 0078)."""
-        from analysis_service.answer_round import passes_floor
+        from analysis_service.answer_state import passes_floor
 
         model = _with_interfaces("unknown", protocols="unknown")
         asked = _paused(model, LEVEL_2)
@@ -572,10 +572,10 @@ class TestTheFrameworkGates:
         model that stated the interface would hold. Under a field limit of two,
         one earlier field answer leaves one place, which a counted gate answer
         would take."""
-        from analysis_service import answer_round
-        from analysis_service.answer_round import EarlyRule
+        from analysis_service import answer_state
+        from analysis_service.answer_state import EarlyRule
 
-        monkeypatch.setitem(answer_round.EARLY_RULES, "field", EarlyRule(1.0, 2))
+        monkeypatch.setitem(answer_state.EARLY_RULES, "field", EarlyRule(1.0, 2))
         selection = {**LEVEL_2, "stride": {}}
         model = _with_interfaces("unknown", protocols="unknown")
         filler = [FactAnswer(key=("", "", "", "subject 0", "", ""), value="unknown")]

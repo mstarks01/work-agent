@@ -866,7 +866,7 @@ def question_set(
         runnable,
         [
             question
-            for question in _open(listed, aside | done)
+            for question in _rankable(listed, aside | done)
             if question.kind == "capability"
         ],
         _settled(aside | done),
@@ -975,15 +975,15 @@ def _settled(done: Iterable[SkipKey]) -> set[str]:
     return {key_ref(key).capability for key in done if not isinstance(key, str)}
 
 
-def _open(
+def _rankable(
     listed: Sequence[EarlyQuestion], done: frozenset[SkipKey]
 ) -> list[EarlyQuestion]:
     """The listed questions a list may rank: not a gate, at or above its
     kind's floor, not done, and not waiting on a parent.
 
-    **The one reader of which question is open to rank.** :func:`recommended`
+    **The one reader of which question a list may rank.** :func:`recommended`
     takes from it, and the effects that break its ties are computed over its
-    capability questions, so no open question goes without its effect.
+    capability questions, so no rankable question goes without its effect.
     """
     waiting = _waiting(listed, _settled(done))
     return [
@@ -1186,7 +1186,7 @@ def recommended(
             place[question.key],
         )
 
-    open_ = _open(listed, done)
+    rankable = _rankable(listed, done)
     for kind, rule in EARLY_RULES.items():
         # The places each framework's limit has counted: a group of field
         # questions takes one place, and a capability question its own.
@@ -1195,7 +1195,7 @@ def recommended(
             if (kind == "capability") == bool(key_ref(key).capability):
                 for name in served:
                     counted[name].add(limit_place(key))
-        eligible = [question for question in open_ if _early_kind(question) == kind]
+        eligible = [question for question in rankable if _early_kind(question) == kind]
         started = [question for question in eligible if question.key in answered_for]
         taken: list[EarlyQuestion] = []
         fresh = sorted(

@@ -36,7 +36,7 @@ from tests.test_webapp import (
     startup_for,
     stub_settings,
 )
-from tests.test_webapp_questions import FACT, PausingRunner, ran, shown_round
+from tests.test_webapp_questions import FACT, PausingRunner, ran, shown_list
 from webapp.main import OPERATOR, Workspace, create_app
 
 #: The shipped tier config, as the webapp tests build it: one fixture, used here.
@@ -161,7 +161,7 @@ class TestARestart:
     ):
         with app(tiers) as client:
             paused = submit(client, questions=True)
-            key = shown_round(client, paused)["early_questions"][0]["key"]
+            key = shown_list(client, paused)["early_questions"][0]["key"]
             saved = client.post(
                 f"/answer/{paused}",
                 json={

@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping
 
 import pytest
 
-from analysis_service.answer_round import passes_floor
+from analysis_service.answer_state import passes_floor
 from analysis_service.assertions import REGISTRY, AssertionCatalog, settled
 from analysis_service.early_questions import early_questions
 from analysis_service.open_facts import prepared_model

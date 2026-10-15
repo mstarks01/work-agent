@@ -355,13 +355,13 @@ def check_answers(
     """Refuse an answer that would place nothing, before a resumed run is admitted.
 
     **The one admission check of a submission's answers.** Its caller is
-    :meth:`~analysis_service.answer_round.QuestionSet.admit`. A link answer is
+    :meth:`~analysis_service.answer_state.QuestionSet.admit`. A link answer is
     written by :func:`apply_answers` here, and each issue it would raise is a
     refusal, so a wrong link costs nothing. A link answer with no catalog to
     write it into raises :class:`NoCatalogError`. ``asked`` is the facts the
     job's questions name, and ``asked_links`` the :func:`fold` keys of the
     principals they ask about; ``earlier`` and ``earlier_links`` are the
-    answers of the earlier rounds, which a later round may answer again. A
+    answers of the earlier saves, which a later save may answer again. A
     link to any other principal is refused, so a submission cannot replace a
     ``represented-by`` row the sources stated. ``reopen`` lets an ``unknown``
     answer take back an earlier one

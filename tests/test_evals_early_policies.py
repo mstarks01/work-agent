@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import question_set
 from analysis_service.report import Report
 from evals.harness import audit, early_policies
 from evals.harness.early_policies import POLICIES, _spend, needs_of, readings

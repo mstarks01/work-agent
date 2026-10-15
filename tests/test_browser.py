@@ -604,10 +604,10 @@ def test_question_progress_and_entry_guidance(page):
     )
     assert page.get_by_label("Ask me questions to make the report better.").is_checked()
     pause(page)
-    assert page.locator("#round-progress-bar").get_attribute("value") == "0"
+    assert page.locator("#answer-progress-bar").get_attribute("value") == "0"
     control = page.locator('#questions select:has(option[value="yes"])').first
     control.select_option("yes")
-    assert float(page.locator("#round-progress-bar").get_attribute("value")) >= 1
+    assert float(page.locator("#answer-progress-bar").get_attribute("value")) >= 1
     assert "Is the connection Web App → Orders DB encrypted?" in page.inner_text(
         "#questions"
     )

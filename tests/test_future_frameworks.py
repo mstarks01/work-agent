@@ -17,8 +17,8 @@ from typing import Any, ClassVar
 
 import pytest
 
-from analysis_service.answer_round import EARLY_RULES, question_set
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import EARLY_RULES, question_set
 from analysis_service.capabilities import CapabilityNeed
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import QUESTION_PRIOR, PriorRow
@@ -88,12 +88,12 @@ def third(monkeypatch):
     )
     carrying(monkeypatch, package)
     # The planner's modules read the registry by the name they imported.
-    from analysis_service import answer_effects, answer_round, early_questions
+    from analysis_service import answer_effects, answer_state, early_questions
     from analysis_service.frameworks import PACKAGES as registered
 
     held = {**registered, THIRD: package}
     monkeypatch.setattr(early_questions, "PACKAGES", held)
-    monkeypatch.setattr(answer_round, "PACKAGES", held)
+    monkeypatch.setattr(answer_state, "PACKAGES", held)
     monkeypatch.setattr(answer_effects, "PACKAGES", held)
     return package
 

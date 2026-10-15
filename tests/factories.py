@@ -46,8 +46,8 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from analysis_service import frameworks as framework_registry
-from analysis_service.answer_round import AnswerState
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import AnswerState
 from analysis_service.binding import NodeBinding
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import MANIFEST_VERSION, BlessedManifest

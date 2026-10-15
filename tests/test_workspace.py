@@ -27,7 +27,7 @@ def test_reopen_keeps_questions_revision_and_related_report(tiers):
             headers=SAME_ORIGIN,
         )
         run = response.json()["run"]
-        paused = web.shown_round(client, run)
+        paused = web.shown_list(client, run)
         listing = client.get("/workspace/runs")
         assert "no-store" in listing.headers["cache-control"]
         assert "Private system description" not in listing.text

@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from analysis_service.answer_round import EARLY_RULES
+from analysis_service.answer_state import EARLY_RULES
 from analysis_service.capabilities import CAPABILITIES, lineage
 from evals.harness.rule_applicability import (
     FIXTURES_DIR,

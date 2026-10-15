@@ -113,36 +113,36 @@ def test_no_description_still_restates_a_withheld_control(case, tmp_path):  # no
         assert "Terminates shopper sessions" not in element.description
 
 
-class TestAnswersWithinRounds:
-    """An owner who stops after N rounds answers only what those rounds ask (#1289)."""
+class TestAnswersWithinSaves:
+    """An owner who stops after N saves answers only what those saves ask (#1289)."""
 
     def flows(self, answers):
         return [answer.key[0].rsplit(">", 1)[-1] for answer in answers]
 
-    def test_the_first_round_asks_every_withheld_fact(
+    def test_the_first_list_asks_every_withheld_fact(
         self,
         case,  # noqa: F811
     ):
-        """Ranked by score alone, round 1 asked one of the three and round 2
-        the rest (QA-2026-09-26-03-E27); ranked per choice, round 1 asks all
+        """Ranked by score alone, the first list asked one of the three and the second
+        the rest (QA-2026-09-26-03-E27); ranked per choice, the first list asks all
         three (QA-2026-09-26-03-E33)."""
-        from evals.harness.withheld import answers_within_rounds
+        from evals.harness.withheld import answers_within_saves
 
         signed = load_answer_file(DRAFT)
-        first = answers_within_rounds(case, signed, 1, ("stride",))
+        first = answers_within_saves(case, signed, 1, ("stride",))
         assert set(first) == set(signed.answers)
         assert "submit-order" in self.flows(first)
 
     def test_answers_keep_the_file_s_own_order_and_values(self, case):  # noqa: F811
-        from evals.harness.withheld import answers_within_rounds
+        from evals.harness.withheld import answers_within_saves
 
         signed = load_answer_file(DRAFT)
-        every = answers_within_rounds(case, signed, 10, ("stride",))
+        every = answers_within_saves(case, signed, 10, ("stride",))
         assert every == signed.answers
 
     def test_the_option_narrows_the_answered_mode_only(self, capsys):
         argv = ["run", "--mode", "withheld", "--case", "01-payments-checkout"]
-        assert run.main([*argv, "--answer-rounds", "1"]) == 1
+        assert run.main([*argv, "--answer-saves", "1"]) == 1
         assert "narrows the answered mode only" in capsys.readouterr().err
 
 

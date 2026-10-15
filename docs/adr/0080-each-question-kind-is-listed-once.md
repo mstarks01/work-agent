@@ -25,7 +25,7 @@ the intended choice. The maintainer had accepted that rule's cost on
 
 ## Decision
 
-**A question kind's rows follow its first row** (`answer_round.grouped`, the
+**A question kind's rows follow its first row** (`answer_state.grouped`, the
 last step of `recommended`). The kind takes the place of its highest-ranked
 row, and its other rows keep the list's order inside it. A lower row of one
 kind can so come before a higher row of another kind.

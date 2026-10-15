@@ -133,7 +133,8 @@ from analysis_service.answer_forms import (
     answer_suggestions,
     facets_json,
 )
-from analysis_service.answer_round import (
+from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import (
     ANSWER_LIMITS,
     MAX_SKIPS,
     AlreadyResumed,
@@ -143,7 +144,6 @@ from analysis_service.answer_round import (
     SourcesOverLimit,
     StaleRevision,
 )
-from analysis_service.answer_sets import AnswerSet
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
 from analysis_service.claims import UnknownKey
@@ -621,7 +621,7 @@ def render_report(
     ``previous`` is the report a follow-up's answers came from. The page then
     shows how each finding moved since it.
 
-    ``state`` is the run's :class:`~analysis_service.answer_round.AnswerState`:
+    ``state`` is the run's :class:`~analysis_service.answer_state.AnswerState`:
     its answers, whether a follow-up wrote its report, what the pause showed,
     what its owner corrected since and the run its follow-up started. It
     decides what the page still asks and how it labels each question, from

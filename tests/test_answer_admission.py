@@ -17,8 +17,8 @@ import pytest
 from pydantic import ValidationError
 
 from analysis_service.answer_forms import answer_choices, answer_limit
-from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_state import question_set
 from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
 from analysis_service.capabilities import lineage
 from analysis_service.early_questions import early_questions
@@ -151,7 +151,7 @@ class TestOneFactHasOneSpelling:
         assert merged_facts([first], [second]) == [second]
 
     def test_a_later_facet_answer_keeps_the_earlier_facets(self):
-        """A size answer in round two keeps the rate answer of round one
+        """A size answer in the second save keeps the rate answer of the first
         (#1289, F2)."""
         key = (FLOW, "", "", "", "capacity-limits", "")
         rate = FactAnswer(key=key, facets={"rate": "yes"})
@@ -250,7 +250,7 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         assert [list(fact.key) for fact in child.answers.facts] == [question["key"]]
 
     def test_an_earlier_answer_may_be_answered_again(self):
-        """A stated attribute is no longer asked, and the round that stated it
+        """A stated attribute is no longer asked, and the save that stated it
         may change it."""
         checkpoint = held()
         earlier = FactAnswer(key=(FLOW, "", "", "", "code-execution", ""), value="yes")
@@ -293,7 +293,7 @@ def admit(questions, links=(), facts=(), save=False, skips=(), presented=None):
     )
 
 
-class TestOneRoundHasOneAdmissionRule:
+class TestOneSaveHasOneAdmissionRule:
     """The HTTP route, the first-run app and the engine each kept their own
     copy of these two rules, and two of the copies disagreed."""
 
@@ -343,9 +343,9 @@ def _known_answer(question: dict) -> dict:
     return {"key": question["key"], "value": value}
 
 
-class TestTheRoundsEnd:
-    """A later round does not ask an "I don't know" fact again, and the
-    rounds after a report end."""
+class TestTheListEnds:
+    """A later list does not ask an "I don't know" fact again, and the
+    final report asks nothing."""
 
     def test_i_do_not_know_is_not_asked_again(self):
         first = _asked_after([]).early[0].key
@@ -369,7 +369,7 @@ class TestTheRoundsEnd:
             admit(final, facts=[FactAnswer(key=CAPACITY, value="unknown")])
 
     def test_a_submitter_who_never_knows_reaches_the_end(self):
-        """Every round at the pause answers every question "I don't know"."""
+        """Every save at the pause answers every question "I don't know"."""
         answered: list[FactAnswer] = []
         for _ in range(20):
             asked = _asked_after(answered)
@@ -414,7 +414,7 @@ class TestTheAdaptiveList:
     """A waiting job asks one adaptive list (ADR 0078)."""
 
     def test_the_list_holds_each_kind_up_to_its_limit_above_the_floor(self):
-        from analysis_service.answer_round import EARLY_RULES, passes_floor
+        from analysis_service.answer_state import EARLY_RULES, passes_floor
         from analysis_service.early_questions import early_questions
 
         asked = _asked_after([])
@@ -435,7 +435,7 @@ class TestTheAdaptiveList:
         assert asked.to_json()["policy_version"] == "adaptive-1"
 
     def test_a_question_counts_as_one_whatever_its_facets(self):
-        from analysis_service.answer_round import recommended
+        from analysis_service.answer_state import recommended
 
         wide = SimpleNamespace(
             key=CAPACITY,
@@ -461,7 +461,7 @@ class TestTheAdaptiveList:
     def test_field_questions_have_no_limit(self):
         """However many places saved field answers take, every field question
         above the floor is listed (ADR 0088)."""
-        from analysis_service.answer_round import recommended
+        from analysis_service.answer_state import recommended
 
         listed = _asked_after([]).early
         answered_for = {
@@ -492,10 +492,10 @@ class TestTheAdaptiveList:
     def test_a_second_framework_takes_no_place_from_the_first(self, monkeypatch):
         """Each framework has its own limit, so a joint pause asks STRIDE what
         it asks alone (QA-2026-10-09-01-E1). A limit counts groups (ADR 0081)."""
-        from analysis_service import answer_round
-        from analysis_service.answer_round import EarlyRule, recommended
+        from analysis_service import answer_state
+        from analysis_service.answer_state import EarlyRule, recommended
 
-        monkeypatch.setitem(answer_round.EARLY_RULES, "field", EarlyRule(1.0, 2))
+        monkeypatch.setitem(answer_state.EARLY_RULES, "field", EarlyRule(1.0, 2))
         field = self._field
         stride = [
             field(f"s{n}", attribute, "stride")
@@ -519,10 +519,10 @@ class TestTheAdaptiveList:
         """A group with a partial answer stays listed and takes one place, so a
         new row of it is listed too, while a new group waits for a place
         (#1289, B3; ADR 0081)."""
-        from analysis_service import answer_round
-        from analysis_service.answer_round import EarlyRule, recommended
+        from analysis_service import answer_state
+        from analysis_service.answer_state import EarlyRule, recommended
 
-        monkeypatch.setitem(answer_round.EARLY_RULES, "field", EarlyRule(1.0, 1))
+        monkeypatch.setitem(answer_state.EARLY_RULES, "field", EarlyRule(1.0, 1))
         facets = QUESTION_KINDS["capacity-limits"].facets
 
         def capacity_of(n):
@@ -555,7 +555,7 @@ class TestTheAdaptiveList:
         """The saved answers charge each framework, and so does a question's
         place in the list. A question answered in part is charged once, so
         its framework's turn is not passed over for it twice."""
-        from analysis_service.answer_round import recommended
+        from analysis_service.answer_state import recommended
 
         def field(name, framework, facets=()):
             return SimpleNamespace(
@@ -957,7 +957,7 @@ class TestAFollowUpMustAddSomething:
         ],
     )
     def test_only_known_content_that_changes_is_information(self, earlier, sent, adds):
-        from analysis_service.answer_round import _adds_information
+        from analysis_service.answer_state import _adds_information
 
         assert (
             _adds_information(
@@ -968,7 +968,7 @@ class TestAFollowUpMustAddSomething:
 
     @pytest.mark.parametrize(("earlier", "adds"), [([], True), ([LINK], False)])
     def test_a_link_is_information_where_it_places_anew(self, earlier, adds):
-        from analysis_service.answer_round import _adds_information
+        from analysis_service.answer_state import _adds_information
 
         assert (
             _adds_information(
@@ -1148,7 +1148,7 @@ def test_both_routes_refuse_one_set_of_odd_fields(odd, tiers):
         SAME_ORIGIN,
         PausingRunner,
         client_for,
-        shown_round,
+        shown_list,
         start,
     )
 
@@ -1159,7 +1159,7 @@ def test_both_routes_refuse_one_set_of_odd_fields(odd, tiers):
 
     app = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(app, questions=True)
-    shown_round(app, paused)
+    shown_list(app, paused)
     page = app.post(f"/answer/{paused}", json=body | {"facts": []}, headers=SAME_ORIGIN)
 
     assert (api.status_code, page.status_code) == (422, 400)
@@ -1336,7 +1336,7 @@ class TestTheFrameworksTakeTurns:
     a submitter who stops after ten choices still completes a STRIDE finding
     (#1289, QA-2026-09-26-03-E29)."""
 
-    def round_of(self, frameworks):
+    def list_of(self, frameworks):
         return question_set(
             valid_model(),
             None,
@@ -1349,7 +1349,7 @@ class TestTheFrameworksTakeTurns:
         ).early
 
     def test_the_first_choices_serve_every_selected_framework(self):
-        shown = self.round_of(BOTH)
+        shown = self.list_of(BOTH)
         first, spent = [], 0
         for question in shown:
             if spent >= 10:
@@ -1359,20 +1359,20 @@ class TestTheFrameworksTakeTurns:
         assert {name for q in first for name in q.frameworks} == set(BOTH)
 
     def test_a_part_still_follows_its_parent(self):
-        keys = [q.key for q in self.round_of(BOTH)]
-        for at, question in enumerate(self.round_of(BOTH)):
+        keys = [q.key for q in self.list_of(BOTH)]
+        for at, question in enumerate(self.list_of(BOTH)):
             if question.parent in keys:
                 assert keys.index(question.parent) < at
 
     def test_the_selection_order_changes_nothing(self):
         backward = dict(reversed(BOTH.items()))
-        assert self.round_of(BOTH) == self.round_of(backward)
+        assert self.list_of(BOTH) == self.list_of(backward)
 
     def test_the_turns_carry_over_the_saved_answers(self):
         """A submitter who answers the first question and saves meets the other
         framework's question next: the list's turns start from what the saved
         answers charged, not from zero (QA-2026-10-12-02-E2)."""
-        first = self.round_of(BOTH)[0]
+        first = self.list_of(BOTH)[0]
         assert first.frameworks == ("asvs",), "a control: asvs wins the first tie"
         after = question_set(
             valid_model(),
@@ -1393,7 +1393,7 @@ class TestTheFrameworksTakeTurns:
         )
 
     def test_one_framework_shows_the_list_s_order(self):
-        shown = self.round_of({"stride": {}})
+        shown = self.list_of({"stride": {}})
         listed = [
             q
             for q in early_questions(valid_model(), {"stride": {}}, None)
@@ -1402,7 +1402,7 @@ class TestTheFrameworksTakeTurns:
         assert [q.key for q in shown] == [q.key for q in listed]
 
     def test_a_gate_question_comes_first(self):
-        from analysis_service.answer_round import recommended
+        from analysis_service.answer_state import recommended
 
         def question(key, gates=()):
             return SimpleNamespace(
@@ -1424,7 +1424,7 @@ class TestTheFrameworksTakeTurns:
     def test_each_question_kind_is_listed_once_at_its_first_row(self):
         """A kind's rows follow its first row; a capability keeps its place,
         because every capability shares one group (ADR 0080)."""
-        from analysis_service.answer_round import grouped
+        from analysis_service.answer_state import grouped
         from analysis_service.open_facts import CAPABILITY_GROUP
 
         def question(key, group):
@@ -1448,7 +1448,7 @@ class TestTheFrameworksTakeTurns:
         ]
 
     def test_a_shared_question_is_charged_to_each_framework_it_serves(self):
-        from analysis_service.answer_round import by_turn
+        from analysis_service.answer_state import by_turn
 
         def question(key, *frameworks):
             return SimpleNamespace(

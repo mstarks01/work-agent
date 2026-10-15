@@ -20,8 +20,8 @@ from fastapi.testclient import TestClient
 
 from analysis_service import StubPipelineRunner
 from analysis_service.analysis import ABSENT_WORD
-from analysis_service.answer_round import ANSWER_LIMITS
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import (
@@ -148,8 +148,8 @@ def ran(client, run_id: str) -> str:
     return seen[-1]
 
 
-def shown_round(client, run_id: str) -> dict:
-    """The round a paused run shows: its stream read to the pause, then its questions."""
+def shown_list(client, run_id: str) -> dict:
+    """The list a paused run shows: its stream read to the pause, then its questions."""
     assert ran(client, run_id) == "awaiting-answers"
     return client.get(f"/workspace/runs/{run_id}").json()["questions"]
 
@@ -180,7 +180,7 @@ class TestTheToggle:
     def test_an_install_with_no_catalog_pauses_and_asks_early_questions(self, tiers):
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        asked = shown_round(client, paused)
+        asked = shown_list(client, paused)
         assert asked["link_questions"] == []
         assert asked["early_questions"]
         answered = client.post(
@@ -195,14 +195,14 @@ class TestTheToggle:
         assert answered.status_code == 200, answered.text
 
 
-class TestTheRounds:
-    """A paused run asks in rounds, and starts once nothing is left (ADR 0053)."""
+class TestTheSaves:
+    """A paused run asks save after save, and starts once nothing is left (ADR 0078)."""
 
-    def test_a_saved_round_shows_the_next_and_only_the_start_button_starts(self, tiers):
+    def test_a_save_shows_the_next_list_and_only_the_start_button_starts(self, tiers):
         """The last save started the analysis by itself (#1289, item 7)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        shown = shown_round(client, paused)
+        shown = shown_list(client, paused)
         for _ in range(20):
             facts = [
                 {"key": q["key"], "value": "unknown"} for q in shown["early_questions"]
@@ -227,7 +227,7 @@ class TestTheRounds:
             assert shown["early_stop"] is None
             assert not before & {tuple(q["key"]) for q in shown["early_questions"]}
         else:
-            pytest.fail("the rounds never ended")
+            pytest.fail("the saves never ended")
         # The stop says why truthfully: the limits held questions back, or a
         # floor left questions out, exactly where it says so.
         assert shown["early_stop"] == (
@@ -247,11 +247,11 @@ class TestTheRounds:
         done = client.get(f"/events/{started.json()['run']}").text
         assert "event: done" in done
 
-    def test_a_save_from_a_page_left_on_an_earlier_round_is_refused(self, tiers):
-        """A page left open on an earlier round cannot save over a later one (#1289)."""
+    def test_a_save_from_a_page_left_on_an_earlier_revision_is_refused(self, tiers):
+        """A page left open on an earlier revision cannot save over a later one (#1289)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        shown = shown_round(client, paused)
+        shown = shown_list(client, paused)
         assert shown["revision"] == 0
         first, second = (q["key"] for q in shown["early_questions"][:2])
 
@@ -287,7 +287,7 @@ class TestTheRounds:
         """The save carries a valid answer, so only the skip can refuse it."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        key = shown_round(client, paused)["early_questions"][0]["key"]
+        key = shown_list(client, paused)["early_questions"][0]["key"]
         fact = {"key": key, "value": "unknown"}
         body = {"links": [], "facts": [fact], "save": True, "revision": 0}
         saved = client.post(
@@ -304,7 +304,7 @@ class TestTheRounds:
         """
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        shown = shown_round(client, paused)
+        shown = shown_list(client, paused)
         skipped = client.post(
             f"/answer/{paused}",
             json={
@@ -336,7 +336,7 @@ class TestTheRounds:
         """A refusal of a malformed answer names its question (#1289)."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
-        first = shown_round(client, paused)["early_questions"][0]
+        first = shown_list(client, paused)["early_questions"][0]
         saved = client.post(
             f"/answer/{paused}",
             json={
@@ -369,7 +369,7 @@ class TestTheWholeFlow:
     def test_a_paused_run_asks_and_its_answers_reach_a_report(self, tiers, runner):
         client = client_for(tiers, runner)
         paused = start(client, questions=True)
-        asked = shown_round(client, paused)
+        asked = shown_list(client, paused)
 
         (question,) = asked["link_questions"]
         assert question["principal"] == "customer accounts"
@@ -521,8 +521,8 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 
 
 def _presented(rows: list[dict]) -> list[list[str]]:
-    """The keys of a round a page shows before any answer: every row but a
-    part whose parent the round also asks (QuestionSet.presented)."""
+    """The keys of a list a page shows before any answer: every row but a
+    part whose parent the list also asks (QuestionSet.presented)."""
     keys = [row["key"] for row in rows]
     return [row["key"] for row in rows if row.get("parent") not in keys]
 
@@ -846,7 +846,7 @@ def test_an_early_row_carries_its_element_s_source_words(tiers):
     """The owner sees what the service read about an element (#1289, B2)."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
-    shown = shown_round(client, paused)
+    shown = shown_list(client, paused)
     model = valid_model()
     for row in shown["early_questions"]:
         element = model.get(row["key"][0])
@@ -1240,7 +1240,7 @@ def test_a_failed_resumed_run_leaves_its_paused_run_to_answer_again(tiers):
     runner = FailingOnceRunner()
     with _bounded(tiers, runner, max_jobs=1) as client:
         paused = _paused(client)
-        shown = shown_round(client, paused)
+        shown = shown_list(client, paused)
         saved_fact = {"key": shown["early_questions"][0]["key"], "value": "yes"}
         saved = client.post(
             f"/answer/{paused}",
@@ -2051,7 +2051,7 @@ await ids.skip.listeners.click(); await settle();
 
 def test_skip_the_rest_sets_aside_a_question_answered_in_part():
     """ "Skip the rest" sets aside a question with facets answered in part, so
-    it does not come back first in every round (#1289)."""
+    it does not come back first after every save (#1289)."""
     key = ["process:web-app", "", "", "", "capacity-limits", ""]
     facets = [{"id": f, "question": f"{f}?"} for f in ("rate", "size")]
     row = _text_row(key, "Web App") | {
@@ -2141,7 +2141,7 @@ def test_a_suggested_element_is_offered_and_sent_only_when_chosen():
 
 
 def _skip_the_rest(links, facts) -> dict:
-    """The body "Skip the rest" sends for a round of these, every row blank."""
+    """The body "Skip the rest" sends for a list of these, every row blank."""
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
@@ -2157,7 +2157,7 @@ await ids.skip.listeners.click(); await settle();
     return sent["body"]
 
 
-def test_skip_the_rest_skips_a_link_only_round():
+def test_skip_the_rest_skips_a_link_only_list():
     """The page sends no empty save, which the service refuses (#1289, A2)."""
     body = _skip_the_rest([_LINK], [])
     assert body["links"] == []
@@ -2268,7 +2268,7 @@ await ids.continue.listeners.click(); await settle();
 
 
 def test_a_table_that_comes_back_keeps_its_earlier_facets():
-    """A size answer in a later round keeps the earlier rate answer (#1289, F2)."""
+    """A size answer in a later save keeps the earlier rate answer (#1289, F2)."""
     store = valid_model().data_stores[0]
     fact = facet_fact(store)
     earlier = {**fact, "answer": {"key": fact["key"], "facets": {"rate": "yes"}}}
@@ -2417,7 +2417,7 @@ def test_a_paused_run_starts_one_analysis(tiers):
     (#1289, ADR 0054)."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
-    shown_round(client, paused)
+    shown_list(client, paused)
     body = {"links": [], "facts": [], "revision": 0}
     first = client.post(f"/answer/{paused}", json=body, headers=SAME_ORIGIN)
     assert ran(client, first.json()["run"]) == "completed"
@@ -2432,7 +2432,7 @@ def test_a_refused_answer_to_a_skipped_question_names_it(tiers):
     """The label map includes skipped questions, which still take answers."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
     paused = start(client, questions=True)
-    first = shown_round(client, paused)["early_questions"][0]
+    first = shown_list(client, paused)["early_questions"][0]
     body = {"links": [], "facts": [], "save": True, "skip": [first["key"]]}
     client.post(f"/answer/{paused}", json=body | {"revision": 0}, headers=SAME_ORIGIN)
 
@@ -2460,7 +2460,7 @@ def test_answers_that_break_the_input_limits_are_refused_at_once(tiers, save):
         "/analyze", json=posted(text) | {"questions": True}, headers=SAME_ORIGIN
     )
     paused = started.json()["run"]
-    shown = shown_round(client, paused)
+    shown = shown_list(client, paused)
     asked = next(q for q in shown["early_questions"] if q["form"] == "choice")
     fact = {"key": asked["key"], "value": asked["choices"][0]["id"]}
 
@@ -2548,9 +2548,9 @@ def test_a_report_whose_follow_up_started_asks_nothing_and_says_where_it_went(ti
 )
 def test_the_page_opens_the_list_with_the_questions_the_service_counts(case):
     """The page hides a part until its parent's "yes", and the service counts
-    a round without such a part: two readers of one rule, so a real ASVS
-    level 2 round is given to both (#1378)."""
-    from analysis_service.answer_round import question_set
+    a list without such a part: two readers of one rule, so a real ASVS
+    level 2 list is given to both (#1378)."""
+    from analysis_service.answer_state import question_set
     from analysis_service.system_model import SystemModel
 
     path = PROJECT_ROOT / "evals/corpus" / case / "model.json"
@@ -2597,7 +2597,7 @@ class TestEarlierAnswers:
         runner = PausingRunner()
         client = client_for(tiers, runner)
         paused = start(client, questions=True)
-        shown = shown_round(client, paused)
+        shown = shown_list(client, paused)
         key = next(
             fact["key"]
             for fact in shown["early_questions"]
@@ -3044,7 +3044,7 @@ calls.push({{ said: text(ids.questions) }});
 
 def test_a_finished_pause_lists_what_stays_open_and_takes_a_held_back_answer():
     """No stop says every fact is settled (#1542 F2, ADR 0068): the page lists
-    what stays open, and a question no round asks can still be answered."""
+    what stays open, and a question no list asks can still be answered."""
     low = _text_row(["", "", "", "who signs?", "", ""], "who signs?")
     summary = {
         "introduced": 14,
@@ -3264,7 +3264,7 @@ class TestTheAmendment:
     def paused_with_an_answer(self, tiers, runner):
         client = client_for(tiers, runner, catalog=False)
         paused = start(client, questions=True)
-        shown = shown_round(client, paused)
+        shown = shown_list(client, paused)
         question = next(q for q in shown["early_questions"] if q["choices"])
         answer = {"key": question["key"], "value": question["choices"][0]["id"]}
         saved = client.post(
@@ -3285,7 +3285,7 @@ class TestTheAmendment:
         )
         assert amended.status_code == 200, amended.text
         run = amended.json()["run"]
-        again = shown_round(client, run)
+        again = shown_list(client, run)
 
         sources = runner.paused_sources[-1]
         assert sources[-1].text == AMENDMENT and sources[-1].label == "Amendment 1"

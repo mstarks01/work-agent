@@ -775,7 +775,7 @@ CatalogIssueCode = Literal[
 
 
 #: The issues a submitter's answer draws when it places nothing. None is a
-#: refusal, and each is a fact about the answers one round applies, so a round
+#: refusal, and each is a fact about the answers one run applies, so a run
 #: drops the ones its checkpoint carries and finds its own again.
 ANSWER_ISSUES: frozenset[str] = frozenset(
     {"unmatched-link", "unknown-link-element", "unmatched-answer"}
@@ -1576,7 +1576,7 @@ def answered(entry: Assertion) -> bool:
     service asked settles the fact, even against the sources (the maintainer's
     decision of 2026-09-25 on #1225), so :func:`project` lets an unscoped one
     outrank every other row, and the question readers find the row an earlier
-    round wrote by it.
+    run wrote by it.
     """
     return any(span.source_label == ANSWERS_LABEL for span in entry.support)
 

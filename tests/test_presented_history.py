@@ -1,9 +1,9 @@
 """A skip is the submitter's own act, of a question the page presented (#1542 F4).
 
-At 2fae7d3 the page kept a part hidden under its parent in the round's rows,
+At 2fae7d3 the page kept a part hidden under its parent in the list's rows,
 so "Skip the rest" sent its key as a skip, and the service admitted it. With
 the parent answered "I don't know" and later changed to "yes", the part stayed
-in the skipped list and out of the round. These tests drive the shipped page
+in the skipped list and out of the list. These tests drive the shipped page
 script and production admission over the same payload.
 """
 
@@ -14,8 +14,8 @@ from dataclasses import replace
 
 import pytest
 
-from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_state import question_set
 from analysis_service.early_questions import early_questions
 from analysis_service.fact_answers import FactAnswer
 from tests.factories import valid_model
@@ -46,7 +46,7 @@ def _chain(*names):
     return tuple(by_name[name] for name in names)
 
 
-def _round(*names):
+def _list_of(*names):
     """A list that holds exactly these capabilities, parents first, as the
     page held a part beside its parent before ADR 0078 listed it apart."""
     return replace(_paused(), early=_chain(*names))
@@ -105,7 +105,7 @@ class TestThePageSkipsOnlyWhatItShows:
         if not (facts or skips):
             return
         _save(
-            _round("oauth", "oauth-client"),
+            _list_of("oauth", "oauth-client"),
             facts=facts,
             skips=skips,
             presented=presented,
@@ -123,7 +123,7 @@ class TestTheServiceDecidesWhatWasPresented:
         yes = [FactAnswer(key=parent_q.key, value="yes")]
         with pytest.raises(ValueError, match="only a question the page presented"):
             _save(
-                _round("oauth", "oauth-client"),
+                _list_of("oauth", "oauth-client"),
                 facts=yes,
                 skips=[child.key],
                 presented=[parent_q.key],
@@ -131,10 +131,10 @@ class TestTheServiceDecidesWhatWasPresented:
 
     def test_a_part_the_owner_never_saw_is_asked_once_its_parent_is_yes(self):
         """The issue's F4b: the parent first "I don't know", then "yes". The
-        part comes to the round with no recovery from the skipped list."""
+        part comes to the list with no recovery from the skipped list."""
         parent, child = _chain("oauth", "oauth-client")
         first = _save(
-            _round("oauth", "oauth-client"),
+            _list_of("oauth", "oauth-client"),
             facts=[FactAnswer(key=parent.key, value="unknown")],
         )
         middle = _paused(first.answers.facts, first.skipped, first.shown)
@@ -157,7 +157,7 @@ class TestTheServiceDecidesWhatWasPresented:
 def test_a_resumed_job_carries_the_skips_its_report_reads():
     """The report tells a skip from a blank only where the resumed job keeps
     the pause's skips beside what it presented."""
-    from analysis_service.answer_round import Answers, AnswerState, ResumedJob
+    from analysis_service.answer_state import Answers, AnswerState, ResumedJob
     from analysis_service.jobs import Checkpoint
 
     skip = _paused().early[0].key

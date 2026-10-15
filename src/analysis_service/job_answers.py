@@ -4,7 +4,7 @@ Every surface that takes a submission to a job reads the job through here,
 builds its **Answer State** from the record, admits the submission, and
 either stores the answers, a draft or a correction, or creates the **Resumed
 Job** and starts it. The Answer State itself writes nothing
-(:mod:`analysis_service.answer_round`); this module is what writes, so no
+(:mod:`analysis_service.answer_state`); this module is what writes, so no
 caller stores answers or starts a job by hand.
 
 A refusal here is typed and never a status code. A driver maps each one to
@@ -30,7 +30,8 @@ from typing import Any
 import anyio.to_thread
 
 from analysis_service import budgets
-from analysis_service.answer_round import (
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
+from analysis_service.answer_state import (
     ANSWER_LIMITS,
     AlreadyResumed,
     Answers,
@@ -38,7 +39,6 @@ from analysis_service.answer_round import (
     SavedAnswers,
     SavedDraft,
 )
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate, CertifyResult
@@ -686,7 +686,7 @@ class JobAnswers:
         """Run one answer rule, and raise its ``ValueError`` as a :class:`Refused`.
 
         The refusals a driver maps on their own pass through unchanged:
-        :class:`~analysis_service.answer_round.AlreadyResumed` and
+        :class:`~analysis_service.answer_state.AlreadyResumed` and
         :class:`~analysis_service.links.NoCatalogError` are conflicts, and
         the others are not ``ValueError`` at all. The ``ValueError`` that
         names the submitter's own choices is re-typed, so a driver maps it

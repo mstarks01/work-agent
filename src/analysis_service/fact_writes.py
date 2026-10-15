@@ -3,7 +3,7 @@
 **Only an open fact is asked, and only an asked fact takes an answer.** An
 attribute is open where :func:`~analysis_service.open_facts.open_attribute`
 says so. An answer to an attribute the model states is refused, unless an
-earlier round answered it, so a submission cannot overwrite what the sources
+earlier save answered it, so a submission cannot overwrite what the sources
 said. An answer to a fact the job did not ask is refused by
 :func:`~analysis_service.links.check_answers`, so a submission cannot write a
 question of its own into every lane prompt.
@@ -99,9 +99,9 @@ def check_fact_answers(
     names one fact in one of the five spellings, as
     :attr:`~analysis_service.claims.UnknownRef.spellings` reads them.
 
-    ``earlier`` is what the earlier rounds answered. An attribute one of them
+    ``earlier`` is what the earlier saves answered. An attribute one of them
     answered is stated now, and may be answered again with another value. An
-    ``unknown`` answer to a fact an earlier round settled reopens the fact, so
+    ``unknown`` answer to a fact an earlier save settled reopens the fact, so
     it is refused unless ``reopen``: a job waiting at its pause lets a
     submitter take back an answer they guessed, and a report's follow-up does
     not. **The rule holds for each facet:** a facet answered ``unknown`` is
@@ -191,12 +191,12 @@ def _check_capability_lineage(
     prepared: SystemModel,
     earlier: Sequence[FactAnswer],
 ) -> None:
-    """Refuse a round that would leave a capability present under an absent ancestor.
+    """Refuse answers that would leave a capability present under an absent ancestor.
 
-    **Checked on the model the round produces**, with every earlier answer and
+    **Checked on the model the answers produce**, with every earlier answer and
     every source statement in it, so a contradiction is refused whether it
-    arrives in one round, across two, or against what the sources state. A
-    contradiction this round's answers take no part in is left as it is:
+    arrives in one save, across two, or against what the sources state. A
+    contradiction these answers take no part in is left as it is:
     :func:`~analysis_service.capabilities.resolve` keeps it for a person to
     settle.
     """
@@ -282,7 +282,7 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
         else:
             note = f"The submitter does not know {attribute}."
         note += detail_note(answer.detail)
-        # A resumed job's checkpoint already holds an earlier round's answers.
+        # A resumed job's checkpoint already holds the answers an earlier run wrote.
         notes = element.get("notes", "")
         if note not in notes:
             element["notes"] = f"{notes} {note}".strip()[:2000]
@@ -343,13 +343,13 @@ def fact_rows(
     ``spans`` are where each answer's line sits in the answers Source, in the
     order of ``answers``. An assertion answer replaces the open row it answers,
     and the stated row keeps the open row's subject, predicate and scope, so it
-    answers exactly what was asked. An earlier round's answer is written again
-    over the row it wrote, so its quote reads this round's answers Source.
+    answers exactly what was asked. An answer an earlier run wrote is written again
+    over the row it wrote, so its quote reads this run's answers Source.
 
     **An attribute answer removes every unscoped row that reaches its
     attribute.** The answer settles the attribute, and such a row left beside it
     would reach the lanes as the opposite fact. Each removed row is named by a
-    ``superseded-by-answer`` issue, which later rounds keep. **A scoped row
+    ``superseded-by-answer`` issue, which later runs keep. **A scoped row
     stays**, because it states a narrower fact that the answer does not settle.
     Where one stays, the answer is written as an unscoped row beside it, which
     :func:`~analysis_service.assertions.project` lets outrank it.

@@ -60,7 +60,7 @@ reads a requirement's band with `requirement_band`, the reader `rank` uses.
 The questions are ordered by band, then count, and a parent's band and count
 are never below its child's, so a parent still comes first. A capability
 question in the highest band also passes the floor where the job's questions
-span more than one band (`answer_round.passes_floor`): in an ASVS job at
+span more than one band (`answer_state.passes_floor`): in an ASVS job at
 level 2, one that settles a single level 1 requirement is asked. In a level 1
 job every question shares one band, and the floor alone decides.
 

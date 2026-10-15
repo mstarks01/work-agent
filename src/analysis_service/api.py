@@ -55,7 +55,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Receive, Scope, Send
 
 from analysis_service import budgets
-from analysis_service.answer_round import (
+from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_state import (
     MAX_SKIPS,
     AlreadyResumed,
     Answers,
@@ -63,7 +64,6 @@ from analysis_service.answer_round import (
     SourcesOverLimit,
     StaleRevision,
 )
-from analysis_service.answer_sets import AnswerSet
 from analysis_service.auth import (
     AuthenticationError,
     TokenVerifier,
