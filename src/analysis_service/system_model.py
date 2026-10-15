@@ -1169,6 +1169,34 @@ def _rewrite_id(
         element.id = derived
 
 
+def _zoned_ids_by_slug(zoned: Iterable[ZonedElement]) -> dict[str, list[str]]:
+    """Every zoned element's derived ID, keyed by the slug after its type prefix."""
+    by_slug: dict[str, list[str]] = {}
+    for element in zoned:
+        by_slug.setdefault(element.id.partition(":")[2], []).append(element.id)
+    return by_slug
+
+
+def _follow_endpoint(
+    endpoint: str, rewrites: Mapping[str, str], by_slug: Mapping[str, list[str]]
+) -> str:
+    """One flow endpoint after the rewrites, then after the slug rule.
+
+    A reference the rewrite table holds follows it. One that names no zoned
+    element but carries a slug exactly one zoned element has, under another
+    type prefix, follows that element. A slug two zoned elements share is left
+    as written, for the gate to report as the ambiguity it is.
+    """
+    followed = rewrites.get(endpoint, endpoint)
+    prefix, _, slug = followed.partition(":")
+    candidates = by_slug.get(slug, [])
+    if followed in candidates or len(candidates) != 1:
+        return followed
+    if prefix not in {ExternalEntity.id_prefix, Process.id_prefix, DataStore.id_prefix}:
+        return followed
+    return candidates[0]
+
+
 def normalize_element_ids(
     model: SystemModel, source_labels: Collection[str] = ()
 ) -> SystemModel:
@@ -1183,8 +1211,11 @@ def normalize_element_ids(
     Names are authoritative and IDs follow. An emitted ID is therefore only a
     *link*: every reference to it — ``trust_zone``, flow endpoints, and
     ``assumptions[].element_id`` — is rewritten to the derived ID, so a
-    self-consistent model stays self-consistent. Dangling references are left
-    untouched for the gate to report.
+    self-consistent model stays self-consistent. A flow endpoint that names no
+    element, but whose slug exactly one zoned element carries under another
+    type, follows that element: the model named the thing and mistyped its
+    prefix, which is the one mismatch a slug settles (ADR 0089). Every other
+    dangling reference is left untouched for the gate to report.
 
     Normalization can make two elements collide on one derived ID. That is a
     real defect surfacing, not one introduced: two elements sharing a name are
@@ -1225,9 +1256,10 @@ def normalize_element_ids(
 
     # Flows last: a flow's derived ID is built from its endpoints' IDs, so the
     # endpoints have to carry their derived values before it is computed.
+    by_slug = _zoned_ids_by_slug(zoned)
     for flow in normalized.data_flows:
-        flow.source = rewrites.get(flow.source, flow.source)
-        flow.destination = rewrites.get(flow.destination, flow.destination)
+        flow.source = _follow_endpoint(flow.source, rewrites, by_slug)
+        flow.destination = _follow_endpoint(flow.destination, rewrites, by_slug)
         _rewrite_id(flow, rewrites, ambiguous)
 
     for assumption in normalized.assumptions:
