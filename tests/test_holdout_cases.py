@@ -28,6 +28,7 @@ from evals.harness.reference import (
     load_corpus,
     refuse_holdout,
 )
+from tests.source_tree import source_files
 
 CORPUS = REPO_ROOT / "evals" / "corpus"
 
@@ -56,7 +57,7 @@ HOLDOUT_READERS = {
 def _loaders() -> set[str]:
     """Every call that reaches the golden ``load_corpus`` unfiltered, by site."""
     found = set()
-    for path in sorted((REPO_ROOT / "evals").rglob("*.py")):
+    for path in source_files("evals"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         relative = path.relative_to(REPO_ROOT).as_posix()
         module = None

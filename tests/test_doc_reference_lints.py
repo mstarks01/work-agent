@@ -72,7 +72,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.source_tree import FROZEN_PROSE
+from tests.source_tree import FROZEN_PROSE, source_files
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -338,12 +338,7 @@ def _resolves_role(ref: str, module_name: str) -> bool:
 
 
 def _code_files() -> list[Path]:
-    return sorted(
-        path
-        for tree in CODE_TREES
-        for path in (REPO_ROOT / tree).rglob("*.py")
-        if not SKIP_DIRS & set(path.parts)
-    )
+    return sorted(source_files(*CODE_TREES))
 
 
 @pytest.mark.parametrize("source", _code_files(), ids=_relative)
