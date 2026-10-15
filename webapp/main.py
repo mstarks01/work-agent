@@ -510,7 +510,7 @@ class Startup:
         return self.settings is not None
 
 
-def build_startup(env: Mapping[str, str] | None = None) -> Startup:
+def build_startup() -> Startup:
     """Resolve the config and prove the credentials, or convert the failure to a page.
 
     Two stages, and the split is the whole content of the diagnostic. Resolving
@@ -533,10 +533,9 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     The bounds a job is held to are the deployment's own: the same source
     limits, budget and deadline ``/v1`` enforces.
     """
-    env = os.environ if env is None else env
     deployment = None
     try:
-        deployment = Deployment.from_env(env)
+        deployment = Deployment.from_env(os.environ)
         deployment.runner(deployment.frameworks)
     except ConfigError as exc:
         logger.error("config error at startup: %s", exc)

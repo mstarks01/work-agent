@@ -170,9 +170,9 @@ class BudgetPolicy(BaseModel):
     #: rather than multiplies.
     global_max_tokens_per_window: int = Field(ge=1)
 
-    def window_start(self, now: datetime | None = None) -> datetime:
+    def window_start(self) -> datetime:
         """The oldest instant still inside the window."""
-        return (now or datetime.now(UTC)) - timedelta(seconds=self.window_seconds)
+        return datetime.now(UTC) - timedelta(seconds=self.window_seconds)
 
 
 def spent_tokens(charges: Iterable[tuple[int, int | None]]) -> int:

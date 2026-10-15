@@ -96,10 +96,6 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the ground kinds this instrument counts, which excludes the kinds it"
         " records under a shape of their own"
     ),
-    ("evals.harness.modes", "EVAL_FRAMEWORKS"): (
-        "the fallback for a case declaring no framework; which frameworks run"
-        " is a property of the case, read through case_frameworks"
-    ),
     ("evals.harness.sitting", "DONE_STATES"): (
         "the states a row needs nothing more in, so a state that still waits on"
         " its reader is absent by construction"

@@ -437,8 +437,6 @@ def from_claim(
     claim: Claim,
     lane: str,
     identifier: str | None,
-    seen_in: int = 1,
-    runs: int = 1,
     rows: Mapping[str, str] = NO_ROWS,
 ) -> Finding:
     """One produced claim as the queue's shape, digests and all.
@@ -461,8 +459,6 @@ def from_claim(
         quotes=tuple(ground.text for ground in claim.grounds if ground.text),
         verb=claim.verb,
         identifier=identifier,
-        seen_in=seen_in,
-        runs=runs,
         mechanism=tuple(sorted(grounded_mechanism(claim, rows))),
     )
 

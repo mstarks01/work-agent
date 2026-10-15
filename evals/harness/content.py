@@ -66,15 +66,12 @@ from typing import Any
 from analysis_service.claims import Claim, Ground, Mitigation, Severity, Verdict
 from analysis_service.parsing import ascii_int
 
-#: Every version of the structural digest this build computes, and the one a
-#: caller gets when it does not choose.
-STRUCTURAL_VERSIONS = (1,)
+#: The version of the structural digest this build computes.
 STRUCTURAL_VERSION = 1
 
 #: The same, for the prose digest. Versioned apart because the two rules change
 #: for different reasons: the structural one moves when a package declares a new
 #: judgement field, and the prose one when the page shows different words.
-PROSE_VERSIONS = (1,)
 PROSE_VERSION = 1
 
 #: How each value announces which rule produced it.
@@ -162,7 +159,7 @@ def _ground_parts(ground: Ground) -> tuple[str, ...]:
     return (ground.kind, ground.referent, ground.attribute)
 
 
-def structural(claim: Claim, version: int = STRUCTURAL_VERSION) -> str:
+def structural(claim: Claim) -> str:
     """What a substance vote judged, as ``s<version>:<16 hex>``.
 
     Sixteen hex characters for the reason a fingerprint uses them: the
@@ -170,32 +167,22 @@ def structural(claim: Claim, version: int = STRUCTURAL_VERSION) -> str:
     read out loud beside a ledger row is worth more than the collision margin it
     spends.
     """
-    _check_version(version, STRUCTURAL_VERSIONS, "structural")
     parts: list[str] = []
     for ground in claim.grounds:
         parts.extend(_ground_parts(ground))
     for name, read in STRUCTURAL_FIELDS.items():
         if name in type(claim).model_fields:
             parts.extend(read(getattr(claim, name)))
-    return _digest(STRUCTURAL_PREFIX, version, parts)
+    return _digest(STRUCTURAL_PREFIX, STRUCTURAL_VERSION, parts)
 
 
-def prose(claim: Claim, version: int = PROSE_VERSION) -> str:
+def prose(claim: Claim) -> str:
     """What a style vote judged, as ``p<version>:<16 hex>``."""
-    _check_version(version, PROSE_VERSIONS, "prose")
     parts: list[str] = []
     for name, read in PROSE_FIELDS.items():
         if name in type(claim).model_fields:
             parts.extend(_rendered(value) for value in read(getattr(claim, name)))
-    return _digest(PROSE_PREFIX, version, parts)
-
-
-def _check_version(version: int, known: tuple[int, ...], which: str) -> None:
-    if version not in known:
-        raise ContentError(
-            f"{which} version {version!r} is not one this build computes"
-            f" ({', '.join(str(value) for value in known)})"
-        )
+    return _digest(PROSE_PREFIX, PROSE_VERSION, parts)
 
 
 def _digest(prefix: str, version: int, parts: Iterable[str]) -> str:

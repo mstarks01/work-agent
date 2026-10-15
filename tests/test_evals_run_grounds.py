@@ -200,6 +200,7 @@ def sweep(
 
     pipeline = modes.build_eval_pipeline(
         ENTRY_PREPARE,
+        frameworks=("stride",),
         resolve_model=resolve,
         sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml"),
     )

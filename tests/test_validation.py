@@ -8,7 +8,6 @@ from analysis_service.system_model import UNKNOWN, SystemModel, make_flow_id
 from analysis_service.validation import (
     CITATION_FIELDS,
     MAX_ELEMENTS,
-    allowed_asset_tags,
     parse_and_validate,
     validate,
 )
@@ -216,12 +215,6 @@ class TestAssetVocabulary:
         model.data_stores[0].assets = ["crown-jewels"]
         issues = [i for i in validate(model) if i.code == "illegal-asset-tag"]
         assert issues[0].element_id == "store:orders-db"
-
-    def test_config_extends_vocabulary(self):
-        model = valid_model()
-        model.data_stores[0].assets = ["crown-jewels"]
-        assert validate(model, extra_asset_tags=["crown-jewels"]) == []
-        assert "crown-jewels" in allowed_asset_tags(["crown-jewels"])
 
 
 class TestParseFailures:

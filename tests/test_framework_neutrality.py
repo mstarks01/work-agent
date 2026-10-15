@@ -165,9 +165,8 @@ DECLARED: dict[str, str] = {
         " claim set is open has no unit to list, so no stage to charge."
     ),
     "evals/harness/modes.py": (
-        "EVAL_FRAMEWORKS is the fallback for a case declaring none; the sweep"
-        " reads `case_frameworks()`. `merged_drafts` is a named accessor for"
-        " STRIDE's scorer, over the framework-keyed `drafts` map."
+        "`merged_drafts` is a named accessor for STRIDE's scorer, over the"
+        " framework-keyed `drafts` map."
     ),
     "evals/harness/instruments.py": (
         "A table keyed by instrument. Each entry declares the packages whose"

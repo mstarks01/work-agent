@@ -241,13 +241,7 @@ class TestStructuralFacts:
         assert zone_kinds(chain)["boundary:core"] == "privilege"
 
     def test_sensitive_assets_drops_a_tag_this_rule_did_not_admit(self):
-        """A deployment tag is held, and its disclosure is still not a loss.
-
-        ``extra_asset_tags`` extends the vocabulary, so an element can carry a
-        tag ``SENSITIVE_ASSET_TAGS`` never listed. What that tag means to the
-        deployment is the deployment's business; this rule may not read it as a
-        confidentiality loss, so it drops out here (#877).
-        """
+        """A tag outside ``SENSITIVE_ASSET_TAGS`` is not read as a loss (#877)."""
         element = Process(
             id="process:p",
             name="P",
@@ -359,8 +353,7 @@ class TestTheAssetVocabularyNamesWhatAnElementHolds:
 
     An attacker acts on data. What a failure would cost — reputation, whether
     an outage matters — is a judgement about the business, so it is not a tag
-    and the person reading the report owns it (#877). A deployment that wants
-    to model one adds it through ``extra_asset_tags``.
+    and the person reading the report owns it (#877).
     """
 
     def test_every_shipped_tag_is_one_whose_disclosure_is_a_loss(self):
@@ -368,15 +361,6 @@ class TestTheAssetVocabularyNamesWhatAnElementHolds:
             "a tag added to CORE_ASSET_TAGS must name something an element"
             " holds, or it does not belong in the shipped vocabulary"
         )
-
-    def test_a_configured_tag_is_not_assumed_to_be_disclosed(self):
-        """The two sets are equal and not the same set.
-
-        ``allowed_asset_tags`` lets a deployment extend the vocabulary, and a
-        tag it adds names something that deployment models. Nothing here may
-        rule that its disclosure is itself a loss.
-        """
-        assert "cardholder-data" not in analysis.SENSITIVE_ASSET_TAGS
 
     def test_comparable_tags_are_sorted_and_deduplicated(self):
         """Both readers compare the result, so neither may read an emitted order."""

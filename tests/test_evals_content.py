@@ -26,11 +26,9 @@ from evals.harness.content import (
     PROSE_FIELDS,
     PROSE_PREFIX,
     PROSE_VERSION,
-    PROSE_VERSIONS,
     STRUCTURAL_FIELDS,
     STRUCTURAL_PREFIX,
     STRUCTURAL_VERSION,
-    STRUCTURAL_VERSIONS,
     ContentError,
     _ground_parts,
     prose,
@@ -73,16 +71,6 @@ def test_a_prose_digest_is_refused_where_a_structural_one_belongs():
 def test_a_fingerprint_is_not_a_digest():
     with pytest.raises(ContentError, match="not a 's' digest"):
         version_of("v6:0123456789abcdef", STRUCTURAL_PREFIX)
-
-
-@pytest.mark.parametrize(
-    ("compute", "known"),
-    [(structural, STRUCTURAL_VERSIONS), (prose, PROSE_VERSIONS)],
-    ids=["structural", "prose"],
-)
-def test_an_unknown_version_is_refused_rather_than_computed(compute, known):
-    with pytest.raises(ContentError, match="not one this build computes"):
-        compute(claim(), max(known) + 1)
 
 
 class TestTheStructuralDigest:

@@ -50,6 +50,7 @@ def head_pipeline(corpus_case, models: dict[str, ScriptedLlm], **overrides: str)
     env = dict(VERTEX_ENV) | {"ANALYSIS_ASSERTIONS": "true"}
     return modes.build_eval_pipeline(
         graph.ENTRY_HEAD_ONLY,
+        frameworks=("stride",),
         deployment=Deployment.from_env(env=env),
         resolve_model=resolve,
         sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml"),
@@ -73,6 +74,7 @@ class TestTheHeadOnlyGraph:
         with pytest.raises(modes.EvalRunError, match="no pass that makes one"):
             modes.build_eval_pipeline(
                 graph.ENTRY_HEAD_ONLY,
+                frameworks=("stride",),
                 deployment=Deployment.from_env(
                     env=VERTEX_ENV | {"ANALYSIS_ASSERTIONS": "false"}
                 ),
