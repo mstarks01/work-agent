@@ -90,7 +90,7 @@ output rather than an unknown fact.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, Literal, get_args
 
@@ -109,11 +109,7 @@ from analysis_service.system_model import (
     TrustBoundary,
     assumable_attribute_names,
 )
-from analysis_service.validation import (
-    MAX_ELEMENTS,
-    ValidationIssue,
-    parse_and_validate,
-)
+from analysis_service.validation import ValidationIssue, parse_and_validate
 
 #: Which transport ``extract`` writes in. The strings are spelled here and
 #: re-spelled once, in :class:`~analysis_service.report.ExecutionEnvelope`, which
@@ -412,8 +408,6 @@ def parse_extraction(
     extraction_format: str = FULL_FORMAT,
     *,
     sources: Mapping[str, str] = MappingProxyType({}),
-    extra_asset_tags: Collection[str] = (),
-    max_elements: int = MAX_ELEMENTS,
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """The one reader of "what extraction emitted" against "a validated model".
 
@@ -442,11 +436,7 @@ def parse_extraction(
     elif extraction_format != FULL_FORMAT:
         raise ValueError(f"unknown extraction format: {extraction_format!r}")
     model, gate_issues = parse_and_validate(
-        payload,
-        extra_asset_tags,
-        max_elements,
-        normalize_ids=True,
-        sources=sources,
+        payload, normalize_ids=True, sources=sources
     )
     return model, issues + gate_issues
 

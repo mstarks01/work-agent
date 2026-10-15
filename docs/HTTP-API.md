@@ -288,8 +288,8 @@ save must answer or skip at least one question.
 `presented`, the keys of the early questions your page showed. The job records them as shown, and the
 report reads that record to tell a skipped question from one left blank or
 never shown ([ADR 0069](adr/0069-a-skip-is-of-a-question-the-page-presented.md)).
-A skip is taken only of a presented question. A key the list does not hold,
-or a part hidden under its parent's answer, is refused with `400`. A question
+A skip is taken only of a presented question. A key the list does not hold is
+refused with `400`. A question
 the service returned and your page did not show is not recorded as shown, so
 send only what you rendered.
 
@@ -1093,7 +1093,7 @@ The `memory` store holds no objects, so its sweep removes nothing.
 ### Adding a new backend
 
 Each backend value is a row of a table, and no code branches on a backend
-name. `JOB_STORES` in [`src/analysis_service/jobs.py`](../src/analysis_service/jobs.py)
+name. `JOB_STORES` in [`src/analysis_service/store_backends.py`](../src/analysis_service/store_backends.py)
 holds the job stores, `OBJECT_STORES` in
 [`src/analysis_service/objects.py`](../src/analysis_service/objects.py) holds
 the object stores, and `DATABASES` in

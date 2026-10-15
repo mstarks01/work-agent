@@ -238,7 +238,6 @@ def build_session(
     voter: str,
     ledger_path: Path = DEFAULT_LEDGER_PATH,
     configs: Mapping[str, str] | None = None,
-    corpus_dir: Path | None = None,
 ) -> Session:
     """Resolve the corpus once, build the queue, and hold it for the sitting.
 
@@ -246,7 +245,7 @@ def build_session(
     the queue asks first about a finding the sweeps disagree on. That count
     only exists if the caller says where one run ends and the next begins.
     """
-    corpus = load_corpus(corpus_dir or verify_corpus.CORPUS_DIR)
+    corpus = load_corpus(verify_corpus.CORPUS_DIR)
     flows = {
         case.meta.id: {
             flow.id: (flow.source, flow.destination) for flow in case.model.data_flows

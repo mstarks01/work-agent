@@ -108,11 +108,10 @@ CONTROL_ATTRIBUTES: tuple[str, ...] = (
 #: Asset tags whose exposure is a confidentiality loss on its own.
 #:
 #: Every tag the service ships is one, so this equals
-#: :data:`~analysis_service.system_model.CORE_ASSET_TAGS` today and is not the
-#: same set: a deployment extends the vocabulary through ``extra_asset_tags``,
-#: and a tag it adds names something the deployment models rather than
-#: something this rule may assume is disclosed. ``test_analysis.py`` holds the
-#: two together, so a core tag added here without a reading fails.
+#: :data:`~analysis_service.system_model.CORE_ASSET_TAGS`. It is a separate
+#: set so that a tag added to the vocabulary needs a reading here.
+#: ``test_analysis.py`` holds the two together, so a core tag added without a
+#: reading fails.
 SENSITIVE_ASSET_TAGS = frozenset(
     {"credentials", "pii", "financial", "health", "secrets", "business-critical-data"}
 )
@@ -278,8 +277,7 @@ def comparable_asset_tags(tags: Iterable[str]) -> tuple[str, ...]:
     """``tags`` as a comparable value: sorted, and each one once.
 
     **It normalises and it selects nothing.** Every shipped tag names what an
-    element holds, so there is no half to drop (#877). A tag a deployment adds
-    through ``extra_asset_tags`` names what that deployment models.
+    element holds, so there is no half to drop (#877).
 
     The one reader, so the places that compare an element's tags cannot
     disagree about what they are comparing. An extraction is scored on the

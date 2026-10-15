@@ -65,7 +65,8 @@ and the code holds the current state, so read the code first. Each map below set
 beside it.
 
 - [#1522](https://github.com/mstarks01/work-agent/issues/1522) — persistent storage for jobs,
-  reports and sources. The spec is ready to build; the build is a separate effort.
+  reports and sources. The build is in the tree: `analysis_service.sql_store`,
+  `analysis_service.objects` and `analysis_service.store_backends` hold it.
   - PostgreSQL, or SQLite on one host, holds job state and principals. `boto3` over the S3 API,
     or the filesystem, holds the sources and the report. Native GCS and Azure backends are a
     separate effort.

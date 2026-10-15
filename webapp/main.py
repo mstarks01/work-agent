@@ -497,7 +497,7 @@ class Startup:
     ``frameworks`` is what this install carries, which is what the picker
     offers and what :func:`_selection` allow-lists against. It is not itself a
     selection and it is never used as one: a submission names its own, and the
-    form ships with every box ticked rather than with a default nobody chose.
+    form ships with every box unticked.
     """
 
     settings: Settings | None
@@ -510,7 +510,7 @@ class Startup:
         return self.settings is not None
 
 
-def build_startup(env: Mapping[str, str] | None = None) -> Startup:
+def build_startup() -> Startup:
     """Resolve the config and prove the credentials, or convert the failure to a page.
 
     Two stages, and the split is the whole content of the diagnostic. Resolving
@@ -525,20 +525,17 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     **Building the runner is the credential check, because binding the tier
     adapters is what resolves the credentials.** Binding does not depend on
     which frameworks a submission picks, so any selection proves the same
-    thing. The probe names the whole carried set for a second reason: that is
-    the selection the form ships ticked, so the most common submission finds
-    its graph already composed.
+    thing, and the probe names the whole carried set.
     :meth:`~analysis_service.deployment.Deployment.runner` memoizes per
-    selection, so a narrower pick composes its own graph once and no
+    selection, so each other pick composes its own graph once and no
     submission binds the adapters twice.
 
     The bounds a job is held to are the deployment's own: the same source
     limits, budget and deadline ``/v1`` enforces.
     """
-    env = os.environ if env is None else env
     deployment = None
     try:
-        deployment = Deployment.from_env(env)
+        deployment = Deployment.from_env(os.environ)
         deployment.runner(deployment.frameworks)
     except ConfigError as exc:
         logger.error("config error at startup: %s", exc)

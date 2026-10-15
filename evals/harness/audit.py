@@ -1006,12 +1006,12 @@ def paths_between(
     return tuple(line for line in done.stdout.splitlines() if line)
 
 
-def files_at(commit: str, root: Path | None = None) -> frozenset[str] | None:
+def files_at(commit: str) -> frozenset[str] | None:
     """Every path git tracks at ``commit``, or ``None`` where git cannot say."""
     try:
         done = subprocess.run(
             ["git", "ls-tree", "-r", "--name-only", commit],
-            cwd=str(root if root is not None else REPO_ROOT),
+            cwd=str(REPO_ROOT),
             capture_output=True,
             text=True,
             check=True,

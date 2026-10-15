@@ -43,6 +43,11 @@ that wants to model one of them adds it through `extra_asset_tags`, which is
 where the judgement belongs — whether an outage matters, or whether a public
 failure is embarrassing, is a property of a business rather than of a system.
 
+*Amended by #1715.* No hook adds a tag to the vocabulary. The vocabulary is
+`CORE_ASSET_TAGS`, and the gate refuses every other tag with
+`illegal-asset-tag`. The cost of an outage or of a public failure stays with
+the person who reads the report.
+
 ## What replaces it
 
 `availability-critical` had one real consumer that `reputation` did not: the
@@ -97,6 +102,8 @@ So the rubric rates an outage on the dependent set, and the lane reads the
 - `SENSITIVE_ASSET_TAGS` now equals `CORE_ASSET_TAGS` and stays a separate
   name, because a deployment's configured tag is not one this service may rule
   is disclosed.
+  *Amended by #1715:* the separate name stays so that a tag added to the
+  vocabulary needs its own reading of disclosure.
 - Every **Framework Package** sees the shorter vocabulary at once, because the
   tags are the System Model's and the System Model is the service's. STRIDE's
   rubric and its denial-of-service lane are the consumers that change. ASVS

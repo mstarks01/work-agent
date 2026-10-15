@@ -6,6 +6,9 @@
   persistent storage map [#1522](https://github.com/mstarks01/work-agent/issues/1522)
 - **Relates to**: [ADR 0064](0064-an-owner-id-is-a-random-surrogate-for-a-principal.md),
   which defines the owner ID in each key
+- **Amended by**: [ADR 0066](0066-a-deleted-job-leaves-a-usage-row.md),
+  under which a delete or an expiry removes the content and keeps a usage
+  row
 
 ## Context
 

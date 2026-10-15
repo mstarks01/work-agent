@@ -12,6 +12,8 @@
 - **Relates to**: [ADR 0002](0002-finding-level-attribution.md), whose
   finding-level attribution this decision keeps intact for every framework —
   grounds stay required for every framework, so none is exempt.
+- **Amended by**: [ADR 0036](0036-a-settled-assertion-is-evidence-a-lane-may-cite.md),
+  which widens the first test
 
 ## Context
 

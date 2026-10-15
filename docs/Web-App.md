@@ -64,8 +64,9 @@ LD_LIBRARY_PATH=~/.local/lib/chromium-deps/usr/lib/x86_64-linux-gnu uv run --gro
 
 **The frameworks to run**, one checkbox per framework this install carries. The
 carried set comes from [`config/frameworks.toml`](../config/frameworks.toml).
-Every box starts ticked, so **Analyze** runs them all unless you untick one. Each
-framework you leave ticked costs its own nodes, so untick what you do not need.
+Every box starts unticked, so tick each framework you want **Analyze** to run.
+The app refuses a submission with no box ticked. Each framework you tick costs
+its own nodes, so tick only what you need.
 
 A framework that needs a job option gets a control beside its checkbox. ASVS
 needs a level, because ASVS 5.0 tells your organization to choose one and no
@@ -351,7 +352,8 @@ it. Where the service refuses answers that would leave a part present under an
 absent ancestor, its refusal names both questions, and the page offers to answer
 the other one the same way in one save. A row the list no longer holds shows no
 **Skip for now**, because the service takes a skip only of a listed question.
-Answers live in the server's memory for the session; the page never claims more.
+The job store holds the answers. A `sql` store keeps them across a restart,
+and the `memory` store loses them when the app stops.
 
 When no recommended question remains, **Start the analysis** becomes the primary
 action. Skipped questions remain open facts, not negative answers.

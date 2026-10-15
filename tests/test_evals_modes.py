@@ -238,6 +238,7 @@ def build(case, entry, models: dict[str, ScriptedLlm]) -> Pipeline:
 
     return modes.build_eval_pipeline(
         entry,
+        frameworks=("stride",),
         resolve_model=resolve,
         sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml"),
     )

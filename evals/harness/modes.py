@@ -1252,13 +1252,6 @@ def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
     }
 
 
-#: The frameworks a sweep runs for a case that declares none, and the fallback
-#: for a caller that names no case. A sweep grades a framework's own claim set
-#: (#167), so which frameworks ran is a property of the *case* rather than of the
-#: harness — see :func:`case_frameworks`, which is what the sweep actually reads.
-EVAL_FRAMEWORKS: tuple[FrameworkName, ...] = ("stride",)
-
-
 def case_framework_options(case: GoldenCase) -> dict[str, dict[str, Any]]:
     """The job-level options this case declares, in the shape the graph seeds.
 
@@ -1319,12 +1312,11 @@ def case_frameworks(case: GoldenCase) -> tuple[FrameworkName, ...]:
     reference set, so running the declaration is what makes "every record the
     corpus holds is graded" true — and what stops a sweep paying for ASVS's 17
     ``strong``-tier lanes on a case that has nothing to score them against.
-
-    A case declaring nothing falls back to :data:`EVAL_FRAMEWORKS`, which keeps
-    a hand-built fixture case runnable without a frameworks array.
+    A sweep grades a framework's own claim set (#167), so which frameworks run
+    is a property of the case and not of the harness. ``CaseMeta`` requires at
+    least one declaration.
     """
-    declared = tuple(declaration.name for declaration in case.meta.frameworks)
-    return declared or EVAL_FRAMEWORKS
+    return tuple(declaration.name for declaration in case.meta.frameworks)
 
 
 def case_selections(case: GoldenCase, pipeline: Pipeline) -> list[FrameworkSelection]:
@@ -1354,10 +1346,10 @@ def case_selections(case: GoldenCase, pipeline: Pipeline) -> list[FrameworkSelec
 def build_eval_pipeline(
     entry: Entry,
     *,
+    frameworks: Sequence[FrameworkName],
     deployment: Deployment | None = None,
     resolve_model: ModelResolver | None = None,
     sampling: SamplingConfig | None = None,
-    frameworks: Sequence[FrameworkName] = EVAL_FRAMEWORKS,
 ) -> Pipeline:
     """The shipped graph, entered where the mode needs it.
 

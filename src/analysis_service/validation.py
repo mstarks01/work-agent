@@ -113,14 +113,8 @@ class ValidationIssue(BaseModel):
 CITATION_FIELDS: frozenset[str] = frozenset({"source_label", "source_excerpt"})
 
 
-def allowed_asset_tags(extra_asset_tags: Collection[str] = ()) -> frozenset[str]:
-    """The controlled asset vocabulary: core tags plus config extensions."""
-    return CORE_ASSET_TAGS | frozenset(extra_asset_tags)
-
-
 def validate(
     model: SystemModel,
-    extra_asset_tags: Collection[str] = (),
     max_elements: int = MAX_ELEMENTS,
     sources: Mapping[str, str] = MappingProxyType({}),
 ) -> list[ValidationIssue]:
@@ -142,7 +136,6 @@ def validate(
         ]
 
     issues: list[ValidationIssue] = []
-    legal_tags = allowed_asset_tags(extra_asset_tags)
 
     for element_id, count in duplicate_ids(elements).items():
         issues.append(
@@ -178,12 +171,12 @@ def validate(
             )
 
         for tag in element.assets:
-            if tag not in legal_tags:
+            if tag not in CORE_ASSET_TAGS:
                 issues.append(
                     ValidationIssue(
                         code="illegal-asset-tag",
                         message=f"asset tag {tag!r} is not in the controlled"
-                        f" vocabulary {sorted(legal_tags)}",
+                        f" vocabulary {sorted(CORE_ASSET_TAGS)}",
                         element_id=element.id,
                         field="assets",
                     )
@@ -610,7 +603,6 @@ def _quote_issue(
 
 def parse_and_validate(
     data: object,
-    extra_asset_tags: Collection[str] = (),
     max_elements: int = MAX_ELEMENTS,
     normalize_ids: bool = False,
     sources: Mapping[str, str] = MappingProxyType({}),
@@ -679,7 +671,7 @@ def parse_and_validate(
             for before, element in zip(emitted, model.elements(), strict=True)
             if before.id in shared
         ]
-    return model, issues + validate(model, extra_asset_tags, max_elements, sources)
+    return model, issues + validate(model, max_elements, sources)
 
 
 #: The issue codes whose repair changes an element's *name*, and therefore its

@@ -567,9 +567,7 @@ def band(
     )
 
 
-def _totals(
-    runs: Sequence[ScoredRun], rows: Collection[tuple[str, str]] = ()
-) -> list[int]:
+def _totals(runs: Sequence[ScoredRun]) -> list[int]:
     """Each run's must-find total, over the references this set can read.
 
     The same references the floor is summed over, so the two readings are of
@@ -578,7 +576,7 @@ def _totals(
     ones, and it is a constant, so it moves the mean and not the spread.
     """
     universe: dict[Scope, set[str]] = {}
-    for scope, ref in _fates(runs, rows):
+    for scope, ref in _fates(runs):
         universe.setdefault(scope, set()).add(ref)
     return [
         sum(

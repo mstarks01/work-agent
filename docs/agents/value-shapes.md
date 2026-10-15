@@ -27,8 +27,7 @@ keeps the repair to that element; a validator makes it a schema fault with no
 element to name, and the scope widens to the whole object. Validating harder
 enlarges the blast radius.
 
-**The rule stops where the set is configurable.** `assets` has the identical
-shape and takes no enum, because `extra_asset_tags` lets a deployment extend
-the vocabulary and the output schema is static. A configurable set is stated in
-the prompt, as `extract.md` rule 6 states it. Which of the two a field is
-decides where its set belongs.
+**`assets` has the same shape and states no enum.** Its set is
+`CORE_ASSET_TAGS`. `extract.md` rule 6 states the set in the prompt, and the
+gate refuses a tag outside it as `illegal-asset-tag`. The schema states only a
+length bound for the field.

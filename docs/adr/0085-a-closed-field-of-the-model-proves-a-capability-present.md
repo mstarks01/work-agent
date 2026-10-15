@@ -11,6 +11,9 @@
   is "yes"
 - **Evidence**: `QA-2026-10-13-10-E1` in `evals/experiments/`, and
   `tests/test_field_capabilities.py`
+- **Amended by**: [ADR 0086](0086-a-separate-reader-states-the-capabilities-a-source-states.md),
+  under which a separate reader also states the capabilities a source
+  states
 
 ## Context
 

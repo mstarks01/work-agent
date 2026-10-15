@@ -87,6 +87,7 @@ def _build_fingerprints(sampling, served="vertex_ai/fake-model-001"):
     """
     pipeline = modes.build_eval_pipeline(
         ENTRY_EXTRACT,
+        frameworks=("stride",),
         resolve_model=lambda _tier_node: served,
         sampling=sampling,
     )

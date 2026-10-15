@@ -3109,6 +3109,10 @@ def _framework_subgraph(
     )
 
 
+#: The name of the workflow that :func:`build_pipeline` returns.
+PIPELINE_NAME = "analysis_pipeline"
+
+
 def build_pipeline(
     *,
     prompt_loader: MarkdownLoader,
@@ -3120,7 +3124,6 @@ def build_pipeline(
     extraction_format: ExtractionFormat = FULL_FORMAT,
     assertions: bool = False,
     capability_reader: bool = False,
-    name: str = "analysis_pipeline",
 ) -> Pipeline:
     """Wire the whole graph: prompts, skills, and models onto the topology.
 
@@ -3233,13 +3236,17 @@ def build_pipeline(
         extract = _extract_node(
             prompt_loader, resolve_model, resolve_sampling, extraction_format
         )
-        return pipeline(Workflow(name=name, edges=[(START, extract)]), [extract])
+        return pipeline(
+            Workflow(name=PIPELINE_NAME, edges=[(START, extract)]), [extract]
+        )
 
     if entry == ENTRY_ASSERT_ONLY:
         assert_keys = GraphKeys.of(frameworks)
         read = _node(_read_model_node_func(assert_keys), READ_MODEL_NODE)
         catalog = _assert_node(prompt_loader, resolve_model, resolve_sampling)
-        return pipeline(Workflow(name=name, edges=[(START, read, catalog)]), [catalog])
+        return pipeline(
+            Workflow(name=PIPELINE_NAME, edges=[(START, read, catalog)]), [catalog]
+        )
 
     keys = GraphKeys.of(frameworks)
     # The tail: the analysing graph's ``prepare`` and its fan-out, or the one
@@ -3361,7 +3368,7 @@ def build_pipeline(
             *(edge for sub in subgraphs for edge in sub.edges(assemble)),
         ]
     workflow = Workflow(
-        name=name,
+        name=PIPELINE_NAME,
         edges=[*head_edges, *pass_edges, *analysis_edges],
     )
     llm_nodes = [

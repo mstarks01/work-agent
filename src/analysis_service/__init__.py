@@ -149,7 +149,6 @@ from analysis_service.system_model import (
 from analysis_service.token_caps import TOKEN_CAPS, alarm_at
 from analysis_service.validation import (
     ValidationIssue,
-    allowed_asset_tags,
     parse_and_validate,
     validate,
 )
@@ -251,7 +250,6 @@ __all__ = [
     "Verdict",
     "ZonedElement",
     "alarm_at",
-    "allowed_asset_tags",
     "build_store",
     "build_verifier",
     "clean_system_name",

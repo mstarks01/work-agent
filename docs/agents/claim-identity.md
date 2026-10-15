@@ -18,11 +18,17 @@ what?**
 
 | Part | Where it comes from | Read by |
 |---|---|---|
-| framework | the block | v1, v2, v3 |
-| lane | the block, from the field its package's `id_rule` declares (`lane_field`) | v1, v2, v3 |
-| targets | `affected_element_ids`, endpoint-resolved | v1, v2, v3 |
-| action verb | `analysis_service.actions`, a closed set of 20 | v2 only |
-| catalog identifier | the claim ID, read by the package that owns the catalog (`IDENTIFIER_OF`) | v3 only |
+| framework | the block | v4, v5, v6 |
+| lane | the block, from the field its package's `id_rule` declares (`lane_field`) | v4, v5, v6 |
+| targets | `affected_element_ids`, endpoint-resolved | v4, v5, v6 |
+| scope | the case ID, which names the **System Model** the claim was reached in | v4, v5, v6 |
+| action verb, as written | `analysis_service.actions`, a closed set of 20 | v4 only |
+| catalog identifier | the claim ID, read by the package that owns the catalog (`IDENTIFIER_OF`) | v5 only |
+| action verb, read through `evals.harness.verbs.EQUIVALENT` | `analysis_service.actions`, a closed set of 20 | v6 only |
+
+`SUPPORTED_VERSIONS` in `evals/harness/fingerprint.py` holds the versions the
+code computes, and `EXTRA_COMPONENT` holds the part each version reads beside
+the four parts that every version reads.
 
 `Claim` carries `verb` and `DraftThreat` requires it, so a finding out of a live
 run keys the same way a reference claim does. The vocabulary is **service-side**
@@ -46,8 +52,10 @@ version's shape, its builder and its decoder, `FLOW_ID_VERSION` is the one the
 service writes, and `flow_id_version` says which rule wrote any single ID
 because the versions' shapes are disjoint by construction. A version's decoder
 never leaves the table: archived reports and archived emissions hold earlier
-spellings and are still read. `evals/harness/flow_ids.py` moves a corpus from
-one version to another, and ADR 0037 is the decision.
+spellings and are still read. `evals/harness/flow_ids.py` reads which version
+a recorded graph spells, and lifts each flow ID in an archived artifact to the
+version of its graph. `evals/harness/bundle.py` calls it on each archived
+proposal. ADR 0037 is the decision.
 
 Read a flow's label with `flow_label`, never by splitting the ID. A split on
 the last colon gives a wrong label for a typed endpoint.
@@ -223,7 +231,7 @@ framework, checked against `PACKAGES` and declared in
 | `stride` | 6 | an open claim set, so the action is half of what makes two claims one finding; read through the equivalence table, so two verbs the labels cannot separate are one key; with the scope |
 | `asvs` | 5 | its claims name a requirement in a catalog, so the identifier and the place it was ruled in are the key; with the scope |
 
-Version 1 — place alone — keys nothing. Under it, two requirements ruled on one
+Place alone keys nothing. Under a rule that reads only the place, two requirements ruled on one
 element in one chapter share a fingerprint, so one vote answers for both.
 
 Those entries follow from what a package's claims *are*, not from preference —
