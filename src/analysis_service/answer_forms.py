@@ -22,6 +22,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.claims import UnknownKey
 from analysis_service.fact_answers import (
+    MAX_DETAIL_CHARS,
     FactAnswer,
     answer_facets,
     answered_row,
@@ -182,11 +183,13 @@ def answer_limit(key: UnknownKey, model: SystemModel) -> int:
     takes it, and :func:`~analysis_service.fact_writes.check_fact_answers`
     refuses one character more. It is the least of three bounds: an answer's
     own, the line the answer writes into the answers Source, and an
-    attribute's field on its element.
+    attribute's field on its element. The line keeps room for the longest
+    detail, so an answer at the limit takes any detail beside it.
     """
+    widest = FactAnswer(key=key, value="x", detail="x" * MAX_DETAIL_CHARS)
     bounds = [
         _max_length(FactAnswer, "value"),
-        MAX_QUOTE_CHARS - (len(fact_line(FactAnswer(key=key, value="x"))) - 1),
+        MAX_QUOTE_CHARS - (len(fact_line(widest)) - 1),
     ]
     ref = key_ref(key)
     element = model.get(ref.element_id) if fact_kind(key) == "attribute" else None

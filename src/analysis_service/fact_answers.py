@@ -23,8 +23,9 @@ them, and :func:`fact_kind` says which.
   that quotes its line of the answers Source.
 
 **An answer's line fits the span that quotes it.** :func:`fact_line` writes
-each answer as one line of the answers Source, and the admission check
-refuses a line longer than
+each answer as one line of the answers Source. The admission check refuses
+an answer longer than :func:`~analysis_service.answer_forms.answer_limit`,
+which keeps the line, with the longest detail, within
 :data:`~analysis_service.assertions.MAX_QUOTE_CHARS`.
 
 **An answer of** ``unknown`` **says the submitter does not know.** It writes

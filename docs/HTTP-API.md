@@ -422,7 +422,9 @@ the reviewer named it (`critic`).
   them. `text` means free text.
 - `max_length` is the longest answer the fact admits, in characters. It is the
   least of the attribute's own limit, such as 200 for `authentication`, and
-  the room on the line the answer writes. One character more is refused.
+  the room on the line the answer writes. That room keeps space for the
+  longest `detail`, so an answer at `max_length` takes any detail. One
+  character more is refused.
 - `choices` lists the values the fact takes. A question kind that asks
   whether something holds, such as "Can content it takes run code with its
   authority?", takes `yes` or `no`. Empty means free text on one
