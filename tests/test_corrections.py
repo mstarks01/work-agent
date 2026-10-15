@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import Ground, UnknownRef
 from analysis_service.fact_answers import FactAnswer, fact_line
+from analysis_service.grounding import verify_quote
 from analysis_service.jobs import Checkpoint, JobRecord, Resumption
 from analysis_service.report_conditions import corrected_findings
 from analysis_service.sources import ANSWERS_LABEL, Source
@@ -141,6 +144,23 @@ class TestWhichFindingsACorrectionReaches:
 
     def test_a_finding_that_quotes_the_answer_s_line(self):
         quote = Ground(kind="quote", text=fact_line(ANSWER), source_label=ANSWERS_LABEL)
+        assert self.reached(sample_threat(grounds=[quote])) == ("stride/S-01",)
+
+    @pytest.mark.parametrize(
+        "spelled",
+        [
+            str.casefold,
+            lambda line: line.replace('"TLS', "\u201cTLS").replace('3"', "3\u201d"),
+            lambda line: line.replace("TLS 1.3", "**TLS 1.3**"),
+            lambda line: line.replace(" of ", " … ").split(" … ")[0] + " … TLS 1.3",
+        ],
+    )
+    def test_a_quote_the_grounding_ladder_admits(self, spelled):
+        """The ladder folds case, curly quotes and markup, and takes a cut."""
+        line = fact_line(ANSWER)
+        text = spelled(line)
+        assert text != line and verify_quote(text, line)
+        quote = Ground(kind="quote", text=text, source_label=ANSWERS_LABEL)
         assert self.reached(sample_threat(grounds=[quote])) == ("stride/S-01",)
 
     def test_a_finding_that_grounds_on_the_attribute(self):
