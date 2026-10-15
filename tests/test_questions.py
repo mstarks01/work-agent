@@ -313,6 +313,7 @@ class TestTheChecks:
         ("value", "rule"),
         [
             ("no authentication at all", "opens with 'no'"),
+            ("unauthenticated", "opens with 'unauthenticated'"),
             ("   ", "is empty"),
             ("x" * 201, "at most 200"),
         ],
@@ -838,7 +839,7 @@ class TestAnAnswerBindsToAnOpenFact:
     """A submission answers what is open, or what an earlier round answered (D2)."""
 
     STATED = FactAnswer(
-        key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="plaintext"
+        key=(flow_id(), "encryption_in_transit", "", "", "", ""), value="mTLS"
     )
 
     def test_an_attribute_the_model_states_is_refused(self):

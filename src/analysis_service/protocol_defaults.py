@@ -40,8 +40,13 @@ PLAIN = re.compile(
 )
 
 #: A protocol field that negates states no protocol it names: "HTTPS, not
-#: HTTP/2" does not state HTTP/2.
-NEGATED = re.compile(r"\b(?:no|not|without|disabled|optional)\b", re.IGNORECASE)
+#: HTTP/2" does not state HTTP/2, and "REST instead of gRPC" does not state
+#: gRPC. A contraction ends in "n't", with either apostrophe.
+NEGATED = re.compile(
+    r"\b(?:no|not|never|without|disabled|optional|rather than|instead of)\b"
+    r"|\w+n['\u2019]t\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)

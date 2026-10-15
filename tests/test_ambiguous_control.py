@@ -12,7 +12,17 @@ def codes(model):
 
 
 @pytest.mark.parametrize(
-    "value", ["no MFA on the password login", "Not stated", "without TLS", "N/A"]
+    "value",
+    [
+        "no MFA on the password login",
+        "Not stated",
+        "without TLS",
+        "N/A",
+        "disabled",
+        "plaintext between the services",
+        "unencrypted",
+        "Missing",
+    ],
 )
 def test_a_control_opening_with_a_negation_is_refused_and_named(value):
     """The leading-token rule reads every one of these as ``stated``; the gate

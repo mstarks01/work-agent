@@ -65,6 +65,7 @@ from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import Match, Rule, clip_fact
 from analysis_service.claims import UnknownRef
 from analysis_service.frameworks import NoRule, PreconditionResult, PredicateReader
+from analysis_service.protocol_defaults import NEGATED
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -768,11 +769,13 @@ RULES: tuple[Rule, ...] = (
 
 #: What a **Data Flow**'s ``protocol`` says when the flow carries the web. ASVS
 #: scopes itself to "web applications and services", so an API over HTTP is in
-#: scope and a message bus is not.
+#: scope and a message bus is not. Each term matches at the start of a word
+#: (:func:`~analysis_service.analysis.matches_term`), and ``rest`` matches only
+#: as a whole word, so "restricted" is not REST.
 WEB_PROTOCOL_TERMS: tuple[str, ...] = (
     "http",
-    "https",
-    "rest",
+    "rest$",
+    "restful",
     "graphql",
     "soap",
     "grpc",
@@ -780,6 +783,28 @@ WEB_PROTOCOL_TERMS: tuple[str, ...] = (
     "ws://",
     "wss://",
 )
+
+
+def _names_web(protocol: str) -> bool:
+    lowered = protocol.lower()
+    return any(matches_term(term, lowered) for term in WEB_PROTOCOL_TERMS)
+
+
+def _speaks_web(protocol: str) -> bool:
+    """Whether a flow's ``protocol`` names a web protocol and negates nothing."""
+    return _names_web(protocol) and not NEGATED.search(protocol)
+
+
+def _protocol_unsettled(protocol: str) -> bool:
+    """Whether a flow's ``protocol`` leaves open if the flow carries the web.
+
+    **The one reader of an open protocol for the precondition and its facts.**
+    A field that states nothing is open. So is a field that names a web
+    protocol and also negates: "AMQP, not HTTP" and "HTTPS, not HTTP/2" read
+    the same to a word match, and only the owner can say which one is web.
+    """
+    negated_web = _names_web(protocol) and NEGATED.search(protocol) is not None
+    return not states_a_protocol(protocol) or negated_web
 
 
 def asvs_precondition(model: SystemModel) -> PreconditionResult:
@@ -849,18 +874,13 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
         return "refuted"
 
     # The interfaces left it open, so the flows are asked.
-    speaks_web = any(
-        term in flow.protocol.lower()
-        for flow in model.data_flows
-        for term in WEB_PROTOCOL_TERMS
-    )
-    if speaks_web:
+    if any(_speaks_web(flow.protocol) for flow in model.data_flows):
         return "satisfied"
 
     # No process to read: the flows are the whole of what a model carrying only
     # stores and entities can be asked, so there they may refuse as well.
     if not kinds:
-        silent = any(not states_a_protocol(flow.protocol) for flow in model.data_flows)
+        silent = any(_protocol_unsettled(flow.protocol) for flow in model.data_flows)
         return "undecidable" if silent or not model.data_flows else "refuted"
 
     return "undecidable"
@@ -872,7 +892,8 @@ def asvs_precondition_facts(model: SystemModel) -> tuple[UnknownRef, ...]:
     **The precondition reads a process's interface first**, so each process
     that never stated one is asked: one "web" answer satisfies it, and "non-web"
     from every process refutes it. A model with no process is read off its
-    flows alone, so there each flow that states no protocol is asked. Every
+    flows alone, so there each flow whose protocol leaves the web open is asked
+    (:func:`_protocol_unsettled`). Every
     fact is a field the precondition reads, so the answer the resumed job
     writes onto the model is the one the gate reads.
     """
@@ -885,7 +906,7 @@ def asvs_precondition_facts(model: SystemModel) -> tuple[UnknownRef, ...]:
     return tuple(
         UnknownRef(element_id=flow.id, attribute="protocol")
         for flow in model.data_flows
-        if not states_a_protocol(flow.protocol)
+        if _protocol_unsettled(flow.protocol)
     )
 
 
