@@ -1237,6 +1237,7 @@ class TestNothingIsRuledOutByVocabulary:
                         state="absent",
                         source_excerpt="The service uses no OAuth at all.",
                         source_label="description",
+                        origin="reader",
                     )
                 ]
             }
@@ -1497,6 +1498,7 @@ class TestTheScopeLineNamesTheUnitsAtTheLevel:
                 state=state,
                 source_excerpt="stated by a test",
                 source_label="description",
+                origin="reader",
             )
 
         model = valid_model().model_copy(
@@ -1760,6 +1762,7 @@ def test_a_capability_a_statement_shows_present_is_never_asked():
                     state="present",
                     source_excerpt="stated by a test",
                     source_label="description",
+                    origin="reader",
                 )
             ]
         }

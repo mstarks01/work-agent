@@ -12,9 +12,10 @@ list — never as silent guesses.
 Boundary crossings are derived, never extracted: a Data Flow crosses a trust
 boundary iff its endpoints' zones differ.
 
-The top-level ``capabilities`` list holds what the answers state about the whole
-application, such as whether it uses OAuth, each with the quote that states it.
-A capability no answer states has no entry, and a reader takes it as unknown.
+The top-level ``capabilities`` list holds what the answers, the model's closed
+fields and the capability reader state about the whole application, such as
+whether it uses OAuth, each with the quote that states it and its ``origin``.
+A capability nothing states has no entry, and a reader takes it as unknown.
 """
 
 from __future__ import annotations
@@ -24,9 +25,9 @@ from collections import Counter
 from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, ClassVar, Literal, get_args, get_origin
+from typing import Any, ClassVar, Literal, Self, get_args, get_origin
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from analysis_service.capabilities import CAPABILITIES, CapabilityFact, Presence
 from analysis_service.references import canonical
@@ -681,14 +682,16 @@ class Assumption(BaseModel):
 class CapabilityStatement(BaseModel):
     """One statement that the application has or lacks a **Capability**.
 
-    An answer makes one. Code makes a ``present`` one where a closed field of
-    the model proves it (:mod:`analysis_service.field_capabilities`), and
-    where the capability reader quotes a source that states it
-    (:mod:`analysis_service.capability_reader`). It carries the words it rests
-    on, the answer's line, the quote of the element whose fields prove it or
-    the source's own words, so the validity gate checks the quote against the
-    source it names. A capability nothing states has no statement: silence is
-    ``unknown``.
+    Three writers make one, and ``origin`` names the writer. An answer makes
+    one (``answer``). Code makes a ``present`` one where a closed field of the
+    model proves it (``field``, :mod:`analysis_service.field_capabilities`),
+    and where the capability reader quotes a source that states it
+    (``reader``, :mod:`analysis_service.capability_reader`). A reader of the
+    origin reads ``origin``, never ``source_label`` or ``basis``. The
+    statement carries the words it rests on, the answer's line, the quote of
+    the element whose fields prove it or the source's own words, so the
+    validity gate checks the quote against the source it names. A capability
+    nothing states has no statement: silence is ``unknown``.
 
     ``capability`` lists the closed set in the provider-facing schema, on the
     rule :class:`Assumption` follows, so a key outside the set stays an
@@ -705,10 +708,20 @@ class CapabilityStatement(BaseModel):
     state: Literal["present", "absent"]
     source_excerpt: str = Field(min_length=1, max_length=1000)
     source_label: str = Field(min_length=1, max_length=200)
-    #: Where code wrote the statement from the model's own closed fields, the
-    #: element and the rule that prove it (:mod:`analysis_service.field_capabilities`).
-    #: Empty for a statement an answer makes or one the reader quotes.
+    origin: Literal["answer", "field", "reader"]
+    #: The element and the rule that prove a ``field`` statement. A statement
+    #: of another origin carries none.
     basis: str = Field(default="", max_length=600)
+
+    @model_validator(mode="after")
+    def _check_basis(self) -> Self:
+        if (self.origin == "field") != bool(self.basis):
+            raise ValueError(
+                "a field statement carries a basis and a statement of another"
+                f" origin carries none; this {self.origin} statement has"
+                f" basis {self.basis!r}"
+            )
+        return self
 
 
 class BoundaryCrossing(BaseModel):
@@ -763,10 +776,11 @@ class EmittedSystemModel(BaseModel):
     """The System Model as the extraction and repair nodes emit it.
 
     Every field but ``capabilities``, because extraction states no
-    capability: an answer states one, and code states one that a closed field
-    proves. Asking extraction for them costs element identity, up to
-    3.5 sd in the #1291 measurement, so the schema a model fills leaves the
-    list out, and a model that writes it anyway is refused.
+    capability: an answer states one, code states one that a closed field
+    proves, and the capability reader states one a source states. Asking
+    extraction for them costs element identity, up to 3.5 sd in the #1291
+    measurement, so the schema a model fills leaves the list out, and a model
+    that writes it anyway is refused.
     """
 
     # A provider reads this schema, so its title and description say what the
@@ -833,7 +847,9 @@ class SystemModel(EmittedSystemModel):
                 statement.state, []
             )
             quote = f"{statement.source_label}: {statement.source_excerpt}"
-            quotes.append(f"{quote} ({statement.basis})" if statement.basis else quote)
+            if statement.origin == "field":
+                quote = f"{quote} ({statement.basis})"
+            quotes.append(quote)
         facts = {}
         for key, states in stated.items():
             if len(states) == 1:

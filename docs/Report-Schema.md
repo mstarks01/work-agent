@@ -31,7 +31,7 @@ framework's own findings sit in its own block under `analyses`.
 
 ```python
 class Report:
-    schema_version: str  # "3.0"
+    schema_version: str  # "3.1"
     disclaimer: str  # the SERVICE's: AI-generated, not human-reviewed
     job: Job  # id, status="completed", timestamps, revise_rounds, frameworks
     input: InputRef  # system_name + one ref per submitted source
@@ -1221,3 +1221,11 @@ version before it. Read it when you load an archived report.
   fields, so this model refuses a 2.10 payload that carries `threats` at the
   top level, and the 2.10 model refuses a 3.0 payload that carries `analyses`.
   The refusal comes from the shapes, not from a reader of `schema_version`.
+- **Version 3.1:** each statement in `system_model.capabilities` carries the
+  required `origin`, which names the writer of the statement. `answer` is a
+  submitter's answer, `field` is a closed field of the model, and `reader` is
+  the capability reader's quote of a source. A `field` statement carries a
+  `basis`, the element and the rule that prove it. A statement of another
+  origin carries no `basis`. Additive for a consumer that reads only the 3.0
+  fields. A route that parses a stored 3.0 job record answers `409` (see
+  [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).

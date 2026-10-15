@@ -36,6 +36,7 @@ def _stating(model: SystemModel, capability: str, state: str) -> SystemModel:
             "state": state,
             "source_excerpt": "x",
             "source_label": "description",
+            "origin": "reader",
         }
     )
     return model.model_copy(update={"capabilities": [statement]})
@@ -191,7 +192,7 @@ class TestTheAnswerIsWritten:
         model = answered_model(valid_model(), [answer])
         (statement,) = model.capabilities
         assert (statement.capability, statement.state) == ("oauth", "absent")
-        assert statement.source_label == ANSWERS_LABEL
+        assert (statement.source_label, statement.origin) == (ANSWERS_LABEL, "answer")
         assert statement.source_excerpt == fact_line(answer)
 
     def test_the_quote_is_found_in_the_answers_source(self):

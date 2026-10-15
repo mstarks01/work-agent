@@ -35,6 +35,7 @@ def _stated(capability: str, state: str, quote: str) -> CapabilityStatement:
             "state": state,
             "source_excerpt": quote,
             "source_label": "Kickoff call",
+            "origin": "reader",
         }
     )
 
@@ -73,6 +74,25 @@ def test_the_schema_states_the_closed_set():
     schema = CapabilityStatement.model_json_schema()
     assert schema["properties"]["capability"]["enum"] == sorted(CAPABILITIES)
     assert schema["properties"]["state"]["enum"] == ["present", "absent"]
+    assert schema["properties"]["origin"]["enum"] == ["answer", "field", "reader"]
+    assert "origin" in schema["required"]
+
+
+def test_a_statement_states_its_origin():
+    raw = _stated("oauth", "absent", "Ana").model_dump()
+    del raw["origin"]
+    with pytest.raises(ValidationError, match="origin"):
+        CapabilityStatement.model_validate(raw)
+
+
+@pytest.mark.parametrize(
+    ("origin", "basis"),
+    [("field", ""), ("answer", "login: a rule"), ("reader", "login: a rule")],
+)
+def test_a_basis_is_on_a_field_statement_and_on_no_other(origin, basis):
+    raw = _stated("oauth", "present", "Ana").model_dump()
+    with pytest.raises(ValidationError, match="basis"):
+        CapabilityStatement.model_validate(raw | {"origin": origin, "basis": basis})
 
 
 def test_a_stated_capability_is_a_fact_with_its_quote():

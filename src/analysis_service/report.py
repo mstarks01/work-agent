@@ -179,7 +179,13 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # 3.0 payload carrying ``analyses`` is refused by a 2.10 model. A stored job
 # record is a different case: it states the version that created it, and
 # :func:`analysis_service.jobs.same_schema` reads that before a route parses it.
-SCHEMA_VERSION = "3.0"
+#
+# Version 3.1: each statement in ``system_model.capabilities`` carries the
+# required ``origin``, which names its writer: ``answer``, ``field`` or
+# ``reader``. A ``field`` statement carries a ``basis``, and a statement of
+# another origin carries none. A stored 3.0 job record gets 409
+# ``UnreadableSchema``.
+SCHEMA_VERSION = "3.1"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
 # one framework. It does not say "threat model": that is false of a report

@@ -328,6 +328,7 @@ def capability_statements(
             state="present" if answer.value == "yes" else "absent",
             source_excerpt=fact_line(answer),
             source_label=ANSWERS_LABEL,
+            origin="answer",
         )
         for key, answer in capabilities.items()
     ]

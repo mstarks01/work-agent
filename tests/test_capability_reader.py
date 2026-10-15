@@ -57,7 +57,7 @@ class TestTheChecks:
         assert statement.state == "present"
         assert statement.source_label == DEFAULT_DESCRIPTION_LABEL
         assert statement.source_excerpt == "Customers log in to the web app"
-        assert statement.basis == ""
+        assert (statement.origin, statement.basis) == ("reader", "")
 
     @pytest.mark.parametrize(
         ("row", "why"),
@@ -97,6 +97,7 @@ class TestTheChecks:
             state="absent",
             source_excerpt="no",
             source_label="Answers",
+            origin="answer",
         )
         model.capabilities.append(answer)
         stated = _stated(
@@ -175,9 +176,9 @@ class TestTheGraph:
         )
         assert isinstance(outcome, PipelineAwaiting)
         stated = {s.capability: s for s in outcome.checkpoint.system_model.capabilities}
-        assert stated["database"].basis == ""
+        assert stated["database"].origin == "reader"
         assert "browser-frontend" not in stated, "its quote is not in the source"
-        assert stated["tls-use"].basis, "a closed field named it first"
+        assert stated["tls-use"].origin == "field", "a closed field named it first"
         assert visited.index(graph.CAPABILITIES_NODE) < visited.index(graph.STATED_NODE)
 
     def test_a_reader_that_wrote_nothing_stops_the_job(self):

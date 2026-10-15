@@ -46,6 +46,7 @@ def with_reader(model, kept, label):
                     state="present",
                     source_excerpt=entry["quote"],
                     source_label=label,
+                    origin="reader",
                 )
             )
             named.add(entry["capability"])
