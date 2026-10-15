@@ -1347,11 +1347,13 @@ def _known_content(answer: FactAnswer | None) -> frozenset[tuple[str, str]]:
 
 
 class StaleRevision(Exception):
-    """Answers to a waiting job that name an earlier revision than its own."""
+    """A save, an amendment or a correction that names an earlier revision
+    than the job's own."""
 
 
 class MissingRevision(ValueError):
-    """Answers to a waiting job that name no revision."""
+    """A save, an amendment or a correction that names no revision where it
+    must."""
 
 
 class SourcesOverLimit(Exception):
@@ -1688,8 +1690,14 @@ class AnswerState:
             follow_up=not self.waiting,
         )
 
-    def correct(self, facts: Sequence[FactAnswer]) -> list[FactAnswer]:
-        """Every correction a final report carries once ``facts`` land, or a ``ValueError``."""
+    def correct(
+        self, facts: Sequence[FactAnswer], *, revision: int | None
+    ) -> list[FactAnswer]:
+        """Every correction a final report carries once ``facts`` land, or a ``ValueError``.
+
+        A correction names the revision it read, as a save does (ADR 0090).
+        """
+        self._check_revision(revision, required=True)
         return self.questions.correct(
             earlier_facts=self.answers.facts, corrections=self.corrections, facts=facts
         )

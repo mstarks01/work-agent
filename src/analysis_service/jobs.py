@@ -320,9 +320,10 @@ class JobRecord(BaseModel):
     # A finished report's draft answers: what its follow-up saved in batches
     # and has not run. The run composes them with what it is sent (ADR 0070).
     draft: HeldAnswerSet = NO_ANSWERS
-    # How many saves a waiting job, or drafts a finished report, has made. A
-    # save or a continue names the revision it read, so a page left open on an
-    # earlier revision cannot write over a later one.
+    # How many saves a waiting job, drafts a finished report, or corrections a
+    # final report has made. A save, a continue or a correction names the
+    # revision it read, so a page left open on an earlier revision cannot write
+    # over a later one.
     revision: int = 0
     # Every early question and link question a waiting job's submitter
     # skipped for now and has not answered since. The list does not show it again.
@@ -703,7 +704,11 @@ class JobStore(Protocol):
     ) -> bool: ...
 
     async def save_corrections(
-        self, job_id: str, owner_id: str, corrections: Sequence[FactAnswer]
+        self,
+        job_id: str,
+        owner_id: str,
+        corrections: Sequence[FactAnswer],
+        revision: int,
     ) -> bool: ...
 
     async def save_draft(
@@ -1189,18 +1194,30 @@ class InMemoryJobStore:
         return True
 
     async def save_corrections(
-        self, job_id: str, owner_id: str, corrections: Sequence[FactAnswer]
+        self,
+        job_id: str,
+        owner_id: str,
+        corrections: Sequence[FactAnswer],
+        revision: int,
     ) -> bool:
-        """Keep a final report's corrections. False where the job is not the
-        owner's or its report is not final, and nothing is written."""
+        """Keep a final report's corrections.
+
+        ``corrections`` is every correction so far. ``revision`` is the
+        revision the correction read: the check and the next revision are one
+        step, as for :meth:`save_answers`. False where the job is not the
+        owner's, its report is not final, or another save moved its revision,
+        and nothing is written.
+        """
         record = self._records.get(job_id)
         if (
             record is None
             or record.owner_id != owner_id
             or record.status != "completed"
             or not record.final()
+            or record.revision != revision
         ):
             return False
+        record.revision += 1
         record.corrections = list(corrections)
         record.updated_at = datetime.now(UTC)
         return True

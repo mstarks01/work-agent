@@ -42,6 +42,10 @@ lands. A run may name its revision, and is checked where it does. A second
 run is refused while the first holds the report. Where the first run fails,
 the report asks again and its draft is still there.
 
+> **Amended by [ADR 0090](0090-a-correction-names-the-revision-it-read.md).**
+> A final report's correction names the revision it read, and the store
+> checks it as it checks a save.
+
 **The limits are published, and each one has its own job.** One request
 keeps its ceilings of 200 facts and 50 links. A job holds at most five times
 those across every save (`MAX_HELD_FACTS`, `MAX_HELD_LINKS`), and the answer

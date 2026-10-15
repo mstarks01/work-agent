@@ -62,10 +62,13 @@ def finished(store, *, final: bool = True) -> str:
     return record.id
 
 
-def correct(client, job, *facts):
+def correct(client, job, *facts, revision=0):
     return client.post(
         f"/v1/jobs/{job}/corrections",
-        json={"facts": [fact.model_dump(mode="json") for fact in facts]},
+        json={
+            "facts": [fact.model_dump(mode="json") for fact in facts],
+            "revision": revision,
+        },
         headers=auth(),
     )
 
@@ -90,6 +93,38 @@ class TestTheRoute:
         questions = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
         assert questions["corrections"] == body["corrections"]
         assert questions["corrected_findings"] == ["stride/S-01"]
+
+    def test_two_corrections_that_read_one_revision_land_once(self):
+        """The second correction would drop the first, so it gets 409 (ADR 0090)."""
+        client, store = make_client()
+        job = finished(store)
+        first = correct(client, job, FactAnswer(key=ASKED.key, value="unknown"))
+        second = correct(client, job, FactAnswer(key=ASKED.key, value="TLS 1.2"))
+        assert first.status_code == 200, first.text
+        assert first.json()["revision"] == 1
+        assert second.status_code == 409, second.text
+        record = asyncio.run(store.get(job))
+        assert [fact.value for fact in record.corrections] == ["unknown"]
+        again = correct(
+            client, job, FactAnswer(key=ASKED.key, value="TLS 1.2"), revision=1
+        )
+        assert again.status_code == 200, again.text
+
+    def test_a_correction_names_the_revision_it_read(self):
+        client, store = make_client()
+        job = finished(store)
+        response = client.post(
+            f"/v1/jobs/{job}/corrections",
+            json={
+                "facts": [
+                    ANSWER.model_copy(update={"value": "unknown"}).model_dump(
+                        mode="json"
+                    )
+                ]
+            },
+            headers=auth(),
+        )
+        assert response.status_code == 422, response.text
 
     def test_a_report_that_is_not_final_refuses_it(self):
         client, store = make_client()

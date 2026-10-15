@@ -48,7 +48,7 @@ token whose principal does not exist yet gets the same `404` as a missing job.
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `GET` | `/v1/jobs/{id}/changes` | For a follow-up, how each finding moved since the report its answers came from: `new`, `unchanged`, `changed` (with the verdict before and after) or `gone`. Matched by claim identity, never by prose. `409` where the job is not a follow-up, where the earlier report is no longer held, or where either report is withheld or [from an older schema version](#a-job-from-an-older-schema-version). |
-| `POST` | `/v1/jobs/{id}/corrections` | Correct a final report's answers, as `{"facts": [...]}`: a changed value, or `unknown`. `200` with `{"job_id", "corrections", "corrected_findings"}`. No job starts, and the report is not rewritten. `400` where the report is not final, a correction names no answer the report read, or changes none. |
+| `POST` | `/v1/jobs/{id}/corrections` | Correct a final report's answers, as `{"facts": [...], "revision"}`: a changed value, or `unknown`. `200` with `{"job_id", "revision", "corrections", "corrected_findings"}`. No job starts, and the report is not rewritten. `400` where the report is not final, a correction names no answer the report read, or changes none. `409` where another correction moved the revision. |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the answers, and a completed job keeps a draft of its follow-up; either answers `200` with its own `job_id`, and a save never starts a job. `409` where a save moved the answers after this request read them. |
 | `POST` | `/v1/jobs/{id}/amendments` | Amend a job in `awaiting-answers`, as `{"text", "revision"}`: what is true that its model misses or reads wrongly. Starts a **new** job that extracts the job's sources again with the amendment added, and pauses again; `201` with its `job_id`. `409` where the revision has moved, before or while the request reads it, or a job already locks this one. |
 | `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "early_blocked", "early_unnecessary", "policy_version", "fallback", "final", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits", "carried_dropped", "carried_dropped_links"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
@@ -298,9 +298,9 @@ the service returned and your page did not show is not recorded as shown, so
 send only what you rendered.
 
 **Send the revision you read.** `revision` counts a job's saves: a waiting
-job's saves, or a finished report's saved drafts. Every answer to a
-waiting job, and every save, carries the `revision` its questions were read
-with: `400` where it is missing, and `409` where another save landed first. Of
+job's saves, a finished report's saved drafts, or a final report's
+corrections. Every answer to a waiting job, every save and every correction
+carries the `revision` its questions were read with: `400` where it is missing, and `409` where another save landed first. Of
 two saves that read one revision, only the first lands, so a page left open on
 an earlier revision cannot write over a later one. Read the questions again after
 a `409`. A finished report's run may send its `revision`, and is checked
@@ -542,7 +542,9 @@ in the batch that sends them.
 or `unknown` where it was a guess. They are kept beside the report, and a
 final job's questions list them as `corrections`, with `corrected_findings`:
 each finding that quotes a corrected answer's line, grounds on its attribute,
-or waits on it. The analysis does not run again.
+or waits on it. The analysis does not run again. A correction carries the
+`revision` its questions were read with, and the reply names the next one
+([ADR 0090](adr/0090-a-correction-names-the-revision-it-read.md)).
 
 | Status | Cause |
 | --- | --- |

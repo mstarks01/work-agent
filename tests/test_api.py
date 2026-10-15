@@ -892,7 +892,10 @@ class TestTheJobIdCheck:
     BODIES: ClassVar[dict[tuple[str, str], dict]] = {
         ("POST", "/v1/jobs/{job_id}/answers"): {"links": [], "facts": []},
         ("POST", "/v1/jobs/{job_id}/amendments"): {"text": "a CDN", "revision": 0},
-        ("POST", "/v1/jobs/{job_id}/corrections"): {"facts": [A_FACT_ANSWER]},
+        ("POST", "/v1/jobs/{job_id}/corrections"): {
+            "facts": [A_FACT_ANSWER],
+            "revision": 0,
+        },
     }
 
     def test_each_route_answers_a_malformed_id_as_a_missing_job_before_the_store(

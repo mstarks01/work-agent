@@ -687,7 +687,9 @@ def render_report(
         final=script_json(asked["final"]),
         resumed_by=script_json(asked["resumed_by"]),
         corrections=script_json(
-            _corrections_payload(report, state.answers.facts, state.corrections)
+            _corrections_payload(
+                report, state.answers.facts, state.corrections, state.revision
+            )
             if state.final
             else {}
         ),
@@ -773,9 +775,13 @@ def _answer_rows(
 
 
 def _corrections_payload(
-    report: Report, answered: Sequence[FactAnswer], corrections: Sequence[FactAnswer]
+    report: Report,
+    answered: Sequence[FactAnswer],
+    corrections: Sequence[FactAnswer],
+    revision: int,
 ) -> dict[str, object]:
-    """A final report's answers as it is corrected in, and what corrections reach.
+    """A final report's answers as it is corrected in, what corrections reach,
+    and the revision a correction names (ADR 0090).
 
     Each answer carries its current value with every correction in.
     """
@@ -788,6 +794,7 @@ def _corrections_payload(
             for row, answer in zip(rows, answers, strict=True)
         ],
         "findings": list(corrected_findings(report.analyses, answered, corrections)),
+        "revision": revision,
     }
 
 
@@ -1135,10 +1142,8 @@ def create_app(
             skips = _skips(body.get("skip", []))
             presented = _presented(body.get("presented", []))
             revision = body.get("revision")
-            if revision is not None and (
-                not isinstance(revision, int) or isinstance(revision, bool)
-            ):
-                raise TypeError
+            if revision is not None:
+                revision = _revision(revision)
         except InvalidFactAnswer as exc:
             return _message(400, str(exc))
         except (ValidationError, ValueError, KeyError, TypeError):
@@ -1189,8 +1194,8 @@ def create_app(
         try:
             body = await request.json()
             text = body["text"]
-            revision = body["revision"]
-            if not isinstance(text, str) or not isinstance(revision, int):
+            revision = _revision(body["revision"])
+            if not isinstance(text, str):
                 raise TypeError
         except (ValueError, KeyError, TypeError):
             return _message(400, "Expected a JSON body with a 'text' and a 'revision'.")
@@ -1252,18 +1257,32 @@ def create_app(
             if not isinstance(raw, list) or len(raw) > MAX_FACT_ANSWERS:
                 raise TypeError
             facts = [await _fact_answer(fact, questions) for fact in raw]
+            revision = _revision(body["revision"])
         except InvalidFactAnswer as exc:
             return _message(400, str(exc))
         except (ValidationError, ValueError, KeyError, TypeError):
             return _message(
-                400, "Expected a JSON body with a 'facts' list of corrections."
+                400,
+                "Expected a JSON body with a 'facts' list of corrections and a"
+                " 'revision'.",
             )
         corrected = await workspace.answers.correct(
-            run_id, await workspace.owner_id(run_id), facts
+            run_id, await workspace.owner_id(run_id), facts, revision=revision
         )
         return JSONResponse({"run": corrected.job_id})
 
     return app
+
+
+def _revision(value: object) -> int:
+    """The revision a page sent, or :class:`TypeError`.
+
+    **The one reader of a posted revision.** JSON ``true`` reads as an ``int``
+    in Python, so a boolean is refused by name.
+    """
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise TypeError("'revision' is a whole number")
+    return value
 
 
 def _selection(

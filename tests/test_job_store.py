@@ -890,13 +890,26 @@ class TestTheSaves:
     def test_a_correction_lands_only_on_a_final_report(self, store):
         corrections = [FactAnswer(key=KEY, value="TLS 1.2")]
         job = completed(store)
-        assert not asyncio.run(store.save_corrections(job, "alice", corrections))
+        assert not asyncio.run(store.save_corrections(job, "alice", corrections, 0))
         final_job = final(store, job)
         assert not asyncio.run(
-            store.save_corrections(final_job, "mallory", corrections)
+            store.save_corrections(final_job, "mallory", corrections, 0)
         )
-        assert asyncio.run(store.save_corrections(final_job, "alice", corrections))
+        assert asyncio.run(store.save_corrections(final_job, "alice", corrections, 0))
         assert asyncio.run(store.get(final_job)).corrections == corrections
+
+    def test_two_corrections_that_read_one_revision_land_once(self, store):
+        """The check and the next revision are one step (ADR 0090)."""
+        final_job = final(store, completed(store))
+        revision = asyncio.run(store.get(final_job)).revision
+        first = [FactAnswer(key=KEY, value="TLS 1.2")]
+        second = [FactAnswer(key=KEY, value="TLS 1.3")]
+        assert asyncio.run(store.save_corrections(final_job, "alice", first, revision))
+        assert not asyncio.run(
+            store.save_corrections(final_job, "alice", second, revision)
+        )
+        saved = asyncio.run(store.get(final_job))
+        assert (saved.corrections, saved.revision) == (first, revision + 1)
 
 
 class TestTheSaveContract:

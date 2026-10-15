@@ -413,6 +413,8 @@ class CorrectionsSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     facts: list[FactAnswer] = Field(min_length=1, max_length=MAX_FACT_ANSWERS)
+    #: The revision the questions were read with (ADR 0090).
+    revision: int = Field(ge=0, strict=True)
 
 
 class NodeCompletion(BaseModel):
@@ -1129,12 +1131,16 @@ def create_app(
 
         The corrections are kept beside the report; the report is not
         rewritten. ``400`` where the job's report is not final, a correction
-        names no answer the report read, or changes none.
+        names no answer the report read, or changes none. ``409`` where
+        another correction moved the revision that the request names.
         """
-        corrected = await _answers(request).correct(job_id, owner_id, body.facts)
+        corrected = await _answers(request).correct(
+            job_id, owner_id, body.facts, revision=body.revision
+        )
         return JSONResponse(
             {
                 "job_id": corrected.job_id,
+                "revision": corrected.revision,
                 "corrections": [
                     fact.model_dump(mode="json") for fact in corrected.corrections
                 ],

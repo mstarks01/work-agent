@@ -362,7 +362,7 @@ class TestAnsweringAReport:
         with pytest.raises(Refused, match="final"):
             asyncio.run(
                 operations(store).correct(
-                    job, OWNER, [FactAnswer(key=ASKED, value="TLS 1.3")]
+                    job, OWNER, [FactAnswer(key=ASKED, value="TLS 1.3")], revision=0
                 )
             )
 

@@ -338,6 +338,8 @@ class Corrected:
     job_id: str
     corrections: list[FactAnswer]
     corrected_findings: list[str]
+    #: The revision the next correction names.
+    revision: int
 
 
 @dataclass(frozen=True)
@@ -606,23 +608,35 @@ class JobAnswers:
         return self._refusing(within_held_limits, held)
 
     async def correct(
-        self, job_id: str, owner_id: str, facts: Sequence[FactAnswer]
+        self,
+        job_id: str,
+        owner_id: str,
+        facts: Sequence[FactAnswer],
+        *,
+        revision: int | None,
     ) -> Corrected:
         """Correct a final report's answers, and run nothing (ADR 0054).
 
         The corrections are kept beside the report; the report is not
-        rewritten.
+        rewritten. ``revision`` is the revision the correction read, so of
+        two corrections that read one revision only the first lands (ADR 0090).
         """
         answerable = await self.answerable(job_id, owner_id)
         parent = answerable.record
         state = answerable.state()
         corrections = await anyio.to_thread.run_sync(
-            partial(self._refusing, state.correct, facts)
+            partial(self._refusing, state.correct, facts, revision=revision)
         )
-        if not await self.store.save_corrections(parent.id, owner_id, corrections):
-            raise SaveConflict("the job's report is no longer final")
+        if not await self.store.save_corrections(
+            parent.id, owner_id, corrections, parent.revision
+        ):
+            raise SaveConflict(
+                "the job's report is no longer final, or another correction"
+                " landed first; read the questions again"
+            )
         return Corrected(
             job_id=parent.id,
+            revision=parent.revision + 1,
             corrections=corrections,
             corrected_findings=list(
                 corrected_findings(

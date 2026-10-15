@@ -136,5 +136,6 @@ class TestTheSourceLimits:
 
 
 def test_only_a_final_report_takes_corrections():
+    state = waiting()
     with pytest.raises(ValueError, match="only a final report takes corrections"):
-        waiting().correct([])
+        state.correct([], revision=state.revision)

@@ -30,7 +30,10 @@ OLDER = "2.10"
 #: The one fact :func:`a_report_that_asks` asks.
 OPEN = UnknownRef(subject="Whether the audit log is append-only")
 
-CORRECTION = {"facts": [FactAnswer(key=ASKED.key, value="unknown").model_dump()]}
+CORRECTION = {
+    "facts": [FactAnswer(key=ASKED.key, value="unknown").model_dump()],
+    "revision": 0,
+}
 DRAFT = {
     "facts": [FactAnswer(key=OPEN.key, value="yes").model_dump()],
     "save": True,
