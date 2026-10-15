@@ -189,7 +189,10 @@ When implementation is authorised:
 
 The branch is the isolation. Start it from the commit the experiment runs
 against, and keep the ledger rows off it: they go to `main` through their own
-pull request, so a reverted candidate does not take its record with it. A kept
+pull request, so a reverted candidate does not take its record with it. The
+`Ledger` workflow (`.github/workflows/ledger.yml`) fails a pull request that
+changes a file of ledger rows or grants and also changes code;
+`evals/harness/ledger_isolation.py` lists the paths that count as code. A kept
 candidate goes through the ordinary pull request and review. The audit never
 merges its own work.
 

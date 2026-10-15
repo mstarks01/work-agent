@@ -78,7 +78,8 @@ On `QA-2026-10-14-01`, with the round-2 prompt and the harness's wording:
 
 The node's prompt wraps the same rules in the service's prompt layout, and the
 rule against injected orders is unmeasured on the development cases. The
-holdout gate measures the node as it ships.
+holdout gate measures the node's prompt and its check, and not every part of a
+job's call: ADR 0087 states what the gate run measured and what it did not.
 
 The reader adds one call to such a job, about $0.004 on the `base` tier, and
 the passes after it wait for it. A deployment with blessed fingerprints sees
