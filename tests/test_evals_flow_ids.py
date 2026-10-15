@@ -132,6 +132,24 @@ class TestTheCorpusIsAtOneVersion:
         with pytest.raises(MigrationError, match="mixture"):
             flow_id_version_of_graph(raw)
 
+    def test_an_id_no_rule_wrote_does_not_decide_the_version(self):
+        """The shape of `20261015T-rulings-refuted/after-r1`: a source label in
+        the source slot. The other flows name the version; this one names none."""
+        raw = graph(
+            flow("process:storefront", "store:orders", "write order", version=2),
+            elements=ENDPOINTS,
+        )
+        raw["data_flows"].append(
+            {
+                "id": "flow:System description>process:storefront>obtain token",
+                "source": "System description",
+                "destination": "process:storefront",
+                "name": "obtain token",
+            }
+        )
+
+        assert flow_id_version_of_graph(raw) == FLOW_ID_VERSION
+
     def test_a_graph_with_no_flows_is_at_this_version(self):
         assert flow_id_version_of_graph(graph()) == FLOW_ID_VERSION
 
