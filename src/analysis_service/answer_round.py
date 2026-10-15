@@ -16,8 +16,8 @@ may continue with no answers, and a finished one has nothing to continue.
 
 **A waiting job asks one adaptive list** (ADR 0078). The list holds every
 recommended question of the pause at once: a question is listed only at or
-above its kind's floor, and one pause asks each kind at most its limit for
-each selected framework (:data:`EARLY_RULES` is the table). Where a job
+above its kind's floor, and one pause asks capability questions up to their
+limit for each selected framework (:data:`EARLY_RULES` is the table). Where a job
 selects more than one framework, the frameworks take turns for the places
 (:func:`by_turn`), and within a framework's turn the list's own order holds:
 the band and the units a capability could settle, the prior per choice for a
@@ -145,9 +145,9 @@ class EarlyRule:
     """Which early questions of one kind the list may hold.
 
     ``floor`` is the score a question needs, and ``limit`` how many places
-    of the kind one pause holds for each selected framework. A group of field
-    questions takes one place and a capability question one
-    (:func:`limit_place`, ADR 0081). A place counts toward the limit of every
+    of the kind one pause holds for each selected framework, or ``None`` for
+    no limit. A group of field questions takes one place and a capability
+    question one (:func:`limit_place`, ADR 0081). A place counts toward the limit of every
     framework its questions serve, so a second framework takes no place from
     the first. The two kinds' scores are not on one scale: a field
     question's is a ranking value read off the prior, and a capability
@@ -155,19 +155,20 @@ class EarlyRule:
     """
 
     floor: float
-    limit: int
+    limit: int | None
 
 
 #: The rule for each kind of early question: ``capability`` and ``field``,
 #: which is every other kind (``QA-2026-09-26-03-E20``). A field question's
 #: floor of 1 is where the ranking cuts: no measurement says how many findings
-#: an answer under it changes. A field place is a group (ADR 0081), and a
-#: STRIDE list holds fewer than 30 groups, so the floor and not the limit
-#: decides which field questions a pause asks. A capability question under 2
-#: settles one unit, and at ASVS level 2 that leaves 28 of 51.
+#: an answer under it changes. Field questions have no limit (ADR 0088): a
+#: field place is a group (ADR 0081), one for each attribute or kind the prior
+#: names, so the floor decides which field questions a pause asks. A
+#: capability question under 2 settles one unit, and at ASVS level 2 that
+#: leaves 28 of 51.
 EARLY_RULES: Mapping[str, EarlyRule] = {
     "capability": EarlyRule(floor=2.0, limit=30),
-    "field": EarlyRule(floor=1.0, limit=30),
+    "field": EarlyRule(floor=1.0, limit=None),
 }
 
 
@@ -1203,7 +1204,7 @@ def recommended(
         )
         for question in by_turn(fresh, spent):
             slot = limit_place(question.key)
-            if any(
+            if rule.limit is None or any(
                 slot in counted[name] or len(counted[name]) < rule.limit
                 for name in question.frameworks
             ):

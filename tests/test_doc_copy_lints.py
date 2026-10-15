@@ -418,16 +418,19 @@ def test_the_question_limits_are_the_early_rules():
         text,
     )
     limit = re.search(
-        r"One pause asks at most (\d+) of each kind for each selected framework", text
+        r"One pause asks at most (\d+) capability questions for each selected"
+        r" framework",
+        text,
     )
-    limit_again = re.search(r"takes no place under the limit of (\d+)\.", text)
+    unlimited = "Field questions have no limit" in text
     links = re.search(r"or there are more than (\d+) entries", text)
 
-    assert policy and floors and limit and limit_again and links
+    assert policy and floors and limit and unlimited and links
     capability, field = EARLY_RULES["capability"], EARLY_RULES["field"]
     assert policy[1] == POLICY_VERSION
     assert (float(floors[1]), float(floors[2])) == (field.floor, capability.floor)
-    assert int(limit[1]) == int(limit_again[1]) == capability.limit == field.limit
+    assert int(limit[1]) == capability.limit
+    assert field.limit is None
     assert int(links[1]) == MAX_LINK_ANSWERS
 
 

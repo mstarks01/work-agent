@@ -253,9 +253,11 @@ reads your answers, so the findings rest on them.
 most useful first, and `policy_version` names the policy that built it
 (`adaptive-1`). Each question's `decisions` counts its choices: one a facet,
 else one. A field question needs a `score` of at least 1, and a capability
-question at least 2. One pause asks at most 30 of each kind for each selected
-framework, and a question two frameworks share counts for each of them
-([ADR 0074](adr/0074-each-framework-has-its-own-question-limit.md)). A
+question at least 2. One pause asks at most 30 capability questions for each
+selected framework, and a question two frameworks share counts for each of
+them ([ADR 0074](adr/0074-each-framework-has-its-own-question-limit.md)).
+Field questions have no limit: the floor decides which of them the list asks
+([ADR 0088](adr/0088-field-questions-have-no-limit.md)). A
 capability question whose `parent` is still open is not in the list: it is in
 `early_blocked`, with the `reason` `parent-undecided`, takes no place, and
 joins the list once the parent is answered "yes". Within a framework's turn,
@@ -304,8 +306,7 @@ against it where it does. A save never starts
 the analysis: when the saved answers leave nothing to ask, the questions say
 so in `early_stop`, and a send without `"save"` starts it. `answered_early` and `answered_links` list each saved answer
 with its question, and you can send a new answer to any of them. A question
-with facets stays listed while a facet has no answer, and it takes no place
-under the limit of 30.
+with facets stays listed while a facet has no answer.
 
 **A stop does not say every fact is settled**
 ([ADR 0068](adr/0068-a-pause-says-what-it-leaves-open.md)). `early_stop` is
