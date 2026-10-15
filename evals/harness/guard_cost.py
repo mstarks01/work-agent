@@ -51,8 +51,8 @@ from evals.harness.provenance import ProvenanceError
 from evals.harness.reference import (
     GoldenCase,
     ReferenceClaim,
+    development_cases,
     load_corpus,
-    tuning_cases,
 )
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -285,7 +285,7 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 def command_guard_cost(args: argparse.Namespace) -> int:
     """Price the guard. It runs no model and reads no credential."""
     try:
-        cases = tuning_cases(load_corpus(args.corpus))
+        cases = development_cases(load_corpus(args.corpus))
         priced = price(cases, args.proposals, args.graphs)
     except (OSError, ValueError, EvalRunError, ProvenanceError) as error:
         print(f"cannot price the guard: {error}", file=sys.stderr)

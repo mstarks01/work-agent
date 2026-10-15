@@ -22,7 +22,7 @@ the rows that change by meaning before any decision.
 
 **Holdout cases.** Cases 14 and 15 carry `holdout: true`. Every sweep scores
 them and reports them apart (`holdout_split`), and no diagnosis command reads
-them. A gain that the tuned cases show and the holdout cases do not was shaped
+them. A gain that the development cases show and the holdout cases do not was shaped
 by the cases it was read on. See **Holdout Case** in `GLOSSARY.md`.
 
 **Instruments for one lane or one critic call.** `run.py lane-replay` sends one
@@ -50,11 +50,11 @@ fix owes. See "Offline completion and paid runs" in `AGENTS.md`.
 |---|---|---|
 | Baseline `6bff717`, must-finds by structure | 71 of 103 | ledger `QA-2026-09-26-01-E1` |
 | Baseline `6bff717`, must-finds by meaning | 59 of 103 | ledger `QA-2026-09-26-01-E1` |
-| Sweep B (commit `7ec9f22`), tuned cases by structure | 72 of 103 | `evals/experiments/QA-2026-09-26-01.md`, E2 |
+| Sweep B (commit `7ec9f22`), development cases by structure | 72 of 103 | `evals/experiments/QA-2026-09-26-01.md`, E2 |
 | Sweep B, holdout cases by structure | 9 of 14 (case 14: 3 of 7, case 15: 6 of 7) | `evals/experiments/QA-2026-09-26-01.md`, E2 |
 | Completeness instruction, missed must-finds recovered by meaning (30 lanes, two passes) | 8 and 8, against 3 and 4 for a plain repeat | ledger `QA-2026-09-26-01-E2` |
 | Completeness instruction end to end (cases 02, 05, 10) | must-finds 13 to 15; lane proposals 44 to 84 | ledger `QA-2026-09-26-01-E5` |
-| Sweep B, tuned cases, findings that are conditional (needs-info) | 175 of 200, on 129 open facts | ledger `QA-2026-09-26-02-E1` |
+| Sweep B, development cases, findings that are conditional (needs-info) | 175 of 200, on 129 open facts | ledger `QA-2026-09-26-02-E1` |
 | Lane closing on cases 02, 05, 10: needs-info, confirmed, open facts | 38 to 78, 6 to 6, 28 to 44 | ledger `QA-2026-09-26-02-E1` |
 | Share of needs-info findings six ranked questions settle (cases 02, 05, 10) | 53% without the closing, 24% with it; ten settle 38% | ledger `QA-2026-09-26-03-E6` |
 
@@ -85,7 +85,7 @@ collapsible group per fact. It reads only the report, so it cannot disagree
 with the verdicts. This is the partner to the lane closing.
 
 **Holdout filter.** `reference.diagnosable` is the one reader of the holdout
-rule. Diagnosis commands filter through `tuning_cases`, and
+rule. Diagnosis commands filter through `development_cases`, and
 `tests/test_holdout_cases.py` resolves every `load_corpus` call under `evals/`
 so a new caller must filter or state its reason.
 

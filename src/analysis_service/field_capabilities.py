@@ -116,6 +116,14 @@ def _internal(parts: _Parts, states: Callable[[DataFlow], bool]) -> Iterator[Dat
             yield flow
 
 
+def _internal_tls(parts: _Parts) -> Iterator[DataFlow]:
+    return _internal(parts, lambda flow: states_inherently(flow, TLS_FAMILY))
+
+
+def _internal_http(parts: _Parts) -> Iterator[DataFlow]:
+    return _internal(parts, lambda flow: states_protocol(flow, HTTP_FAMILY))
+
+
 def _internal_service(parts: _Parts) -> Iterator[DataFlow]:
     """A process and a data store that talk over a TLS-family or HTTP-family protocol."""
     network = (*TLS_FAMILY, *HTTP_FAMILY)
@@ -220,14 +228,12 @@ FIELD_CAPABILITIES: tuple[FieldCapability, ...] = (
     ),
     FieldCapability(
         "internal-tls-connections",
-        lambda parts: _internal(
-            parts, lambda flow: states_inherently(flow, TLS_FAMILY)
-        ),
+        _internal_tls,
         "two parts of the application talk over a TLS-family protocol",
     ),
     FieldCapability(
         "internal-http-connections",
-        lambda parts: _internal(parts, lambda flow: states_protocol(flow, HTTP_FAMILY)),
+        _internal_http,
         "two parts of the application talk over an HTTP-family protocol",
     ),
     FieldCapability(

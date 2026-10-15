@@ -49,6 +49,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.config_files import read_toml
 from analysis_service.errors import ConfigError
+from analysis_service.parsing import is_version
 from analysis_service.vendors import (
     UPSTREAM_SLUG,
     VENDOR_NAMES,
@@ -883,7 +884,7 @@ def load_model_tiers(
     _apply_env_overrides(raw, env)
 
     version = raw.get("version")
-    if type(version) is not int or version != SUPPORTED_VERSION:
+    if not is_version(version, SUPPORTED_VERSION):
         raise ModelConfigError(
             f"{path}: unsupported version {version!r}; expected {SUPPORTED_VERSION}"
         )

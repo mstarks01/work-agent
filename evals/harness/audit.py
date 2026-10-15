@@ -73,7 +73,7 @@ from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
-from analysis_service.parsing import non_negative
+from analysis_service.parsing import non_negative, strings
 from evals.harness.history import current_commit
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import DEFAULT_CORPUS, load_corpus
@@ -238,7 +238,7 @@ def exhausted(ledger: Sequence[Experiment] | None = None) -> dict[str, int]:
 
 
 def held_out(
-    case: str, flagged: bool, ledger: Sequence[Experiment] | None = None
+    case: str, *, flagged: bool, ledger: Sequence[Experiment] | None = None
 ) -> bool:
     """Whether ``case`` is still held out: the one reader of the development split.
 
@@ -248,6 +248,20 @@ def held_out(
     counts as a development case (#1093).
     """
     return flagged and case not in exhausted(ledger)
+
+
+def still_held_out(
+    flagged: Iterable[str], ledger: Sequence[Experiment] | None = None
+) -> frozenset[str]:
+    """The cases in ``flagged`` that are still held out, each asked of :func:`held_out`.
+
+    Every case in ``flagged`` carries the ``holdout`` flag. ``None`` reads the
+    ledger on record once.
+    """
+    ledger = load() if ledger is None else ledger
+    return frozenset(
+        case for case in flagged if held_out(case, flagged=True, ledger=ledger)
+    )
 
 
 def holdout_cases() -> frozenset[str]:
@@ -720,7 +734,7 @@ def _strings(
     held: Mapping[str, Any], name: str, block: str, where: str
 ) -> tuple[str, ...]:
     value = held.get(name, [])
-    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+    if not strings(value):
         raise ExperimentError(f"{where}: {block}: {name} is not a list of strings")
     return tuple(value)
 
@@ -804,7 +818,7 @@ def _condition(held: object, where: str) -> Condition | None:
     lists = {}
     for listed in ("adapters", "unrepresentable"):
         value = held.get(listed)
-        if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        if not strings(value):
             raise ExperimentError(
                 f"{where}: condition {name!r}: {listed} is not a list of strings"
             )

@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast, get_args
 
+from analysis_service.parsing import is_version, strings
 from evals.harness import ledger
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
@@ -99,7 +100,7 @@ def load(path: Path | str = DEFAULT_ROSTER_PATH) -> Roster:
 
     if unknown := set(raw) - {"version", "voters"}:
         raise RosterError(f"{path}: unknown keys: {', '.join(sorted(unknown))}")
-    if type(raw.get("version")) is not int or raw["version"] != VERSION:
+    if not is_version(raw.get("version"), VERSION):
         raise RosterError(
             f"{path}: version {raw.get('version')!r} is not {VERSION}; an old"
             " shape fails the load rather than inheriting a meaning"
@@ -148,7 +149,7 @@ def _standing(path: Path, login: str, entry: object) -> Standing:
 
 def _aliases(path: Path, login: str, entry: dict[str, object]) -> list[str]:
     raw = entry.get("aliases", [])
-    if not isinstance(raw, list) or not all(isinstance(name, str) for name in raw):
+    if not strings(raw):
         raise RosterError(f"{path}: [voters.{login}] aliases is not a list of logins")
     for alias in raw:
         if not _LOGIN.match(alias):

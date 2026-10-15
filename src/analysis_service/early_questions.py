@@ -12,7 +12,7 @@ job does hold (``QA-2026-09-26-03-E13``):
   (:meth:`~analysis_service.claims.Claim.idle`) leads nothing.
 
 A question's score is the prior times one plus the candidates, summed over
-the job's frameworks. On 13 tuned cases that order settled about 60% of what
+the job's frameworks. On 13 development cases that order settled about 60% of what
 the report's own order settled, at six and at ten questions a case. The count
 cannot see the main reason to ask early: the lanes then write their findings
 with the answer in hand.
@@ -132,7 +132,7 @@ class PriorRow:
     runs: tuple[str, ...]
     #: The commit the command ran at, or ``None`` where no run was counted.
     revision: str | None
-    #: The tuned cases counted. A holdout case is never counted.
+    #: The development cases counted. A holdout case is never counted.
     cases: int
     #: Citations of each attribute or kind, per element of each type.
     rates: Mapping[str, Mapping[str, float]]

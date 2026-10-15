@@ -44,6 +44,7 @@ from analysis_service.answer_sets import AnswerSet
 from analysis_service.claims import FrameworkName
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import check_fact_answers
+from analysis_service.parsing import signer, strings
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import validate
@@ -89,7 +90,7 @@ def _field_value(value: object) -> FieldValue:
     """A set-back value in one of its two shapes, or a refusal."""
     if isinstance(value, str):
         return value
-    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+    if strings(value):
         return tuple(value)
     raise EvalRunError(
         f"a set-back value is a string or a list of strings, not {value!r}"
@@ -101,11 +102,12 @@ def load_answer_file(path: Path) -> AnswerFile | None:
     if not path.is_file():
         return None
     raw: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    signed_by = raw.get("signed_by")
-    if signed_by is None or signed_by == "":
+    try:
+        signed_by = signer(raw.get("signed_by"))
+    except ValueError as exc:
+        raise EvalRunError(f"{path}: {exc}") from exc
+    if signed_by is None:
         return None
-    if not isinstance(signed_by, str) or not signed_by.strip():
-        raise EvalRunError(f"{path}: signed_by {signed_by!r} names nobody")
     withheld = raw.get("withheld", {})
     return AnswerFile(
         signed_by=signed_by,

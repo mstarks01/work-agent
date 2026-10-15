@@ -839,31 +839,37 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
 
 
 def holdout_split(scores: Sequence[CaseScore]) -> dict[str, float] | None:
-    """Coverage on the tuned cases beside coverage on the holdout cases (#744).
+    """Coverage on the development cases beside coverage on the holdout cases (#744).
 
     ``None`` where no holdout case was scored. A fix whose gain shows on the
-    tuned cases and not on the holdout ones was shaped by the cases it was
-    read on. A holdout the ledger exhausted counts as tuned
+    development cases and not on the holdout ones was shaped by the cases it was
+    read on. A holdout the ledger exhausted counts as a development case
     (:func:`~evals.harness.audit.held_out`).
     """
     ledger = audit.load()
     held = [
         score
         for score in scores
-        if audit.held_out(score.case_id, score.holdout, ledger)
+        if audit.held_out(score.case_id, flagged=score.holdout, ledger=ledger)
     ]
     if not held:
         return None
-    tuned = [score for score in scores if score not in held]
+    development = [score for score in scores if score not in held]
     return {
-        "tuned_coverage": round(
-            ratio(sum(score.reference_coverage for score in tuned), len(tuned)), 3
+        "development_coverage": round(
+            ratio(
+                sum(score.reference_coverage for score in development), len(development)
+            ),
+            3,
         ),
         "holdout_coverage": round(
             ratio(sum(score.reference_coverage for score in held), len(held)), 3
         ),
-        "tuned_must_find_coverage": round(
-            ratio(sum(score.must_find_coverage for score in tuned), len(tuned)), 3
+        "development_must_find_coverage": round(
+            ratio(
+                sum(score.must_find_coverage for score in development), len(development)
+            ),
+            3,
         ),
         "holdout_must_find_coverage": round(
             ratio(sum(score.must_find_coverage for score in held), len(held)), 3
@@ -928,9 +934,9 @@ def render(scores: Sequence[CaseScore]) -> None:
         if split:
             print(
                 f"holdout: coverage {split['holdout_coverage']:.2f}"
-                f" vs tuned {split['tuned_coverage']:.2f}; must-find"
+                f" vs development {split['development_coverage']:.2f}; must-find"
                 f" {split['holdout_must_find_coverage']:.2f}"
-                f" vs tuned {split['tuned_must_find_coverage']:.2f}"
+                f" vs development {split['development_must_find_coverage']:.2f}"
             )
         spent = audit.exhausted_line(score.case_id for score in scores if score.holdout)
         if spent:

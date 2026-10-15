@@ -912,20 +912,23 @@ def pooled_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 
 def holdout_split(scores: Sequence[ApplicabilityScore]) -> dict[str, float] | None:
-    """Applicability recall on the tuned cases beside the holdout ones (#744).
+    """Applicability recall on the development cases beside the holdout ones (#744).
 
     ``None`` where no holdout case was scored. The same question the STRIDE
     scorer's split asks, over the recall this package produces, with an
-    exhausted holdout counted as tuned (:func:`~evals.harness.audit.held_out`).
+    exhausted holdout counted as a development case
+    (:func:`~evals.harness.audit.held_out`).
     """
     ledger = audit.load()
     held = [
-        score for score in scores if audit.held_out(score.case, score.holdout, ledger)
+        score
+        for score in scores
+        if audit.held_out(score.case, flagged=score.holdout, ledger=ledger)
     ]
     if not held:
         return None
     return {
-        "tuned_recall": round(
+        "development_recall": round(
             _mean(score.recall for score in scores if score not in held), 3
         ),
         "holdout_recall": round(_mean(score.recall for score in held), 3),

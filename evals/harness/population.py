@@ -51,7 +51,7 @@ from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports
-from evals.harness.reference import GoldenCase, load_corpus, tuning_cases
+from evals.harness.reference import GoldenCase, development_cases, load_corpus
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 
@@ -256,7 +256,7 @@ def command_freeze_population(args: argparse.Namespace) -> int:
             for path in args.reports
         }
         if args.assertions:
-            cases = tuning_cases(load_corpus(args.corpus))
+            cases = development_cases(load_corpus(args.corpus))
             for path in args.assertions:
                 reports.update(assertion_reports(path, cases))
         if not reports:

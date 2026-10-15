@@ -12,7 +12,7 @@ from pathlib import Path
 from analysis_service.candidates import generate_candidates
 from analysis_service.frameworks import package_for
 from analysis_service.open_facts import prepared_model
-from evals.harness.reference import MUST_FIND, load_corpus, tuning_cases
+from evals.harness.reference import MUST_FIND, development_cases, load_corpus
 from evals.reference_facts import FACTS_FILE, load_facts, reference_catalog
 
 CORPUS = Path("evals/corpus")
@@ -32,7 +32,7 @@ def rules_hitting(model, catalog, reference, package):
 def main(framework):
     package = package_for(framework)
     totals = {"must": 0, "unled": 0, "newly_led": 0, "new_rule_on_led": 0}
-    for case in tuning_cases(load_corpus(CORPUS)):
+    for case in development_cases(load_corpus(CORPUS)):
         if not (CORPUS / case.id / FACTS_FILE).exists():
             continue
         sources = {source.label: source.text for source in case.sources}

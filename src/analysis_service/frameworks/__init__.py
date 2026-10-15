@@ -28,8 +28,9 @@ runs before an adapter binds and before an instruction composes.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from inspect import getattr_static
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal, get_args
@@ -597,17 +598,20 @@ def package_for(name: FrameworkName) -> FrameworkPackage:
     return PACKAGES[name]
 
 
-def reads_capabilities(name: FrameworkName) -> bool:
-    """Whether the package's units apply by a rule over **Capabilities**.
+def reads_capabilities(selection: Iterable[FrameworkName]) -> bool:
+    """Whether a package in ``selection`` applies by a rule over **Capabilities**.
 
-    **The one reader of that question**, read off the record's own
+    **The one reader of that question**, read off each record's own
     ``applicability`` hook: a package applies by capabilities exactly when its
     record answers for its units, and a flag beside the hook could say
     otherwise. A package that inherits the neutral hook reads no capability,
     so a pass that states capabilities serves it nothing.
     """
-    hook = PACKAGES[name].record.applicability.__func__  # type: ignore[attr-defined]
-    return hook is not Claim.applicability.__func__  # type: ignore[attr-defined]
+    neutral = getattr_static(Claim, "applicability")
+    return any(
+        getattr_static(PACKAGES[name].record, "applicability") is not neutral
+        for name in selection
+    )
 
 
 def widest_fan_out() -> int:

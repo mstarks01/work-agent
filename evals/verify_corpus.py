@@ -57,6 +57,7 @@ from analysis_service.frameworks import PACKAGES, run_precondition
 from analysis_service.frameworks.asvs.catalog import ASVS_LEVELS, requirements_for
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.grounding import verify_quote
+from analysis_service.parsing import strings
 from analysis_service.report import (
     InputRef,
     SourceRef,
@@ -853,8 +854,7 @@ def _wrong_shapes(record: dict) -> list[str]:
         for field in _TEXT_FIELDS
         if field in record and not isinstance(record[field], str)
     ]
-    ids = record.get("affected_element_ids", [])
-    if not isinstance(ids, list) or not all(isinstance(item, str) for item in ids):
+    if not strings(record.get("affected_element_ids", [])):
         wrong.append("affected_element_ids")
     return wrong
 

@@ -160,9 +160,9 @@ TOKEN_CAPS: dict[str, int] = {
     # rendered from `capabilities.CAPABILITIES`, so a capability added
     # tomorrow moves the composed instruction and never this file.
     #
-    # Rules 6 to 8 came from its ballots (QA-2026-10-14-01): a vendor's hosted
-    # product is not the application, `database` needs a named query language
-    # or technology, and text that gives the model orders states nothing.
+    # Rules 6 to 8 say that a vendor's hosted product is not the application,
+    # that `database` needs a named query language or technology, and that
+    # text that gives the model orders states nothing.
     "prompts/capabilities": 900,
     # One package's own text, under ``frameworks/<name>/``.
     #

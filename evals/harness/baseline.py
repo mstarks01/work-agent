@@ -67,7 +67,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from analysis_service.model_tiers import TierName
-from analysis_service.parsing import non_negative
+from analysis_service.parsing import non_negative, strings
 from analysis_service.vendors import vendor_for_route
 
 # The tier whose model names a baseline. Spelled, not indexed: a position in
@@ -806,10 +806,6 @@ def default_base_ref(root: Path) -> str:
     return "main"
 
 
-def _strings(value: object) -> bool:
-    return isinstance(value, list) and all(isinstance(item, str) for item in value)
-
-
 def _rates(entry: object) -> bool:
     """Whether one ``unit_prices`` entry names a model and states numbers."""
     return (
@@ -849,7 +845,7 @@ def manifest_problems(manifest: object) -> list[str]:
         if not isinstance(cost, Mapping):
             problems.append(f"{where}: cost is {cost!r}, not a table")
             continue
-        if not _strings(cost.get("unpriced", [])):
+        if not strings(cost.get("unpriced", [])):
             problems.append(f"{where}: cost.unpriced is not a list of strings")
         prices = cost.get("unit_prices", [])
         if not isinstance(prices, list) or not all(_rates(row) for row in prices):
@@ -857,7 +853,7 @@ def manifest_problems(manifest: object) -> list[str]:
                 f"{where}: cost.unit_prices is not a list of a model and its rates"
             )
         fallbacks = cost.get("fallbacks", {})
-        if not isinstance(fallbacks, Mapping) or not _strings(list(fallbacks.values())):
+        if not isinstance(fallbacks, Mapping) or not strings(list(fallbacks.values())):
             problems.append(f"{where}: cost.fallbacks is not a table of strings")
     return problems
 

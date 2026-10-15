@@ -77,7 +77,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    StrictInt,
     ValidationError,
     field_validator,
     model_validator,
@@ -86,6 +85,7 @@ from pydantic import (
 from analysis_service.config_files import read_toml
 from analysis_service.errors import ConfigError
 from analysis_service.model_tiers import TIER_NAMES, TierName
+from analysis_service.parsing import is_version
 
 # The only schema version this loader accepts. Every config file pins its own
 # version and every loader exact-matches it, so the numbers are independent: a
@@ -212,7 +212,7 @@ class _RawSampling(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    version: StrictInt
+    version: int
     tiers: dict[TierName, _RawTier]
 
 
@@ -425,18 +425,18 @@ def load_sampling(
         env = os.environ
     raw = read_toml(path, SamplingConfigError)
 
+    version = raw.get("version")
+    if not is_version(version, SUPPORTED_VERSION):
+        raise SamplingConfigError(
+            f"{path}: unsupported version {version!r}; expected {SUPPORTED_VERSION}"
+        )
+
     _apply_env_overrides(raw.get("tiers"), env)
 
     try:
         parsed = _RawSampling(**raw)
     except ValidationError as exc:
         raise SamplingConfigError(f"{path}: {exc}") from exc
-
-    if parsed.version != SUPPORTED_VERSION:
-        raise SamplingConfigError(
-            f"{path}: unsupported version {parsed.version};"
-            f" expected {SUPPORTED_VERSION}"
-        )
 
     resolved = {
         tier: TierSampling(**raw_tier.model_dump())

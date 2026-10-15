@@ -27,7 +27,7 @@ from evals.harness.exemplar_verbs import (
     verb_keyed_frameworks,
 )
 from evals.harness.fingerprint import IDENTIFIER_OF
-from evals.harness.reference import load_corpus, tuning_cases
+from evals.harness.reference import development_cases, load_corpus
 
 
 @pytest.fixture(scope="module")
@@ -105,7 +105,7 @@ def test_all_but_one_case_carries_a_disagreement(corpus, swept):
     """
     graded = {
         case.id
-        for case in tuning_cases(corpus)
+        for case in development_cases(corpus)
         if any(framework in case.frameworks for framework in verb_keyed_frameworks())
     }
     assert graded - {entry.case for entry in swept} == {"16-library-lending-interview"}

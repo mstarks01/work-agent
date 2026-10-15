@@ -290,7 +290,7 @@ def _blank_control_issues(element: Element) -> list[ValidationIssue]:
 #: rule fires, so the gate refuses the shape and the repair pass picks one.
 #: A word that names the absence itself, such as "disabled" or "plaintext",
 #: opens a value that the leading-token rule also reads as *stated*, so the
-#: gate refuses it too. No archived model holds a control that opens with one.
+#: gate refuses it too.
 AMBIGUOUS_CONTROL_LEADS: frozenset[str] = frozenset(
     {
         "no",
@@ -315,8 +315,7 @@ AMBIGUOUS_CONTROL_LEADS: frozenset[str] = frozenset(
 #: "I don't know" or "TBD" as a stated control, so a submitter who typed one
 #: into an answer turned off every rule that asks about a missing control
 #: (#1289). The sentinel for that fact is ``unknown``. An apostrophe comes in
-#: two spellings, and a phone or a word processor types the curly one. No
-#: archived model or report held a control that opens with one of these.
+#: two spellings, and a phone or a word processor types the curly one.
 UNCERTAIN_CONTROL_LEADS: frozenset[str] = frozenset(
     {
         "unsure",
@@ -354,8 +353,7 @@ def _ambiguous_control_issues(element: Element) -> list[ValidationIssue]:
     ``not`` is none of the three and is read differently by a person and by
     :func:`~analysis_service.analysis.control_state` (#675 D02). Refused here
     rather than reclassified: which of the three the writer meant is a fact
-    about the input, and the repair pass has the input in front of it. The
-    corpus and every archived model were checked and carry no such value.
+    about the input, and the repair pass has the input in front of it.
     """
     issues = []
     for attribute in CONTROL_ATTRIBUTES:

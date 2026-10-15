@@ -62,6 +62,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.config_files import read_toml
 from analysis_service.model_tiers import TIER_NAMES, TierName
+from analysis_service.parsing import is_version
 from analysis_service.report import (
     NodeRun,
     Report,
@@ -267,7 +268,7 @@ def load_manifest(path: Path | str) -> BlessedManifest:
     # The version check fires before shape validation, so a file on another
     # schema is named as such rather than reported as a set of stray keys.
     version = raw.get("version")
-    if type(version) is not int or version != MANIFEST_VERSION:
+    if not is_version(version, MANIFEST_VERSION):
         raise CertificationError(
             f"{path}: unsupported version {version!r};"
             f" expected {MANIFEST_VERSION}, which keys blessed fingerprints"

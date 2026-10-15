@@ -16,7 +16,7 @@ from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.system_model import ModelIndex
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
-from evals.harness.reference import load_corpus, tuning_cases
+from evals.harness.reference import development_cases, load_corpus
 from evals.harness.scorer import score_case
 
 RUNS = (
@@ -38,7 +38,7 @@ def matched(case, directory):
 def main():
     targets = defaultdict(list)
     counts = Counter()
-    for case in tuning_cases(load_corpus(Path("evals/corpus"))):
+    for case in development_cases(load_corpus(Path("evals/corpus"))):
         found = [matched(case, directory) for directory in RUNS]
         for index, reference in enumerate(case.stride_claims()):
             if not reference.must_find:

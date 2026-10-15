@@ -16,13 +16,14 @@ from __future__ import annotations
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path
-from typing import get_args
+from typing import cast, get_args
 
 from analysis_service.claims import (
     FRAMEWORK_NAMES,
     FrameworkName,
 )
 from analysis_service.errors import ConfigError
+from analysis_service.parsing import is_version, strings
 
 __all__ = ["SUPPORTED_VERSION", "FrameworkConfigError", "load_frameworks"]
 
@@ -53,7 +54,7 @@ def load_frameworks(
         raise FrameworkConfigError(f"{path}: {exc}") from exc
 
     version = raw.get("version")
-    if type(version) is not int or version != SUPPORTED_VERSION:
+    if not is_version(version, SUPPORTED_VERSION):
         raise FrameworkConfigError(
             f"{path}: unsupported version {version!r}; expected {SUPPORTED_VERSION}"
         )
@@ -63,7 +64,7 @@ def load_frameworks(
         raise FrameworkConfigError(
             f"{path}: 'carried' must be a non-empty list of framework names"
         )
-    if not all(isinstance(name, str) for name in carried):
+    if not strings(carried):
         raise FrameworkConfigError(f"{path}: 'carried' must hold strings")
 
     repeated = sorted({name for name in carried if carried.count(name) > 1})
@@ -75,4 +76,4 @@ def load_frameworks(
             f"{path}: 'carried' names frameworks this build cannot spell:"
             f" {', '.join(unknown)}; it knows {sorted(get_args(FrameworkName))}"
         )
-    return tuple(carried)
+    return cast(tuple[FrameworkName, ...], tuple(carried))

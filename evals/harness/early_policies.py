@@ -366,10 +366,7 @@ def paired(root: Path) -> list[Paired]:
     another framework, with the two selections it is read under. A holdout
     case's report is not opened (:func:`~evals.harness.audit.held_out`); an
     exhausted one is a development case and is read."""
-    ledger = audit.load()
-    held = {
-        case for case in audit.holdout_cases() if audit.held_out(case, True, ledger)
-    }
+    held = audit.still_held_out(audit.holdout_cases())
     by_case: dict[str, list[tuple[Path, Report]]] = defaultdict(list)
     for path in sorted(root.rglob("*.report.json")):
         case = path.name.removesuffix(".report.json")

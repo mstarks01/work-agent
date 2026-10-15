@@ -6,7 +6,7 @@ ranks the questions a paused job asks with it. This command counts it from a
 sweep's reports, or from critic replays of that sweep's drafts, and writes the
 one framework's row of ``question_prior.json`` with the runs it read.
 
-**Only tuned cases are counted.** A holdout case's findings never shape a
+**Only development cases are counted.** A holdout case's findings never shape a
 table that the service ranks with.
 
 **A rate is citations per element.** Each finding's open facts are counted
@@ -38,8 +38,8 @@ from evals.harness.bundle import reports_dir
 from evals.harness.reference import (
     CorpusError,
     corpus_argument,
+    development_cases,
     load_corpus,
-    tuning_cases,
 )
 
 #: One case's sample: the case, its model and each finding's open facts.
@@ -132,13 +132,13 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 def command_question_prior(args: argparse.Namespace) -> int:
     """Count one framework's prior and write its row, keeping the other rows."""
     try:
-        cases = [case.id for case in tuning_cases(load_corpus(args.corpus))]
+        cases = [case.id for case in development_cases(load_corpus(args.corpus))]
     except CorpusError as error:
         print(error, file=sys.stderr)
         return 1
     samples = samples_of(args.artifact, args.replay, args.framework, cases)
     if not samples:
-        print("no tuned case has a report under that artifact", file=sys.stderr)
+        print("no development case has a report under that artifact", file=sys.stderr)
         return 1
     table = dict(load_prior(args.out)) if args.out.is_file() else {}
     for name in PACKAGES:
@@ -157,7 +157,7 @@ def command_question_prior(args: argparse.Namespace) -> int:
     )
     rows = sum(len(fields) for fields in table[args.framework].rates.values())
     print(
-        f"{args.framework}: {rows} rates from {len(counted)} tuned cases and"
+        f"{args.framework}: {rows} rates from {len(counted)} development cases and"
         f" {len(samples)} samples, written to {args.out}"
     )
     return 0

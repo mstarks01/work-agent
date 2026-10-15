@@ -34,8 +34,8 @@ from tests.factories import (
 from tests.test_graph import FakeContext
 
 SOURCES = {DEFAULT_DESCRIPTION_LABEL: DESCRIPTION_TEXT}
-READER = next(name for name in PACKAGES if reads_capabilities(name))
-OTHERS = tuple(name for name in PACKAGES if not reads_capabilities(name))
+READER = next(name for name in PACKAGES if reads_capabilities((name,)))
+OTHERS = tuple(name for name in PACKAGES if not reads_capabilities((name,)))
 
 
 def _row(capability, quote, label=DEFAULT_DESCRIPTION_LABEL):
