@@ -39,12 +39,17 @@ wrote, and `evals/harness/archive.py` names the spelling each kind carries.
 | `20260919T-naming-rule` | extraction | the `extract.md` edits of #1076 and #1078, three runs |
 | `20261005T-revert` | extraction | `extract.md` and the extraction schema head as they stand since #1474, all 15 cases, five runs (QA-2026-10-05-01-E1) |
 | `20261012T-assets-rule6` | extraction | the rule 6 asset definitions of #1629, all 16 cases, five runs (QA-2026-10-12-01-E10); `20261005T-revert` is its before side |
+| `20261015T-rule4-app-process` | extraction | the rule 4 reword of #1735 (an app is a Process where the text gives it behaviour), all 16 cases, five runs (QA-2026-10-15-02-E3); `20261012T-assets-rule6` replayed on the main corpus is its before side |
+| `20261015T-rule6-bcd` | extraction | the rule 6 narrowing of #1734 (`business-critical-data` is the operating records no other tag names), all 16 cases, five runs (QA-2026-10-15-02-E4); `20261012T-assets-rule6` is its before side |
 
-The `20261005T-revert` sweeps are the arm to price an `extract.md` change
-against: the prompt they ran is the one in the tree. Replay them on their own:
+No archived arm ran the prompt now in the tree. `20261015T-rule4-app-process`
+ran without the rule 6 edit of #1734, and `20261015T-rule6-bcd` ran without the
+rule 4 edit of #1735. To price an `extract.md` change, replay the arm that
+differs from the tree only in the rule your edit does not touch, and say so in
+the experiment row:
 
 ```sh
-python -m evals.harness.run replay evals/emissions/20261005T-revert/main-r*.json
+python -m evals.harness.run replay evals/emissions/20261015T-rule4-app-process/after-r*.json
 ```
 
 The heads sweep reads through `extract` and `assert` and keeps the catalog its
