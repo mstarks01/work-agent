@@ -46,6 +46,7 @@ from analysis_service.claims import (
     ProposalBatch,
     RuledClaim,
     RulingBatch,
+    Severity,
     UnknownRef,
 )
 from analysis_service.errors import ConfigError
@@ -394,7 +395,9 @@ class FrameworkPackage:
         """Whether this package's record grades harm.
 
         Reads the record's own fields rather than a declared flag, so the rubric
-        the gate demands and the field that would read it cannot disagree.
+        the gate demands and the field that would read it cannot disagree. The
+        gate refuses a ``severity`` field that is not a
+        :class:`~analysis_service.claims.Severity`, so the name says the type.
         """
         return "severity" in self.record.model_fields
 
@@ -756,6 +759,18 @@ def _declaration_issues(package: FrameworkPackage) -> list[str]:
 
     if not issubclass(package.record, Claim):
         issues.append(f"record {package.record.__name__} does not subclass Claim")
+    # The readers of a graded claim find ``severity`` by name and read its
+    # likelihood, impact and level, so the name is a claim about the type.
+    severity = package.record.model_fields.get("severity")
+    if severity is not None and not (
+        isinstance(severity.annotation, type)
+        and issubclass(severity.annotation, Severity)
+    ):
+        issues.append(
+            f"record {package.record.__name__} declares severity as"
+            f" {severity.annotation!r}, which is not a Severity; every reader"
+            " of a graded claim reads its likelihood, impact and level"
+        )
     # The narrow half of the precondition's two checks, and the value is stated
     # rather than oversold: the member is typed and mypy covers the
     # construction. It earns its place on the gate's own terms — the gate

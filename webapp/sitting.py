@@ -40,6 +40,9 @@ PORT = base.PORT
 
 LOCAL_SUBMITTER = "local-review"
 
+#: Whether a submission names the reviewer or files under the anonymous name.
+ReviewerMode = Literal["self", "anonymous"]
+
 #: What the page calls each rail state. One table, keyed by
 #: :data:`~evals.harness.sitting.RowState`. ``/api/review-states`` hands the
 #: page the state and the label together, so the page keys its own behaviour
@@ -56,7 +59,7 @@ assert set(REVIEW_LABELS) == set(get_args(sittings.RowState))
 
 class ContributionChoice(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    reviewer: Literal["self", "anonymous"] = "anonymous"
+    reviewer: ReviewerMode = "anonymous"
     author: str | None = Field(default=None, max_length=64)
 
 
@@ -98,7 +101,7 @@ def _author(value: str | None) -> str:
     return author
 
 
-def _reviewer(author: str, mode: Literal["self", "anonymous"]) -> str:
+def _reviewer(author: str, mode: ReviewerMode) -> str:
     return author if mode == "self" else ANONYMOUS
 
 
@@ -116,7 +119,7 @@ def _choice_author(session: Session, body: ContributionChoice) -> str:
 def _review_envelope(
     session: Session,
     author: str,
-    reviewer_mode: Literal["self", "anonymous"],
+    reviewer_mode: ReviewerMode,
 ) -> envelopes.Envelope:
     cases: dict[str, envelopes.CaseAnswers] = {}
     for row in session.carried():

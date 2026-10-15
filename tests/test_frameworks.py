@@ -206,3 +206,22 @@ def test_every_undecidable_precondition_offers_an_answer_that_decides_it(name):
             check_fact_answers(facts, model, None)
             decided.add(run_precondition(package, answered_model(model, facts)))
         assert decided - {"undecidable"}, f"{name} stays undecidable on {label}"
+
+
+def test_a_severity_field_that_is_not_a_severity_fails_the_gate():
+    """A package's ``severity`` is read for its likelihood, impact and level.
+
+    The readers find it by name, so a record that declares the name with
+    another type passes every other check and raises in the first job.
+    """
+    from dataclasses import replace
+
+    from analysis_service.frameworks.stride.record import DraftThreat
+
+    class WordSeverity(DraftThreat):
+        severity: str  # type: ignore[assignment]
+
+    package = replace(PACKAGES["stride"], record=WordSeverity)
+
+    with pytest.raises(FrameworkPackageError, match="declares severity as"):
+        validate_package(package, STRIDE_ROOT)

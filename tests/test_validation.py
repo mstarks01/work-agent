@@ -4,6 +4,7 @@ from typing import ClassVar
 
 import pytest
 
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import UNKNOWN, SystemModel, make_flow_id
 from analysis_service.validation import (
     CITATION_FIELDS,
@@ -548,6 +549,22 @@ class TestExcerptsVerify:
         model = TestCitationsResolve().model_citing("Nowhere", "words nobody submitted")
         assert [i.code for i in validate(model, sources=self.SOURCES)] == [
             "invalid-reference"
+        ]
+
+    @pytest.mark.parametrize("label", [ANSWERS_LABEL, ANSWERS_LABEL.upper()])
+    def test_an_element_quoting_the_answers_source_is_refused(self, label):
+        """Code reads the answers Source, so an element cites none of it.
+
+        The quote is in that source, so only the label rule can refuse it. A
+        field capability copies an element's citation, and would otherwise
+        quote the answers Source under another origin.
+        """
+        answers = '"Shopper" is process:checkout-web-app.'
+        sources = {**self.SOURCES, ANSWERS_LABEL: answers}
+        model = TestCitationsResolve().model_citing(label, '"Shopper"')
+        issues = validate(model, sources=sources)
+        assert [(i.code, i.field, i.element_id) for i in issues] == [
+            ("invalid-reference", "source_label", "process:web-app")
         ]
 
 

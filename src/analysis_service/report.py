@@ -51,6 +51,7 @@ from analysis_service.claims import FrameworkAnalysis, FrameworkName, SharedElem
 from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import block_type_for
 from analysis_service.ladder import SchemaPath, SchemaRefusal
+from analysis_service.model_tiers import ReviewIndependence
 from analysis_service.sources import Source, clean_system_name
 from analysis_service.system_model import (
     BoundaryCrossing,
@@ -538,9 +539,7 @@ class ExecutionEnvelope(BaseModel):
 
     identity_version: int = Field(ge=1)
     build: dict[str, str] = Field(default_factory=dict)
-    review_independence: Literal["shared", "distinct_model", "distinct_provider"] = (
-        "shared"
-    )
+    review_independence: ReviewIndependence = "shared"
     extraction_format: Literal["full", "compact-v4"] | None = "full"
     extraction_strategy: Literal["graph-first"] | None = "graph-first"
 

@@ -161,6 +161,10 @@ class InvalidTransitionError(ValueError):
     """A job was asked to move along an edge the lifecycle does not have."""
 
 
+#: What one event in a job's log records: a status change or a finished node.
+EventKind = Literal["status", "node"]
+
+
 class JobEvent(BaseModel):
     """One entry in a job's append-only event log.
 
@@ -171,7 +175,7 @@ class JobEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     seq: int = Field(ge=1)
-    kind: Literal["status", "node"]
+    kind: EventKind
     at: datetime
     status: JobStatus | None = None
     node: str | None = None
@@ -489,7 +493,7 @@ class JobRecord(BaseModel):
     def _append_event(
         self,
         *,
-        kind: Literal["status", "node"],
+        kind: EventKind,
         status: JobStatus | None = None,
         node: str | None = None,
     ) -> None:

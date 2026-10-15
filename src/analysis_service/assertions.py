@@ -261,6 +261,10 @@ QualifierKind = Literal[
 #: Where an assertion's value comes from.
 Basis = Literal["stated", "inferred", "derived"]
 
+#: The bases a model may propose. ``derived`` is a value a rule in code wrote,
+#: so a proposal that claims it is refused by the schema the provider reads.
+ProposedBasis = Literal["stated", "inferred"]
+
 #: Whether anything checked that the support *supports* the value. It starts at
 #: ``unchecked`` and no extractor may move it.
 Assessment = Literal["unchecked", "supported", "unsupported", "unresolved"]
@@ -2100,7 +2104,7 @@ class AssertionProposal(BaseModel):
     value: str = Field(min_length=1, max_length=MAX_VALUE_CHARS)
     reason: UnknownReason | None = None
     scope: list[Qualifier] = Field(default_factory=list, max_length=MAX_QUALIFIERS)
-    basis: Basis
+    basis: ProposedBasis
     quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
     explanation: str = Field(default="", max_length=1000)
     #: See :attr:`Assertion.exclusive`. A model sets it only where the source
@@ -2235,19 +2239,15 @@ def _bounded(
     return kept, issues
 
 
-def _prepare(sources: Mapping[str, str]) -> Mapping[str, SpanSource]:
+def _prepare(sources: Mapping[str, str]) -> Mapping[str, SpanSource | None]:
     """Every source folded once, keyed by label, for every quote taken from it.
 
-    A source whose two folds disagree is absent here rather than wrong: see
+    A source whose two folds disagree is ``None`` here rather than wrong: see
     :func:`~analysis_service.grounding.index_source`. Its quotes then find no
-    span, which is the same outcome as a quote that is not in it.
+    span, which is the same outcome as a quote that is not in it. Its label
+    stays a key, so a quote label resolves against every label the job holds.
     """
-    built = {}
-    for label, text in sources.items():
-        prepared = span_source(label, text)
-        if prepared is not None:
-            built[label] = prepared
-    return built
+    return {label: span_source(label, text) for label, text in sources.items()}
 
 
 def _resolve_row(
@@ -2256,7 +2256,7 @@ def _resolve_row(
     element_ids: Collection[str],
     labels: Mapping[str, str],
     subjects: dict[str, Subject],
-    prepared: Mapping[str, SpanSource],
+    prepared: Mapping[str, SpanSource | None],
     checked: Mapping[str, _Checked],
     issues: list[CatalogIssue],
 ) -> tuple[str, Assertion] | None:
@@ -2426,10 +2426,14 @@ def _named(written: str, labels: Mapping[str, str], prefixes: Collection[str]) -
 
 
 def _spans(
-    quote: QuoteProposal, prepared: Mapping[str, SpanSource]
+    quote: QuoteProposal, prepared: Mapping[str, SpanSource | None]
 ) -> tuple[SupportSpan, ...]:
-    """Where one proposed quote sits, or nothing where it is not there."""
-    source = prepared.get(quote.source_label)
+    """Where one proposed quote sits, or nothing where it is not there.
+
+    The label resolves by :func:`~analysis_service.references.canonical`, the
+    rule every other citation of a source follows.
+    """
+    source = prepared.get(canonical(quote.source_label, prepared))
     if source is None:
         return ()
     return spans_for(quote.quote, source)

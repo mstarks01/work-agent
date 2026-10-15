@@ -101,7 +101,7 @@ class TestTheChecks:
             capability="authentication",
             state="absent",
             source_excerpt="no",
-            source_label="Answers",
+            source_label=ANSWERS_LABEL,
             origin="answer",
         )
         model.capabilities.append(answer)

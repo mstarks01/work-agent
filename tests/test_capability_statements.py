@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.compact import expand
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import (
     CapabilityStatement,
     EmittedSystemModel,
@@ -93,6 +94,24 @@ def test_a_basis_is_on_a_field_statement_and_on_no_other(origin, basis):
     raw = _stated("oauth", "present", "Ana").model_dump()
     with pytest.raises(ValidationError, match="basis"):
         CapabilityStatement.model_validate(raw | {"origin": origin, "basis": basis})
+
+
+@pytest.mark.parametrize(
+    ("origin", "label", "basis"),
+    [
+        ("answer", "Kickoff call", ""),
+        ("field", ANSWERS_LABEL, "login: a rule"),
+        ("reader", ANSWERS_LABEL, ""),
+    ],
+)
+def test_an_answer_statement_quotes_the_answers_source_and_no_other_does(
+    origin, label, basis
+):
+    raw = _stated("oauth", "present", "Ana").model_dump()
+    with pytest.raises(ValidationError, match="answers Source"):
+        CapabilityStatement.model_validate(
+            raw | {"origin": origin, "source_label": label, "basis": basis}
+        )
 
 
 def test_a_stated_capability_is_a_fact_with_its_quote():

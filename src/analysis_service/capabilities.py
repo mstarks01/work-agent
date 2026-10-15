@@ -60,6 +60,9 @@ __all__ = [
 #: Whether the application has a capability. ``unknown`` is what silence is.
 Presence = Literal["present", "absent", "unknown"]
 
+#: What a statement of a capability says: a statement is never ``unknown``.
+StatedPresence = Literal["present", "absent"]
+
 #: Whether a unit of a framework applies to the application.
 Applicability = Literal["applicable", "not-applicable", "unknown"]
 

@@ -10,6 +10,7 @@ from analysis_service.field_capabilities import (
     FIELD_CAPABILITIES,
     with_field_capabilities,
 )
+from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import (
     UNKNOWN,
     Assumption,
@@ -221,7 +222,7 @@ def test_a_capability_a_statement_names_is_left_as_it_is():
         capability="tls-use",
         state="absent",
         source_excerpt="no",
-        source_label="Answers",
+        source_label=ANSWERS_LABEL,
         origin="answer",
     )
     model.capabilities.append(answer)

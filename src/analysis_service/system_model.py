@@ -29,8 +29,14 @@ from typing import Any, ClassVar, Literal, Self, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from analysis_service.capabilities import CAPABILITIES, CapabilityFact, Presence
+from analysis_service.capabilities import (
+    CAPABILITIES,
+    CapabilityFact,
+    Presence,
+    StatedPresence,
+)
 from analysis_service.references import canonical
+from analysis_service.sources import ANSWERS_LABEL
 
 UNKNOWN = "unknown"
 
@@ -394,6 +400,15 @@ ELEMENT_ID = "^(?:{})$".format(
 )
 
 
+#: The closed sets of the element fields a model fills. Named once, so the
+#: compact transport (:mod:`analysis_service.compact`) states the same sets.
+EntityKind = Literal["human", "external-system"]
+Exposure = Literal["internet-facing", "internal", "unknown"]
+InterfaceKind = Literal["web", "non-web", "unknown"]
+Operations = Literal["read", "write", "read-write", "unknown"]
+BoundaryKind = Literal["network", "privilege", "tenant", "other"]
+
+
 class _Element(BaseModel):
     """Attributes common to every element type."""
 
@@ -425,7 +440,7 @@ class ExternalEntity(_Element):
 
     id_prefix: ClassVar[str] = "entity"
 
-    kind: Literal["human", "external-system"]
+    kind: EntityKind
     trust_zone: str
 
 
@@ -451,8 +466,8 @@ class Process(_Element):
 
     technology: str = Field(max_length=200)
     trust_zone: str
-    exposure: Literal["internet-facing", "internal", "unknown"]
-    interface_kind: Literal["web", "non-web", "unknown"]
+    exposure: Exposure
+    interface_kind: InterfaceKind
 
 
 class DataStore(_Element):
@@ -502,7 +517,7 @@ class DataFlow(_Element):
     #: still asked for the value by ``prompts/extract.md`` and graded on it by
     #: the extraction scorer, so omitting it costs an attribute against the
     #: blessed model rather than passing unnoticed.
-    operations: Literal["read", "write", "read-write", "unknown"] = "unknown"
+    operations: Operations = "unknown"
 
 
 class TrustBoundary(_Element):
@@ -531,7 +546,7 @@ class TrustBoundary(_Element):
 
     id_prefix: ClassVar[str] = "boundary"
 
-    kind: Literal["network", "privilege", "tenant", "other"]
+    kind: BoundaryKind
 
 
 Element = ExternalEntity | Process | DataStore | DataFlow | TrustBoundary
@@ -691,7 +706,9 @@ class CapabilityStatement(BaseModel):
     statement carries the words it rests on, the answer's line, the quote of
     the element whose fields prove it or the source's own words, so the
     validity gate checks the quote against the source it names. A capability
-    nothing states has no statement: silence is ``unknown``.
+    nothing states has no statement: silence is ``unknown``. An ``answer``
+    statement quotes the answers Source, and no statement of another origin
+    quotes it, so the writer and the support cannot disagree.
 
     ``capability`` lists the closed set in the provider-facing schema, on the
     rule :class:`Assumption` follows, so a key outside the set stays an
@@ -705,7 +722,7 @@ class CapabilityStatement(BaseModel):
         max_length=60,
         json_schema_extra={"enum": [*sorted(CAPABILITIES)]},
     )
-    state: Literal["present", "absent"]
+    state: StatedPresence
     source_excerpt: str = Field(min_length=1, max_length=1000)
     source_label: str = Field(min_length=1, max_length=200)
     origin: Literal["answer", "field", "reader"]
@@ -720,6 +737,12 @@ class CapabilityStatement(BaseModel):
                 "a field statement carries a basis and a statement of another"
                 f" origin carries none; this {self.origin} statement has"
                 f" basis {self.basis!r}"
+            )
+        if (self.origin == "answer") != (self.source_label == ANSWERS_LABEL):
+            raise ValueError(
+                "an answer statement quotes the answers Source, and no other"
+                f" statement quotes it; this {self.origin} statement quotes"
+                f" {self.source_label!r}"
             )
         return self
 
