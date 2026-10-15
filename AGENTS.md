@@ -51,7 +51,7 @@ See `docs/agents/vendor-parity.md`.
 
 "Run a quality audit" invokes `.claude/skills/quality-audit/`. Before you
 propose a fix, read the experiment ledger with `uv run python -m
-evals.harness.run experiments --signature`. Record every experiment, including
+evals.harness.run experiments --signature "<the failure>"`. Record every experiment, including
 the ones that lost. **Report quality** work starts from
 `docs/agents/report-quality.md`.
 
