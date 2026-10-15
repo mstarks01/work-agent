@@ -271,6 +271,24 @@ class TestEveryBlessedElementTakesOneFate:
 
         assert row.fate == "omitted"
 
+    def test_a_produced_flow_no_rule_wrote_is_an_issue_not_an_abort(self, golden):
+        dropped = "flow:process:order-service>store:receipt-archive>append-receipt"
+        bad_id = "flow:System description>process:order-service>obtain-token"
+        copy = golden.model.model_copy(deep=True)
+        kept = [f for f in copy.data_flows if f.id != dropped]
+        stray = kept[0].model_copy(
+            update={"id": bad_id, "source": "System description"}
+        )
+        copy.data_flows[:] = [*kept, stray]
+
+        graded = replay.replay_extraction(golden, ExtractionResult(golden.id, copy, ()))
+
+        assert {row.fate for row in graded.fates if row.reference == dropped} == {
+            "omitted"
+        }
+        assert f"malformed-flow-id: {bad_id}" in graded.issues
+        assert bad_id in graded.extra
+
     def test_a_wrong_fact_is_an_attribute_on_a_paired_element(self, golden):
         copy = golden.model.model_copy(deep=True)
         next(
