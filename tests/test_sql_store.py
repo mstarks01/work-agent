@@ -440,13 +440,6 @@ class TestTheDigestCheck:
 
 
 class TestTheReport:
-    def test_the_service_writes_a_report_once(self, env):
-        store = build_store(env)
-        record = completed_job(store)
-        record.report = sample_report().model_copy(update={"disclaimer": "another"})
-        with pytest.raises(ValueError, match="written once"):
-            asyncio.run(store.save(record))
-
     def test_a_report_from_another_schema_version_reads_as_stored(self, env):
         store = build_store(env)
         record = completed_job(store)

@@ -27,6 +27,7 @@ internal detail and never surfaces it.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -614,7 +615,15 @@ class JobStore(Protocol):
         self, job_id: str, seen: int
     ) -> tuple[JobStatus, list[JobEvent]] | None: ...
 
-    async def save(self, record: JobRecord) -> None: ...
+    async def save(self, record: JobRecord) -> None:
+        """Write ``record`` over the job it names.
+
+        A report is written once, and a save never clears or replaces it. A
+        save only appends events. :func:`check_save` raises
+        :class:`ValueError` where a save breaks either rule, and the store
+        writes nothing.
+        """
+        ...
 
     async def save_answers(
         self,
@@ -638,7 +647,9 @@ class JobStore(Protocol):
         revision: int,
     ) -> bool: ...
 
-    async def owned_jobs(self, owner_id: str) -> list[JobRecord]: ...
+    async def owned_jobs(self, owner_id: str) -> list[JobRecord]:
+        """Every job of the owner, as envelopes, oldest first."""
+        ...
 
     async def delete(
         self, job_id: str, owner_id: str, *, updated_before: datetime | None = None
@@ -656,7 +667,8 @@ class JobStore(Protocol):
 
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
         """The ID and the owner ID of each terminal job last updated before
-        ``before``. The retention sweep deletes these (#1530)."""
+        ``before``, oldest update first. The retention sweep deletes these
+        (#1530)."""
         ...
 
     async def sweep_orphans(self, before: datetime) -> int:
@@ -670,7 +682,31 @@ class JobStore(Protocol):
         """
         ...
 
-    async def fail_in_flight(self) -> list[str]: ...
+    async def fail_in_flight(self) -> list[str]:
+        """Fail each queued or running job, oldest first, and return the IDs."""
+        ...
+
+
+def report_digest(report: Report) -> str:
+    """The SHA-256 digest of the report's stored JSON."""
+    return hashlib.sha256(report.model_dump_json().encode()).hexdigest()
+
+
+def check_save(
+    record: JobRecord, report_sha256: str | None, events: Sequence[JobEvent]
+) -> None:
+    """Raise :class:`ValueError` where saving ``record`` breaks the contract of
+    :meth:`JobStore.save`.
+
+    ``report_sha256`` is the digest of the report the store holds, or ``None``
+    where it holds no report, and ``events`` is the events it holds.
+    """
+    if report_sha256 is not None and (
+        record.report is None or report_digest(record.report) != report_sha256
+    ):
+        raise ValueError(f"job {record.id} holds a report, written once")
+    if record.events[: len(events)] != list(events):
+        raise ValueError(f"job {record.id} holds events, appended to only")
 
 
 @dataclass(frozen=True)
@@ -754,6 +790,16 @@ def check_bounds(
         owner_tokens=owner_tokens,
         global_tokens=global_tokens,
     )
+
+
+def _by_creation(record: JobRecord) -> tuple[datetime, str]:
+    """The order of a listing oldest first, as a SQL store sorts its rows."""
+    return record.created_at, record.id
+
+
+def _by_update(record: JobRecord) -> tuple[datetime, str]:
+    """The order of a listing oldest update first, as a SQL store sorts its rows."""
+    return record.updated_at, record.id
 
 
 class InMemoryJobStore:
@@ -977,8 +1023,11 @@ class InMemoryJobStore:
         ]
 
     async def save(self, record: JobRecord) -> None:
-        if record.id not in self._records:
+        held = self._records.get(record.id)
+        if held is None:
             raise ValueError(f"job {record.id!r} does not exist")
+        digest = None if held.report is None else report_digest(held.report)
+        check_save(record, digest, held.events)
         self._records[record.id] = record.model_copy(deep=True)
 
     async def save_answers(
@@ -1071,7 +1120,7 @@ class InMemoryJobStore:
         """
         return [
             await self.owned(record.id, owner_id)  # type: ignore[misc]
-            for record in self._records.values()
+            for record in sorted(self._records.values(), key=_by_creation)
             if record.owner_id == owner_id
         ]
 
@@ -1108,7 +1157,7 @@ class InMemoryJobStore:
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
         return [
             (record.id, record.owner_id)
-            for record in self._records.values()
+            for record in sorted(self._records.values(), key=_by_update)
             if record.status in TERMINAL_STATUSES and record.updated_at < before
         ]
 
@@ -1126,7 +1175,7 @@ class InMemoryJobStore:
         the IDs of the failed jobs.
         """
         failed = []
-        for record in self._records.values():
+        for record in sorted(self._records.values(), key=_by_creation):
             if record.status in TERMINAL_STATUSES:
                 continue
             record.transition("failed")

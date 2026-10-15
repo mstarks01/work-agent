@@ -100,9 +100,11 @@ from analysis_service.jobs import (
     Resumption,
     UsageRow,
     check_bounds,
+    check_save,
     is_follow_up,
     locks_its_parent,
     parent_of,
+    report_digest,
 )
 from analysis_service.objects import (
     ObjectName,
@@ -1072,11 +1074,10 @@ class SqlJobStore:
     async def save(self, record: JobRecord) -> None:
         """Write the record back, and the events it gained.
 
-        The sources are written once, at admission. The report is written
-        once: a save puts it where the row names none, and raises where the
-        row names another. A save that stopped after its put and before its
-        row write left a report object that no row names. A later save puts
-        its report there again.
+        The sources are written once, at admission. A save puts the report
+        where the row names none. A save that stopped after its put and before
+        its row write left a report object that no row names. A later save
+        puts its report there again.
         """
         async with self._transaction() as connection:
             found = await connection.execute(
@@ -1085,24 +1086,28 @@ class SqlJobStore:
                 )
             )
             row = found.one_or_none()
+            texts = await connection.scalars(
+                select(job_events.c.event)
+                .where(job_events.c.job_id == record.id)
+                .order_by(job_events.c.seq)
+            )
+            held = [JobEvent.model_validate_json(text) for text in texts]
         if row is None:
             raise ValueError(f"job {record.id!r} does not exist")
+        check_save(record, row.report_sha256, held)
         values = _job_row(record)
-        if record.report is not None:
+        if record.report is not None and not _names(row, "report.json"):
             data = record.report.model_dump_json().encode()
-            if not _names(row, "report.json"):
-                key = object_key(row.owner_id, row.id, "report.json")
-                try:
-                    await self._objects.put(key, data)
-                except FileExistsError:
-                    # No row names the object, so it is an orphan. The job is
-                    # not terminal until the row write below, so the orphan
-                    # sweep keeps the new object.
-                    await self._objects.delete(key)
-                    await self._objects.put(key, data)
-                values["report_sha256"] = _digest(data)
-            elif row.report_sha256 != _digest(data):
-                raise ValueError(f"job {record.id} holds a report, written once")
+            key = object_key(row.owner_id, row.id, "report.json")
+            try:
+                await self._objects.put(key, data)
+            except FileExistsError:
+                # No row names the object, so it is an orphan. The job is not
+                # terminal until the row write below, so the orphan sweep
+                # keeps the new object.
+                await self._objects.delete(key)
+                await self._objects.put(key, data)
+            values["report_sha256"] = report_digest(record.report)
         async with self._transaction(writes=True) as connection:
             await connection.execute(
                 update(jobs).where(jobs.c.id == record.id).values(values)

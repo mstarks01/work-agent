@@ -838,6 +838,41 @@ class TestTheSaves:
         assert asyncio.run(store.get(final_job)).corrections == corrections
 
 
+class TestTheSaveContract:
+    """A report is written once, and a save only appends events."""
+
+    def test_a_save_never_replaces_the_report(self, store):
+        record = asyncio.run(store.get(completed(store)))
+        record.report = sample_report().model_copy(update={"disclaimer": "another"})
+        with pytest.raises(ValueError, match="written once"):
+            asyncio.run(store.save(record))
+        assert asyncio.run(store.get(record.id)).report == sample_report()
+
+    def test_a_save_never_clears_the_report(self, store):
+        record = asyncio.run(store.get(completed(store)))
+        record.report = None
+        with pytest.raises(ValueError, match="written once"):
+            asyncio.run(store.save(record))
+        assert asyncio.run(store.get(record.id)).report == sample_report()
+
+    @pytest.mark.parametrize("change", ["drop", "edit"])
+    def test_a_save_never_drops_or_changes_an_event(self, store, change):
+        record = new_record()
+        asyncio.run(admit(store, record))
+        record.transition("running")
+        asyncio.run(store.save(record))
+        held = list(record.events)
+        if change == "drop":
+            record.events = record.events[:1]
+        else:
+            record.events[0] = record.events[0].model_copy(
+                update={"at": record.events[0].at - timedelta(minutes=1)}
+            )
+        with pytest.raises(ValueError, match="appended to only"):
+            asyncio.run(store.save(record))
+        assert asyncio.run(store.get(record.id)).events == held
+
+
 class TestADeletedJobLeavesAUsageRow:
     """ADR 0066: a delete removes the content and keeps what admission reads."""
 
@@ -910,6 +945,26 @@ class TestADeletedJobLeavesAUsageRow:
         assert [record.id for record in listed] == [first, second]
         assert all(record.report is None for record in listed)
 
+    def test_the_listing_orders_by_age_and_not_by_admission(self, store):
+        aged = admitted_youngest_first(store, "failed")
+        assert [record.id for record in asyncio.run(store.owned_jobs("alice"))] == aged
+
+
+def admitted_youngest_first(store, status: JobStatus) -> list[str]:
+    """The IDs of three jobs in ``status``, oldest first, which ``store``
+    admits youngest first. A job's creation and last update are one age."""
+    records = []
+    for days in (3, 2, 1):
+        record = new_record()
+        if status != "queued":
+            record.transition("running")
+            record.transition(status)
+        record.created_at = record.updated_at = datetime.now(UTC) - timedelta(days=days)
+        records.append(record)
+    for record in reversed(records):
+        asyncio.run(admit(store, record))
+    return [record.id for record in records]
+
 
 def last_updated(store, status: JobStatus, days_ago: int, reserved: int = 0) -> str:
     """The ID of a job in ``status`` whose last update was ``days_ago`` days ago."""
@@ -942,6 +997,11 @@ class ChangedAfterListing:
 class TestTheRetentionSweep:
     """#1530: the sweep deletes each terminal job older than the period, through
     the delete of the route."""
+
+    def test_the_listing_orders_by_last_update_and_not_by_admission(self, store):
+        aged = admitted_youngest_first(store, "failed")
+        listed = asyncio.run(store.expired(datetime.now(UTC)))
+        assert listed == [(job, "alice") for job in aged]
 
     def test_a_delete_with_a_cutoff_keeps_a_job_updated_since(self, store):
         job = last_updated(store, "completed", days_ago=2)
@@ -1375,6 +1435,10 @@ class TestTheRestartScan:
                 "failed",
             )
         assert asyncio.run(store.fail_in_flight()) == []
+
+    def test_it_fails_the_jobs_by_age_and_not_by_admission(self, store):
+        aged = admitted_youngest_first(store, "queued")
+        assert asyncio.run(store.fail_in_flight()) == aged
 
     def test_a_waiting_or_terminal_job_stays_as_it_is(self, store):
         jobs = [completed(store)]
