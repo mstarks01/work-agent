@@ -38,6 +38,7 @@ from analysis_service.capabilities import (
     Expression,
     evaluate,
     expression_issues,
+    expression_keys,
     resolve,
 )
 from analysis_service.frameworks import FrameworkPackageError
@@ -62,6 +63,11 @@ _VERSION, _ROWS = _load(_PATH)
 #: Each requirement's applicability expression, keyed by the standard's ID.
 APPLICABILITY: Mapping[str, Expression] = MappingProxyType(
     {row["id"]: row["applies_if"] for row in _ROWS}
+)
+
+#: Every capability a row of the table reads.
+CAPABILITY_KEYS: frozenset[str] = frozenset(
+    key for expression in APPLICABILITY.values() for key in expression_keys(expression)
 )
 
 #: Why each row reads what it reads, in this repository's words.

@@ -990,6 +990,15 @@ class Claim(BaseModel):
         return []
 
     @classmethod
+    def capability_keys(cls) -> frozenset[str]:
+        """Every **Capability** that a rule of :meth:`applicability` reads.
+
+        The neutral answer is empty: a framework with no rule over capabilities
+        reads none, whatever its :meth:`applicability` returns.
+        """
+        return frozenset()
+
+    @classmethod
     def unit_band(cls, unit: str) -> Band | None:
         """The band of one unit :meth:`applicability` answers for, as the framework ranks its units.
 

@@ -64,6 +64,7 @@ from analysis_service.claims import (
     deferral_reason,
 )
 from analysis_service.frameworks.asvs.applicability import (
+    CAPABILITY_KEYS,
     RATIONALES,
     applicability_for,
 )
@@ -221,6 +222,11 @@ class DraftRequirementRuling(Claim):
         level = AsvsOptions.model_validate(options).level
         decisions = applicability_for(level, model.capability_facts())
         return [_entry(unit, decision) for unit, decision in decisions.items()]
+
+    @classmethod
+    def capability_keys(cls) -> frozenset[str]:
+        """Every capability a row of the applicability table reads."""
+        return CAPABILITY_KEYS
 
     @classmethod
     def unit_band(cls, unit: str) -> Band | None:

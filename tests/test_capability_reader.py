@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
+from collections.abc import Iterable
+from types import MappingProxyType
+from typing import Literal
 
 import pytest
 
-from analysis_service import graph
+from analysis_service import frameworks, graph
 from analysis_service.budgets import llm_calls_for
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.capability_reader import (
@@ -15,6 +19,7 @@ from analysis_service.capability_reader import (
     CapabilityRow,
     with_stated_capabilities,
 )
+from analysis_service.claims import ApplicabilityEntry, FrameworkName
 from analysis_service.frameworks import PACKAGES, reads_capabilities
 from analysis_service.jobs import JobRecord, PipelineAwaiting
 from analysis_service.markdown_loader import MarkdownLoader
@@ -22,7 +27,7 @@ from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.prompts import compose_capabilities_prompt
 from analysis_service.report import FrameworkSelection
 from analysis_service.sources import ANSWERS_LABEL, DEFAULT_DESCRIPTION_LABEL, Source
-from analysis_service.system_model import CapabilityStatement
+from analysis_service.system_model import CapabilityStatement, SystemModel
 from tests.factories import (
     DESCRIPTION_TEXT,
     PROJECT_ROOT,
@@ -210,3 +215,70 @@ class TestTheCost:
         for name in OTHERS:
             selection = [FrameworkSelection(name=name)]
             assert llm_calls_for(selection) == 3 + len(PACKAGES[name].lanes) + 2
+
+
+#: The widest options of each package, so every rule of its table is read.
+WIDEST_OPTIONS = {"asvs": {"level": 3}, "stride": {}}
+
+
+def _stating(
+    state: Literal["present", "absent"], keys: Iterable[str] = CAPABILITIES
+) -> SystemModel:
+    statements = [
+        CapabilityStatement(
+            capability=key,
+            state=state,
+            source_excerpt="x",
+            source_label=DEFAULT_DESCRIPTION_LABEL,
+            origin="reader",
+        )
+        for key in keys
+    ]
+    return valid_model().model_copy(update={"capabilities": statements})
+
+
+def _decisions(name: FrameworkName, model: SystemModel) -> list[ApplicabilityEntry]:
+    record = PACKAGES[name].record
+    return record.applicability(model, WIDEST_OPTIONS[name])
+
+
+class TestCapabilityKeys:
+    """Each package states the capabilities its rules read, and the hook agrees."""
+
+    def test_the_options_table_names_every_package(self):
+        assert set(WIDEST_OPTIONS) == set(PACKAGES)
+
+    @pytest.mark.parametrize("name", sorted(PACKAGES))
+    def test_a_package_with_no_keys_answers_alike_for_any_capability(self, name):
+        if PACKAGES[name].record.capability_keys():
+            pytest.skip(f"{name} reads capabilities")
+        present = _decisions(name, _stating("present"))
+        assert present == _decisions(name, _stating("absent"))
+
+    @pytest.mark.parametrize("name", sorted(PACKAGES))
+    def test_each_key_a_package_states_moves_a_decision(self, name):
+        keys = PACKAGES[name].record.capability_keys()
+        assert keys <= CAPABILITIES.keys()
+        still = sorted(
+            key
+            for key in keys
+            if _decisions(name, _stating("present", (key,)))
+            == _decisions(name, _stating("absent", (key,)))
+        )
+        assert still == []
+
+    def test_a_pass_through_hook_reads_no_capability(self, monkeypatch):
+        neutral = PACKAGES["stride"]
+        base = neutral.record
+
+        class PassThrough(base):
+            @classmethod
+            def applicability(cls, model, options):
+                return super().applicability(model, options)
+
+        packages = {
+            **PACKAGES,
+            "stride": dataclasses.replace(neutral, record=PassThrough),
+        }
+        monkeypatch.setattr(frameworks, "PACKAGES", MappingProxyType(packages))
+        assert not frameworks.reads_capabilities(("stride",))
