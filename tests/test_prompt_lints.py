@@ -794,7 +794,7 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
 #
 # `extract.md` states as its **controlling rule** that "`unknown` is the
 # default, not the fallback", and repeats the word a dozen times. It then hands
-# the model `assets`, a closed vocabulary of eight tags that does not contain it
+# the model `assets`, a closed vocabulary of six tags that does not contain it
 # and cannot. The prompt must say so (#295). A model that follows a prompt
 # without that warning writes `unknown` into `assets`, which is
 # `illegal-asset-tag`: a Tier 1 failure that kills the job and spends its one

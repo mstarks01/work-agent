@@ -189,6 +189,19 @@ class TestAssumptionsRecordAnInference:
                 grounded
             ), f"{shape.__name__} does not state the closed set"
 
+    def test_every_assets_field_states_the_tag_set(self):
+        """Each element shape the provider sees lists ``CORE_ASSET_TAGS``."""
+        from analysis_service.compact import CompactSystemModel
+        from analysis_service.system_model import CORE_ASSET_TAGS, SystemModel
+
+        for model in (SystemModel, CompactSystemModel):
+            shapes = model.model_json_schema()["$defs"].values()
+            tagged = [s for s in shapes if "assets" in s.get("properties", {})]
+            assert tagged, f"{model.__name__} has no assets field"
+            for shape in tagged:
+                items = shape["properties"]["assets"]["items"]
+                assert items["enum"] == sorted(CORE_ASSET_TAGS), shape["title"]
+
     def test_the_assumable_union_covers_every_element_type(self):
         """The table against its registry: no type carries a name outside it."""
         from analysis_service.system_model import (

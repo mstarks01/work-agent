@@ -27,7 +27,7 @@ keeps the repair to that element; a validator makes it a schema fault with no
 element to name, and the scope widens to the whole object. Validating harder
 enlarges the blast radius.
 
-**`assets` has the same shape and states no enum.** Its set is
-`CORE_ASSET_TAGS`. `extract.md` rule 6 states the set in the prompt, and the
-gate refuses a tag outside it as `illegal-asset-tag`. The schema states only a
-length bound for the field.
+**`assets` is a list of tags from a closed set.** Its set is
+`CORE_ASSET_TAGS`. The schema states that set as an enum on each item through
+`assets_field`, `extract.md` rule 6 states it in the prompt, and the gate
+refuses a tag outside it as `illegal-asset-tag`.

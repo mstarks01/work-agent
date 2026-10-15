@@ -97,7 +97,6 @@ from typing import Any, Literal, get_args
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.system_model import (
-    CORE_ASSET_TAGS,
     ELEMENT_GROUPS,
     UNKNOWN,
     DataFlow,
@@ -107,6 +106,7 @@ from analysis_service.system_model import (
     Process,
     SystemModel,
     TrustBoundary,
+    assets_field,
     assumable_attribute_names,
 )
 from analysis_service.validation import ValidationIssue, parse_and_validate
@@ -249,7 +249,7 @@ class _CompactElement(BaseModel):
     ref: str = _ref_field()
     name: str = Field(min_length=1, max_length=200, pattern=NAMEABLE)
     description: str = Field(default="", max_length=2000)
-    assets: list[str] = Field(default_factory=list, max_length=len(CORE_ASSET_TAGS) * 4)
+    assets: list[str] = assets_field()
     source_excerpt: str = Field(default="", max_length=1000)
     source_label: str = Field(default="", max_length=200)
     source_speaker: str = Field(default="", max_length=200)
