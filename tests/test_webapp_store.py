@@ -9,6 +9,7 @@ what the first one kept.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -231,9 +232,14 @@ class TestARestart:
 
 
 class TestARecordOfAnotherSchemaVersion:
-    """#1665: each read that parses a stored record asks ``same_schema`` first."""
+    """#1665: each read that parses a stored record asks ``same_schema`` first.
 
-    def test_the_list_shows_it_and_its_page_answers_409(self, tiers, durable):
+    Each test stores a part that the schema version covers in a shape this
+    service cannot parse, under a version other than this service's. The list
+    shows the run, and each page that parses the record answers 409.
+    """
+
+    def test_an_unparsable_resumption_is_never_parsed(self, tiers, durable):
         with app(tiers) as client:
             answered = completed(client)
             child = client.post(
@@ -242,19 +248,47 @@ class TestARecordOfAnotherSchemaVersion:
                 headers=SAME_ORIGIN,
             ).json()["run"]
             assert ran(client, child) == "completed"
-        database = durable["ANALYSIS_DATABASE_URL"].partition(":///")[2]
-        with sqlite3.connect(database) as connection:
+        with sqlite3.connect(database_of(durable)) as connection:
             connection.execute(
                 "UPDATE jobs SET schema_version = '0.1', resumption = '{\"x\": 1}'"
                 " WHERE id = ?",
                 (child,),
             )
+        assert_listed_and_refused(tiers, child)
+
+    def test_unparsable_sources_are_never_parsed(self, tiers, durable):
         with app(tiers) as client:
-            listed = client.get("/workspace/runs")
-            page = client.get(f"/workspace/runs/{child}")
-        assert listed.status_code == 200, listed.text
-        assert child in {run["run"] for run in listed.json()}
-        assert page.status_code == 409
+            run = completed(client)
+        sources = b'[{"x": 1}]'
+        with sqlite3.connect(database_of(durable)) as connection:
+            (owner_id,) = connection.execute(
+                "SELECT owner_id FROM jobs WHERE id = ?", (run,)
+            ).fetchone()
+            connection.execute(
+                "UPDATE jobs SET schema_version = '0.1', sources_sha256 = ?"
+                " WHERE id = ?",
+                (hashlib.sha256(sources).hexdigest(), run),
+            )
+        root = Path(durable["ANALYSIS_OBJECT_ROOT"])
+        (root / owner_id / run / "sources.json").write_bytes(sources)
+        assert_listed_and_refused(tiers, run)
+
+
+def assert_listed_and_refused(tiers, run: str) -> None:
+    """The list shows ``run``, and its run page and report page answer 409."""
+    with app(tiers) as client:
+        listed = client.get("/workspace/runs")
+        page = client.get(f"/workspace/runs/{run}")
+        report = client.get(f"/report/{run}")
+    assert listed.status_code == 200, listed.text
+    assert run in {item["run"] for item in listed.json()}
+    assert page.status_code == 409, page.text
+    assert report.status_code == 409, report.text
+
+
+def database_of(env: dict[str, str]) -> str:
+    """The path of the SQLite database that ``env`` names."""
+    return env["ANALYSIS_DATABASE_URL"].partition(":///")[2]
 
 
 def queued_run(store) -> str:

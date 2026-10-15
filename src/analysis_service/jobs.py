@@ -42,7 +42,7 @@ from collections.abc import (
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from itertools import chain
-from typing import Any, Literal, Protocol, Self, TypeGuard
+from typing import Annotated, Any, Literal, Protocol, Self, TypeGuard
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -251,7 +251,10 @@ class JobRecord(BaseModel):
     # :func:`same_schema` reads it before a route parses any of them (#1532).
     # No default, so a record that does not state its version fails to load.
     schema_version: str
-    sources: list[Source] = Field(min_length=1)
+    # ``None`` only on an envelope (:meth:`JobStore.owned`), which leaves out
+    # each part that the schema version covers. A route reads the sources by
+    # name, with :meth:`JobStore.sources`, after :func:`same_schema`.
+    sources: Annotated[list[Source], Field(min_length=1)] | None
     # What this job asked to be analysed under, in the order its report's blocks
     # will carry. Required and non-empty here as well as on the wire: the record
     # is what the runner is selected by and what the report's own ``job.frameworks``
@@ -381,6 +384,13 @@ class JobRecord(BaseModel):
         )
         record._append_event(kind="status", status="queued")
         return record
+
+    def whole_sources(self) -> list[Source]:
+        """The sources of a whole record. Raises :class:`ValueError` on an
+        envelope, which leaves them out."""
+        if self.sources is None:
+            raise ValueError(f"job {self.id} is an envelope, which holds no sources")
+        return self.sources
 
     def pauses(self) -> bool:
         """Whether this job's run stops after the assertion pass to ask a person.
@@ -597,7 +607,17 @@ class JobStore(Protocol):
 
     async def get(self, job_id: str) -> JobRecord | None: ...
 
-    async def owned(self, job_id: str, owner_id: str) -> JobRecord | None: ...
+    async def owned(self, job_id: str, owner_id: str) -> JobRecord | None:
+        """The record ``owner_id`` owns, as an envelope, or ``None``.
+
+        An envelope leaves out each part that the schema version covers: the
+        sources, the checkpoint, the resumption and the report. So an
+        envelope reads a record of any version, and a route reads each of
+        those parts by name after :func:`same_schema` accepts the version.
+        """
+        ...
+
+    async def sources(self, job_id: str, owner_id: str) -> list[Source] | None: ...
 
     async def report_json(
         self, job_id: str, owner_id: str
@@ -619,9 +639,9 @@ class JobStore(Protocol):
         """Write ``record`` over the job it names.
 
         A report is written once, and a save never clears or replaces it. A
-        save only appends events. :func:`check_save` raises
-        :class:`ValueError` where a save breaks either rule, and the store
-        writes nothing.
+        save only appends events, and never writes an envelope.
+        :func:`check_save` raises :class:`ValueError` where a save breaks one
+        of these rules, and the store writes nothing.
         """
         ...
 
@@ -687,9 +707,20 @@ class JobStore(Protocol):
         ...
 
 
+def stored_report(report: Report) -> bytes:
+    """The report as a store holds it: its JSON, as UTF-8."""
+    return report.model_dump_json().encode()
+
+
+def object_digest(data: bytes) -> str:
+    """The SHA-256 digest of an object's stored bytes. **The one digest rule**
+    of a stored object: a store writes it and checks a read against it."""
+    return hashlib.sha256(data).hexdigest()
+
+
 def report_digest(report: Report) -> str:
-    """The SHA-256 digest of the report's stored JSON."""
-    return hashlib.sha256(report.model_dump_json().encode()).hexdigest()
+    """The digest of the report's stored JSON."""
+    return object_digest(stored_report(report))
 
 
 def check_save(
@@ -699,8 +730,11 @@ def check_save(
     :meth:`JobStore.save`.
 
     ``report_sha256`` is the digest of the report the store holds, or ``None``
-    where it holds no report, and ``events`` is the events it holds.
+    where it holds no report, and ``events`` is the events it holds. An
+    envelope leaves out parts that the job holds, so a save of one raises.
     """
+    if record.sources is None:
+        raise ValueError(f"job {record.id} is an envelope, which a save never writes")
     if report_sha256 is not None and (
         record.report is None or report_digest(record.report) != report_sha256
     ):
@@ -926,8 +960,9 @@ class InMemoryJobStore:
         """The record ``owner_id`` owns, as an envelope, or ``None``.
 
         What the status and event routes need: they read the envelope and never
-        the analysis. The report, the checkpoint and the resumption are nearly
-        all of a record's weight, and none of them is read by the envelope.
+        the analysis. The envelope leaves out each part that the schema
+        version covers, as on every store. The report, the checkpoint and the
+        resumption are also nearly all of a record's weight.
         Copying them is work no caller asked for, and a read carries none of
         the bounds admission does — no ceiling, no rate, no budget — so a caller
         who polls a job pays each of them per request and the process pays it
@@ -943,9 +978,24 @@ class InMemoryJobStore:
         if record is None or record.owner_id != owner_id:
             return None
         envelope = record.model_copy(
-            update={"report": None, "checkpoint": None, "resumption": None}
+            update={
+                "sources": None,
+                "report": None,
+                "checkpoint": None,
+                "resumption": None,
+            }
         )
         return envelope.model_copy(deep=True)
+
+    async def sources(self, job_id: str, owner_id: str) -> list[Source] | None:
+        """The owned job's sources, as a copy, or ``None``.
+
+        Ownership is re-checked, as :meth:`report_json` does.
+        """
+        record = self._records.get(job_id)
+        if record is None or record.owner_id != owner_id or record.sources is None:
+            return None
+        return [source.model_copy(deep=True) for source in record.sources]
 
     async def report_json(self, job_id: str, owner_id: str) -> dict[str, Any] | None:
         """The owned job's report, already JSON, or ``None`` if it has none.
@@ -995,7 +1045,7 @@ class InMemoryJobStore:
     async def resumption(self, job_id: str, owner_id: str) -> Resumption | None:
         """The owned job's resumption, as a copy, or ``None``.
 
-        The envelope leaves it out for its weight, and a finished job's
+        The envelope leaves it out, and a finished job's
         questions need it: whether the job came from a report's answers is
         whether its report is final (ADR 0054).
         """
@@ -1320,7 +1370,8 @@ class StubPipelineRunner:
             # independent digest computations is how a fixture comes to carry
             # an InputRef production would never produce.
             input=InputRef.of(
-                system_name=job.system_name or "Stub System", sources=job.sources
+                system_name=job.system_name or "Stub System",
+                sources=job.whole_sources(),
             ),
             nodes=[NodeRun(node=node, duration_ms=0) for node in self.nodes],
             system_model=model,

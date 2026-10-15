@@ -33,10 +33,13 @@ provider.
 - A JSON part is stored as text, never as `jsonb`. One column type then
   serves PostgreSQL and SQLite, and no query reads inside the JSON.
 - Each job row stores the `SCHEMA_VERSION` that wrote the record. One
-  function compares its major number with the current one, and a route
-  that must parse an older record refuses it. No migration rewrites a
-  stored report, checkpoint or sources object
-  ([#1532](https://github.com/mstarks01/work-agent/issues/1532)).
+  function, `same_schema`, accepts only the exact current version, because a
+  record of any other version can hold a shape that this service cannot
+  parse ([#1708](https://github.com/mstarks01/work-agent/pull/1708)). A route
+  that must parse a record of another version refuses it. A read of the job
+  row parses no part that the version covers until the function accepts the
+  version. No migration rewrites a stored report, checkpoint or sources
+  object ([#1532](https://github.com/mstarks01/work-agent/issues/1532)).
 - The row holds the SHA-256 of each object. A read checks it and fails closed
   on a mismatch.
 - The service writes the object first and the row second. It deletes the

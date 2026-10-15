@@ -92,9 +92,11 @@ answers, corrections and amendments routes, `/changes`, and a submission with
 `detail` names the stored version and the current version, and tells you to
 submit the job again.
 
-`GET /v1/jobs/{id}` and `GET /v1/jobs/{id}/report` serve a job of any version.
-The report route returns the report as the service stored it, so read its own
-`schema_version`. A job that is not yours reads as `404`, never as `409`.
+`GET /v1/jobs/{id}`, its events, `DELETE /v1/jobs/{id}` and
+`GET /v1/jobs/{id}/report` serve a job of any version. These routes parse no
+part of the job that the version covers: the sources, the checkpoint, the
+resumption and the report. The report route returns the report as the service
+stored it, so read its own `schema_version`. A job that is not yours reads as `404`, never as `409`.
 
 ### Deleting a job
 
@@ -111,8 +113,8 @@ returns `404` for the job. The service keeps a usage row for the job, which no
 route reads (ADR 0066). The row holds the owner ID, the creation time, the
 tokens, the status and the parent job ID. So a deleted job still counts toward
 the rate and the token [budgets](#how-much-you-may-consume-over-time). A
-deleted follow-up still uses the one follow-up of its report. The service keeps
-the usage row, and no new job can take the ID of a deleted job.
+deleted follow-up still uses the one follow-up of its report. No new job can
+take the ID of a deleted job.
 
 On the `sql` store, the delete changes the job row into the usage row in one
 transaction, and then deletes the objects. When the object store does not
@@ -1115,7 +1117,8 @@ pair, so a new row runs every contract test. A new job store implements the
 | `principal` | The principal of an issuer and a `sub`, or nothing. It creates nothing. |
 | `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision and then its object store. The app calls it before the restart scan. |
 | `get` | The whole record, for the driver that runs the job. |
-| `owned` | The record an owner ID owns, without its report. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
+| `owned` | The record an owner ID owns, as an envelope: without the sources, the report, the checkpoint and the resumption, which are the parts the schema version covers. So it reads a job of any version. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
+| `sources` | The owned job's sources. A route reads them after it checks the job's schema version. |
 | `report_json` | The owned job's report, already serialised. |
 | `events_after` | A job's status and the events past a cursor, and nothing else. |
 | `save` | The record back, for a job that already exists. |

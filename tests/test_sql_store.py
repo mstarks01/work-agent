@@ -10,8 +10,10 @@ migration against the tables the store reads.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
+import sqlite3
 import stat
 from pathlib import Path
 
@@ -396,6 +398,21 @@ def report_file(env: dict[str, str], record: JobRecord) -> Path:
     return Path(env["ANALYSIS_OBJECT_ROOT"], record.owner_id, record.id, "report.json")
 
 
+def of_another_version(env: dict[str, str], store: JobStore, record: JobRecord) -> None:
+    """State another schema version on ``record``'s row, and store its sources
+    in a shape this service cannot parse, under a digest that matches them."""
+    record.schema_version = "1.0"
+    asyncio.run(store.save(record))
+    sources = b'[{"x": 1}]'
+    report_file(env, record).with_name("sources.json").write_bytes(sources)
+    database = env["ANALYSIS_DATABASE_URL"].partition(":///")[2]
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE jobs SET sources_sha256 = ? WHERE id = ?",
+            (hashlib.sha256(sources).hexdigest(), record.id),
+        )
+
+
 class TestTheDigestCheck:
     """A changed or missing object is refused, and the API says no more than 500."""
 
@@ -417,7 +434,9 @@ class TestTheDigestCheck:
         record = completed_job(store)
         report_file(env, record).with_name("sources.json").unlink()
         with pytest.raises(CorruptObject):
-            asyncio.run(store.owned(record.id, "alice"))
+            asyncio.run(store.sources(record.id, "alice"))
+        with pytest.raises(CorruptObject):
+            asyncio.run(store.get(record.id))
 
     def test_the_api_answers_500_with_no_detail(self, env):
         store = build_store(env)
@@ -451,6 +470,34 @@ class TestTheReport:
             response = client.get(f"/v1/jobs/{record.id}/report", headers=auth())
         assert response.status_code == 200
         assert response.content == stored
+
+    def test_sources_of_another_schema_version_are_never_parsed(self, env):
+        """The status route and the delete read the envelope, which holds no
+        part that the schema version covers, and a parsing route answers 409."""
+        store = build_store(env)
+        record = completed_job(store)
+        of_another_version(env, store, record)
+        with TestClient(app_over(store)) as client:
+            status = client.get(f"/v1/jobs/{record.id}", headers=auth())
+            questions = client.get(f"/v1/jobs/{record.id}/questions", headers=auth())
+            deleted = client.delete(f"/v1/jobs/{record.id}", headers=auth())
+        assert status.status_code == 200, status.text
+        assert questions.status_code == 409, questions.text
+        assert deleted.status_code == 204, deleted.text
+
+    def test_the_restart_scan_fails_a_job_of_another_schema_version(self, env):
+        store = build_store(env)
+        record = JobRecord.create(
+            owner_id="alice",
+            sources=[Source.description("a web app storing orders")],
+            frameworks=sample_selection(),
+        )
+        record.transition("running")
+        asyncio.run(admit(store, record))
+        of_another_version(env, store, record)
+        assert asyncio.run(store.fail_in_flight()) == [record.id]
+        failed = asyncio.run(store.owned(record.id, "alice"))
+        assert (failed.status, failed.error) == ("failed", RESTART_FAILURE_MESSAGE)
 
     def test_a_delete_removes_both_objects(self, env):
         store = build_store(env)

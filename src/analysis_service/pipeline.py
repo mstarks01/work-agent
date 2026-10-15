@@ -131,7 +131,8 @@ class AdkPipelineRunner:
                 f" graph was built for {list(self._pipeline.frameworks)}"
             )
         input_ref = InputRef.of(
-            system_name=job.system_name or DEFAULT_SYSTEM_NAME, sources=job.sources
+            system_name=job.system_name or DEFAULT_SYSTEM_NAME,
+            sources=job.whole_sources(),
         )
         try:
             return await self._drive(job, on_node, input_ref)
@@ -147,7 +148,7 @@ class AdkPipelineRunner:
         self, job: JobRecord, on_node: NodeCallback, input_ref: InputRef
     ) -> PipelineOutcome:
         graph_run = await self._executor.run(
-            job.sources,
+            job.whole_sources(),
             user_id=job.owner_id,
             # The options ride into the run rather than into the graph. A runner
             # holds one built graph per selection and two jobs may select the
