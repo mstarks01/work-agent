@@ -90,7 +90,7 @@ from analysis_service.answer_sets import AnswerSet
 from analysis_service.aws_identity import platform_session
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import UnknownKey
-from analysis_service.fact_answers import FactAnswer, SkipKey
+from analysis_service.fact_answers import STORED, FactAnswer, SkipKey
 from analysis_service.jobs import (
     RESTART_FAILURE_MESSAGE,
     TERMINAL_STATUSES,
@@ -103,6 +103,7 @@ from analysis_service.jobs import (
     UsageRow,
     check_bounds,
     check_save,
+    envelope_parts,
     is_follow_up,
     locks_its_parent,
     object_digest,
@@ -318,9 +319,6 @@ def _job_row(record: JobRecord) -> dict[str, Any]:
     return row
 
 
-#: The parts of a job row that the schema version covers, which an envelope
-#: leaves out.
-_COVERED_COLUMNS = frozenset({"checkpoint", "resumption"})
 #: The columns that the restart scan changes when it fails a job: what
 #: :meth:`JobRecord.transition` sets, and the error.
 _FAILED_COLUMNS = ("status", "measured_tokens", "updated_at", "error")
@@ -333,14 +331,14 @@ def _record(
     events: Sequence[str],
 ) -> JobRecord:
     """The record a row and its objects hold. An envelope, where ``sources``
-    is ``None``, leaves out each part that the schema version covers, and
+    is ``None``, leaves out each part that :func:`envelope_parts` names, and
     never parses one."""
-    envelope = sources is None
+    left_out = envelope_parts(row.schema_version) if sources is None else {}
     data: dict[str, Any] = {}
     for name in JobRecord.model_fields.keys() - _OUTSIDE_THE_ROW:
         value = row._mapping[name]
-        if envelope and name in _COVERED_COLUMNS:
-            data[name] = None
+        if name in left_out:
+            data[name] = left_out[name]
         elif name in _JSON_FIELDS:
             data[name] = json.loads(value)
         else:
@@ -348,7 +346,7 @@ def _record(
     data["sources"] = None if sources is None else json.loads(sources)
     data["report"] = None if report is None else json.loads(report)
     data["events"] = [json.loads(text) for text in events]
-    return JobRecord.model_validate(data)
+    return JobRecord.model_validate(data, context=STORED)
 
 
 def _event_rows(job_id: str, events: Sequence[JobEvent]) -> list[dict[str, Any]]:
@@ -1072,7 +1070,9 @@ class SqlJobStore:
 
     async def report(self, job_id: str, owner_id: str) -> Report | None:
         data = await self._report(job_id, owner_id)
-        return None if data is None else Report.model_validate_json(data)
+        return (
+            None if data is None else Report.model_validate_json(data, context=STORED)
+        )
 
     async def _part(self, name: str, job_id: str, owner_id: str) -> Any:
         async with self._transaction() as connection:
@@ -1081,7 +1081,11 @@ class SqlJobStore:
                     jobs.c.id == job_id, jobs.c.owner_id == owner_id
                 )
             )
-        return None if text is None else _ADAPTERS[name].validate_json(text)
+        return (
+            None
+            if text is None
+            else _ADAPTERS[name].validate_json(text, context=STORED)
+        )
 
     async def checkpoint(self, job_id: str, owner_id: str) -> Checkpoint | None:
         return await self._part("checkpoint", job_id, owner_id)
@@ -1230,7 +1234,7 @@ class SqlJobStore:
         )
         if text is None:
             return None
-        resumption = _ADAPTERS["resumption"].validate_json(text)
+        resumption = _ADAPTERS["resumption"].validate_json(text, context=STORED)
         return "final" if is_follow_up(resumption) else "offers-follow-up"
 
     async def save_draft(

@@ -32,6 +32,7 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     Resumption,
+    envelope_parts,
     same_schema,
 )
 from analysis_service.objects import ObjectStore, build_object_store, object_key
@@ -1634,6 +1635,26 @@ class TestTheSchemaVersion:
             assert covered == (None, None, None, None)
         assert asyncio.run(store.sources(job, "alice")) == whole.sources
         assert asyncio.run(store.sources(job, "mallory")) is None
+
+    @pytest.mark.parametrize("version", [SCHEMA_VERSION, "2.10"])
+    def test_an_envelope_holds_a_versioned_part_only_of_its_own_version(
+        self, store, version
+    ):
+        job = final(store, completed(store))
+        record = asyncio.run(store.get(job))
+        record.schema_version = version
+        asyncio.run(store.save(record))
+        whole = asyncio.run(store.get(job))
+        left_out = envelope_parts(version)
+        for read in (
+            asyncio.run(store.owned(job, "alice")),
+            asyncio.run(store.owned_jobs("alice"))[-1],
+        ):
+            for name, value in read:
+                if name not in {"events", *left_out}:
+                    assert value == getattr(whole, name), name
+            assert {name: getattr(read, name) for name in left_out} == left_out
+        assert ("answers" in left_out) is not same_schema(version)
 
     def test_a_save_never_writes_an_envelope(self, store):
         job = completed(store)

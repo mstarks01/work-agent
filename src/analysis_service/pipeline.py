@@ -158,7 +158,7 @@ class AdkPipelineRunner:
             extra_state={
                 STATE_FRAMEWORK_OPTIONS: {
                     selection.name: dict(selection.options)
-                    for selection in job.frameworks
+                    for selection in job.whole_frameworks()
                 },
                 **_seeded_state(job),
             },
@@ -176,7 +176,7 @@ class AdkPipelineRunner:
                     # than the graph's name list: the envelope checks the
                     # blocks against this field, so recording what the job
                     # asked for is what makes that check mean anything.
-                    frameworks=list(job.frameworks),
+                    frameworks=list(job.whole_frameworks()),
                 ),
                 input_ref=input_ref,
                 pipeline=self._pipeline,

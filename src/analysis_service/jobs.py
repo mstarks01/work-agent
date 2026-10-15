@@ -136,6 +136,37 @@ def same_schema(version: str) -> bool:
     return version == SCHEMA_VERSION
 
 
+#: The parts of a record that an envelope never holds: nearly all of a
+#: record's weight, and each read by name after :func:`same_schema`.
+_OBJECT_PARTS = ("sources", "report", "checkpoint", "resumption")
+
+
+def envelope_parts(schema_version: str) -> dict[str, object]:
+    """What an envelope of a record of ``schema_version`` holds in place of
+    each part it leaves out.
+
+    **The one reader of "what does an envelope leave out"**, which both job
+    stores ask. The schema version covers two groups of parts. An envelope
+    never holds the objects. It holds the answers, the fact keys, the
+    selection and the node runs only where :func:`same_schema` accepts the
+    version. So no envelope parses a part of another version, and the run
+    list and the status route read a record of any version.
+    """
+    parts: dict[str, object] = dict.fromkeys(_OBJECT_PARTS)
+    if not same_schema(schema_version):
+        parts |= {
+            "frameworks": None,
+            "answers": NO_ANSWERS,
+            "shown_early": [],
+            "corrections": [],
+            "draft": NO_ANSWERS,
+            "skipped_early": [],
+            "carried": NO_ANSWERS,
+            "unreported_nodes": [],
+        }
+    return parts
+
+
 # Stored on a failed job in place of any internal detail.
 GENERIC_FAILURE_MESSAGE = "internal error while running the analysis pipeline"
 
@@ -251,9 +282,9 @@ class JobRecord(BaseModel):
     id: str
     owner_id: str
     # The ``SCHEMA_VERSION`` of the service that created this record. It
-    # covers the checkpoint, the resumption, the sources and the report, and
-    # :func:`same_schema` reads it before a route parses any of them (#1532).
-    # No default, so a record that does not state its version fails to load.
+    # covers each part :func:`envelope_parts` names, and :func:`same_schema`
+    # reads it before a route parses any of them (#1532). No default, so a
+    # record that does not state its version fails to load.
     schema_version: str
     # ``None`` only on an envelope (:meth:`JobStore.owned`), which leaves out
     # each part that the schema version covers. A route reads the sources by
@@ -265,8 +296,9 @@ class JobRecord(BaseModel):
     # is stamped from, so a record with no selection would name a graph that
     # cannot be built. No default, for the reason ``config/frameworks.toml``
     # carries none — a defaulted selection makes one submission mean different
-    # things on two installs.
-    frameworks: list[FrameworkSelection] = Field(min_length=1)
+    # things on two installs. ``None`` only on an envelope of a record of
+    # another schema version (:func:`envelope_parts`).
+    frameworks: Annotated[list[FrameworkSelection], Field(min_length=1)] | None
     system_name: str | None = None
     # The submitter's answers to an earlier report's link questions and open
     # facts. They are also composed into the answers Source, which is what an
@@ -389,6 +421,14 @@ class JobRecord(BaseModel):
         record._append_event(kind="status", status="queued")
         return record
 
+    def whole_frameworks(self) -> list[FrameworkSelection]:
+        """The selection of a record this service can parse. Raises
+        :class:`ValueError` on an envelope of a record of another schema
+        version, which leaves it out."""
+        if self.frameworks is None:
+            raise ValueError(f"job {self.id} is of schema {self.schema_version}")
+        return self.frameworks
+
     def whole_sources(self) -> list[Source]:
         """The sources of a whole record. Raises :class:`ValueError` on an
         envelope, which leaves them out."""
@@ -427,7 +467,7 @@ class JobRecord(BaseModel):
         two jobs selecting the same frameworks with different options share one
         built graph.
         """
-        return tuple(selection.name for selection in self.frameworks)
+        return tuple(selection.name for selection in self.whole_frameworks())
 
     def transition(self, new_status: JobStatus) -> None:
         """Move to ``new_status``, refusing edges outside the lifecycle.
@@ -617,10 +657,10 @@ class JobStore(Protocol):
     async def owned(self, job_id: str, owner_id: str) -> JobRecord | None:
         """The record ``owner_id`` owns, as an envelope, or ``None``.
 
-        An envelope leaves out each part that the schema version covers: the
-        sources, the checkpoint, the resumption and the report. So an
-        envelope reads a record of any version, and a route reads each of
-        those parts by name after :func:`same_schema` accepts the version.
+        An envelope leaves out each part that the schema version covers, as
+        :func:`envelope_parts` names them. So an envelope reads a record of any
+        version, and a route reads those parts after :func:`same_schema`
+        accepts the version.
         """
         ...
 
@@ -986,14 +1026,7 @@ class InMemoryJobStore:
         record = self._records.get(job_id)
         if record is None or record.owner_id != owner_id:
             return None
-        envelope = record.model_copy(
-            update={
-                "sources": None,
-                "report": None,
-                "checkpoint": None,
-                "resumption": None,
-            }
-        )
+        envelope = record.model_copy(update=envelope_parts(record.schema_version))
         return envelope.model_copy(deep=True)
 
     async def sources(self, job_id: str, owner_id: str) -> list[Source] | None:
@@ -1373,7 +1406,7 @@ class StubPipelineRunner:
                 id=job.id,
                 created_at=job.created_at,
                 completed_at=datetime.now(UTC),
-                frameworks=list(job.frameworks),
+                frameworks=list(job.whole_frameworks()),
             ),
             # Built through the same constructor the real runner uses: two
             # independent digest computations is how a fixture comes to carry
@@ -1386,7 +1419,9 @@ class StubPipelineRunner:
             system_model=model,
             boundary_crossings=model.boundary_crossings(),
             elements_analyzed=len(model.elements()),
-            analyses=[self._stub_block(selection) for selection in job.frameworks],
+            analyses=[
+                self._stub_block(selection) for selection in job.whole_frameworks()
+            ],
         )
 
     def _stub_block(self, selection: FrameworkSelection) -> FrameworkAnalysis:

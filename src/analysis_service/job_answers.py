@@ -248,7 +248,8 @@ class Answerable:
         return AnswerState(
             checkpoint=Checkpoint(system_model=self.model, assertions=self.assertions),
             frameworks={
-                selection.name: selection.options for selection in record.frameworks
+                selection.name: selection.options
+                for selection in record.whole_frameworks()
             },
             analyses=self.analyses,
             waiting=record.status == "awaiting-answers",
@@ -525,7 +526,7 @@ class JobAnswers:
         record = JobRecord.create(
             owner_id=owner_id,
             sources=outcome.sources,
-            frameworks=parent.frameworks,
+            frameworks=parent.whole_frameworks(),
             system_name=parent.system_name,
             answers=outcome.answers,
             shown_early=outcome.shown,
@@ -537,7 +538,9 @@ class JobAnswers:
                 follow_up=outcome.follow_up,
             ),
             parent_revision=parent.revision,
-            reserved_tokens=budgets.estimate(outcome.sources, parent.frameworks),
+            reserved_tokens=budgets.estimate(
+                outcome.sources, parent.whole_frameworks()
+            ),
         )
         return await self.admit(record, start=start)
 
@@ -567,13 +570,15 @@ class JobAnswers:
         record = JobRecord.create(
             owner_id=owner_id,
             sources=amended.sources,
-            frameworks=parent.frameworks,
+            frameworks=parent.whole_frameworks(),
             system_name=parent.system_name,
             ask_questions=True,
             amends=parent.id,
             parent_revision=parent.revision,
             carried=amended.answers,
-            reserved_tokens=budgets.estimate(amended.sources, parent.frameworks),
+            reserved_tokens=budgets.estimate(
+                amended.sources, parent.whole_frameworks()
+            ),
         )
         return await self.admit(record, start=start)
 

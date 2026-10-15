@@ -1123,7 +1123,7 @@ pair, so a new row runs every contract test. A new job store implements the
 | `principal` | The principal of an issuer and a `sub`, or nothing. It creates nothing. |
 | `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision and then its object store. The app calls it before the restart scan. |
 | `get` | The whole record, for the driver that runs the job. |
-| `owned` | The record an owner ID owns, as an envelope: without the sources, the report, the checkpoint and the resumption, which are the parts the schema version covers. So it reads a job of any version. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
+| `owned` | The record an owner ID owns, as an envelope: without the sources, the report, the checkpoint and the resumption. For a job of another schema version, it also leaves out the answers, the fact keys, the framework selection and the node runs. These are the parts the schema version covers, so it reads a job of any version. It reads a stored facet answer with the value the service wrote when it admitted the answer. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
 | `sources` | The owned job's sources. A route reads them after it checks the job's schema version. |
 | `report_json` | The owned job's report, already serialised. |
 | `events_after` | A job's status and the events past a cursor, and nothing else. |

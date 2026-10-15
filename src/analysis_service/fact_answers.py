@@ -39,6 +39,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -46,6 +47,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -68,6 +70,7 @@ __all__ = [
     "FACET_ANSWERS",
     "MAX_FACT_ANSWERS",
     "MAX_HELD_FACTS",
+    "STORED",
     "FactAnswer",
     "FactKind",
     "FactStatus",
@@ -141,6 +144,11 @@ _KEY_FIELDS = (
 #: The answers a facet takes, beside ``unknown``.
 FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
 
+#: The validation context of a record that a store reads back. A stored
+#: answer keeps the ``value`` that the service wrote when it admitted the
+#: answer, so a later change to a facet's wording never makes it unreadable.
+STORED: Mapping[str, bool] = MappingProxyType({"stored": True})
+
 
 class FactAnswer(BaseModel):
     """One submitter answer to one open fact, named by the fact's key."""
@@ -162,9 +170,14 @@ class FactAnswer(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _facet_value(cls, data: Any) -> Any:
-        """Write ``value`` from ``facets``, one facet a clause, in the kind's order."""
-        if not isinstance(data, dict) or data.get("facets") is None:
+    def _facet_value(cls, data: Any, info: ValidationInfo) -> Any:
+        """Write ``value`` from ``facets``, one facet a clause, in the kind's order.
+
+        **The one writer of a facet answer's value**, at admission. A stored
+        answer, read under :data:`STORED`, keeps the value it holds.
+        """
+        stored = bool(info.context and info.context.get("stored"))
+        if stored or not isinstance(data, dict) or data.get("facets") is None:
             return data
         facets, key = data["facets"], data.get("key")
         question = ""

@@ -474,7 +474,7 @@ class Workspace:
             # Whether the run stops for answers, so the page shows its
             # progress under the Questions tab rather than Reports.
             "pauses": record.pauses(),
-            "frameworks": [selection.name for selection in record.frameworks],
+            "frameworks": [selection.name for selection in record.frameworks or ()],
             "reports": [
                 {
                     "run": item.id,
@@ -1011,7 +1011,7 @@ def create_app(
         ]
         payload["selection"] = [
             {"name": selection.name, "options": dict(selection.options)}
-            for selection in record.frameworks
+            for selection in record.whole_frameworks()
         ]
         sources = await store.sources(record.id, owner_id)
         if sources is None:
