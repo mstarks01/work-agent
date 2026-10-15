@@ -258,7 +258,9 @@ def leaks(
     found: dict[Path, str] = {}
     ignored = _ignored(root)
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or SKIPPED_DIRS.intersection(path.parts):
+        if not path.is_file() or SKIPPED_DIRS.intersection(
+            path.relative_to(root).parts
+        ):
             continue
         if ignored.intersection((path, *path.parents)):
             continue
@@ -353,6 +355,22 @@ def test_the_scan_catches_a_sentence_pasted_in_another_format(tmp_path):
     found = leaks(tmp_path, frozenset(), fingerprints(borrowed))
 
     assert list(found) == [tmp_path / "copied.md"]
+
+
+def test_a_checkout_under_a_skipped_name_is_still_scanned(tmp_path):
+    """A skip name is matched inside the scanned tree, never in the folders
+    above it, so a checkout under ``.venv`` is not a checkout of nothing."""
+    borrowed = (
+        "Verify that the application encodes every value it writes into a"
+        " response for the context that value is written into."
+    )
+    root = tmp_path / ".venv" / "checkout"
+    root.mkdir(parents=True)
+    (root / "copied.md").write_text(borrowed)
+
+    assert list(leaks(root, frozenset(), fingerprints(borrowed))) == [
+        root / "copied.md"
+    ]
 
 
 def test_a_governed_file_is_not_reported_against_itself(tmp_path):

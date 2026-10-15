@@ -201,7 +201,12 @@ from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
-from analysis_service.sources import ANSWERS_LABEL, SourceLimits
+from analysis_service.sources import (
+    ANSWERS_LABEL,
+    MAX_SYSTEM_NAME_CHARS,
+    SourceLimits,
+    clean_system_name,
+)
 from analysis_service.store_backends import audited_delete, build_store, store_lifespan
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
@@ -484,6 +489,13 @@ class Workspace:
 
 
 DEFAULT_NAME = "Your system"
+
+#: The page's statement of :func:`~analysis_service.sources.clean_system_name`.
+#: A fixed sentence, so a refusal never echoes the name it refused.
+_NAME_REFUSED = (
+    f"Use an analysis name of at most {MAX_SYSTEM_NAME_CHARS} characters, on one"
+    " line, with no control or formatting characters."
+)
 
 
 def _name_of(record: JobRecord) -> str:
@@ -958,6 +970,7 @@ def create_app(
                 tiers=_tier_lines(state.tiers),
                 frameworks=_framework_fields(state.frameworks),
                 questions=_QUESTIONS_FIELD,
+                name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 store_note=escape(store_note(workspace.store)) if workspace else "",
             )
         )
@@ -1033,12 +1046,13 @@ def create_app(
             answers_from = body.get("answers_from")
             if answers_from is not None and not isinstance(answers_from, str):
                 raise TypeError
-            name = body.get("name", DEFAULT_NAME)
-            if not isinstance(name, str) or not 1 <= len(name.strip()) <= 120:
-                return _message(
-                    400, "Use an analysis name between 1 and 120 characters."
-                )
-            name = name.strip()
+            name = body.get("name")
+            if not isinstance(name, str | None):
+                return _message(400, _NAME_REFUSED)
+            try:
+                name = clean_system_name(name)
+            except ValueError:
+                return _message(400, _NAME_REFUSED)
         except SelectionError as exc:
             # Names the framework and the field it wanted, or the name the
             # install does not carry, and nothing about this deployment. Safe

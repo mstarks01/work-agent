@@ -1,7 +1,8 @@
-"""The system name rule, and the two entry points held against each other.
+"""The system name rule, and the entry points held against each other.
 
-``clean_system_name`` is the rule. The HTTP route, the in-process engine and
-the stored report's own field are its three callers, and this file does the job
+``clean_system_name`` is the rule. The HTTP route, the in-process engine, the
+web app's form route and the stored report's own field are its four callers,
+and this file does the job
 the parity suites do elsewhere: never ask whether a caller agrees with its own
 expectation, ask whether the callers agree with each other.
 
@@ -15,14 +16,19 @@ what the report says.
 from __future__ import annotations
 
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from analysis_service.deployment import Deployment
 from analysis_service.engine import EngineInputError
 from analysis_service.jobs import PipelineRejected
 from analysis_service.report import InputRef
 from analysis_service.sources import MAX_SYSTEM_NAME_CHARS, Source, clean_system_name
+from tests.factories import TEST_TIER_ENV
 from tests.test_api import auth, make_client, submission
 from tests.test_engine import RecordingRunner, analyze, engine_for
+from tests.test_webapp import LOOPBACK, SAME_ORIGIN, posted, startup_for
+from webapp.main import create_app
 
 # Written as escapes rather than as themselves: every one of these is invisible
 # or reorders the line around it, which is the property that makes it worth
@@ -91,8 +97,26 @@ def _engine_outcome(name: str) -> Outcome:
     return (True, runner.jobs[0].system_name)
 
 
+def _webapp_outcome(name: str) -> Outcome:
+    """What the web app's form route did with ``name``, by its status and job."""
+    runner = _recorder()
+    tiers = Deployment.from_env(env=TEST_TIER_ENV).tiers
+    client = TestClient(create_app(startup_for(tiers, runner)), base_url=LOOPBACK)
+
+    response = client.post(
+        "/analyze", json=posted("text") | {"name": name}, headers=SAME_ORIGIN
+    )
+
+    assert response.status_code in {200, 400}, response.status_code
+    if response.status_code == 400:
+        return (False, None)
+    # Draining the event stream is what lets the background run reach the runner.
+    client.get(f"/events/{response.json()['run']}")
+    return (True, runner.jobs[0].system_name)
+
+
 def _rule_outcome(name: str) -> Outcome:
-    """What the shared rule says, in the shape the two doors are read in."""
+    """What the shared rule says, in the shape the doors are read in."""
     try:
         return (True, clean_system_name(name))
     except ValueError:
@@ -100,9 +124,9 @@ def _rule_outcome(name: str) -> Outcome:
 
 
 @pytest.mark.parametrize("name", NAMES)
-def test_the_two_entry_points_agree(name: str) -> None:
-    """The route and the engine refuse the same names and store the same names."""
-    assert _http_outcome(name) == _engine_outcome(name)
+def test_the_entry_points_agree(name: str) -> None:
+    """The route, the engine and the web app refuse and store the same names."""
+    assert _http_outcome(name) == _engine_outcome(name) == _webapp_outcome(name)
 
 
 @pytest.mark.parametrize("name", NAMES)
@@ -112,6 +136,18 @@ def test_neither_door_departs_from_the_rule(name: str) -> None:
 
     assert _http_outcome(name) == expected
     assert _engine_outcome(name) == expected
+    assert _webapp_outcome(name) == expected
+
+
+def test_the_form_field_takes_the_rule_bound() -> None:
+    """The page's ``maxlength`` is the rule's bound, so the form never refuses
+    a name the route admits."""
+    tiers = Deployment.from_env(env=TEST_TIER_ENV).tiers
+    client = TestClient(create_app(startup_for(tiers)), base_url=LOOPBACK)
+
+    page = client.get("/").text
+
+    assert f'id="analysis-name" name="name" maxlength="{MAX_SYSTEM_NAME_CHARS}"' in page
 
 
 @pytest.mark.parametrize("name", ["   ", "", "\t\n "])

@@ -22,7 +22,7 @@
       <section id="description-panel" aria-label="System description">
         <form id="analyze" class="entry">
           <div id="entry-heading"><h1>Start with your system.</h1><p class="muted">Describe it once. Examine it from different perspectives.</p></div>
-          <label class="field-label" for="analysis-name">Analysis name</label><input id="analysis-name" name="name" maxlength="120" placeholder="For example, Customer portal" autocomplete="off">
+          <label class="field-label" for="analysis-name">Analysis name</label><input id="analysis-name" name="name" maxlength="<!--name_limit-->" placeholder="For example, Customer portal" autocomplete="off">
           <label class="field-label" for="description">What are you building?</label><textarea id="description" name="description" placeholder="Describe each part of your system and how the parts connect. For each connection, say the protocol, how each side proves who it is, and whether the traffic is encrypted. For each data store, say what it is, whether its data is encrypted, and who can get a backup. For each service, say whether it faces the internet and what limits its requests. Say where each part runs, and which part each person or team uses. Each true detail you give removes questions later." required></textarea>
           <div class="description-help"><p class="hint">Include what you know. Questions can help fill the gaps.</p><button type="button" id="load" class="quiet">Load example</button></div>
           <fieldset id="frameworks"><legend>Analysis frameworks</legend><!--frameworks--></fieldset>

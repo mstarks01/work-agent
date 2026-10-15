@@ -34,7 +34,7 @@ from pathlib import Path
 import pytest
 
 from evals.harness.run import COMMANDS
-from tests.source_tree import FROZEN_PROSE
+from tests.source_tree import FROZEN_PROSE, source_files
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -88,7 +88,7 @@ def _documented() -> list[tuple[Path, int, str]]:
     found: list[tuple[Path, int, str]] = []
     for entry in SEARCHED:
         base = REPO_ROOT / entry
-        paths = [base] if base.is_file() else sorted(base.rglob("*.md"))
+        paths = [base] if base.is_file() else source_files(entry, suffixes=(".md",))
         for path in paths:
             if any(path.is_relative_to(REPO_ROOT / tree) for tree in FROZEN):
                 continue

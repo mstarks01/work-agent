@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from analysis_service.answer_sets import AnswerSet
@@ -12,6 +10,7 @@ from analysis_service.report import Report
 from evals.harness import audit, early_policies
 from evals.harness.early_policies import POLICIES, _spend, needs_of, readings
 from tests.factories import valid_model
+from tests.source_tree import REPO_ROOT
 
 BOTH = {"stride": {}, "asvs": {"level": 2}}
 
@@ -22,7 +21,9 @@ def keys_of(charges):
 
 
 BASELINE = next(
-    Path("evals/baselines").glob("6bff717-*/*.reports/01-payments-checkout.report.json")
+    (REPO_ROOT / "evals/baselines").glob(
+        "6bff717-*/*.reports/01-payments-checkout.report.json"
+    )
 )
 
 

@@ -334,10 +334,10 @@ class JobSubmission(BaseModel):
     # package raises it with no edit here.
     frameworks: list[FrameworkRequest] = Field(min_length=1, max_length=len(PACKAGES))
     #: Read by :func:`~analysis_service.sources.clean_system_name`, the same
-    #: rule the in-process engine applies, so the two entry points accept and
-    #: refuse the same names. It reaches the report a consumer renders, so a
-    #: control, format or bidirectional character is refused: none has a
-    #: reading a person wants and each has one a renderer might.
+    #: rule the in-process engine and the web app apply, so the entry points
+    #: accept and refuse the same names. It reaches the report a consumer
+    #: renders, so a control, format or bidirectional character is refused: none
+    #: has a reading a person wants and each has one a renderer might.
     #:
     #: No ``min_length`` or ``max_length`` beside it. The rule trims first and
     #: measures what is left, so a schema bound on the untrimmed value would

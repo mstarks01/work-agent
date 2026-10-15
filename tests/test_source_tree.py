@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import subprocess
 import tomllib
+from pathlib import Path
 
-from tests.source_tree import _SKIPPED_PATHS, REPO_ROOT, source_files
+from tests import source_tree
+from tests.source_tree import _SKIPPED, _SKIPPED_PATHS, REPO_ROOT, source_files
 
 
 def test_no_skipped_path_is_one_git_tracks():
@@ -51,9 +53,13 @@ def test_mypy_excludes_every_path_the_lints_skip():
     reads it.
     """
     manifest = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    excluded = manifest["tool"]["mypy"]["exclude"]
+    mypy = manifest["tool"]["mypy"]
 
-    missing = [path for path in _SKIPPED_PATHS if f"^{path}/" not in excluded]
+    missing = [
+        path
+        for path in _SKIPPED_PATHS
+        if path.split("/")[0] in mypy["files"] and f"^{path}/" not in mypy["exclude"]
+    ]
 
     assert not missing, (
         f"tests/source_tree.py skips {missing} and pyproject.toml's [tool.mypy]"
@@ -66,3 +72,70 @@ def test_the_enumerator_reads_the_source_it_is_asked_for():
     found = {path.name for path in source_files("src")}
 
     assert {"fan_in.py", "claims.py", "graph.py"} <= found
+
+
+def _tree(root: Path, *names: str) -> None:
+    """Write an empty file at each repository-relative name under ``root``."""
+    for name in names:
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).touch()
+
+
+def test_a_checkout_under_a_skipped_name_still_reads_its_source(tmp_path, monkeypatch):
+    """A skip name is matched inside the repository, never in the folders above it."""
+    root = tmp_path / "research" / ".venv" / "checkout"
+    _tree(root, "src/kept.py")
+    monkeypatch.setattr(source_tree, "REPO_ROOT", root)
+
+    assert source_files("src") == [root / "src/kept.py"]
+
+
+def test_no_walk_reads_the_run_archive_or_a_nested_worktree(tmp_path, monkeypatch):
+    """A worktree under ``.claude/worktrees`` is a whole checkout at another
+    revision, and ``evals/runs`` is untracked output. The skills beside them are
+    tracked prose and stay in."""
+    _tree(
+        tmp_path,
+        "src/kept.py",
+        ".claude/skills/audit/SKILL.md",
+        ".claude/worktrees/other/src/kept.py",
+        ".claude/worktrees/other/README.md",
+        "evals/runs/job/probe.py",
+        "evals/runs/job/notes.md",
+        "evals/harness/run.py",
+    )
+    monkeypatch.setattr(source_tree, "REPO_ROOT", tmp_path)
+
+    found = {
+        path.relative_to(tmp_path).as_posix()
+        for path in source_files(".", suffixes=(".py", ".md"))
+    }
+
+    assert found == {
+        "src/kept.py",
+        ".claude/skills/audit/SKILL.md",
+        "evals/harness/run.py",
+    }
+
+
+def test_every_directory_gitignore_names_is_skipped():
+    """``.gitignore`` lists what the checkout accumulates, so every walk skips it.
+
+    A directory there and not here is a directory a lint reads in one checkout
+    and not in CI's: a nested worktree, the run archive, a coverage report.
+    """
+    patterns = [
+        line.strip().strip("/")
+        for line in (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+        if line.strip().endswith("/") and not line.startswith("#")
+    ]
+
+    missing = [
+        pattern
+        for pattern in patterns
+        if pattern not in (_SKIPPED_PATHS if "/" in pattern else _SKIPPED)
+    ]
+
+    assert not missing, (
+        f".gitignore names {missing} and tests/source_tree.py walks into it."
+    )

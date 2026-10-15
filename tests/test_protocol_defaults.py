@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
@@ -12,6 +11,7 @@ from analysis_service.protocol_defaults import PROTOCOL_DEFAULTS, with_protocol_
 from analysis_service.system_model import UNKNOWN, Assumption
 from analysis_service.validation import validate
 from tests.factories import valid_model
+from tests.source_tree import REPO_ROOT
 from tests.test_graph import KEYS, FakeContext
 
 FLOW = "flow:entity:customer>process:web-app>login"
@@ -84,7 +84,9 @@ def test_every_protocol_the_extraction_prompt_names_is_a_row_of_the_table():
     table writes it where the model did not. They must name the same protocols."""
     rule = next(
         line
-        for line in Path("prompts/extract.md").read_text(encoding="utf-8").splitlines()
+        for line in (REPO_ROOT / "prompts/extract.md")
+        .read_text(encoding="utf-8")
+        .splitlines()
         if "An encrypted protocol states" in line
     )
     encrypted, authenticating = set(), set()

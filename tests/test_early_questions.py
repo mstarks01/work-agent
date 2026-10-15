@@ -8,7 +8,6 @@ for a row per framework, and against the questions route for a paused job.
 from __future__ import annotations
 
 from collections import Counter
-from pathlib import Path
 
 import pytest
 
@@ -38,6 +37,7 @@ from analysis_service.system_model import (
     attribute_names,
 )
 from tests.factories import valid_model
+from tests.source_tree import REPO_ROOT
 from tests.test_api import auth
 from tests.test_pause import catalog_client, waiting
 
@@ -200,7 +200,7 @@ def test_the_framework_order_changes_no_question():
     assert at_rest.frameworks == ("stride",)
 
 
-CORPUS_MODELS = sorted(Path("evals/corpus").glob("*/model.json"))
+CORPUS_MODELS = sorted((REPO_ROOT / "evals/corpus").glob("*/model.json"))
 
 
 @pytest.mark.parametrize("level", [1, 2, 3])
@@ -593,7 +593,7 @@ class TestTheFrameworkGates:
         assert [q.key for q in after.early] == [q.key for q in stated.early]
 
     def test_a_framework_whose_precondition_is_total_asks_no_gate_question(self):
-        for case in sorted(Path("evals/corpus").iterdir()):
+        for case in sorted((REPO_ROOT / "evals/corpus").iterdir()):
             model = SystemModel.model_validate_json((case / "model.json").read_text())
             asked = early_questions(model, {"stride": {}}, None)
             assert not any(q.gates for q in asked), case.name
