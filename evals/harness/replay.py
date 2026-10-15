@@ -285,14 +285,33 @@ class ExtractionReplay:
 def replay_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionReplay:
     """Score one archived emission under today's scorer and name every loss."""
     score = score_extraction(case, result)
+    malformed = malformed_flow_ids(result.extracted)
     return ExtractionReplay(
         case_id=case.id,
         parsed=result.extracted is not None,
         fates=classify_elements(case.model, result.extracted, score.alignment),
         wrong_facts=score.differing,
         extra=score.alignment.unaligned_produced,
-        issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues),
+        issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues)
+        + tuple(f"malformed-flow-id: {one}" for one in malformed),
     )
+
+
+def malformed_flow_ids(produced: SystemModel | None) -> tuple[str, ...]:
+    """Produced flow IDs no identity rule wrote.
+
+    Such a flow can stand for no blessed flow, so the fates never read it; it
+    stays in ``extra`` and is named in ``issues`` rather than ending the replay.
+    """
+    if produced is None:
+        return ()
+    malformed = []
+    for flow in produced.data_flows:
+        try:
+            flow_id_version(flow.id)
+        except FlowIdError:
+            malformed.append(flow.id)
+    return tuple(malformed)
 
 
 def classify_elements(
@@ -319,7 +338,12 @@ def classify_elements(
     placeholders = placeholder_zones(reference)
     unpaired = tuple(alignment.unaligned_produced)
     flows = {flow.id: flow for flow in reference.data_flows}
-    loose_flows = [flow for flow in produced.data_flows if flow.id in set(unpaired)]
+    malformed = set(malformed_flow_ids(produced))
+    loose_flows = [
+        flow
+        for flow in produced.data_flows
+        if flow.id in set(unpaired) and flow.id not in malformed
+    ]
     loose_nodes = [one for one in unpaired if element_type(one) != DataFlow.id_prefix]
     for one in alignment.unaligned_reference:
         if one in placeholders:
