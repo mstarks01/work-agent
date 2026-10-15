@@ -1354,22 +1354,30 @@ class CapabilityNeed:
 
 
 def open_capability_needs(
-    decisions: Mapping[str, Decision], band: Callable[[str], int]
+    decisions: Mapping[str, Decision],
+    band: Callable[[str], int],
+    known: Mapping[str, CapabilityFact],
 ) -> dict[str, CapabilityNeed]:
     """How many unknown decisions each capability, or a descendant of it, would
     settle, and the band of the most important one.
 
-    ``decisions`` maps each unit to its decision, and ``band`` gives a unit's
-    band. A decision counts once for a capability, however many of its
-    missing keys sit under it.
+    ``decisions`` maps each unit to its decision, ``band`` gives a unit's
+    band, and ``known`` is what the job knows about each capability. A
+    decision counts once for a capability, however many of its missing keys
+    sit under it. An ancestor that ``known`` settles, with what the parent
+    links imply, is never credited: an answer to it would settle nothing.
     """
+    facts = resolve(known)
     units: dict[str, int] = {}
     bands: dict[str, int] = {}
     for unit, decision in decisions.items():
         if not decision.missing:
             continue
         credited = {
-            key for missing in decision.missing for key in (missing, *lineage(missing))
+            key
+            for missing in decision.missing
+            for key in (missing, *lineage(missing))
+            if facts[key].state == "unknown"
         }
         # One read of the unit's band, however many keys it credits.
         order = band(unit)

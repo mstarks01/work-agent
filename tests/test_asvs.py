@@ -1723,3 +1723,24 @@ def test_the_three_interface_kinds_this_rule_reads_are_the_three_that_exist():
         "asvs_precondition refutes on 'every process says non-web' and answers"
         " undecidable for anything else; decide where a new kind belongs"
     )
+
+
+def test_a_capability_a_statement_shows_present_is_never_asked():
+    """A present parent stays off the list while its children are open."""
+    model = valid_model().model_copy(
+        update={
+            "capabilities": [
+                CapabilityStatement(
+                    capability="oauth",
+                    state="present",
+                    source_excerpt="stated by a test",
+                    source_label="description",
+                )
+            ]
+        }
+    )
+
+    asked = ASVS.record.open_capabilities(model, {"level": 2})
+
+    assert "oauth" not in asked
+    assert "oauth-client" in asked

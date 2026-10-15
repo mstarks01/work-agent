@@ -20,8 +20,9 @@ from analysis_service.answer_forms import answer_choices, answer_limit
 from analysis_service.answer_round import question_set
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
+from analysis_service.capabilities import lineage
 from analysis_service.early_questions import early_questions
-from analysis_service.fact_answers import FactAnswer, answered_keys, fact_line
+from analysis_service.fact_answers import FactAnswer, answered_keys, fact_line, key_ref
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.links import (
     LinkAnswer,
@@ -1250,14 +1251,23 @@ class TestTheListRanksByBandAndUnitsThenByWhatAnAnswerSettles:
         assert after.summary.unnecessary == len(moot)
 
     def test_a_yes_lists_the_parts_the_effect_said_it_unlocks(self):
-        """The list can grow, and the effect said by how much."""
+        """The list can grow, and the effect said by how much. A part is found
+        by the table's lineage: once the parent is "yes", the parent is settled,
+        so a part it unlocks waits on no question."""
         asked = _listed()
         parent = next(
             q for q in asked.early if asked.effects[q.key].answers["yes"].unlocks
         )
         after = _listed([FactAnswer(key=parent.key, value="yes")])
         listed = (*after.early, *after.held_back, *after.below_floor)
-        parts = [q for q in listed if q.parent == parent.key]
+        capability = key_ref(parent.key).capability
+        parts = [
+            q
+            for q in listed
+            if q.kind == "capability"
+            and q.parent is None
+            and capability in lineage(key_ref(q.key).capability)
+        ]
         assert len(parts) == asked.effects[parent.key].answers["yes"].unlocks
         assert after.summary.recommended_choices > 0
 

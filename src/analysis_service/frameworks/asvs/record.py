@@ -275,9 +275,10 @@ class DraftRequirementRuling(Claim):
         requirement that reads a child, so the parent's count includes them.
         """
         level = AsvsOptions.model_validate(options).level
-        decisions = applicability_for(level, model.capability_facts())
+        known = model.capability_facts()
+        decisions = applicability_for(level, known)
         return open_capability_needs(
-            decisions, lambda unit: requirement_band(unit).order
+            decisions, lambda unit: requirement_band(unit).order, known
         )
 
     @classmethod
