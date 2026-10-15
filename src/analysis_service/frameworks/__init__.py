@@ -30,7 +30,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from inspect import getattr_static
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal, get_args
@@ -601,17 +600,12 @@ def package_for(name: FrameworkName) -> FrameworkPackage:
 def reads_capabilities(selection: Iterable[FrameworkName]) -> bool:
     """Whether a package in ``selection`` applies by a rule over **Capabilities**.
 
-    **The one reader of that question**, read off each record's own
-    ``applicability`` hook: a package applies by capabilities exactly when its
-    record answers for its units, and a flag beside the hook could say
-    otherwise. A package that inherits the neutral hook reads no capability,
-    so a pass that states capabilities serves it nothing.
+    **The one reader of that question.** It reads each record's
+    :meth:`~analysis_service.claims.Claim.capability_keys`, which a package
+    derives from its own rule table. A package whose rules name no capability
+    reads none, so a pass that states capabilities serves it nothing.
     """
-    neutral = getattr_static(Claim, "applicability")
-    return any(
-        getattr_static(PACKAGES[name].record, "applicability") is not neutral
-        for name in selection
-    )
+    return any(PACKAGES[name].record.capability_keys() for name in selection)
 
 
 def widest_fan_out() -> int:
