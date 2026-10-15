@@ -396,7 +396,8 @@ the reviewer named it (`critic`).
   `question` (one of a fixed list of questions about one element, such as
   "What limits bound the requests the Web App accepts?"), or `subject` (a
   question the reviewer wrote in its own words because no listed question
-  fitted).
+  fitted). A subject is one line, with no double quote and no control or
+  formatting character, and a key that names another subject is refused.
 - `basis` is `evidence` where a finding's own evidence rests on the fact, and
   `critic` where only the reviewer's verdict names it. The `evidence` questions
   come first, and their order does not change when the analysis runs again on

@@ -43,6 +43,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from analysis_service.grounding import normalize
+
 # Closed and load-bearing: each kind names the register rendered around its
 # text. Adding one means editing prompts/extract.md in the same change.
 SourceKind = Literal["description", "transcript", "answers"]
@@ -347,6 +349,22 @@ def plain_name(value: str) -> str:
     if _carries_formatting(value):
         raise ValueError("carries a control or formatting character")
     return value
+
+
+def quotable(value: str) -> bool:
+    """Whether ``value`` can sit between double quotes in one line.
+
+    **The one rule of a quoted phrase.** A line of the answers Source quotes
+    a question, and a lane quotes that line with the submitter's authority. A
+    phrase that holds a line break, a control or formatting character, or a
+    character that the grounding ladder reads as a double quote could close
+    its quote and add a sentence that nobody wrote.
+    """
+    return (
+        '"' not in normalize(value)
+        and not carries_line_break(value)
+        and not _carries_formatting(value)
+    )
 
 
 def clean_system_name(value: str | None) -> str | None:

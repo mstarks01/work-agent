@@ -38,6 +38,7 @@ sources (the maintainer's decision of 2026-09-25 on #1225).
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Collection, Mapping, Sequence
 from functools import lru_cache
 from types import MappingProxyType
@@ -62,9 +63,10 @@ from analysis_service.assertions import (
 )
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import Spelling, UnknownKey, UnknownRef
+from analysis_service.grounding import normalize
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
-from analysis_service.sources import plain_name
+from analysis_service.sources import FORMATTING_CATEGORIES, plain_name, quotable
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -229,6 +231,11 @@ class FactAnswer(BaseModel):
             case ("assertion",):
                 return ("", "", ref.assertion, "", "", "")
             case ("subject",):
+                if not quotable(ref.subject):
+                    raise ValueError(
+                        "a subject is one line, with no double quote and no"
+                        " control or formatting character"
+                    )
                 return ("", "", "", ref.subject, "", "")
             case ("capability",):
                 return ("", "", "", "", "", ref.capability)
@@ -327,8 +334,25 @@ def fact_line(fact: FactAnswer) -> str:
     elif fact.kind == "assertion":
         line = f'The open question {assertion} is answered "{fact.value}".'
     else:
-        line = f'Asked "{subject}", the answer is "{fact.value}".'
+        line = f'Asked "{_phrase(subject)}", the answer is "{fact.value}".'
     return line + detail_note(fact.detail)
+
+
+def _phrase(value: str) -> str:
+    """``value`` as a phrase that its double quotes hold on one line.
+
+    A key admits only a :func:`~analysis_service.sources.quotable` subject,
+    so this returns it unchanged. Any other value folds its line breaks into
+    spaces, drops each control and formatting character, and writes each
+    double quote as a single quote, so the line says what its key says.
+    """
+    if quotable(value):
+        return value
+    return "".join(
+        "'" if '"' in normalize(char) else char
+        for char in " ".join(value.split())
+        if unicodedata.category(char) not in FORMATTING_CATEGORIES
+    )
 
 
 def detail_note(detail: str) -> str:
