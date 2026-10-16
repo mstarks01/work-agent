@@ -1609,17 +1609,10 @@ class TestTheReportPageGetsARowPerUnit:
     """#659 F18: grouped counts say how much, and never which or on what grounds."""
 
     def _asvs_report(self):
-        import json
-        from pathlib import Path as _Path
+        """A sound ASVS report, built the way ``assemble`` builds one."""
+        from tests.test_structural_readers import sound_report
 
-        from analysis_service.report import Report
-
-        archive = sorted(_Path("evals/runs").rglob("*.report.json"))
-        for path in archive:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-            if any(b["framework"] == "asvs" for b in raw.get("analyses", ())):
-                return Report.model_validate(raw)
-        pytest.skip("no archived ASVS report to read")
+        return sound_report("asvs")
 
     def test_every_unit_carries_the_standards_own_words(self):
         from webapp.main import unit_rows

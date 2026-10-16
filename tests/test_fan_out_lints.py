@@ -29,8 +29,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.frameworks import PACKAGES, widest_fan_out
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from tests.source_tree import REPO_ROOT, source_files
 
 #: Where a fan-out claim can be made, and the suffixes worth reading.
 SEARCHED = ("src", "config", "evals", "docs")
@@ -63,13 +62,16 @@ DECLARES = re.compile(
 def _searched_files() -> list[Path]:
     return [
         path
-        for root in SEARCHED
-        for path in sorted((REPO_ROOT / root).rglob("*"))
-        if path.suffix in SUFFIXES
-        and path.is_file()
-        and not any(f"/frameworks/{name}/" in path.as_posix() for name in PACKAGES)
-        and "/docs/adr/" not in path.as_posix()
+        for path in source_files(*SEARCHED, suffixes=SUFFIXES)
+        if not _exempt(f"/{path.relative_to(REPO_ROOT).as_posix()}")
     ]
+
+
+def _exempt(where: str) -> bool:
+    """A package's own files state its own count, and an ADR records a decision."""
+    return "/docs/adr/" in where or any(
+        f"/frameworks/{name}/" in where for name in PACKAGES
+    )
 
 
 def test_there_are_files_to_search():

@@ -2,14 +2,29 @@
 
 import pytest
 
+from analysis_service.sources import MAX_SYSTEM_NAME_CHARS
 from tests import test_webapp_questions as web
 from tests.test_webapp import BREAKOUT, SAME_ORIGIN, posted
 
 tiers = web.tiers
 
 
-@pytest.mark.parametrize("name", ["", " " * 3, "x" * 121, None, [], 42])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "x" * (MAX_SYSTEM_NAME_CHARS + 1),
+        "Orders\nforged line",
+        "Orders\u202egnirdrO",
+        [],
+        42,
+    ],
+)
 def test_invalid_names_do_not_claim_a_run(tiers, name):
+    """A name the shared rule refuses, or one that is not text, starts nothing.
+
+    A blank or absent name is not here: the rule reads it as no name, and
+    ``tests/test_system_name_readers.py`` holds that against the other doors.
+    """
     with web.client_for(tiers, web.PausingRunner()) as client:
         response = client.post(
             "/analyze", json=posted("System") | {"name": name}, headers=SAME_ORIGIN

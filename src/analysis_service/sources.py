@@ -335,10 +335,10 @@ def plain_name(value: str) -> str:
 def clean_system_name(value: str | None) -> str | None:
     """The one rule for a caller-supplied system name, at every entry point.
 
-    The HTTP route and the in-process engine both ask this, so a name one
-    accepts the other accepts, and a name one refuses the other refuses.
-    ``tests/test_system_name_readers.py`` holds the two doors against each
-    other rather than each against an expectation of its own.
+    The HTTP route, the in-process engine and the web app's form route all ask
+    this, so a name one accepts the others accept, and a name one refuses the
+    others refuse. ``tests/test_system_name_readers.py`` holds the doors
+    against each other rather than each against an expectation of its own.
 
     ``None`` is the answer for a name that is absent or blank. Both mean the
     caller named no system, so both fall through to the report's own default

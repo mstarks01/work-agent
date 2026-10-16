@@ -3,8 +3,6 @@ service, and tells the two policies apart."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from analysis_service.claims import UnknownRef
@@ -21,12 +19,15 @@ from evals.harness.early_answerers import (
 )
 from evals.harness.early_policies import Selection
 from tests.factories import valid_model
+from tests.source_tree import REPO_ROOT
 
 LEVEL_2: Selection = {"asvs": {"level": 2}}
 BOTH = {"stride": {}, "asvs": {"level": 2}}
 
 BASELINE = next(
-    Path("evals/baselines").glob("6bff717-*/*.reports/01-payments-checkout.report.json")
+    (REPO_ROOT / "evals/baselines").glob(
+        "6bff717-*/*.reports/01-payments-checkout.report.json"
+    )
 )
 
 

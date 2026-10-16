@@ -5,11 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from pathlib import Path
 
 from evals.harness.calibration import load_pairs
+from tests.source_tree import REPO_ROOT
 
-REVIEW_PATH = Path("evals/calibration_labels/reviews/02.json")
+REVIEW_PATH = REPO_ROOT / "evals/calibration_labels/reviews/02.json"
 
 
 def _text_digest(pair) -> str:

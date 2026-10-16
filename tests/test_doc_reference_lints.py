@@ -72,14 +72,9 @@ from pathlib import Path
 
 import pytest
 
-from tests.source_tree import FROZEN_PROSE, source_files
+from tests.source_tree import FROZEN_PROSE, held_files, source_files
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
-#: Directories that hold no prose of this repository's own.
-SKIP_DIRS = frozenset(
-    {".venv", ".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", "__pycache__"}
-)
 
 #: A backticked repository path. Anchored on a known extension rather than on
 #: a slash, so a bare ``BLESSING.md`` is checked and an ordinary hyphenated
@@ -153,30 +148,22 @@ def _sources() -> list[Path]:
     the same backticks mark a reference in both. Matching on backticks is what
     keeps ordinary code out: a path in an expression carries none.
     """
-    found = []
-    for path in REPO_ROOT.rglob("*"):
-        if path.suffix not in {".md", ".py"} or not path.is_file():
-            continue
-        if SKIP_DIRS.intersection(path.parts):
-            continue
-        if _relative(path).startswith(FROZEN_PROSE):
-            continue
-        found.append(path)
-    return sorted(found)
+    return [
+        path
+        for path in source_files(".", suffixes=(".md", ".py"))
+        if not _relative(path).startswith(FROZEN_PROSE)
+    ]
 
 
 SOURCES = _sources()
 #: Every file in the tree, as a repository-relative posix path. Built once,
-#: because the suffix reading below is a scan.
-TREE: frozenset[str] = frozenset(
-    _relative(path)
-    for path in REPO_ROOT.rglob("*")
-    if path.is_file() and not SKIP_DIRS.intersection(path.parts)
-)
+#: because the suffix reading below is a scan. It is the only answer to "does
+#: this file exist": the disk also holds the files the walk skips.
+TREE: frozenset[str] = frozenset(_relative(path) for path in held_files("."))
 
 
 def _resolves(source: Path, ref: str) -> bool:
-    """Whether ``ref``, as written in ``source``, names a file that exists.
+    """Whether ``ref``, as written in ``source``, names a file in :data:`TREE`.
 
     Four readings, because the prose uses all four: a path from the repository
     root, the same under ``src/`` where the package lives, a path relative to
@@ -187,11 +174,9 @@ def _resolves(source: Path, ref: str) -> bool:
     mention would be a style rule wearing a lint's clothes, and this module
     decides existence rather than house style.
     """
-    if (REPO_ROOT / ref).exists() or (REPO_ROOT / "src" / ref).exists():
-        return True
-    if Path(os.path.normpath(source.parent / ref)).exists():
-        return True
-    return any(path.endswith(f"/{ref}") for path in TREE)
+    beside = os.path.relpath(os.path.normpath(source.parent / ref), REPO_ROOT)
+    readings = {os.path.normpath(ref), os.path.normpath(f"src/{ref}"), beside}
+    return bool(readings & TREE) or any(path.endswith(f"/{ref}") for path in TREE)
 
 
 def _resolves_symbol(ref: str) -> bool:
@@ -430,3 +415,22 @@ def test_the_scan_actually_finds_references():
     assert symbols > 30, (
         f"only {symbols} symbol references found; the pattern is broken"
     )
+
+
+def test_a_file_the_walk_skips_resolves_nothing(tmp_path, monkeypatch):
+    """A name resolves against the tree the walk reads, never against the disk.
+
+    The run archive and a nested worktree hold files the repository does not,
+    so a document naming one of them passes here and fails in CI.
+    """
+    archived = tmp_path / "evals" / "runs" / "job" / "only-here.json"
+    archived.parent.mkdir(parents=True)
+    archived.touch()
+    monkeypatch.setattr(f"{__name__}.REPO_ROOT", tmp_path)
+    monkeypatch.setattr(f"{__name__}.TREE", frozenset({"docs/guide.md"}))
+    guide = tmp_path / "docs" / "guide.md"
+
+    assert not _resolves(guide, "evals/runs/job/only-here.json")
+    assert not _resolves(guide, "only-here.json")
+    assert _resolves(guide, "guide.md")
+    assert _resolves(guide, "docs/guide.md")

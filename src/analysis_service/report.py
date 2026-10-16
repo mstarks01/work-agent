@@ -685,7 +685,8 @@ def _stored_system_name(value: str) -> str:
     """One stored system name, checked against the rule that wrote it.
 
     :func:`~analysis_service.sources.clean_system_name` is that rule and this
-    is its third caller, beside the HTTP route and the in-process engine. A
+    is its fourth caller, beside the HTTP route, the in-process engine and the
+    web app's form route. A
     stored name has to be a name that rule *produces*, so the check is equality
     with its answer rather than a repeat of the checks inside it.
 
@@ -711,7 +712,7 @@ class InputRef(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    #: Already clean by the time a report is built — both entry points run
+    #: Already clean by the time a report is built — every entry point runs
     #: :func:`~analysis_service.sources.clean_system_name` before a job exists.
     #: Checked again here because a report is also *read back*: an artifact or
     #: a saved report is deserialized into this model, and a stored name is
