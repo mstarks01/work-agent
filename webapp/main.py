@@ -181,13 +181,13 @@ from analysis_service.job_answers import (
     Withheld,
 )
 from analysis_service.jobs import (
-    TERMINAL_STATUSES,
     Envelope,
     InMemoryJobStore,
     JobRecord,
     JobStatus,
     JobStore,
     PipelineRunner,
+    ended,
     event_frames,
     execute_job,
     parent_of,
@@ -416,9 +416,7 @@ class Workspace:
         removable = [
             job
             for job in held
-            if job.status in TERMINAL_STATUSES
-            and job.id != answering
-            and not await self.waiting(job)
+            if ended(job) and job.id != answering and not await self.waiting(job)
         ]
         excess = len(held) - limit + 1
         if excess > len(removable):

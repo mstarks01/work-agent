@@ -622,6 +622,9 @@ class UnreadableRecord(BaseModel):
     updated_at: datetime
     #: ``None`` where the stored status is not a :data:`JobStatus`.
     status: JobStatus | None
+    #: The job's charge, which the token budgets read (ADR 0095).
+    reserved_tokens: int
+    measured_tokens: int | None
 
 
 #: What an envelope read returns: the envelope, or the record it cannot parse.
@@ -637,6 +640,17 @@ def readable(record: Envelope) -> TypeGuard[JobRecord]:
     them with :class:`UnreadableSchema`.
     """
     return isinstance(record, JobRecord) and same_schema(record.schema_version)
+
+
+def ended(record: Envelope) -> bool:
+    """Whether the job of ``record`` has ended: its status is terminal, or
+    :func:`readable` refuses it, whatever its stored status (ADR 0095).
+
+    **The one reader of "has this job ended"**. Admission counts a job in
+    flight only where it has not ended, and a delete and the retention sweep
+    take only a job that has. No stored status changes.
+    """
+    return not readable(record) or record.status in TERMINAL_STATUSES
 
 
 # What one admission attempt did.
@@ -829,8 +843,8 @@ class JobStore(Protocol):
         """Delete the owned job's content and keep its usage row (ADR 0066).
 
         The number of objects the delete removed, or ``None`` where nothing
-        changed: the job is missing, another owner's, or not in a terminal
-        status. Where ``updated_before`` is set, a job whose last update is
+        changed: the job is missing, another owner's, or not :func:`ended`.
+        Where ``updated_before`` is set, a job whose last update is
         not before it also answers ``None``. The store checks it in the step
         that deletes, so a job that changed after the retention sweep listed
         it stays.
@@ -838,9 +852,9 @@ class JobStore(Protocol):
         ...
 
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
-        """The ID and the owner ID of each terminal job last updated before
-        ``before``, oldest update first. The retention sweep deletes these
-        (#1530)."""
+        """The ID and the owner ID of each job that has :func:`ended` and was
+        last updated before ``before``, oldest update first. The retention
+        sweep deletes these (#1530)."""
         ...
 
     async def sweep_orphans(self, before: datetime) -> int:
@@ -917,9 +931,16 @@ def _parent_id(row: JobRecord | UsageRow) -> str | None:
     return parent_of(row) if isinstance(row, JobRecord) else row.parent_id
 
 
+def _holds_a_slot(job: Envelope | UsageRow) -> bool:
+    """Whether ``job`` holds one of its owner's in-flight slots: it has not
+    :func:`ended`. A usage row holds none, because a store deletes only a job
+    that has ended."""
+    return not isinstance(job, UsageRow) and not ended(job)
+
+
 def check_bounds(
     record: JobRecord,
-    held: Iterable[JobRecord | UsageRow],
+    held: Iterable[Envelope | UsageRow],
     *,
     ceiling: int,
     budget: BudgetPolicy,
@@ -931,7 +952,9 @@ def check_bounds(
     parent, and inserts the record only where this admits it. ``held`` is
     every job the store counts: its records and its usage rows. A store can
     leave out a terminal job that started before the window, because no bound
-    counts it.
+    counts it. It passes each job of the record's owner that its stored
+    status leaves in flight as an envelope, so :func:`ended` reads it, and it
+    can pass every other job as a usage row.
 
     **The bounds run cheapest-first, and the order is the answer a caller
     gets.** A submission over several of them hears about the concurrency
@@ -944,7 +967,7 @@ def check_bounds(
     held = list(held)
     mine = [job for job in held if job.owner_id == record.owner_id]
 
-    active = sum(1 for job in mine if job.status not in TERMINAL_STATUSES)
+    active = sum(1 for job in mine if _holds_a_slot(job))
     if active >= ceiling:
         return Admission(outcome="at_ceiling", active=active)
 
@@ -1343,16 +1366,16 @@ class InMemoryJobStore:
     ) -> int | None:
         """Remove the owned job's content, and keep its usage row (ADR 0066).
 
-        Only a job in a terminal status can be deleted: a job in flight holds
-        a slot its run releases. ``None`` where the job is missing, not the
-        owner's, not terminal or not last updated before ``updated_before``,
+        Only a job that has :func:`ended` can be deleted: a job in flight
+        holds a slot its run releases. ``None`` where the job is missing, not
+        the owner's, not ended or not last updated before ``updated_before``,
         and nothing changes. Else ``0``: this store holds no objects.
         """
         record = self._records.get(job_id)
         if (
             record is None
             or record.owner_id != owner_id
-            or record.status not in TERMINAL_STATUSES
+            or not ended(record)
             or (updated_before is not None and record.updated_at >= updated_before)
         ):
             return None
@@ -1372,7 +1395,7 @@ class InMemoryJobStore:
         return [
             (record.id, record.owner_id)
             for record in sorted(self._records.values(), key=_by_update)
-            if record.status in TERMINAL_STATUSES and record.updated_at < before
+            if ended(record) and record.updated_at < before
         ]
 
     async def sweep_orphans(self, before: datetime) -> int:

@@ -185,7 +185,7 @@ credential case, which is the common one at this point.
 - **One run at a time.** A second submission while one is running is refused with
   a message rather than queued.
 - **At most 20 runs.** The app holds at most 20 jobs, and it deletes the
-  oldest finished job first. A
+  oldest finished job first. A job the app cannot read has finished. A
   job that waits for your answers is never deleted. When every held job waits
   for answers, a new submission is refused until you answer or continue one.
   A refused submission deletes nothing.

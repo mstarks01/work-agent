@@ -1142,6 +1142,60 @@ class TestTheRetentionSweep:
         )
 
 
+def unreadable(store, status: JobStatus, days_ago: int = 0) -> str:
+    """The ID of a job in ``status`` that ``store`` holds under another schema
+    version, last updated ``days_ago`` days ago. It is unreadable on every
+    store, so it has ended (ADR 0095)."""
+    record = new_record()
+    if status == "running":
+        record.transition("running")
+    record.schema_version = "2.10"
+    record.updated_at = datetime.now(UTC) - timedelta(days=days_ago, minutes=1)
+    asyncio.run(admit(store, record))
+    return record.id
+
+
+IN_FLIGHT: tuple[JobStatus, ...] = ("queued", "running")
+
+
+class TestAnUnreadableJobHasEnded:
+    """An unreadable job has ended, whatever its stored status, by the
+    maintainer's ruling of 2026-10-16 (ADR 0095)."""
+
+    @pytest.mark.parametrize("status", IN_FLIGHT)
+    def test_it_holds_no_slot(self, store, status):
+        unreadable(store, status)
+        assert reserve(store, new_record(), ceiling=1).outcome == "admitted"
+
+    @pytest.mark.parametrize("status", IN_FLIGHT)
+    def test_its_owner_deletes_it_and_its_usage_row_holds_no_slot(self, store, status):
+        job = unreadable(store, status)
+        assert asyncio.run(store.delete(job, "alice")) is not None
+        assert asyncio.run(store.owned(job, "alice")) is None
+        assert reserve(store, new_record(), ceiling=1).outcome == "admitted"
+
+    @pytest.mark.parametrize("status", IN_FLIGHT)
+    def test_another_owner_cannot_delete_it(self, store, status):
+        job = unreadable(store, status)
+        assert asyncio.run(store.delete(job, "mallory")) is None
+        assert asyncio.run(store.owned(job, "alice")) is not None
+
+    @pytest.mark.parametrize("status", IN_FLIGHT)
+    def test_the_retention_sweep_removes_it(self, store, status):
+        old = unreadable(store, status, days_ago=30)
+        recent = unreadable(store, status, days_ago=29)
+        asyncio.run(store_backends.expire_jobs(store, 30))
+        assert asyncio.run(store.owned(old, "alice")) is None
+        assert asyncio.run(store.owned(recent, "alice")) is not None
+
+    @pytest.mark.parametrize("status", IN_FLIGHT)
+    def test_no_stored_status_changes(self, store, status):
+        job = unreadable(store, status)
+        reserve(store, new_record(), ceiling=1)
+        asyncio.run(store.expired(datetime.now(UTC)))
+        assert asyncio.run(store.owned(job, "alice")).status == status
+
+
 def later() -> datetime:
     """A cutoff after now, so that the orphan sweep counts each object as old."""
     return datetime.now(UTC) + timedelta(minutes=1)
@@ -1662,6 +1716,8 @@ class TestTheSchemaVersion:
             created_at=record.created_at,
             updated_at=record.updated_at,
             status=None,
+            reserved_tokens=0,
+            measured_tokens=None,
         )
         assert readable(record)
         assert not readable(record.model_copy(update={"schema_version": "2.10"}))
