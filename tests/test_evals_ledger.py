@@ -16,6 +16,7 @@ import pytest
 
 from evals.harness.fingerprint import Components, fingerprint, version_for
 from evals.harness.ledger import (
+    DEFAULT_LEDGER_PATH,
     REASON_GLOSS,
     REASONS,
     STYLE_REASONS,
@@ -886,3 +887,21 @@ def test_a_rekey_preview_names_a_rule_that_splits_a_finding(tmp_path, capsys):
 
     command_rekey(argparse.Namespace(ledger=str(path), yes=False))
     assert "POOL MOVED: 2 findings before, 1 after" in capsys.readouterr().out
+
+
+def test_the_pool_groups_each_archived_vote_where_verdicts_for_finds_it():
+    """``pool_members`` groups a vote under a finding through ``identity_of``,
+    and ``verdicts_for`` is the one reader of which vote answers a finding.
+    ``distinct_mechanisms`` is not transitive, so the two can part where one
+    voter holds two live votes under one key; the archived ledger is put to
+    both."""
+    ledger = load(DEFAULT_LEDGER_PATH)
+    live = ledger.current()
+
+    for (value, mechanism), held in ledger.pool_members().items():
+        answering = {
+            vote.components
+            for vote in ledger.verdicts_for(value, mechanism, live).values()
+            if vote.joins_the_pool
+        }
+        assert answering == held, value

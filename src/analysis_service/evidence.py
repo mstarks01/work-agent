@@ -312,10 +312,12 @@ def prepared_view(
     """The model a job's lanes read, what moved it, and the evidence it offers.
 
     **The one reader of "what does analysis preparation make of this catalog".**
-    ``prepare`` calls it, and so does every instrument that asks what a
-    catalog does to a job — ``run.py falsify``'s production path and the
-    reassessment after a review — so a guarantee tested through one is the
-    guarantee the other runs. The projection is applied first because a zone
+    ``prepare`` calls it, the question readers take their model from it
+    through :func:`~analysis_service.open_facts.prepared_model`, and so does
+    every instrument that asks what a catalog does to a job — ``run.py
+    falsify``'s production path, the reassessment after a review, the
+    replay's offered count and the population table — so a guarantee tested
+    through one is the guarantee the other runs. The projection is applied first because a zone
     predicate moves ``trust_zone``, and the evidence is derived from the model
     it produced.
     """
@@ -517,7 +519,8 @@ def _one_ground_issue(
 def _cell(value: str) -> str:
     """``value`` as one table cell: its lines joined by a space, and ``|`` escaped.
 
-    **The one writer of a cell in the three tables below.** A gloss carries
+    **The one writer of a cell in the two tables below**, the evidence catalog
+    and the element roster. A gloss carries
     words a model or a submitter wrote, and a line break or a ``|`` there ended
     the row and let the rest read as a heading or a fence of its own. Every
     terminator ``str.splitlines`` splits on is joined, U+2028 included. A cell
@@ -802,9 +805,11 @@ def _grounds_of(
     Quotes first, then evidence, then absences, and the order is fixed rather
     than incidental: :class:`~analysis_service.claims.UnverifiedGround` marks a
     quote by its *index* into the finished list, so a reader following a mark
-    back to the quote it is about depends on this being the one place the list
-    is built. Quotes lead because they are the submitter's own words, which is
-    what a reader looks for first.
+    back to the quote it is about depends on this being the one place the order
+    is set. The fan-in's scope check later removes the grounds about none of a
+    claim's elements, keeping the order of the rest, and it runs before the
+    quote check takes any mark. Quotes lead because they are the submitter's
+    own words, which is what a reader looks for first.
 
     A ref is stripped of surrounding whitespace before lookup — which spelling
     of a name arrived is mechanical — and matched exactly thereafter.

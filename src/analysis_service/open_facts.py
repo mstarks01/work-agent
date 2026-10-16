@@ -27,10 +27,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from analysis_service.analysis import control_state
-from analysis_service.assertions import AssertionCatalog, apply_projection
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
-from analysis_service.evidence import evidence_catalog
+from analysis_service.evidence import evidence_catalog, prepared_view
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.system_model import ZONE_ATTRIBUTE, SystemModel
 
@@ -239,4 +239,4 @@ def prepared_model(model: SystemModel, catalog: AssertionCatalog | None) -> Syst
     report's model is projected already, and projecting it again changes
     nothing.
     """
-    return model if catalog is None else apply_projection(model, catalog)[0]
+    return model if catalog is None else prepared_view(model, catalog)[0]

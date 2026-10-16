@@ -60,6 +60,7 @@ from analysis_service.answer_state import (
     MAX_SKIPS,
     AlreadyResumed,
     Answers,
+    Revision,
     SkipKey,
     SourcesOverLimit,
     StaleRevision,
@@ -107,7 +108,6 @@ from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
     NoCatalogError,
-    with_link_answers,
 )
 from analysis_service.parsing import ascii_int
 from analysis_service.principals import Identity
@@ -392,7 +392,7 @@ class AnswersSubmission(BaseModel):
     save: bool = Field(default=False, strict=True)
     skip: list[SkipKey] = Field(default_factory=list, max_length=MAX_SKIPS)
     presented: list[UnknownKey] = Field(default_factory=list, max_length=MAX_HELD_FACTS)
-    revision: int | None = Field(default=None, ge=0, strict=True)
+    revision: Revision | None = None
 
 
 class AmendmentSubmission(BaseModel):
@@ -403,7 +403,7 @@ class AmendmentSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     text: str = Field(min_length=1)
-    revision: int = Field(ge=0, strict=True)
+    revision: Revision
 
 
 class CorrectionsSubmission(BaseModel):
@@ -414,7 +414,7 @@ class CorrectionsSubmission(BaseModel):
 
     facts: list[FactAnswer] = Field(min_length=1, max_length=MAX_FACT_ANSWERS)
     #: The revision the questions were read with (ADR 0090).
-    revision: int = Field(ge=0, strict=True)
+    revision: Revision
 
 
 class NodeCompletion(BaseModel):
@@ -919,20 +919,9 @@ def create_app(
         selection = _resolve_selection(
             request.app.state.frameworks, submission.frameworks
         )
-        if submission.links and not request.app.state.carries_catalog:
-            raise HTTPException(
-                status_code=400,
-                detail="this deployment builds no assertion catalog, so nothing"
-                " would read a link answer",
-            )
-        # Only onto a job that has sources of its own: answers alone would
-        # carry the body past the ladder's empty-sources rung.
+        answers = _answers(request)
         try:
-            sources = (
-                with_link_answers(submission.sources, submission.links)
-                if submission.sources
-                else list(submission.sources)
-            )
+            sources = answers.submitted_sources(submission.sources, submission.links)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         breach = request.app.state.limits.breach(sources)
@@ -947,7 +936,6 @@ def create_app(
         # race this seam exists to close. What the caller loses is that a
         # submission which breaches a rung *and* sits on the ceiling hears
         # about the rung; both answers refuse it, and neither runs a model.
-        answers = _answers(request)
         submitter = await answers.submitter(identity)
         carried = await answers.carried_from(
             submission.answers_from, submitter.owner_id, asks=submission.questions

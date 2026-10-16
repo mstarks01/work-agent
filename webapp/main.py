@@ -142,6 +142,7 @@ from analysis_service.answer_state import (
     Answers,
     AnswerState,
     QuestionSet,
+    Revision,
     SourcesOverLimit,
     StaleRevision,
 )
@@ -157,6 +158,7 @@ from analysis_service.fact_answers import (
     FactAnswer,
     SkipKey,
     answer_facets,
+    attribute_place,
     fact_label,
     merged_facts,
 )
@@ -737,7 +739,7 @@ def _provenance_payload(
     return {
         "answers_label": ANSWERS_LABEL,
         "answered_attributes": [
-            list(answer.key[:2])
+            list(attribute_place(answer.key))
             for answer in answered
             if answer.kind == "attribute" and answer.known
         ],
@@ -1274,15 +1276,16 @@ def create_app(
     return app
 
 
-def _revision(value: object) -> int:
-    """The revision a page sent, or :class:`TypeError`.
+_REVISION: TypeAdapter[int] = TypeAdapter(Revision)
 
-    **The one reader of a posted revision.** JSON ``true`` reads as an ``int``
-    in Python, so a boolean is refused by name.
+
+def _revision(value: object) -> int:
+    """The revision a page sent, or :class:`ValidationError`.
+
+    Read by :data:`~analysis_service.answer_state.Revision`, the type the HTTP
+    models declare, so the page and the route refuse the same values.
     """
-    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-        raise TypeError("'revision' is a whole number")
-    return value
+    return _REVISION.validate_python(value)
 
 
 def _selection(

@@ -77,6 +77,8 @@ class AppliedPair:
 
     ``expected`` is the whole of the disagreement: ``False`` is an over-applied
     requirement, which is the side of the question this view exists for.
+    ``negative`` marks one the case labels ``not-applicable``, which is a
+    judged disagreement rather than an unjudged one.
     """
 
     requirement: str
@@ -94,6 +96,8 @@ class AppliedPair:
     deferred: bool
     #: Whether the case marks this requirement ``must-find``.
     must_find: bool
+    #: Whether the case labels this requirement ``not-applicable``.
+    negative: bool = False
 
 
 @dataclass(frozen=True)
@@ -129,8 +133,17 @@ class CasePairing:
 
     @property
     def over_applied(self) -> tuple[AppliedPair, ...]:
-        """The requirements the run applied and the case did not expect."""
-        return tuple(pair for pair in self.applied_pairs if not pair.expected)
+        """The requirements the run applied and the case did not list."""
+        return tuple(
+            pair
+            for pair in self.applied_pairs
+            if not pair.expected and not pair.negative
+        )
+
+    @property
+    def negatives_applied(self) -> tuple[AppliedPair, ...]:
+        """The requirements the run applied and the case says do not apply."""
+        return tuple(pair for pair in self.applied_pairs if pair.negative)
 
     @property
     def agreed_pairs(self) -> tuple[AppliedPair, ...]:
@@ -167,6 +180,15 @@ class CasePairing:
                     "argument": pair.argument,
                 }
                 for pair in self.over_applied
+            ],
+            "negatives_applied": [
+                {
+                    "requirement": pair.requirement,
+                    "lane": pair.lane,
+                    "verdict": pair.verdict,
+                    "argument": pair.argument,
+                }
+                for pair in self.negatives_applied
             ],
             "deferred": [
                 {
@@ -245,7 +267,8 @@ def pair_case(
     deferrals = _deferrals(block)
 
     applied_pairs = []
-    for requirement in sorted(set(score.matched) | set(score.over_applied)):
+    applied = (*score.matched, *score.over_applied, *score.negatives_applied)
+    for requirement in sorted(applied):
         entry = catalog.get(requirement)
         claim = claims.get(requirement)
         if entry is None:
@@ -263,11 +286,12 @@ def pair_case(
                 argument=(
                     claim.description if claim else deferrals.get(requirement, "")
                 ),
-                expected=requirement in references,
+                expected=requirement in score.expected,
                 deferred=requirement in score.matched_by_deferral,
                 must_find=bool(
                     (reference := references.get(requirement)) and reference.must_find
                 ),
+                negative=requirement in score.negatives,
             )
         )
 
@@ -293,7 +317,7 @@ def pair_case(
         case=case.id,
         level=level,
         expected=len(score.expected),
-        applied=len(score.matched) + len(score.over_applied),
+        applied=len(applied),
         agreed=len(score.matched),
         applied_pairs=tuple(applied_pairs),
         missed_pairs=tuple(missed_pairs),
@@ -314,6 +338,9 @@ def render(pairing: CasePairing) -> None:
     )
     print(f"\nover-applied ({len(pairing.over_applied)}):")
     for applied in pairing.over_applied:
+        print(f"  {applied.requirement:<10} {applied.lane:<34} {applied.verdict}")
+    print(f"\nruled out by the case ({len(pairing.negatives_applied)}):")
+    for applied in pairing.negatives_applied:
         print(f"  {applied.requirement:<10} {applied.lane:<34} {applied.verdict}")
     print(f"\nexpected, answered only by a deferral ({len(pairing.deferred_pairs)}):")
     for deferred in pairing.deferred_pairs:
@@ -426,6 +453,11 @@ def render_html(pairing: CasePairing, source: str) -> str:
             _section(
                 f"Over-applied — {len(pairing.over_applied)} the case did not expect",
                 _applied_html(pairing.over_applied),
+            ),
+            _section(
+                f"Ruled out — {len(pairing.negatives_applied)} the case says do"
+                " not apply",
+                _applied_html(pairing.negatives_applied),
             ),
             _section(
                 f"Missed — {len(pairing.missed_pairs)} the case expected",

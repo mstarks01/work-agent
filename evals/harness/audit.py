@@ -1365,7 +1365,7 @@ def admit(
             raise ExperimentError(
                 f"{where}: holdout_reads names {case!r}, which is not a holdout case"
             )
-        if case in exhausted(ledger):
+        if not held_out(case, flagged=True, ledger=ledger):
             earlier = exposure(ledger)[case]
             raise ExperimentError(
                 f"{where}: {case} was read by {', '.join(earlier)}, which is"

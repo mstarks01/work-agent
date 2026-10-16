@@ -187,9 +187,9 @@ def endpoint_subset(
     """Does one claim's **Element** set contain the other's, once resolved?
 
     The loosest element rule that is still usable, and the frontier in
-    ``tests/test_evals_identity.py`` is what says so: 14 false splits over the
-    200 labelled pairs against ``equality``'s 89, at the price of 23 false
-    merges over 287 reference pairs against ``equality``'s 1.
+    ``tests/test_evals_identity.py`` is what says so. The frontier table in
+    ``docs/agents/claim-identity.md`` carries its figures beside
+    ``equality``'s.
 
     Subset rather than equality because the two sides are written at different
     grain — one names the flow and the process it ends at, the other names only

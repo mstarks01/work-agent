@@ -20,6 +20,7 @@ from analysis_service.model_tiers import (
     TierSelection,
     env_vars_for,
     load_model_tiers,
+    tiers_in_use,
     validate_model_string,
 )
 from analysis_service.vendors import (
@@ -734,6 +735,25 @@ class TestDeclaredCredentialMode:
                 ),
                 env={},
             )
+
+    @pytest.mark.parametrize(
+        "placed",
+        [
+            {"extract": "base", "repair": "base"},
+            {"extract": "review"},
+            dict.fromkeys(LLM_NODES, "base"),
+        ],
+    )
+    def test_the_raw_reader_names_the_tiers_the_config_binds(self, config_path, placed):
+        """``tiers_in_use`` reads the node map before validation, and
+        ``bound_tiers`` reads it after, so each node map is put to both."""
+        nodes = {node: placed.get(node, "strong") for node in LLM_NODES}
+
+        tiers = load_model_tiers(
+            config_path(config_toml(review_vendor=VENDOR, nodes=nodes)), env={}
+        )
+
+        assert tiers_in_use(nodes) == set(tiers.bound_tiers)
 
     def test_the_environment_wins_over_the_file(self, config_path):
         """One rule, and the environment is the later reader of it.

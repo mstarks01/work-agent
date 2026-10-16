@@ -51,6 +51,7 @@ from analysis_service.claims import (
 )
 from analysis_service.errors import ConfigError
 from analysis_service.markdown_loader import _inside
+from analysis_service.model_tiers import FRAMEWORK_ROLES, tier_key
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -519,11 +520,13 @@ def lane_of(claim: Claim) -> str | None:
     """The lane a claim was reached in, read from the field its package stamps.
 
     ``None`` for a package whose claims carry no lane field. The one reader for
-    the seams that key a claim by its lane: the fan-in's settled drop and
-    :func:`~analysis_service.critic.finding_key`. The scorer keys a claim's
-    identity by its lane too, and the corpus records one action at one place in
-    two lanes as two findings, so a check that ignored the lane deleted what the
-    reference set counts.
+    the seams that key a claim by its lane: the fan-in's settled drop,
+    :func:`~analysis_service.critic.finding_key` and the grounds count in
+    ``evals/harness/grounds.py``. A reference record carries its lane in the
+    same declared field, which ``evals/verify_corpus.py`` reads. The scorer
+    keys a claim's identity by its lane too, and the corpus records one action
+    at one place in two lanes as two findings, so a check that ignored the lane
+    deleted what the reference set counts.
     """
     field = PACKAGES[claim.framework].id_rule.lane_field
     return getattr(claim, field) if field else None
@@ -1086,7 +1089,7 @@ def validate_packages(
         validate_package(package, root / name)
         missing = [
             key
-            for key in (f"analyze/{name}", f"critic/{name}", f"recritic/{name}")
+            for key in (tier_key(role, name) for role in FRAMEWORK_ROLES)
             if key not in tiers
         ]
         if missing:

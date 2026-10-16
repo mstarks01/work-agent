@@ -1,9 +1,10 @@
 """Reading a value out of a string or a file this service does not control.
 
-One rule, one reader. Three call sites parse an integer out of somebody else's
-string — an HTTP header a client sets, and a version segment read back off a
-stored fingerprint — and each of them has to answer the same question first:
-does this string spell a number ``int`` will accept?
+One rule, one reader. Four call sites parse an integer out of somebody else's
+string — two HTTP headers a client sets, a retention setting an operator sets,
+and a version segment read back off a stored digest or fingerprint — and each
+of them has to answer the same question first: does this string spell a number
+``int`` will accept?
 
 ``str.isdigit`` is not that question, and never was. It passes ``"²"``, which
 ``int`` refuses with a ``ValueError``, and it passes fullwidth ``"１００"``,

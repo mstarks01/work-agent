@@ -194,10 +194,23 @@ def _digest(prefix: str, version: int, parts: Iterable[str]) -> str:
     )
 
 
-#: How long a version segment may be, for the reason ``fingerprint`` bounds its
-#: own: ``int`` raises on a string past 4300 digits, so an unbounded read
+#: How long a version segment may be. Two digits is past every version a
+#: digest or a fingerprint has held, and the bound is what keeps a refusal a
+#: refusal: ``int`` raises on a string past 4300 digits, so an unbounded read
 #: answered "this is not a digest" with a traceback.
 _VERSION_DIGITS = 2
+
+
+def stored_version(value: str, prefix: str) -> int | None:
+    """The version a stored ``<prefix><version>:<hash>`` value names, or ``None``.
+
+    **The one reader of a version segment**: :func:`version_of` reads a digest
+    with it, and :func:`evals.harness.fingerprint.version_of` a fingerprint.
+    """
+    head, _, rest = value.partition(":")
+    if not rest or not head.startswith(prefix):
+        return None
+    return ascii_int(head[len(prefix) :], max_digits=_VERSION_DIGITS)
 
 
 def version_of(value: str, prefix: str) -> int:
@@ -207,12 +220,7 @@ def version_of(value: str, prefix: str) -> int:
     cannot be handed the other: a prose digest stored where a structural one
     belongs would read live against every claim.
     """
-    head, _, rest = value.partition(":")
-    version = (
-        ascii_int(head[1:], max_digits=_VERSION_DIGITS)
-        if rest and head.startswith(prefix)
-        else None
-    )
+    version = stored_version(value, prefix)
     if version is None:
         raise ContentError(f"{value!r} is not a {prefix!r} digest")
     return version

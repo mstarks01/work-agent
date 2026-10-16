@@ -221,7 +221,8 @@ def split(
             " out, so no held-out case is left to confirm a gain on"
         )
     spent = audit.exhausted(ledger)
-    refused = {case: spent[case] for case in sorted(flagged & set(spent))}
+    still = audit.still_held_out(flagged, ledger)
+    refused = {case: spent[case] for case in sorted(flagged - still)}
     reads = audit.exposure(ledger)
     read = sorted(held["baseline"] | held["candidate"])
     notes = [

@@ -11,8 +11,9 @@ corruption is applied to it — a fact flipped, a control copied onto another
 subject, a flow relabelled, a span removed — and the probe declares what the
 two instruments must then say:
 
-* **the gate** (:func:`~analysis_service.assertions.gate_issues`, the one
-  reader of "does this catalog pass") refuses the row, by code; or
+* **the gate** (:meth:`~analysis_service.assertions.AssertionRecord.over`,
+  the one reader of "does this catalog pass") refuses the row, by code, in
+  any of its rounds; or
 * **the endpoint** (:attr:`~evals.harness.replay.AssertionReplay.recovered`,
   the one reader of required-fact recall) stops counting the row, and the
   matcher's fate says why.
@@ -41,7 +42,6 @@ from analysis_service.assertions import (
     AssertionRecord,
     Subject,
     assertion_id,
-    gate_issues,
     settled,
 )
 from analysis_service.evidence import lead_topics, prepared_view
@@ -719,7 +719,8 @@ def run_probe(name: str, case: GoldenCase, reference: SignedReference) -> Outcom
         if corrupted.sources is None
         else dict(corrupted.sources)
     )
-    refused = sorted({issue.code for issue in gate_issues(catalog, model, sources)})
+    gated = AssertionRecord.over(catalog, model, sources, proposed=len(catalog.entries))
+    refused = sorted({issue.code for issue in gated.issues})
     graded = replay_assertions(
         case,
         reference,

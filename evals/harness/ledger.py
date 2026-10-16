@@ -578,6 +578,10 @@ class Ledger:
 
         The components are what a re-key keeps, so two pools keyed under two
         rules compare by these where their identities cannot.
+
+        A vote joins a finding through :func:`identity_of`, which is a second
+        reader beside :meth:`verdicts_for`; a test holds the two equal over the
+        archived ledger.
         """
         groups: dict[str, list[tuple[str, ...]]] = {}
         members: dict[Identity, set[Components]] = {}

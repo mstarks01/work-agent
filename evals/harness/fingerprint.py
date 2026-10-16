@@ -62,7 +62,7 @@ from typing import Any
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.asvs.record import requirement_of
-from analysis_service.parsing import ascii_int
+from evals.harness.content import stored_version
 from evals.harness.identity import FlowMap, endpoint_form
 from evals.harness.verbs import canonical, check_verb
 
@@ -394,21 +394,10 @@ def key_claim(
     return fingerprint(components, version=version), components
 
 
-#: How long a version segment may be. Two digits is past every version
-#: :data:`SUPPORTED_VERSIONS` has ever held, and the bound is what keeps a
-#: refusal a refusal: ``int`` raises on a string past 4300 digits, so an
-#: unbounded read answered "this is not a fingerprint" with a traceback.
-_VERSION_DIGITS = 2
-
-
 def version_of(value: str) -> int:
-    """Which version produced this fingerprint, read back off the value."""
-    head, _, rest = value.partition(":")
-    version = (
-        ascii_int(head[1:], max_digits=_VERSION_DIGITS)
-        if rest and head.startswith("v")
-        else None
-    )
+    """Which version produced this fingerprint, read back off the value by
+    :func:`~evals.harness.content.stored_version`."""
+    version = stored_version(value, "v")
     if version is None:
         raise FingerprintError(f"{value!r} is not a fingerprint")
     return version

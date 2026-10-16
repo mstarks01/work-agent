@@ -63,13 +63,13 @@ from analysis_service.jobs import (
     Resumption,
     same_schema,
 )
-from analysis_service.links import NoCatalogError
+from analysis_service.links import LinkAnswer, NoCatalogError, with_link_answers
 from analysis_service.pipeline import entry_of
 from analysis_service.principals import Identity, Principal, log_created
 from analysis_service.questions import question_fallback
 from analysis_service.report import SCHEMA_VERSION, Report
 from analysis_service.report_conditions import corrected_findings
-from analysis_service.sources import SourceLimits
+from analysis_service.sources import Source, SourceLimits
 from analysis_service.system_model import SystemModel
 
 logger = logging.getLogger(__name__)
@@ -349,8 +349,10 @@ class JobAnswers:
     ``runner_for`` looks a runner up by selection and entry. ``limits`` bounds
     what a job may carry, ``ceiling`` how many jobs one owner may have in
     flight, and ``budget`` the tokens a window admits. ``carries_catalog``
-    says whether a job here builds an assertion catalog, the only reader of
-    a link answer. ``gate`` is the certification gate that withholds an
+    says whether a job here builds an assertion catalog. A link answer places
+    a principal in that catalog, so a deployment without one refuses it
+    (:class:`NoCatalog`); the answer's line also goes into the job's answers
+    Source (:func:`~analysis_service.links.with_link_answers`). ``gate`` is the certification gate that withholds an
     unblessed report; ``None`` where the runner is a stand-in and nothing was
     certified.
     """
@@ -481,6 +483,22 @@ class JobAnswers:
         """
         answerable = await self.answerable(job_id, owner_id)
         return await anyio.to_thread.run_sync(answerable.payload)
+
+    def submitted_sources(
+        self, sources: Sequence[Source], links: Sequence[LinkAnswer]
+    ) -> list[Source]:
+        """A new job's sources with its link answers composed in, or a refusal.
+
+        The same :class:`NoCatalog` refusal :meth:`answer` makes, and the
+        ``ValueError`` of :func:`~analysis_service.links.with_link_answers`.
+        The answers go only onto a job that has sources of its own: answers
+        alone would carry the body past the ladder's empty-sources rung.
+        """
+        if links and not self.carries_catalog:
+            raise NoCatalog()
+        if not sources:
+            return list(sources)
+        return with_link_answers(sources, links)
 
     async def answer(
         self, job_id: str, owner_id: str, answers: Answers, *, start: Start

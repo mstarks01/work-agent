@@ -98,13 +98,13 @@ from analysis_service.assertions import (
     AssertionCatalog,
     AssertionRecord,
     CatalogProposal,
-    apply_projection,
     assertion_id,
     identity_parts,
     offered,
     referent_type,
     snap_subject,
 )
+from analysis_service.evidence import prepared_view
 from analysis_service.grounding import normalize
 from analysis_service.system_model import (
     FLOW_DELIMITER,
@@ -1023,12 +1023,13 @@ class BindingReplay:
 def _offered(record: AssertionRecord, model: SystemModel) -> int:
     """How many rows the evidence catalog would offer a lane from this record.
 
-    Asked of the model the lanes would read — ``model`` with the record's
-    projection applied, as ``prepare`` applies it — through
-    :func:`~analysis_service.assertions.offered`, the evidence catalog's own
-    reader, so this count and the table a lane sees cannot disagree.
+    Asked of the model the lanes would read, which
+    :func:`~analysis_service.evidence.prepared_view` makes as ``prepare``
+    makes it, through :func:`~analysis_service.assertions.offered`, the
+    evidence catalog's own reader, so this count and the table a lane sees
+    cannot disagree.
     """
-    projected, _ = apply_projection(model, record.catalog)
+    projected, _, _ = prepared_view(model, record.catalog)
     return len(offered(record.catalog, projected))
 
 

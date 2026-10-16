@@ -259,8 +259,9 @@ def _bare_attribute(value: str) -> str:
 AttributeName = Annotated[str, BeforeValidator(_bare_attribute)]
 
 
-#: An open fact's identity: element, attribute, assertion row, subject and
-#: question kind. Read off :attr:`UnknownRef.key`, which is the one reader of it.
+#: An open fact's identity: element, attribute, assertion row, subject,
+#: question kind and capability. Read off :attr:`UnknownRef.key`, which is the
+#: one reader of it.
 UnknownKey = tuple[str, str, str, str, str, str]
 #: The five ways :class:`UnknownRef` names an open fact.
 Spelling = Literal["question", "attribute", "assertion", "subject", "capability"]
@@ -423,6 +424,19 @@ class UnknownRef(BaseModel):
         )
 
 
+#: The fields of :class:`UnknownRef` in :attr:`UnknownRef.key` order, for a
+#: reader that holds a key and not its reference. A test holds the two equal;
+#: :func:`~analysis_service.fact_answers.key_ref` is the reader that uses it.
+UNKNOWN_KEY_FIELDS = (
+    "element_id",
+    "attribute",
+    "assertion",
+    "subject",
+    "question",
+    "capability",
+)
+
+
 def name_unknown(ref: UnknownRef) -> str:
     """One open fact as a sentence fragment, in its own spelling.
 
@@ -488,17 +502,19 @@ class Ground(BaseModel):
     raised.
 
     NO MODEL EVER GENERATES ONE, which is what makes a flat object safe here.
-    The five branches carry different required fields, and that relationship
+    The seven branches carry different required fields, and that relationship
     is not expressible in a JSON schema a provider will reliably compile —
     ``oneOf`` has the thinnest, least uniform support across the vendors a
     category agent may be routed to, and ``config/sampling.toml`` records what
     an uncompilable grammar costs: one vendor rejects ``SystemModel``'s as "too
     large", and ``constrain_output = false`` is no answer, because
     unconstrained the model fences its JSON and omits required fields. A dead
-    run, not a degraded one. Since the only writer is code holding a catalog
-    entry, the constraint never has to reach a schema compiler at all, and the
-    validator below is checking this module's own arithmetic rather than
-    refereeing a model's guess.
+    run, not a degraded one. The only writer is
+    :func:`~analysis_service.evidence.resolve_proposals`: it copies a catalog
+    entry the agent names, or builds a ``quote`` or an ``absent-element`` ground
+    from the words or the term the agent wrote. So the constraint never has to
+    reach a schema compiler at all, and the validator below is checking this
+    module's own arithmetic rather than refereeing a model's guess.
 
     :class:`Verdict` is the tagged variant that *is* generated, and it is this
     same flat shape, so the repo has one answer to "tagged variant in a
@@ -535,7 +551,7 @@ class Ground(BaseModel):
       framework needs to justify a claim about what a system does not have. A
       requirement about LDAP injection does not apply to a system that never
       mentions a directory service, and the fact that rules it out is the
-      absence itself; the four branches above can each only name something
+      absence itself; every other branch can only name something
       present, so a claim about an absence has no other honest ground to cite.
       Verified like a quote rather than trusted like prose: the service checks
       the term against every element's text
@@ -631,11 +647,11 @@ class Ground(BaseModel):
     def referent(self) -> str:
         """What this ground names: an element, a term, or an assertion.
 
-        The key two readers digest a non-quote ground under — the critic's
-        rating-disagreement check and the substance digest a vote binds to —
-        so a branch whose referent sits in a field ``place`` does not read is
-        told apart from every other ground of its kind here, once, rather than
-        by each digest's own ``or`` chain. Empty for a ``quote``.
+        The key the substance digest a vote binds to
+        (``evals/harness/content.py``) reads a non-quote ground under, so a
+        branch whose referent sits in a field ``place`` does not read is told
+        apart from every other ground of its kind here, once, rather than by
+        the digest's own ``or`` chain. Empty for a ``quote``.
         """
         return self.place or self.term or self.assertion
 
@@ -701,13 +717,10 @@ class VerdictFields(BaseModel):
         Named for a reference rather than for a pair: an open assertion row is
         one of these and has no element and no attribute to pair.
 
-        **The one reader of that field as a set.** Three sites ask the same
-        question of it — the review seam refusing a ``confirmed`` that leaves
-        a reference unaccounted for, ``complete_rulings`` declining to hand a
-        dismissed one back as a question, and the critic-review replay
-        recording what the critic ruled on — and each one spelled the
-        comprehension itself. A rule with three readers is how the three come
-        to disagree about what a dismissal is.
+        **The one reader of that field as a set.**
+        :func:`~analysis_service.critic.complete_rulings` asks it so that a
+        dismissed reference is not handed back as a question, and the
+        critic-review replay asks it to record what the critic ruled on.
         """
         return frozenset(ref.key for ref in self.immaterial_unknowns)
 
@@ -1162,11 +1175,14 @@ class Claim(BaseModel):
     def text_of_unit(cls, unit: str) -> str:
         """This framework's own statement of one unit, or ``""``.
 
-        **One reader of what a unit says**, asked by the two places that need
-        it: the critic view, through :meth:`unit_text`, and the report page,
-        which lists a row per unit and would otherwise show a reader an
-        identifier and a verdict with no way to tell whether either is right.
-        A second lookup would be a second answer to one question.
+        **One reader of what a unit says**, asked by the critic view, through
+        :meth:`unit_text`, and by the report page, which lists a row per unit
+        and would otherwise show a reader an identifier and a verdict with no
+        way to tell whether either is right. A package answers from its own
+        catalog: ASVS's answer is
+        :func:`~analysis_service.frameworks.asvs.catalog.requirement_text`,
+        which the review documents call too, and the skill roster prints each
+        catalog entry's own ``text``, which is the field that function reads.
 
         The neutral answer is empty: a framework whose claims are an open set
         has no catalog to quote, so it supplies no text and both callers

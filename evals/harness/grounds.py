@@ -64,7 +64,7 @@ from analysis_service.claims import (
     UnverifiedGround,
 )
 from analysis_service.fan_in import DraftJoinError
-from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks import lane_of
 
 # Why the fan-in killed a case. A claim that loses every ground costs its own
 # entry rather than the case: it is dropped and marked, and
@@ -288,18 +288,6 @@ def ratio(numerator: float, denominator: float) -> float:
     return numerator / denominator if denominator else 0.0
 
 
-def lane_of(framework: FrameworkName, draft: Claim) -> str:
-    """The lane a draft was found in, without naming any framework's field.
-
-    A package declares which record field its ``IdRule`` stamps the lane into,
-    so this reads the declaration rather than a field name. A package whose
-    record carries no lane answers the empty string, which is a legal shape
-    (``lane_field`` is ``None``) rather than a defect to raise on.
-    """
-    field = PACKAGES[framework].id_rule.lane_field
-    return str(getattr(draft, field, "")) if field else ""
-
-
 def measure_grounds(
     case_id: str,
     framework: FrameworkName,
@@ -337,7 +325,9 @@ def measure_grounds(
             ThreatGrounds(
                 threat_id=draft.id,
                 framework=framework,
-                lane=lane_of(framework, draft),
+                # A package whose record carries no lane answers "", which is
+                # a legal shape rather than a defect to raise on.
+                lane=lane_of(draft) or "",
                 kinds=tuple(ground.kind for ground in draft.grounds),
                 unverified=tuple(sorted(marked.get(draft.id, ()))),
                 repaired=tuple(sorted(rewritten.get(draft.id, ()))),

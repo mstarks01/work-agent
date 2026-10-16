@@ -44,7 +44,12 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, NamedTuple, get_args
 
-from analysis_service.assertions import REGISTRY, AssertionCatalog, assertion_id
+from analysis_service.assertions import (
+    REGISTRY,
+    AssertionCatalog,
+    assertion_id,
+    projection_fields,
+)
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
     ATTRIBUTE_GROUNDS,
@@ -600,10 +605,10 @@ def row_controls(assertions: AssertionCatalog | None) -> Mapping[str, str]:
     """
     if assertions is None:
         return NO_ROWS
+    fields = projection_fields()
     return MappingProxyType(
         {
-            assertion_id(entry): REGISTRY[entry.predicate].projects_into
-            or entry.predicate
+            assertion_id(entry): fields.get(entry.predicate) or entry.predicate
             for entry in assertions.entries
             if entry.predicate in REGISTRY
         }

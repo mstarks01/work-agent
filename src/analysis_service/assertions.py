@@ -967,6 +967,10 @@ class AssertionRecord(BaseModel):
     ) -> AssertionRecord:
         """One record over a catalog something else built, with the gate run on it.
 
+        **The one reader of "does this catalog pass".** The falsification
+        probes read their gate codes from it too, so a probe sees the refusals
+        of every round that a job's catalog meets.
+
         **The way a catalog nobody resolved here still answers the gate.** A
         resumed job hands the catalog its parent built to ``prepare``; it
         reaches a lane through this, so a catalog an agent selects from answers
@@ -1260,25 +1264,6 @@ def spans_for(quote: str, prepared: SpanSource) -> tuple[SupportSpan, ...]:
         )
         for fragment, span in zip(fragments(quote), located, strict=True)
     )
-
-
-def gate_issues(
-    catalog: AssertionCatalog, model: SystemModel, sources: Mapping[str, str]
-) -> list[CatalogIssue]:
-    """Everything the gate says about one catalog and the graph beside it.
-
-    **The one reader of "does this catalog pass".**
-    :meth:`AssertionRecord.over` runs it on what a resolver built and on a
-    record a resumed job carries, so two catalogs reaching one lane answered
-    one set of rules. The two halves are
-    different questions — :func:`catalog_issues` reads the rows, and
-    :func:`contradiction_issues` reads them against the graph's own attributes
-    — and a caller that wants only one asks for it by name.
-    """
-    return [
-        *catalog_issues(catalog, model=model, sources=sources),
-        *contradiction_issues(catalog, model),
-    ]
 
 
 def quarantine(

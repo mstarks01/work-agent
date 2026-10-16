@@ -171,7 +171,8 @@ def seed_state(
 
     The one writer of the input keys. :meth:`GraphExecutor.run` seeds a session
     with it, and ``lane-replay`` seeds the ``prepare`` it runs offline with it,
-    so a replayed lane reads the sources as a graph run renders them.
+    so a replayed lane reads the sources as a graph run renders them. The two
+    critic replays take their input text from it for the same reason.
     """
     seed: dict[str, Any] = dict(extra_state or {})
     if STATE_INPUT_TEXT in seed:

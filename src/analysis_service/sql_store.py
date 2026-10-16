@@ -269,7 +269,9 @@ def _names(row: Row[Any], name: ObjectName) -> bool:
     **The one rule of a named object.** A row names an object where it holds
     the object's digest. The sources digest is never null, so a row always
     names its sources. A row names its report only after a save wrote the
-    report's digest. A usage row names no object.
+    report's digest. A usage row names no object. A save hands
+    :func:`~analysis_service.jobs.check_save` that same digest column, which
+    holds ``None`` exactly where this says the row names no report.
     """
     return row._mapping[DIGEST_COLUMNS[name]] is not None
 

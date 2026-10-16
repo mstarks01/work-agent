@@ -131,11 +131,22 @@ ReviewIndependence = Literal["shared", "distinct_model", "distinct_provider"]
 # comment in the config file: at two keys a comment holds, and at 2N keys it
 # drifts. A re-ask on a cheaper model than the pass it corrects is the failure
 # the check exists to catch.
+#: The node roles each framework has a tier key for.
+FRAMEWORK_ROLES: tuple[str, ...] = ("analyze", "critic", "recritic")
+
+
+def tier_key(role: str, framework: str) -> str:
+    """The tier-config key of one framework's node role, ``<role>/<framework>``.
+
+    **The one spelling of a framework's tier key.** The node table, the graph's
+    node map, the package check and the two pairing checks all ask it.
+    """
+    return f"{role}/{framework}"
+
+
 def _framework_nodes() -> tuple[str, ...]:
     return tuple(
-        f"{role}/{name}"
-        for name in FRAMEWORK_NAMES
-        for role in ("analyze", "critic", "recritic")
+        tier_key(role, name) for name in FRAMEWORK_NAMES for role in FRAMEWORK_ROLES
     )
 
 
@@ -155,12 +166,16 @@ def critic_pairing_issues(resolve_tier) -> list[str]:
     Takes the resolver rather than a config object so the rule can be stated
     once and checked wherever a node -> tier map exists.
     """
-    return [
-        f"recritic/{name} resolves to {resolve_tier(f'recritic/{name}')!r} but"
-        f" critic/{name} resolves to {resolve_tier(f'critic/{name}')!r};"
-        " a re-ask must not run on a cheaper model than the pass it corrects"
+    pairs = [
+        (tier_key("recritic", name), tier_key("critic", name))
         for name in FRAMEWORK_NAMES
-        if resolve_tier(f"recritic/{name}") != resolve_tier(f"critic/{name}")
+    ]
+    return [
+        f"{recritic} resolves to {resolve_tier(recritic)!r} but"
+        f" {critic} resolves to {resolve_tier(critic)!r};"
+        " a re-ask must not run on a cheaper model than the pass it corrects"
+        for recritic, critic in pairs
+        if resolve_tier(recritic) != resolve_tier(critic)
     ]
 
 
@@ -310,7 +325,9 @@ class ModelTierConfig(BaseModel):
         **The one reader of "is this tier bound".** The node map is what says
         so. A tier with a selection that no node points at costs no adapter, no
         credential and no SDK. Every site that decides what a deployment needs
-        reads this set, and not the wider set in ``self.tiers``.
+        reads this set, and not the wider set in ``self.tiers``. The loader asks
+        the same question of the raw node map before validation, through
+        :func:`tiers_in_use`, and a test holds the two answers equal.
 
         A frozenset because callers only ask what is in it.
         """
@@ -574,8 +591,8 @@ class ModelTierConfig(BaseModel):
             return []
         breaches = []
         for name in FRAMEWORK_NAMES:
-            analyze = self.tiers[self.nodes[f"analyze/{name}"]]
-            critic = self.tiers[self.nodes[f"critic/{name}"]]
+            analyze = self.tiers[self.nodes[tier_key("analyze", name)]]
+            critic = self.tiers[self.nodes[tier_key("critic", name)]]
             detail = self._independence_detail(analyze, critic)
             if detail is not None:
                 breaches.append(

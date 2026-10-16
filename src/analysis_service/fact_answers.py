@@ -62,7 +62,12 @@ from analysis_service.assertions import (
     assertion_id,
 )
 from analysis_service.capabilities import CAPABILITIES
-from analysis_service.claims import Spelling, UnknownKey, UnknownRef
+from analysis_service.claims import (
+    UNKNOWN_KEY_FIELDS,
+    Spelling,
+    UnknownKey,
+    UnknownRef,
+)
 from analysis_service.grounding import normalize
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
@@ -81,6 +86,7 @@ __all__ = [
     "answer_facets",
     "answered_keys",
     "answered_row",
+    "attribute_place",
     "covers",
     "detail_note",
     "fact_kind",
@@ -133,17 +139,6 @@ _KIND_ORDER: tuple[FactKind, ...] = (
 )
 
 
-#: The fields of :class:`~analysis_service.claims.UnknownRef`, in key order.
-_KEY_FIELDS = (
-    "element_id",
-    "attribute",
-    "assertion",
-    "subject",
-    "question",
-    "capability",
-)
-
-
 #: The answers a facet takes, beside ``unknown``.
 FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
 
@@ -184,8 +179,8 @@ class FactAnswer(BaseModel):
             return data
         facets, key = data["facets"], data.get("key")
         question = ""
-        if isinstance(key, list | tuple) and len(key) == len(_KEY_FIELDS):
-            question = dict(zip(_KEY_FIELDS, key, strict=True))["question"]
+        if isinstance(key, list | tuple) and len(key) == len(UNKNOWN_KEY_FIELDS):
+            question = dict(zip(UNKNOWN_KEY_FIELDS, key, strict=True))["question"]
         kind = QUESTION_KINDS.get(question)
         if kind is None or kind.answer != "facets":
             raise ValueError("facets answer only a question kind that has facets")
@@ -220,26 +215,28 @@ class FactAnswer(BaseModel):
         :func:`merged_facts` would keep both. A key that
         uses more than one spelling is left as sent, for the check to refuse.
         """
-        if not isinstance(key, list | tuple) or len(key) != 6:
+        if not isinstance(key, list | tuple) or len(key) != len(UNKNOWN_KEY_FIELDS):
             return key
-        ref = UnknownRef.model_validate(dict(zip(_KEY_FIELDS, key, strict=True)))
+        ref = UnknownRef.model_validate(dict(zip(UNKNOWN_KEY_FIELDS, key, strict=True)))
         match ref.spellings:
             case ("question",):
-                return (ref.element_id, "", "", "", ref.question, "")
+                read = {"element_id": ref.element_id, "question": ref.question}
             case ("attribute",):
-                return (ref.element_id, ref.attribute, "", "", "", "")
+                read = {"element_id": ref.element_id, "attribute": ref.attribute}
             case ("assertion",):
-                return ("", "", ref.assertion, "", "", "")
+                read = {"assertion": ref.assertion}
             case ("subject",):
                 if not quotable(ref.subject):
                     raise ValueError(
                         "a subject is one line, with no double quote and no"
                         " control or formatting character"
                     )
-                return ("", "", "", ref.subject, "", "")
+                read = {"subject": ref.subject}
             case ("capability",):
-                return ("", "", "", "", "", ref.capability)
-        return ref.key
+                read = {"capability": ref.capability}
+            case _:
+                return ref.key
+        return UnknownRef.model_construct(None, **read).key
 
     @field_validator("value")
     @classmethod
@@ -285,15 +282,19 @@ def key_ref(key: UnknownKey) -> UnknownRef:
     The reference is shared between callers and read, never written: one
     build of the early list reads each key many times over.
     """
-    element_id, attribute, assertion, subject, question, capability = key
     return UnknownRef.model_construct(
-        element_id=element_id,
-        attribute=attribute,
-        assertion=assertion,
-        subject=subject,
-        question=question,
-        capability=capability,
+        None, **dict(zip(UNKNOWN_KEY_FIELDS, key, strict=True))
     )
+
+
+def attribute_place(key: UnknownKey) -> tuple[str, str]:
+    """The element and the attribute that a key names, by name.
+
+    Blank parts for a key that names no attribute, so a caller asks
+    :func:`fact_kind` first where the kind matters.
+    """
+    ref = key_ref(key)
+    return ref.element_id, ref.attribute
 
 
 def fact_kind(key: UnknownKey) -> FactKind:
@@ -321,20 +322,20 @@ def fact_line(fact: FactAnswer) -> str:
 
     A detail follows the answer in the submitter's own words (ADR 0073).
     """
-    element_id, attribute, assertion, subject, question, capability = fact.key
+    ref = key_ref(fact.key)
     if fact.kind == "capability":
-        asked = CAPABILITIES[capability].question
+        asked = CAPABILITIES[ref.capability].question
         line = f'Asked "{asked}", the answer is "{fact.value}".'
     elif fact.kind == "question":
-        kind = QUESTION_KINDS[question]
-        asked = kind.template.format(element=element_id)
+        kind = QUESTION_KINDS[ref.question]
+        asked = kind.template.format(element=ref.element_id)
         line = f'Asked "{asked}", the answer is "{fact.value}".'
     elif fact.kind == "attribute":
-        line = f'The {attribute} of {element_id} is "{fact.value}".'
+        line = f'The {ref.attribute} of {ref.element_id} is "{fact.value}".'
     elif fact.kind == "assertion":
-        line = f'The open question {assertion} is answered "{fact.value}".'
+        line = f'The open question {ref.assertion} is answered "{fact.value}".'
     else:
-        line = f'Asked "{_phrase(subject)}", the answer is "{fact.value}".'
+        line = f'Asked "{_phrase(ref.subject)}", the answer is "{fact.value}".'
     return line + detail_note(fact.detail)
 
 
