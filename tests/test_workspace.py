@@ -66,8 +66,8 @@ def test_reopen_keeps_questions_revision_and_related_report(tiers):
         assert len(rows) == 1
         assert rows[0]["name"] == BREAKOUT
         report = rows[0]["reports"][0]
+        assert set(report) == {"run", "name", "generated_at"}
         assert report["run"] == child
-        assert report["url"] == f"/report/{child}"
         assert report["name"] == BREAKOUT
         assert report["generated_at"]
         assert client.get(f"/workspace/runs/{run}").json()["run"] == child
