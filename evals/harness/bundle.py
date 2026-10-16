@@ -22,10 +22,10 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from analysis_service.assertions import (
     GRAPH_BOUND,
@@ -45,7 +45,7 @@ from analysis_service.frameworks.stride.record import Threat
 from analysis_service.report import Report
 from analysis_service.system_model import FLOW_ID_RULES
 from evals.harness import flow_ids, modes, replay
-from evals.harness.archive import archive_bytes
+from evals.harness.archive import CaseKind, archive_bytes
 from evals.harness.reference import GoldenCase
 
 
@@ -110,6 +110,37 @@ def reports_dir(out: str | Path) -> Path:
     return Path(out).with_suffix(REPORTS_SUFFIX)
 
 
+def case_file(out: str | Path, case_id: str, kind: CaseKind) -> Path:
+    """Where a sweep writes one case's file of ``kind``, given its artifact path.
+
+    Every writer in this module takes its path from here, and
+    :func:`check_sweep_out` checks each kind, so the check before the spend
+    covers every write after it.
+    """
+    return reports_dir(out) / f"{case_id}.{kind}.json"
+
+
+def check_sweep_out(out: str | Path, case_ids: Iterable[str]) -> None:
+    """Refuse a sweep's ``--out`` when a write after the spend would fail.
+
+    The sweep writes the artifact, makes :func:`reports_dir` beside it, and
+    writes each :func:`case_file` in that folder. A folder that does not exist
+    yet is made in the artifact's folder, which :func:`check_out` reads.
+    """
+    check_out(out)
+    folder = reports_dir(out)
+    if folder.is_dir():
+        check_out(
+            *(
+                case_file(out, case_id, kind)
+                for case_id in case_ids
+                for kind in get_args(CaseKind)
+            )
+        )
+    elif folder.is_symlink() or folder.exists():
+        raise modes.EvalRunError(f"{folder}: is a file, not the folder for the reports")
+
+
 def check_out(*paths: str | Path | None) -> None:
     """Refuse an output path that a paid command could not write.
 
@@ -155,13 +186,13 @@ def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) ->
     directory.mkdir(parents=True, exist_ok=True)
     total_bytes = 0
     for case_id, run in sorted(runs.items()):
-        path = directory / f"{case_id}.report.json"
+        path = case_file(out, case_id, "report")
         path.write_text(run.report.model_dump_json(indent=2) + "\n", "utf-8")
         # The drafts beside the report, because the report is what survived the
         # critic and half of what a score reads is what did not. Without them
         # ``score`` could recompute recall and not critic yield, and a command
         # that re-scores some of a sweep is worse than one that refuses.
-        drafts = directory / f"{case_id}.drafts.json"
+        drafts = case_file(out, case_id, "drafts")
         drafts.write_text(
             archive_bytes(
                 "drafts",
@@ -175,11 +206,11 @@ def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) ->
         # The lanes' own emissions, before the fan-in routed anything away.
         # ``score`` does not read them: they exist so a reader can ask what a
         # lane answered, which the drafts no longer say.
-        proposals = directory / f"{case_id}.proposals.json"
+        proposals = case_file(out, case_id, "proposals")
         proposals.write_text(archive_bytes("proposals", dict(run.proposals)), "utf-8")
         # What each lane was asked, beside what it answered: without it a lane
         # that wrote nothing at a place cannot be read against its leads.
-        lanes = directory / f"{case_id}.lanes.json"
+        lanes = case_file(out, case_id, "lanes")
         lanes.write_text(archive_bytes("lanes", dict(run.lane_material)), "utf-8")
         total_bytes += path.stat().st_size + drafts.stat().st_size
     print(f"{len(runs)} report(s) written to {directory} ({total_bytes / 1024:.0f} KB)")
@@ -229,7 +260,7 @@ def write_assertions(
     directory.mkdir(parents=True, exist_ok=True)
     total_bytes = 0
     for case_id, result in sorted(resolved.items()):
-        path = directory / f"{case_id}.assertions.json"
+        path = case_file(out, case_id, "assertions")
         path.write_text(
             archive_bytes(
                 "assertions",
@@ -304,7 +335,7 @@ def write_extractions(
     directory.mkdir(parents=True, exist_ok=True)
     total_bytes = 0
     for case_id, result in sorted(extracted.items()):
-        path = directory / f"{case_id}.extraction.json"
+        path = case_file(out, case_id, "extraction")
         path.write_text(
             archive_bytes(
                 "extraction",
@@ -346,7 +377,7 @@ def write_failures(out: str, failed: Mapping[str, Mapping[str, Any]]) -> None:
     directory = reports_dir(out)
     directory.mkdir(parents=True, exist_ok=True)
     for case_id, captured in sorted(failed.items()):
-        path = directory / f"{case_id}.failure.json"
+        path = case_file(out, case_id, "failure")
         path.write_text(archive_bytes("failure", dict(captured)), "utf-8")
     print(f"{len(failed)} failed case(s) captured in {directory}")
 

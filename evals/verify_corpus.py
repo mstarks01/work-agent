@@ -456,9 +456,7 @@ def _escalate_leads(
             continue
         claim = record.get("claim")
         cited = record.get("affected_element_ids")
-        if not isinstance(claim, str) or not isinstance(cited, list):
-            continue
-        if not all(isinstance(element_id, str) for element_id in cited):
+        if not isinstance(claim, str) or not strings(cited):
             continue
         # A cited flow stands for both its ends, by the service's own fold.
         places = endpoint_targets(cited, flows)
