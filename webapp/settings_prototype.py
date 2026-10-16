@@ -19,6 +19,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 
+from analysis_service.vendors import CREDENTIAL_MODE_NOTES
 from webapp.page import Grants, client_script, render, response, script_json
 
 _GRANTS = Grants(script=True, style=True)
@@ -40,9 +41,16 @@ LOADER_MESSAGES = {
         "ANALYSIS_MODEL_{TIER}_VENDOR is set without ANALYSIS_MODEL_{TIER}_MODEL;"
         " a vendor without its model is not a usable selection"
     ),
-    "no-key": (
-        "vendor '{vendor}' needs ANALYSIS_{VENDOR}_API_KEY_FILE; it is unset or"
-        " empty (credential mode: api_key)"
+    "no-mode": (
+        "config/model_tiers.toml: 1 validation error for ModelTierConfig\n"
+        "  Value error, vendor '{vendor}' allows more than one credential mode"
+        " ({modes}), so credentials.{vendor} must declare which one this"
+        " deployment uses [type=value_error, input_value={'version': 9, ...},"
+        " input_type=dict]"
+    ),
+    "no-credential": (
+        "vendor '{vendor}' needs {var}; it is unset or empty (credential mode:"
+        " {mode})"
     ),
 }
 
@@ -84,6 +92,66 @@ def _model_suggestions() -> dict[str, list[str]]:
 
 
 _MODELS = _model_suggestions()
+
+
+def _credential_settings(ready: bool) -> list[dict[str, object]]:
+    """Each vendor's credential fields, read from its ``VENDORS`` row.
+
+    A vendor with more than one mode gets a mode field first. Each variable
+    carries the modes that read it, so the page shows it only under those.
+    """
+    from analysis_service.vendors import vendor_for
+
+    entries = []
+    for vendor in _VENDORS:
+        row = vendor_for(vendor)
+        modes = [mode.value for mode in row.credential_modes]
+        if len(modes) > 1:
+            entries.append(
+                _setting(
+                    f"credentials.{vendor}.mode",
+                    "Credentials",
+                    f"{vendor.capitalize()} credential mode",
+                    "choice",
+                    f"ANALYSIS_MODEL_CREDENTIALS_{vendor.upper()}",
+                    options=modes,
+                    vendor=vendor,
+                )
+            )
+        variables = {}
+        for mode, source in row.credentials.items():
+            for entry in source.env:
+                variables.setdefault(entry.var, (entry.secret, []))[1].append(
+                    mode.value
+                )
+        for var, (secret, var_modes) in variables.items():
+            words = var.removeprefix(f"ANALYSIS_{vendor.upper()}_")
+            words = words.removesuffix("_FILE").replace("_", " ").lower()
+            words = words.replace("api", "API")
+            stored = ready and vendor == "anthropic"
+            entries.append(
+                _setting(
+                    f"credentials.{vendor}.{words.replace(' ', '_').lower()}",
+                    "Credentials",
+                    f"{vendor.capitalize()} {words}",
+                    "secret" if secret else "text",
+                    var,
+                    "set" if stored else "",
+                    vendor=vendor,
+                    modes=var_modes,
+                    source="page" if stored else "default",
+                )
+            )
+    return entries
+
+
+def _vendor_modes() -> dict[str, list[str]]:
+    from analysis_service.vendors import vendor_for
+
+    return {
+        vendor: [mode.value for mode in vendor_for(vendor).credential_modes]
+        for vendor in _VENDORS
+    }
 
 
 def _setting(key, group, label, kind, env, value="", **extra):
@@ -130,25 +198,8 @@ def _settings(state: str) -> list[dict[str, object]]:
                 source="page" if model else "default",
             ),
         ]
+    entries += _credential_settings(ready)
     entries += [
-        _setting(
-            "credentials.anthropic.api_key",
-            "Credentials",
-            "Anthropic API key",
-            "secret",
-            "ANALYSIS_ANTHROPIC_API_KEY_FILE",
-            "set" if ready else "",
-            vendor="anthropic",
-            source="page" if ready else "default",
-        ),
-        _setting(
-            "credentials.openai.api_key",
-            "Credentials",
-            "OpenAI API key",
-            "secret",
-            "ANALYSIS_OPENAI_API_KEY_FILE",
-            vendor="openai",
-        ),
         _setting(
             "frameworks.carried",
             "Frameworks",
@@ -296,6 +347,8 @@ def mount(app: FastAPI) -> None:
             "messages": LOADER_MESSAGES,
             "settings_dir": "~/.config/work-agent/settings",
             "models": _MODELS,
+            "vendor_modes": _vendor_modes(),
+            "mode_notes": {mode.value: note for mode, note in CREDENTIAL_MODE_NOTES.items()},
         }
         return response(
             render(

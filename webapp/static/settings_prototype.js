@@ -29,17 +29,36 @@ function h(tag, attrs = {}, ...children) {
 }
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const visible = (s) => !s.when || draft[s.when[0]] === s.when[1];
+const chosenVendors = () => [...new Set(TIERS.map((t) => draft[`tiers.${t}.vendor`]).filter(Boolean))];
+const modeOf = (vendor) => {
+  const modes = PROTO.vendor_modes[vendor];
+  return modes.length === 1 ? modes[0] : draft[`credentials.${vendor}.mode`];
+};
+// A credential field shows only for a vendor a tier chose, under a mode that reads it.
+const visible = (s) => {
+  if (s.when && draft[s.when[0]] !== s.when[1]) return false;
+  if (!s.vendor) return true;
+  if (!chosenVendors().includes(s.vendor)) return false;
+  return !s.modes || s.modes.includes(modeOf(s.vendor));
+};
 const locked = (s) => s.mark === "shows" || s.source === "outside";
 const isChanged = (s) =>
   s.kind === "secret" ? draft[s.key] !== saved[s.key] && draft[s.key] !== "" : !same(draft[s.key], saved[s.key]);
 const changes = () => PROTO.settings.filter((s) => visible(s) && !locked(s) && isChanged(s));
 const groups = () => [...new Set(PROTO.settings.map((s) => s.group))];
 const fill = (template, values) => template.replace(/\{(\w+)\}/g, (_, k) => values[k]);
-const keySet = (vendor) => {
-  const s = PROTO.settings.find((x) => x.kind === "secret" && x.vendor === vendor);
-  return !s || saved[s.key] === "set" || draft[s.key] !== saved[s.key] && draft[s.key] !== "";
-};
+const present = (s) =>
+  s.kind === "secret" ? saved[s.key] === "set" || (draft[s.key] !== saved[s.key] && draft[s.key] !== "") : String(draft[s.key]).trim() !== "";
+
+// The loader's message for the first credential this vendor lacks, or null.
+function missingCredential(vendor) {
+  const mode = modeOf(vendor);
+  if (!mode) {
+    return fill(PROTO.messages["no-mode"], { vendor, modes: PROTO.vendor_modes[vendor].join(", ") });
+  }
+  const lacking = PROTO.settings.find((s) => s.vendor === vendor && s.modes && s.modes.includes(mode) && !present(s));
+  return lacking ? fill(PROTO.messages["no-credential"], { vendor, var: lacking.env, mode }) : null;
+}
 
 // The stand-in for "build a test Deployment from the new mapping".
 function check() {
@@ -52,11 +71,9 @@ function check() {
   if (missing.length) {
     return fill(PROTO.messages["no-vendor"], { tiers: JSON.stringify(missing).replaceAll('"', "'") });
   }
-  for (const tier of TIERS) {
-    const vendor = draft[`tiers.${tier}.vendor`];
-    if (vendor && !keySet(vendor)) {
-      return fill(PROTO.messages["no-key"], { vendor, VENDOR: vendor.toUpperCase() });
-    }
+  for (const vendor of chosenVendors()) {
+    const message = missingCredential(vendor);
+    if (message) return message;
   }
   // Deployment.from_env does not read the store: the check runs build_store too.
   if (draft["store.job"] === "sql") {
@@ -192,6 +209,8 @@ function tags(s) {
   if (s.source === "outside") out.push(h("span", { class: "tag outside" }, `set outside this page: ${s.env}`));
   if (s.mark === "shows") out.push(h("span", { class: "tag" }, "shown only"));
   if (s.restart) out.push(h("span", { class: "tag restart" }, "restart needed"));
+  const firstOfVendor = s.vendor && PROTO.settings.find((x) => x.vendor === s.vendor && visible(x)) === s;
+  if (firstOfVendor && modeOf(s.vendor)) out.push(h("small", { class: "hint" }, PROTO.mode_notes[modeOf(s.vendor)]));
   return out;
 }
 
@@ -289,7 +308,6 @@ function variantA() {
 // ---- Variant B: setup steps, then "More settings" ---------------------------
 
 function variantB() {
-  const chosenVendors = () => [...new Set(TIERS.map((t) => draft[`tiers.${t}.vendor`]).filter(Boolean))];
   const steps = [
     {
       title: "Choose the models",
@@ -301,10 +319,11 @@ function variantB() {
       keys: () => PROTO.settings.filter((s) => s.group === "Models"),
     },
     {
-      title: "Add a key for each vendor",
-      done: () => chosenVendors().length > 0 && chosenVendors().every(keySet),
-      summary: () => chosenVendors().map((v) => `${v}: ${keySet(v) ? "set" : "not set"}`).join(" · ") || "Choose a model first.",
-      keys: () => PROTO.settings.filter((s) => s.kind === "secret" && chosenVendors().includes(s.vendor)),
+      title: "Add the credentials for each vendor",
+      done: () => chosenVendors().length > 0 && chosenVendors().every((v) => !missingCredential(v)),
+      summary: () =>
+        chosenVendors().map((v) => `${v}: ${missingCredential(v) ? "incomplete" : "complete"}`).join(" · ") || "Choose a model first.",
+      keys: () => PROTO.settings.filter((s) => s.group === "Credentials" && visible(s)),
     },
     {
       title: "Choose the frameworks",
@@ -403,6 +422,10 @@ function variantC() {
       const rows = PROTO.settings.filter(
         (s) => s.group === g && visible(s) && `${s.label} ${s.env} ${s.key}`.toLowerCase().includes(filter),
       );
+      if (!rows.length && g === "Credentials" && !filter) {
+        tbody.append(h("tr", { class: "groupline" }, h("th", { colspan: 4 }, g)));
+        tbody.append(h("tr", {}, h("td", { colspan: 4, class: "hint" }, "Choose a vendor for a tier. Its credential fields show here.")));
+      }
       if (!rows.length) continue;
       tbody.append(h("tr", { class: "groupline" }, h("th", { colspan: 4 }, g)));
       for (const s of rows) {
@@ -487,6 +510,10 @@ function writeState() {
   const lines = ["# settings.env (the TOML question is open: 'How does the page write a TOML copy?')"];
   const files = [];
   for (const s of PROTO.settings) {
+    if (s.kind === "secret" && !visible(s) && saved[s.key] === "set") {
+      lines.push(`${s.env}=${PROTO.settings_dir}/${s.vendor}_api_key   # kept? no tier uses ${s.vendor} now`);
+      continue;
+    }
     if (!visible(s) || s.mark === "shows") continue;
     if (s.source === "outside") {
       lines.push(`# ${s.env}=${s.value}  <- process environment, not written`);
