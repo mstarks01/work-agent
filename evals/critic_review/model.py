@@ -27,6 +27,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.frameworks import FrameworkName
+from analysis_service.parsing import Signer
 
 #: What each fixture is built to catch, and the four the review change turns on.
 #:
@@ -176,7 +177,7 @@ class CriticFixture(BaseModel):
     #: read, and may not be quoted as evidence that the review change works:
     #: ``tests/test_critic_review_lints.py`` refuses to let an unsigned set gate
     #: anything. ``bootstrap`` says who drafted it, which is never who signs it.
-    reviewed_by: str | None = None
+    reviewed_by: Signer = None
     #: Who *drafted* the fixture and its proposed answer, which is never who
     #: signs it. ``tests/test_critic_review_lints.py`` reads this beside
     #: ``reviewed_by`` and refuses a set the drafting agent signed for itself:

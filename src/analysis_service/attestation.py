@@ -291,11 +291,22 @@ class VerificationKey(BaseModel):
             raise ValueError(f"{self.key_id}: retired_at is only for a retired key")
         return self
 
+    @model_validator(mode="after")
+    def _key_decodes(self) -> Self:
+        """Refuse a key that does not decode, so the keyring load fails on it."""
+        self.loaded()
+        return self
+
     def loaded(self) -> Ed25519PublicKey:
+        """The key, decoded from base64 of its 32 raw bytes, or ``ValueError``."""
         try:
-            return Ed25519PublicKey.from_public_bytes(base64.b64decode(self.public_key))
-        except (ValueError, TypeError) as exc:
-            raise KeyringError(f"{self.key_id}: unusable public key") from exc
+            return Ed25519PublicKey.from_public_bytes(
+                base64.b64decode(self.public_key, validate=True)
+            )
+        except ValueError as exc:
+            raise ValueError(
+                f"{self.key_id}: public_key is not a raw Ed25519 public key"
+            ) from exc
 
 
 class Keyring(BaseModel):

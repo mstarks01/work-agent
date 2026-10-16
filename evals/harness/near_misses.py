@@ -38,6 +38,7 @@ from evals.harness.reference import (
     RULINGS_FILE,
     CorpusError,
     GoldenCase,
+    ReferenceThreat,
     RulingVerdict,
     load_case,
 )
@@ -114,10 +115,7 @@ def rows(
                     "n": str(len(ballot) + 1),
                     "case": case.id,
                     "ref": str(loss.reference_index),
-                    "reference_claim": reference.claim,
-                    "reference_lane": reference.lane,
-                    "reference_verb": reference.verb or "",
-                    "reference_place": PLACE_SEP.join(reference.affected_element_ids),
+                    **_shown(reference),
                     "draft_id": draft.id,
                     "draft_title": draft.title,
                     "draft_description": draft.description,
@@ -131,6 +129,20 @@ def rows(
                 }
             )
     return ballot
+
+
+def _shown(reference: ReferenceThreat) -> dict[str, str]:
+    """The ballot columns that show the reader the reference claim.
+
+    :func:`_append` compares them with the claim at the row's index when the
+    ballot returns, so a ruling binds to the claim the reader saw.
+    """
+    return {
+        "reference_claim": reference.claim,
+        "reference_lane": reference.lane,
+        "reference_verb": reference.verb or "",
+        "reference_place": PLACE_SEP.join(reference.affected_element_ids),
+    }
 
 
 def _ruled(case: GoldenCase, index: int, draft: DraftThreat) -> bool:
@@ -266,7 +278,17 @@ def _append(
     reviewed_by: str,
     ballot_name: str,
 ) -> bool:
-    claim = load_case(case_dir).stride_claims()[int(row["ref"])]
+    claims = load_case(case_dir).stride_claims()
+    index = int(row["ref"])
+    claim = claims[index] if index < len(claims) else None
+    if claim is None or any(
+        row[column] != value for column, value in _shown(claim).items()
+    ):
+        raise ValueError(
+            f"row {row['n']}: reference claim {index} of {case_dir.name} is not"
+            " the claim the ballot showed; the corpus changed after the ballot,"
+            " so issue a new ballot"
+        )
     data: dict[str, Any] = (
         json.loads(path.read_text(encoding="utf-8"))
         if path.is_file()

@@ -21,14 +21,23 @@ import json
 import shutil
 
 import pytest
+from pydantic import BeforeValidator
 
 from analysis_service.assertions import project
+from analysis_service.parsing import signer
 from analysis_service.sources import text_digest
 from evals import verify_corpus
+from evals.critic_review.model import CriticFixture
+from evals.harness import replay
 from evals.harness.modes import PROJECTION_COMPARED, reachable_controls
-from evals.harness.reference import load_case
+from evals.harness.reference import CorpusError, RuledReading, load_case
 from evals.reference_facts import (
     DRAFTER,
+    Dispute,
+    FactRow,
+    QualifierAlias,
+    SubjectAlias,
+    UnheldFact,
     drafted_cases,
     facts_path,
     load_facts,
@@ -294,3 +303,50 @@ def test_an_unheld_claim_past_the_end_fails(tmp_path):
     assert ["does not match its digest" in issue for issue in _issues(case_dir)] == [
         True
     ]
+
+
+def _signed_case(tmp_path, first_signer):
+    """A copy of case 08 with every row signed but the first, which carries ``first_signer``."""
+    case_dir = tmp_path / "08-sso-identity-broker"
+    shutil.copytree(verify_corpus.CORPUS_DIR / case_dir.name, case_dir)
+    path = facts_path(case_dir)
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["rows"][0]["reviewed_by"] = first_signer
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    return case_dir
+
+
+def test_a_blank_signer_leaves_its_row_unsigned(tmp_path):
+    """``parsing.signer`` reads ``""`` as nobody, and so does every reader here."""
+    case_dir = _signed_case(tmp_path, "")
+
+    assert replay.unsigned_rows(tmp_path, load_case(case_dir)) == 1
+    assert replay.signed_reference(tmp_path, load_case(case_dir)) is None
+
+
+@pytest.mark.parametrize("blank", [" ", "\t", 7])
+def test_a_signer_that_names_nobody_refuses_the_file(tmp_path, blank):
+    case_dir = _signed_case(tmp_path, blank)
+
+    with pytest.raises(CorpusError, match="names nobody"):
+        load_facts(case_dir)
+
+
+@pytest.mark.parametrize(
+    ("model", "field"),
+    [
+        (FactRow, "reviewed_by"),
+        (Dispute, "reviewed_by"),
+        (UnheldFact, "reviewed_by"),
+        (SubjectAlias, "reviewed_by"),
+        (QualifierAlias, "reviewed_by"),
+        (RuledReading, "reviewed_by"),
+        (CriticFixture, "reviewed_by"),
+    ],
+)
+def test_every_signer_field_reads_through_the_one_rule(model, field):
+    """Each field that says who signed runs ``parsing.signer`` as it loads."""
+    assert any(
+        isinstance(item, BeforeValidator) and item.func is signer
+        for item in model.model_fields[field].metadata
+    )

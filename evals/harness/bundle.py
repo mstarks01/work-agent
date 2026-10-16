@@ -21,6 +21,7 @@ claim set; every neutral reader goes through :func:`framework_block` or
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
@@ -107,6 +108,25 @@ def reports_dir(out: str | Path) -> Path:
     operator point them at two different ones.
     """
     return Path(out).with_suffix(REPORTS_SUFFIX)
+
+
+def check_out(*paths: str | Path | None) -> None:
+    """Refuse an output path that a paid command could not write.
+
+    A paid command calls this before its first model call. A write that fails
+    after the spend costs the money and keeps nothing (#886). ``None`` is a
+    flag that the caller did not pass.
+    """
+    for given in paths:
+        if given is None:
+            continue
+        path = Path(given)
+        if path.is_dir():
+            raise modes.EvalRunError(f"{path}: is a folder, not a file to write")
+        if not path.parent.is_dir():
+            raise modes.EvalRunError(f"{path}: the folder {path.parent} does not exist")
+        if not os.access(path.parent, os.W_OK):
+            raise modes.EvalRunError(f"{path}: the folder {path.parent} is read-only")
 
 
 def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) -> None:

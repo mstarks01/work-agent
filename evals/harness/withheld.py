@@ -105,7 +105,7 @@ def load_answer_file(path: Path) -> AnswerFile | None:
     try:
         signed_by = signer(raw.get("signed_by"))
     except ValueError as exc:
-        raise EvalRunError(f"{path}: {exc}") from exc
+        raise EvalRunError(f"{path}: signed_by: {exc}") from exc
     if signed_by is None:
         return None
     withheld = raw.get("withheld", {})

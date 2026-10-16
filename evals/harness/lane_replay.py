@@ -69,7 +69,7 @@ from analysis_service.graph import (
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import lane_closing
 from evals.harness.artifact import repo_commit
-from evals.harness.bundle import reports_dir
+from evals.harness.bundle import check_out, reports_dir
 from evals.harness.descendants import FRAMEWORK as SCORED
 from evals.harness.descendants import lane_must_finds
 from evals.harness.modes import EvalRunError, case_framework_options
@@ -303,6 +303,7 @@ def command_lane_replay(args: argparse.Namespace) -> int:
                 "--prepare-today builds the whole request, so it takes neither"
                 " --fresh-leads nor --append"
             )
+        check_out(args.out)
         case = load_case(REPO_ROOT / DEFAULT_CORPUS / args.case)
         if args.prepare_today is not None:
             prepared = prepare_today(case, args.framework, args.prepare_today)

@@ -781,6 +781,22 @@ class TestAssembleAndVerify:
         with pytest.raises(BaselineError, match="no reports directory"):
             assemble(tmp_path, "ada", [source])
 
+    def test_a_refused_later_sweep_copies_nothing(self, tmp_path, priced):
+        """Every sweep is checked before any is copied.
+
+        A refusal after the first copy would leave files that no manifest entry
+        owns, and the next ``verify`` names them as strays.
+        """
+        good = write_sweep(tmp_path, sweep_document(seed=1), "one")
+        bare = tmp_path / "bare.json"
+        bare.write_text(json.dumps(sweep_document(seed=2), indent=2), "utf-8")
+
+        with pytest.raises(BaselineError, match="no reports directory"):
+            assemble(tmp_path, "ada", [good, bare])
+
+        baselines = tmp_path / "evals" / "baselines"
+        assert not baselines.exists() or not any(baselines.rglob("*"))
+
     def test_a_stray_file_is_named(self, tmp_path, priced):
         directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
         (directory / "notes.txt").write_text("hand-written\n", encoding="utf-8")

@@ -234,3 +234,67 @@ def test_a_refused_reading_may_carry_a_verb_its_lane_does_not_take(corpus):
     case = load_case(corpus / CASE)
 
     assert [r.verb for r in case.refused_readings[5]] == ["flood"]
+
+
+def _edit_claims(corpus, edit):
+    path = corpus / CASE / "claims" / "stride.json"
+    claims = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps(edit(claims), indent=2), encoding="utf-8")
+
+
+def _moved(claims):
+    """Claim 2 removed, so index 3 now names the claim after it."""
+    return claims[:2] + claims[3:]
+
+
+def _reworded(claims):
+    claims[3]["claim"] += " Reworded."
+    return claims
+
+
+def _removed(claims):
+    """Index 3 names no claim; the claims the case's rulings name stay."""
+    return [claims[3], claims[5]]
+
+
+@pytest.mark.parametrize("edit", [_moved, _reworded, _removed])
+def test_a_ruling_on_a_claim_that_changed_since_the_ballot_is_refused(
+    tmp_path, corpus, edit
+):
+    """The reader ruled on the claim the ballot showed, not the one at its index now."""
+    case = load_case(corpus / CASE)
+    issued = _issue(tmp_path, case, _tampering_draft(case, 3))
+    returned = tmp_path / "returned.csv"
+    _write(
+        returned,
+        [{"n": "1", "verdict": "same", "note": "why"}],
+        ["n", "verdict", "note"],
+    )
+    answered = near_misses.returned_rows(issued, returned)
+    _edit_claims(corpus, edit)
+    before = (corpus / CASE / RULINGS_FILE).read_bytes()
+
+    with pytest.raises(ValueError, match="row 1: reference claim 3"):
+        near_misses.record(answered, corpus, "reader", "ballot")
+
+    assert (corpus / CASE / RULINGS_FILE).read_bytes() == before
+
+
+@pytest.mark.parametrize("reviewed_by", [" ", "\t"])
+def test_a_ruling_signed_by_nobody_is_refused(tmp_path, corpus, reviewed_by):
+    case = load_case(corpus / CASE)
+    issued = _issue(tmp_path, case, _tampering_draft(case, 3))
+    returned = tmp_path / "returned.csv"
+    _write(
+        returned,
+        [{"n": "1", "verdict": "same", "note": "why"}],
+        ["n", "verdict", "note"],
+    )
+    before = (corpus / CASE / RULINGS_FILE).read_bytes()
+
+    with pytest.raises(CorpusError, match="names nobody"):
+        near_misses.record(
+            near_misses.returned_rows(issued, returned), corpus, reviewed_by, "b"
+        )
+
+    assert (corpus / CASE / RULINGS_FILE).read_bytes() == before

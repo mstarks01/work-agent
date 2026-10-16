@@ -281,6 +281,14 @@ class TestTheKeyring:
         with pytest.raises(KeyringError):
             load_keyring(self.write(tmp_path, body))
 
+    @pytest.mark.parametrize(
+        "key", ["not base64 !", "AA==", base64.b64encode(b"x" * 31).decode()]
+    )
+    def test_a_key_that_does_not_decode_is_refused_at_load(self, tmp_path, key):
+        body = self.valid().replace(public(KEY), key)
+        with pytest.raises(KeyringError, match="not a raw Ed25519 public key"):
+            load_keyring(self.write(tmp_path, body))
+
     def test_revoking_by_appending_a_second_entry_is_refused(self, tmp_path):
         # The fail-open this closes. An operator who revokes a key by adding a
         # revoked entry rather than editing the active one leaves two entries
@@ -362,6 +370,16 @@ class TestTheStandaloneVerifier:
         (tmp_path / "report.json").write_text(json.dumps(report), encoding="utf-8")
         code = self.run(tmp_path, "--attestation", str(tmp_path / "sig.json"))
         assert code == verify_report.EXIT_CODES["invalid"]
+
+    def test_a_key_that_does_not_decode_is_a_usage_error(self, tmp_path, capsys):
+        self.files(tmp_path)
+        keyring = tmp_path / "keyring.toml"
+        keyring.write_text(
+            keyring.read_text(encoding="utf-8").replace(public(KEY), "AA=="),
+            encoding="utf-8",
+        )
+        assert self.run(tmp_path, "--attestation", str(tmp_path / "sig.json")) == 2
+        assert KEY_ID in capsys.readouterr().err
 
     def test_an_unusable_keyring_is_a_usage_error_not_a_verdict(self, tmp_path):
         self.files(tmp_path)
@@ -462,7 +480,7 @@ class TestATimeIsComparableToAnother:
     def test_an_aware_one_is_accepted(self):
         key = VerificationKey(
             key_id="k1",
-            public_key="AA==",
+            public_key=public(KEY),
             status="retired",
             retired_at=datetime(2026, 9, 2, 12, 0, 0, tzinfo=UTC),
         )

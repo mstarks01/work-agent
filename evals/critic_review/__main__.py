@@ -37,6 +37,8 @@ from evals.critic_review.loading import (
 )
 from evals.critic_review.model import CriticFixture
 from evals.critic_review.replay import replay, user_turn
+from evals.harness.bundle import check_out
+from evals.harness.modes import EvalRunError
 from evals.harness.node_call import node_call
 
 
@@ -83,6 +85,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--out", help="write the full per-fixture record here")
     args = parser.parse_args(argv)
+    try:
+        check_out(args.out)
+    except EvalRunError as refusal:
+        print(refusal, file=sys.stderr)
+        return 1
 
     fixtures = load_fixtures()
     unsigned = [entry.id for entry in fixtures if entry.reviewed_by is None]

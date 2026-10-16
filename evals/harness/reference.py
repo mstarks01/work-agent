@@ -46,10 +46,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     ValidationError,
@@ -66,6 +67,7 @@ from analysis_service.claims import (
 from analysis_service.frameworks.asvs.record import AsvsChapter
 from analysis_service.frameworks.stride.record import LANES_OF_VERB, StrideCategory
 from analysis_service.markdown_loader import RESOLVE_ERRORS
+from analysis_service.parsing import signer
 from analysis_service.sources import MAX_LABEL_CHARS, Source, SourceKind
 from analysis_service.system_model import DataFlow, SystemModel
 from analysis_service.validation import parse_and_validate
@@ -270,7 +272,7 @@ class RuledReading(BaseModel):
     reading: Reading
     verdict: RulingVerdict
     ruling: str = Field(min_length=1, max_length=1000)
-    reviewed_by: str = Field(min_length=1, max_length=100)
+    reviewed_by: Annotated[str, BeforeValidator(signer), Field(max_length=100)]
     source: str = Field(min_length=1, max_length=300)
 
 
