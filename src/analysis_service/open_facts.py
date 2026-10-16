@@ -7,7 +7,8 @@ question many times and hides which answer would settle the most. This groups
 them the other way round: each open fact once, with the findings that cite it.
 
 **Deterministic, and derived from the report alone.** No model is asked. The
-grouping reads each verdict's ``related_unknowns`` through
+grouping reads what each finding waits on
+(:meth:`~analysis_service.claims.RuledClaim.waits_on`) through
 :attr:`~analysis_service.claims.UnknownRef.key`, the one reader of "are these two
 references the same", and labels an element through the report's own System
 Model. Nothing here is stored on the report: it is computed wherever a reader
@@ -170,7 +171,7 @@ def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, 
     for claim in block.claims:
         if claim.verdict.status != NEEDS_INFO:
             continue
-        refs = claim.verdict.related_unknowns
+        refs = claim.waits_on()
         needs[claim.id] = {ref.key for ref in refs}
         for ref in refs:
             labels.setdefault(ref.key, label_of(ref, names))

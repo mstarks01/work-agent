@@ -50,13 +50,10 @@ def conditions(
     some facets: the finding is neither confirmed nor cleared, and nothing
     reads the fact as absent.
 
-    The card shows the facts the finding's verdict names in
-    ``related_unknowns``, as
-    :attr:`~analysis_service.claims.ProposedVerdict.status` and
-    :func:`~analysis_service.open_facts.open_facts` read them. A ground the
-    critic dismissed is not one. The follow-up still asks that ground and
-    counts the finding as waiting on it
-    (:func:`~analysis_service.questions.follow_up_needs`).
+    The card shows the facts the finding waits on
+    (:meth:`~analysis_service.claims.RuledClaim.waits_on`), which the
+    follow-up's counts and order read too. A ground the critic dismissed is
+    not one (ADR 0094).
     """
     names = element_names(model)
     said = {answer.key: answer for answer in answered}
@@ -70,7 +67,7 @@ def conditions(
         for claim in block.all_claims():
             if claim.verdict.status != "needs-info":
                 continue
-            cites = claim.verdict.related_unknowns
+            cites = claim.waits_on()
             refs = {ref.key: ref for ref in cites}
             wanted = needs_of(cites)
             found[f"{block.framework}/{claim.id}"] = [
@@ -104,10 +101,7 @@ def corrected_findings(
     attributes = {attribute_place(key) for key in keys if fact_kind(key) == "attribute"}
 
     def rests_on(claim: Any) -> bool:
-        cited = {
-            ref.key
-            for ref in [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
-        }
+        cited = {ref.key for ref in [*claim.unknown_grounds(), *claim.waits_on()]}
         if cited & keys:
             return True
         for ground in claim.grounds:

@@ -207,10 +207,11 @@ class FollowUpNeeds:
 
     #: Each draft's open grounds, whatever its verdict.
     evidence: Mapping[Finding, frozenset[UnknownKey]]
-    #: The open facts a ``needs-info`` verdict names.
+    #: The open facts each draft waits on
+    #: (:meth:`~analysis_service.claims.RuledClaim.waits_on`).
     named: Mapping[Finding, frozenset[UnknownKey]]
-    #: Each conditional finding's ``evidence`` and ``named`` facts together, so
-    #: a ground the critic dismissed is one. An answer to each covers the finding.
+    #: Each conditional finding's ``named`` facts: the findings an answer can
+    #: cover. A ground the critic dismissed is not one (ADR 0094).
     waiting: Mapping[Finding, frozenset[UnknownKey]]
     #: Each draft's band, as its package ranks it.
     bands: Mapping[Finding, Band]
@@ -231,19 +232,15 @@ def follow_up_needs(
 ) -> FollowUpNeeds:
     """Every open fact each draft waits on, as :func:`fact_questions` reads them.
 
-    A fact ``earlier`` answers in full is not open. **The verdict decides
-    whether a finding is conditional:** a ``needs-info`` finding is
-    conditional unless ``earlier`` answers a fact its verdict's
-    ``related_unknowns`` names without settling it, because no answer in the
-    list can cover it. Those are the facts its card in
-    :func:`~analysis_service.report_conditions.conditions` shows.
-
-    **A conditional finding waits on more than its card shows.** ``waiting``
-    joins its open grounds (``evidence``) and the open facts its verdict
-    names (``named``). So a ground the critic dismissed still ranks the
-    finding's facts in :func:`follow_up_order`, names the finding in
-    :attr:`FactQuestion.findings`, and must be answered before
-    :attr:`FactQuestion.covered_so_far` counts the finding.
+    A fact ``earlier`` answers in full is not open. A finding waits on the
+    facts :meth:`~analysis_service.claims.RuledClaim.waits_on` reads, which
+    are the facts its card in
+    :func:`~analysis_service.report_conditions.conditions` shows. A ground the
+    critic dismissed is not one (ADR 0094): it is only ``evidence``, which
+    sets a question's basis and places it among the facts no waiting finding
+    needs. A ``needs-info`` finding is conditional unless ``earlier`` answers
+    a fact it waits on without settling it, because no answer in the list can
+    cover it.
 
     **A finding that needs only some facets of a kind**
     (:func:`~analysis_service.fact_answers.needs_of`) waits on it until those
@@ -263,7 +260,8 @@ def follow_up_needs(
         for claim in block.all_claims():
             finding = (block.framework, claim.id)
             bands[finding] = rank(claim)
-            wanted = needs_of(claim.verdict.related_unknowns)
+            waited = claim.waits_on()
+            wanted = needs_of(waited)
             covered = {
                 key for key, need in wanted.items() if covers(said.get(key), need)
             }
@@ -283,27 +281,18 @@ def follow_up_needs(
                 if _open(ref, prepared) and ref.key not in done
             ]
             evidence[finding] = frozenset(ref.key for ref in grounds)
-            cited = list(grounds)
-            if claim.verdict.status == "needs-info":
-                verdict = [
-                    ref
-                    for ref in claim.verdict.related_unknowns
-                    if _open(ref, prepared)
-                    and ref.key not in done
-                    and ref.key not in covered
-                ]
-                named[finding] = frozenset(ref.key for ref in verdict)
-                cited += verdict
-            for ref in cited:
+            verdict = [
+                ref
+                for ref in waited
+                if _open(ref, prepared) and ref.key not in done | covered
+            ]
+            named[finding] = frozenset(ref.key for ref in verdict)
+            for ref in (*grounds, *verdict):
                 refs.setdefault(ref.key, ref)
-    waiting = {
-        finding: evidence.get(finding, frozenset()) | named.get(finding, frozenset())
-        for finding in conditional
-    }
     return FollowUpNeeds(
         evidence=evidence,
         named=named,
-        waiting={finding: keys for finding, keys in waiting.items() if keys},
+        waiting={finding: named[finding] for finding in conditional if named[finding]},
         bands=bands,
         refs=refs,
         facets=facets,
@@ -315,9 +304,10 @@ def follow_up_order(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
 
     **The findings that wait decide the order** (ADR 0056). The facts the
     conditional findings wait on come first, the most important findings'
-    first (:func:`_by_band`), the critic's facts among them. The facts of the
-    other drafts follow: a confirmed or rejected draft, and one that waits on
-    a fact answered "I don't know", which no answer here can complete. Each
+    first (:func:`_by_band`), the critic's facts among them. The facts no
+    waiting finding needs follow: those of a confirmed or rejected draft, of
+    one that waits on a fact answered "I don't know", which no answer here can
+    complete, and a ground the critic dismissed (ADR 0094). Each
     fact is ``evidence`` where any draft's own grounds cite it, and
     ``critic`` where only a verdict names it.
 
@@ -336,7 +326,7 @@ def follow_up_order(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
                 | needs.named.get(finding, frozenset())
             )
             - asked
-            for finding in needs.bands.keys() - needs.waiting.keys()
+            for finding in needs.bands
         },
         band,
     )
@@ -371,7 +361,7 @@ def fact_questions(
     Each question counts the findings of every framework together, because one
     answer settles a fact for every framework that cites it. ``cited_by`` and
     ``covered_so_far`` count only the conditional findings, which are the ones
-    waiting on an answer, by their grounds and their verdict. A confirmed
+    waiting on an answer, by the facts they wait on. A confirmed
     finding and a rejected draft rank the questions and are not counted: the
     first waits on nothing, and no answer brings the second into the report.
 
