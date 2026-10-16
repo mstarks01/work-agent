@@ -1,0 +1,1158 @@
+{
+  "artifact_version": 7,
+  "mode": "extraction",
+  "cases": [
+    "12-overclaiming-supplier-portal"
+  ],
+  "models": {
+    "tiers_config_version": 9,
+    "tiers": {
+      "base": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-luna",
+        "upstreams": [
+          "openai/flex"
+        ]
+      },
+      "strong": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-terra",
+        "upstreams": [
+          "openai/flex"
+        ]
+      },
+      "review": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-terra",
+        "upstreams": [
+          "openai/flex"
+        ]
+      }
+    }
+  },
+  "gating": "tier-1-structural-only",
+  "certification": {
+    "certified": false,
+    "uncertified_nodes": [
+      {
+        "node": "extract",
+        "fingerprint": "ea5b15b5ceba04db0853b0051154ef89787ade20a9708cf7c8de3c90816c9b0c"
+      }
+    ],
+    "unexercised_tiers": []
+  },
+  "provenance": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.104.0"
+    },
+    "sampling_config_version": 5,
+    "tiers_config_version": 9,
+    "sampling": {
+      "base": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 16384,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      },
+      "strong": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      },
+      "review": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      }
+    },
+    "node_runs": {
+      "extract": [
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "c8a8d740c7debfb4e1ef873718bd28ad689f669dba2aa14eca7c20538d92a68a",
+          "generation_fingerprint": "ea5b15b5ceba04db0853b0051154ef89787ade20a9708cf7c8de3c90816c9b0c",
+          "served_upstream": "OpenAI"
+        }
+      ]
+    },
+    "generation_identities": {
+      "base": {
+        "requested_models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "served_models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "instruction_digests": [
+          "c8a8d740c7debfb4e1ef873718bd28ad689f669dba2aa14eca7c20538d92a68a"
+        ],
+        "fingerprints": [
+          "ea5b15b5ceba04db0853b0051154ef89787ade20a9708cf7c8de3c90816c9b0c"
+        ],
+        "nodes": [
+          "extract"
+        ]
+      }
+    }
+  },
+  "node_usage": {
+    "extract": {
+      "prompt_tokens": 6893,
+      "cached_prompt_tokens": 0,
+      "cache_write_tokens": 2446,
+      "completion_tokens": 3572,
+      "reasoning_tokens": 1552,
+      "total_tokens": 10465
+    }
+  },
+  "node_charges": {
+    "extract": 0.00289365
+  },
+  "node_latency": {
+    "extract": {
+      "executions": 1,
+      "total_ms": 32952,
+      "slowest_ms": 32952,
+      "mean_ms": 32952
+    }
+  },
+  "structural_failures": [],
+  "mode_output": [
+    {
+      "case": "12-overclaiming-supplier-portal",
+      "recall": 0.389,
+      "precision": 0.412,
+      "endpoint_recall": 0.5,
+      "interaction_recall": 0.333,
+      "zone_recall": 0.25,
+      "sourced_zone_recall": 0.25,
+      "zone_partition_agreement": 1.0,
+      "same_zone_recall": 1.0,
+      "different_zone_agreement": 1.0,
+      "zone_pair_coverage": 0.75,
+      "endpoint_missing": [
+        "boundary:cloud-account",
+        "boundary:public-internet",
+        "boundary:vendor-platform",
+        "entity:portal-vendor",
+        "flow:entity:category-manager>process:supplier-portal",
+        "flow:entity:portal-vendor>store:landing-bucket",
+        "flow:entity:supplier>process:supplier-portal",
+        "flow:process:supplier-portal>store:document-store",
+        "process:supplier-portal",
+        "store:document-store"
+      ],
+      "endpoint_extra": [
+        "boundary:our-cloud-account",
+        "boundary:vendor-hosting",
+        "entity:vendor",
+        "flow:entity:category-manager>process:supplier-document-portal",
+        "flow:entity:supplier>process:supplier-document-portal",
+        "flow:entity:vendor>store:landing-bucket",
+        "flow:process:supplier-document-portal>store:vendor-platform",
+        "process:supplier-document-portal",
+        "store:vendor-platform"
+      ],
+      "name_tokens_absent_from_source": [],
+      "sourced_recall": 0.714,
+      "aliased": [
+        {
+          "reference": "entity:portal-vendor",
+          "produced": "entity:vendor",
+          "evidence": "alias",
+          "excerpt": "The vendor hosts it"
+        },
+        {
+          "reference": "process:supplier-portal",
+          "produced": "process:supplier-document-portal",
+          "evidence": "alias",
+          "excerpt": "Supplier document portal."
+        },
+        {
+          "reference": "store:document-store",
+          "produced": "store:vendor-platform",
+          "evidence": "alias",
+          "excerpt": "documents themselves stay in the vendor's platform"
+        }
+      ],
+      "alignment": {
+        "pairs": [
+          {
+            "reference": "boundary:corporate-network",
+            "produced": "boundary:corporate-network",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "entity:category-manager",
+            "produced": "entity:category-manager",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "entity:supplier",
+            "produced": "entity:supplier",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "process:supplier-master-service",
+            "produced": "process:supplier-master-service",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "store:landing-bucket",
+            "produced": "store:landing-bucket",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "store:supplier-database",
+            "produced": "store:supplier-database",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "entity:portal-vendor",
+            "produced": "entity:vendor",
+            "evidence": "alias",
+            "excerpt": "The vendor hosts it"
+          },
+          {
+            "reference": "process:supplier-portal",
+            "produced": "process:supplier-document-portal",
+            "evidence": "alias",
+            "excerpt": "Supplier document portal."
+          },
+          {
+            "reference": "store:document-store",
+            "produced": "store:vendor-platform",
+            "evidence": "alias",
+            "excerpt": "documents themselves stay in the vendor's platform"
+          },
+          {
+            "reference": "boundary:cloud-account",
+            "produced": "boundary:our-cloud-account",
+            "evidence": "membership",
+            "excerpt": ""
+          },
+          {
+            "reference": "boundary:vendor-platform",
+            "produced": "boundary:vendor-hosting",
+            "evidence": "membership",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:entity:category-manager>process:supplier-portal>review-documents",
+            "produced": "flow:entity:category-manager>process:supplier-document-portal>review-paperwork",
+            "evidence": "discriminated",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:entity:supplier>process:supplier-portal>upload-documents",
+            "produced": "flow:entity:supplier>process:supplier-document-portal>upload-paperwork",
+            "evidence": "discriminated",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+            "produced": "flow:entity:vendor>store:landing-bucket>push-extract",
+            "evidence": "discriminated",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:supplier-portal>store:document-store>store-documents",
+            "produced": "flow:process:supplier-document-portal>store:vendor-platform>store-documents",
+            "evidence": "label",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+            "produced": "flow:process:supplier-master-service>store:landing-bucket>load-extract",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+            "produced": "flow:process:supplier-master-service>store:supplier-database>write-records",
+            "evidence": "discriminated",
+            "excerpt": ""
+          }
+        ],
+        "unaligned_reference": [
+          "boundary:public-internet"
+        ],
+        "unaligned_produced": [],
+        "ambiguous": []
+      },
+      "aligned_recall": 1.0,
+      "aligned_precision": 1.0,
+      "aligned_interaction_recall": 1.0,
+      "aligned_interaction_precision": 1.0,
+      "actor_recall": 1.0,
+      "same_type_unmatched_candidates": [],
+      "extra_status": {
+        "boundary:our-cloud-account": "equivalent",
+        "boundary:vendor-hosting": "equivalent",
+        "entity:vendor": "equivalent",
+        "flow:entity:category-manager>process:supplier-document-portal>review-paperwork": "equivalent",
+        "flow:entity:supplier>process:supplier-document-portal>upload-paperwork": "equivalent",
+        "flow:entity:vendor>store:landing-bucket>push-extract": "equivalent",
+        "flow:process:supplier-document-portal>store:vendor-platform>store-documents": "equivalent",
+        "flow:process:supplier-master-service>store:supplier-database>write-records": "equivalent",
+        "process:supplier-document-portal": "equivalent",
+        "store:vendor-platform": "equivalent"
+      },
+      "initiator_recall": 1.0,
+      "initiators_missing": [],
+      "crossings_match": false,
+      "crossings_recall": 0.0,
+      "crossings_precision": 0.0,
+      "crossings_derivable": true,
+      "crossings_undecidable": [
+        "flow:entity:supplier>process:supplier-document-portal"
+      ],
+      "crossings_missing": [
+        "flow:entity:category-manager>process:supplier-portal",
+        "flow:entity:portal-vendor>store:landing-bucket",
+        "flow:entity:supplier>process:supplier-portal"
+      ],
+      "missing": [
+        "boundary:cloud-account",
+        "boundary:public-internet",
+        "boundary:vendor-platform",
+        "entity:portal-vendor",
+        "flow:entity:category-manager>process:supplier-portal>review-documents",
+        "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
+        "flow:entity:supplier>process:supplier-portal>upload-documents",
+        "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
+        "flow:process:supplier-portal>store:document-store>store-documents",
+        "process:supplier-portal",
+        "store:document-store"
+      ],
+      "extra": [
+        "boundary:our-cloud-account",
+        "boundary:vendor-hosting",
+        "entity:vendor",
+        "flow:entity:category-manager>process:supplier-document-portal>review-paperwork",
+        "flow:entity:supplier>process:supplier-document-portal>upload-paperwork",
+        "flow:entity:vendor>store:landing-bucket>push-extract",
+        "flow:process:supplier-document-portal>store:vendor-platform>store-documents",
+        "flow:process:supplier-master-service>store:supplier-database>write-records",
+        "process:supplier-document-portal",
+        "store:vendor-platform"
+      ],
+      "scored_field_agreement": 0.807,
+      "state_agrees_unbased": 0,
+      "control_state_agreement": 0.792,
+      "attributes_compared": 57,
+      "attributes_comparable": 59,
+      "comparison_coverage": 0.966,
+      "attributes_differing": [
+        {
+          "element": "entity:supplier",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "business-critical-data, credentials, pii"
+        },
+        {
+          "element": "entity:category-manager",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "business-critical-data, pii"
+        },
+        {
+          "element": "entity:portal-vendor",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "business-critical-data, credentials, pii"
+        },
+        {
+          "element": "process:supplier-portal",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "business-critical-data, credentials, pii"
+        },
+        {
+          "element": "process:supplier-master-service",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": "business-critical-data, pii"
+        },
+        {
+          "element": "store:document-store",
+          "attribute": "encryption_at_rest",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "store:document-store",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "store:landing-bucket",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "store:supplier-database",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "flow:entity:supplier>process:supplier-portal>upload-documents",
+          "attribute": "assets",
+          "blessed": "business-critical-data, pii",
+          "extracted": "business-critical-data, credentials, pii"
+        },
+        {
+          "element": "flow:entity:category-manager>process:supplier-portal>review-documents",
+          "attribute": "authentication",
+          "blessed": "unverified",
+          "extracted": "stated"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 3,
+        "measured": 3,
+        "uncited": 0,
+        "tokenless": 0,
+        "exhausted": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    }
+  ],
+  "trusted": false,
+  "repo_commit": {
+    "commit": "624c7d207f36b7dbc6a081910e699c73fff05991",
+    "clean": true
+  },
+  "corpus_digest": "82961fc5d15274ffa13581482d13b60ed8944628a7bc1e2a8dbdc69a2bfb7578",
+  "flow_identity_version": 2,
+  "frameworks": [
+    "asvs",
+    "stride"
+  ],
+  "stopped": [],
+  "series": {},
+  "completion": {
+    "attempted": 1,
+    "scored": 0,
+    "failed": 0,
+    "stopped_before": 0
+  },
+  "attribute_aggregate": {
+    "compared": 57,
+    "agreed": 46,
+    "agreement": 0.807,
+    "by_attribute": {
+      "boundary.kind": {
+        "compared": 3,
+        "agreed": 3,
+        "agreement": 1.0
+      },
+      "entity.kind": {
+        "compared": 3,
+        "agreed": 3,
+        "agreement": 1.0
+      },
+      "process.exposure": {
+        "compared": 2,
+        "agreed": 2,
+        "agreement": 1.0
+      },
+      "process.interface_kind": {
+        "compared": 2,
+        "agreed": 2,
+        "agreement": 1.0
+      },
+      "boundary.assets": {
+        "compared": 3,
+        "agreed": 3,
+        "agreement": 1.0
+      },
+      "entity.assets": {
+        "compared": 3,
+        "agreed": 0,
+        "agreement": 0.0
+      },
+      "flow.assets": {
+        "compared": 6,
+        "agreed": 5,
+        "agreement": 0.833
+      },
+      "process.assets": {
+        "compared": 2,
+        "agreed": 0,
+        "agreement": 0.0
+      },
+      "store.assets": {
+        "compared": 3,
+        "agreed": 3,
+        "agreement": 1.0
+      },
+      "flow.operations": {
+        "compared": 6,
+        "agreed": 6,
+        "agreement": 1.0
+      },
+      "flow.protocol": {
+        "compared": 6,
+        "agreed": 6,
+        "agreement": 1.0
+      },
+      "flow.authentication": {
+        "compared": 6,
+        "agreed": 5,
+        "agreement": 0.833
+      },
+      "flow.encryption_in_transit": {
+        "compared": 6,
+        "agreed": 6,
+        "agreement": 1.0
+      },
+      "store.encryption_at_rest": {
+        "compared": 3,
+        "agreed": 2,
+        "agreement": 0.667
+      },
+      "store.data_classification": {
+        "compared": 3,
+        "agreed": 0,
+        "agreement": 0.0
+      }
+    }
+  },
+  "grounds": [],
+  "grounds_failures": [],
+  "grounds_aggregate": null,
+  "coverage": [
+    {
+      "framework": "asvs",
+      "lane": "encoding-and-sanitization",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "validation-and-business-logic",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "web-frontend-security",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "api-and-web-service",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "file-handling",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "authentication",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "session-management",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "authorization",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "self-contained-tokens",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "oauth-and-oidc",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "cryptography",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "secure-communication",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "configuration",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "data-protection",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "secure-coding-and-architecture",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "security-logging-and-error-handling",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "webrtc",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "spoofing",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "tampering",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "repudiation",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "information-disclosure",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "denial-of-service",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "elevation-of-privilege",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    }
+  ],
+  "coverage_totals": {
+    "cases": 0,
+    "drafts": 0,
+    "rules_fired": 0,
+    "rules": 0,
+    "candidates": 0,
+    "candidates_cited": 0,
+    "elements": 0,
+    "elements_cited": 0,
+    "boundary_crossings": 0,
+    "boundary_crossings_cited": 0,
+    "unknown_controls": 0,
+    "unknown_controls_cited": 0,
+    "cited_rates": {
+      "candidates_cited": 0.0,
+      "elements_cited": 0.0,
+      "boundary_crossings_cited": 0.0,
+      "unknown_controls_cited": 0.0
+    }
+  },
+  "filler": {},
+  "instruction": [
+    {
+      "framework": "(shared)",
+      "node": "extract",
+      "tokens": 4168,
+      "sha256": "67f6056a744feba6361f39e0aca823299106f6bb484558279ab8067257df931e"
+    }
+  ],
+  "instruction_totals": {
+    "(shared)": {
+      "nodes": 1,
+      "tokens": 4168,
+      "largest": 4168
+    }
+  },
+  "applicability": [],
+  "applicability_aggregate": null,
+  "applicability_exemplar_delta": null,
+  "applicability_holdout_split": null,
+  "over_applied_for_promotion": [],
+  "disposition": [],
+  "disposition_aggregate": null,
+  "applicability_yield": [],
+  "applicability_yield_aggregate": null,
+  "attribution": [],
+  "attribution_aggregate": null,
+  "scores": [],
+  "exemplar_delta": null,
+  "holdout_split": null,
+  "unlisted_for_promotion": [],
+  "critic_yield": [],
+  "critic_yield_aggregate": null,
+  "losses": [],
+  "losses_aggregate": null,
+  "writing": [],
+  "writing_aggregate": {
+    "answered": 0,
+    "objections": 0,
+    "carried": 0,
+    "objection_rate": 0.0,
+    "by_framework": {},
+    "by_reason": {}
+  }
+}

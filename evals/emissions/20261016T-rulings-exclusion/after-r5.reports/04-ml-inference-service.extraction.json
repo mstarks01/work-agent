@@ -1,0 +1,545 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:calling-service",
+        "name": "calling service",
+        "description": "A backend operated by another product team that calls the inference gateway.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "Other teams' backends call our inference gateway",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text mentions two calling services but gives no distinguishing names, so they are represented as one entity.",
+        "kind": "external-system",
+        "trust_zone": "boundary:different-cloud"
+      },
+      {
+        "id": "entity:ml-engineer",
+        "name": "ML engineer",
+        "description": "An engineer who publishes new model artifacts to the registry bucket.",
+        "assets": [],
+        "source_excerpt": "ML engineers publish new model artifacts to the registry bucket.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:inference-gateway",
+        "name": "inference gateway",
+        "description": "A FastAPI service that receives inference requests, forwards them to the model server, and writes requests and responses to the inference log.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "our inference gateway, a FastAPI service on GKE",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Keys are issued per calling team and have never been expired.",
+        "technology": "FastAPI",
+        "trust_zone": "boundary:gke",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:model-server",
+        "name": "model server",
+        "description": "The server that runs the actual model on GPU nodes and reads model artifacts and customer features.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "the model server, which runs the actual model on GPU nodes in our model network",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text says artifact verification is not believed to occur, but does not state a verified control value.",
+        "technology": "unknown",
+        "trust_zone": "boundary:model-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:model-registry-bucket",
+        "name": "model registry bucket",
+        "description": "A bucket containing model artifacts loaded by the model server and published to by ML engineers.",
+        "assets": [],
+        "source_excerpt": "a model registry bucket",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The speaker says they trust the bucket and does not believe anything verifies that an artifact has not been swapped.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:redis-feature-store",
+        "name": "Redis feature store",
+        "description": "A Redis store containing customer features such as account age and spend bands per customer.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "a Redis feature store on the same network",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Redis has no password and is described as reachable only inside the model network.",
+        "technology": "Redis",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:inference-log",
+        "name": "inference log",
+        "description": "A BigQuery log containing every request and response for debugging, including raw prompts.",
+        "assets": [],
+        "source_excerpt": "an inference log in BigQuery",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Raw prompts sometimes carry whatever the calling team's users typed.",
+        "technology": "BigQuery",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:calling-service>process:inference-gateway>call-inference",
+        "name": "call inference",
+        "description": "A calling service sends an inference request to the inference gateway.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "Other teams' backends call our inference gateway",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Callers pass an API key in a header; keys are issued per calling team and have never been expired.",
+        "source": "entity:calling-service",
+        "destination": "process:inference-gateway",
+        "protocol": "unknown",
+        "authentication": "API key in header",
+        "data_description": "Inference request with an API key in a header",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>forward-request",
+        "name": "forward request",
+        "description": "The inference gateway forwards an inference request to the model server.",
+        "assets": [],
+        "source_excerpt": "The gateway forwards the request to the model server",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "none",
+        "data_description": "Inference request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:model-server>store:model-registry-bucket>load-artifacts",
+        "name": "load artifacts",
+        "description": "The model server loads model artifacts from the model registry bucket at startup.",
+        "assets": [],
+        "source_excerpt": "The model server loads model artifacts from a model registry bucket at startup.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The model server uses its own service account for this.",
+        "source": "process:model-server",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "service account",
+        "data_description": "Model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:model-server>store:redis-feature-store>read-features",
+        "name": "read features",
+        "description": "The model server reads customer features from the Redis feature store.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "the model server reads from a Redis feature store",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The feature data includes account age and spend bands per customer.",
+        "source": "process:model-server",
+        "destination": "store:redis-feature-store",
+        "protocol": "unknown",
+        "authentication": "none",
+        "data_description": "Customer features including account age and spend bands per customer",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:inference-gateway>store:inference-log>write-log",
+        "name": "write log",
+        "description": "The inference gateway writes requests and responses to the inference log.",
+        "assets": [],
+        "source_excerpt": "The gateway writes every request and response into an inference log in BigQuery",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "store:inference-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Every inference request and response, including raw prompts",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifacts",
+        "name": "publish artifacts",
+        "description": "An ML engineer publishes new model artifacts to the model registry bucket.",
+        "assets": [],
+        "source_excerpt": "ML engineers publish new model artifacts to the registry bucket.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The speaker is unsure what governs who can push and thinks it may be a shared group account.",
+        "source": "entity:ml-engineer",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "New model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:different-cloud",
+        "name": "different cloud",
+        "description": "The cloud location in which two of the calling services operate.",
+        "assets": [],
+        "source_excerpt": "two of the calling services are in a different cloud",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:gke",
+        "name": "GKE",
+        "description": "The hosting environment where the inference gateway runs.",
+        "assets": [],
+        "source_excerpt": "a FastAPI service on GKE",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:model-network",
+        "name": "model network",
+        "description": "The network containing the model server's GPU nodes and intended to be reachable only from the gateway.",
+        "assets": [],
+        "source_excerpt": "GPU nodes in our model network",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The model network is meant to be reachable only from the gateway.",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The inference gateway presents a web interface because it is described as a FastAPI service.",
+        "element_id": "process:inference-gateway",
+        "attribute": "interface_kind",
+        "basis": "FastAPI is a framework for HTTP application interfaces."
+      },
+      {
+        "assumption": "The Redis feature store's data is confidential.",
+        "element_id": "store:redis-feature-store",
+        "attribute": "data_classification",
+        "basis": "The store contains customer features, including account age and spend bands per customer; disclosure could harm or describe customers."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:calling-service",
+        "name": "calling service",
+        "description": "A backend operated by another product team that calls the inference gateway.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "Other teams' backends call our inference gateway",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text mentions two calling services but gives no distinguishing names, so they are represented as one entity.",
+        "kind": "external-system",
+        "trust_zone": "boundary:different-cloud"
+      },
+      {
+        "id": "entity:ml-engineer",
+        "name": "ML engineer",
+        "description": "An engineer who publishes new model artifacts to the registry bucket.",
+        "assets": [],
+        "source_excerpt": "ML engineers publish new model artifacts to the registry bucket.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:inference-gateway",
+        "name": "inference gateway",
+        "description": "A FastAPI service that receives inference requests, forwards them to the model server, and writes requests and responses to the inference log.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "our inference gateway, a FastAPI service on GKE",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Keys are issued per calling team and have never been expired.",
+        "technology": "FastAPI",
+        "trust_zone": "boundary:gke",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:model-server",
+        "name": "model server",
+        "description": "The server that runs the actual model on GPU nodes and reads model artifacts and customer features.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "the model server, which runs the actual model on GPU nodes in our model network",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text says artifact verification is not believed to occur, but does not state a verified control value.",
+        "technology": "unknown",
+        "trust_zone": "boundary:model-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:model-registry-bucket",
+        "name": "model registry bucket",
+        "description": "A bucket containing model artifacts loaded by the model server and published to by ML engineers.",
+        "assets": [],
+        "source_excerpt": "a model registry bucket",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The speaker says they trust the bucket and does not believe anything verifies that an artifact has not been swapped.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:redis-feature-store",
+        "name": "Redis feature store",
+        "description": "A Redis store containing customer features such as account age and spend bands per customer.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "a Redis feature store on the same network",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Redis has no password and is described as reachable only inside the model network.",
+        "technology": "Redis",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:inference-log",
+        "name": "inference log",
+        "description": "A BigQuery log containing every request and response for debugging, including raw prompts.",
+        "assets": [],
+        "source_excerpt": "an inference log in BigQuery",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Raw prompts sometimes carry whatever the calling team's users typed.",
+        "technology": "BigQuery",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:calling-service>process:inference-gateway>call-inference",
+        "name": "call inference",
+        "description": "A calling service sends an inference request to the inference gateway.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "Other teams' backends call our inference gateway",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Callers pass an API key in a header; keys are issued per calling team and have never been expired.",
+        "source": "entity:calling-service",
+        "destination": "process:inference-gateway",
+        "protocol": "unknown",
+        "authentication": "API key in header",
+        "data_description": "Inference request with an API key in a header",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>forward-request",
+        "name": "forward request",
+        "description": "The inference gateway forwards an inference request to the model server.",
+        "assets": [],
+        "source_excerpt": "The gateway forwards the request to the model server",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "process:model-server",
+        "protocol": "unknown",
+        "authentication": "none",
+        "data_description": "Inference request",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:model-server>store:model-registry-bucket>load-artifacts",
+        "name": "load artifacts",
+        "description": "The model server loads model artifacts from the model registry bucket at startup.",
+        "assets": [],
+        "source_excerpt": "The model server loads model artifacts from a model registry bucket at startup.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The model server uses its own service account for this.",
+        "source": "process:model-server",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "service account",
+        "data_description": "Model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:model-server>store:redis-feature-store>read-features",
+        "name": "read features",
+        "description": "The model server reads customer features from the Redis feature store.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "the model server reads from a Redis feature store",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The feature data includes account age and spend bands per customer.",
+        "source": "process:model-server",
+        "destination": "store:redis-feature-store",
+        "protocol": "unknown",
+        "authentication": "none",
+        "data_description": "Customer features including account age and spend bands per customer",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:inference-gateway>store:inference-log>write-log",
+        "name": "write log",
+        "description": "The inference gateway writes requests and responses to the inference log.",
+        "assets": [],
+        "source_excerpt": "The gateway writes every request and response into an inference log in BigQuery",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:inference-gateway",
+        "destination": "store:inference-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Every inference request and response, including raw prompts",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifacts",
+        "name": "publish artifacts",
+        "description": "An ML engineer publishes new model artifacts to the model registry bucket.",
+        "assets": [],
+        "source_excerpt": "ML engineers publish new model artifacts to the registry bucket.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The speaker is unsure what governs who can push and thinks it may be a shared group account.",
+        "source": "entity:ml-engineer",
+        "destination": "store:model-registry-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "New model artifacts",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:different-cloud",
+        "name": "different cloud",
+        "description": "The cloud location in which two of the calling services operate.",
+        "assets": [],
+        "source_excerpt": "two of the calling services are in a different cloud",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:gke",
+        "name": "GKE",
+        "description": "The hosting environment where the inference gateway runs.",
+        "assets": [],
+        "source_excerpt": "a FastAPI service on GKE",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:model-network",
+        "name": "model network",
+        "description": "The network containing the model server's GPU nodes and intended to be reachable only from the gateway.",
+        "assets": [],
+        "source_excerpt": "GPU nodes in our model network",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The model network is meant to be reachable only from the gateway.",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The inference gateway presents a web interface because it is described as a FastAPI service.",
+        "element_id": "process:inference-gateway",
+        "attribute": "interface_kind",
+        "basis": "FastAPI is a framework for HTTP application interfaces."
+      },
+      {
+        "assumption": "The Redis feature store's data is confidential.",
+        "element_id": "store:redis-feature-store",
+        "attribute": "data_classification",
+        "basis": "The store contains customer features, including account age and spend bands per customer; disclosure could harm or describe customers."
+      }
+    ],
+    "capabilities": []
+  },
+  "issues": [],
+  "repair": null
+}
