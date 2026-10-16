@@ -1241,6 +1241,48 @@ every graph node, every retry and the single-node replays. A scripted or
 recorded response is not affected. The test suite turns it on for every test.
 It guards against an accidental paid call; it is not a spend control.
 
+### Job storage
+
+The [HTTP app](HTTP-API.md) reads these variables at startup. The in-process
+engine keeps no jobs and does not read them. An unset or unknown backend value
+stops the startup. [Job storage](HTTP-API.md#job-storage) in the HTTP API guide
+tells how to set up each backend.
+
+| Variable | Values | Rule |
+| --- | --- | --- |
+| `ANALYSIS_JOB_STORE` | `memory`, `sql` | Required. |
+| `ANALYSIS_OBJECT_STORE` | `filesystem`, `s3` | Required by `sql`. Refused by `memory`. |
+| `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<path>`, `postgresql+asyncpg://<user>@<host>:<port>/<database>` | Required by `sql`. A URL that holds a password stops the startup. |
+| `ANALYSIS_DATABASE_CREDENTIALS` | `password`, `iam` | Required for PostgreSQL. Refused for SQLite. |
+| `ANALYSIS_DATABASE_PASSWORD_FILE` | the path of a file that holds the password | Required by `password`. The only way to give the password. Refused by `iam`. |
+| `ANALYSIS_DATABASE_IAM` | `rds` | Required by `iam`. Refused by `password`. |
+| `ANALYSIS_DATABASE_REGION` | an AWS region, for example `eu-west-1` | Required by `rds`. Refused by `password`. |
+| `ANALYSIS_DATABASE_CA_FILE` | the path of a PEM file of CA certificates | Optional, for PostgreSQL. Unset trusts the system CA bundle. |
+| `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
+| `ANALYSIS_OBJECT_BUCKET` | the name of a bucket | Required by `s3`. |
+| `ANALYSIS_OBJECT_REGION` | the name of a region | Required by `s3`. |
+| `ANALYSIS_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. |
+| `ANALYSIS_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. |
+| `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3`. |
+| `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`, `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` | a path to a file | Required by `api_key`. Refused by `iam`. |
+| `ANALYSIS_RETENTION_DAYS` | a whole number of days from 1 to 36500 | Optional. Unset keeps every job. See [Retention](HTTP-API.md#retention). |
+
+### Bearer auth
+
+The [HTTP app](HTTP-API.md) reads these variables at startup and uses them to
+check the bearer token on each `/v1` request. The in-process engine does not
+read them. An unset or unknown `ANALYSIS_AUTH_PROVIDER` stops the startup.
+[Bearer auth](HTTP-API.md#bearer-auth) in the HTTP API guide lists the
+accepted signing algorithms and shows how to set up an identity provider.
+
+| Variable | Purpose |
+| --- | --- |
+| `ANALYSIS_AUTH_PROVIDER` | Auth backend to use. Today: `oidc`. |
+| `ANALYSIS_OIDC_ISSUER` | Expected `iss` claim — your IdP's issuer URL. |
+| `ANALYSIS_OIDC_AUDIENCE` | Expected `aud` claim — the API's identifier at the IdP. |
+| `ANALYSIS_OIDC_JWKS_URL` | JWKS endpoint the IdP publishes its signing keys at. |
+| `ANALYSIS_OIDC_ALGORITHMS` | *Optional.* Comma-separated accepted signing algorithms. Defaults to `RS256`. |
+
 ## Input limits
 
 Bounds enforced before or during analysis:

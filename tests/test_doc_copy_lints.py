@@ -381,6 +381,30 @@ def test_the_oidc_allowlist_is_the_allowed_algorithms():
     assert documented == ALLOWED_ALGORITHMS
 
 
+# Storage and auth: Configuration.md repeats two HTTP-API.md tables.
+
+
+def _from_http_api(rows: list[list[str]]) -> list[list[str]]:
+    """The rows with each link into HTTP-API.md written as HTTP-API.md writes it."""
+    return [[cell.replace("](HTTP-API.md#", "](#") for cell in row] for row in rows]
+
+
+def test_the_storage_table_is_the_http_api_storage_table():
+    header = ("Variable", "Values", "Rule")
+    copy = table(section(CONFIGURATION, "### Job storage"), *header)
+
+    assert _from_http_api(copy) == table(section(HTTP_API, "## Job storage"), *header)
+
+
+def test_the_auth_table_is_the_http_api_auth_tables():
+    provider, oidc = tables(
+        section(HTTP_API, "### How the provider is chosen"), "Variable", "Purpose"
+    )
+    copy = table(section(CONFIGURATION, "### Bearer auth"), "Variable", "Purpose")
+
+    assert copy == provider + oidc
+
+
 # Routes: the FastAPI app.
 
 
