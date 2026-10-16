@@ -227,7 +227,7 @@ function control(s, onRedraw, suggest = false) {
         type: "password",
         autocomplete: "off",
         value: draft[s.key] === saved[s.key] ? "" : draft[s.key],
-        placeholder: saved[s.key] === "set" ? "Set. Type a new key to replace it." : "Not set. Paste the key.",
+        placeholder: saved[s.key] === "set" ? "Type a new key to replace it." : "Paste the key.",
         oninput: (e) => set(e.target.value || saved[s.key]),
       });
     case "number":
@@ -445,6 +445,29 @@ function variantB() {
 
 // ---- Variant C: one table of every setting, and a changes panel -------------
 
+// Where the value comes from, and nothing else.
+function sourceOf(s) {
+  if (s.source === "outside") {
+    return h("span", {}, h("span", { class: "tag outside" }, "process environment"), h("small", { class: "hint" }, h("code", {}, s.env)));
+  }
+  if (s.source === "page") return h("span", { class: "tag" }, "this page");
+  if (s.source === "file") return h("code", { class: "file" }, s.file);
+  return h("span", { class: "tag" }, "default");
+}
+
+// What the Value cell says beside the control: a key's state, a restart, a
+// value the page only shows, and the vendor's credential mode.
+function valueNotes(s) {
+  const notes = [];
+  if (s.kind === "secret") notes.push(h("small", { class: "hint" }, saved[s.key] === "set" ? "Set." : "Not set."));
+  if (s.restart) notes.push(h("small", { class: "hint" }, "Takes effect after a restart."));
+  if (s.mark === "shows") notes.push(h("small", { class: "hint" }, `Shown only. ${s.reason}`));
+  if (s.source === "outside") notes.push(h("small", { class: "hint" }, "Unset the variable to change this here."));
+  const firstOfVendor = s.vendor && PROTO.settings.find((x) => x.vendor === s.vendor && visible(x)) === s;
+  if (firstOfVendor && modeOf(s.vendor) === "iam") notes.push(h("small", { class: "hint" }, PROTO.mode_notes.iam));
+  return notes;
+}
+
 function variantC() {
   let filter = "";
   const tbody = h("tbody");
@@ -456,25 +479,22 @@ function variantC() {
     tbody.replaceChildren();
     for (const g of groups()) {
       const rows = PROTO.settings.filter(
-        (s) => s.group === g && visible(s) && `${s.label} ${s.env} ${s.key}`.toLowerCase().includes(filter),
+        (s) => s.group === g && visible(s) && `${s.label} ${s.key}`.toLowerCase().includes(filter),
       );
       if (!rows.length && g === "Credentials" && !filter) {
-        tbody.append(h("tr", { class: "groupline" }, h("th", { colspan: 4 }, g)));
-        tbody.append(h("tr", {}, h("td", { colspan: 4, class: "hint" }, "Choose a vendor for a tier. Its credential fields show here.")));
+        tbody.append(h("tr", { class: "groupline" }, h("th", { colspan: 3 }, g)));
+        tbody.append(h("tr", {}, h("td", { colspan: 3, class: "hint" }, "Choose a vendor for a tier. Its credential fields show here.")));
       }
       if (!rows.length) continue;
-      tbody.append(h("tr", { class: "groupline" }, h("th", { colspan: 4 }, g)));
+      tbody.append(h("tr", { class: "groupline" }, h("th", { colspan: 3 }, g)));
       for (const s of rows) {
-        const source =
-          s.mark === "shows" ? "shown only" : s.source === "outside" ? "outside this page" : s.source === "page" ? "this page" : "default";
         tbody.append(
           h(
             "tr",
             { "data-key": s.key },
-            h("td", {}, h("label", { for: `f-${s.key}` }, s.label), s.mark === "shows" ? shownOnly(s) : null),
-            h("td", {}, control(s, draw, true)),
-            h("td", {}, h("span", { class: `tag${s.source === "outside" ? " outside" : ""}` }, source), " ", s.restart ? h("span", { class: "tag restart" }, "restart") : null, s.kind === "secret" ? tags(s)[0] : null),
-            h("td", {}, h("code", {}, s.env || "(TOML only)")),
+            h("td", {}, h("label", { for: `f-${s.key}` }, s.label)),
+            h("td", {}, control(s, draw, true), valueNotes(s)),
+            h("td", {}, sourceOf(s)),
           ),
         );
       }
@@ -496,7 +516,7 @@ function variantC() {
         h("input", {
           id: "filter",
           type: "search",
-          placeholder: "Name or variable",
+          placeholder: "Name of a setting",
           oninput: (e) => {
             filter = e.target.value.toLowerCase();
             fillTable();
@@ -508,7 +528,7 @@ function variantC() {
           h(
             "table",
             { class: "settings" },
-            h("thead", {}, h("tr", {}, h("th", {}, "Setting"), h("th", {}, "Value"), h("th", {}, "Source"), h("th", {}, "Variable"))),
+            h("thead", {}, h("tr", {}, h("th", {}, "Setting"), h("th", {}, "Value"), h("th", {}, "Source"))),
             tbody,
           ),
         ),

@@ -208,6 +208,8 @@ def _settings(state: str) -> list[dict[str, object]]:
             "ANALYSIS_FRAMEWORKS_FILE",
             ["asvs", "stride"],
             options=["asvs", "stride"],
+            source="file",
+            file="config/frameworks.toml",
         ),
         _setting(
             "store.job",
@@ -278,6 +280,8 @@ def _settings(state: str) -> list[dict[str, object]]:
             "number",
             "ANALYSIS_RETRY_ATTEMPTS",
             3,
+            source="file",
+            file="config/resilience.toml",
         ),
         _setting(
             "resilience.timeout_ms",
@@ -286,6 +290,8 @@ def _settings(state: str) -> list[dict[str, object]]:
             "number",
             "ANALYSIS_TIMEOUT_MS",
             300000,
+            source="file",
+            file="config/resilience.toml",
         ),
         _setting(
             "resilience.max_active_jobs",
@@ -294,7 +300,8 @@ def _settings(state: str) -> list[dict[str, object]]:
             "number",
             "ANALYSIS_MAX_ACTIVE_JOBS",
             2 if ready else 3,
-            source="outside" if ready else "default",
+            source="outside" if ready else "file",
+            file="config/resilience.toml",
         ),
         _setting(
             "resilience.max_sources",
@@ -303,14 +310,18 @@ def _settings(state: str) -> list[dict[str, object]]:
             "number",
             "ANALYSIS_MAX_SOURCES",
             10,
+            source="file",
+            file="config/resilience.toml",
         ),
         _setting(
-            "sampling.base.temperature",
+            "sampling.base.max_output_tokens",
             "Sampling",
-            "Base tier temperature",
+            "Base tier output limit (tokens)",
             "number",
-            "ANALYSIS_SAMPLING_BASE_TEMPERATURE",
-            1.0,
+            "ANALYSIS_SAMPLING_BASE_MAX_OUTPUT_TOKENS",
+            16384,
+            source="file",
+            file="config/sampling.toml",
             mark="shows",
             reason="A change makes each run uncertified until a sweep measures it.",
         ),
@@ -321,6 +332,8 @@ def _settings(state: str) -> list[dict[str, object]]:
             "text",
             "",
             "shared",
+            source="file",
+            file="config/model_tiers.toml",
             mark="shows",
             reason="A change makes each run uncertified until a sweep measures it.",
         ),
@@ -440,6 +453,7 @@ _PAGE = """<!doctype html>
   .multi-menu label { display:flex; align-items:center; gap:8px; padding:6px 8px;
     border-radius:5px; }
   table.settings .multi-menu input { width:auto; margin:0; }
+  table.settings input[type=checkbox] { width:auto; margin:0; }
   .multi-menu label:hover { background:var(--soft); }
   table.settings small { display:block; }
   table.settings tr.groupline th { background:var(--sidebar); font-size:12px; }
