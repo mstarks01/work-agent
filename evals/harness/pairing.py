@@ -47,6 +47,7 @@ from analysis_service.claims import (
 from analysis_service.frameworks.asvs.catalog import Requirement, requirements_for
 from analysis_service.frameworks.asvs.record import requirement_of
 from evals.harness.applicability import (
+    APPLIED_CELLS,
     FRAMEWORK,
     ApplicabilityScore,
     declared_level,
@@ -172,24 +173,8 @@ class CasePairing:
             "expected": self.expected,
             "applied": self.applied,
             "agreed": self.agreed,
-            "over_applied": [
-                {
-                    "requirement": pair.requirement,
-                    "lane": pair.lane,
-                    "verdict": pair.verdict,
-                    "argument": pair.argument,
-                }
-                for pair in self.over_applied
-            ],
-            "negatives_applied": [
-                {
-                    "requirement": pair.requirement,
-                    "lane": pair.lane,
-                    "verdict": pair.verdict,
-                    "argument": pair.argument,
-                }
-                for pair in self.negatives_applied
-            ],
+            "over_applied": _applied_json(self.over_applied),
+            "negatives_applied": _applied_json(self.negatives_applied),
             "deferred": [
                 {
                     "requirement": pair.requirement,
@@ -209,6 +194,18 @@ class CasePairing:
                 for pair in self.missed_pairs
             ],
         }
+
+
+def _applied_json(pairs: Sequence[AppliedPair]) -> list[dict[str, str]]:
+    return [
+        {
+            "requirement": pair.requirement,
+            "lane": pair.lane,
+            "verdict": pair.verdict,
+            "argument": pair.argument,
+        }
+        for pair in pairs
+    ]
 
 
 def refuse_path_inside_repo(out: Path) -> Path:
@@ -267,10 +264,14 @@ def pair_case(
     deferrals = _deferrals(block)
 
     applied_pairs = []
-    applied = (*score.matched, *score.over_applied, *score.negatives_applied)
+    applied = [
+        requirement for cell in APPLIED_CELLS for requirement in getattr(score, cell)
+    ]
     for requirement in sorted(applied):
         entry = catalog.get(requirement)
         claim = claims.get(requirement)
+        # Only an ``off_catalog`` requirement has no entry. It has no text to
+        # pair, and it still counts in ``applied``, as it does in precision.
         if entry is None:
             continue
         applied_pairs.append(
@@ -336,12 +337,8 @@ def render(pairing: CasePairing) -> None:
         f" the run applied {pairing.applied},"
         f" both agree on {pairing.agreed}"
     )
-    print(f"\nover-applied ({len(pairing.over_applied)}):")
-    for applied in pairing.over_applied:
-        print(f"  {applied.requirement:<10} {applied.lane:<34} {applied.verdict}")
-    print(f"\nruled out by the case ({len(pairing.negatives_applied)}):")
-    for applied in pairing.negatives_applied:
-        print(f"  {applied.requirement:<10} {applied.lane:<34} {applied.verdict}")
+    _print_applied("over-applied", pairing.over_applied)
+    _print_applied("negatives applied", pairing.negatives_applied)
     print(f"\nexpected, answered only by a deferral ({len(pairing.deferred_pairs)}):")
     for deferred in pairing.deferred_pairs:
         mark = "must-find" if deferred.must_find else "         "
@@ -351,6 +348,12 @@ def render(pairing: CasePairing) -> None:
         mark = "must-find" if missed.must_find else "         "
         why = "deferred" if missed.deferral else "never raised"
         print(f"  {missed.requirement:<10} {mark}  {why:<13} {missed.lane}")
+
+
+def _print_applied(title: str, pairs: Sequence[AppliedPair]) -> None:
+    print(f"\n{title} ({len(pairs)}):")
+    for pair in pairs:
+        print(f"  {pair.requirement:<10} {pair.lane:<34} {pair.verdict}")
 
 
 def _section(title: str, body: str) -> str:
@@ -455,8 +458,8 @@ def render_html(pairing: CasePairing, source: str) -> str:
                 _applied_html(pairing.over_applied),
             ),
             _section(
-                f"Ruled out — {len(pairing.negatives_applied)} the case says do"
-                " not apply",
+                f"Negatives applied — {len(pairing.negatives_applied)} the case"
+                " says do not apply",
                 _applied_html(pairing.negatives_applied),
             ),
             _section(

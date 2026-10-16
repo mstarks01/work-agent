@@ -12,13 +12,18 @@ from pathlib import Path
 import pytest
 
 from analysis_service.frameworks.asvs.catalog import requirements_for
-from evals.harness.applicability import declared_level, score_applicability
+from evals.harness.applicability import (
+    APPLIED_CELLS,
+    declared_level,
+    score_applicability,
+)
 from evals.harness.pairing import (
     ATTRIBUTION,
     REPO_ROOT,
     PairingError,
     pair_case,
     refuse_path_inside_repo,
+    render,
     render_html,
 )
 from tests.eval_factories import corpus_case
@@ -122,17 +127,47 @@ def test_it_lives_outside_the_repo_root_check_only_by_resolution(tmp_path):
         refuse_path_inside_repo(inside)
 
 
-def test_a_requirement_the_case_rules_out_and_the_run_applies_is_shown():
+def test_a_requirement_the_case_labels_not_applicable_and_the_run_applies_is_shown(
+    capsys,
+):
     """``negatives_applied`` is the judged disagreement: the case says the
     requirement does not apply, and the run applied it. The view shows it apart
-    from the unjudged over-applied ones, and counts it as applied."""
+    from the unjudged over-applied ones, under the cell's own name, and counts
+    it as applied."""
     case = corpus_case("04-ml-inference-service")
     score = score_applicability(case, Block([ruling("V9.1.1")]))
 
     pairing = pair_case(case, Block([ruling("V9.1.1")]), score)
+    render(pairing)
 
     assert score.negatives_applied == ("V9.1.1",)
     assert [pair.requirement for pair in pairing.negatives_applied] == ["V9.1.1"]
     assert pairing.over_applied == ()
     assert pairing.applied == 1
-    assert "V9.1.1" in render_html(pairing, "test")
+    (row,) = pairing.to_json()["negatives_applied"]
+    assert row.keys() == {"requirement", "lane", "verdict", "argument"}
+    assert "negatives applied (1):" in capsys.readouterr().out
+    page = render_html(pairing, "test")
+    assert "V9.1.1" in page
+    assert "Negatives applied — 1" in page
+
+
+def test_its_applied_count_is_the_precision_denominator(case, expected):
+    """The view explains the precision figure, so it counts what that divides by.
+
+    An off-catalog requirement has no catalog text to pair, and the run still
+    applied it.
+    """
+    level = declared_level(case)
+    beyond = next(
+        entry.id
+        for entry in requirements_for(3)
+        if entry.id not in {inside.id for inside in requirements_for(level)}
+    )
+    block = Block(ruling(r) for r in [*expected, beyond])
+
+    score = score_applicability(case, block)
+    pairing = pair_case(case, block, score)
+
+    assert score.off_catalog == (beyond,)
+    assert pairing.applied == sum(len(getattr(score, cell)) for cell in APPLIED_CELLS)
