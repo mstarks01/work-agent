@@ -1176,6 +1176,20 @@ class TestReadingAFinishedRun:
         with pytest.raises(graph.GraphProducedNothing):
             graph.result_of({})
 
+    def test_the_bench_reads_a_drive_through_the_one_reader(self):
+        """``evals/bench`` reads its drive's outcome through ``result_of``, so a
+        rejection names its issues rather than raising a bare ``KeyError``."""
+        from evals.bench.deterministic import analysis_of
+
+        ctx = FakeContext()
+        graph.reject_model('[{"code": "schema", "message": "bad"}]', ctx, KEYS)
+
+        assert analysis_of(self.analysis_state()) == graph.result_of(
+            self.analysis_state()
+        )
+        with pytest.raises(RuntimeError, match="schema"):
+            analysis_of(ctx.state)
+
 
 # --- Node functions ---------------------------------------------------------
 

@@ -350,3 +350,18 @@ def test_every_signer_field_reads_through_the_one_rule(model, field):
         isinstance(item, BeforeValidator) and item.func is signer
         for item in model.model_fields[field].metadata
     )
+
+
+def test_a_signed_proposal_holds_only_signed_rows():
+    """``signed_proposal`` is what the ``direct-facts`` mode and the
+    lane replay's ``signed`` arm hand a graph as the verified reading, so a row
+    nobody signed is refused by name rather than passed through."""
+    from evals.reference_facts import signed_proposal
+
+    facts = load_facts(DRAFTED[0])
+    rows = [facts.rows[0].model_copy(update={"reviewed_by": None}), *facts.rows[1:]]
+    draft = facts.model_copy(update={"rows": rows})
+
+    assert len(signed_proposal(facts).assertions) == len(facts.rows)
+    with pytest.raises(CorpusError, match="unsigned"):
+        signed_proposal(draft)

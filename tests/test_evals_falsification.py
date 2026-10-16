@@ -236,3 +236,22 @@ def _arguments():
     import argparse
 
     return argparse.Namespace(corpus=str(CORPUS))
+
+
+@pytest.mark.parametrize("name", sorted(falsify.PROBES))
+def test_the_reading_without_the_corrupted_rows_keeps_no_subject_behind(name):
+    """``without`` retracts the corrupted rows through
+    :func:`~analysis_service.assertions.without`, so a subject whose only row
+    the probe changed leaves the table with it."""
+    from analysis_service.assertions import without
+    from evals.harness.reference import load_corpus
+    from evals.harness.replay import signed_reference
+
+    corpus = Path(__file__).resolve().parents[1] / "evals" / "corpus"
+    case = next(
+        one for one in load_corpus(corpus) if one.id == falsify.PROBES[name].case_id
+    )
+    reference = signed_reference(corpus, case)
+    built = falsify.reading(name, case, reference, reviewed=False)
+
+    assert built.without == without(built.without, ())

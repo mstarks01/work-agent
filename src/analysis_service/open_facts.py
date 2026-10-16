@@ -121,12 +121,13 @@ def label_of(ref: UnknownRef, names: Mapping[str, str]) -> str:
     """What a reader sees for one open fact: the question it asks.
 
     Every surface words a fact through this, so the form page, the report page,
-    ``/v1`` and a refusal ask it alike.
+    ``/v1`` and a refusal ask it alike. The spelling is read through
+    :attr:`~analysis_service.claims.UnknownRef.spellings`.
     """
     if ref.capability:
         capability = CAPABILITIES.get(ref.capability)
         return capability.question if capability else ref.capability
-    if ref.assertion:
+    if "assertion" in ref.spellings:
         return ref.assertion
     if ref.question:
         where = names.get(ref.element_id, ref.element_id)

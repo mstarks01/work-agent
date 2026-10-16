@@ -58,13 +58,19 @@ def ascii_int(value: str, *, max_digits: int) -> int | None:
 
 
 def non_negative(value: object) -> TypeGuard[int | float]:
-    """Whether ``value`` is a finite number of zero or more, and not a bool."""
-    return (
-        isinstance(value, int | float)
-        and not isinstance(value, bool)
-        and math.isfinite(value)
-        and value >= 0
-    )
+    """Whether ``value`` is a finite number of zero or more, and not a bool.
+
+    **The one rule for an amount a JSON file holds**, dollars included
+    (:func:`~evals.harness.baseline.money` reads it). ``json`` reads an
+    integer of any size, and :func:`math.isfinite` raises ``OverflowError`` on
+    one too large for a float, so that integer reads as no amount.
+    """
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return False
+    try:
+        return math.isfinite(value) and value >= 0
+    except OverflowError:
+        return False
 
 
 def is_version(value: object, expected: int) -> bool:

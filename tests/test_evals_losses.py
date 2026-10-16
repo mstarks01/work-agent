@@ -9,6 +9,7 @@ cause through the real scorer and the real identity rule over case 01.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -27,7 +28,7 @@ from evals.harness.fingerprint import key_claim
 from evals.harness.identity import SubsetVerbIdentity, endpoint_form, endpoint_subset
 from evals.harness.ledger import Ledger, cast
 from evals.harness.losses import CAUSES, attribute_case, pooled
-from evals.harness.reference import load_case
+from evals.harness.reference import Reading, load_case
 from evals.harness.scorer import score_case
 from evals.harness.triggers import case_trigger_recall
 from tests.eval_factories import draft_threat, promote, unreconciled
@@ -217,6 +218,32 @@ def test_a_killed_draft_at_the_place_with_the_reference_verb_is_the_critics(
     loss = by_index(charged)[0]
     assert loss.cause == "critic"
     assert loss.draft_id == draft.id
+
+
+def test_a_killed_draft_at_a_ruled_reading_is_the_critics(case, flows):
+    """The ladder reads every reading the scorer accepts (``stride_readings``),
+    so a draft the critic killed at a ruled place charges the critic."""
+    reference = case.stride_claims()[0]
+    own = endpoint_form(reference.affected_element_ids, flows)
+    elsewhere = next(
+        element.id
+        for element in case.model.elements()
+        if not element.id.startswith("boundary:")
+        and not endpoint_form([element.id], flows) & own
+    )
+    ruled = replace(
+        case,
+        ruled_readings={
+            0: (Reading(verb=reference.verb, affected_element_ids=(elsewhere,)),)
+        },
+    )
+    draft = draft_threat(
+        1, reference.category, "draft 1", element_ids=(elsewhere,), verb=reference.verb
+    )
+
+    assert by_index(charge(case, flows, [draft], []))[0].cause in {"place", "unled"}
+    loss = by_index(charge(ruled, flows, [draft], []))[0]
+    assert (loss.cause, loss.draft_id) == ("critic", draft.id)
 
 
 def test_an_equivalent_verb_is_the_reference_action(case, flows, monkeypatch):

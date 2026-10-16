@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -945,14 +946,48 @@ class AssertionRecord(BaseModel):
         the resolver's contract is that its catalog raises nothing, and here
         is where that contract meets real model output.
         """
-        catalog, issues = resolve_catalog(proposal, model, sources)
-        return cls.over(
+        record, _ = cls.resolved(proposal, model, sources)
+        return record
+
+    @classmethod
+    def resolved(
+        cls,
+        proposal: CatalogProposal,
+        model: SystemModel,
+        sources: Mapping[str, str],
+    ) -> tuple[AssertionRecord, dict[int, tuple[str, ...]]]:
+        """:meth:`of`, and each proposed row the record lost, by index, with
+        its codes.
+
+        **The one reader of "which proposed row did this record lose".** It
+        reads :meth:`refusals`, so a refusal of the whole catalog loses every
+        row, and a built row the gate removed loses each proposed row that
+        built it. A reader that keys a proposed row's fate on
+        :attr:`CatalogIssue.row` sees neither, because neither carries a row.
+        """
+        catalog, issues, identities = _resolve(proposal, model, sources)
+        record = cls.over(
             catalog,
             model,
             sources,
             proposed=len(proposal.assertions),
             issues=issues,
         )
+        rows_of: dict[str, list[int]] = defaultdict(list)
+        for index, identity in identities.items():
+            rows_of[identity].append(index)
+        lost: dict[int, set[str]] = defaultdict(set)
+        for refusal in record.refusals():
+            indices = (
+                rows_of.get(refusal.identity, [])
+                if refusal.proposed_row is None
+                else [refusal.proposed_row]
+            )
+            for index in indices:
+                lost[index].update(refusal.codes)
+        return record, {
+            index: tuple(sorted(codes)) for index, codes in sorted(lost.items())
+        }
 
     @classmethod
     def over(
@@ -2149,14 +2184,28 @@ def resolve_catalog(
     where :data:`MAX_ASSERTIONS` is enforced, because the schema cannot carry
     it without costing a vendor.
     """
+    catalog, issues, _ = _resolve(proposal, model, sources)
+    return catalog, issues
+
+
+def _resolve(
+    proposal: CatalogProposal,
+    model: SystemModel,
+    sources: Mapping[str, str],
+) -> tuple[AssertionCatalog, list[CatalogIssue], dict[int, str]]:
+    """:func:`resolve_catalog`, and the identity each kept proposed row built."""
     if len(proposal.assertions) > MAX_ASSERTIONS:
-        return AssertionCatalog(), [
-            CatalogIssue(
-                code="too-many-assertions",
-                message=f"{len(proposal.assertions)} assertions proposed;"
-                f" the cap is {MAX_ASSERTIONS}",
-            )
-        ]
+        return (
+            AssertionCatalog(),
+            [
+                CatalogIssue(
+                    code="too-many-assertions",
+                    message=f"{len(proposal.assertions)} assertions proposed;"
+                    f" the cap is {MAX_ASSERTIONS}",
+                )
+            ],
+            {},
+        )
     # The pass writes no answer. A quote of the answers Source locates nothing,
     # as a quote of a source the job does not hold, so no row built here quotes
     # it and a row's origin and support agree.
@@ -2170,6 +2219,7 @@ def resolve_catalog(
     kept: dict[str, Assertion] = {}
     subjects: dict[str, Subject] = {}
     issues: list[CatalogIssue] = []
+    identities: dict[int, str] = {}
 
     for index, row in enumerate(proposal.assertions):
         resolved = _resolve_row(
@@ -2178,6 +2228,7 @@ def resolve_catalog(
         if resolved is None:
             continue
         identity, entry = resolved
+        identities[index] = identity
         held = kept.get(identity)
         kept[identity] = entry if held is None else _merge(held, entry)
 
@@ -2189,7 +2240,7 @@ def resolve_catalog(
     # refused: the subject was recorded while the row was being built, and a
     # table naming something no row is about says the catalog holds a fact it
     # does not.
-    return _catalog(entries, subjects), issues
+    return _catalog(entries, subjects), issues, identities
 
 
 def _bounded(

@@ -189,7 +189,7 @@ class CriticYield:
         by_cause: dict[str, dict[str, int]] = {}
         for draft in self.killed:
             entry = by_cause.setdefault(
-                draft.cause or "unstated", {"killed": 0, "matched": 0, "must_find": 0}
+                draft.cause or UNSTATED, {"killed": 0, "matched": 0, "must_find": 0}
             )
             entry["killed"] += 1
             entry["matched"] += draft.disposition.startswith("matched")
@@ -294,12 +294,18 @@ def score_case_with_yield(
     )
 
 
+#: The cause a kill reads where its verdict names no step. **The one spelling
+#: of a missing ``rejected_because``**: the critic yield and the loss
+#: attribution both read it, so neither invents a step the critic never wrote.
+UNSTATED = "unstated"
+
+
 def rejection_steps(block: FrameworkAnalysis | None) -> dict[str, str]:
     """Each rejected claim's stated step, keyed by claim ID, off the block's verdicts.
 
     The one reader of ``rejected_because`` for this instrument. A rejected
     claim whose verdict names no step is absent here, so its kill reads
-    ``unstated`` rather than a step the critic never wrote.
+    :data:`UNSTATED` rather than a step the critic never wrote.
     """
     if block is None:
         return {}

@@ -219,20 +219,17 @@ class _UpstreamPin:
 class _PromptCacheRule:
     """Which models on a vendor take OpenAI's explicit prompt-cache breakpoint.
 
-    ``family`` matches a model name and captures its major and minor version;
-    ``minimum`` is the first version that takes the breakpoint.
-    :meth:`Vendor.caches_prompt_prefix` is the one reader.
+    ``minimum`` is the first GPT version that takes the breakpoint, and
+    :func:`gpt_version` reads the version, whatever gateway segment spells
+    the model. :meth:`Vendor.caches_prompt_prefix` is the one reader.
     """
 
-    family: re.Pattern[str]
     minimum: tuple[int, int]
 
     def accepts(self, model: str) -> bool:
-        """Whether ``model`` is in the family, at or above the minimum."""
-        match = self.family.match(model)
-        if match is None:
-            return False
-        return (int(match.group(1)), int(match.group(2) or 0)) >= self.minimum
+        """Whether ``model`` is a GPT at or above the minimum."""
+        version = gpt_version(model)
+        return version is not None and version >= self.minimum
 
 
 @dataclass(frozen=True)
@@ -343,9 +340,12 @@ class _FormRule:
     denylist applies.
 
     **A rule constrains an identifier's shape, never its version.** This service
-    runs any generation a vendor serves. The one place a version is read is
-    :func:`~analysis_service.binding.check_temperature`, and what it decides there
-    is whether a *sampling param* may be sent, not whether the model may run.
+    runs any generation a vendor serves. A version is read through
+    :func:`claude_generation` or :func:`gpt_version`, and only to decide what a
+    call sends: :func:`~analysis_service.binding.check_temperature` decides
+    whether a *sampling param* may be sent, and
+    :meth:`Vendor.caches_prompt_prefix` decides whether a call carries a cache
+    breakpoint. Neither decides whether the model may run.
     """
 
     family: re.Pattern[str]
@@ -652,14 +652,9 @@ _BEDROCK_CLAUDE_RULE = _FormRule(
 _CATCH_ALL = _FormRule(family=re.compile(""), pinned=None, hint="")
 
 # The GPT-5.6 family and later take the explicit cache breakpoint; earlier GPT
-# models and every other family do not. One rule per spelling of the model
-# name: bare on the direct row, under OpenRouter's ``openai/`` segment there.
-_OPENAI_PROMPT_CACHE = _PromptCacheRule(
-    family=re.compile(r"gpt-(\d+)(?:\.(\d+))?"), minimum=(5, 6)
-)
-_OPENROUTER_PROMPT_CACHE = _PromptCacheRule(
-    family=re.compile(r"openai/gpt-(\d+)(?:\.(\d+))?"), minimum=(5, 6)
-)
+# models and every other family do not. One rule serves every row that reaches
+# the family, because :func:`gpt_version` reads past a gateway segment.
+_GPT_PROMPT_CACHE = _PromptCacheRule(minimum=(5, 6))
 
 # OpenRouter reads Claude under a third spelling: its own vendor segment, and a
 # **dot** where every other vendor writes a hyphen —
@@ -738,12 +733,12 @@ _CLAUDE_GENERATION = re.compile(
 def family_identifier(model: str) -> str:
     """The model identifier inside a gateway slug, or the identifier itself.
 
-    **One reader of one rule.** Two family rules have to see past an
-    aggregator's own vendor segment — :func:`claude_generation` and
-    :func:`openai_reasoning_model` — and both say in their own docstrings that
-    a family rule may not key on the vendor. A second copy of "strip what comes
-    before the first slash" is exactly the pair of readers that comes to
-    disagree, so there is one.
+    **One reader of one rule.** Every family rule has to see past an
+    aggregator's own vendor segment — :func:`claude_generation`,
+    :func:`gpt_version` and :func:`openai_reasoning_model` — and each says in
+    its own docstring that a family rule may not key on the vendor. A second
+    copy of "strip what comes before the first slash" is exactly the pair of
+    readers that comes to disagree, so there is one.
 
     Every **leading** segment goes, and not only the first, so this reads the
     same identifier :data:`_CLAUDE_FAMILY` does. What remains is what the
@@ -790,10 +785,29 @@ def claude_generation(model: str) -> tuple[int, int] | None:
 # OpenAI's reasoning families serve ``temperature`` at exactly its default of
 # 1 and reject any other value. Two shapes name one: the o-series (``o3``,
 # ``o4-mini``) and GPT from major 5 onward (``gpt-5.6-terra``). ``gpt-4o`` is
-# neither, and parses to major 4 rather than being special-cased.
-_O_SERIES_ID = re.compile(r"o\d+[a-z0-9.\-]*")
-_GPT_ID = re.compile(r"gpt-(?P<major>\d+)(?:\.\d+)?[a-z0-9.\-]*")
+# neither, and parses to major 4 rather than being special-cased. Each shape
+# admits OpenRouter's ``:<variant>`` tail, which names a build and no alias.
+_O_SERIES_ID = re.compile(r"o\d+[a-z0-9.\-]*" + _OPENROUTER_VARIANT)
+_GPT_ID = re.compile(
+    r"gpt-(?P<major>\d+)(?:\.(?P<minor>\d+))?[a-z0-9.\-]*" + _OPENROUTER_VARIANT
+)
 _REASONING_FROM_GPT_MAJOR = 5
+
+
+def gpt_version(model: str) -> tuple[int, int] | None:
+    """The ``(major, minor)`` a GPT identifier names, or ``None`` if it isn't one.
+
+    **The one parse of a GPT version.** :func:`openai_reasoning_model` and
+    :meth:`Vendor.caches_prompt_prefix` both read it, so a spelling that one
+    rule recognises the other recognises too. The identifier is read through
+    :func:`family_identifier`, as :func:`claude_generation` reads a Claude, so
+    ``openrouter/openai/gpt-5.6-terra`` names ``(5, 6)``. An absent minor reads
+    as ``0``.
+    """
+    match = _GPT_ID.fullmatch(family_identifier(model))
+    if match is None:
+        return None
+    return int(match["major"]), int(match["minor"] or 0)
 
 
 def openai_reasoning_model(model: str) -> bool:
@@ -815,11 +829,10 @@ def openai_reasoning_model(model: str) -> bool:
     an aggregator's vendor segment, and a ``fullmatch`` on the whole slug
     answered ``False`` for it.
     """
-    identifier = family_identifier(model)
-    if _O_SERIES_ID.fullmatch(identifier):
+    if _O_SERIES_ID.fullmatch(family_identifier(model)):
         return True
-    match = _GPT_ID.fullmatch(identifier)
-    return match is not None and int(match["major"]) >= _REASONING_FROM_GPT_MAJOR
+    version = gpt_version(model)
+    return version is not None and version[0] >= _REASONING_FROM_GPT_MAJOR
 
 
 @dataclass(frozen=True)
@@ -1346,7 +1359,7 @@ VENDORS: dict[VendorName, Vendor] = {
         served_trust="provider_reported",
         routes_to_one_provider=True,
         upstream_pin=None,
-        prompt_cache=_OPENAI_PROMPT_CACHE,
+        prompt_cache=_GPT_PROMPT_CACHE,
         schema_rules=(_CLAUDE_BOUNDS, _every_model("as_built")),
         credentials={CredentialMode.API_KEY: _api_key_source("openai")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
@@ -1521,7 +1534,7 @@ VENDORS: dict[VendorName, Vendor] = {
         upstream_pin=_UpstreamPin(
             field="provider", only="only", fallbacks="allow_fallbacks"
         ),
-        prompt_cache=_OPENROUTER_PROMPT_CACHE,
+        prompt_cache=_GPT_PROMPT_CACHE,
         # OpenRouter passes a ``json_schema`` response format through to
         # Anthropic with its structured-outputs beta header, and documents no
         # rewrite of the keywords Claude refuses (its structured-outputs and

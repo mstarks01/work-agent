@@ -36,6 +36,7 @@ from analysis_service.claims import (
     ScopeEntry,
 )
 from analysis_service.frameworks.asvs.record import requirement_of
+from evals.harness.critic_yield import UNSTATED
 from evals.harness.reference import GoldenCase
 
 if TYPE_CHECKING:
@@ -183,7 +184,7 @@ def _charge_miss(
     """The stage, cause and reason for a requirement the run never applied."""
     rejection = rejections.get(requirement)
     if rejection is not None:
-        step = rejection.verdict.rejected_because or "evidence"
+        step = rejection.verdict.rejected_because or UNSTATED
         return "critic", step, rejection.verdict.reason
     entry = scope.get(requirement)
     if entry is not None:

@@ -50,7 +50,7 @@ from analysis_service.claims import (
     UnknownRef,
 )
 from analysis_service.errors import ConfigError
-from analysis_service.markdown_loader import _inside
+from analysis_service.markdown_loader import MarkdownFormatError, MarkdownLoader
 from analysis_service.model_tiers import FRAMEWORK_ROLES, tier_key
 from analysis_service.system_model import SystemModel
 
@@ -964,32 +964,41 @@ def _predicate_reader_issues(package: FrameworkPackage) -> list[str]:
     return issues
 
 
-def _readable(root: Path, path: Path) -> bool:
+def _readable(loader: MarkdownLoader | None, root: Path, path: Path) -> bool:
     """The loader's question, asked by the gate that runs before it.
 
-    `is_file()` follows a symlink out of the package root; `MarkdownLoader.load`
-    resolves and refuses one. This asks the loader's question, so startup and
-    the first job agree. One rule, and the loader owns it.
+    It asks :meth:`MarkdownLoader.readable` itself, so startup and the first
+    job agree. `is_file()` follows a symlink out of the package root, which the
+    loader refuses; a containment check passes a file under a directory
+    symlink, which the loader's walk never reads. One rule, and the loader
+    owns it.
 
-    **The root is the package's text root**, which is the root the loader uses.
-    `path.parent` would make this gate stricter than the loader: a lane skill
-    symlinked to another file inside the same package resolves outside its own
-    directory but inside the root, so `load` accepts it. A shared reader is
-    only one reader if every caller asks it the same question.
+    **The loader's root is the package's text root.** `path.parent` would make
+    this gate stricter than the loader: a lane skill symlinked to another file
+    inside the same package resolves outside its own directory but inside the
+    root, so `load` accepts it. ``None`` is a root that does not exist, where
+    nothing is readable. The name is read relative to ``root`` as given,
+    because the loader holds its root resolved.
     """
-    return _inside(root, path)
+    if loader is None or not path.is_relative_to(root):
+        return False
+    return loader.readable(path.relative_to(root).with_suffix("").as_posix())
 
 
 def _disk_issues(package: FrameworkPackage, root: Path) -> list[str]:
     """Family B: every declared thing exists under this package's text root."""
     issues: list[str] = []
     expected: set[Path] = set()
+    try:
+        loader = MarkdownLoader(root) if root.is_dir() else None
+    except MarkdownFormatError as exc:
+        return [str(exc)]
 
     for lane in package.lanes:
         for doc in ("skill", "exemplars"):
             path = root / "lanes" / lane / f"{doc}.md"
             expected.add(path)
-            if not _readable(root, path):
+            if not _readable(loader, root, path):
                 issues.append(f"lane {lane!r} has no {doc}.md")
             elif doc == "skill":
                 issues += _heading_issues(lane, path)
@@ -997,18 +1006,18 @@ def _disk_issues(package: FrameworkPackage, root: Path) -> list[str]:
     for doc in (CRITIC_DOC, DISCLAIMER_DOC, OUTPUT_DOC):
         path = root / f"{doc}.md"
         expected.add(path)
-        if not _readable(root, path):
+        if not _readable(loader, root, path):
             issues.append(f"the package carries no {doc}.md")
 
     rubric = root / f"{SEVERITY_RUBRIC_DOC}.md"
     if package.carries_severity():
         expected.add(rubric)
-        if not _readable(root, rubric):
+        if not _readable(loader, root, rubric):
             issues.append(
                 "the record carries a severity field but the package carries no"
                 f" {SEVERITY_RUBRIC_DOC}.md"
             )
-    elif _readable(root, rubric):
+    elif _readable(loader, root, rubric):
         issues.append(
             f"the package carries {SEVERITY_RUBRIC_DOC}.md but its record grades"
             " nothing, so nothing would read it"
@@ -1018,13 +1027,13 @@ def _disk_issues(package: FrameworkPackage, root: Path) -> list[str]:
     if closing:
         path = root / f"{closing}.md"
         expected.add(path)
-        if not _readable(root, path):
+        if not _readable(loader, root, path):
             issues.append(f"LANE_CLOSING_DOC names {closing}.md, which is not on disk")
 
     for entry in package.knowledge.documents():
         path = root / f"{entry}.md"
         expected.add(path)
-        if not _readable(root, path):
+        if not _readable(loader, root, path):
             issues.append(f"the knowledge tables name {entry}, which is not on disk")
 
     # Both directions, as the corpus lints already check: unread Markdown under

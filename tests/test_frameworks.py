@@ -135,12 +135,21 @@ def test_the_gate_and_the_loader_answer_the_same_question(tmp_path):
     # on one, not `OSError`, and both readers must answer "absent" rather
     # than raise through the startup gate or the first job.
     (root / "critic.md").symlink_to(root / "critic.md")
+    # The fourth: a lane directory symlinked to another inside the root. The
+    # file resolves inside the root, and the loader's walk does not follow a
+    # directory symlink, so the loader never reads it.
+    (root / "lanes" / "repudiation").symlink_to(root / "lanes" / "tampering")
 
     loader = MarkdownLoader(root)
-    for name in ("lanes/spoofing/skill", "lanes/spoofing/exemplars", "critic"):
+    for name in (
+        "lanes/spoofing/skill",
+        "lanes/spoofing/exemplars",
+        "critic",
+        "lanes/repudiation/skill",
+    ):
         path = root / f"{name}.md"
 
-        assert _readable(root, path) == loader.readable(name), name
+        assert _readable(loader, root, path) == loader.readable(name), name
     assert not loader.readable("critic")
     with pytest.raises(MarkdownNotFoundError):
         loader.load("critic")

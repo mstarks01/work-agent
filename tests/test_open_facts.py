@@ -120,3 +120,21 @@ def test_every_free_text_subject_is_its_own_fact(path):
             if fact.key[3]
         }
         assert grouped == subjects
+
+
+@pytest.mark.parametrize("path", REPORTS, ids=lambda path: path.name[:2])
+def test_a_card_and_the_open_facts_name_the_same_facts(path):
+    """``conditions`` and :func:`open_facts` answer one question: which facts a
+    conditional finding waits on. A ground the critic dismissed is not one."""
+    from analysis_service.report_conditions import conditions
+
+    report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+    cards = conditions(report.analyses, report.system_model, [], [])
+    for block in report.analyses:
+        cited: dict[str, set] = {}
+        for fact in open_facts(block, report.system_model):
+            for claim_id in fact.cited_by:
+                cited.setdefault(claim_id, set()).add(fact.key)
+        for claim in _needs_info(block):
+            card = cards[f"{block.framework}/{claim.id}"]
+            assert {key for key, _, _ in card} == cited.get(claim.id, set()), claim.id

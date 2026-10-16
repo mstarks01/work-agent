@@ -230,9 +230,12 @@ def follow_up_needs(
 ) -> FollowUpNeeds:
     """Every open fact each draft waits on, as :func:`fact_questions` reads them.
 
-    A fact ``earlier`` answers in full is not open. A finding that waits on a
-    fact ``earlier`` answers without settling it is not conditional, because
-    no answer in the list can cover it. **A finding that needs only some facets
+    A fact ``earlier`` answers in full is not open. A finding waits on the
+    facts its verdict's ``related_unknowns`` names, as its card in
+    :func:`~analysis_service.report_conditions.conditions` says; a ground the
+    critic dismissed is evidence only. A finding that waits on a fact
+    ``earlier`` answers without settling it is not conditional, because no
+    answer in the list can cover it. **A finding that needs only some facets
     of a kind** (:func:`~analysis_service.fact_answers.needs_of`) waits on it
     until those facets are known, and no longer (ADR 0073).
     """
@@ -250,8 +253,7 @@ def follow_up_needs(
         for claim in block.all_claims():
             finding = (block.framework, claim.id)
             bands[finding] = rank(claim)
-            cites = [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
-            wanted = needs_of(cites)
+            wanted = needs_of(claim.verdict.related_unknowns)
             covered = {
                 key for key, need in wanted.items() if covers(said.get(key), need)
             }

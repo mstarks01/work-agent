@@ -1453,10 +1453,13 @@ class Carried:
 
 @dataclass(frozen=True)
 class AmendedJob:
-    """The job an amendment starts: what it extracts, and what it carries."""
+    """The job an amendment starts: what it extracts.
+
+    What it carries is :meth:`~analysis_service.jobs.JobRecord.held_answers`,
+    the one reader of what a new analysis carries.
+    """
 
     sources: list[Source]
-    answers: AnswerSet
 
 
 @dataclass(frozen=True)
@@ -1623,9 +1626,10 @@ class AnswerState:
         that the model misses a component or a flow, or reads a stated fact
         wrongly, writes what is true. The new job extracts the paused job's
         sources with the amendment added as one more description, and pauses
-        again. It carries the answers this job holds, and its own questions
-        take each one they still ask (:attr:`carried`). The amendment names
-        the revision it read, as a save does.
+        again. It carries every answer this job holds
+        (:meth:`~analysis_service.jobs.JobRecord.held_answers`), and its own
+        questions take each one they still ask (:attr:`carried`). The amendment
+        names the revision it read, as a save does.
         """
         if self.resumed_by is not None:
             raise AlreadyResumed(
@@ -1650,7 +1654,7 @@ class AnswerState:
         breach = None if limits is None else limits.breach(sources)
         if breach is not None:
             raise SourcesOverLimit(breach)
-        return AmendedJob(sources=sources, answers=self.held)
+        return AmendedJob(sources=sources)
 
     def answer(
         self, answers: Answers, *, limits: SourceLimits | None

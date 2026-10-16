@@ -297,9 +297,24 @@ def drafted_cases(corpus_dir: Path) -> list[Path]:
 def signed_proposal(facts: ReferenceFacts) -> CatalogProposal:
     """The case's signed rows as the proposal an ``assert`` node would emit.
 
-    The one reader of that shape: the reference catalog resolves it, and the
-    ``direct-facts`` eval mode hands it to a graph in place of the node's call.
+    **The one reader of a case's rows as the verified reading.** The
+    ``direct-facts`` eval mode and the lane replay's ``signed`` arm hand it to
+    a graph in place of the node's call, so a case with a row nobody signed is
+    a :class:`CorpusError` here rather than a draft put in front of the lanes.
     """
+    unsigned = [
+        index for index, row in enumerate(facts.rows) if row.reviewed_by is None
+    ]
+    if unsigned:
+        raise CorpusError(
+            f"{facts.case}: {FACTS_FILE} rows {unsigned} are unsigned; a signed"
+            " proposal holds only rows a person signed"
+        )
+    return _proposal(facts)
+
+
+def _proposal(facts: ReferenceFacts) -> CatalogProposal:
+    """Every row, signed or not, as the proposal an ``assert`` node would emit."""
     return CatalogProposal(assertions=[row.assertion for row in facts.rows])
 
 
@@ -325,7 +340,7 @@ def reference_catalog(
     rather than go through the harness loader it refuses to check the corpus
     through.
     """
-    record = AssertionRecord.of(signed_proposal(facts), model, sources)
+    record = AssertionRecord.of(_proposal(facts), model, sources)
     if record.issues:
         listed = "; ".join(
             f"row {issue.row}: {issue.code}: {issue.message}"

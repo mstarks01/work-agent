@@ -443,9 +443,9 @@ def name_unknown(ref: UnknownRef) -> str:
     **The one spelling of a reference in a message a re-ask reads**, so the
     three checks in :mod:`analysis_service.critic` that name one, and the
     sentence a ``needs-info`` carries, cannot describe the same fact four
-    ways.
+    ways. The spelling is read through :attr:`UnknownRef.spellings`.
     """
-    if ref.assertion:
+    if "assertion" in ref.spellings:
         return f"the open fact `{ref.assertion}`"
     if ref.names_an_element:
         return f"`{ref.attribute}` on `{ref.element_id}`"

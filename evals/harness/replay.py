@@ -1070,21 +1070,14 @@ def bind_assertions(
     """
     sources = {source.label: source.text for source in case.sources}
     proposed = CatalogProposal.model_validate(proposal.proposal)
-    blessed = AssertionRecord.of(proposed, case.model, sources)
+    blessed, refused_blessed = AssertionRecord.resolved(proposed, case.model, sources)
     if extraction.extracted is None:
         return BindingReplay(
             case.id, graph, False, (), 0, _offered(blessed, case.model)
         )
-    extracted = AssertionRecord.of(proposed, extraction.extracted, sources)
-    refused_blessed = {issue.row for issue in blessed.issues if issue.row is not None}
-    refused_extracted = {
-        issue.row for issue in extracted.issues if issue.row is not None
-    }
+    extracted, codes = AssertionRecord.resolved(proposed, extraction.extracted, sources)
+    refused_extracted = codes.keys()
     produced_of = align(case, extraction.extracted).produced_of
-    codes: dict[int, set[str]] = defaultdict(set)
-    for issue in extracted.issues:
-        if issue.row is not None:
-            codes[issue.row].add(issue.code)
     rows = []
     for index, row in enumerate(proposed.assertions):
         fate: BindFate

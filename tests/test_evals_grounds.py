@@ -96,8 +96,21 @@ class TestMeasureGrounds:
             "unknown-attribute": 1,
             "absent-attribute": 1,
             "derived-fact": 1,
+            "absent-element": 0,
             "assertion": 0,
+            "unknown-assertion": 0,
         }
+
+    def test_every_ground_kind_is_counted(self):
+        """The counts are keyed by ``GroundKind`` itself, so a kind added to
+        the record is counted rather than dropped from the measurement."""
+        from typing import get_args
+
+        from analysis_service.claims import GroundKind
+
+        measurement = measure_grounds("case-a", "stride", [], [])
+
+        assert tuple(measurement.kind_counts) == get_args(GroundKind)
 
     def test_a_quoteless_threat_is_counted_not_faulted(self):
         """The branch rule predicts these: an unknown or a crossing was the

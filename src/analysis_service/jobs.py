@@ -451,11 +451,13 @@ class JobRecord(BaseModel):
     def held_answers(self) -> AnswerSet:
         """Every answer this job holds, each later one over the earlier.
 
-        **The one reader of what a new analysis carries** (ADR 0079). A final
-        report's corrections lie over a report's draft, the draft over the
-        answers the job's run read or its pause saved, and those over what
-        the job carried. Nothing is checked here: the job that carries them
-        checks each one against its own questions.
+        **The one reader of what a new analysis carries**, whether a
+        submission names this job (ADR 0079) or an amendment starts from it
+        (ADR 0072). A final report's corrections lie over a report's draft,
+        the draft over the answers the job's run read or its pause saved, and
+        those over every answer the job carried, a dropped one included.
+        Nothing is checked here: the job that carries them checks each one
+        against its own questions.
         """
         corrected = AnswerSet(facts=tuple(self.corrections))
         return corrected.over(self.draft.over(self.answers.over(self.carried)))

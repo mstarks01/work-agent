@@ -459,24 +459,34 @@ def attribute_case(
             # ``tests/test_verb_coverage.py`` holds every STRIDE reference to a
             # verb; a record without one is a corpus the lints did not run on.
             raise ValueError(f"{case.id}: reference {index} carries no verb")
+        # Every reading the scorer accepts, its own first (``stride_readings``),
+        # so a ruled reading at another place charges the stage that lost it.
+        readings = [
+            (read_verb or verb, place)
+            for read_verb, place in case.stride_readings(index)
+        ]
         in_lane = [claim for claim in produced if claim.category == lane]
-        at_place = _at_place(reference.affected_element_ids, in_lane, flows)
-        if at_place:
-            claim = _charged_to(at_place, verb)
+        found = next(
+            (
+                (read_verb, place, here)
+                for read_verb, place in readings
+                if (here := _at_place(place, in_lane, flows))
+            ),
+            None,
+        )
+        if found is not None:
+            read_verb, place, at_place = found
+            claim = _charged_to(at_place, read_verb)
             losses.append(
                 Loss(
                     index,
                     lane,
                     index in must_find,
-                    "merged" if same_action(claim.verb, verb) else "verb",
+                    "merged" if same_action(claim.verb, read_verb) else "verb",
                     verb,
                     draft_id=claim.id,
                     draft_verb=claim.verb,
-                    place_relation=_relation(
-                        reference.affected_element_ids,
-                        claim.affected_element_ids,
-                        flows,
-                    ),
+                    place_relation=_relation(place, claim.affected_element_ids, flows),
                     re_ask=block.re_ask_kinds(claim.id),
                 )
             )
@@ -504,16 +514,28 @@ def attribute_case(
         killed = [
             draft
             for draft in drafts
-            if draft.category == lane
-            and draft.id not in surviving
-            and same_action(draft.verb, verb)
+            if draft.category == lane and draft.id not in surviving
         ]
-        killed_here = _at_place(reference.affected_element_ids, killed, flows)
-        if killed_here:
-            # Every one of these already shares the reference's action, so the
+        found = next(
+            (
+                (read_verb, place, here)
+                for read_verb, place in readings
+                if (
+                    here := _at_place(
+                        place,
+                        [d for d in killed if same_action(d.verb, read_verb)],
+                        flows,
+                    )
+                )
+            ),
+            None,
+        )
+        if found is not None:
+            # Every one of these already shares the reading's action, so the
             # ID is the whole of the choice — and it is still a choice, so the
             # same reader makes it.
-            draft = _charged_to(killed_here, verb)
+            read_verb, place, killed_here = found
+            draft = _charged_to(killed_here, read_verb)
             losses.append(
                 Loss(
                     index,
@@ -523,22 +545,22 @@ def attribute_case(
                     verb,
                     draft_id=draft.id,
                     draft_verb=draft.verb,
-                    place_relation=_relation(
-                        reference.affected_element_ids,
-                        draft.affected_element_ids,
-                        flows,
-                    ),
+                    place_relation=_relation(place, draft.affected_element_ids, flows),
                     re_ask=block.re_ask_kinds(draft.id),
                 )
             )
             continue
-        proposed_here = _proposed_at(
-            reference.affected_element_ids,
-            (proposed or {}).get(lane),
-            verb,
-            flows,
+        batch = (proposed or {}).get(lane)
+        offered = next(
+            (
+                (read_verb, place, offers)
+                for read_verb, place in readings
+                if (offers := _proposed_at(place, batch, read_verb, flows))
+            ),
+            None,
         )
-        if proposed_here:
+        if offered is not None:
+            read_verb, place, proposed_here = offered
             proposal = min(proposed_here, key=lambda claim: str(claim.get("title", "")))
             title = str(proposal.get("title", ""))
             # The draft the fan-in made of this proposal, if it kept one: the
@@ -549,7 +571,7 @@ def attribute_case(
                     for draft in drafts
                     if draft.category == lane
                     and draft.title == title
-                    and same_action(draft.verb, verb)
+                    and same_action(draft.verb, read_verb)
                 ),
                 key=lambda draft: draft.id,
             )
@@ -570,9 +592,7 @@ def attribute_case(
                     draft_id=kept[0].id if kept else None,
                     draft_verb=proposal["verb"],
                     place_relation=_relation(
-                        reference.affected_element_ids,
-                        proposal["affected_element_ids"],
-                        flows,
+                        place, proposal["affected_element_ids"], flows
                     ),
                     proposal_title=title,
                     fan_in_effect=effect,

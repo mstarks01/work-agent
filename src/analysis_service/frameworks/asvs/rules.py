@@ -53,6 +53,7 @@ from types import MappingProxyType
 
 from analysis_service.analysis import (
     TEXT_ATTRIBUTES,
+    comparable_asset_tags,
     control_state,
     crossing_facts,
     is_unverified,
@@ -672,7 +673,9 @@ def _write_with_no_record(
         yield (
             (flow.source, store.id, flow.id),
             {
-                "assets": ", ".join(sorted(AUDITED_ASSET_TAGS & set(store.assets))),
+                "assets": ", ".join(
+                    comparable_asset_tags(AUDITED_ASSET_TAGS & set(store.assets))
+                ),
                 "authentication": clip_fact(flow.authentication),
                 "record_named_anywhere": mentions,
             },

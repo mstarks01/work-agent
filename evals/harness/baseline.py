@@ -421,16 +421,10 @@ def money(raw: Any) -> float | None:
     The shape is the one :meth:`SweepCost.to_json` writes: a JSON number. A
     string is refused even when `float()` would read it -- "1_000" and
     non-ASCII digits both would -- and so is a boolean, which is an `int` to
-    `float()`. A JSON integer too large for a float raises `OverflowError`,
-    which is not a `ValueError`.
+    `float()`. :func:`~analysis_service.parsing.non_negative` decides all of
+    it, so a ledger's dollars and a manifest's read one rule.
     """
-    if isinstance(raw, bool) or not isinstance(raw, int | float):
-        return None
-    try:
-        value = float(raw)
-    except OverflowError:
-        return None
-    return value if math.isfinite(value) and value >= 0 else None
+    return float(raw) if non_negative(raw) else None
 
 
 def recorded_usd(cost: Any, key: str = "actual_usd") -> float | None:

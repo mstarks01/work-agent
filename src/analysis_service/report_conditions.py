@@ -49,6 +49,11 @@ def conditions(
     ``unknown`` where it says "I don't know", and ``partial`` where it answers
     some facets: the finding is neither confirmed nor cleared, and nothing
     reads the fact as absent.
+
+    A finding waits on the facts its verdict's ``related_unknowns`` names, as
+    :attr:`~analysis_service.claims.ProposedVerdict.status` and
+    :func:`~analysis_service.open_facts.open_facts` read them. A ground the
+    critic dismissed is not one.
     """
     names = element_names(model)
     said = {answer.key: answer for answer in answered}
@@ -62,7 +67,7 @@ def conditions(
         for claim in block.all_claims():
             if claim.verdict.status != "needs-info":
                 continue
-            cites = [*claim.unknown_grounds(), *claim.verdict.related_unknowns]
+            cites = claim.verdict.related_unknowns
             refs = {ref.key: ref for ref in cites}
             wanted = needs_of(cites)
             found[f"{block.framework}/{claim.id}"] = [

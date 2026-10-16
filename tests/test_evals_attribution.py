@@ -28,6 +28,7 @@ from evals.harness.attribution import (
     attribute_case,
     pooled,
 )
+from evals.harness.critic_yield import UNSTATED
 from tests.eval_factories import corpus_case
 from tests.test_evals_applicability import Block, Scoped, deferred, ruling
 
@@ -168,16 +169,16 @@ class TestAMissIsChargedToTheStageThatLostIt:
 
         assert (loss.stage, loss.cause) == ("critic", step)
 
-    def test_a_rejection_recorded_before_the_cause_was_a_field_reads_as_evidence(
-        self, case
-    ):
+    def test_a_rejection_that_names_no_step_reads_as_the_yield_reads_it(self, case):
+        """The critic named no step, so the loss names none, as the critic
+        yield's kill table does: never a step the critic did not write."""
         rejected = [ruling("V1.2.4", "rejected")]
         rejected[0].verdict.rejected_because = None
         block = perfect(case, without={"V1.2.4"}, rejected_claims=rejected)
 
         (loss,) = attribute(case, block).losses
 
-        assert (loss.stage, loss.cause) == ("critic", "evidence")
+        assert (loss.stage, loss.cause) == ("critic", UNSTATED)
 
     def test_a_requirement_with_neither_claim_nor_entry_is_named_unlisted(self, case):
         block = perfect(case, without={"V1.2.4"})

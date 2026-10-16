@@ -44,6 +44,7 @@ from analysis_service.assertions import (
     assertion_id,
     settled,
 )
+from analysis_service.assertions import without as retracted
 from analysis_service.evidence import lead_topics, prepared_view
 from analysis_service.system_model import (
     SystemModel,
@@ -944,8 +945,8 @@ class Reading:
 
     ``catalog`` is the corrupted rows, with the corrupted ones assessed
     ``unsupported`` where the reading is reviewed; ``without`` is the same
-    reading with the corrupted rows left out, which is what a lead lost to
-    omission is measured against. ``changed`` names the corrupted rows.
+    reading with the corrupted rows retracted, and with each subject only they
+    named, which is what a lead lost to omission is measured against. ``changed`` names the corrupted rows.
     """
 
     catalog: AssertionCatalog
@@ -980,9 +981,9 @@ def reading(
         entries = [marked.get(assertion_id(entry), entry) for entry in entries]
     return Reading(
         catalog=AssertionCatalog(subjects=subjects, entries=entries),
-        without=AssertionCatalog(
-            subjects=subjects,
-            entries=[entry for entry in corrupted.entries if entry not in changed],
+        without=retracted(
+            AssertionCatalog(subjects=subjects, entries=list(corrupted.entries)),
+            {assertion_id(entry) for entry in changed},
         ),
         model=case.model if corrupted.model is None else corrupted.model,
         sources=(

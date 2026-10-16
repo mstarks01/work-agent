@@ -55,7 +55,7 @@ import json
 import random
 import sys
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from typing import Any, get_args
 
@@ -451,6 +451,19 @@ def _minimal_options(package: FrameworkPackage) -> dict[str, Any]:
     return chosen
 
 
+def analysis_of(final_state: Mapping[str, Any]) -> graph.Analysis:
+    """The scripted drive's analysis, read through :func:`graph.result_of`.
+
+    Every reply is scripted, so a rejection is this bench's defect, and it
+    raises with the gate's issues.
+    """
+    match graph.result_of(final_state):
+        case graph.Rejected(issues=issues):
+            raise RuntimeError(f"the scripted job was rejected: {issues}")
+        case analysis:
+            return analysis
+
+
 def _selections() -> list[tuple[FrameworkName, ...]]:
     """Each package alone, then every package together.
 
@@ -511,7 +524,7 @@ def case_pipeline() -> None:
             sum(node.duration_ms for node in run.node_runs if node.node in bodies)
             / 1000
         )
-        analysis = graph.Analysis.from_state(run.final_state[graph.STATE_ANALYSIS])
+        analysis = analysis_of(run.final_state)
 
         # ``to_state`` plus a JSON dump is the serialization the graph actually
         # pays: ``assemble`` writes exactly this into the session, and a driver
