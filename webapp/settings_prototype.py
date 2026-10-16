@@ -443,7 +443,7 @@ _PAGE = """<!doctype html>
   .multi-menu label:hover { background:var(--soft); }
   table.settings small { display:block; }
   table.settings tr.groupline th { background:var(--sidebar); font-size:12px; }
-  .pending { position:sticky; top:16px; border:1px solid var(--line);
+  .pending { position:sticky; top:16px; margin-top:24px; border:1px solid var(--line);
     border-radius:9px; padding:14px; font-size:13px; }
   .pending ul { padding-left:18px; }
 </style>
