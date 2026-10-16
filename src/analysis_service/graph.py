@@ -177,7 +177,7 @@ from analysis_service.evidence import (
     render_catalog,
     render_element_roster,
 )
-from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_answers import STORED, FactAnswer
 from analysis_service.fan_in import fan_in
 from analysis_service.field_capabilities import with_field_capabilities
 from analysis_service.frameworks import (
@@ -1762,8 +1762,11 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
     links = [
         LinkAnswer.model_validate(link) for link in state.get(STATE_LINK_ANSWERS) or []
     ]
+    # The driver seeds answers the service admitted, so this read keeps what
+    # admission wrote, as a store's read does.
     facts = [
-        FactAnswer.model_validate(fact) for fact in state.get(STATE_FACT_ANSWERS) or []
+        FactAnswer.model_validate(fact, context=STORED)
+        for fact in state.get(STATE_FACT_ANSWERS) or []
     ]
     if held is not None or links or facts:
         # The submitter's answers settle what they answer, so they are written

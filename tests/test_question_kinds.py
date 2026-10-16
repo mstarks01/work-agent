@@ -13,10 +13,12 @@ import re
 
 import pytest
 
+from analysis_service.assertions import AssertionCatalog, AssertionRecord
 from analysis_service.claims import ProposedVerdict, UnknownRef
 from analysis_service.critic import review_issues, snap_rulings
 from analysis_service.fact_answers import STORED, FactAnswer
 from analysis_service.fact_writes import check_fact_answers
+from analysis_service.jobs import Checkpoint
 from analysis_service.links import with_link_answers
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.prompts import compose_critic_prompt, compose_recritic_prompt
@@ -26,6 +28,7 @@ from analysis_service.sources import Source
 from analysis_service.system_model import UNKNOWN
 from tests import test_critic_review_replay
 from tests.factories import sample_draft, sample_report, sample_ruling, valid_model
+from tests.test_questions import resume
 
 STORE = "store:orders-db"
 
@@ -254,6 +257,22 @@ class TestTheFacets:
         assert read.value == stored["value"]
         with pytest.raises(ValueError, match="writes a facet answer"):
             FactAnswer.model_validate(stored)
+
+    def test_a_resumed_job_runs_with_an_answer_under_another_facet_wording(self):
+        """The run seeds each answer into the graph state and ``prepare`` reads
+        it back, so that read keeps the stored value too."""
+        key = (STORE, "", "", "", "capacity-limits", "")
+        stored = FactAnswer(key=key, facets={"rate": "yes"}).model_dump(mode="json")
+        stored["value"] = "An earlier wording of the rate facet? yes"
+        earlier = FactAnswer.model_validate(stored, context=STORED)
+        held = Checkpoint(
+            system_model=valid_model(),
+            assertions=AssertionRecord(proposed=0, catalog=AssertionCatalog()),
+        )
+
+        report = resume(held, earlier=[earlier])
+
+        assert report.system_model is not None
 
 
 def test_a_blank_assertion_names_no_open_row_on_any_surface():
