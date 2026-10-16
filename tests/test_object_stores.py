@@ -236,6 +236,14 @@ class TestTheSettings:
                 {"ANALYSIS_OBJECT_CREDENTIALS": "iam"},
                 "reads no static key; unset ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE",
             ),
+            (
+                {"ANALYSIS_OBJECT_ROOT": "/srv/objects"},
+                "s3 object store takes no ANALYSIS_OBJECT_ROOT",
+            ),
+            (
+                {"ANALYSIS_OBJECT_ENDPIONT": "http://objects.example"},
+                "s3 object store takes no ANALYSIS_OBJECT_ENDPIONT",
+            ),
         ],
     )
     def test_an_unusable_setting(self, env, change, message):

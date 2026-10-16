@@ -130,7 +130,30 @@ class TestTheStartupRefusals:
             ({"ANALYSIS_JOB_STORE": "redis"}, "unknown value 'redis'"),
             ({"ANALYSIS_OBJECT_STORE": None}, "set ANALYSIS_OBJECT_STORE"),
             ({"ANALYSIS_OBJECT_STORE": "tape"}, "unknown value 'tape'"),
-            ({"ANALYSIS_JOB_STORE": "memory"}, "unset ANALYSIS_OBJECT_STORE"),
+            (
+                {
+                    "ANALYSIS_JOB_STORE": "memory",
+                    "ANALYSIS_DATABASE_URL": None,
+                    "ANALYSIS_OBJECT_ROOT": None,
+                },
+                "memory job store takes no ANALYSIS_OBJECT_STORE; unset it$",
+            ),
+            (
+                {
+                    "ANALYSIS_JOB_STORE": "memory",
+                    "ANALYSIS_OBJECT_STORE": None,
+                    "ANALYSIS_OBJECT_ROOT": None,
+                },
+                "memory job store takes no ANALYSIS_DATABASE_URL; unset it$",
+            ),
+            (
+                {"ANALYSIS_OBJECT_BUCKET": "jobs"},
+                "filesystem object store takes no ANALYSIS_OBJECT_BUCKET",
+            ),
+            (
+                {"ANALYSIS_OBJECT_ROOTS": "/srv/objects"},
+                "filesystem object store takes no ANALYSIS_OBJECT_ROOTS",
+            ),
             ({"ANALYSIS_DATABASE_URL": None}, "set ANALYSIS_DATABASE_URL"),
             ({"ANALYSIS_DATABASE_URL": "not a url"}, "is not a database URL"),
             (

@@ -120,7 +120,11 @@ from analysis_service.objects import (
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import Report
 from analysis_service.sources import Source
-from analysis_service.store_settings import StoreConfigError, closed_setting
+from analysis_service.store_settings import (
+    StoreConfigError,
+    closed_setting,
+    refuse_unread,
+)
 from analysis_service.vendors import (
     SECRET_FILE_SUFFIX,
     ProviderAuthError,
@@ -553,6 +557,12 @@ def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
             f"the database password comes only from the file that {_PASSWORD_FILE}"
             f" names; unset {bare}"
         )
+    refuse_unread(
+        env,
+        ("ANALYSIS_DATABASE_",),
+        (_URL, _CREDENTIALS, _PASSWORD_FILE, _CA_FILE, _IAM, _REGION),
+        "a PostgreSQL database",
+    )
     credentials = closed_setting(
         env.get(_CREDENTIALS, ""), _CREDENTIALS, DATABASE_CREDENTIALS
     )
@@ -578,15 +588,7 @@ def _sqlite(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
     stops the startup. The file holds content, so it must pass
     :func:`~analysis_service.objects.check_private`, as the object root does.
     """
-    stray = sorted(
-        name
-        for name, value in env.items()
-        if name.startswith("ANALYSIS_DATABASE_") and name != _URL and value.strip()
-    )
-    if stray:
-        raise StoreConfigError(
-            f"a SQLite database takes no {', '.join(stray)}; unset it"
-        )
+    refuse_unread(env, ("ANALYSIS_DATABASE_",), (_URL,), "a SQLite database")
     check_private(_sqlite_file(url), "the database file", directory=False)
     return {}
 

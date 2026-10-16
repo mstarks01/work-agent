@@ -20,7 +20,11 @@ from typing import Literal
 from analysis_service.jobs import InMemoryJobStore, JobStore
 from analysis_service.objects import ObjectStore, build_object_store
 from analysis_service.parsing import ascii_int
-from analysis_service.store_settings import StoreConfigError, closed_setting
+from analysis_service.store_settings import (
+    StoreConfigError,
+    closed_setting,
+    refuse_unread,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,17 +80,22 @@ def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
     back to non-durable, per-instance ``memory`` storage that loses every job on
     restart and isolates jobs behind a load balancer. The object store follows
     the row: ``ANALYSIS_OBJECT_STORE`` is required where the row keeps objects
-    and refused where it does not. This builds the store and opens no
-    connection; :meth:`JobStore.startup_check` checks what the store reaches.
+    and refused, with each database setting, where it does not. This builds the
+    store and opens no connection; :meth:`JobStore.startup_check` checks what
+    the store reaches.
     """
-    value = env.get("ANALYSIS_JOB_STORE", "")
-    backend = JOB_STORES[closed_setting(value, "ANALYSIS_JOB_STORE", JOB_STORES)]
+    name = closed_setting(
+        env.get("ANALYSIS_JOB_STORE", ""), "ANALYSIS_JOB_STORE", JOB_STORES
+    )
+    backend = JOB_STORES[name]
     if backend.objects:
         return backend.build(env, build_object_store(env))
-    if env.get("ANALYSIS_OBJECT_STORE", "").strip():
-        raise StoreConfigError(
-            "this job store keeps no objects; unset ANALYSIS_OBJECT_STORE"
-        )
+    refuse_unread(
+        env,
+        ("ANALYSIS_DATABASE_", "ANALYSIS_OBJECT_"),
+        (),
+        f"the {name} job store",
+    )
     return backend.build(env, None)
 
 

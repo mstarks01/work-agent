@@ -1245,8 +1245,10 @@ It guards against an accidental paid call; it is not a spend control.
 
 The [HTTP app](HTTP-API.md) reads these variables at startup. The in-process
 engine keeps no jobs and does not read them. An unset or unknown backend value
-stops the startup. [Job storage](HTTP-API.md#job-storage) in the HTTP API guide
-tells how to set up each backend.
+stops the startup. A set `ANALYSIS_DATABASE_*` or `ANALYSIS_OBJECT_*` variable
+that the selected backend does not read also stops the startup. [Job
+storage](HTTP-API.md#job-storage) in the HTTP API guide tells how to set up each
+backend.
 
 | Variable | Values | Rule |
 | --- | --- | --- |

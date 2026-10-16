@@ -136,7 +136,16 @@ class TestTheSettings:
         [
             ("ANALYSIS_JOB_STORE", "redis", "unknown value 'redis'"),
             ("ANALYSIS_JOB_STORE", "", "set ANALYSIS_JOB_STORE"),
-            ("ANALYSIS_OBJECT_STORE", "filesystem", "unset ANALYSIS_OBJECT_STORE"),
+            (
+                "ANALYSIS_OBJECT_STORE",
+                "filesystem",
+                "memory job store takes no ANALYSIS_OBJECT_STORE",
+            ),
+            (
+                "ANALYSIS_DATABASE_URL",
+                "sqlite+aiosqlite:///srv/jobs.db",
+                "memory job store takes no ANALYSIS_DATABASE_URL",
+            ),
         ],
     )
     def test_an_unusable_store_setting_stops_the_startup(
