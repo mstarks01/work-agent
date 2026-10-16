@@ -43,6 +43,7 @@ from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from analysis_service.aws_identity import platform_session
+from analysis_service.objects import OBJECT_STORES, S3_KEY_FILES
 from analysis_service.store_settings import (
     StoreConfigError,
     closed_setting,
@@ -55,13 +56,6 @@ from analysis_service.vendors import (
     refused_var,
 )
 
-#: The files that hold the static key pair of the ``api_key`` mode, by the
-#: ``boto3`` argument that each one fills.
-KEY_FILES: dict[str, str] = {
-    "aws_access_key_id": "ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE",
-    "aws_secret_access_key": "ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE",
-}
-
 #: How a request names the bucket: in the host name, or in the path. The
 #: values are the ``addressing_style`` values of ``botocore``.
 Addressing = Literal["virtual", "path"]
@@ -70,7 +64,7 @@ Addressing = Literal["virtual", "path"]
 def _key_pair(env: Mapping[str, str]) -> boto3.Session:
     """``api_key``: a session on the static key pair, from the two files only."""
     pair = {}
-    for argument, var in KEY_FILES.items():
+    for argument, var in S3_KEY_FILES.items():
         try:
             value = read_secret(env, var)
         except ProviderAuthError as error:
@@ -89,7 +83,7 @@ def _platform_identity(env: Mapping[str, str]) -> boto3.Session:
     :func:`~analysis_service.aws_identity.platform_session`. A key file stops
     the startup too, so a static key works only where the deployment declares
     ``api_key``."""
-    for var in KEY_FILES.values():
+    for var in S3_KEY_FILES.values():
         if env.get(var, "").strip():
             raise StoreConfigError(
                 f"the iam mode of the s3 object store reads no static key;"
@@ -106,29 +100,18 @@ CREDENTIALS: dict[CredentialMode, Callable[[Mapping[str, str]], boto3.Session]] 
 }
 
 
-#: Every setting that the ``s3`` store reads. Any other set setting under
-#: ``ANALYSIS_OBJECT_`` stops the build.
-_SETTINGS = (
-    "ANALYSIS_OBJECT_STORE",
-    "ANALYSIS_OBJECT_BUCKET",
-    "ANALYSIS_OBJECT_REGION",
-    "ANALYSIS_OBJECT_ENDPOINT",
-    "ANALYSIS_OBJECT_ADDRESSING",
-    "ANALYSIS_OBJECT_CREDENTIALS",
-    *KEY_FILES.values(),
-)
-
-
 def _refuse_stray_settings(env: Mapping[str, str]) -> None:
     """Refuse a key in the environment by name, then any other unread setting."""
-    for var in KEY_FILES.values():
+    for var in S3_KEY_FILES.values():
         bare = refused_var(var)
         if env.get(bare, "").strip():
             raise StoreConfigError(
                 f"the s3 object store reads its key from the file that {var}"
                 f" names; unset {bare}, which this service refuses"
             )
-    refuse_unread(env, ("ANALYSIS_OBJECT_",), _SETTINGS, "the s3 object store")
+    refuse_unread(
+        env, ("ANALYSIS_OBJECT_",), OBJECT_STORES["s3"].reads, "the s3 object store"
+    )
 
 
 def _session(env: Mapping[str, str]) -> boto3.Session:

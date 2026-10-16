@@ -378,6 +378,14 @@ def _parse_env_value(var: str, param: str, value: str) -> float | int | bool | s
     return value
 
 
+def env_variables() -> tuple[str, ...]:
+    """Every ``ANALYSIS_SAMPLING_{TIER}_{PARAM}`` override this loader reads:
+    one for each tier and each offered param."""
+    return tuple(
+        env_var_for(tier, param) for tier in TIER_NAMES for param in OFFERED_PARAMS
+    )
+
+
 def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
     """Fold ``ANALYSIS_SAMPLING_{TIER}_{PARAM}`` overrides into the raw tables.
 

@@ -98,7 +98,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import Self, TypeVar
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
@@ -137,7 +137,27 @@ MAX_JOBS_PER_WINDOW_VAR = f"{_ENV_PREFIX}MAX_JOBS_PER_WINDOW"
 MAX_TOKENS_PER_WINDOW_VAR = f"{_ENV_PREFIX}MAX_TOKENS_PER_WINDOW"
 GLOBAL_MAX_TOKENS_PER_WINDOW_VAR = f"{_ENV_PREFIX}GLOBAL_MAX_TOKENS_PER_WINDOW"
 
-_T = TypeVar("_T", int, float)
+#: Each env override, by the field it replaces, with the parse of its value.
+#: The one list of the overrides: :func:`load_resilience` and
+#: :func:`env_variables` read it.
+ENV_OVERRIDES: dict[str, tuple[str, Callable[[str], float]]] = {
+    "attempts": (ATTEMPTS_VAR, int),
+    "timeout_ms": (TIMEOUT_MS_VAR, int),
+    "max_source_bytes": (MAX_SOURCE_BYTES_VAR, int),
+    "max_sources": (MAX_SOURCES_VAR, int),
+    "job_deadline_ms": (JOB_DEADLINE_MS_VAR, int),
+    "retry_budget_ratio": (RETRY_BUDGET_RATIO_VAR, float),
+    "max_active_jobs": (MAX_ACTIVE_JOBS_VAR, int),
+    "budget_window_seconds": (BUDGET_WINDOW_SECONDS_VAR, int),
+    "max_jobs_per_window": (MAX_JOBS_PER_WINDOW_VAR, int),
+    "max_tokens_per_window": (MAX_TOKENS_PER_WINDOW_VAR, int),
+    "global_max_tokens_per_window": (GLOBAL_MAX_TOKENS_PER_WINDOW_VAR, int),
+}
+
+
+def env_variables() -> tuple[str, ...]:
+    """Every env override this loader reads."""
+    return tuple(var for var, _ in ENV_OVERRIDES.values())
 
 
 class ResilienceConfigError(ValueError):
@@ -299,8 +319,8 @@ class ResilienceConfig(BaseModel):
 
 
 def _override(
-    env: Mapping[str, str], var: str, parse: Callable[[str], _T]
-) -> _T | None:
+    env: Mapping[str, str], var: str, parse: Callable[[str], float]
+) -> float | None:
     """Parse one env override, treating a set-but-empty value as a mistake."""
     if var not in env:
         return None
@@ -340,19 +360,8 @@ def load_resilience(
         )
 
     overrides = {
-        "attempts": _override(env, ATTEMPTS_VAR, int),
-        "timeout_ms": _override(env, TIMEOUT_MS_VAR, int),
-        "max_source_bytes": _override(env, MAX_SOURCE_BYTES_VAR, int),
-        "max_sources": _override(env, MAX_SOURCES_VAR, int),
-        "job_deadline_ms": _override(env, JOB_DEADLINE_MS_VAR, int),
-        "retry_budget_ratio": _override(env, RETRY_BUDGET_RATIO_VAR, float),
-        "max_active_jobs": _override(env, MAX_ACTIVE_JOBS_VAR, int),
-        "budget_window_seconds": _override(env, BUDGET_WINDOW_SECONDS_VAR, int),
-        "max_jobs_per_window": _override(env, MAX_JOBS_PER_WINDOW_VAR, int),
-        "max_tokens_per_window": _override(env, MAX_TOKENS_PER_WINDOW_VAR, int),
-        "global_max_tokens_per_window": _override(
-            env, GLOBAL_MAX_TOKENS_PER_WINDOW_VAR, int
-        ),
+        field: _override(env, var, parse)
+        for field, (var, parse) in ENV_OVERRIDES.items()
     }
     raw.update({key: value for key, value in overrides.items() if value is not None})
 

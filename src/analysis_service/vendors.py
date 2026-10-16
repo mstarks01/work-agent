@@ -1560,6 +1560,18 @@ VENDORS: dict[VendorName, Vendor] = {
 }
 
 
+def env_variables() -> tuple[str, ...]:
+    """Every credential variable of every vendor and mode, once each."""
+    return tuple(
+        dict.fromkeys(
+            var
+            for vendor in VENDORS.values()
+            for mode in vendor.credentials
+            for var in vendor.required_env_vars(mode)
+        )
+    )
+
+
 class VendorSdkError(ConfigError):
     """A selected vendor's client library is not installed.
 

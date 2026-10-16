@@ -40,8 +40,7 @@ from alembic import command
 from sqlalchemy.engine import URL, make_url
 
 from analysis_service.migrations import alembic_config
-from analysis_service.objects import ObjectStoreName
-from analysis_service.s3_objects import KEY_FILES
+from analysis_service.objects import S3_KEY_FILES, ObjectStoreName
 from analysis_service.sql_store import engine_for
 
 REQUIRE_POSTGRES = os.environ.get("REQUIRE_POSTGRES") == "1"
@@ -105,7 +104,7 @@ def s3_env(directory: Path) -> dict[str, str]:
         "ANALYSIS_OBJECT_REGION": TEST_REGION,
         "ANALYSIS_OBJECT_CREDENTIALS": "api_key",
     }
-    for argument, var in KEY_FILES.items():
+    for argument, var in S3_KEY_FILES.items():
         path = directory / var.lower()
         path.write_text(TEST_KEYS[argument], encoding="utf-8")
         path.chmod(0o600)

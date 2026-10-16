@@ -158,6 +158,12 @@ DECLARED: dict[str, str] = {
         " has no profiled pair, which the matrix fails on rather than"
         " skipping quietly."
     ),
+    "webapp/settings_page.py": (
+        "IAM_SETUP is a table keyed by vendor: the note and the setup command of"
+        " each vendor whose row allows the iam mode, and None for each other"
+        " vendor. tests/test_settings_page.py holds its keys against VENDORS"
+        " and its None entries against each row's credential modes."
+    ),
     "src/analysis_service/binding.py": (
         "An error message naming the model family a rule matched, not a vendor"
         " selection. `openai_reasoning_model` is keyed on the identifier and"

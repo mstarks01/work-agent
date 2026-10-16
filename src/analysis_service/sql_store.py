@@ -124,12 +124,17 @@ from analysis_service.principals import Identity, Principal
 from analysis_service.report import Report
 from analysis_service.sources import Source
 from analysis_service.store_settings import (
+    DATABASE_CA_FILE_VAR,
+    DATABASE_CREDENTIALS_VAR,
+    DATABASE_IAM_VAR,
+    DATABASE_PASSWORD_FILE_VAR,
+    DATABASE_REGION_VAR,
+    DATABASE_URL_VAR,
     StoreConfigError,
     closed_setting,
     refuse_unread,
 )
 from analysis_service.vendors import (
-    SECRET_FILE_SUFFIX,
     ProviderAuthError,
     read_secret,
     refused_var,
@@ -434,19 +439,6 @@ def _prepare_sqlite(engine: AsyncEngine) -> None:
         connection.exec_driver_sql("BEGIN IMMEDIATE" if writes else "BEGIN")
 
 
-#: The setting that names the database.
-_URL = "ANALYSIS_DATABASE_URL"
-#: The setting that selects a row of :data:`DATABASE_CREDENTIALS`.
-_CREDENTIALS = "ANALYSIS_DATABASE_CREDENTIALS"
-#: The setting that names the file of the database password.
-_PASSWORD_FILE = "ANALYSIS_DATABASE_PASSWORD" + SECRET_FILE_SUFFIX
-#: The setting that names a private CA.
-_CA_FILE = "ANALYSIS_DATABASE_CA_FILE"
-#: The setting that selects a row of :data:`DATABASE_IAM`.
-_IAM = "ANALYSIS_DATABASE_IAM"
-#: The setting that names the AWS region of an RDS database.
-_REGION = "ANALYSIS_DATABASE_REGION"
-
 #: What asyncpg takes as a password: the text, or an async callable that it
 #: awaits for each new connection.
 Password = str | Callable[[], Awaitable[str]]
@@ -477,9 +469,9 @@ def _rds_token(url: URL, env: Mapping[str, str]) -> Callable[[], Awaitable[str]]
     thread, because a refresh of the credentials goes over the network.
     ``url`` holds the port that the connection uses (:func:`_postgres`).
     """
-    region = env.get(_REGION, "").strip()
+    region = env.get(DATABASE_REGION_VAR, "").strip()
     if not region:
-        raise StoreConfigError(f"set {_REGION} for an RDS IAM token")
+        raise StoreConfigError(f"set {DATABASE_REGION_VAR} for an RDS IAM token")
     session = platform_session("the rds token of the database")
     client = session.client("rds", region_name=region)
 
@@ -507,32 +499,22 @@ DATABASE_IAM: dict[DatabaseIamName, DatabaseIam] = {
 def _password_file(url: URL, env: Mapping[str, str]) -> Password:
     """The password in the file that ``ANALYSIS_DATABASE_PASSWORD_FILE`` names.
 
-    This file is the only way to give the password. The settings of the IAM
-    credentials stop the startup.
+    This file is the only way to give the password.
     """
-    for setting in (_IAM, _REGION):
-        if env.get(setting, "").strip():
-            raise StoreConfigError(
-                f"password credentials use no IAM token; unset {setting}"
-            )
     try:
-        password = read_secret(env, _PASSWORD_FILE)
+        password = read_secret(env, DATABASE_PASSWORD_FILE_VAR)
     except ProviderAuthError as error:
         raise StoreConfigError(str(error)) from None
     if not password:
         raise StoreConfigError(
-            f"set {_PASSWORD_FILE} to a file that holds the database password"
+            f"set {DATABASE_PASSWORD_FILE_VAR} to a file that holds the database password"
         )
     return password
 
 
 def _iam_token(url: URL, env: Mapping[str, str]) -> Password:
     """The token callable of the provider that ``ANALYSIS_DATABASE_IAM`` names."""
-    if env.get(_PASSWORD_FILE, "").strip():
-        raise StoreConfigError(
-            f"IAM credentials use no password; unset {_PASSWORD_FILE}"
-        )
-    name = closed_setting(env.get(_IAM, ""), _IAM, DATABASE_IAM)
+    name = closed_setting(env.get(DATABASE_IAM_VAR, ""), DATABASE_IAM_VAR, DATABASE_IAM)
     iam = DATABASE_IAM[name]
     try:
         return iam.token(url, env)
@@ -543,16 +525,33 @@ def _iam_token(url: URL, env: Mapping[str, str]) -> Password:
         ) from None
 
 
+@dataclass(frozen=True)
+class DatabaseCredentials:
+    """One way a connection gets its password: a row of
+    :data:`DATABASE_CREDENTIALS`.
+
+    No field has a default, so a new row states every fact.
+    """
+
+    #: The password, or the token callable, for the database at the URL.
+    password: Callable[[URL, Mapping[str, str]], Password]
+    #: The database settings that this mode reads. :func:`_postgres` refuses
+    #: each other one, and the Settings page shows only these.
+    reads: tuple[str, ...]
+
+
 DatabaseCredentialMode = Literal["password", "iam"]
 
 #: How a connection gets its password, for each value of
 #: ``ANALYSIS_DATABASE_CREDENTIALS``. The table answers for every name of
 #: :data:`DatabaseCredentialMode`.
-DATABASE_CREDENTIALS: dict[
-    DatabaseCredentialMode, Callable[[URL, Mapping[str, str]], Password]
-] = {
-    "password": _password_file,
-    "iam": _iam_token,
+DATABASE_CREDENTIALS: dict[DatabaseCredentialMode, DatabaseCredentials] = {
+    "password": DatabaseCredentials(
+        password=_password_file, reads=(DATABASE_PASSWORD_FILE_VAR,)
+    ),
+    "iam": DatabaseCredentials(
+        password=_iam_token, reads=(DATABASE_IAM_VAR, DATABASE_REGION_VAR)
+    ),
 }
 
 
@@ -564,7 +563,7 @@ def _verify_full(env: Mapping[str, str]) -> ssl.SSLContext:
     CA only. Where the setting is unset, the context trusts the system CA
     bundle.
     """
-    ca_file = env.get(_CA_FILE, "").strip() or None
+    ca_file = env.get(DATABASE_CA_FILE_VAR, "").strip() or None
     try:
         return ssl.create_default_context(cafile=ca_file)
     except OSError as error:
@@ -572,7 +571,7 @@ def _verify_full(env: Mapping[str, str]) -> ssl.SSLContext:
         # IsADirectoryError) and a file that holds no PEM certificate
         # (ssl.SSLError) are each an OSError.
         raise StoreConfigError(
-            f"{_CA_FILE} names a file that this service cannot read as a CA"
+            f"{DATABASE_CA_FILE_VAR} names a file that this service cannot read as a CA"
             f" ({type(error).__name__})"
         ) from None
 
@@ -590,31 +589,38 @@ def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
     can name a Unix socket.
     """
     if url.query:
-        raise StoreConfigError(f"{_URL} for PostgreSQL takes no query; remove it")
+        raise StoreConfigError(
+            f"{DATABASE_URL_VAR} for PostgreSQL takes no query; remove it"
+        )
     if not url.username or not url.host or url.host.startswith("/"):
-        raise StoreConfigError(f"{_URL} for PostgreSQL needs a user and a network host")
+        raise StoreConfigError(
+            f"{DATABASE_URL_VAR} for PostgreSQL needs a user and a network host"
+        )
     if not url.database:
-        raise StoreConfigError(f"{_URL} for PostgreSQL names no database")
+        raise StoreConfigError(f"{DATABASE_URL_VAR} for PostgreSQL names no database")
     url = url.set(port=url.port or 5432)
-    bare = refused_var(_PASSWORD_FILE)
+    bare = refused_var(DATABASE_PASSWORD_FILE_VAR)
     if env.get(bare, "").strip():
         raise StoreConfigError(
-            f"the database password comes only from the file that {_PASSWORD_FILE}"
+            f"the database password comes only from the file that {DATABASE_PASSWORD_FILE_VAR}"
             f" names; unset {bare}"
         )
+    name = closed_setting(
+        env.get(DATABASE_CREDENTIALS_VAR, ""),
+        DATABASE_CREDENTIALS_VAR,
+        DATABASE_CREDENTIALS,
+    )
+    credentials = DATABASE_CREDENTIALS[name]
     refuse_unread(
         env,
         ("ANALYSIS_DATABASE_",),
-        (_URL, _CREDENTIALS, _PASSWORD_FILE, _CA_FILE, _IAM, _REGION),
-        "a PostgreSQL database",
-    )
-    credentials = closed_setting(
-        env.get(_CREDENTIALS, ""), _CREDENTIALS, DATABASE_CREDENTIALS
+        DATABASES["postgresql+asyncpg"].reads + credentials.reads,
+        f"a PostgreSQL database with {name} credentials",
     )
     return {
         "port": url.port,
         "ssl": _verify_full(env),
-        "password": DATABASE_CREDENTIALS[credentials](url, env),
+        "password": credentials.password(url, env),
     }
 
 
@@ -634,7 +640,9 @@ def _sqlite_file(url: URL) -> Path:
     """
     path = Path(url.database or "")
     if not path.is_absolute():
-        raise StoreConfigError(f"{_URL} must name a SQLite file by an absolute path")
+        raise StoreConfigError(
+            f"{DATABASE_URL_VAR} must name a SQLite file by an absolute path"
+        )
     check_private(path.parent, "the directory of the database file", directory=True)
     return path
 
@@ -646,7 +654,12 @@ def _sqlite(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
     stops the startup. The file holds content, so it must pass
     :func:`~analysis_service.objects.check_private`, as the object root does.
     """
-    refuse_unread(env, ("ANALYSIS_DATABASE_",), (_URL,), "a SQLite database")
+    refuse_unread(
+        env,
+        ("ANALYSIS_DATABASE_",),
+        DATABASES["sqlite+aiosqlite"].reads,
+        "a SQLite database",
+    )
     check_private(_sqlite_file(url), "the database file", directory=False)
     return {}
 
@@ -712,6 +725,10 @@ class Database:
     #: Makes the database where there is none. Only the migration step calls
     #: it, through :func:`create_database`; the service never makes one.
     create: Callable[[URL], None]
+    #: The database settings that this database reads itself, beside those of
+    #: its row of :data:`DATABASE_CREDENTIALS`. :attr:`connect` refuses each
+    #: other one, and the Settings page shows only these.
+    reads: tuple[str, ...]
 
 
 DatabaseDriver = Literal["sqlite+aiosqlite", "postgresql+asyncpg"]
@@ -728,6 +745,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         connect=_sqlite,
         admission_lock=_held_by_begin_immediate,
         create=_create_sqlite,
+        reads=(DATABASE_URL_VAR,),
     ),
     # The server checks a password or an IAM token only when a connection
     # opens, so a pooled connection stays open after its token expires, and
@@ -738,6 +756,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         connect=_postgres,
         admission_lock=_advisory_lock,
         create=_no_creation,
+        reads=(DATABASE_URL_VAR, DATABASE_CREDENTIALS_VAR, DATABASE_CA_FILE_VAR),
     ),
 }
 
@@ -748,22 +767,26 @@ def database_url(env: Mapping[str, str]) -> URL:
     A URL that holds a password stops the startup, so a password never sits
     in an environment variable. No message repeats the URL.
     """
-    value = env.get(_URL, "").strip()
+    value = env.get(DATABASE_URL_VAR, "").strip()
     if not value:
-        raise StoreConfigError(f"set {_URL} for the sql job store")
+        raise StoreConfigError(f"set {DATABASE_URL_VAR} for the sql job store")
     try:
         url = make_url(value)
     except ArgumentError:
-        raise StoreConfigError(f"{_URL} is not a database URL") from None
+        raise StoreConfigError(f"{DATABASE_URL_VAR} is not a database URL") from None
     if url.password is not None or any("password" in key.lower() for key in url.query):
-        raise StoreConfigError(f"{_URL} holds a password; remove it from the URL")
+        raise StoreConfigError(
+            f"{DATABASE_URL_VAR} holds a password; remove it from the URL"
+        )
     _database(url)
     return url
 
 
 def _database(url: URL) -> Database:
     """The row of :data:`DATABASES` for the driver of ``url``."""
-    return DATABASES[closed_setting(url.drivername, f"the driver of {_URL}", DATABASES)]
+    return DATABASES[
+        closed_setting(url.drivername, f"the driver of {DATABASE_URL_VAR}", DATABASES)
+    ]
 
 
 def create_database(env: Mapping[str, str]) -> None:

@@ -77,6 +77,14 @@ _PINNED = (
 #: as a property of the name, never as a ticket number. Delete the name and its
 #: tests instead when the reason is only that the tests exist.
 TEST_ONLY: dict[str, str] = {
+    "SETTINGS": (
+        "the page module of ADR 0091, held against deployment_variables() by"
+        " its test; the Settings page of #1775 is its reader"
+    ),
+    "IAM_SETUP": (
+        "the iam note and setup command of the page module of ADR 0091; the"
+        " credential fields of #1775 and #1777 read it"
+    ),
     "measure_direction": (
         "the one aggregation ADR 0031 pins its direction numbers with, and the"
         " instrument a later candidate rule is priced through"

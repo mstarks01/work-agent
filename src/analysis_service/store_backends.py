@@ -18,9 +18,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from analysis_service.jobs import InMemoryJobStore, JobStore
-from analysis_service.objects import ObjectStore, build_object_store
+from analysis_service.objects import OBJECT_STORES, ObjectStore, build_object_store
 from analysis_service.parsing import ascii_int
 from analysis_service.store_settings import (
+    DATABASE_URL_VAR,
+    DATABASE_VARIABLES,
     StoreConfigError,
     closed_setting,
     refuse_unread,
@@ -30,6 +32,11 @@ logger = logging.getLogger(__name__)
 
 
 JobStoreName = Literal["memory", "sql"]
+
+#: The setting that selects a row of :data:`JOB_STORES`.
+JOB_STORE_VAR = "ANALYSIS_JOB_STORE"
+#: The setting of the retention period, which :func:`retention_days` reads.
+RETENTION_DAYS_VAR = "ANALYSIS_RETENTION_DAYS"
 
 
 @dataclass(frozen=True)
@@ -46,6 +53,12 @@ class JobStoreBackend:
     #: True, ``ANALYSIS_OBJECT_STORE`` is required; where False, it is refused,
     #: so a half-durable configuration cannot start.
     objects: bool
+    #: The ``ANALYSIS_DATABASE_*`` and ``ANALYSIS_OBJECT_*`` settings that this
+    #: store reads itself. A store that keeps objects leaves each other one to
+    #: the rows of the object store and the database, which refuse what they do
+    #: not read. A store that keeps none refuses each other one. The Settings
+    #: page shows only these.
+    reads: tuple[str, ...]
 
 
 def _sql_store(env: Mapping[str, str], objects: ObjectStore | None) -> JobStore:
@@ -66,9 +79,13 @@ def _sql_store(env: Mapping[str, str], objects: ObjectStore | None) -> JobStore:
 #: :data:`JobStoreName`.
 JOB_STORES: dict[JobStoreName, JobStoreBackend] = {
     "memory": JobStoreBackend(
-        build=lambda env, objects: InMemoryJobStore(), objects=False
+        build=lambda env, objects: InMemoryJobStore(), objects=False, reads=()
     ),
-    "sql": JobStoreBackend(build=_sql_store, objects=True),
+    "sql": JobStoreBackend(
+        build=_sql_store,
+        objects=True,
+        reads=(DATABASE_URL_VAR, "ANALYSIS_OBJECT_STORE"),
+    ),
 }
 
 
@@ -84,16 +101,14 @@ def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
     store and opens no connection; :meth:`JobStore.startup_check` checks what
     the store reaches.
     """
-    name = closed_setting(
-        env.get("ANALYSIS_JOB_STORE", ""), "ANALYSIS_JOB_STORE", JOB_STORES
-    )
+    name = closed_setting(env.get(JOB_STORE_VAR, ""), JOB_STORE_VAR, JOB_STORES)
     backend = JOB_STORES[name]
     if backend.objects:
         return backend.build(env, build_object_store(env))
     refuse_unread(
         env,
         ("ANALYSIS_DATABASE_", "ANALYSIS_OBJECT_"),
-        (),
+        backend.reads,
         f"the {name} job store",
     )
     return backend.build(env, None)
@@ -144,16 +159,33 @@ def retention_days(env: Mapping[str, str] = os.environ) -> int | None:
     A value that is not a whole number from 1 to :data:`MAX_RETENTION_DAYS`
     raises, so the startup stops.
     """
-    value = env.get("ANALYSIS_RETENTION_DAYS")
+    value = env.get(RETENTION_DAYS_VAR)
     if value is None:
         return None
     days = ascii_int(value, max_digits=len(str(MAX_RETENTION_DAYS)))
     if days is None or not 1 <= days <= MAX_RETENTION_DAYS:
         raise StoreConfigError(
-            "ANALYSIS_RETENTION_DAYS must be a whole number of days from 1 to"
+            f"{RETENTION_DAYS_VAR} must be a whole number of days from 1 to"
             f" {MAX_RETENTION_DAYS}, or unset to keep every job"
         )
     return days
+
+
+def env_variables() -> tuple[str, ...]:
+    """Every setting that the store loaders read, once each.
+
+    The job store, the retention period, the reads of each row of
+    :data:`JOB_STORES` and :data:`~analysis_service.objects.OBJECT_STORES`,
+    and the database settings. A change to any of them takes effect only
+    after a restart (ADR 0093).
+    """
+    names = [JOB_STORE_VAR, RETENTION_DAYS_VAR]
+    for job_store in JOB_STORES.values():
+        names += job_store.reads
+    for object_store in OBJECT_STORES.values():
+        names += object_store.reads
+    names += DATABASE_VARIABLES
+    return tuple(dict.fromkeys(names))
 
 
 async def expire_jobs(store: JobStore, days: int) -> None:

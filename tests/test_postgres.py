@@ -92,10 +92,16 @@ class TestTheSettings:
                 {"ANALYSIS_DATABASE_PASSWORD": "hunter2"},
                 "unset ANALYSIS_DATABASE_PASSWORD$",
             ),
-            ({"ANALYSIS_DATABASE_IAM": "rds"}, "unset ANALYSIS_DATABASE_IAM$"),
+            (
+                {"ANALYSIS_DATABASE_IAM": "rds"},
+                "with password credentials takes no ANALYSIS_DATABASE_IAM; unset it$",
+            ),
             (
                 {"ANALYSIS_DATABASE_REGION": "eu-west-1"},
-                "unset ANALYSIS_DATABASE_REGION$",
+                (
+                    "with password credentials takes no ANALYSIS_DATABASE_REGION;"
+                    " unset it$"
+                ),
             ),
             (
                 {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://analysis:hunter2@db/x"},
@@ -128,7 +134,10 @@ class TestTheSettings:
             ),
             (
                 {"ANALYSIS_DATABASE_CAFILE": "/etc/ssl/ca.pem"},
-                "PostgreSQL database takes no ANALYSIS_DATABASE_CAFILE; unset it$",
+                (
+                    "PostgreSQL database with password credentials takes no"
+                    " ANALYSIS_DATABASE_CAFILE; unset it$"
+                ),
             ),
         ],
     )
@@ -213,7 +222,10 @@ class TestTheIamCredentials:
             ({"ANALYSIS_DATABASE_REGION": None}, "set ANALYSIS_DATABASE_REGION"),
             (
                 {"ANALYSIS_DATABASE_PASSWORD_FILE": "/run/secrets/password"},
-                "unset ANALYSIS_DATABASE_PASSWORD_FILE",
+                (
+                    "with iam credentials takes no ANALYSIS_DATABASE_PASSWORD_FILE;"
+                    " unset it$"
+                ),
             ),
         ],
     )

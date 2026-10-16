@@ -104,6 +104,7 @@ on:
       - "!src/analysis_service/report_changes.py"
       - "!src/analysis_service/report_conditions.py"
       - "!src/analysis_service/s3_objects.py"
+      - "!src/analysis_service/settings_variables.py"
       - "!src/analysis_service/smoke.py"
       - "!src/analysis_service/sql_store.py"
       - "!src/analysis_service/store_backends.py"
