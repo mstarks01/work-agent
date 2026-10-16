@@ -52,6 +52,7 @@ from analysis_service.system_model import (
     Element,
     EmittedSystemModel,
     Process,
+    ZonedElement,
     _Element,
     normalize_element_ids,
 )
@@ -286,8 +287,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
 
         Resolving first is what makes the message actionable: repair is told
         that a ``trust_zone`` points at ``process:web-app``, not that some token
-        it no longer recognises went missing. The wide lookup runs only because
-        the field's own scope holds nothing — a narrow hit is never overruled.
+        it no longer recognises went missing.
         """
         payload = compact_fixture()
         payload["data_stores"][0]["trust_zone"] = "p:app"
@@ -306,8 +306,8 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         ``boundary:card-processor`` are different IDs. A flat ref namespace made
         every use of it ambiguous and failed the whole extraction.
 
-        Each field resolves in its own scope, so ``trust_zone`` reaches the
-        boundary and a flow endpoint reaches the entity, from one spelling.
+        The tag tells the two apart, so ``trust_zone`` reaches the boundary and
+        a flow endpoint reaches the entity, from one slug.
         """
         payload = compact_fixture()
         payload["trust_boundaries"][0]["ref"] = "b:cust"
@@ -387,6 +387,92 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         _, issues = parse_extraction(payload, COMPACT_FORMAT)
 
         assert "invalid-reference" in codes(issues)
+
+    def test_an_endpoint_mistyped_follows_the_one_element_with_its_slug(self):
+        """The case 14 shape (ADR 0089) on this route: ``e:cust`` is declared
+        and a flow names ``p:cust``."""
+        payload = compact_fixture()
+        payload["data_flows"][0]["source"] = "p:cust"
+
+        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+
+        assert codes(issues) == []
+        assert model.data_flows[0].source == "entity:customer"
+
+
+def _with_element(rows: list[dict], name: str, handle: str, key: str) -> None:
+    """Append a copy of the group's first row under a new name and handle."""
+    rows.append(dict(rows[0], name=name, **{key: handle}))
+
+
+#: One flow source each route is handed: the extra elements (group, name,
+#: slug), the endpoint as (the group whose type it carries, slug), and the
+#: element ID it must resolve to, or ``None`` for a dangling endpoint.
+SLUG_RULE_CASES = {
+    "one-element-carries-the-slug": ((), ("processes", "customer"), "entity:customer"),
+    "the-right-type": ((), ("external_entities", "customer"), "entity:customer"),
+    "no-element-carries-the-slug": ((), ("processes", "ghost"), None),
+    "two-elements-carry-the-slug": (
+        (("data_stores", "Customer", "customer"),),
+        ("processes", "customer"),
+        None,
+    ),
+    "an-unzoned-element-carries-the-slug": ((), ("processes", "internet"), None),
+    "a-type-no-endpoint-has": ((), ("trust_boundaries", "customer"), None),
+    "the-endpoint-two-elements-arrived-with": (
+        (
+            ("processes", "Batch Worker", "customer"),
+            ("processes", "Report Worker", "customer"),
+        ),
+        ("processes", "customer"),
+        None,
+    ),
+}
+
+
+class TestBothRoutesFollowAnEndpointByOneRule:
+    """ADR 0089 on both routes, from one set of inputs.
+
+    Each case is written once and spelled twice: as element IDs for the full
+    route and as refs for the compact route, with each ref the slug its ID
+    carries. The two routes must agree with each other and with the case.
+    """
+
+    @staticmethod
+    def _resolved(payload: dict, extraction_format: str) -> tuple[str | None, bool]:
+        model, issues = parse_extraction(payload, extraction_format)
+        assert model is not None
+        source = model.data_flows[0].source
+        named = {element.id for element in model.elements()}
+        resolved = source if source in named else None
+        return resolved, "invalid-reference" in codes(issues)
+
+    @pytest.mark.parametrize("case", SLUG_RULE_CASES)
+    def test_the_routes_agree(self, case):
+        extras, (endpoint_group, endpoint_slug), expected = SLUG_RULE_CASES[case]
+        full = valid_model().model_dump(mode="json")
+        compact = as_compact(full)
+        for group, name, slug in extras:
+            prefix = get_args(EmittedSystemModel.model_fields[group].annotation)[0]
+            _with_element(full[group], name, f"{prefix.id_prefix}:{slug}", "id")
+            _with_element(compact[group], name, f"{REF_TAGS[group]}:{slug}", "ref")
+        prefix = get_args(EmittedSystemModel.model_fields[endpoint_group].annotation)[0]
+        full["data_flows"][0]["source"] = f"{prefix.id_prefix}:{endpoint_slug}"
+        compact["data_flows"][0]["source"] = (
+            f"{REF_TAGS[endpoint_group]}:{endpoint_slug}"
+        )
+
+        on_full = self._resolved(full, FULL_FORMAT)
+        on_compact = self._resolved(compact, COMPACT_FORMAT)
+
+        assert on_full == on_compact == (expected, expected is None)
+
+    def test_both_routes_read_one_set_of_zoned_types(self):
+        """The full route reads ``zoned_elements()``, the compact route the
+        ``ZonedElement`` union; a type in one and not the other splits them."""
+        walked = {type(element) for element in valid_model().zoned_elements()}
+
+        assert walked == set(get_args(ZonedElement))
 
 
 class TestMalformedOutputFailsExplicitly:

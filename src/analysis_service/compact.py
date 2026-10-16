@@ -67,19 +67,25 @@ Three properties make the expansion safe to put in front of the gate:
   of the ID rule, overwrite it and follow every reference. Deriving here would
   be a second reader of that rule, and it would re-impose the 300-character
   ``id`` bound on a value the full route never re-checks.
-- **An unresolved ref survives as itself.** A ref naming no element is left in
-  the field verbatim, so the gate reports ``invalid-reference`` naming the ref
-  the model wrote. Reference typing is the gate's rule and stays there: a
-  ``trust_zone`` pointing at a process resolves to that process's ID and fails
-  the gate with a message naming a real element.
-- **A reference resolves inside the scope of the field that reads it.** That is
-  what gives the transport back the type a full-model ID carries in its prefix,
-  because a model can give ``card-processor`` to an external entity and to its
-  own trust zone, which the full model spells as two IDs and a flat namespace
-  cannot tell apart. A ref
-  several elements of one scope claim resolves to none of them, and the adapter
+- **An unresolved ref survives as itself.** A ref that names no element, and
+  that the slug rule below does not move, is left in the field verbatim, so the
+  gate reports ``invalid-reference`` naming the ref the model wrote. Reference
+  typing is the gate's rule and stays there: a ``trust_zone`` pointing at a
+  process resolves to that process's ID and fails the gate with a message
+  naming a real element.
+- **A typed ref names one element.** The tag gives the transport back the type
+  a full-model ID carries in its prefix, because a model can give
+  ``card-processor`` to an external entity and to its own trust zone, which the
+  full model spells as two IDs and a flat namespace cannot tell apart. A ref
+  several elements of one type claim resolves to none of them, and the adapter
   reports ``duplicate-ref`` rather than picking — picking would be a silent
   wrong binding, which is the failure this transport has to be incapable of.
+- **A mistyped flow endpoint follows its slug, as on the full route.** A flow
+  endpoint that names no element follows the one zoned element whose ref
+  carries its slug under another tag.
+  :func:`~analysis_service.system_model.follow_by_slug` is the one reader of
+  that rule (ADR 0089): this route calls it over refs, and the full route calls
+  it over element IDs.
 
 The one deliberate divergence from :class:`~analysis_service.system_model.DataFlow`
 is ``operations``, which is required here and defaulted there. The default exists
@@ -90,7 +96,8 @@ output rather than an unknown fact.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from functools import partial
 from types import MappingProxyType
 from typing import Any, Literal, get_args
 
@@ -98,6 +105,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.system_model import (
     ELEMENT_GROUPS,
+    ENDPOINT_PREFIXES,
     UNKNOWN,
     BoundaryKind,
     DataFlow,
@@ -113,6 +121,7 @@ from analysis_service.system_model import (
     TrustBoundary,
     assets_field,
     assumable_attribute_names,
+    follow_by_slug,
 )
 from analysis_service.validation import ValidationIssue, parse_and_validate
 
@@ -378,6 +387,14 @@ COMPACT_ELEMENTS: Mapping[str, tuple[type[BaseModel], type[Element]]] = (
     )
 )
 
+#: The groups whose elements a flow endpoint may name, read off the element
+#: classes so the compact route and the full route share one set.
+_ENDPOINT_GROUPS: tuple[str, ...] = tuple(
+    group
+    for group, (_, element_type) in COMPACT_ELEMENTS.items()
+    if element_type.id_prefix in ENDPOINT_PREFIXES
+)
+
 #: Every field a compact element may leave out, in declaration order.
 #:
 #: Read off the schema rather than listed, so the allowlist #938 asks for is the
@@ -472,8 +489,19 @@ def expand(payload: object) -> tuple[dict[str, Any] | None, list[ValidationIssue
         ]
 
     claims, ambiguous = _claims(compact)
+    follow = partial(
+        follow_by_slug,
+        named=claims.keys() | ambiguous,
+        zoned=[
+            row.ref for group in _ENDPOINT_GROUPS for row in getattr(compact, group)
+        ],
+        endpoint_prefixes={REF_TAGS[group] for group in _ENDPOINT_GROUPS},
+    )
     expanded: dict[str, Any] = {
-        group: [_expand_element(group, row, claims) for row in getattr(compact, group)]
+        group: [
+            _expand_element(group, row, claims, follow)
+            for row in getattr(compact, group)
+        ]
         for group in COMPACT_ELEMENTS
     }
     expanded["assumptions"] = [
@@ -531,20 +559,27 @@ def _provisional_id(element_type: type[Element], ref: str) -> str:
 
 
 def _expand_element(
-    group: str, row: BaseModel, claims: Mapping[str, str]
+    group: str,
+    row: BaseModel,
+    claims: Mapping[str, str],
+    follow: Callable[[str], str],
 ) -> dict[str, Any]:
     """One compact row as full-model JSON: ``ref`` becomes ``id``, refs resolve.
 
-    Every other field is copied unchanged. A ref naming no element is left as
-    the model wrote it, so the gate reports ``invalid-reference`` quoting the
-    ref rather than an ID this function invented. A ref of the wrong *type*
-    still resolves, and the gate reports it against a real element ID: which
-    types a field may name is the gate's rule and stays there.
+    Every other field is copied unchanged. A flow endpoint first passes through
+    ``follow``, the slug rule. A ref that still names no element is left as the
+    model wrote it, so the gate reports ``invalid-reference`` quoting the ref
+    rather than an ID this function invented. A ref of the wrong *type* still
+    resolves, and the gate reports it against a real element ID: which types a
+    field may name is the gate's rule and stays there.
     """
     _, element_type = COMPACT_ELEMENTS[group]
     expanded = row.model_dump(mode="json")
     expanded["id"] = _provisional_id(element_type, expanded.pop("ref"))
     for field in REFERENCE_FIELDS:
         if field in expanded:
-            expanded[field] = claims.get(expanded[field], expanded[field])
+            ref = expanded[field]
+            if field in ("source", "destination"):
+                ref = follow(ref)
+            expanded[field] = claims.get(ref, ref)
     return expanded
