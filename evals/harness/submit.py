@@ -506,8 +506,12 @@ def _check_your_file_appends(root: Path, author: str) -> Check:
 def _voters_table(raw: str) -> dict[str, Any] | None:
     """The ``voters`` table out of one roster's raw TOML, or ``None``.
 
-    **The one reader of what a roster's voters table is.** Two checks ask it of
-    the same file and each has to handle the same two shapes: ``voters`` need
+    **The one tolerant reader of a roster's voters table**, for the two
+    preflight checks that read a base revision and must report rather than
+    raise. :func:`~evals.harness.roster.load` is the strict loader every other
+    reader asks, and it refuses an absent or empty table; the checks here call
+    it for the live file and report its refusal. Two checks ask this of the
+    same file and each has to handle the same two shapes: ``voters`` need
     not be present, and it need not be a table. ``voters = "ada"`` is legal
     TOML, and a scalar has no ``.get`` and iterates as its characters. A caller
     that reads the file itself gets one of those right and ships the other.

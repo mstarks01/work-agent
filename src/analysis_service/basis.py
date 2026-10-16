@@ -60,9 +60,12 @@ A **content token** is a run of letters and digits, with an internal dot kept so
 a version survives whole: ``"TLS 1.3"`` gives ``tls`` and ``1.3``, and ``"OAuth
 2.0"`` gives ``oauth`` and ``2.0``. Single characters and :data:`FUNCTION_WORDS`
 drop out. What is left is matched against the cited source through
-:func:`~analysis_service.analysis.matches_term`, the repo's one reader of "does
-this text name this term", which matches at the start of a word — so ``encrypt``
-reaches ``encrypted`` and ``tls`` reaches ``TLSv1.2``.
+:func:`~analysis_service.analysis.matches_term`, which matches at the start of a
+word — so ``encrypt`` reaches ``encrypted`` and ``tls`` reaches ``TLSv1.2``. A
+token is a stem of the source's own words, so a prefix match is the rule here.
+A protocol name and a domain-pack term are whole names, and
+:func:`~analysis_service.protocol_defaults.names_protocol` and
+:mod:`analysis_service.domains` match them as whole words.
 
 :data:`FUNCTION_WORDS` is an ordinary English closed-class list: articles,
 conjunctions, prepositions, pronouns and auxiliaries. It was written from that

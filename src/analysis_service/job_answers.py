@@ -595,7 +595,7 @@ class JobAnswers:
             ask_questions=True,
             amends=parent.id,
             parent_revision=parent.revision,
-            carried=amended.answers,
+            carried=parent.held_answers(),
             reserved_tokens=budgets.estimate(
                 amended.sources, parent.whole_frameworks()
             ),

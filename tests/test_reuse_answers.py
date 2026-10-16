@@ -158,3 +158,37 @@ class TestTheRoute:
         assert [a["key"] for a in read["carried_dropped"]] == [list(GONE.key)]
         assert key in [q["key"] for q in read["answered_early"]]
         assert key not in [q["key"] for q in read["early_questions"]]
+
+    def test_an_amendment_carries_what_a_new_analysis_carries(self):
+        """Both new jobs read :meth:`JobRecord.held_answers`, so a carried answer
+        the waiting job's questions dropped reaches each one, and each new
+        job's own questions decide whether to take it."""
+        client, store = catalog_client()
+        parent = waiting(store)
+        asked = client.get(f"/v1/jobs/{parent}/questions", headers=auth()).json()
+        key = next(
+            q["key"] for q in asked["early_questions"] if q["kind"] == "attribute"
+        )
+        earlier = _holding(
+            store, answers=AnswerSet(facts=(FactAnswer(key=tuple(key), value="none"),))
+        )
+        child_id = _submit(client, earlier).json()["job_id"]
+        child = asyncio.run(store.get(child_id)).model_copy(
+            update={"status": "awaiting-answers", "checkpoint": held()}
+        )
+        child.carried = AnswerSet(facts=(*child.carried.facts, GONE))
+        asyncio.run(store.save(child))
+
+        amended = client.post(
+            f"/v1/jobs/{child_id}/amendments",
+            json={"text": "A CDN sits in front.", "revision": child.revision},
+            headers=auth(),
+        )
+        assert amended.status_code == 201, amended.text
+        again = _submit(client, child_id)
+        assert again.status_code == 201, again.text
+
+        by_amendment = asyncio.run(store.get(amended.json()["job_id"])).carried
+        by_submission = asyncio.run(store.get(again.json()["job_id"])).carried
+        assert by_amendment == by_submission == child.held_answers()
+        assert GONE in by_amendment.facts

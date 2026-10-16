@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,7 +13,7 @@ import pytest
 
 from evals.harness import near_misses
 from evals.harness.losses import CaseLosses, Loss
-from evals.harness.reference import RULINGS_FILE, CorpusError, load_case
+from evals.harness.reference import RULINGS_FILE, CorpusError, Reading, load_case
 from tests.eval_factories import draft_threat
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
@@ -110,6 +111,37 @@ def test_a_reading_already_ruled_is_not_asked_again():
         displaced_standing="pooled",
     )
     assert _ballot(case, loss, draft) == []
+
+
+def test_a_ruled_reading_of_one_action_is_not_asked_again():
+    """``forge`` and ``inject`` are one action to the matcher and the vote key
+    (:data:`~evals.harness.verbs.EQUIVALENT`), so a ruling on one is a ruling
+    on the other, and a place reads in its endpoint form."""
+    case = load_case(CORPUS_DIR / CASE)
+    place = case.stride_claims()[3].affected_element_ids
+    ruled = replace(
+        case,
+        ruled_readings={3: (Reading(verb="forge", affected_element_ids=place),)},
+    )
+    draft = draft_threat(
+        1,
+        "tampering",
+        "A forged image is planted",
+        element_ids=tuple(reversed(place)),
+        verb="inject",
+    )
+    loss = Loss(
+        reference_index=3,
+        lane="tampering",
+        must_find=True,
+        cause="place",
+        reference_verb="plant",
+        displaced_draft_id=draft.id,
+        displaced_standing="pooled",
+    )
+
+    assert _ballot(case, loss, draft)
+    assert _ballot(ruled, loss, draft) == []
 
 
 def _write(path, rows, columns):

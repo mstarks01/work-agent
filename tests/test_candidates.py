@@ -343,6 +343,26 @@ class TestFiring:
 
         assert hit.facts["assets"] == _tags(store.assets)
 
+    def test_every_rule_reports_tags_in_the_one_comparable_form(self, model):
+        """A fact that lists an element's tags reads them sorted and once, as
+        ``comparable_asset_tags`` says, whatever order the model emitted."""
+        from evals.harness.modes import _tags
+
+        store = next(one for one in model.data_stores if one.id == "store:ledger")
+        store.assets = ["secrets", "pii", "credentials", "pii", "financial"]
+        store.encryption_at_rest = "unknown"
+        reported = [
+            value
+            for candidate_set in candidates(model, None).values()
+            for hit in candidate_set.candidates
+            for key, value in hit.facts.items()
+            if key in {"assets", "destination_assets", "assets_in_transit"} and value
+        ]
+
+        assert reported
+        for value in reported:
+            assert value == _tags(value.split(", ")), value
+
     def test_privilege_crossing_reads_the_boundary_kind(self, model):
         hits = fired(model, "elevation-of-privilege-privilege-zone-crossing")
         assert hits[0].element_ids == (

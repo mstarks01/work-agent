@@ -51,7 +51,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import ValidationError
 
@@ -78,13 +78,9 @@ from analysis_service.frameworks import lane_of
 # :class:`GroundMisShape`.
 FailureKind = Literal["other"]
 
-_KINDS: tuple[GroundKind, ...] = (
-    "quote",
-    "unknown-attribute",
-    "absent-attribute",
-    "derived-fact",
-    "assertion",
-)
+#: Every ground kind, read off :data:`GroundKind` itself, so a kind the record
+#: adds is counted rather than dropped.
+_KINDS: tuple[GroundKind, ...] = get_args(GroundKind)
 
 
 @dataclass(frozen=True)

@@ -1026,7 +1026,7 @@ def create_app(
         ]
         sources = await store.sources(record.id, owner_id)
         if sources is None:
-            return no_such_run()
+            await workspace.answers.missing(record, "sources")
         payload["description"] = "\n\n".join(
             source.text for source in sources if source.kind != "answers"
         )
@@ -1233,15 +1233,21 @@ def create_app(
         if report is None:
             return PlainTextResponse("no such report", status_code=404)
         # The page compares with the report before it where the store holds
-        # that report under this service's schema version, and else shows
-        # none, as for a parent that is gone.
+        # that report under this service's schema version and
+        # :meth:`JobAnswers.servable` lets it be served, and else shows none,
+        # as for a parent that is gone.
         resumption = answerable.record.resumption
         parent = (
             None if resumption is None else await workspace.owned(resumption.parent_id)
         )
         previous = None
         if parent is not None and same_schema(parent.schema_version):
-            previous = await workspace.store.report(parent.id, owner_id)
+            try:
+                workspace.answers.servable(parent)
+            except (NotCompleted, Withheld):
+                pass
+            else:
+                previous = await workspace.store.report(parent.id, owner_id)
         return response(render_report(report, answerable.state(), previous))
 
     @app.post("/correct/{run_id}")

@@ -254,3 +254,18 @@ class TestTheFacets:
         assert read.value == stored["value"]
         with pytest.raises(ValueError, match="writes a facet answer"):
             FactAnswer.model_validate(stored)
+
+
+def test_a_blank_assertion_names_no_open_row_on_any_surface():
+    """``spellings`` reads a field of blank padding as unused, and the label and
+    the re-ask sentence read the spelling through it, so all three name the
+    attribute (#1745 read ``fact_kind`` the same way)."""
+    from analysis_service.claims import name_unknown
+
+    ref = UnknownRef(element_id="e1", attribute="authentication", assertion=" ")
+
+    assert ref.spellings == ("attribute",)
+    assert label_of(ref, {"e1": "Gateway"}) == label_of(
+        UnknownRef(element_id="e1", attribute="authentication"), {"e1": "Gateway"}
+    )
+    assert name_unknown(ref) == "`authentication` on `e1`"

@@ -159,7 +159,13 @@ def names_protocol(text: str, names: tuple[str, ...]) -> bool:
 def stated_protocol_flows(model: SystemModel) -> Iterator[DataFlow]:
     """The flows whose protocol the sources state, not one the model assumed.
 
-    **The one reader of whether a flow's protocol counts.**
+    **The one reader of whether a flow's protocol counts as a basis for a
+    value this service writes.** :func:`with_protocol_defaults` and
+    :mod:`analysis_service.field_capabilities` derive a value from a protocol,
+    and a value derived from an assumed protocol would be an assumption built on
+    an assumption. A rule that only reads the model, as the ASVS precondition and
+    its candidate rules do, reads every flow's protocol: an assumed one is part
+    of the model a lane reads, with its :class:`Assumption` beside it.
     """
     inferred = {a.element_id for a in model.assumptions if a.attribute == "protocol"}
     return (flow for flow in model.data_flows if flow.id not in inferred)

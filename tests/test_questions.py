@@ -54,6 +54,7 @@ from analysis_service.links import (
 from analysis_service.open_facts import open_attribute
 from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.questions import _by_band, fact_questions
+from analysis_service.report import Report
 from analysis_service.report_conditions import conditions
 from analysis_service.sources import ANSWERS_LABEL, Source, text_digest
 from analysis_service.system_model import ZONE_ATTRIBUTE, Assumption
@@ -940,6 +941,30 @@ def test_a_fact_answered_i_do_not_know_leaves_the_list_and_the_count(report):
     assert first.key not in {question.key for question in again}
     counted = {finding for question in again for finding in question.findings}
     assert not counted & set(first.findings)
+
+
+@pytest.mark.parametrize("path", REPORTS, ids=lambda path: path.name[:2])
+def test_a_dismissed_ground_answered_i_do_not_know_leaves_the_finding_waiting(path):
+    """A finding waits on the facts its verdict names, as its card says, so
+    "I don't know" for a ground the critic dismissed leaves it conditional."""
+    report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+    catalog = report.assertions.catalog if report.assertions else None
+    dismissed = [
+        (f"{block.framework}/{claim.id}", ref.key)
+        for block in report.analyses
+        for claim in block.all_claims()
+        if claim.verdict.status == "needs-info"
+        for ref in claim.unknown_grounds()
+        if ref.key in claim.verdict.dismissed_refs()
+    ]
+    if not dismissed:
+        pytest.skip("no conditional finding cites a ground the critic dismissed")
+    finding, key = dismissed[0]
+    earlier = [FactAnswer(key=key, value=UNKNOWN)]
+
+    again = fact_questions(report.analyses, report.system_model, catalog, earlier)
+
+    assert finding in {f for question in again for f in question.findings}
 
 
 CAPACITY_FACETS = ("rate", "size", "concurrency", "quota")

@@ -10,7 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.parsing import ascii_int, is_version, signer, strings
+from analysis_service.parsing import (
+    ascii_int,
+    is_version,
+    non_negative,
+    signer,
+    strings,
+)
 
 #: The shapes ``str.isdigit`` passes and ``int`` does not accept as written.
 #: ``"²"`` raises a ``ValueError``; a fullwidth digit is a *second spelling* of
@@ -64,3 +70,29 @@ class TestSigner:
     def test_a_value_that_names_nobody_raises(self, value):
         with pytest.raises(ValueError, match="names nobody"):
             signer(value)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        0,
+        0.5,
+        3,
+        -1,
+        -0.5,
+        10**400,
+        -(10**400),
+        float("inf"),
+        float("nan"),
+        True,
+        "1",
+        None,
+        [1],
+    ],
+)
+def test_money_and_non_negative_answer_one_rule(value):
+    """A dollar figure and a rate read one rule. A JSON integer too large for a
+    float is not a finite number, and it is refused rather than raised on."""
+    from evals.harness.baseline import money
+
+    assert non_negative(value) == (money(value) is not None)

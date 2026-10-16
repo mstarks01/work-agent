@@ -965,6 +965,35 @@ class TestOpenAIReasoningFamilies:
         assert openai_reasoning_model("gpt-5o")
 
 
+class TestEveryGptRuleReadsOneIdentifier:
+    """The prompt-cache rule and the reasoning rule read a GPT version through
+    ``family_identifier``, so a gateway segment or a variant tail moves
+    neither answer."""
+
+    SPELLINGS = (
+        "openai/gpt-{}",
+        "openrouter/openai/gpt-{}",
+        "openai/gpt-{}:exacto",
+    )
+
+    @pytest.mark.parametrize("version", ["5.6-terra", "5.6", "5.5", "4o", "6"])
+    @pytest.mark.parametrize("spelling", SPELLINGS)
+    def test_a_spelling_answers_as_the_bare_name(self, spelling, version):
+        model = spelling.format(version)
+        bare = f"gpt-{version}"
+        assert openai_reasoning_model(model) == openai_reasoning_model(bare)
+        for vendor in VENDORS.values():
+            assert vendor.caches_prompt_prefix(model) == (
+                vendor.caches_prompt_prefix(bare)
+            ), vendor.name
+
+    def test_every_row_with_a_cache_rule_marks_gpt_5_6(self):
+        cached = [vendor for vendor in VENDORS.values() if vendor.prompt_cache]
+        assert cached
+        assert all(vendor.caches_prompt_prefix("gpt-5.6-terra") for vendor in cached)
+        assert not any(vendor.caches_prompt_prefix("gpt-5.5") for vendor in cached)
+
+
 class TestTheRouteToVendorRule:
     """One reader, built by inverting the registry on its own prefixes."""
 

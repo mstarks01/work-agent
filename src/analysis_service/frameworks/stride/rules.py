@@ -485,7 +485,7 @@ def _store_at_rest_unverified(
                 "encryption_at_rest": _clip(store.encryption_at_rest),
                 "encryption_state": control_state(store.encryption_at_rest),
                 "data_classification": _clip(store.data_classification),
-                "assets": ", ".join(store.assets),
+                "assets": ", ".join(comparable_asset_tags(store.assets)),
             },
         )
 

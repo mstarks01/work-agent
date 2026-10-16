@@ -8,6 +8,7 @@ real corpus case so the alignment it reads is the shipped one.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import shutil
 from pathlib import Path
@@ -18,6 +19,7 @@ import pytest
 from analysis_service.assertions import (
     ABSENT,
     GATE_REFUSALS,
+    MAX_ASSERTIONS,
     SPAN_REFUSALS,
     UNKNOWN,
     Assertion,
@@ -1622,6 +1624,39 @@ class TestBindingAProposalToAnExtractedGraph:
         omitted = [row for row in binding.rows if row.fate == "omitted"]
         assert omitted
         assert all(not row.aligned for row in omitted)
+
+    def test_a_proposal_over_the_cap_loses_every_row(self, golden, proposal):
+        """The row fates read :meth:`AssertionRecord.refusals`, so a refusal of
+        the whole catalog loses each proposed row, as the record counts it."""
+        rows = proposal.proposal["assertions"]
+        over = (rows * (MAX_ASSERTIONS // len(rows) + 1))[: MAX_ASSERTIONS + 1]
+        padded = dataclasses.replace(
+            proposal, proposal={**proposal.proposal, "assertions": over}
+        )
+
+        binding = self.bound(golden, padded, golden.model)
+
+        assert binding.counts["refused"] == MAX_ASSERTIONS + 1
+        assert {row.fate for row in binding.rows} == {"refused"}
+
+    def test_a_row_the_gate_removed_after_the_build_is_lost(
+        self, golden, proposal, monkeypatch
+    ):
+        """A quarantined row carries an identity and no proposed row, and each
+        proposed row that built it is lost."""
+        from analysis_service.assertions import Refusal, _identity
+
+        kept = self.bound(golden, proposal, golden.model).counts["refused"]
+        refusals = AssertionRecord.refusals
+
+        def with_one_removed(record):
+            first = _identity(record.catalog.entries[0])
+            return (*refusals(record), Refusal(("stale-digest",), identity=first))
+
+        monkeypatch.setattr(AssertionRecord, "refusals", with_one_removed)
+        binding = self.bound(golden, proposal, golden.model)
+
+        assert binding.counts["refused"] > kept
 
     def test_an_emission_that_did_not_parse_binds_nothing(self, golden, proposal):
         binding = self.bound(golden, proposal, None)

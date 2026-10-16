@@ -33,6 +33,8 @@ from pathlib import Path
 from typing import Any, get_args
 
 from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.system_model import ModelIndex
+from evals.harness.identity import endpoint_form
 from evals.harness.losses import CaseLosses, Loss
 from evals.harness.reference import (
     RULINGS_FILE,
@@ -146,14 +148,23 @@ def _shown(reference: ReferenceThreat) -> dict[str, str]:
 
 
 def _ruled(case: GoldenCase, index: int, draft: DraftThreat) -> bool:
-    """Whether a person already ruled on this draft's reading of the claim."""
+    """Whether a person already ruled on this draft's reading of the claim.
+
+    A reading is one action at one place. The action reads through
+    :func:`~evals.harness.verbs.same_action`, as the matcher and the vote key
+    read it, and the place through
+    :func:`~evals.harness.identity.endpoint_form`, the identity rule's one
+    spelling of a place.
+    """
     readings = (
         *case.ruled_readings.get(index, ()),
         *case.refused_readings.get(index, ()),
     )
-    place = set(draft.affected_element_ids)
+    flows = ModelIndex.of(case.model).flow_endpoints
+    place = endpoint_form(draft.affected_element_ids, flows)
     return any(
-        reading.verb == draft.verb and set(reading.affected_element_ids) == place
+        same_action(reading.verb, draft.verb)
+        and endpoint_form(reading.affected_element_ids, flows) == place
         for reading in readings
     )
 

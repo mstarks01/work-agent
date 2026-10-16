@@ -418,6 +418,30 @@ class TestTheWholeFlow:
         assert changes(finished) == {}
         assert changes(resumed)["findings"], "the follow-up lists no finding"
 
+    def test_a_follow_up_s_page_shows_nothing_of_a_withheld_parent(
+        self, tiers, runner, monkeypatch
+    ):
+        """The page asks ``servable`` of the parent, as ``/v1`` does, so a
+        report the gate withholds never shows through the comparison."""
+        from analysis_service.job_answers import JobAnswers
+
+        client = client_for(tiers, runner)
+        finished = start(client, questions=False)
+        client.get(f"/events/{finished}")
+        resumed = answer(client, finished, LINK).json()["run"]
+        client.get(f"/events/{resumed}")
+        monkeypatch.setattr(
+            JobAnswers,
+            "withheld",
+            lambda self, record: object() if record.id == finished else None,
+        )
+
+        page = client.get(f"/report/{resumed}")
+
+        block = re.search(r'id="changes"[^>]*>(.*?)</script>', page.text, re.DOTALL)
+        assert page.status_code == 200
+        assert json.loads(block.group(1)) == {}
+
 
 class TestTheAnswerEndpoint:
     def test_it_requires_the_app_s_own_page(self, tiers, runner):
@@ -3464,3 +3488,28 @@ def test_a_withheld_pause_ends_its_stream_with_a_frame_the_page_reads(
         event, data = stream.rstrip().splitlines()[-2:]
         assert event == "event: failed"
         assert "withheld" in json.loads(data.removeprefix("data: "))["message"]
+
+
+def test_a_held_run_without_its_sources_reads_as_this_service_s_defect(
+    tiers, runner, monkeypatch, caplog
+):
+    """``JobAnswers.missing`` says why a part is missing, so a held run whose
+    sources are gone is a logged 500, never a 404 that reads as a deleted run."""
+    from tests.test_webapp import stub_settings
+    from webapp.main import Workspace
+
+    workspace = Workspace(stub_settings(runner))
+    with TestClient(
+        app_for(tiers, runner, workspace=workspace), base_url=LOOPBACK
+    ) as client:
+        run = start(client, questions=False)
+        client.get(f"/events/{run}")
+
+        async def no_sources(job_id, owner_id):
+            return None
+
+        monkeypatch.setattr(workspace.store, "sources", no_sources)
+        response = client.get(f"/workspace/runs/{run}")
+
+    assert response.status_code == 500
+    assert "holds no sources" in caplog.text

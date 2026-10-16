@@ -269,8 +269,11 @@ def reachable_from(model: SystemModel, element_id: str) -> list[str]:
 
 
 def sensitive_assets(element: Element) -> tuple[str, ...]:
-    """The element's asset tags whose disclosure is itself a loss."""
-    return tuple(tag for tag in element.assets if tag in SENSITIVE_ASSET_TAGS)
+    """The element's asset tags whose disclosure is itself a loss, in
+    :func:`comparable_asset_tags` form."""
+    return comparable_asset_tags(
+        tag for tag in element.assets if tag in SENSITIVE_ASSET_TAGS
+    )
 
 
 def comparable_asset_tags(tags: Iterable[str]) -> tuple[str, ...]:
