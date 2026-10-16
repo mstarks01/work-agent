@@ -6,6 +6,10 @@
 - **Relates to**: [ADR 0054](0054-a-report-offers-one-follow-up.md), whose one
   follow-up this keeps, and [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md),
   whose revision check a draft save reuses
+- **Amended by**: [ADR 0077](0077-the-first-run-app-holds-job-records-in-the-job-store.md),
+  under which the first-run app keeps the draft on the job record;
+  [ADR 0090](0090-a-correction-names-the-revision-it-read.md), under which a
+  correction names the revision it read
 
 ## Context
 
