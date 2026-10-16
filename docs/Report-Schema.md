@@ -37,7 +37,7 @@ class Report:
     input: InputRef  # system_name + one ref per submitted source
     nodes: list[
         NodeRun
-    ]  # per-node model, sampling fingerprint, duration_ms, token usage
+    ]  # per-node model, execution fingerprint, duration_ms, token usage
     sampling: dict[str, dict]  # per-tier resolved decoding params (provenance)
     system_model: SystemModel  # the ONE canonical model every framework ran on
     boundary_crossings: list[BoundaryCrossing]
@@ -53,11 +53,12 @@ class Report:
         AnalysisContext | None
     )  # what informed the analysis (never what proves it)
     analyses: list[FrameworkAnalysis]  # one block per framework, in the job's own order
+    execution: ExecutionEnvelope | None  # identity version, served trust, build versions
 ```
 
-**A field sits where the thing it describes sits.** Ten fields describe the job
-or the shared model and sit on the envelope. Eight describe one framework's
-output and sit on the block. `analysis_context` follows the same rule: the
+**A field sits where the thing it describes sits.** A field that describes the
+job or the shared model sits on the envelope. A field that describes one
+framework's output sits on the block. `analysis_context` follows the same rule: the
 instruction digest describes the built graph and the domain packs describe the
 model, so both sit on the envelope, while `fired_rules` and `knowledge_docs`
 name *one package's* rules and what they retrieved, so both sit on the block.
@@ -82,12 +83,14 @@ class FrameworkAnalysis:
     claims: list[RuledClaim]  # the actionable findings
     rejected_claims: list[RuledClaim]  # the audit trail of drafts the critic ruled out
     scope: list[ScopeEntry]  # units this framework considered and raised nothing about
+    applicability: list[ApplicabilityEntry]  # whether each selected unit applies
     coverage: list[LaneCoverage]  # per-lane account of what each agent was offered
     unverified_grounds: list[UnverifiedGround]
     unreconciled_rulings: list[
         UnreconciledRuling
     ]  # how the first critic pass failed, before the re-ask
     repaired_quotes: list[RepairedQuote]
+    unresolved_references: list[UnresolvedReference]
     unresolved_mentions: list[UnresolvedMention]
     unresolved_evidence: list[UnresolvedEvidence]
     unknown_claim_identities: list[UnknownClaimIdentity]
@@ -128,6 +131,7 @@ class Claim:
     title: str
     description: str
     affected_element_ids: list[str]  # element IDs in system_model — always resolve
+    verb: ActionVerb | None  # the action; a package with an open claim set requires it
     grounds: list[Ground]  # why it was raised — at least one, never empty
 
 
@@ -794,7 +798,7 @@ Two things `grounds` is deliberately not:
 
 ### What a `needs-info` may name
 
-`related_unknowns` holds at least one entry, in one of two spellings. Which one
+`related_unknowns` holds at least one entry, in one of five spellings. Which one
 is true of the fact, never a matter of taste:
 
 ```python
@@ -802,6 +806,10 @@ class UnknownRef:
     element_id: str  # with attribute: the fact has a place in the model
     attribute: str
     subject: str  # alone: the fact has no place in the model
+    assertion: str  # alone: an open row of the job's assertion catalog
+    question: str  # with element_id: a kind of question about that element
+    facets: list[str]  # with question: the parts of the kind the argument rests on
+    capability: str  # alone: a capability of the whole application
 ```
 
 **The element spelling** points at a field a submitter can fill in, and is the
@@ -811,6 +819,17 @@ ordinary case for a claim about a specific element.
 Model holds no slot for — whether a policy is documented, or what code does.
 A framework ruling on requirements answers mostly that kind, so without this
 spelling its commonest verdict has no field to point at.
+
+**The `question` spelling** names a kind of question about the element in
+`element_id`, from a closed list the provider schema states. The critic picks
+it where a fact has no place in the model and a kind fits; `subject` is the
+fallback. `facets` names the parts of that kind the argument rests on, and an
+empty list means the whole question (ADR 0073).
+
+**The `assertion` spelling** names one open row of the job's assertion catalog,
+by its identity. **The `capability` spelling** names a **Capability** of the
+whole application. A framework's applicability rule asks it, so no critic names
+one, and the field is not on the provider schema.
 
 A reader should treat an entry pointing at an attribute that exists on every
 element type — `notes`, say — with suspicion. Such an entry often hides a
@@ -880,6 +899,8 @@ class Verdict:
     status: "confirmed" | "needs-info" | "rejected"
     reason: str  # required unless confirmed
     related_unknowns: list[UnknownRef]  # required iff needs-info
+    immaterial_unknowns: list[UnknownRef]  # unknown grounds the critic dismissed
+    rejected_because: "evidence" | "reasoning" | "lane" | "duplicate" | None
 ```
 
 - `confirmed` — grounded in the model's facts.
@@ -967,6 +988,8 @@ class NodeRun:
     served_trust: (
         Literal["provider_reported", "requested_echo"] | None
     )  # what `model` is worth as evidence; None for code-only nodes
+    reported_charge_usd: float | None  # what the provider said it charged; usually None
+    served_upstream: str | None  # the serving organisation a gateway named; never identity
 
 
 class TokenUsage:
@@ -998,9 +1021,10 @@ class TokenUsage:
   eval sweep that folds several graphs into one list, and there the node's own
   copy is the only thing that says which instruction set produced its hash.
 - **`execution_fingerprint`** is a hash of the versioned **execution identity**:
-  the requested route, the served route, the tier's decoding parameters, the
-  instruction digest, and the installed versions of the distributions between
-  the node and its provider. One value identifying everything that decided what
+  the requested route, the served route, how far the served route is trusted,
+  the tier's decoding parameters, the instruction digest, the installed
+  versions of the distributions between the node and its provider, and the
+  identity's schema version. One value identifying everything that decided what
   this call could answer. It can be recomputed from the artifact alone — the two
   routes and the digest are on the node, the parameters are in `sampling`, and
   the build versions are in `execution`. It does not hash the input or the
@@ -1198,8 +1222,8 @@ version before it. Read it when you load an archived report.
   - The envelope carries `assertions`: the assertion catalog the job's lanes
     selected from, with each row's basis and assessment, and the rows the
     resolver and the gate refused. It is `None` on a job that ran no assertion
-    pass, which is every job on a deployment that does not set
-    `ANALYSIS_ASSERTIONS`. The `Ground` kind `assertion` references a row in it.
+    pass, which is every job on a deployment that sets
+    `ANALYSIS_ASSERTIONS=false`. The `Ground` kind `assertion` references a row in it.
   - The `Ground` kind `unknown-assertion` references a catalog row whose value
     is the unknown sentinel, for a predicate the model has no field for. It is
     the assertion layer's `unknown-attribute`: a question the sources leave open

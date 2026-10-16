@@ -20,11 +20,11 @@ catches what the others cannot:
 - **Declaration.** A vendor named outside the registry must say why, as a
   property of the vendor rather than as its name.
 - **Property.** Completeness cannot see a wrong value: a table such as
-  `_FORM_RULES` can hold every key and still hold a wrong entry. Those tests sit
-  beside the rules they check.
+  `VENDORS` can hold every key and still hold a wrong entry, such as a wrong
+  `form_rules`. Those tests sit beside the rules they check.
 
 **Keep the guards runnable on a half-built registry.** A collection-time
-`CREDENTIAL_MODES[name]` makes a partly-added row an import error, so the suite
+`VENDORS[name]` makes a partly-added row an import error, so the suite
 cannot reach the module whose message names the missing entry. Use `.get`. A guard that cannot run when the tree is half-built helps nobody.
 
 **A vendor row makes claims about a third party, which a framework never does.**

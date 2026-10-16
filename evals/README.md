@@ -227,7 +227,7 @@ somewhere else.
 | `harness/early_answerers.py` | Answers the early list from the top, one question a save, with six answerers (every capability yes, no, unknown, yes and no by turns, every question skipped, and each signed applicability fixture's truth) under the shipped order and the order with the effects stubbed. At 5, 10 and 20 choices it counts, per framework, the conditional findings completed in all and by band, the units the framework's own applicability rule decides, the questions an answer made unnecessary, the answers of "I don't know" and the skips. It then reverses the walk's first "yes" or "no" through the service's save and counts what the change reopens and closes. `run.py early-answerers`, no credentials. |
 | `harness/early_policies.py` | Compares orders of early questions for a job that selects more than one framework. Each framework is scored on its own archived reports, with every framework the case's reports hold selected. At each budget of owner choices it counts the conditional findings whose every open fact is answered, and the units whose every missing capability is answered. The orders are a table, `POLICIES`: the shipped list, two merges of each framework's own ranking, and `group-question`, which charges a group's parts once for every element a list shows it for (ADR 0081). `run.py early-policies`, no credentials. |
 | `harness/schema_paths.py` | Counts, per node, how its schema reached the provider (`schema_path`), each refusal that moved its tier down the ladder (`schema_fallback`) and its schema re-asks (`reasks`), over every archived report under `--root` (ADR 0058). A report written before those fields existed reads as no schema and no re-ask. `run.py schema-paths`, no credentials. |
-| `harness/early_rounds.py` | Replays rounds of early questions on archived extracted models, with the service's own question set, admission and writer. Four answerers answer each round: from the case's blessed model, every capability yes or no, and every control none or a named mechanism. It counts the questions at the floor at the start, those asked in all, and those an answer added or took away. `run.py early-rounds`, no credentials. |
+| `harness/early_rounds.py` | Replays the early question list on archived extracted models, save after save, with the service's own question set, admission and writer. Seven answerers in `ANSWERERS` answer it: every capability yes or no with the blessed model's attribute values, every control none or a named mechanism, every question skipped, and two that answer only the first facet of a question with parts. It counts the questions at the floor at the start, those asked in all, and those an answer added or took away. `run.py early-rounds`, no credentials. |
 | `harness/question_prior.py` | Counts the early-question prior: how often a framework's findings cite each attribute or question kind, per element of one type, over a sweep's development cases. It reads the reports' verdicts, or with `--replay` the rulings of critic replays of that sweep. It writes that framework's row of `src/analysis_service/question_prior.json` with the runs it read, and keeps the other rows. `run.py question-prior`, no credentials. |
 | `harness/withheld.py` | A case's answers file, `evals/answers/<case>.json`: who signed it, its answers, and for the withheld-sentence test the phrases taken out of the sources, the model fields set back and the assumption records dropped. One reader parses, checks and applies it for the `answered` and `withheld` modes, and each check fails closed: a phrase must occur once, and afterwards no withheld phrase may remain in a source or a model field, and every excerpt must still pass the validity gate's citation check, which reads `…` as a cut between fragments. |
 | `harness/descendants.py` | The stages after a lane, run again on the archive: the fan-in re-run over a sweep's `<case>.proposals.json` with any injected proposal added to its lane, each kept draft carrying its archived critic ruling by title, and every draft no critic ruled on bounded both ways (`lower` rejected, `upper` accepted). Answers whether a finding would have survived had a lane proposed it, for no provider call. Assembly is not re-run. `run.py descendants`. |
@@ -275,10 +275,10 @@ somewhere else.
 | `harness/instruction_delta.py` | What one prompt edit did: which node's instruction moved, and what moved with it. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`analysis_service.certification`), which this imports. |
-| `harness/modes.py` | The four run modes over the shipped graph, the assertion counts, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. |
+| `harness/modes.py` | The eight run modes over the shipped graph (`MODE_ENTRIES`), the assertion counts, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. |
 | `harness/instruments.py` | Every measurement a sweep reports, as one table keyed by instrument — the per-case row, the fold, the rendering, and the artifact keys each one owns. |
 | `harness/artifact.py` | The sweep artifact: one declared shape, written once by `build` and read back through `load_artifact`, which refuses a file missing any declared key. |
-| `harness/archive.py` | The bytes each archived file's producer writes, as one table keyed by file kind. A Baseline holds five kinds and three encodings — a report is UTF-8, the drafts beside it are escaped ASCII, a manifest sorts its keys — and every writer asks here rather than picking one. |
+| `harness/archive.py` | The bytes each archived file's producer writes, as one table keyed by file kind. A Baseline holds nine kinds of file and three encodings — a report is UTF-8, the drafts beside it are escaped ASCII, a manifest sorts its keys — and every writer asks here rather than picking one. |
 | `harness/run.py` | The command-line entry point. `score` re-reads the ledger over a finished sweep's saved reports, so a vote reaches the numbers without a second sweep. |
 | `harness/submit.py` | `submit <kind>`: runs a contribution's CI checks locally as a checklist, then packages the kind's allowlist on a fresh branch and opens the PR through `gh`. Kinds live in a table: `vote`, `sitting`, `baseline`. `verify-contribution --author` re-runs those checks in CI against the login GitHub says opened the PR. |
 
@@ -478,7 +478,7 @@ python -m evals.harness.run promote artifact.json          # preview, writes not
 python -m evals.harness.run promote artifact.json --yes    # re-pin and bless
 ```
 
-See [TUNING.md](TUNING.md#step-5--promote-the-winner).
+See [TUNING.md](TUNING.md#step-6--promote-the-winner).
 
 Also credential-free, over two or more finished sweeps of the same corpus —
 what one sweep cannot tell you is how much of its own number is sampling noise:
@@ -831,10 +831,12 @@ with input too sparse to model confidently (which should yield `needs-info`
 threats, not invented ones), one that over-claims security controls the text
 doesn't justify.
 
-Cases `14` and `15` are **Holdout Case**s (`holdout: true`). Every sweep
-scores them and reports them apart in the holdout split, and no diagnosis
-command reads them. A gain that the development cases show and the holdout cases do
-not was shaped by the cases it was read on.
+Cases `14` and `15` carry `holdout: true`. A sweep reports a **Holdout Case**
+apart in the holdout split, and no diagnosis command reads it, until the
+experiment ledger reads it `HOLDOUT_READS` times. The ledger read each of the
+two three times, so both are exhausted and count as development cases;
+`experiments --holdouts` prints the reads. A gain that the development cases
+show and the holdout cases do not was shaped by the cases it was read on.
 
 The corpus checks in `verify_corpus.py` are deterministic and need no
 credentials, so they run on every PR (via `tests/test_corpus_lints.py`) and stay

@@ -68,10 +68,11 @@ The security posture is deliberate throughout:
   colours through ``element.style.*``, which is a CSSOM write CSP does not
   govern. No page loads an external resource or carries an ``on*=`` handler, so
   ``'none'`` costs nothing. Each policy grants what its own page does and
-  nothing else: the report page reaches only its own origin, to post answers to
-  ``/answer/{run}``, the form page reaches only its own origin, through
-  ``connect-src 'self'`` for ``/example``, ``/analyze``, ``/answer/{run}`` and
-  ``/events``, and the diagnostic page runs no script, so it is granted no
+  nothing else: the report page reaches only its own origin, to post to
+  ``/answer/{run}`` and ``/correct/{run}``, the form page reaches only its own
+  origin, through ``connect-src 'self'`` for ``/example``, ``/analyze``,
+  ``/answer/{run}``, ``/amend/{run}``, ``/events/{run}`` and
+  ``/workspace/runs``, and the diagnostic page runs no script, so it is granted no
   ``script-src`` at all. Each page declares what it does as a
   :class:`~webapp.page.Grants`, and the policy follows from the declaration
   rather than from a string this file keeps. A page and its policy are built
@@ -241,15 +242,15 @@ PORT = 8000
 #: to stay inside the bound.
 MAX_RUNS = 20
 
-#: The report page loads nothing external. It reaches its own origin for one
-#: thing: posting answers to its questions to ``/answer/{run}``.
+#: The report page loads nothing external. It reaches its own origin to post
+#: answers to ``/answer/{run}`` and corrections to ``/correct/{run}``.
 _REPORT_GRANTS = Grants(script=True, style=True, connect=True)
 
-#: The form page calls ``/example``, ``/analyze`` and ``/events/{run}``, so it
-#: needs its own origin and the report page does not. ``form-action`` stays
-#: closed even though the page carries a ``<form>`` — the submit handler is
-#: ``preventDefault()``-ed and posts through fetch, so a navigation away from
-#: this form is something going wrong.
+#: The form page calls ``/example``, ``/analyze``, ``/answer/{run}``,
+#: ``/amend/{run}``, ``/events/{run}`` and ``/workspace/runs``, so it needs its
+#: own origin. ``form-action`` stays closed even though the page carries a
+#: ``<form>`` — the submit handler is ``preventDefault()``-ed and posts through
+#: fetch, so a navigation away from this form is something going wrong.
 _FORM_GRANTS = Grants(script=True, style=True, connect=True)
 
 #: The diagnostic page runs no script and makes no request: it is one style

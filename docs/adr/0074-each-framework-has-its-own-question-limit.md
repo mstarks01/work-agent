@@ -36,7 +36,7 @@ questions took the 5 places that STRIDE lost. ASVS lost no question.
 A round takes a new question while at least one of those frameworks has a
 place left. An answer counts toward the limit of each framework its question
 served, and toward every selected framework's limit where no list holds its
-question (`answer_round.next_round`).
+question (`answer_state.question_set`).
 
 The floors, the number of questions a round asks and the turn order do not
 change.

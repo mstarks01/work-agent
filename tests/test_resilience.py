@@ -111,14 +111,14 @@ def test_the_deadline_bounds_what_the_per_call_knobs_cannot():
     """The arithmetic the deadline exists for, pinned so it stays visible.
 
     ``timeout_ms`` bounds one request; ``attempts`` of them may be made per node
-    with the library's retry layer off; five LLM stages run in series on
+    with the library's retry layer off; seven LLM stages run in series on
     the graph's longest path. The deadline has to be well under that product or
     it is not a bound at all — and the product moves whenever any factor does,
     which is why the deadline states the answer directly instead.
     """
     loaded = load_resilience(CONFIG_PATH, env={})
     per_node = loaded.timeout_ms * loaded.attempts
-    unbounded_worst_case = per_node * 5
+    unbounded_worst_case = per_node * 7
     assert loaded.job_deadline_ms < unbounded_worst_case
 
 

@@ -11,7 +11,7 @@ one caller may run at once.
 ``job_deadline_ms`` is the only one of the seven that bounds a single job as a
 whole, and it exists because the per-call knobs cannot. ``timeout_ms`` bounds
 one HTTP request. ``attempts`` multiplies it. The retry arithmetic below
-multiplies it again. The graph then runs five LLM stages in series on its
+multiplies it again. The graph then runs seven LLM stages in series on its
 longest path. Those compose to a worst case in hours, while every individual
 bound still holds. Without this knob, a product of four numbers that nobody
 chose sets a job's tail, and a wedged run holds a ``running`` job until the

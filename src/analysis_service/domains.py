@@ -1,6 +1,6 @@
 """Which domain packs a System Model earns, decided deterministically.
 
-``skills/domains/`` holds subject-matter packs — HTTP APIs, OAuth and OIDC,
+``domains/`` holds subject-matter packs — HTTP APIs, OAuth and OIDC,
 multi-tenancy, data stores — that sharpen a category agent on architectures it
 would otherwise reason about generically. Loading all of them into every
 analysis is the failure this module exists to prevent. They are the largest
@@ -18,7 +18,7 @@ job that selects it.
 That last point is the security argument too (OWASP LLM01). Caller text
 influences which pack loads, and never what a pack says. The service matches
 names against a closed set defined here, the loader only ever reads
-``skills/domains/<name>.md`` for a name in :data:`DETECTORS`, and no caller byte
+``domains/<name>.md`` for a name in :data:`DETECTORS`, and no caller byte
 reaches the composed skill text through this path.
 
 :data:`MAX_PACKS` caps the selection. Where more packs match than that, the ones
@@ -49,7 +49,7 @@ _SCANNED_FIELDS = ("technology", "protocol", "authentication", "name")
 
 # pack name -> the terms that select it. Matched case-insensitively on word
 # boundaries against the fields above, so ``sso`` does not fire on ``lasso``.
-# Each name must have a matching ``skills/domains/<name>.md``; the skill lints
+# Each name must have a matching ``domains/<name>.md``; the skill lints
 # hold that true.
 DETECTORS: dict[str, tuple[str, ...]] = {
     "http-api": (

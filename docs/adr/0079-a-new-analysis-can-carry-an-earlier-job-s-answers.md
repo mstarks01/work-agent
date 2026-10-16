@@ -6,6 +6,9 @@
   whose carried answers this reuses;
   [ADR 0065](0065-a-job-record-splits-into-rows-and-two-objects.md), whose
   durable store will keep the earlier jobs this reads
+- **Amended by**: [#1672](https://github.com/mstarks01/work-agent/issues/1672),
+  under which the carried answers survive a restart where
+  `ANALYSIS_JOB_STORE` is `sql`
 
 ## Context
 

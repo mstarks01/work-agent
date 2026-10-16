@@ -15,7 +15,11 @@
 - **Amended by**: [ADR 0068](0068-a-pause-says-what-it-leaves-open.md),
   which narrows the `nothing-left` stop, and
   [ADR 0071](0071-the-floor-exception-reads-each-framework-s-own-bands.md),
-  under which the floor exception reads the bands of each framework apart
+  under which the floor exception reads the bands of each framework apart;
+  by [ADR 0088](0088-field-questions-have-no-limit.md), under which field
+  questions have no limit; and by
+  [#1672](https://github.com/mstarks01/work-agent/issues/1672), under which a
+  paused job survives a restart where `ANALYSIS_JOB_STORE` is `sql`
 
 ## Context
 
@@ -161,7 +165,7 @@ median of 6 rounds on the corpus models, and an ASVS pause takes 3. A
 submitter can stop at any round, and skip, so a smaller page costs a person
 who answers everything more rounds, and nobody else anything.
 
-A saved round is kept on the waiting job, through `JobStore.save_round`, which
+A saved round is kept on the waiting job, through `JobStore.save_answers`, which
 writes the answers and nothing else. A first-run app restart still loses a
 paused run (#1282).
 

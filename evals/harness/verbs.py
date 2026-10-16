@@ -76,8 +76,8 @@ EQUIVALENT: tuple[frozenset[str], ...] = (frozenset({"forge", "inject", "plant"}
 
 #: The reference-claim pairs this vocabulary does **not** separate, with why.
 #: Kept whole rather than counted, for the reason
-#: :class:`~evals.harness.calibration.Disagreement` is: three is a list a person
-#: reads and acts on, and a rate is a number they cannot.
+#: :class:`~evals.harness.calibration.Disagreement` is: a short list is one a
+#: person reads and acts on, and a rate is a number they cannot.
 UNSEPARATED: tuple[tuple[str, str, str], ...] = (
     (
         "08-sso-identity-broker",

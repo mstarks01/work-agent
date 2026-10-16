@@ -71,7 +71,7 @@ shape holds on a second axis, which is not obvious: **which measurement the eval
 sweep reports.**
 
 An **instrument** is one reading over a finished sweep — a per-case row, a fold
-over those rows, a rendering, and the artifact keys it owns. Seven exist.
+over those rows, a rendering, and the artifact keys it owns. Fourteen exist.
 Without a table, each instrument is wired by hand into several places, and a
 sweep missing one prints one measurement fewer and raises nothing.
 

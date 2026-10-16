@@ -61,9 +61,11 @@ never production performance and never go in a scored comparison.
 | Criticism killed it | the evidence missing from the critic's input | re-run the critic on the saved candidates |
 | Reporting dropped it | a correct adjudicated result | re-assemble the report |
 
-`lane-replay --prepare-today signed` implements the first of these, and it is
-the seam for the second: it rebuilds one lane's request from the captured
-`<case>.lanes.json`, so a substituted lead is one changed key and one call.
+`lane-replay --prepare-today signed` implements the first of these: it builds
+one lane's request from today's `prepare` over the case's signed facts, and it
+takes no artifact. `lane-replay <artifact>` is the seam for the second: it
+rebuilds one lane's request from the sweep's captured `<case>.lanes.json`, so
+a substituted lead is one changed key and one call.
 `descendants` implements the third and fourth at no cost: it injects a
 candidate into a lane's archived proposals, runs the fan-in again, and bounds
 what the critic would keep (`lower` rejects every draft no critic ruled on,

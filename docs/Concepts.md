@@ -190,7 +190,7 @@ probabilistic models.
 - a digest of the submitted sources;
 - a digest of the built model instructions;
 - the configured and provider-returned model identifiers for each model call;
-- resolved sampling settings and a per-call sampling fingerprint;
+- resolved sampling settings and a per-call execution fingerprint;
 - node timing and token use when available; and
 - which deterministic rules and local reference documents informed each
   framework.
@@ -200,16 +200,19 @@ system model or findings are correct.
 
 ## Fingerprint and certification
 
-A **sampling fingerprint** hashes the provider-qualified model identifier that
-answered a call together with the resolved sampling settings for its tier. It
-does not include the input, prompt text, or output. Those are represented
-elsewhere—or, for the full output, by the report itself.
+An **execution fingerprint** hashes what decided one model call: the model
+route the deployment requested, the provider-qualified model identifier that
+answered, how far that identifier is trusted, the resolved sampling settings
+for its tier, the digest of the built model instructions, the installed
+versions of the libraries between the service and the provider, and the
+schema version of these parts. It does not include the input or the output.
+Those are represented elsewhere—or, for the full output, by the report itself.
 
 **Certification** compares the fingerprints observed in a completed report
 with a deployment-local allow-list in `config/blessed-fingerprints.toml`. It can
-show that the model-and-sampling setup was one the operator approved. It does
-not certify finding accuracy, guarantee repeatability, or certify the complete
-prompt and input combination.
+show that the model, sampling, instructions and build were a setup the operator
+approved. It does not certify finding accuracy, guarantee repeatability, or
+certify the input.
 
 ## Outcomes
 

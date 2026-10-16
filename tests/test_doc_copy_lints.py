@@ -60,7 +60,7 @@ SHIPPED_SAMPLING = load_sampling(SHIPPED_PATHS.sampling, env={})
 
 _TOML_FENCE = re.compile(r"^```toml\n(.*?)^```", re.DOTALL | re.MULTILINE)
 _ASSIGNMENT = re.compile(r"`([a-z_]+ = [^`\n]+)`")
-_NUMBER_WORDS = {"three": 3, "four": 4, "five": 5, "six": 6, "ten": 10}
+_NUMBER_WORDS = {"three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "ten": 10}
 
 
 def section(path: Path, heading: str) -> str:

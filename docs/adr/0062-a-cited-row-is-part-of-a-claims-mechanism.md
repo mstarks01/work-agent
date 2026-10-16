@@ -5,6 +5,9 @@
 - **Effort**: [#1438](https://github.com/mstarks01/work-agent/issues/1438)
 - **Relates to**: [ADR 0060](0060-two-mechanisms-at-one-place-are-two-findings.md),
   whose mechanism this completes.
+- **Amended by**: [ADR 0075](0075-the-assertion-pass-runs-by-default.md),
+  under which the assertion pass runs by default, so a default job has a
+  catalog and passes its rows
 
 ## Context
 

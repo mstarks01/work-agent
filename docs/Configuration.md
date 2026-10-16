@@ -23,7 +23,7 @@ Both [`Engine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 | `config/frameworks.toml` | Which framework packages this deployment carries. |
 | `frameworks/` | One directory per framework package: its lanes, critic, disclaimer, rubric and local corpus. |
 | `domains/` | The shared domain packs, selected from the system model rather than by any framework's rules. |
-| `prompts/` | The framework-neutral prompt Markdown (`extract`, `repair`, `analyze`, `critic`, `recritic`). |
+| `prompts/` | The framework-neutral prompt Markdown (`extract`, `extract-compact`, `repair`, `capabilities`, `assert`, `analyze`, `critic`, `recritic`). |
 
 ### Models and vendors
 
@@ -491,8 +491,9 @@ A tier asking for more than its model will serve **fails the build**: every
 provider accepts `max_output_tokens`, so the supported-param gate cannot see an
 over-ceiling value and the serving model rejects it at request time instead. The
 ceiling is read from the pinned model map per `(vendor, model)` — 16,384 on
-`gpt-4o`, 64,000 on Claude 4.6+, 65,535 on Gemini 2.5 — and a model the map does
-not know is not gated.
+`gpt-4o`, 128,000 on `claude-opus-4-6` and `claude-opus-5-5`, 65,535 on
+`gemini-2.5-pro` through `vertex` and 65,536 through `gemini` — and a model the
+map does not know is not gated.
 
 > **`top_k` is not a setting.** A file that sets it fails at startup with
 > `not overridable`. It is the one parameter the build-time check provably
@@ -507,7 +508,7 @@ and never overridable: `response_schema` (the SDK *raises*), `response_mime_type
 The service sets no `http_options` either. `timeout_ms` reaches the provider
 library as its own parameter, because `http_options.timeout` changes unit on
 the way. See
-[resilience.toml](#resiliencetoml).
+[Resilience](#resilience).
 
 ### The startup parameter check
 
@@ -917,8 +918,8 @@ selections you offer, never against the shipped numbers.
 
 `job_deadline_ms` is the only bound on a **job as a whole**, and the per-call
 knobs cannot substitute for it. `timeout_ms` bounds one request at 300 s,
-`attempts` allows 3 of them per node, and the graph runs five LLM stages in
-series on its longest path — 75 minutes, with every individual bound respected
+`attempts` allows 3 of them per node, and the graph runs seven LLM stages in
+series on its longest path — 105 minutes, with every individual bound respected
 the whole way. The product moves whenever any factor does, and only a deadline
 states the answer directly. 900 s is a **backstop, not an
 SLO**: one observed clean run is ~119 s, the longest legitimate path with a
@@ -1229,9 +1230,9 @@ decides before its lanes run, then read it.
 
 Each tier's vendor determines what credentials it needs; see
 [Models and vendors](#models-and-vendors) for the table. If a selected vendor's
-credentials are missing, startup stops with an error, so a misconfigured
-deployment never reaches its first request. Offline tests and the in-memory
-[stub runner](Integration-Guide.md) need none of this.
+credentials are missing, the service still starts. The first submission
+that needs them returns `503`, and the log names the missing variable. Offline
+tests and the in-memory [stub runner](Integration-Guide.md) need none of this.
 
 **`ANALYSIS_OFFLINE`** refuses every live provider call. With it on (`1`,
 `true`, `yes` or `on`), a call that would reach a provider raises an error

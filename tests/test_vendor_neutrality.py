@@ -370,8 +370,8 @@ def test_every_vendor_keyed_table_answers_for_every_vendor(tables):
     assert not incomplete, (
         f"these tables are keyed by a vendor vocabulary and do not answer for"
         f" all of it: {incomplete}. Add the missing entries. A table with a"
-        " vendor missing is the shape that let `_FORM_RULES` refuse an"
-        " identifier on two vendors and accept it on the third."
+        " vendor missing can refuse an identifier on some vendors and accept"
+        " it on another."
     )
 
 
