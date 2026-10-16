@@ -53,7 +53,7 @@ from analysis_service.links import (
 )
 from analysis_service.open_facts import open_attribute
 from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.questions import _by_band, fact_questions, follow_up_needs
+from analysis_service.questions import _by_band, fact_questions
 from analysis_service.report import Report
 from analysis_service.report_conditions import conditions
 from analysis_service.sources import ANSWERS_LABEL, Source, text_digest
@@ -1013,11 +1013,10 @@ def _dismissed_ground_analyses() -> list[FrameworkAnalysis]:
     return [sample_analysis([critical, low])]
 
 
-def test_a_dismissed_ground_ranks_and_counts_with_its_finding_s_facts():
-    """The card shows only the facts the verdict names. The follow-up also
-    counts the finding's open grounds, so a ground the critic dismissed is
-    asked among the critical finding's facts, before the low finding's fact,
-    and the finding is covered only once it is answered too."""
+def test_a_dismissed_ground_is_asked_last_and_holds_up_no_finding():
+    """A ground the critic dismissed is not a fact its finding waits on
+    (ADR 0094). It is still asked, among the facts no waiting finding needs,
+    so the critical finding is covered once its one named fact is answered."""
     analyses = _dismissed_ground_analyses()
     model = valid_model()
 
@@ -1026,32 +1025,24 @@ def test_a_dismissed_ground_ranks_and_counts_with_its_finding_s_facts():
 
     assert [key for key, _, _ in card] == [NAMED.key]
     assert [(q.key, q.basis, q.findings, q.covered_so_far) for q in questions] == [
-        (NAMED.key, "evidence", ("stride/S-01",), 0),
-        (DISMISSED.key, "evidence", ("stride/S-01",), 1),
+        (NAMED.key, "evidence", ("stride/S-01",), 1),
         (LOW_FACT.key, "critic", ("stride/S-02",), 2),
+        (DISMISSED.key, "evidence", (), 2),
     ]
 
 
 @pytest.mark.parametrize("path", REPORTS, ids=lambda path: path.name[:2])
-def test_the_follow_up_waits_on_the_card_s_facts_and_the_dismissed_grounds(path):
-    """The two readers of what a conditional finding waits on, held against
-    each other: the follow-up's facts are the card's facts and the open
-    grounds the critic dismissed, and no other."""
+def test_the_card_and_the_follow_up_name_the_same_facts(path):
+    """One reader of what a finding waits on: each conditional finding's card
+    lists exactly the asked facts whose question names the finding."""
     report = Report.model_validate_json(path.read_text(encoding="utf-8"))
     catalog = report.assertions.catalog if report.assertions else None
-    needs = follow_up_needs(report.analyses, report.system_model, catalog)
+    questions = fact_questions(report.analyses, report.system_model, catalog)
     cards = conditions(report.analyses, report.system_model, [], [])
-    claims = {
-        (block.framework, claim.id): claim
-        for block in report.analyses
-        for claim in block.all_claims()
-    }
-    for finding, keys in needs.waiting.items():
-        framework, claim_id = finding
-        card = {key for key, _, _ in cards[f"{framework}/{claim_id}"]}
-        dismissed = claims[finding].verdict.dismissed_refs()
-        assert needs.named.get(finding, frozenset()) <= card, finding
-        assert keys - card <= dismissed, finding
+    asked = {question.key for question in questions}
+    for finding, rows in cards.items():
+        named = {question.key for question in questions if finding in question.findings}
+        assert named == {key for key, _, _ in rows} & asked, finding
 
 
 CAPACITY_FACETS = ("rate", "size", "concurrency", "quota")

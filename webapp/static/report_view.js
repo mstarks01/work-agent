@@ -1065,8 +1065,9 @@
       unwaited.append(el("summary", null,
         `Questions no conditional finding waits on (${aside.length})`));
       unwaited.append(el("div", "meta",
-        "Only a confirmed finding, a rejected draft, or a finding that waits on a " +
-        "fact answered \"I don't know\" cites these facts. An answer cannot move a " +
+        "Only a confirmed finding, a rejected draft, a finding that waits on a " +
+        "fact answered \"I don't know\", or evidence the reviewer ruled does not " +
+        "matter to its finding cites these facts. An answer cannot move a " +
         "conditional finding in this report; the next analysis reads it."));
       // The facts only the critic named come after the ones the findings' own
       // evidence rests on, and they can change when the analysis runs again,
