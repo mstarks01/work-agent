@@ -574,10 +574,23 @@ def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _sqlite_file(url: URL) -> Path:
-    """The file of a SQLite database: an absolute path, or the startup stops."""
+    """The file of a SQLite database: an absolute path in a directory that
+    passes :func:`~analysis_service.objects.check_private`, or the startup
+    stops.
+
+    The store checks the file once, and SQLite then opens it by its path for
+    each connection and follows a symbolic link. SQLite also makes and reads
+    its journal beside the file, and plays back a journal it finds there. So
+    a user who can write the directory can change what each connection
+    opens, and the private directory is what stops it. A user who can write a
+    directory above it can also replace the directory: the store assumes
+    that only root or the service user can write those, as the object root
+    does.
+    """
     path = Path(url.database or "")
     if not path.is_absolute():
         raise StoreConfigError(f"{_URL} must name a SQLite file by an absolute path")
+    check_private(path.parent, "the directory of the database file", directory=True)
     return path
 
 
@@ -775,6 +788,9 @@ def _counted(since: datetime) -> CompoundSelect:
 
 class SqlJobStore:
     """:class:`~analysis_service.jobs.JobStore` on a database and an object store."""
+
+    #: The database and the object store keep each job through a restart.
+    durable = True
 
     def __init__(self, engine: AsyncEngine, objects: ObjectStore) -> None:
         self._engine = engine

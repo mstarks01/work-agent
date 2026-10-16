@@ -213,6 +213,25 @@ class TestTheStartupRefusals:
         with pytest.raises(StoreConfigError, match="set its mode to 0600"):
             start(env)
 
+    @pytest.mark.parametrize("mode", [0o750, 0o705, 0o1777])
+    def test_a_database_directory_that_others_can_open(self, env, mode):
+        """Another user who can write the directory can put a link or a hot
+        journal beside the file between the check and a connection."""
+        database = Path(
+            env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        )
+        os.chmod(database.parent, mode)
+        with pytest.raises(StoreConfigError, match="set its mode to 0700"):
+            start(env)
+
+    def test_the_migration_makes_no_file_in_a_directory_others_can_open(self, tmp_path):
+        database = tmp_path / "shared" / "jobs.db"
+        database.parent.mkdir(mode=0o700)
+        os.chmod(database.parent, 0o777)
+        with pytest.raises(StoreConfigError, match="set its mode to 0700"):
+            migrate(database)
+        assert not database.exists()
+
     def test_a_database_file_that_is_a_symbolic_link(self, env, tmp_path):
         database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
         link = tmp_path / "link.db"

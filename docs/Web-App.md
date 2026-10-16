@@ -211,7 +211,7 @@ directory, run the migration step once, then start the app:
 
 ```sh
 uv sync --extra sql
-install -d -m 0700 ~/.local/share/work-agent/objects
+install -d -m 0700 ~/.local/share/work-agent ~/.local/share/work-agent/objects
 export ANALYSIS_JOB_STORE=sql ANALYSIS_OBJECT_STORE=filesystem \
   ANALYSIS_DATABASE_URL=sqlite+aiosqlite:///$HOME/.local/share/work-agent/jobs.db \
   ANALYSIS_OBJECT_ROOT=$HOME/.local/share/work-agent/objects
