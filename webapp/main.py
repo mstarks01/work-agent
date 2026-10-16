@@ -504,7 +504,6 @@ class Workspace:
             "reports": [
                 {
                     "run": item.id,
-                    "url": f"/report/{item.id}",
                     "name": _name_of(item),
                     "generated_at": item.updated_at.isoformat(),
                 }
@@ -1525,7 +1524,7 @@ async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
         except Withheld as refusal:
             yield _frame("failed", {"message": str(refusal)})
             return
-        yield _frame("done", {"url": f"/report/{run_id}"})
+        yield _frame("done", {})
     elif status == "rejected":
         issues = [
             {"code": issue.code, "message": issue.message}

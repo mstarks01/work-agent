@@ -245,7 +245,9 @@ class TestARestart:
         with app(tiers) as client:
             after = client.get("/workspace/runs").json()
             reports = [
-                client.get(report["url"]) for run in after for report in run["reports"]
+                client.get(f"/report/{report['run']}")
+                for run in after
+                for report in run["reports"]
             ]
             questions = client.get(f"/workspace/runs/{paused}").json()["questions"]
             stale = client.post(
