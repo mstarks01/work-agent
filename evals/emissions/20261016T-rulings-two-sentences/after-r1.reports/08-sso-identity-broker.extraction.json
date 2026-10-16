@@ -1,0 +1,871 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:colleague",
+        "name": "colleague",
+        "description": "A colleague who signs in and uses applications.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Colleagues sign in to it from wherever they are",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Colleagues may include franchise colleagues, who do not have staff accounts with us.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:own-device",
+        "name": "own device",
+        "description": "A colleague's own device used from home.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "including their own devices at home",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not specify device security properties.",
+        "kind": "external-system",
+        "trust_zone": "boundary:home-devices"
+      },
+      {
+        "id": "entity:hr-system",
+        "name": "HR system",
+        "description": "The system supplying colleague and group membership changes.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "it comes from the HR system overnight",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:own-identity-provider",
+        "name": "own identity provider",
+        "description": "A franchise's identity provider that vouches for franchise colleagues.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "their own identity provider vouches for them",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not specify which colleagues this provider is allowed to vouch for.",
+        "kind": "external-system",
+        "trust_zone": "boundary:franchise-identity-provider"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:identity-broker",
+        "name": "identity broker",
+        "description": "Signs colleagues in, issues tokens, signs tokens, and pulls directory changes.",
+        "assets": [
+          "credentials",
+          "pii",
+          "secrets"
+        ],
+        "source_excerpt": "Everything colleagues use signs them in through one identity broker",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Tokens carry staff ids and group lists. Nothing calls back to the broker to ask whether a colleague is still allowed in. Tokens are valid for twelve hours and cannot be revoked before expiry. The text does not state whether colleagues are asked for a second factor.",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "internal",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:application",
+        "name": "application",
+        "description": "An application that takes the broker token and decides what the colleague may do from its groups.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "Every application takes that token and decides what the colleague may do from the groups in it",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-admin-console",
+        "name": "store admin console",
+        "description": "An application that allows a holder of a store-manager token to change prices and void transactions.",
+        "assets": [
+          "credentials",
+          "financial"
+        ],
+        "source_excerpt": "The store admin console is one of those applications",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The console does not check which store the colleague belongs to, so a store-manager token works against every store.",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "internal",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:key-store",
+        "name": "key store",
+        "description": "A store holding the broker's token-signing key.",
+        "assets": [
+          "secrets",
+          "credentials"
+        ],
+        "source_excerpt": "The broker signs tokens with a signing key it keeps in a key store",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:directory",
+        "name": "directory",
+        "description": "The broker's directory of colleagues and their group memberships.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "The broker keeps the colleagues and the groups they are in its own directory",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state whether the directory is encrypted where it sits.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:audit-log",
+        "name": "audit log",
+        "description": "A log to which the broker writes sign-ins.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The broker writes sign-ins to an audit log",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Nobody has written down what the log records or whether it covers the franchise route. The text does not state whether the log is encrypted where it sits.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:colleague>entity:own-device>enter-sign-in",
+        "name": "enter sign-in",
+        "description": "A colleague enters sign-in information on their own device.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "Colleagues sign in to it from wherever they are, including their own devices at home",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "entity:own-device",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Sign-in information",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:own-device>process:identity-broker>submit-sign-in",
+        "name": "submit sign-in",
+        "description": "The colleague's own device submits the sign-in to the identity broker.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "Colleagues sign in to it from wherever they are, including their own devices at home",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:own-device",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Sign-in information",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:own-identity-provider>process:identity-broker>vouch-sign-in",
+        "name": "vouch sign-in",
+        "description": "The franchise identity provider vouches for a franchise colleague to the broker.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "their own identity provider vouches for them and the broker takes that as a sign-in",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not specify which colleagues the provider is allowed to vouch for.",
+        "source": "entity:own-identity-provider",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "A franchise colleague's sign-in assertion",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:application>process:identity-broker>fetch-public-half",
+        "name": "fetch public half",
+        "description": "An application fetches the public half of the broker's signing key.",
+        "assets": [
+          "secrets"
+        ],
+        "source_excerpt": "Applications fetch the public half from the broker to check the signature",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:application",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "The public half of the token-signing key",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:identity-broker>store:key-store>read-signing-key",
+        "name": "read signing key",
+        "description": "The identity broker reads the signing key from the key store.",
+        "assets": [
+          "secrets"
+        ],
+        "source_excerpt": "The broker signs tokens with a signing key it keeps in a key store",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "store:key-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "The token-signing key",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:identity-broker>store:directory>update-membership",
+        "name": "update membership",
+        "description": "The broker updates its directory with changes pulled from HR.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "The broker pulls the changes once a night",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "store:directory",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Colleagues and group memberships",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:identity-broker>entity:hr-system>pull-changes",
+        "name": "pull changes",
+        "description": "The broker pulls colleague and group membership changes from the HR system overnight.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Group membership is not maintained there by hand \u2014 it comes from the HR system overnight",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "entity:hr-system",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Colleague and group membership changes",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:colleague>process:store-admin-console>change-prices",
+        "name": "change prices",
+        "description": "A colleague uses the console to change prices when the token contains the store-manager group.",
+        "assets": [
+          "credentials",
+          "financial"
+        ],
+        "source_excerpt": "If the token has the store-manager group in it, the console lets the holder change prices",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "process:store-admin-console",
+        "protocol": "unknown",
+        "authentication": "token with store-manager group",
+        "data_description": "A token containing staff id and group membership, and price changes",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:colleague>process:store-admin-console>void-transactions",
+        "name": "void transactions",
+        "description": "A colleague uses the console to void transactions when the token contains the store-manager group.",
+        "assets": [
+          "credentials",
+          "financial"
+        ],
+        "source_excerpt": "the console lets the holder change prices and void transactions",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "process:store-admin-console",
+        "protocol": "unknown",
+        "authentication": "token with store-manager group",
+        "data_description": "A token containing staff id and group membership, and transaction changes",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:identity-broker>store:audit-log>write-sign-ins",
+        "name": "write sign-ins",
+        "description": "The broker writes sign-in events to the audit log.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The broker writes sign-ins to an audit log",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "It is unknown whether this flow covers the franchise route.",
+        "source": "process:identity-broker",
+        "destination": "store:audit-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Sign-in events",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "The corporate network on which the identity broker and store admin console run.",
+        "assets": [],
+        "source_excerpt": "The broker runs on the corporate network",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:home-devices",
+        "name": "home devices",
+        "description": "The zone containing colleagues' own devices used at home.",
+        "assets": [],
+        "source_excerpt": "including their own devices at home",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:franchise-identity-provider",
+        "name": "franchise identity provider",
+        "description": "The external identity-provider zone used to vouch for franchise colleagues.",
+        "assets": [],
+        "source_excerpt": "their own identity provider vouches for them",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The identity broker is internally exposed because it runs on the corporate network.",
+        "element_id": "process:identity-broker",
+        "attribute": "exposure",
+        "basis": "The description states that the identity broker runs on the corporate network."
+      },
+      {
+        "assumption": "The store admin console is internally exposed because it runs on the corporate network.",
+        "element_id": "process:store-admin-console",
+        "attribute": "exposure",
+        "basis": "The description states that the store admin console also runs on the corporate network."
+      },
+      {
+        "assumption": "The key store contains confidential data because it holds a token-signing key.",
+        "element_id": "store:key-store",
+        "attribute": "data_classification",
+        "basis": "The description states that the key store holds the broker's signing key."
+      },
+      {
+        "assumption": "The directory contains confidential data because it holds colleagues and their group memberships.",
+        "element_id": "store:directory",
+        "attribute": "data_classification",
+        "basis": "The description states that the directory keeps colleagues and the groups they are in."
+      },
+      {
+        "assumption": "The audit log contains confidential data because it holds sign-in records.",
+        "element_id": "store:audit-log",
+        "attribute": "data_classification",
+        "basis": "The description states that the broker writes sign-ins to the audit log."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:colleague",
+        "name": "colleague",
+        "description": "A colleague who signs in and uses applications.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Colleagues sign in to it from wherever they are",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Colleagues may include franchise colleagues, who do not have staff accounts with us.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:own-device",
+        "name": "own device",
+        "description": "A colleague's own device used from home.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "including their own devices at home",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not specify device security properties.",
+        "kind": "external-system",
+        "trust_zone": "boundary:home-devices"
+      },
+      {
+        "id": "entity:hr-system",
+        "name": "HR system",
+        "description": "The system supplying colleague and group membership changes.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "it comes from the HR system overnight",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:own-identity-provider",
+        "name": "own identity provider",
+        "description": "A franchise's identity provider that vouches for franchise colleagues.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "their own identity provider vouches for them",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not specify which colleagues this provider is allowed to vouch for.",
+        "kind": "external-system",
+        "trust_zone": "boundary:franchise-identity-provider"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:identity-broker",
+        "name": "identity broker",
+        "description": "Signs colleagues in, issues tokens, signs tokens, and pulls directory changes.",
+        "assets": [
+          "credentials",
+          "pii",
+          "secrets"
+        ],
+        "source_excerpt": "Everything colleagues use signs them in through one identity broker",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Tokens carry staff ids and group lists. Nothing calls back to the broker to ask whether a colleague is still allowed in. Tokens are valid for twelve hours and cannot be revoked before expiry. The text does not state whether colleagues are asked for a second factor.",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "internal",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:application",
+        "name": "application",
+        "description": "An application that takes the broker token and decides what the colleague may do from its groups.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "Every application takes that token and decides what the colleague may do from the groups in it",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-admin-console",
+        "name": "store admin console",
+        "description": "An application that allows a holder of a store-manager token to change prices and void transactions.",
+        "assets": [
+          "credentials",
+          "financial"
+        ],
+        "source_excerpt": "The store admin console is one of those applications",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The console does not check which store the colleague belongs to, so a store-manager token works against every store.",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "internal",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:key-store",
+        "name": "key store",
+        "description": "A store holding the broker's token-signing key.",
+        "assets": [
+          "secrets",
+          "credentials"
+        ],
+        "source_excerpt": "The broker signs tokens with a signing key it keeps in a key store",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:directory",
+        "name": "directory",
+        "description": "The broker's directory of colleagues and their group memberships.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "The broker keeps the colleagues and the groups they are in its own directory",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state whether the directory is encrypted where it sits.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:audit-log",
+        "name": "audit log",
+        "description": "A log to which the broker writes sign-ins.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The broker writes sign-ins to an audit log",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Nobody has written down what the log records or whether it covers the franchise route. The text does not state whether the log is encrypted where it sits.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:colleague>entity:own-device>enter-sign-in",
+        "name": "enter sign-in",
+        "description": "A colleague enters sign-in information on their own device.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "Colleagues sign in to it from wherever they are, including their own devices at home",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "entity:own-device",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Sign-in information",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:own-device>process:identity-broker>submit-sign-in",
+        "name": "submit sign-in",
+        "description": "The colleague's own device submits the sign-in to the identity broker.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "Colleagues sign in to it from wherever they are, including their own devices at home",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:own-device",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Sign-in information",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:own-identity-provider>process:identity-broker>vouch-sign-in",
+        "name": "vouch sign-in",
+        "description": "The franchise identity provider vouches for a franchise colleague to the broker.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "their own identity provider vouches for them and the broker takes that as a sign-in",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not specify which colleagues the provider is allowed to vouch for.",
+        "source": "entity:own-identity-provider",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "A franchise colleague's sign-in assertion",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:application>process:identity-broker>fetch-public-half",
+        "name": "fetch public half",
+        "description": "An application fetches the public half of the broker's signing key.",
+        "assets": [
+          "secrets"
+        ],
+        "source_excerpt": "Applications fetch the public half from the broker to check the signature",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:application",
+        "destination": "process:identity-broker",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "The public half of the token-signing key",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:identity-broker>store:key-store>read-signing-key",
+        "name": "read signing key",
+        "description": "The identity broker reads the signing key from the key store.",
+        "assets": [
+          "secrets"
+        ],
+        "source_excerpt": "The broker signs tokens with a signing key it keeps in a key store",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "store:key-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "The token-signing key",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:identity-broker>store:directory>update-membership",
+        "name": "update membership",
+        "description": "The broker updates its directory with changes pulled from HR.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "The broker pulls the changes once a night",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "store:directory",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Colleagues and group memberships",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:identity-broker>entity:hr-system>pull-changes",
+        "name": "pull changes",
+        "description": "The broker pulls colleague and group membership changes from the HR system overnight.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Group membership is not maintained there by hand \u2014 it comes from the HR system overnight",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:identity-broker",
+        "destination": "entity:hr-system",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Colleague and group membership changes",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:colleague>process:store-admin-console>change-prices",
+        "name": "change prices",
+        "description": "A colleague uses the console to change prices when the token contains the store-manager group.",
+        "assets": [
+          "credentials",
+          "financial"
+        ],
+        "source_excerpt": "If the token has the store-manager group in it, the console lets the holder change prices",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "process:store-admin-console",
+        "protocol": "unknown",
+        "authentication": "token with store-manager group",
+        "data_description": "A token containing staff id and group membership, and price changes",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:colleague>process:store-admin-console>void-transactions",
+        "name": "void transactions",
+        "description": "A colleague uses the console to void transactions when the token contains the store-manager group.",
+        "assets": [
+          "credentials",
+          "financial"
+        ],
+        "source_excerpt": "the console lets the holder change prices and void transactions",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:colleague",
+        "destination": "process:store-admin-console",
+        "protocol": "unknown",
+        "authentication": "token with store-manager group",
+        "data_description": "A token containing staff id and group membership, and transaction changes",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:identity-broker>store:audit-log>write-sign-ins",
+        "name": "write sign-ins",
+        "description": "The broker writes sign-in events to the audit log.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The broker writes sign-ins to an audit log",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "It is unknown whether this flow covers the franchise route.",
+        "source": "process:identity-broker",
+        "destination": "store:audit-log",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Sign-in events",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "The corporate network on which the identity broker and store admin console run.",
+        "assets": [],
+        "source_excerpt": "The broker runs on the corporate network",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:home-devices",
+        "name": "home devices",
+        "description": "The zone containing colleagues' own devices used at home.",
+        "assets": [],
+        "source_excerpt": "including their own devices at home",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:franchise-identity-provider",
+        "name": "franchise identity provider",
+        "description": "The external identity-provider zone used to vouch for franchise colleagues.",
+        "assets": [],
+        "source_excerpt": "their own identity provider vouches for them",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The identity broker is internally exposed because it runs on the corporate network.",
+        "element_id": "process:identity-broker",
+        "attribute": "exposure",
+        "basis": "The description states that the identity broker runs on the corporate network."
+      },
+      {
+        "assumption": "The store admin console is internally exposed because it runs on the corporate network.",
+        "element_id": "process:store-admin-console",
+        "attribute": "exposure",
+        "basis": "The description states that the store admin console also runs on the corporate network."
+      },
+      {
+        "assumption": "The key store contains confidential data because it holds a token-signing key.",
+        "element_id": "store:key-store",
+        "attribute": "data_classification",
+        "basis": "The description states that the key store holds the broker's signing key."
+      },
+      {
+        "assumption": "The directory contains confidential data because it holds colleagues and their group memberships.",
+        "element_id": "store:directory",
+        "attribute": "data_classification",
+        "basis": "The description states that the directory keeps colleagues and the groups they are in."
+      },
+      {
+        "assumption": "The audit log contains confidential data because it holds sign-in records.",
+        "element_id": "store:audit-log",
+        "attribute": "data_classification",
+        "basis": "The description states that the broker writes sign-ins to the audit log."
+      }
+    ],
+    "capabilities": []
+  },
+  "issues": [],
+  "repair": null
+}

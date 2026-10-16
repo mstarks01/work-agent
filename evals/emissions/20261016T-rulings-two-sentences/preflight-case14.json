@@ -1,0 +1,1226 @@
+{
+  "artifact_version": 7,
+  "mode": "extraction",
+  "cases": [
+    "14-loyalty-oauth-platform"
+  ],
+  "models": {
+    "tiers_config_version": 9,
+    "tiers": {
+      "base": {
+        "vendor": "openai",
+        "model": "gpt-5.6-luna"
+      },
+      "strong": {
+        "vendor": "openai",
+        "model": "gpt-5.6-terra"
+      },
+      "review": {
+        "vendor": "openai",
+        "model": "gpt-5.6-terra"
+      }
+    }
+  },
+  "gating": "tier-1-structural-only",
+  "certification": {
+    "certified": false,
+    "uncertified_nodes": [
+      {
+        "node": "extract",
+        "fingerprint": "27ced0eded5985ba938aa15a9f203ad9171287a90e7dee4e873059543cabcd5a"
+      }
+    ],
+    "unexercised_tiers": []
+  },
+  "provenance": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.104.0"
+    },
+    "sampling_config_version": 5,
+    "tiers_config_version": 9,
+    "sampling": {
+      "base": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 16384,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      },
+      "strong": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      },
+      "review": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true,
+        "structured_output": "auto"
+      }
+    },
+    "node_runs": {
+      "extract": [
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openai/gpt-5.6-luna",
+          "served_model": "openai/gpt-5.6-luna",
+          "instruction_sha256": "e6dd8f8ae2a221f7e8957e0cdc22b5c16ff6184aca8ec5f7324314bcf161d846",
+          "generation_fingerprint": "27ced0eded5985ba938aa15a9f203ad9171287a90e7dee4e873059543cabcd5a"
+        }
+      ]
+    },
+    "generation_identities": {
+      "base": {
+        "requested_models": [
+          "openai/gpt-5.6-luna"
+        ],
+        "served_models": [
+          "openai/gpt-5.6-luna"
+        ],
+        "instruction_digests": [
+          "e6dd8f8ae2a221f7e8957e0cdc22b5c16ff6184aca8ec5f7324314bcf161d846"
+        ],
+        "fingerprints": [
+          "27ced0eded5985ba938aa15a9f203ad9171287a90e7dee4e873059543cabcd5a"
+        ],
+        "nodes": [
+          "extract"
+        ]
+      }
+    }
+  },
+  "node_usage": {
+    "extract": {
+      "prompt_tokens": 7811,
+      "cached_prompt_tokens": 0,
+      "cache_write_tokens": 7093,
+      "completion_tokens": 5283,
+      "reasoning_tokens": 1679,
+      "total_tokens": 13094
+    }
+  },
+  "node_charges": {},
+  "node_latency": {
+    "extract": {
+      "executions": 1,
+      "total_ms": 39623,
+      "slowest_ms": 39623,
+      "mean_ms": 39623
+    }
+  },
+  "structural_failures": [],
+  "mode_output": [
+    {
+      "case": "14-loyalty-oauth-platform",
+      "recall": 0.455,
+      "precision": 0.385,
+      "endpoint_recall": 0.895,
+      "interaction_recall": 0.8,
+      "zone_recall": 0.333,
+      "sourced_zone_recall": 0.333,
+      "zone_partition_agreement": 1.0,
+      "same_zone_recall": 1.0,
+      "different_zone_agreement": 1.0,
+      "zone_pair_coverage": 0.778,
+      "endpoint_missing": [
+        "boundary:member-devices",
+        "boundary:rewards-cloud",
+        "flow:entity:member>entity:partner-app",
+        "flow:entity:member>process:authorization-server"
+      ],
+      "endpoint_extra": [
+        "boundary:member-phones",
+        "boundary:own-cloud-account",
+        "entity:browser",
+        "flow:entity:browser>entity:partner-app",
+        "flow:entity:browser>process:authorization-server",
+        "flow:entity:member>process:mobile-app",
+        "flow:process:support-console>process:authorization-server"
+      ],
+      "name_tokens_absent_from_source": [],
+      "sourced_recall": 0.895,
+      "aliased": [],
+      "alignment": {
+        "pairs": [
+          {
+            "reference": "boundary:partner-servers",
+            "produced": "boundary:partner-servers",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "entity:member",
+            "produced": "entity:member",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "entity:partner-app",
+            "produced": "entity:partner-app",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "process:authorization-server",
+            "produced": "process:authorization-server",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "process:mobile-app",
+            "produced": "process:mobile-app",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "process:rewards-api",
+            "produced": "process:rewards-api",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "process:support-console",
+            "produced": "process:support-console",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "store:api-log-store",
+            "produced": "store:api-log-store",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "store:identity-database",
+            "produced": "store:identity-database",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "store:points-ledger",
+            "produced": "store:points-ledger",
+            "evidence": "exact",
+            "excerpt": ""
+          },
+          {
+            "reference": "boundary:member-devices",
+            "produced": "boundary:member-phones",
+            "evidence": "membership",
+            "excerpt": ""
+          },
+          {
+            "reference": "boundary:rewards-cloud",
+            "produced": "boundary:own-cloud-account",
+            "evidence": "membership",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:entity:partner-app>process:authorization-server>token-requests",
+            "produced": "flow:entity:partner-app>process:authorization-server>request-tokens",
+            "evidence": "discriminated",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:entity:partner-app>process:rewards-api>call-rewards-api",
+            "produced": "flow:entity:partner-app>process:rewards-api>show-points",
+            "evidence": "sole",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants",
+            "produced": "flow:process:authorization-server>store:identity-database>store-identity-data",
+            "evidence": "discriminated",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:mobile-app>process:rewards-api>call-rewards-api",
+            "produced": "flow:process:mobile-app>process:rewards-api>call-api",
+            "evidence": "sole",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:rewards-api>store:api-log-store>write-request-log",
+            "produced": "flow:process:rewards-api>store:api-log-store>write-requests",
+            "evidence": "discriminated",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:rewards-api>store:points-ledger>read-and-write-points",
+            "produced": "flow:process:rewards-api>store:points-ledger>update-ledger",
+            "evidence": "discriminated",
+            "excerpt": ""
+          },
+          {
+            "reference": "flow:process:support-console>store:identity-database>close-accounts",
+            "produced": "flow:process:support-console>store:identity-database>close-account",
+            "evidence": "discriminated",
+            "excerpt": ""
+          }
+        ],
+        "unaligned_reference": [
+          "flow:entity:member>process:authorization-server>sign-in-and-consent",
+          "flow:entity:member>entity:partner-app>return-with-authorization-code",
+          "flow:process:mobile-app>process:authorization-server>token-requests"
+        ],
+        "unaligned_produced": [
+          "entity:browser",
+          "flow:entity:member>process:mobile-app>use-mobile-app",
+          "flow:process:mobile-app>process:authorization-server>sign-in",
+          "flow:process:mobile-app>process:authorization-server>disconnect-app",
+          "flow:entity:browser>process:authorization-server>sign-in",
+          "flow:entity:browser>entity:partner-app>return-code",
+          "flow:process:support-console>process:authorization-server>obtain-token"
+        ],
+        "ambiguous": [
+          {
+            "reference": [
+              "flow:process:mobile-app>process:authorization-server>token-requests"
+            ],
+            "produced": [
+              "flow:process:mobile-app>process:authorization-server>disconnect-app",
+              "flow:process:mobile-app>process:authorization-server>sign-in"
+            ]
+          }
+        ]
+      },
+      "aligned_recall": 0.842,
+      "aligned_precision": 0.696,
+      "aligned_interaction_recall": 0.7,
+      "aligned_interaction_precision": 0.538,
+      "actor_recall": 1.0,
+      "same_type_unmatched_candidates": [
+        "flow:entity:browser>entity:partner-app>return-code",
+        "flow:entity:browser>process:authorization-server>sign-in",
+        "flow:entity:member>process:mobile-app>use-mobile-app",
+        "flow:process:mobile-app>process:authorization-server>disconnect-app",
+        "flow:process:mobile-app>process:authorization-server>sign-in",
+        "flow:process:support-console>process:authorization-server>obtain-token"
+      ],
+      "extra_status": {
+        "boundary:member-phones": "equivalent",
+        "boundary:own-cloud-account": "equivalent",
+        "entity:browser": "unreviewed",
+        "flow:entity:browser>entity:partner-app>return-code": "unreviewed",
+        "flow:entity:browser>process:authorization-server>sign-in": "unreviewed",
+        "flow:entity:member>process:mobile-app>use-mobile-app": "unreviewed",
+        "flow:entity:partner-app>process:authorization-server>request-tokens": "equivalent",
+        "flow:entity:partner-app>process:rewards-api>show-points": "equivalent",
+        "flow:process:authorization-server>store:identity-database>store-identity-data": "equivalent",
+        "flow:process:mobile-app>process:authorization-server>disconnect-app": "unreviewed",
+        "flow:process:mobile-app>process:authorization-server>sign-in": "unreviewed",
+        "flow:process:mobile-app>process:rewards-api>call-api": "equivalent",
+        "flow:process:rewards-api>store:api-log-store>write-requests": "equivalent",
+        "flow:process:rewards-api>store:points-ledger>update-ledger": "equivalent",
+        "flow:process:support-console>process:authorization-server>obtain-token": "unreviewed",
+        "flow:process:support-console>store:identity-database>close-account": "equivalent"
+      },
+      "initiator_recall": 1.0,
+      "initiators_missing": [],
+      "crossings_match": false,
+      "crossings_recall": 0.667,
+      "crossings_precision": 1.0,
+      "crossings_derivable": true,
+      "crossings_undecidable": [
+        "flow:entity:browser>entity:partner-app",
+        "flow:entity:browser>process:authorization-server",
+        "flow:entity:member>process:mobile-app"
+      ],
+      "crossings_missing": [
+        "flow:entity:member>entity:partner-app",
+        "flow:entity:member>process:authorization-server"
+      ],
+      "missing": [
+        "boundary:member-devices",
+        "boundary:rewards-cloud",
+        "flow:entity:member>entity:partner-app>return-with-authorization-code",
+        "flow:entity:member>process:authorization-server>sign-in-and-consent",
+        "flow:entity:partner-app>process:authorization-server>token-requests",
+        "flow:entity:partner-app>process:rewards-api>call-rewards-api",
+        "flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants",
+        "flow:process:mobile-app>process:authorization-server>token-requests",
+        "flow:process:mobile-app>process:rewards-api>call-rewards-api",
+        "flow:process:rewards-api>store:api-log-store>write-request-log",
+        "flow:process:rewards-api>store:points-ledger>read-and-write-points",
+        "flow:process:support-console>store:identity-database>close-accounts"
+      ],
+      "extra": [
+        "boundary:member-phones",
+        "boundary:own-cloud-account",
+        "entity:browser",
+        "flow:entity:browser>entity:partner-app>return-code",
+        "flow:entity:browser>process:authorization-server>sign-in",
+        "flow:entity:member>process:mobile-app>use-mobile-app",
+        "flow:entity:partner-app>process:authorization-server>request-tokens",
+        "flow:entity:partner-app>process:rewards-api>show-points",
+        "flow:process:authorization-server>store:identity-database>store-identity-data",
+        "flow:process:mobile-app>process:authorization-server>disconnect-app",
+        "flow:process:mobile-app>process:authorization-server>sign-in",
+        "flow:process:mobile-app>process:rewards-api>call-api",
+        "flow:process:rewards-api>store:api-log-store>write-requests",
+        "flow:process:rewards-api>store:points-ledger>update-ledger",
+        "flow:process:support-console>process:authorization-server>obtain-token",
+        "flow:process:support-console>store:identity-database>close-account"
+      ],
+      "scored_field_agreement": 0.697,
+      "state_agrees_unbased": 0,
+      "control_state_agreement": 0.852,
+      "attributes_compared": 66,
+      "attributes_comparable": 81,
+      "comparison_coverage": 0.815,
+      "attributes_differing": [
+        {
+          "element": "entity:member",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "pii"
+        },
+        {
+          "element": "entity:partner-app",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "credentials, financial, pii"
+        },
+        {
+          "element": "process:mobile-app",
+          "attribute": "assets",
+          "blessed": "credentials",
+          "extracted": "credentials, financial, pii"
+        },
+        {
+          "element": "process:authorization-server",
+          "attribute": "exposure",
+          "blessed": "internet-facing",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:authorization-server",
+          "attribute": "assets",
+          "blessed": "credentials, secrets",
+          "extracted": "credentials, pii, secrets"
+        },
+        {
+          "element": "process:rewards-api",
+          "attribute": "assets",
+          "blessed": "financial, pii",
+          "extracted": "business-critical-data, credentials, financial, pii"
+        },
+        {
+          "element": "process:support-console",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "credentials, financial, pii"
+        },
+        {
+          "element": "store:identity-database",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "store:points-ledger",
+          "attribute": "assets",
+          "blessed": "business-critical-data, financial",
+          "extracted": "business-critical-data, financial, pii"
+        },
+        {
+          "element": "store:points-ledger",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "store:api-log-store",
+          "attribute": "assets",
+          "blessed": "credentials, pii",
+          "extracted": "credentials"
+        },
+        {
+          "element": "store:api-log-store",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "flow:entity:partner-app>process:authorization-server>token-requests",
+          "attribute": "assets",
+          "blessed": "credentials, secrets",
+          "extracted": "credentials"
+        },
+        {
+          "element": "flow:process:mobile-app>process:rewards-api>call-rewards-api",
+          "attribute": "operations",
+          "blessed": "read-write",
+          "extracted": "unknown"
+        },
+        {
+          "element": "flow:entity:partner-app>process:rewards-api>call-rewards-api",
+          "attribute": "operations",
+          "blessed": "read-write",
+          "extracted": "read"
+        },
+        {
+          "element": "flow:process:rewards-api>store:points-ledger>read-and-write-points",
+          "attribute": "assets",
+          "blessed": "financial",
+          "extracted": "business-critical-data, financial, pii"
+        },
+        {
+          "element": "flow:process:rewards-api>store:api-log-store>write-request-log",
+          "attribute": "assets",
+          "blessed": "credentials, pii",
+          "extracted": "credentials"
+        },
+        {
+          "element": "flow:process:support-console>store:identity-database>close-accounts",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "credentials, pii"
+        },
+        {
+          "element": "flow:process:support-console>store:identity-database>close-accounts",
+          "attribute": "authentication",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "boundary:member-devices",
+          "attribute": "kind",
+          "blessed": "network",
+          "extracted": "tenant"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 13,
+        "measured": 13,
+        "uncited": 0,
+        "tokenless": 0,
+        "exhausted": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    }
+  ],
+  "trusted": false,
+  "repo_commit": {
+    "commit": "ba3789517a1db3210e84bdd3b86e09457ef203c5",
+    "clean": true
+  },
+  "corpus_digest": "82961fc5d15274ffa13581482d13b60ed8944628a7bc1e2a8dbdc69a2bfb7578",
+  "flow_identity_version": 2,
+  "frameworks": [
+    "asvs",
+    "stride"
+  ],
+  "stopped": [],
+  "series": {},
+  "completion": {
+    "attempted": 1,
+    "scored": 0,
+    "failed": 0,
+    "stopped_before": 0
+  },
+  "attribute_aggregate": {
+    "compared": 66,
+    "agreed": 46,
+    "agreement": 0.697,
+    "by_attribute": {
+      "boundary.kind": {
+        "compared": 3,
+        "agreed": 2,
+        "agreement": 0.667
+      },
+      "entity.kind": {
+        "compared": 2,
+        "agreed": 2,
+        "agreement": 1.0
+      },
+      "process.exposure": {
+        "compared": 4,
+        "agreed": 3,
+        "agreement": 0.75
+      },
+      "process.interface_kind": {
+        "compared": 4,
+        "agreed": 4,
+        "agreement": 1.0
+      },
+      "boundary.assets": {
+        "compared": 3,
+        "agreed": 3,
+        "agreement": 1.0
+      },
+      "entity.assets": {
+        "compared": 2,
+        "agreed": 0,
+        "agreement": 0.0
+      },
+      "flow.assets": {
+        "compared": 7,
+        "agreed": 3,
+        "agreement": 0.429
+      },
+      "process.assets": {
+        "compared": 4,
+        "agreed": 0,
+        "agreement": 0.0
+      },
+      "store.assets": {
+        "compared": 3,
+        "agreed": 1,
+        "agreement": 0.333
+      },
+      "flow.operations": {
+        "compared": 7,
+        "agreed": 5,
+        "agreement": 0.714
+      },
+      "flow.protocol": {
+        "compared": 7,
+        "agreed": 7,
+        "agreement": 1.0
+      },
+      "flow.authentication": {
+        "compared": 7,
+        "agreed": 6,
+        "agreement": 0.857
+      },
+      "flow.encryption_in_transit": {
+        "compared": 7,
+        "agreed": 7,
+        "agreement": 1.0
+      },
+      "store.encryption_at_rest": {
+        "compared": 3,
+        "agreed": 3,
+        "agreement": 1.0
+      },
+      "store.data_classification": {
+        "compared": 3,
+        "agreed": 0,
+        "agreement": 0.0
+      }
+    }
+  },
+  "grounds": [],
+  "grounds_failures": [],
+  "grounds_aggregate": null,
+  "coverage": [
+    {
+      "framework": "asvs",
+      "lane": "encoding-and-sanitization",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "validation-and-business-logic",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "web-frontend-security",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "api-and-web-service",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "file-handling",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "authentication",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "session-management",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "authorization",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "self-contained-tokens",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "oauth-and-oidc",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "cryptography",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "secure-communication",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "configuration",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "data-protection",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "secure-coding-and-architecture",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "security-logging-and-error-handling",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "webrtc",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "spoofing",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "tampering",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "repudiation",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "information-disclosure",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "denial-of-service",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "elevation-of-privilege",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    }
+  ],
+  "coverage_totals": {
+    "cases": 0,
+    "drafts": 0,
+    "rules_fired": 0,
+    "rules": 0,
+    "candidates": 0,
+    "candidates_cited": 0,
+    "elements": 0,
+    "elements_cited": 0,
+    "boundary_crossings": 0,
+    "boundary_crossings_cited": 0,
+    "unknown_controls": 0,
+    "unknown_controls_cited": 0,
+    "cited_rates": {
+      "candidates_cited": 0.0,
+      "elements_cited": 0.0,
+      "boundary_crossings_cited": 0.0,
+      "unknown_controls_cited": 0.0
+    }
+  },
+  "filler": {},
+  "instruction": [
+    {
+      "framework": "(shared)",
+      "node": "extract",
+      "tokens": 4168,
+      "sha256": "141b0c2b6bd54c06acdd1e7a99c61115ac6f1b62776201ed8cd8cd8d57f71995"
+    }
+  ],
+  "instruction_totals": {
+    "(shared)": {
+      "nodes": 1,
+      "tokens": 4168,
+      "largest": 4168
+    }
+  },
+  "applicability": [],
+  "applicability_aggregate": null,
+  "applicability_exemplar_delta": null,
+  "applicability_holdout_split": null,
+  "over_applied_for_promotion": [],
+  "disposition": [],
+  "disposition_aggregate": null,
+  "applicability_yield": [],
+  "applicability_yield_aggregate": null,
+  "attribution": [],
+  "attribution_aggregate": null,
+  "scores": [],
+  "exemplar_delta": null,
+  "holdout_split": null,
+  "unlisted_for_promotion": [],
+  "critic_yield": [],
+  "critic_yield_aggregate": null,
+  "losses": [],
+  "losses_aggregate": null,
+  "writing": [],
+  "writing_aggregate": {
+    "answered": 0,
+    "objections": 0,
+    "carried": 0,
+    "objection_rate": 0.0,
+    "by_framework": {},
+    "by_reason": {}
+  }
+}

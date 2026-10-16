@@ -1,0 +1,1045 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:customer-user",
+        "name": "customer user",
+        "description": "A person at a customer company who uses the billing app as an admin or viewer.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "People at a customer company use the billing app in their browser over HTTPS.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Each user belongs to one company and is either an admin or a viewer. Authentication uses an email address, password, and session cookie; there is no second factor.",
+        "kind": "human",
+        "trust_zone": "boundary:customer-company"
+      },
+      {
+        "id": "entity:payer",
+        "name": "payer",
+        "description": "The person who receives an invoice email and uses the payment page.",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "Each invoice email sends the payer a link that ends in the invoice number.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The payer is not required to sign in.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:support-agent",
+        "name": "support agent",
+        "description": "A support employee who uses the admin console from the support office network.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "Our support agents work from the support office network.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Each agent signs in with their own account and a one-time code.",
+        "kind": "human",
+        "trust_zone": "boundary:support-office-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:billing-app",
+        "name": "billing app",
+        "description": "The shared invoicing application that authenticates users, serves billing and payment pages, manages invoices, enqueues render jobs, and fetches PDFs.",
+        "assets": [
+          "business-critical-data",
+          "credentials",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "all companies share one billing app",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The app performs tenant filtering itself, uses one database account for all companies, and saves every field received by the invoice edit form.",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:admin-console",
+        "name": "admin console",
+        "description": "The administrative console used by support agents to open billing-app sessions as customer users.",
+        "assets": [
+          "credentials",
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "From the admin console an agent can open a session in the billing app as any customer user.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The console is reachable only from the support office network.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "internal",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:payment-page",
+        "name": "payment page",
+        "description": "The page that displays an invoice, the company name, and bank details to a payer without requiring sign-in.",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The payment page shows the invoice, the company's name and its bank details",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not explicitly state whether the payment page is a separate process from the billing app.",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:pdf-renderer",
+        "name": "PDF renderer",
+        "description": "The renderer that consumes render jobs, reads invoices, and writes PDFs to the PDF bucket.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The PDF renderer takes jobs off the queue one at a time",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "It trusts the company ID carried by the job.",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:tenant-database",
+        "name": "tenant database",
+        "description": "A shared PostgreSQL database containing every company's invoices, customers, and payout bank details.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The billing app keeps every company's invoices, customers and payout bank details in one PostgreSQL database, the tenant database.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Every table has a company ID column. The database has no row-level security, and the app connects with one database account for all companies.",
+        "technology": "PostgreSQL",
+        "trust_zone": "boundary:cloud-platform",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:render-queue",
+        "name": "render queue",
+        "description": "A queue holding PDF render jobs containing a company ID and invoice number.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "To make a PDF, the billing app puts a render job on the render queue.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state the queue technology or its protection.",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:pdf-bucket",
+        "name": "PDF bucket",
+        "description": "A shared cloud bucket containing rendered invoice PDFs stored under company ID and invoice number.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "writes the PDF to the PDF bucket under the company ID and the invoice number",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The billing app fetches PDFs with one service credential for all companies.",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:customer-user>process:billing-app>sign-in",
+        "name": "sign in",
+        "description": "The customer user signs in to the billing app.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "They sign in with an email address and a password and get a session cookie.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "There is no second factor for admins or viewers.",
+        "source": "entity:customer-user",
+        "destination": "process:billing-app",
+        "protocol": "https",
+        "authentication": "email address and password",
+        "data_description": "Email address, password, and session cookie",
+        "encryption_in_transit": "https",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:customer-user>process:billing-app>use-app",
+        "name": "use app",
+        "description": "The customer user uses the billing app in a browser over HTTPS.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "People at a customer company use the billing app in their browser over HTTPS.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The user may open and edit invoices; the text does not specify the complete set of requests.",
+        "source": "entity:customer-user",
+        "destination": "process:billing-app",
+        "protocol": "https",
+        "authentication": "session cookie",
+        "data_description": "Invoices, customer records, and payout bank details",
+        "encryption_in_transit": "https",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:entity:payer>process:payment-page>open-payment-page",
+        "name": "open payment page",
+        "description": "The payer follows an invoice link and opens the payment page.",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "Each invoice email sends the payer a link that ends in the invoice number.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The payer is not asked to sign in.",
+        "source": "entity:payer",
+        "destination": "process:payment-page",
+        "protocol": "unknown",
+        "authentication": "none",
+        "data_description": "Invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:billing-app>entity:payer>send-invoice-email",
+        "name": "send invoice email",
+        "description": "The billing app sends the payer an invoice email containing a link ending in the invoice number.",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "Each invoice email sends the payer a link that ends in the invoice number.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The email transport is not described.",
+        "source": "process:billing-app",
+        "destination": "entity:payer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Invoice link containing the invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>process:payment-page>serve-payment-page",
+        "name": "serve payment page",
+        "description": "The billing app serves the payment page with invoice, company name, and bank details.",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The payment page shows the invoice, the company's name and its bank details",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state whether the payment page is implemented as a separate process.",
+        "source": "process:billing-app",
+        "destination": "process:payment-page",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Invoice, company name, and bank details",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>store:tenant-database>query-invoices",
+        "name": "query invoices",
+        "description": "The billing app reads and writes tenant records in the tenant database.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The billing app keeps every company's invoices, customers and payout bank details in one PostgreSQL database",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The app adds the company filter to each query itself and uses one database account for all companies.",
+        "source": "process:billing-app",
+        "destination": "store:tenant-database",
+        "protocol": "unknown",
+        "authentication": "one database account for all companies",
+        "data_description": "Invoices, customers, payout bank details, and company IDs",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:billing-app>store:render-queue>enqueue-render-job",
+        "name": "enqueue render job",
+        "description": "The billing app places a PDF render job on the render queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The job carries a company ID and an invoice number.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "store:render-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Company ID and invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:pdf-renderer>store:render-queue>consume-render-job",
+        "name": "consume render job",
+        "description": "The PDF renderer takes render jobs from the render queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The PDF renderer takes jobs off the queue one at a time",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:pdf-renderer",
+        "destination": "store:render-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Render job containing company ID and invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:pdf-renderer>store:tenant-database>read-invoice",
+        "name": "read invoice",
+        "description": "The PDF renderer reads an invoice from the tenant database.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "reads the invoice from the tenant database",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The renderer trusts the company ID carried by the job.",
+        "source": "process:pdf-renderer",
+        "destination": "store:tenant-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Invoice selected using company ID and invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:pdf-renderer>store:pdf-bucket>write-pdf",
+        "name": "write PDF",
+        "description": "The PDF renderer writes a rendered PDF to the PDF bucket.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "writes the PDF to the PDF bucket under the company ID and the invoice number",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:pdf-renderer",
+        "destination": "store:pdf-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Rendered invoice PDF, company ID, and invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>store:pdf-bucket>fetch-pdf",
+        "name": "fetch PDF",
+        "description": "The billing app fetches PDFs from the PDF bucket.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii",
+          "credentials"
+        ],
+        "source_excerpt": "The billing app fetches PDFs from the bucket with one service credential for all companies.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The service credential is shared across companies.",
+        "source": "process:billing-app",
+        "destination": "store:pdf-bucket",
+        "protocol": "unknown",
+        "authentication": "one service credential for all companies",
+        "data_description": "Rendered invoice PDFs",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:support-agent>process:admin-console>sign-in",
+        "name": "sign in",
+        "description": "A support agent signs in to the admin console.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "each agent signs in to it with their own account and a one-time code",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:support-agent",
+        "destination": "process:admin-console",
+        "protocol": "unknown",
+        "authentication": "account and one-time code",
+        "data_description": "Support-agent account credentials and one-time code",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:admin-console>process:billing-app>open-user-session",
+        "name": "open user session",
+        "description": "The admin console opens a billing-app session as any customer user.",
+        "assets": [
+          "credentials",
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "From the admin console an agent can open a session in the billing app as any customer user.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Subsequent actions are recorded against the customer user rather than the support agent.",
+        "source": "process:admin-console",
+        "destination": "process:billing-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Customer-user session and identity",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>store:tenant-database>record-user-actions",
+        "name": "record user actions",
+        "description": "The billing app records actions performed through an impersonated customer session in the tenant database.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "Everything the agent then does is recorded in the tenant database against that customer user, and not against the agent.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "store:tenant-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Actions attributed to the customer user",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:customer-company",
+        "name": "customer company",
+        "description": "A customer-company tenant boundary; each customer company is a separate tenant.",
+        "assets": [],
+        "source_excerpt": "Each customer company is one tenant",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:support-office-network",
+        "name": "support office network",
+        "description": "The network from which support agents work and the admin console is reachable.",
+        "assets": [],
+        "source_excerpt": "Our support agents work from the support office network.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cloud-platform",
+        "name": "cloud platform",
+        "description": "The cloud platform hosting the shared billing app, database, and PDF bucket.",
+        "assets": [],
+        "source_excerpt": "all companies share one billing app, one database and one PDF bucket in our cloud platform.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state the exact network placement of the render queue or PDF renderer.",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The tenant database is confidential because it contains invoices, customer records, and payout bank details.",
+        "element_id": "store:tenant-database",
+        "attribute": "data_classification",
+        "basis": "The described contents include personal, commercially sensitive, and payment-related data."
+      },
+      {
+        "assumption": "The render queue is confidential because its jobs contain company IDs and invoice numbers associated with invoice rendering.",
+        "element_id": "store:render-queue",
+        "attribute": "data_classification",
+        "basis": "The queue carries render jobs containing company ID and invoice number."
+      },
+      {
+        "assumption": "The PDF bucket is confidential because it contains rendered invoice PDFs and is associated with company and invoice identifiers.",
+        "element_id": "store:pdf-bucket",
+        "attribute": "data_classification",
+        "basis": "The bucket stores PDFs rendered from invoices, which contain financial and personal information."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:customer-user",
+        "name": "customer user",
+        "description": "A person at a customer company who uses the billing app as an admin or viewer.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "People at a customer company use the billing app in their browser over HTTPS.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Each user belongs to one company and is either an admin or a viewer. Authentication uses an email address, password, and session cookie; there is no second factor.",
+        "kind": "human",
+        "trust_zone": "boundary:customer-company"
+      },
+      {
+        "id": "entity:payer",
+        "name": "payer",
+        "description": "The person who receives an invoice email and uses the payment page.",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "Each invoice email sends the payer a link that ends in the invoice number.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The payer is not required to sign in.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:support-agent",
+        "name": "support agent",
+        "description": "A support employee who uses the admin console from the support office network.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "Our support agents work from the support office network.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Each agent signs in with their own account and a one-time code.",
+        "kind": "human",
+        "trust_zone": "boundary:support-office-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:billing-app",
+        "name": "billing app",
+        "description": "The shared invoicing application that authenticates users, serves billing and payment pages, manages invoices, enqueues render jobs, and fetches PDFs.",
+        "assets": [
+          "business-critical-data",
+          "credentials",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "all companies share one billing app",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The app performs tenant filtering itself, uses one database account for all companies, and saves every field received by the invoice edit form.",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:admin-console",
+        "name": "admin console",
+        "description": "The administrative console used by support agents to open billing-app sessions as customer users.",
+        "assets": [
+          "credentials",
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "From the admin console an agent can open a session in the billing app as any customer user.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The console is reachable only from the support office network.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "internal",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:payment-page",
+        "name": "payment page",
+        "description": "The page that displays an invoice, the company name, and bank details to a payer without requiring sign-in.",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The payment page shows the invoice, the company's name and its bank details",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not explicitly state whether the payment page is a separate process from the billing app.",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:pdf-renderer",
+        "name": "PDF renderer",
+        "description": "The renderer that consumes render jobs, reads invoices, and writes PDFs to the PDF bucket.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The PDF renderer takes jobs off the queue one at a time",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "It trusts the company ID carried by the job.",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:tenant-database",
+        "name": "tenant database",
+        "description": "A shared PostgreSQL database containing every company's invoices, customers, and payout bank details.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The billing app keeps every company's invoices, customers and payout bank details in one PostgreSQL database, the tenant database.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Every table has a company ID column. The database has no row-level security, and the app connects with one database account for all companies.",
+        "technology": "PostgreSQL",
+        "trust_zone": "boundary:cloud-platform",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:render-queue",
+        "name": "render queue",
+        "description": "A queue holding PDF render jobs containing a company ID and invoice number.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "To make a PDF, the billing app puts a render job on the render queue.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state the queue technology or its protection.",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:pdf-bucket",
+        "name": "PDF bucket",
+        "description": "A shared cloud bucket containing rendered invoice PDFs stored under company ID and invoice number.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "writes the PDF to the PDF bucket under the company ID and the invoice number",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The billing app fetches PDFs with one service credential for all companies.",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-platform",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:customer-user>process:billing-app>sign-in",
+        "name": "sign in",
+        "description": "The customer user signs in to the billing app.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "They sign in with an email address and a password and get a session cookie.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "There is no second factor for admins or viewers.",
+        "source": "entity:customer-user",
+        "destination": "process:billing-app",
+        "protocol": "https",
+        "authentication": "email address and password",
+        "data_description": "Email address, password, and session cookie",
+        "encryption_in_transit": "https",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:customer-user>process:billing-app>use-app",
+        "name": "use app",
+        "description": "The customer user uses the billing app in a browser over HTTPS.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "People at a customer company use the billing app in their browser over HTTPS.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The user may open and edit invoices; the text does not specify the complete set of requests.",
+        "source": "entity:customer-user",
+        "destination": "process:billing-app",
+        "protocol": "https",
+        "authentication": "session cookie",
+        "data_description": "Invoices, customer records, and payout bank details",
+        "encryption_in_transit": "https",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:entity:payer>process:payment-page>open-payment-page",
+        "name": "open payment page",
+        "description": "The payer follows an invoice link and opens the payment page.",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "Each invoice email sends the payer a link that ends in the invoice number.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The payer is not asked to sign in.",
+        "source": "entity:payer",
+        "destination": "process:payment-page",
+        "protocol": "unknown",
+        "authentication": "none",
+        "data_description": "Invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:billing-app>entity:payer>send-invoice-email",
+        "name": "send invoice email",
+        "description": "The billing app sends the payer an invoice email containing a link ending in the invoice number.",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "Each invoice email sends the payer a link that ends in the invoice number.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The email transport is not described.",
+        "source": "process:billing-app",
+        "destination": "entity:payer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Invoice link containing the invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>process:payment-page>serve-payment-page",
+        "name": "serve payment page",
+        "description": "The billing app serves the payment page with invoice, company name, and bank details.",
+        "assets": [
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The payment page shows the invoice, the company's name and its bank details",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state whether the payment page is implemented as a separate process.",
+        "source": "process:billing-app",
+        "destination": "process:payment-page",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Invoice, company name, and bank details",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>store:tenant-database>query-invoices",
+        "name": "query invoices",
+        "description": "The billing app reads and writes tenant records in the tenant database.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "The billing app keeps every company's invoices, customers and payout bank details in one PostgreSQL database",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The app adds the company filter to each query itself and uses one database account for all companies.",
+        "source": "process:billing-app",
+        "destination": "store:tenant-database",
+        "protocol": "unknown",
+        "authentication": "one database account for all companies",
+        "data_description": "Invoices, customers, payout bank details, and company IDs",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:billing-app>store:render-queue>enqueue-render-job",
+        "name": "enqueue render job",
+        "description": "The billing app places a PDF render job on the render queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The job carries a company ID and an invoice number.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "store:render-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Company ID and invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:pdf-renderer>store:render-queue>consume-render-job",
+        "name": "consume render job",
+        "description": "The PDF renderer takes render jobs from the render queue.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The PDF renderer takes jobs off the queue one at a time",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:pdf-renderer",
+        "destination": "store:render-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Render job containing company ID and invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:pdf-renderer>store:tenant-database>read-invoice",
+        "name": "read invoice",
+        "description": "The PDF renderer reads an invoice from the tenant database.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "reads the invoice from the tenant database",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The renderer trusts the company ID carried by the job.",
+        "source": "process:pdf-renderer",
+        "destination": "store:tenant-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Invoice selected using company ID and invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:pdf-renderer>store:pdf-bucket>write-pdf",
+        "name": "write PDF",
+        "description": "The PDF renderer writes a rendered PDF to the PDF bucket.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "writes the PDF to the PDF bucket under the company ID and the invoice number",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:pdf-renderer",
+        "destination": "store:pdf-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Rendered invoice PDF, company ID, and invoice number",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>store:pdf-bucket>fetch-pdf",
+        "name": "fetch PDF",
+        "description": "The billing app fetches PDFs from the PDF bucket.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii",
+          "credentials"
+        ],
+        "source_excerpt": "The billing app fetches PDFs from the bucket with one service credential for all companies.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The service credential is shared across companies.",
+        "source": "process:billing-app",
+        "destination": "store:pdf-bucket",
+        "protocol": "unknown",
+        "authentication": "one service credential for all companies",
+        "data_description": "Rendered invoice PDFs",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:support-agent>process:admin-console>sign-in",
+        "name": "sign in",
+        "description": "A support agent signs in to the admin console.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "each agent signs in to it with their own account and a one-time code",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "entity:support-agent",
+        "destination": "process:admin-console",
+        "protocol": "unknown",
+        "authentication": "account and one-time code",
+        "data_description": "Support-agent account credentials and one-time code",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:admin-console>process:billing-app>open-user-session",
+        "name": "open user session",
+        "description": "The admin console opens a billing-app session as any customer user.",
+        "assets": [
+          "credentials",
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "From the admin console an agent can open a session in the billing app as any customer user.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Subsequent actions are recorded against the customer user rather than the support agent.",
+        "source": "process:admin-console",
+        "destination": "process:billing-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Customer-user session and identity",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:billing-app>store:tenant-database>record-user-actions",
+        "name": "record user actions",
+        "description": "The billing app records actions performed through an impersonated customer session in the tenant database.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "Everything the agent then does is recorded in the tenant database against that customer user, and not against the agent.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:billing-app",
+        "destination": "store:tenant-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Actions attributed to the customer user",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:customer-company",
+        "name": "customer company",
+        "description": "A customer-company tenant boundary; each customer company is a separate tenant.",
+        "assets": [],
+        "source_excerpt": "Each customer company is one tenant",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:support-office-network",
+        "name": "support office network",
+        "description": "The network from which support agents work and the admin console is reachable.",
+        "assets": [],
+        "source_excerpt": "Our support agents work from the support office network.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cloud-platform",
+        "name": "cloud platform",
+        "description": "The cloud platform hosting the shared billing app, database, and PDF bucket.",
+        "assets": [],
+        "source_excerpt": "all companies share one billing app, one database and one PDF bucket in our cloud platform.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state the exact network placement of the render queue or PDF renderer.",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The tenant database is confidential because it contains invoices, customer records, and payout bank details.",
+        "element_id": "store:tenant-database",
+        "attribute": "data_classification",
+        "basis": "The described contents include personal, commercially sensitive, and payment-related data."
+      },
+      {
+        "assumption": "The render queue is confidential because its jobs contain company IDs and invoice numbers associated with invoice rendering.",
+        "element_id": "store:render-queue",
+        "attribute": "data_classification",
+        "basis": "The queue carries render jobs containing company ID and invoice number."
+      },
+      {
+        "assumption": "The PDF bucket is confidential because it contains rendered invoice PDFs and is associated with company and invoice identifiers.",
+        "element_id": "store:pdf-bucket",
+        "attribute": "data_classification",
+        "basis": "The bucket stores PDFs rendered from invoices, which contain financial and personal information."
+      }
+    ],
+    "capabilities": []
+  },
+  "issues": [],
+  "repair": null
+}
