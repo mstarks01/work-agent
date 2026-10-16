@@ -55,8 +55,8 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** The last map, [#1522](https://github.com/mstarks01/work-agent/issues/1522), is under
-Completed maps. Chart a new one only against the bar at the end of this file.
+[#1760](https://github.com/mstarks01/work-agent/issues/1760) — a settings page in the first-run
+app. Its frontier is its open sub-issues with no open blocker and no assignee.
 
 ### Completed maps
 
