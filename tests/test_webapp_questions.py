@@ -442,6 +442,41 @@ class TestTheWholeFlow:
         assert page.status_code == 200
         assert json.loads(block.group(1)) == {}
 
+    def test_the_workspace_lists_no_report_the_gate_withholds(
+        self, tiers, runner, monkeypatch
+    ):
+        """The snapshot asks ``servable`` of each report it lists, so a
+        withheld report has no link that leads to a 404."""
+        from analysis_service.job_answers import JobAnswers
+
+        client = client_for(tiers, runner)
+        finished = start(client, questions=False)
+        client.get(f"/events/{finished}")
+        monkeypatch.setattr(JobAnswers, "withheld", lambda self, record: object())
+
+        [listed] = client.get("/workspace/runs").json()
+        reopened = client.get(f"/workspace/runs/{finished}").json()
+
+        assert listed["reports"] == []
+        assert reopened["reports"] == []
+        assert client.get(f"/report/{finished}").status_code == 404
+
+    def test_a_withheld_report_ends_its_stream_with_a_frame_the_page_reads(
+        self, tiers, runner, monkeypatch
+    ):
+        """The stream asks ``servable`` before it sends the page to the report."""
+        from analysis_service.job_answers import JobAnswers
+
+        monkeypatch.setattr(JobAnswers, "withheld", lambda self, record: object())
+        client = client_for(tiers, runner)
+        finished = start(client, questions=False)
+
+        stream = client.get(f"/events/{finished}").text
+
+        event, data = stream.rstrip().splitlines()[-2:]
+        assert event == "event: failed"
+        assert "withheld" in json.loads(data.removeprefix("data: "))["message"]
+
 
 class TestTheAnswerEndpoint:
     def test_it_requires_the_app_s_own_page(self, tiers, runner):

@@ -869,9 +869,13 @@ stops the startup. The database file holds the answers, the drafts and the
 checkpoint of each job, so it has the rule of the object root. The
 [migration step](#the-migration-step) makes a new file with mode `0600`. The
 startup stops when the file is missing, is not a regular file, is owned by
-another user, or is open to a group or to others. Give the directory of the
-file permissions that only the service user can open. A SQLite database takes
-no other database setting, and each one stops the startup.
+another user, or is open to a group or to others. The directory of the file
+has the same rule as the object root, because SQLite opens the file by its
+path for each connection and keeps its journal beside it. The startup and the
+migration step stop when that directory has another owner than the service
+user, or a group or others can open it. Make it with `install -d -m 0700
+/var/lib/analysis`. A SQLite database takes no other database setting, and
+each one stops the startup.
 
 #### PostgreSQL
 
@@ -1045,7 +1049,7 @@ The startup stops when the schema is not at the latest revision.
 The service starts in this order, and a failure at a step stops the startup:
 
 1. It reads the backend settings and builds the store. For SQLite, it checks
-   the database file.
+   the database file and its directory.
 2. It reads `ANALYSIS_RETENTION_DAYS`.
 3. The `sql` store checks that the schema is at the latest revision.
 4. The `sql` store checks the object store: for `filesystem`, the root, and

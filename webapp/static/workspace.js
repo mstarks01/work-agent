@@ -103,6 +103,8 @@ const workspace = (() => {
         });
         sync(checkbox);
       }
+      // The snapshot lists only the reports the app serves.
+      const served = data.reports.some((report) => report.run === data.run);
       if (data.questions) showQuestions(data.questions);
       else if (data.status === "running") {
         show("progress-panel");
@@ -110,11 +112,12 @@ const workspace = (() => {
         el("status").hidden = false;
         el("status-text").textContent = "The analysis is running. This page updates automatically.";
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
-      } else if (data.status === "completed" && new URLSearchParams(location.search).get("view") !== "reports") {
+      } else if (served && new URLSearchParams(location.search).get("view") !== "reports") {
         location.replace("/report/" + encodeURIComponent(data.run));
       } else {
         show("reports-panel");
         if (data.status === "failed") message("The analysis stopped. Open an earlier paused run to retry, or start a new analysis.");
+        if (data.status === "completed" && !served) message("The report of this analysis is withheld.");
       }
     } catch (error) { message(error.message); }
   };

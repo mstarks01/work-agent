@@ -642,6 +642,11 @@ class JobStore(Protocol):
     it takes a request.
     """
 
+    #: Whether the store keeps its jobs through a restart. Each store states
+    #: it, and the protocol gives no default, so a new store cannot read as
+    #: durable because it said nothing.
+    durable: bool
+
     async def startup_check(self) -> None: ...
 
     async def reserve(
@@ -896,6 +901,9 @@ class InMemoryJobStore:
     A deleted job leaves a :class:`UsageRow`, which this store keeps for the
     life of the process: admission reads it, and no route does.
     """
+
+    #: A restart loses every job this store holds.
+    durable = False
 
     def __init__(self) -> None:
         self._records: dict[str, JobRecord] = {}

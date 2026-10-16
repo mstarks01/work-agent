@@ -629,6 +629,25 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     assert "Generated " in page.locator("#report-list a").inner_text()
 
 
+def test_reopening_an_analysis_whose_report_is_withheld_stays_on_it(page, monkeypatch):
+    """The page goes to a report only where the snapshot lists it, so a
+    withheld report never leads to a 404."""
+    from analysis_service.job_answers import JobAnswers
+
+    pause(page)
+    analysis_url = page.url
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    monkeypatch.setattr(JobAnswers, "withheld", lambda self, record: object())
+
+    page.goto(analysis_url)
+
+    page.wait_for_selector("#reports-panel", state="visible", timeout=5000)
+    assert "/report/" not in page.url
+    assert "withheld" in page.inner_text("#workspace-message")
+    assert page.locator("#report-list a").count() == 0
+
+
 def test_a_320px_submitter_answers_and_skips_without_sideways_scroll(browser, served):
     """The narrowest layout the issue names: every control reachable, no
     horizontal scroll, an answer saved and a question skipped (#1632)."""

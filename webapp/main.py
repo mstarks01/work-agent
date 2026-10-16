@@ -271,9 +271,10 @@ def store_note(store: JobStore) -> str:
     """The sentence that tells a user whether a restart keeps their runs.
 
     The startup line and the form page both show it, so the two cannot
-    disagree about the store.
+    disagree about the store. It reads :attr:`JobStore.durable`, which each
+    store states.
     """
-    if isinstance(store, InMemoryJobStore):
+    if not store.durable:
         return (
             "This app keeps your runs in memory, so a restart clears them."
             " To keep them, set a sql store as docs/Web-App.md states."
@@ -419,6 +420,15 @@ class Workspace:
                 self.store, job.id, job.owner_id, "workspace", updated_before=chosen_at
             )
 
+    def served(self, record: JobRecord) -> bool:
+        """True where :meth:`JobAnswers.servable` lets this job's report be
+        served. Each view that links to a report or shows one asks it."""
+        try:
+            self.answers.servable(record)
+        except (NotCompleted, Withheld):
+            return False
+        return True
+
     async def parent_of(self, record: JobRecord) -> str | None:
         """The job this one resumes or amends: :func:`parent_of` over the
         record with its resumption, which an envelope leaves out.
@@ -487,7 +497,7 @@ class Workspace:
                     "generated_at": item.updated_at.isoformat(),
                 }
                 for item in related
-                if item.status == "completed"
+                if self.served(item)
             ],
         }
 
@@ -1241,13 +1251,12 @@ def create_app(
             None if resumption is None else await workspace.owned(resumption.parent_id)
         )
         previous = None
-        if parent is not None and same_schema(parent.schema_version):
-            try:
-                workspace.answers.servable(parent)
-            except (NotCompleted, Withheld):
-                pass
-            else:
-                previous = await workspace.store.report(parent.id, owner_id)
+        if (
+            parent is not None
+            and same_schema(parent.schema_version)
+            and workspace.served(parent)
+        ):
+            previous = await workspace.store.report(parent.id, owner_id)
         return response(render_report(report, answerable.state(), previous))
 
     @app.post("/correct/{run_id}")
@@ -1470,8 +1479,8 @@ async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
 
     The store's event log is the one record of the run. The page acts on its
     end, so the last frame carries what the page shows for it: the questions
-    a pause asks, where a report is, why a description was refused, or why a
-    run failed.
+    a pause asks, where a report is, why a report is withheld, why a
+    description was refused, or why a run failed.
     """
     async for frame in event_frames(workspace.store, run_id):
         yield frame
@@ -1488,6 +1497,11 @@ async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
             return
         yield _frame("questions", {"run": run_id} | payload)
     elif status == "completed":
+        try:
+            workspace.answers.servable(record)
+        except Withheld as refusal:
+            yield _frame("failed", {"message": str(refusal)})
+            return
         yield _frame("done", {"url": f"/report/{run_id}"})
     elif status == "rejected":
         issues = [

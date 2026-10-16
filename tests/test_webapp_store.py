@@ -131,6 +131,18 @@ class TestTheSettings:
     ):
         assert_store_is_named(tiers, caplog, "a restart keeps them")
 
+    def test_the_page_says_a_restart_clears_a_memory_store_another_class_wraps(
+        self, tiers
+    ):
+        """The store states whether it is durable, so a class the note does not
+        know never reads as durable."""
+        store = ChangesTheOldestOnAdmission(InMemoryJobStore())
+        workspace = Workspace(stub_settings(), store=store)
+        client = TestClient(
+            create_app(startup_for(tiers), workspace), base_url=LOOPBACK
+        )
+        assert "a restart clears them" in client.get("/").text
+
     @pytest.mark.parametrize(
         ("setting", "value", "message"),
         [
