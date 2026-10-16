@@ -210,7 +210,10 @@ class TestARestart:
                 headers=SAME_ORIGIN,
             ).json()["run"]
             assert ran(client, final) == "completed"
-            correction = {"facts": [{"key": list(FACT["key"]), "value": "unknown"}]}
+            correction = {
+                "facts": [{"key": list(FACT["key"]), "value": "unknown"}],
+                "revision": 0,
+            }
             corrected = client.post(
                 f"/correct/{final}", json=correction, headers=SAME_ORIGIN
             )

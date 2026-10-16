@@ -2353,9 +2353,22 @@ class TestCorrections:
         client.get(f"/events/{final}")
         return client, finished, final
 
-    def correct(self, client, run, value, headers=SAME_ORIGIN):
+    def correct(self, client, run, value, headers=SAME_ORIGIN, revision=0):
         body = {"facts": [{"key": list(FACT["key"]), "value": value}]}
+        body["revision"] = revision
         return client.post(f"/correct/{run}", json=body, headers=headers)
+
+    def test_a_correction_read_off_an_earlier_revision_is_refused(self, tiers):
+        """Two tabs read one revision, and only the first correction lands."""
+        client, _, final = self.runs(tiers)
+        assert self.correct(client, final, "unknown").status_code == 200
+        stale = self.correct(client, final, "none")
+        assert stale.status_code == 409, stale.text
+        page = client.get(f"/report/{final}").text
+        match = re.search(r'id="corrections"[^>]*>(.*?)</script>', page, re.DOTALL)
+        payload = json.loads(match.group(1))
+        assert payload["revision"] == 1
+        assert payload["answers"][0]["answer"]["value"] == "unknown"
 
     def test_a_final_report_keeps_a_correction_and_the_page_carries_it(self, tiers):
         client, _, final = self.runs(tiers)
@@ -2394,7 +2407,7 @@ class TestCorrections:
         payloads = {
             "report": {"system_model": valid_model().model_dump(mode="json")},
             "final": True,
-            "corrections": {"answers": [row], "findings": []},
+            "corrections": {"answers": [row], "findings": [], "revision": 3},
         }
         steps = """
 await box.all("button")[0].listeners.click();
@@ -2408,7 +2421,8 @@ await box.all("button")[1].listeners.click();
         (sent,) = seen["calls"]
         assert sent["url"] == "/correct/r1"
         assert sent["body"] == {
-            "facts": [{"key": list(FACT["key"]), "value": "unknown"}]
+            "facts": [{"key": list(FACT["key"]), "value": "unknown"}],
+            "revision": 3,
         }
 
 

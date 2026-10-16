@@ -599,7 +599,10 @@ def test_each_run_route_answers_a_malformed_id_as_a_missing_run_before_the_store
             bodies={
                 ("POST", "/answer/{run_id}"): {"links": [], "facts": []},
                 ("POST", "/amend/{run_id}"): {"text": "a CDN", "revision": 0},
-                ("POST", "/correct/{run_id}"): {"facts": [A_FACT_ANSWER]},
+                ("POST", "/correct/{run_id}"): {
+                    "facts": [A_FACT_ANSWER],
+                    "revision": 0,
+                },
             },
             headers=SAME_ORIGIN,
         )

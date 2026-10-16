@@ -1265,19 +1265,28 @@ class SqlJobStore:
             return saved.rowcount == 1
 
     async def save_corrections(
-        self, job_id: str, owner_id: str, corrections: Sequence[FactAnswer]
+        self,
+        job_id: str,
+        owner_id: str,
+        corrections: Sequence[FactAnswer],
+        revision: int,
     ) -> bool:
-        """Keep a final report's corrections."""
+        """Keep a final report's corrections, as one conditional ``UPDATE``
+        on the revision (ADR 0090)."""
         value = _json("corrections", list(corrections))
         async with self._transaction(writes=True) as connection:
             if await self._report_state(connection, job_id, owner_id) != "final":
                 return False
-            await connection.execute(
+            saved = await connection.execute(
                 update(jobs)
-                .where(jobs.c.id == job_id)
-                .values(corrections=value, updated_at=datetime.now(UTC))
+                .where(jobs.c.id == job_id, jobs.c.revision == revision)
+                .values(
+                    corrections=value,
+                    revision=jobs.c.revision + 1,
+                    updated_at=datetime.now(UTC),
+                )
             )
-            return True
+            return saved.rowcount == 1
 
     async def owned_jobs(self, owner_id: str) -> list[JobRecord]:
         """Every job of the owner, as envelopes, oldest first."""

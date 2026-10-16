@@ -1310,7 +1310,7 @@
       const saved = await fetch("/correct/" + encodeURIComponent(run), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ facts }),
+        body: JSON.stringify({ facts, revision: CORRECTIONS.revision }),
       });
       const body = await saved.json();
       if (!saved.ok) {

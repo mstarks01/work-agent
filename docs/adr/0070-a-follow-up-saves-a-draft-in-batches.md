@@ -6,6 +6,10 @@
 - **Relates to**: [ADR 0054](0054-a-report-offers-one-follow-up.md), whose one
   follow-up this keeps, and [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md),
   whose revision check a draft save reuses
+- **Amended by**: [ADR 0077](0077-the-first-run-app-holds-job-records-in-the-job-store.md),
+  under which the first-run app keeps the draft on the job record;
+  [ADR 0090](0090-a-correction-names-the-revision-it-read.md), under which a
+  correction names the revision it read
 
 ## Context
 
@@ -41,6 +45,10 @@ revision in one step. Of two saves that read one revision, only the first
 lands. A run may name its revision, and is checked where it does. A second
 run is refused while the first holds the report. Where the first run fails,
 the report asks again and its draft is still there.
+
+> **Amended by [ADR 0090](0090-a-correction-names-the-revision-it-read.md).**
+> A final report's correction names the revision it read, and the store
+> checks it as it checks a save.
 
 **The limits are published, and each one has its own job.** One request
 keeps its ceilings of 200 facts and 50 links. A job holds at most five times
