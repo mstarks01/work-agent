@@ -218,6 +218,7 @@ from analysis_service.vendors import (
     missing_sdk,
     vendor_for,
 )
+from webapp import settings_prototype
 from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
@@ -1279,6 +1280,7 @@ def create_app(
         )
         return JSONResponse({"run": corrected.job_id})
 
+    settings_prototype.mount(app)  # PROTOTYPE #1762, never merges
     return app
 
 
