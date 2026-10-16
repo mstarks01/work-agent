@@ -126,6 +126,10 @@ class TestTheSettings:
                 {"ANALYSIS_DATABASE_CA_FILE": os.devnull},
                 r"cannot read as a CA \(SSLError\)",
             ),
+            (
+                {"ANALYSIS_DATABASE_CAFILE": "/etc/ssl/ca.pem"},
+                "PostgreSQL database takes no ANALYSIS_DATABASE_CAFILE; unset it$",
+            ),
         ],
     )
     def test_an_unusable_setting_stops_the_startup(self, env, change, message):

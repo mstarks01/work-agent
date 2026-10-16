@@ -816,9 +816,11 @@ Required by the [`/v1` API](HTTP-API.md); the in-process engine keeps no jobs.
 The API uses only the `JobStore` interface, so the backend is a deploy-time
 choice.
 
-Two settings select the backends at startup, and each one **fails closed**:
-an unset or unknown value stops the startup. The service never falls back to
-`memory`, and it never reads a backend value from a request.
+Two settings select the backends at startup, and each one **fails closed**: an
+unset or unknown value stops the startup. The service never falls back to
+`memory`, and it never reads a backend value from a request. A set
+`ANALYSIS_DATABASE_*` or `ANALYSIS_OBJECT_*` variable that the selected backend
+does not read also stops the startup.
 
 | Variable | Values | Rule |
 | --- | --- | --- |

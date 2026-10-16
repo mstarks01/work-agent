@@ -24,7 +24,11 @@ from pathlib import Path
 from typing import Literal, Protocol, cast, get_args
 
 from analysis_service.jobs import JOB_ID_PATTERN
-from analysis_service.store_settings import StoreConfigError, closed_setting
+from analysis_service.store_settings import (
+    StoreConfigError,
+    closed_setting,
+    refuse_unread,
+)
 
 #: The two objects of a job. A job has one report, which the service writes
 #: once, so no name carries a revision.
@@ -142,6 +146,12 @@ class FilesystemObjectStore:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> FilesystemObjectStore:
+        refuse_unread(
+            env,
+            ("ANALYSIS_OBJECT_",),
+            ("ANALYSIS_OBJECT_STORE", "ANALYSIS_OBJECT_ROOT"),
+            "the filesystem object store",
+        )
         value = env.get("ANALYSIS_OBJECT_ROOT", "")
         if not value:
             raise StoreConfigError("set ANALYSIS_OBJECT_ROOT for the filesystem store")

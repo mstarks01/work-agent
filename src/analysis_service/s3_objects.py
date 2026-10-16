@@ -43,7 +43,11 @@ from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from analysis_service.aws_identity import platform_session
-from analysis_service.store_settings import StoreConfigError, closed_setting
+from analysis_service.store_settings import (
+    StoreConfigError,
+    closed_setting,
+    refuse_unread,
+)
 from analysis_service.vendors import (
     CredentialMode,
     ProviderAuthError,
@@ -102,7 +106,21 @@ CREDENTIALS: dict[CredentialMode, Callable[[Mapping[str, str]], boto3.Session]] 
 }
 
 
-def _session(env: Mapping[str, str]) -> boto3.Session:
+#: Every setting that the ``s3`` store reads. Any other set setting under
+#: ``ANALYSIS_OBJECT_`` stops the build.
+_SETTINGS = (
+    "ANALYSIS_OBJECT_STORE",
+    "ANALYSIS_OBJECT_BUCKET",
+    "ANALYSIS_OBJECT_REGION",
+    "ANALYSIS_OBJECT_ENDPOINT",
+    "ANALYSIS_OBJECT_ADDRESSING",
+    "ANALYSIS_OBJECT_CREDENTIALS",
+    *KEY_FILES.values(),
+)
+
+
+def _refuse_stray_settings(env: Mapping[str, str]) -> None:
+    """Refuse a key in the environment by name, then any other unread setting."""
     for var in KEY_FILES.values():
         bare = refused_var(var)
         if env.get(bare, "").strip():
@@ -110,6 +128,10 @@ def _session(env: Mapping[str, str]) -> boto3.Session:
                 f"the s3 object store reads its key from the file that {var}"
                 f" names; unset {bare}, which this service refuses"
             )
+    refuse_unread(env, ("ANALYSIS_OBJECT_",), _SETTINGS, "the s3 object store")
+
+
+def _session(env: Mapping[str, str]) -> boto3.Session:
     value = env.get("ANALYSIS_OBJECT_CREDENTIALS", "")
     mode = closed_setting(value, "ANALYSIS_OBJECT_CREDENTIALS", CREDENTIALS)
     return CREDENTIALS[mode](env)
@@ -191,6 +213,7 @@ class S3ObjectStore:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> S3ObjectStore:
+        _refuse_stray_settings(env)
         bucket = _required(env, "ANALYSIS_OBJECT_BUCKET")
         region = _required(env, "ANALYSIS_OBJECT_REGION")
         addressing = closed_setting(
