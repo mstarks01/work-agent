@@ -13,10 +13,12 @@ run, so only the paths in :data:`CODE` count as code: the paths a candidate
 change touches, and that a revert takes away.
 
 Standard library only: ``.github/workflows/ledger.yml`` runs the base branch's
-copy with the runner's own Python, before any dependency is installed::
+copy with the runner's own Python, before any dependency is installed. The diff
+goes to a file and not through a pipe, so a failed ``git diff`` fails the step
+and does not pass an empty list::
 
-    git diff -z --name-only --no-renames BASE...HEAD \
-        | python3 evals/harness/ledger_isolation.py
+    git diff -z --name-only --no-renames BASE...HEAD > paths
+    python3 evals/harness/ledger_isolation.py < paths
 """
 
 from __future__ import annotations
