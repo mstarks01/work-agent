@@ -71,6 +71,9 @@ that disagree leave the capability `unknown`. The list is on the model, and not
 in the assertion catalog, because the assertion pass is off by default and a
 default job must still read its capabilities.
 
+> **Amended by [ADR 0075](0075-the-assertion-pass-runs-by-default.md).**
+> The assertion pass runs by default. The capabilities stay on the model.
+
 **Extraction states no capability.** The extraction and repair nodes fill
 `EmittedSystemModel`, which has no `capabilities` field, and `extract.md` asks
 for none. Asking extraction for capabilities cost element identity: against

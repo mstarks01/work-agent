@@ -64,6 +64,10 @@ analysis" is available in every round.
 | Field | 1 | 30 | The score is a ranking heuristic, the prior's citation rate times one plus the candidates, and 1 is where the ranking cuts. No measurement says how many findings an answer changes, so the floor is not a count of findings. The top 30 hold 99% of a STRIDE list's ranking score at the floor (E20), which is not a share of the report's value. |
 | Capability | 2 | 30 | A capability's score counts the units it could settle, not findings, so it takes its own floor. Under 2, it settles one unit. At ASVS level 2 the floor left 28 of 51, and dropped about 6 a job that settle a level 1 requirement while it kept 13 that settle only level 2; a question in the highest band now passes the floor where bands differ (ADR 0055), so 34 pass and the limit asks 30. |
 
+> **Amended by [ADR 0088](0088-field-questions-have-no-limit.md).**
+> Field questions have no limit. Capability questions keep the limit of 30
+> for each framework.
+
 Two limits, not one: the two kinds' scores are on different scales, so one
 shared limit would let the higher-scored kind take every place. Each limit
 applies to each selected framework
@@ -168,6 +172,9 @@ who answers everything more rounds, and nobody else anything.
 A saved round is kept on the waiting job, through `JobStore.save_answers`, which
 writes the answers and nothing else. A first-run app restart still loses a
 paused run (#1282).
+
+> **Amended by [#1672](https://github.com/mstarks01/work-agent/issues/1672).**
+> A paused job survives a restart where `ANALYSIS_JOB_STORE` is `sql`.
 
 **A capability and an attribute can ask about related facts, and neither
 answer writes the other.** A flow's authentication and the `oauth`,

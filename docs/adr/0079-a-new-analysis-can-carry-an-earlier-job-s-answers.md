@@ -54,6 +54,11 @@ Jobs are held in memory, so an owner can carry only from a job of the same
 server session. A durable job store (ADR 0065) extends this to every job the
 store keeps, with no change to the rule.
 
+> **Amended by [#1672](https://github.com/mstarks01/work-agent/issues/1672).**
+> The job store holds the jobs. Where `ANALYSIS_JOB_STORE` is `sql`, an owner
+> can carry from every job the store keeps, and the carried answers survive a
+> restart.
+
 ## Evidence
 
 `tests/test_reuse_answers.py` (what a job holds, the route, the owner check,

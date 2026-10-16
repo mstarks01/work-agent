@@ -656,7 +656,8 @@ the next sitting, and only the rate over it is a score.
 - **near/far exemplar delta** — see below.
 - **holdout split** — coverage on the **Holdout Case**s beside coverage on the
   development ones (`holdout_split`, and `applicability_holdout_split` for ASVS).
-  Absent while no holdout case is scored. No diagnosis command reads a holdout
+  Absent while no case that is still held out is scored. Cases 14 and 15 are
+  exhausted, so every sweep today has no split. No diagnosis command reads a holdout
   case, so a gain on the development cases that the holdout does not repeat was
   shaped by the cases it was read on. A holdout the experiment ledger read
   `HOLDOUT_READS` times is exhausted and counts as a development case, and the
@@ -819,8 +820,8 @@ too. The gap is tracked and watched, but never fails a build.
 | `11-sparse-shift-scheduling` | workforce scheduling | far | synthetic (sparse input) |
 | `12-overclaiming-supplier-portal` | supplier management | far | synthetic (over-claiming input) |
 | `13-dispatch-control-plane` | field service dispatch | far | synthetic |
-| `14-loyalty-oauth-platform` | identity & access | far | synthetic (holdout) |
-| `15-multitenant-invoicing` | multi-tenant SaaS | far | synthetic (holdout) |
+| `14-loyalty-oauth-platform` | identity & access | far | synthetic (exhausted holdout) |
+| `15-multitenant-invoicing` | multi-tenant SaaS | far | synthetic (exhausted holdout) |
 | `16-library-lending-interview` | library lending | far | synthetic (two sources, one a transcript) |
 
 The Cookbook cases come from the [OWASP Threat Model
