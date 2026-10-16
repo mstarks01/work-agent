@@ -95,7 +95,41 @@ function discard() {
 
 // ---- shared pieces --------------------------------------------------------
 
-function control(s, onRedraw) {
+// A model field with suggestions from the pinned litellm map for the tier's
+// vendor. Free text stays allowed: the map lags each new model.
+function modelControl(s, id, set) {
+  const vendor = draft[s.key.replace(/\.model$/, ".vendor")];
+  const known = (PROTO.models[vendor] || []);
+  const listId = `models-${s.key}`;
+  const note = h("small", { class: "hint" });
+  const showNote = () => {
+    const value = draft[s.key].trim();
+    note.textContent = !vendor
+      ? "Choose the vendor first."
+      : !value
+        ? `${known.length} models in the list. Type to filter, or type any model.`
+        : known.includes(value)
+          ? ""
+          : "Not in the model list. The check still runs it.";
+  };
+  const input = h("input", {
+    id,
+    type: "text",
+    list: listId,
+    autocomplete: "off",
+    disabled: !vendor,
+    value: draft[s.key],
+    placeholder: vendor ? "Type to search, e.g. opus" : "",
+    oninput: (e) => {
+      set(e.target.value);
+      showNote();
+    },
+  });
+  showNote();
+  return h("span", {}, input, h("datalist", { id: listId }, known.map((m) => h("option", { value: m }))), note);
+}
+
+function control(s, onRedraw, suggest = false) {
   const id = `f-${s.key}`;
   if (locked(s)) {
     return h("span", { id }, h("code", {}, String(s.value)));
@@ -105,6 +139,7 @@ function control(s, onRedraw) {
     if (redraw) onRedraw();
     else refresh();
   };
+  if (suggest && /^tiers\.\w+\.model$/.test(s.key)) return modelControl(s, id, set);
   switch (s.kind) {
     case "choice":
       return h(
@@ -378,7 +413,7 @@ function variantC() {
             "tr",
             { "data-key": s.key },
             h("td", {}, h("label", { for: `f-${s.key}` }, s.label), s.mark === "shows" ? shownOnly(s) : null),
-            h("td", {}, control(s, draw)),
+            h("td", {}, control(s, draw, true)),
             h("td", {}, h("span", { class: `tag${s.source === "outside" ? " outside" : ""}` }, source), " ", s.restart ? h("span", { class: "tag restart" }, "restart") : null, s.kind === "secret" ? tags(s)[0] : null),
             h("td", {}, h("code", {}, s.env || "(TOML only)")),
           ),
@@ -409,10 +444,14 @@ function variantC() {
           },
         }),
         h(
-          "table",
-          { class: "settings" },
-          h("thead", {}, h("tr", {}, h("th", {}, "Setting"), h("th", {}, "Value"), h("th", {}, "Source"), h("th", {}, "Variable"))),
-          tbody,
+          "div",
+          { class: "table-wrap" },
+          h(
+            "table",
+            { class: "settings" },
+            h("thead", {}, h("tr", {}, h("th", {}, "Setting"), h("th", {}, "Value"), h("th", {}, "Source"), h("th", {}, "Variable"))),
+            tbody,
+          ),
         ),
       ),
       h(

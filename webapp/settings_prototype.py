@@ -47,6 +47,45 @@ LOADER_MESSAGES = {
 }
 
 
+def _model_suggestions() -> dict[str, list[str]]:
+    """Each vendor's chat models that call tools, from the pinned litellm map.
+
+    A list of suggestions, not a closed set: the map lags each new model, and
+    the model gate accepts a model the map does not name.
+    """
+    import analysis_service.model_gate  # noqa: F401  pins the local map first
+    import litellm
+
+    from analysis_service.vendors import vendor_for
+
+    prefixes = {"vertex": "vertex_ai", "bedrock": "bedrock"}
+    models = {}
+    for vendor in _VENDORS:
+        prefix = prefixes.get(vendor, vendor)
+        names = set()
+        for name, info in litellm.model_cost.items():
+            usable = (
+                info.get("mode") == "chat"
+                and (info.get("litellm_provider") or "").startswith(prefix)
+                and info.get("supports_function_calling")
+                and "*" not in name
+                and not name.startswith("ft:")
+            )
+            if not usable:
+                continue
+            bare = name.removeprefix(f"{prefix}/").removeprefix(f"{vendor}/")
+            try:
+                vendor_for(vendor).validate_model(bare, "prototype")
+            except ValueError:
+                continue
+            names.add(bare)
+        models[vendor] = sorted(names)
+    return models
+
+
+_MODELS = _model_suggestions()
+
+
 def _setting(key, group, label, kind, env, value="", **extra):
     """One stub entry, in the shape the page module of ADR 0091 gives."""
     return {
@@ -256,6 +295,7 @@ def mount(app: FastAPI) -> None:
             "settings": _settings(state),
             "messages": LOADER_MESSAGES,
             "settings_dir": "~/.config/work-agent/settings",
+            "models": _MODELS,
         }
         return response(
             render(
@@ -333,6 +373,9 @@ _PAGE = """<!doctype html>
   table.settings td code { font-size:11px; color:var(--muted); }
   table.settings input, table.settings select { width:100%; padding:5px; }
   table.settings tr.changed { background:var(--soft); }
+  table.settings input[list] { min-width:12rem; }
+  .table-wrap { overflow-x:auto; }
+  table.settings small { display:block; }
   table.settings tr.groupline th { background:var(--sidebar); font-size:12px; }
   .pending { position:sticky; top:16px; border:1px solid var(--line);
     border-radius:9px; padding:14px; font-size:13px; }
