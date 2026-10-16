@@ -42,7 +42,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Literal, Self
+from typing import Literal, Self, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
@@ -131,11 +131,13 @@ ReviewIndependence = Literal["shared", "distinct_model", "distinct_provider"]
 # comment in the config file: at two keys a comment holds, and at 2N keys it
 # drifts. A re-ask on a cheaper model than the pass it corrects is the failure
 # the check exists to catch.
-#: The node roles each framework has a tier key for.
-FRAMEWORK_ROLES: tuple[str, ...] = ("analyze", "critic", "recritic")
+#: A node role that each framework has a tier key for.
+FrameworkRole = Literal["analyze", "critic", "recritic"]
+#: Each :data:`FrameworkRole`, in the order of the tier keys.
+FRAMEWORK_ROLES: tuple[FrameworkRole, ...] = get_args(FrameworkRole)
 
 
-def tier_key(role: str, framework: str) -> str:
+def tier_key(role: FrameworkRole, framework: str) -> str:
     """The tier-config key of one framework's node role, ``<role>/<framework>``.
 
     **The one spelling of a framework's tier key.** The node table, the graph's

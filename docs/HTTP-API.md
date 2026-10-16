@@ -106,7 +106,9 @@ no progress. Its events, its report and each route above return `409`, so a
 report whose certification does not parse is never served.
 An unreadable job has ended, whatever its stored status. It takes none of
 your in-flight slots, `DELETE /v1/jobs/{id}` deletes it, and the
-[retention sweep](#retention) deletes it.
+[retention sweep](#retention) deletes it. An unreadable resumed job locks the
+job it resumes only where its stored status is `completed` or
+`awaiting-answers`.
 
 ### Deleting a job
 
@@ -565,7 +567,7 @@ or waits on it. The analysis does not run again. A correction carries the
 | `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; a link answer names a principal the job did not ask about; a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters; or the answers would leave a capability present while an ancestor capability is absent. That problem body carries `contradiction`, `{"part", "ancestor"}`: the two capability questions' keys, which a client can answer together in one request. |
 | `404` | The job is not yours, or does not exist. |
 | `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". Or the job's report is final: its follow-up has run. |
-| `409` | The job is neither completed nor waiting on answers, its report is withheld, its report carries no catalog, or it is [from an older schema version](#a-job-from-an-older-schema-version). Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed or was rejected. |
+| `409` | The job is neither completed nor waiting on answers, its report is withheld, its report carries no catalog, or it is [from an older schema version](#a-job-from-an-older-schema-version). Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed, was rejected, or is unreadable with a stored status other than `completed` or `awaiting-answers`. |
 | `413` | The job's sources with the answers composed in are over this deployment's size or count limit. A save is refused too, so no saved answer holds a job that no start could run. |
 | `422` | An entry of `links` or `facts` is malformed, or a list holds more than its limit: 50 links, 200 facts. |
 

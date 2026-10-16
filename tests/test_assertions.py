@@ -12,7 +12,7 @@ import re
 from typing import get_args
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from analysis_service.analysis import ABSENT_WORD
 from analysis_service.assertions import (
@@ -75,7 +75,12 @@ from analysis_service.claims import Ground
 from analysis_service.deployment import DEFAULT_PROMPTS_DIR
 from analysis_service.evidence import evidence_catalog, unknown_evidence_ref
 from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import UNKNOWN, SystemModel, all_attribute_names
+from analysis_service.system_model import (
+    UNKNOWN,
+    CapabilityStatement,
+    SystemModel,
+    all_attribute_names,
+)
 
 SOURCE_LABEL = "System description"
 
@@ -1003,6 +1008,15 @@ class TestTheCatalogRoundTrips:
             AssertionCatalog.model_validate({"entries": [], "notes": "hello"})
 
 
+def admits(model: type[BaseModel], raw: dict) -> bool:
+    """Whether ``model`` admits ``raw``."""
+    try:
+        model.model_validate(raw)
+    except ValidationError:
+        return False
+    return True
+
+
 class TestARowNamesItsWriter:
     """``origin`` says who wrote a row, and :func:`answered` reads only it."""
 
@@ -1048,6 +1062,29 @@ class TestARowNamesItsWriter:
     def test_a_row_whose_origin_and_support_disagree_is_refused(self, origin, sources):
         with pytest.raises(ValidationError, match="answers Source"):
             Assertion.model_validate(self.raw(origin, *sources))
+
+    @pytest.mark.parametrize(
+        ("origin", "statement_origin"),
+        [("answer", "answer"), ("assertion-pass", "reader")],
+    )
+    @pytest.mark.parametrize("source", ["answers", "description"])
+    def test_a_capability_statement_admits_the_same_rows(
+        self, origin, statement_origin, source
+    ):
+        """An assertion and a capability statement refuse and admit the same
+        pairs of a writer and a quote of the answers Source."""
+        statement = {
+            "capability": "oauth",
+            "state": "present",
+            "source_excerpt": "MFA",
+            "source_label": self.span(source).source_label,
+            "origin": statement_origin,
+        }
+        verdicts = [
+            admits(Assertion, self.raw(origin, source)),
+            admits(CapabilityStatement, statement),
+        ]
+        assert verdicts == [(origin == "answer") == (source == "answers")] * 2
 
     def test_a_pass_row_that_quotes_the_answers_is_no_answer(self):
         """The label is not the reader: only ``origin`` makes a row an answer."""

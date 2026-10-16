@@ -65,7 +65,7 @@ from tests.test_api import (
     auth,
     submission,
 )
-from tests.test_job_store import DeletingReads
+from tests.test_job_store import DeletingReads, follow_up
 from tests.test_resume import LINK
 from tests.test_webapp_questions import PausingRunner
 
@@ -769,6 +769,23 @@ class TestAStoredValueThisServiceDoesNotList:
                 "SELECT status FROM usage_rows WHERE job_id = ?", (job,)
             ).fetchone()
         assert kept == stored
+
+    @pytest.mark.parametrize(("case", "status"), UNREADABLE_IN_FLIGHT)
+    @pytest.mark.parametrize("deleted", [False, True], ids=["held", "deleted"])
+    def test_it_does_not_lock_its_parent(self, env, case, status, deleted):
+        """An unreadable child has ended and read nothing into a report, so
+        its parent takes answers again (ADR 0095)."""
+        store = build_store(env)
+        parent = completed_job(store).id
+        child = follow_up(parent)
+        if status == "running":
+            child.transition("running")
+        asyncio.run(admit(store, child))
+        store_unlisted(database_of(env), child.id, case)
+        if deleted:
+            assert asyncio.run(store.delete(child.id, "alice")) is not None
+        assert asyncio.run(store.resumed_by(parent, "alice")) is None
+        asyncio.run(admit(store, follow_up(parent)))
 
     @pytest.mark.parametrize(
         "certification", ['{"certified": "maybe"}', '{"certified": true, "x": 1}']

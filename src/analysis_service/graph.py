@@ -202,7 +202,12 @@ from analysis_service.knowledge import (
 )
 from analysis_service.links import LinkAnswer, apply_answers
 from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
-from analysis_service.model_tiers import ReviewIndependence, TierName, tier_key
+from analysis_service.model_tiers import (
+    FrameworkRole,
+    ReviewIndependence,
+    TierName,
+    tier_key,
+)
 from analysis_service.prompt_cache import remember_stable_prefix, stable_prefix
 from analysis_service.prompts import (
     compose_analyze_prompt,
@@ -303,9 +308,10 @@ _SHARED_TIER_NODES: Mapping[str, str] = MappingProxyType(
 # :class:`FrameworkNodes`, which are the only places those names are spelled.
 JOIN_ROLE = "join"
 MERGE_ROLE = "merge"
-CRITIC_ROLE = "critic"
+# The critic and the re-ask each also run on a tier key of their own role.
+CRITIC_ROLE: FrameworkRole = "critic"
 ROUTER_ROLE = "router"
-RECRITIC_ROLE = "recritic"
+RECRITIC_ROLE: FrameworkRole = "recritic"
 REREVIEW_ROLE = "rereview"
 CRITIC_FAILED_ROLE = "critic_failed"
 
@@ -512,8 +518,8 @@ class FrameworkNodes:
         """
         return {
             **{lane.node_name: tier_key("analyze", self.name) for lane in self.lanes},
-            self.node(CRITIC_ROLE): tier_key("critic", self.name),
-            self.node(RECRITIC_ROLE): tier_key("recritic", self.name),
+            self.node(CRITIC_ROLE): tier_key(CRITIC_ROLE, self.name),
+            self.node(RECRITIC_ROLE): tier_key(RECRITIC_ROLE, self.name),
         }
 
 

@@ -56,6 +56,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     Column,
+    ColumnElement,
     CompoundSelect,
     Connection,
     DateTime,
@@ -289,13 +290,14 @@ def _names(row: Row[Any], name: ObjectName) -> bool:
     return row._mapping[DIGEST_COLUMNS[name]] is not None
 
 
-def _object_keys(row: Row[Any], *, unnamed: bool = False) -> list[str]:
+def _object_keys(row: Row[Any], *, include_unnamed: bool = False) -> list[str]:
     """The key of each object that the job row ``row`` names. With
-    ``unnamed``, the key of each object that its job can hold, named or not."""
+    ``include_unnamed``, the key of each object that its job can hold, named
+    or not."""
     return [
         object_key(row.owner_id, row.id, name)
         for name in DIGEST_COLUMNS
-        if unnamed or _names(row, name)
+        if include_unnamed or _names(row, name)
     ]
 
 
@@ -845,35 +847,43 @@ def _held(job_id: str) -> CompoundSelect:
     )
 
 
+#: The columns of the admission view of a job beside its ID: the fields of a
+#: :class:`~analysis_service.jobs.UsageRow`.
+_VIEW_COLUMNS = (
+    "owner_id",
+    "created_at",
+    "reserved_tokens",
+    "measured_tokens",
+    "status",
+    "parent_id",
+)
+
+
+def _admission_view(where: Callable[[Table], ColumnElement[bool]]) -> CompoundSelect:
+    """The admission view of each job row and usage row that ``where`` selects."""
+
+    def view(table: Table, job_id: Column[Any]) -> Select[Any]:
+        return select(
+            job_id.label("job_id"), *(table.c[name] for name in _VIEW_COLUMNS)
+        ).where(where(table))
+
+    return union_all(view(jobs, jobs.c.id), view(usage_rows, usage_rows.c.job_id))
+
+
 def _children(parent_id: str) -> CompoundSelect:
-    """Every job that names ``parent_id`` as its parent, with its status."""
-    return union_all(
-        select(jobs.c.id, jobs.c.status).where(jobs.c.parent_id == parent_id),
-        select(usage_rows.c.job_id, usage_rows.c.status).where(
-            usage_rows.c.parent_id == parent_id
-        ),
-    )
+    """The admission view of each job that names ``parent_id`` as its parent."""
+    return _admission_view(lambda table: table.c.parent_id == parent_id)
 
 
 def _counted(since: datetime) -> CompoundSelect:
     """The admission view of each job a bound can count: those in flight, and
     those that started inside the window."""
-    columns = ("owner_id", "created_at", "reserved_tokens", "measured_tokens")
-
-    def view(table: Table, job_id: Column[Any]) -> Select[Any]:
-        return select(
-            job_id.label("job_id"),
-            *(table.c[name] for name in columns),
-            table.c.status,
-            table.c.parent_id,
-        ).where(
-            or_(
-                table.c.created_at >= since,
-                table.c.status.not_in(sorted(TERMINAL_STATUSES)),
-            )
+    return _admission_view(
+        lambda table: or_(
+            table.c.created_at >= since,
+            table.c.status.not_in(sorted(TERMINAL_STATUSES)),
         )
-
-    return union_all(view(jobs, jobs.c.id), view(usage_rows, usage_rows.c.job_id))
+    )
 
 
 class SqlJobStore:
@@ -954,9 +964,10 @@ class SqlJobStore:
     ) -> str | None:
         """The child of ``parent_id`` that locks it, by :func:`locks_its_parent`."""
         children = await connection.execute(_children(parent_id))
-        return next(
-            (child for child, status in children if locks_its_parent(status)), None
-        )
+        for row in children.all():
+            if locks_its_parent(await self._admission_record(connection, row)):
+                return row.job_id
+        return None
 
     async def reserve(
         self,
@@ -1065,14 +1076,11 @@ class SqlJobStore:
                     return Admission(outcome="parent_moved", active=0)
             counted = await connection.execute(_counted(budget.window_start()))
             held: list[Envelope | UsageRow] = []
-            for row in counted:
-                live = None
-                if (
-                    row.owner_id == record.owner_id
-                    and row.status not in TERMINAL_STATUSES
-                ):
-                    live = await self._envelope_in(connection, row.job_id)
-                held.append(UsageRow(**row._mapping) if live is None else live)
+            for row in counted.all():
+                if row.owner_id == record.owner_id:
+                    held.append(await self._admission_record(connection, row))
+                else:
+                    held.append(UsageRow(**row._mapping))
             admission = check_bounds(record, held, ceiling=ceiling, budget=budget)
             if admission.outcome != "admitted":
                 return admission
@@ -1123,6 +1131,18 @@ class SqlJobStore:
             if row is None:
                 return None
             return row, await _events(connection, row.id)
+
+    async def _admission_record(
+        self, connection: AsyncConnection, row: Row[Any]
+    ) -> Envelope | UsageRow:
+        """What admission reads of the job of the admission view row ``row``:
+        the envelope where the stored status leaves the job in flight and a
+        job row holds it, else the view row. A terminal stored status ends a
+        job whether it parses or not, so no other row is parsed."""
+        live = None
+        if row.status not in TERMINAL_STATUSES:
+            live = await self._envelope_in(connection, row.job_id)
+        return UsageRow(**row._mapping) if live is None else live
 
     async def _envelope_in(
         self, connection: AsyncConnection, job_id: str
@@ -1499,7 +1519,7 @@ class SqlJobStore:
                 batch = job_ids[start : start + _ID_BATCH]
                 for row in await connection.execute(query.where(jobs.c.id.in_(batch))):
                     in_flight = row.status not in TERMINAL_STATUSES
-                    kept.update(_object_keys(row, unnamed=in_flight))
+                    kept.update(_object_keys(row, include_unnamed=in_flight))
         return kept
 
     async def sweep_orphans(self, before: datetime) -> int:

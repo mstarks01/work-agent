@@ -151,6 +151,28 @@ _BACKTICK_RUN = re.compile(r"`+")
 CARRIED_EVIDENCE_KINDS: tuple[str, ...] = ("prose",)
 
 
+def check_answer_quotes(origin: str, labels: Sequence[str]) -> None:
+    """Raise :class:`ValueError` unless the row of ``origin`` that quotes the
+    source labels ``labels`` quotes the answers Source as its origin says.
+
+    **The one rule of an answer's quotes.** A row whose origin is ``answer``
+    quotes the answers Source in each label, and in at least one. A row of
+    another origin quotes it in none. So the writer of a row and its quotes
+    cannot disagree. An :class:`~analysis_service.assertions.Assertion` and a
+    :class:`~analysis_service.system_model.CapabilityStatement` each ask it.
+    """
+    quoted = [label == ANSWERS_LABEL for label in labels]
+    if origin == "answer":
+        agrees = bool(quoted) and all(quoted)
+    else:
+        agrees = not any(quoted)
+    if not agrees:
+        raise ValueError(
+            "every quote of an answer row is of the answers Source, and no quote"
+            f" of another row is; this {origin} row quotes {sorted(set(labels))}"
+        )
+
+
 class Source(BaseModel):
     """One piece of untrusted input text a job is built from.
 
