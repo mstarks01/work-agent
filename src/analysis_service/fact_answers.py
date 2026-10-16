@@ -142,10 +142,20 @@ _KIND_ORDER: tuple[FactKind, ...] = (
 #: The answers a facet takes, beside ``unknown``.
 FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
 
-#: The validation context of a record that a store reads back. A stored
-#: answer keeps the ``value`` that the service wrote when it admitted the
-#: answer, so a later change to a facet's wording never makes it unreadable.
+#: The validation context of an answer that the service reads back: a record
+#: that a store holds, or an answer that a run's state carries. An answer read
+#: back keeps what the service admitted, so a rule that judges a submission,
+#: or a later change to a facet's wording, never makes it unreadable.
 STORED: Mapping[str, bool] = MappingProxyType({"stored": True})
+
+
+def _read_back(info: ValidationInfo) -> bool:
+    """True where the service reads back an answer it admitted earlier.
+
+    **The one reader of "is this a submission or a read-back".** Each rule
+    that judges a submission asks it, and applies only to a submission.
+    """
+    return bool(info.context and info.context.get("stored"))
 
 
 class FactAnswer(BaseModel):
@@ -171,11 +181,10 @@ class FactAnswer(BaseModel):
     def _facet_value(cls, data: Any, info: ValidationInfo) -> Any:
         """Write ``value`` from ``facets``, one facet a clause, in the kind's order.
 
-        **The one writer of a facet answer's value**, at admission. A stored
-        answer, read under :data:`STORED`, keeps the value it holds.
+        **The one writer of a facet answer's value**, at admission. An
+        answer read back under :data:`STORED` keeps the value it holds.
         """
-        stored = bool(info.context and info.context.get("stored"))
-        if stored or not isinstance(data, dict) or data.get("facets") is None:
+        if _read_back(info) or not isinstance(data, dict) or data.get("facets") is None:
             return data
         facets, key = data["facets"], data.get("key")
         question = ""
@@ -208,12 +217,14 @@ class FactAnswer(BaseModel):
 
     @field_validator("key", mode="before")
     @classmethod
-    def _one_spelling(cls, key: Any) -> Any:
+    def _one_spelling(cls, key: Any, info: ValidationInfo) -> Any:
         """Bound each part, and blank every part the fact's spelling does not read.
 
         Two keys that differ only in a part nobody reads name one fact, and
         :func:`merged_facts` would keep both. A key that
         uses more than one spelling is left as sent, for the check to refuse.
+        A submission's subject must be :func:`~analysis_service.sources.quotable`;
+        an answer read back keeps its subject, which :func:`fact_line` folds.
         """
         if not isinstance(key, list | tuple) or len(key) != len(UNKNOWN_KEY_FIELDS):
             return key
@@ -226,7 +237,7 @@ class FactAnswer(BaseModel):
             case ("assertion",):
                 read = {"assertion": ref.assertion}
             case ("subject",):
-                if not quotable(ref.subject):
+                if not (_read_back(info) or quotable(ref.subject)):
                     raise ValueError(
                         "a subject is one line, with no double quote and no"
                         " control or formatting character"

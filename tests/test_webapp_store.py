@@ -333,7 +333,7 @@ class TestARecordOfAnotherSchemaVersion:
 
 
 class TestAStoredFacetAnswer:
-    """A stored answer keeps the value the service wrote when it admitted it."""
+    """A stored answer reads back as the service admitted it."""
 
     def test_it_reads_under_another_facet_wording(self, tiers, durable):
         with app(tiers) as client:
@@ -341,6 +341,25 @@ class TestAStoredFacetAnswer:
         key = (valid_model().processes[0].id, "", "", "", "capacity-limits", "")
         stored = FactAnswer(key=key, facets={"rate": "yes"}).model_dump(mode="json")
         stored["value"] = "An earlier wording of the rate facet? yes"
+        held = json.dumps({"links": [], "facts": [stored]})
+        with sqlite3.connect(database_of(durable)) as connection:
+            connection.execute(
+                "UPDATE jobs SET answers = ?, corrections = ? WHERE id = ?",
+                (held, json.dumps([stored]), run),
+            )
+        with app(tiers) as client:
+            listed = client.get("/workspace/runs")
+            page = client.get(f"/workspace/runs/{run}")
+        assert listed.status_code == 200, listed.text
+        assert page.status_code == 200, page.text
+
+    def test_it_reads_with_a_subject_a_line_cannot_quote(self, tiers, durable):
+        """The quotable-subject rule refuses a submission; a stored answer
+        keeps the subject it holds."""
+        with app(tiers) as client:
+            run = completed(client)
+        key = ["", "", "", 'who signs the "release" builds?', "", ""]
+        stored = {"key": key, "value": "ops", "facets": None, "detail": ""}
         held = json.dumps({"links": [], "facts": [stored]})
         with sqlite3.connect(database_of(durable)) as connection:
             connection.execute(
