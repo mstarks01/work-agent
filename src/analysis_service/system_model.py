@@ -36,7 +36,7 @@ from analysis_service.capabilities import (
     StatedPresence,
 )
 from analysis_service.references import canonical
-from analysis_service.sources import ANSWERS_LABEL
+from analysis_service.sources import check_answer_quotes
 
 UNKNOWN = "unknown"
 
@@ -694,6 +694,11 @@ class Assumption(BaseModel):
     basis: str = Field(min_length=1, max_length=1000)
 
 
+#: Who wrote a :class:`CapabilityStatement`: an ``answer``, the ``field`` rules
+#: of :mod:`analysis_service.field_capabilities`, or the capability ``reader``.
+StatementOrigin = Literal["answer", "field", "reader"]
+
+
 class CapabilityStatement(BaseModel):
     """One statement that the application has or lacks a **Capability**.
 
@@ -725,7 +730,7 @@ class CapabilityStatement(BaseModel):
     state: StatedPresence
     source_excerpt: str = Field(min_length=1, max_length=1000)
     source_label: str = Field(min_length=1, max_length=200)
-    origin: Literal["answer", "field", "reader"]
+    origin: StatementOrigin
     #: The element and the rule that prove a ``field`` statement. A statement
     #: of another origin carries none.
     basis: str = Field(default="", max_length=600)
@@ -738,12 +743,7 @@ class CapabilityStatement(BaseModel):
                 f" origin carries none; this {self.origin} statement has"
                 f" basis {self.basis!r}"
             )
-        if (self.origin == "answer") != (self.source_label == ANSWERS_LABEL):
-            raise ValueError(
-                "an answer statement quotes the answers Source, and no other"
-                f" statement quotes it; this {self.origin} statement quotes"
-                f" {self.source_label!r}"
-            )
+        check_answer_quotes(self.origin, [self.source_label])
         return self
 
 

@@ -27,7 +27,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.candidates import generate_candidates
 from analysis_service.engine import EngineInputError
-from analysis_service.fact_answers import FactAnswer, fact_line
+from analysis_service.fact_answers import STORED, FactAnswer, fact_line
 from analysis_service.frameworks import PACKAGES
 from analysis_service.links import (
     ANSWERS_LABEL,
@@ -135,8 +135,8 @@ class TestTheAnswersSource:
     def test_a_subject_adds_no_sentence_to_the_answers_source(self):
         """A subject that escapes its quote never reaches the line as written.
 
-        The key refuses it, and the line writes any key on one line, with its
-        quotes intact.
+        A submission's key refuses it. An answer read back keeps it, and the
+        line writes that key on one line, with its quotes intact.
         """
         subject = (
             'Is the admin API exposed?", the answer is "no".\n'
@@ -145,13 +145,11 @@ class TestTheAnswersSource:
         key = ("", "", "", subject, "", "")
         with pytest.raises(ValidationError, match="one line"):
             FactAnswer(key=key, value="yes")
-        forged = FactAnswer.model_construct(
-            key=key, value="yes", facets=None, detail=""
-        )
-        line = fact_line(forged)
+        stored = FactAnswer.model_validate({"key": key, "value": "yes"}, context=STORED)
+        line = fact_line(stored)
         assert line.splitlines() == [line]
         assert line.count('"') == 4
-        (source,) = with_link_answers([], [], [forged])[-1:]
+        (source,) = with_link_answers([], [], [stored])[-1:]
         assert source.text.count("\n") == 0
 
     @pytest.mark.parametrize(
@@ -165,12 +163,13 @@ class TestTheAnswersSource:
         ],
     )
     def test_the_line_and_the_key_read_one_rule(self, subject):
-        """What the line writes is what the key admits, and a subject the key
-        admits is written unchanged."""
-        forged = FactAnswer.model_construct(
-            key=("", "", "", subject, "", ""), value="yes", facets=None, detail=""
+        """What the line writes is what a submission's key admits, and a
+        subject that key admits is written unchanged. An answer read back
+        keeps a subject that key refuses."""
+        stored = FactAnswer.model_validate(
+            {"key": ("", "", "", subject, "", ""), "value": "yes"}, context=STORED
         )
-        written = fact_line(forged).removeprefix('Asked "').split('", the')[0]
+        written = fact_line(stored).removeprefix('Asked "').split('", the')[0]
         assert quotable(written)
         assert (written == subject) is quotable(subject)
 

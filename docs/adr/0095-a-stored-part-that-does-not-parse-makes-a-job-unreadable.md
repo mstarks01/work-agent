@@ -54,6 +54,11 @@ ended", and it asks `readable`.
 - No stored status changes. The usage row of a deleted job keeps the stored
   status, and a usage row holds no in-flight slot, because a store deletes
   only a job that has ended.
+- `locks_its_parent` asks `ended`. A resumed job locks its parent while it
+  has not ended, and after it ended in a terminal status that read its
+  answers into a report. So an unreadable child locks its parent only where
+  its stored status is `completed` or `awaiting-answers`, and the usage row
+  of a deleted child follows the same rule.
 
 ## Consequences
 
@@ -62,7 +67,9 @@ the list and the status route working. A job that holds a removed value
 stays unreadable, and its owner submits it again.
 
 An unreadable job holds no in-flight slot, and its owner or the retention
-sweep can delete it, whatever its stored status. A job of another schema
+sweep can delete it, whatever its stored status. Its parent takes answers
+again unless its stored status is terminal and read its answers into a
+report. A job of another schema
 version is unreadable too, so a job that another version runs in a shared
 database is ended for this service. The restart scan still fails a queued or
 running job of another schema version, because it can read that job's

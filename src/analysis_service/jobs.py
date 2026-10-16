@@ -116,16 +116,6 @@ def parent_of(record: JobRecord) -> str | None:
     return record.amends
 
 
-def locks_its_parent(status: JobStatus) -> bool:
-    """True where a resumed job in ``status`` locks its parent: the parent takes
-    no answers.
-
-    **The one reader of "does a resumed job lock its parent".** The
-    job store and the first-run app both ask it.
-    """
-    return status not in NON_LOCKING_STATUSES
-
-
 def same_schema(version: str) -> bool:
     """Whether ``version`` is this service's ``SCHEMA_VERSION``, exactly.
 
@@ -938,6 +928,22 @@ def _holds_a_slot(job: Envelope | UsageRow) -> bool:
     return not isinstance(job, UsageRow) and not ended(job)
 
 
+def locks_its_parent(child: Envelope | UsageRow) -> bool:
+    """True where the resumed job ``child`` locks its parent: the parent takes
+    no answers.
+
+    **The one reader of "does a resumed job lock its parent".** A child locks
+    its parent while it has not :func:`ended`, and after it ended in a status
+    that read its answers into a report. An unreadable child has ended, so its
+    stored status locks only where it is terminal, and a usage row keeps the
+    stored status of the job it held (ADR 0095). Each job store asks it.
+    """
+    if _holds_a_slot(child):
+        return True
+    status = child.status
+    return status in TERMINAL_STATUSES and status not in NON_LOCKING_STATUSES
+
+
 def check_bounds(
     record: JobRecord,
     held: Iterable[Envelope | UsageRow],
@@ -1104,15 +1110,15 @@ class InMemoryJobStore:
         one resumed job: a report's follow-up runs the analysis once (ADR
         0054), and a paused job's answers start one analysis. A job an
         amendment started locks its paused job the same way (ADR 0072). A
-        child job that failed or was rejected read nothing into a report, so
-        its parent takes answers again. Admission, a save and the questions route
-        all ask this.
+        child that :func:`locks_its_parent` refuses read nothing into a report,
+        so its parent takes answers again. Admission, a save and the questions
+        route all ask this.
         """
         return next(
             (
                 child.job_id if isinstance(child, UsageRow) else child.id
                 for child in self._rows()
-                if _parent_id(child) == parent_id and locks_its_parent(child.status)
+                if _parent_id(child) == parent_id and locks_its_parent(child)
             ),
             None,
         )

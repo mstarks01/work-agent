@@ -79,7 +79,7 @@ from analysis_service.grounding import (
     verify_quote,
 )
 from analysis_service.references import canonical
-from analysis_service.sources import ANSWERS_LABEL, text_digest
+from analysis_service.sources import ANSWERS_LABEL, check_answer_quotes, text_digest
 from analysis_service.system_model import (
     ELEMENT_ID,
     UNKNOWN,
@@ -730,17 +730,7 @@ class Assertion(BaseModel):
 
     @model_validator(mode="after")
     def _check_origin(self) -> Self:
-        quoted = [span.source_label == ANSWERS_LABEL for span in self.support]
-        if self.origin == "answer":
-            agrees = bool(quoted) and all(quoted)
-        else:
-            agrees = not any(quoted)
-        if not agrees:
-            raise ValueError(
-                "every span of an answer row quotes the answers Source, and no"
-                f" span of another row quotes it; this {self.origin} row quotes"
-                f" {sorted({span.source_label for span in self.support})}"
-            )
+        check_answer_quotes(self.origin, [span.source_label for span in self.support])
         return self
 
 

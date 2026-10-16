@@ -342,10 +342,12 @@ def fact_line(fact: FactAnswer) -> str:
 def _phrase(value: str) -> str:
     """``value`` as a phrase that its double quotes hold on one line.
 
-    A key admits only a :func:`~analysis_service.sources.quotable` subject,
-    so this returns it unchanged. Any other value folds its line breaks into
-    spaces, drops each control and formatting character, and writes each
-    double quote as a single quote, so the line says what its key says.
+    A submission's key admits only a :func:`~analysis_service.sources.quotable`
+    subject, and this returns it unchanged. An answer read back under
+    :data:`STORED` keeps the subject it holds, which an earlier rule admitted.
+    This folds such a value's line breaks into spaces, drops each control and
+    formatting character, and writes each double quote as a single quote, so
+    the line says what its key says.
     """
     if quotable(value):
         return value

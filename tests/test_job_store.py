@@ -1142,11 +1142,14 @@ class TestTheRetentionSweep:
         )
 
 
-def unreadable(store, status: JobStatus, days_ago: int = 0) -> str:
+def unreadable(
+    store, status: JobStatus, days_ago: int = 0, record: JobRecord | None = None
+) -> str:
     """The ID of a job in ``status`` that ``store`` holds under another schema
-    version, last updated ``days_ago`` days ago. It is unreadable on every
-    store, so it has ended (ADR 0095)."""
-    record = new_record()
+    version, last updated ``days_ago`` days ago: ``record``, or a new job. It
+    is unreadable on every store, so it has ended (ADR 0095)."""
+    if record is None:
+        record = new_record()
     if status == "running":
         record.transition("running")
     record.schema_version = "2.10"
@@ -1194,6 +1197,28 @@ class TestAnUnreadableJobHasEnded:
         reserve(store, new_record(), ceiling=1)
         asyncio.run(store.expired(datetime.now(UTC)))
         assert asyncio.run(store.owned(job, "alice")).status == status
+
+    @pytest.mark.parametrize("status", IN_FLIGHT)
+    @pytest.mark.parametrize("deleted", [False, True], ids=["held", "deleted"])
+    def test_it_does_not_lock_its_parent(self, store, status, deleted):
+        """It read nothing into a report, so its parent takes answers again.
+        Its usage row keeps the stored status and locks nothing either."""
+        parent = completed(store)
+        child = unreadable(store, status, record=follow_up(parent))
+        if deleted:
+            assert asyncio.run(store.delete(child, "alice")) is not None
+        assert asyncio.run(store.resumed_by(parent, "alice")) is None
+        assert reserve(store, follow_up(parent)).outcome == "admitted"
+
+    def test_one_with_a_report_still_locks_its_parent(self, store):
+        parent = completed(store)
+        child = follow_up(parent)
+        child.transition("running")
+        child.report = sample_report()
+        child.transition("completed")
+        child.schema_version = "2.10"
+        asyncio.run(admit(store, child))
+        assert asyncio.run(store.resumed_by(parent, "alice")) == child.id
 
 
 def later() -> datetime:
