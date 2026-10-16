@@ -233,7 +233,13 @@ function control(s, onRedraw, suggest = false) {
     case "number":
       return h("input", { id, type: "number", value: draft[s.key], oninput: (e) => set(Number(e.target.value)) });
     default:
-      return h("input", { id, type: "text", value: draft[s.key], oninput: (e) => set(e.target.value) });
+      return h("input", {
+        id,
+        type: "text",
+        value: draft[s.key],
+        placeholder: s.example ? `e.g. ${s.example}` : null,
+        oninput: (e) => set(e.target.value),
+      });
   }
 }
 
@@ -506,13 +512,13 @@ function variantC() {
     {},
     h("h1", {}, "Settings"),
     engineBanner(),
+    h("label", { class: "field-label", for: "filter" }, "Find a setting"),
     h(
       "div",
       { class: "grid-c" },
       h(
         "div",
         {},
-        h("label", { class: "field-label", for: "filter" }, "Find a setting"),
         h("input", {
           id: "filter",
           type: "search",

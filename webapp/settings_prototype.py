@@ -94,6 +94,15 @@ def _model_suggestions() -> dict[str, list[str]]:
 _MODELS = _model_suggestions()
 
 
+#: An example value for each credential field that is not a key, from
+#: docs/First-Run.md. The page module of ADR 0091 holds this fact.
+_EXAMPLES = {
+    "ANALYSIS_VERTEX_PROJECT": "your-gcp-project",
+    "ANALYSIS_VERTEX_LOCATION": "us-central1",
+    "ANALYSIS_BEDROCK_REGION": "us-east-1",
+}
+
+
 def _credential_settings(ready: bool) -> list[dict[str, object]]:
     """Each vendor's credential fields, read from its ``VENDORS`` row.
 
@@ -139,6 +148,7 @@ def _credential_settings(ready: bool) -> list[dict[str, object]]:
                     "set" if stored else "",
                     vendor=vendor,
                     modes=var_modes,
+                    example=_EXAMPLES.get(var),
                     source="page" if stored else "default",
                 )
             )
@@ -457,7 +467,7 @@ _PAGE = """<!doctype html>
   .multi-menu label:hover { background:var(--soft); }
   table.settings small { display:block; }
   table.settings tr.groupline th { background:var(--sidebar); font-size:12px; }
-  .pending { position:sticky; top:16px; margin-top:24px; border:1px solid var(--line);
+  .pending { position:sticky; top:16px; border:1px solid var(--line);
     border-radius:9px; padding:14px; font-size:13px; }
   .pending ul { padding-left:18px; }
 </style>
