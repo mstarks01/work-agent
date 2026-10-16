@@ -1169,32 +1169,35 @@ def _rewrite_id(
         element.id = derived
 
 
-def _zoned_ids_by_slug(zoned: Iterable[ZonedElement]) -> dict[str, list[str]]:
-    """Every zoned element's derived ID, keyed by the slug after its type prefix."""
-    by_slug: dict[str, list[str]] = {}
-    for element in zoned:
-        by_slug.setdefault(element.id.partition(":")[2], []).append(element.id)
-    return by_slug
+#: The type prefixes a flow endpoint may carry: the zoned elements' own.
+ENDPOINT_PREFIXES: frozenset[str] = frozenset(
+    element.id_prefix for element in get_args(ZonedElement)
+)
 
 
-def _follow_endpoint(
-    endpoint: str, rewrites: Mapping[str, str], by_slug: Mapping[str, list[str]]
+def follow_by_slug(
+    endpoint: str,
+    named: Collection[str],
+    zoned: Iterable[str],
+    endpoint_prefixes: Collection[str],
 ) -> str:
-    """One flow endpoint after the rewrites, then after the slug rule.
+    """The handle a flow endpoint follows under ADR 0089, else the endpoint.
 
-    A reference the rewrite table holds follows it. One that names no zoned
-    element but carries a slug exactly one zoned element has, under another
-    type prefix, follows that element. A slug two zoned elements share is left
-    as written, for the gate to report as the ambiguity it is.
+    The one reader of the rule. Each extraction route calls it over its own
+    handles, where a handle is a type prefix, a colon and a slug: the full
+    route over element IDs, the compact route over refs.
+
+    An endpoint follows the one zoned handle that carries its slug when the
+    endpoint names no element (``named`` holds every handle that names one,
+    or more than one) and its prefix is in ``endpoint_prefixes``. ``zoned``
+    holds one handle per zoned element, so a slug two elements carry gives
+    two candidates and the endpoint stays as written for the gate to report.
     """
-    followed = rewrites.get(endpoint, endpoint)
-    prefix, _, slug = followed.partition(":")
-    candidates = by_slug.get(slug, [])
-    if followed in candidates or len(candidates) != 1:
-        return followed
-    if prefix not in {ExternalEntity.id_prefix, Process.id_prefix, DataStore.id_prefix}:
-        return followed
-    return candidates[0]
+    prefix, _, slug = endpoint.partition(":")
+    if endpoint in named or prefix not in endpoint_prefixes:
+        return endpoint
+    candidates = [handle for handle in zoned if handle.partition(":")[2] == slug]
+    return candidates[0] if len(candidates) == 1 else endpoint
 
 
 def normalize_element_ids(
@@ -1213,9 +1216,10 @@ def normalize_element_ids(
     ``assumptions[].element_id`` — is rewritten to the derived ID, so a
     self-consistent model stays self-consistent. A flow endpoint that names no
     element, but whose slug exactly one zoned element carries under another
-    type, follows that element: the model named the thing and mistyped its
-    prefix, which is the one mismatch a slug settles (ADR 0089). Every other
-    dangling reference is left untouched for the gate to report.
+    type, follows that element through :func:`follow_by_slug`: the model named
+    the thing and mistyped its prefix, which is the one mismatch a slug settles
+    (ADR 0089). Every other dangling reference is left untouched for the gate
+    to report.
 
     Normalization can make two elements collide on one derived ID. That is a
     real defect surfacing, not one introduced: two elements sharing a name are
@@ -1256,10 +1260,19 @@ def normalize_element_ids(
 
     # Flows last: a flow's derived ID is built from its endpoints' IDs, so the
     # endpoints have to carry their derived values before it is computed.
-    by_slug = _zoned_ids_by_slug(zoned)
+    # An emitted ID two elements arrived with names elements, so the slug rule
+    # never moves it: it stays dangling beside its ``duplicate-id``.
+    named = {element.id for element in non_flows} | ambiguous.keys()
+    zoned_ids = [element.id for element in zoned]
     for flow in normalized.data_flows:
-        flow.source = _follow_endpoint(flow.source, rewrites, by_slug)
-        flow.destination = _follow_endpoint(flow.destination, rewrites, by_slug)
+        for field in ("source", "destination"):
+            endpoint = getattr(flow, field)
+            followed = rewrites.get(endpoint, endpoint)
+            setattr(
+                flow,
+                field,
+                follow_by_slug(followed, named, zoned_ids, ENDPOINT_PREFIXES),
+            )
         _rewrite_id(flow, rewrites, ambiguous)
 
     for assumption in normalized.assumptions:
