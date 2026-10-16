@@ -37,6 +37,7 @@ from analysis_service.fact_answers import (
     FactAnswer,
     answer_facets,
     answered_row,
+    attribute_place,
     detail_note,
     fact_label,
     fact_line,
@@ -112,8 +113,9 @@ def check_fact_answers(
     settled_before = {answer.key: answer for answer in earlier if answer.known}
     stated = prepared.capability_facts()
     for answer in answers:
-        element_id, attribute, assertion, subject, question, capability = answer.key
         ref = key_ref(answer.key)
+        element_id, attribute, assertion = ref.element_id, ref.attribute, ref.assertion
+        subject, question, capability = ref.subject, ref.question, ref.capability
         if len(ref.spellings) != 1:
             raise ValueError(f"an answer's key names one fact, not {answer.key!r}")
         kind = answer.kind
@@ -272,7 +274,7 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
     for answer in answers:
         if answer.kind != "attribute":
             continue
-        element_id, attribute, *_ = answer.key
+        element_id, attribute = attribute_place(answer.key)
         element = by_id.get(element_id)
         if element is None:
             continue
@@ -287,7 +289,7 @@ def answered_model(model: SystemModel, answers: Sequence[FactAnswer]) -> SystemM
         if note not in notes:
             element["notes"] = f"{notes} {note}".strip()[:2000]
     answered = {
-        answer.key[:2]
+        attribute_place(answer.key)
         for answer in answers
         if answer.kind == "attribute" and answer.known
     }
@@ -359,7 +361,7 @@ def fact_rows(
     replaced: dict[str, Assertion] = {}
     issues: list[CatalogIssue] = []
     attributes = {
-        answer.key[:2]: (answer, span)
+        attribute_place(answer.key): (answer, span)
         for answer, span in zip(answers, spans, strict=True)
         if answer.kind == "attribute" and answer.known
     }

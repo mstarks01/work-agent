@@ -15,6 +15,7 @@ from analysis_service.fact_answers import (
     FactAnswer,
     FactStatus,
     SkipKey,
+    attribute_place,
     fact_kind,
     fact_line,
     fact_status,
@@ -92,7 +93,7 @@ def corrected_findings(
         if fact.key in before
     ]
     keys = {fact.key for fact in corrections}
-    attributes = {key[:2] for key in keys if fact_kind(key) == "attribute"}
+    attributes = {attribute_place(key) for key in keys if fact_kind(key) == "attribute"}
 
     def rests_on(claim: Any) -> bool:
         cited = {

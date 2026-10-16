@@ -851,6 +851,15 @@ class TestTheGroundsBoundTheCitedElements:
     def model(self):
         return three_hop_model()
 
+    def test_the_reason_states_the_bound_the_check_reads(self):
+        """``BEYOND_GROUNDS`` writes the bound in words, so it is held to
+        ``BOUND_HOPS``, which ``within_bound`` reads."""
+        from analysis_service.claims import BEYOND_GROUNDS
+        from analysis_service.fan_in import BOUND_HOPS
+
+        words = {1: "one", 2: "two", 3: "three"}
+        assert BEYOND_GROUNDS.startswith(f"more than {words[BOUND_HOPS]} hops ")
+
     def test_an_element_three_hops_away_is_dropped_and_marked(self, model):
         from analysis_service.claims import BEYOND_GROUNDS
 

@@ -227,11 +227,11 @@ def resumed_sources(
 ) -> tuple[list[Source], list[LinkAnswer], list[FactAnswer]]:
     """A resumed job's sources and answers, from its parent's and the new ones.
 
-    **The one reader of "what does a resumed job carry".** The HTTP route and
-    the in-process engine both resume, and each would otherwise drop the
-    parent's answers Source and compose a new one its own way. The new answers
-    go over the parent's, and the answers Source is composed from the merged
-    set.
+    **The one reader of "what does a resumed job carry".**
+    :meth:`~analysis_service.answer_state.QuestionSet.admit` asks it for every
+    driver that resumes a job, so no driver drops the parent's answers Source
+    and composes a new one its own way. The new answers go over the parent's,
+    and the answers Source is composed from the merged set.
     """
     merged = merged_links(parent_links, links)
     answered = merged_facts(parent_facts, facts)

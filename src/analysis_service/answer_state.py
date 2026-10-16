@@ -53,7 +53,9 @@ from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, partial
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypeVar
+
+from pydantic import Field
 
 from analysis_service.answer_effects import Effect, capability_effects
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
@@ -128,6 +130,7 @@ __all__ = [
     "QuestionSet",
     "Reason",
     "ResumedJob",
+    "Revision",
     "SavedAnswers",
     "SavedDraft",
     "SourcesOverLimit",
@@ -137,6 +140,7 @@ __all__ = [
     "passes_floor",
     "question_set",
     "recommended",
+    "whose_turn",
 ]
 
 
@@ -1277,6 +1281,17 @@ def by_turn(
 
 
 _Item = TypeVar("_Item")
+_Name = TypeVar("_Name", bound=str)
+
+
+def whose_turn(waiting: Iterable[_Name], charged: Mapping[_Name, int]) -> _Name:
+    """The framework whose turn it is, of the ones with something left.
+
+    **The one reader of the turn rule**: the framework charged the fewest
+    choices so far goes next, and on a tie the first by name goes first.
+    :func:`_in_turn` and the offline order policies both ask it.
+    """
+    return min(waiting, key=lambda each: (charged.get(each, 0), each))
 
 
 def _in_turn(
@@ -1288,9 +1303,8 @@ def _in_turn(
 ) -> list[_Item]:
     """The items with the selected frameworks taking turns.
 
-    **The one reader of whose turn it is** (:func:`by_turn`). The next item
-    is the first one left that serves the framework charged the fewest
-    choices so far. On a tie the first by name goes first. Every framework the
+    The order :func:`by_turn` reads. The next item is the first one left that
+    serves the framework :func:`whose_turn` names. Every framework the
     item serves is charged its choices. An item that serves no framework
     keeps its place after every item that does.
     """
@@ -1301,7 +1315,7 @@ def _in_turn(
         served = set().union(*map(serves, left))
         if not served:
             return order + left
-        name = min(served, key=lambda each: (charged[each], each))
+        name = whose_turn(served, charged)
         item = next(item for item in left if name in serves(item))
         left.remove(item)
         order.append(item)
@@ -1344,6 +1358,13 @@ def _known_content(answer: FactAnswer | None) -> frozenset[tuple[str, str]]:
             (facet, value) for facet, value in answer.facets.items() if value != UNKNOWN
         )
     return frozenset({("", answer.value)}) if answer.known else frozenset()
+
+
+#: The revision a request names: a whole number from zero, and never ``true``.
+#: **The one reader of a posted revision.** The HTTP models declare their
+#: ``revision`` fields with it, and the first-run app validates a posted value
+#: with it.
+Revision = Annotated[int, Field(ge=0, strict=True)]
 
 
 class StaleRevision(Exception):

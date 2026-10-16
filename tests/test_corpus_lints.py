@@ -115,7 +115,7 @@ def _must_find_lanes() -> dict[str, set[object]]:
             if not path.is_file():
                 continue
             must_find_lanes.setdefault(name, set()).update(
-                verify_corpus.RECORD_LANE[name](record)
+                verify_corpus.record_lane(name, record)
                 for record in verify_corpus._load_json_array(path)
                 if record.get("tier") == "must-find"
             )

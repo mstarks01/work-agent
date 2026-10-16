@@ -257,6 +257,22 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
     assert json.loads(done.stdout) is RuledClaim.rules_on_unit(claim)
 
 
+def test_the_page_names_the_attribute_ground_kinds_the_claims_name():
+    """The page lists the attribute ground kinds again where it draws a
+    ground, so its list is held to ``ATTRIBUTE_GROUNDS``."""
+    from analysis_service.claims import ATTRIBUTE_GROUNDS
+    from tests.test_webapp import viewer_javascript
+
+    branch = re.search(
+        r"if \(((?:ground\.kind === \"[\w-]+\"(?: \|\| )?)+)\) \{\s*"
+        r"body\.append\(ref\(ground\.element_id\)",
+        viewer_javascript(),
+    )
+
+    assert branch is not None, "the page draws no attribute ground"
+    assert set(re.findall(r'"([\w-]+)"', branch.group(1))) == ATTRIBUTE_GROUNDS
+
+
 def test_a_description_names_an_element_by_its_name():
     """A finding never shows `flow:entity:customer>process:web-app>login` (#561).
 

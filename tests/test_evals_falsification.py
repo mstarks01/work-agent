@@ -141,6 +141,41 @@ class TestAProbeThatCostsNothingFails:
             "changed-source",
         }
 
+    def test_the_gate_reports_a_refusal_from_a_later_round(self, monkeypatch) -> None:
+        """An inference whose premise the first round removes is refused in the
+        second, and the probe's gate reads every round as the job's gate does."""
+        from analysis_service.assertions import assertion_id
+
+        def corrupt(reference, case):
+            premise = falsify._find(reference, "credential-custody")
+            inference = next(
+                entry for entry in reference.entries if entry.basis == "inferred"
+            )
+            rows = falsify._instead(
+                reference,
+                {
+                    assertion_id(premise): premise.model_copy(update={"support": []}),
+                    assertion_id(inference): inference.model_copy(
+                        update={"premises": [assertion_id(premise)]}
+                    ),
+                },
+            )
+            return falsify.Corruption(rows)
+
+        probe = falsify.Probe(case_id="01-payments-checkout", corrupt=corrupt)
+        monkeypatch.setattr(falsify, "PROBES", {"stranded": probe})
+        case = next(
+            case
+            for case in falsify.development_cases(falsify.load_corpus(CORPUS))
+            if case.id == probe.case_id
+        )
+
+        reference = falsify.signed_reference(CORPUS, case)
+        assert reference is not None
+        outcome = falsify.run_probe("stranded", case, reference)
+
+        assert outcome.refused == ("dangling-premise", "unsupported-assertion")
+
     def test_a_probe_that_stops_costing_is_a_failure(self, probed) -> None:
         """A declaration the outcome no longer meets breaks, rather than relaxing."""
         weakened = falsify.Probe(

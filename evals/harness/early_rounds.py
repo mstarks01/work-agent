@@ -55,6 +55,7 @@ from analysis_service.fact_answers import (
     FactAnswer,
     SkipKey,
     answered_keys,
+    attribute_place,
     merged_facts,
 )
 from analysis_service.jobs import Checkpoint
@@ -78,7 +79,7 @@ def dont_know(question: EarlyQuestion) -> FactAnswer:
 
 def _blessed(question: EarlyQuestion, blessed: SystemModel) -> FactAnswer:
     """The blessed value of an attribute question, else "I don't know"."""
-    element_id, attribute = question.key[:2]
+    element_id, attribute = attribute_place(question.key)
     element = blessed.get(element_id)
     value = getattr(element, attribute, None) if attribute else None
     stated = isinstance(value, str) and control_state(value) != "unverified"

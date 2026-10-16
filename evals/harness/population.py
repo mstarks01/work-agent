@@ -41,11 +41,11 @@ from analysis_service.assertions import (
     UNKNOWN,
     AssertionRecord,
     CatalogProposal,
-    apply_projection,
     assertion_id,
     offered,
     settled,
 )
+from analysis_service.evidence import prepared_view
 from analysis_service.reassess import Verdict, reassess
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
@@ -100,12 +100,13 @@ def population(
 ) -> tuple[PopulationRow, ...]:
     """Every row of one job, routed by the job's own readers.
 
-    ``model`` is the model the job read. It is projected again here, which is
-    idempotent on a model the job already projected, so a report's embedded
-    model and an unprojected one route the same.
+    ``model`` is the model the job read. It is prepared again here by
+    :func:`~analysis_service.evidence.prepared_view`, which is idempotent on a
+    model the job already projected, so a report's embedded model and an
+    unprojected one route the same.
     """
     catalog = record.catalog
-    projected, _ = apply_projection(model, catalog)
+    projected, _, _ = prepared_view(model, catalog)
     cited = {assertion_id(entry) for entry in offered(catalog, projected)}
     held = {assertion_id(entry) for entry in settled(catalog)}
     rows = []

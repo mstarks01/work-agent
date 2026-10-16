@@ -86,6 +86,7 @@ from analysis_service.graph import (
     ENTRY_EXTRACT_ONLY,
     ENTRY_HEAD_ONLY,
     ENTRY_PREPARE,
+    EXTRACTING_ENTRIES,
     STATE_ASSERTION_CATALOG,
     STATE_ASSERTION_PROPOSAL,
     STATE_EXTRACTED_MODEL,
@@ -2540,9 +2541,7 @@ MODE_ENTRIES: dict[str, Entry] = {
 #: an emission beside its artifact. Read off the entries rather than listed,
 #: so a mode added tomorrow answers by the entry it builds.
 EXTRACTING_MODES: frozenset[str] = frozenset(
-    mode
-    for mode, entry in MODE_ENTRIES.items()
-    if entry in {ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY, ENTRY_HEAD_ONLY}
+    mode for mode, entry in MODE_ENTRIES.items() if entry in EXTRACTING_ENTRIES
 )
 
 #: The modes whose graph ends in a :class:`Report`. ``extraction`` stops at the

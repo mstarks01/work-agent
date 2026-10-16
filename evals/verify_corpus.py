@@ -53,6 +53,7 @@ from analysis_service.claims import (
     Rating,
     derive_severity_level,
 )
+from analysis_service.critic import endpoint_targets
 from analysis_service.frameworks import PACKAGES, run_precondition
 from analysis_service.frameworks.asvs.catalog import ASVS_LEVELS, requirements_for
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
@@ -66,6 +67,7 @@ from analysis_service.sources import SourceKind, text_digest
 from analysis_service.system_model import (
     ELEMENT_GROUPS,
     UNKNOWN,
+    ModelIndex,
     SystemModel,
     make_element_id,
     make_flow_id,
@@ -358,14 +360,21 @@ RECORD_CHECKS: Mapping[
     "asvs": _asvs_record_issues,
     "stride": _stride_record_issues,
 }
-#: Which lane a reference record belongs to, or ``None`` for a framework whose
-#: records carry no lane. Read by :func:`lane_coverage_issues`, which is the
-#: check that an unmeasured lane — one ``strong`` call per lane, which is the
-#: granularity that spends money — cannot reach a deployment.
-RECORD_LANE: Mapping[FrameworkName, Callable[[dict], object]] = {
-    "asvs": lambda record: record.get("chapter"),
-    "stride": lambda record: record.get("category"),
-}
+
+
+def record_lane(framework: FrameworkName, record: dict) -> object:
+    """Which lane a reference record belongs to, or ``None`` for a framework
+    whose records carry no lane.
+
+    A record carries its lane in the field the package's ``IdRule`` stamps,
+    so this reads that declaration, as
+    :func:`~analysis_service.frameworks.lane_of` does for a claim. Read by
+    :func:`lane_coverage_issues`, which is the check that an unmeasured lane —
+    one ``strong`` call per lane, which is the granularity that spends money —
+    cannot reach a deployment.
+    """
+    field = PACKAGES[framework].id_rule.lane_field
+    return record.get(field) if field else None
 
 
 #: The two authorization verbs, read off the shipped family so this module
@@ -441,7 +450,7 @@ def _escalate_leads(
     reach is an escalation after all. Neither answer is this module's to pick.
     """
     reaches = {(flow.source, flow.destination) for flow in model.data_flows}
-    by_id = {flow.id: flow for flow in model.data_flows}
+    flows = ModelIndex.of(model).flow_endpoints
     for index, record in enumerate(records):
         if not isinstance(record, dict) or record.get("verb") != ESCALATE:
             continue
@@ -449,13 +458,10 @@ def _escalate_leads(
         cited = record.get("affected_element_ids")
         if not isinstance(claim, str) or not isinstance(cited, list):
             continue
-        # A cited flow stands for both its ends. Read them off the model's own
-        # flow rather than splitting the ID, which stops being right the day an
-        # ID's shape moves.
-        places: set[str] = set()
-        for element_id in cited:
-            flow = by_id.get(element_id)
-            places.update((flow.source, flow.destination) if flow else (element_id,))
+        if not all(isinstance(element_id, str) for element_id in cited):
+            continue
+        # A cited flow stands for both its ends, by the service's own fold.
+        places = endpoint_targets(cited, flows)
         joined = sorted(
             (source, destination)
             for source in places
@@ -926,8 +932,7 @@ def _check_claims(
     # below and is what this corpus has always held for STRIDE. The bar asks that
     # a lane be measured *somewhere*; this asks that no case quietly grades five
     # of six. :data:`LANES_REQUIRED_PER_CASE` says why ASVS is exempt.
-    lane_of = RECORD_LANE[framework]
-    seen_lanes = {lane_of(record) for record in shaped}
+    seen_lanes = {record_lane(framework, record) for record in shaped}
     stray = sorted(str(lane) for lane in seen_lanes - set(PACKAGES[framework].lanes))
     if stray:
         yield f"{where_file} names lanes {framework} does not declare: {stray}"
@@ -1495,7 +1500,7 @@ def main() -> int:
                 continue
             records = _load_json_array(path)
             must_find_lanes.setdefault(name, set()).update(
-                RECORD_LANE[name](record)
+                record_lane(name, record)
                 for record in records
                 if isinstance(record, dict)
                 and record.get("tier") == MUST_FIND

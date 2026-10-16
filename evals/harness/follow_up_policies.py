@@ -33,6 +33,7 @@ from pathlib import Path
 from analysis_service.claims import UnknownKey
 from analysis_service.critic import complete_rulings
 from analysis_service.frameworks import SCHEMAS
+from analysis_service.graph import rulings_of
 from analysis_service.questions import (
     Basis,
     Finding,
@@ -181,16 +182,17 @@ def with_rulings(report: Report, rulings: Path) -> Report:
     Each ruling is completed against its draft as the service completes it
     (:func:`~analysis_service.critic.complete_rulings`), so a draft that rests
     on an unstated fact reads ``needs-info`` here as it would in a report.
+    The sample is parsed by :func:`~analysis_service.graph.rulings_of`, as the
+    graph parses a critic's emission.
     """
+    emitted = json.loads(rulings.read_text(encoding="utf-8"))["claims"]
     blocks = []
     for block in report.analyses:
-        batch = SCHEMAS[block.framework].rulings.model_validate_json(
-            rulings.read_text(encoding="utf-8")
-        )
+        parsed = rulings_of(emitted, SCHEMAS[block.framework])
         drafts = block.all_claims()
         verdicts = {
             ruling.id: ruling.verdict
-            for ruling in complete_rulings(list(drafts), batch.claims)
+            for ruling in complete_rulings(list(drafts), parsed)
         }
         ruled = [
             claim.model_copy(update={"verdict": verdicts.get(claim.id, claim.verdict)})

@@ -870,13 +870,18 @@ class Vendor:
     #: providers, and one Llama slug by 12 endpoints whose tags carry differing
     #: numeric formats. See `docs/research/openrouter-served-model.md`.
     #:
-    #: One reader: ``evals/harness/baseline.py`` asks the record for the
-    #: upstream that served every tier on such a route, and names a
-    #: **Baseline** after route and upstream together. A sweep whose record
-    #: names no upstream, or more than one, is refused, because a Baseline's
-    #: whole value is that its sweeps are comparable and the unexplained spread
-    #: would land inside one. Nothing refuses to *run* the vendor; an analysis
-    #: is an analysis.
+    #: ``evals/harness/baseline.py`` asks the record for the upstream that
+    #: served every tier on such a route, and names a **Baseline** after route
+    #: and upstream together. A sweep whose record names no upstream, or more
+    #: than one, is refused, because a Baseline's whole value is that its
+    #: sweeps are comparable and the unexplained spread would land inside one.
+    #: Nothing refuses to *run* the vendor; an analysis is an analysis. The
+    #: other readers: the ``distinct_provider`` independence check in
+    #: :mod:`~analysis_service.model_tiers` refuses such a route,
+    #: :func:`~analysis_service.binding.build_tier_adapters` captures its
+    #: charge, ``evals/harness/prices.py`` refuses to price it from a third
+    #: party's entry, and ``evals/harness/run.py`` records its upstream pins
+    #: with a sweep.
     #:
     #: Stated as a property rather than as a vendor's name, so it answers for a
     #: row nobody has written: any route in front of more than one provider

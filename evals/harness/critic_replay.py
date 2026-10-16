@@ -49,6 +49,7 @@ from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import AnalysisMarks, Claim, FrameworkName, Ruling
 from analysis_service.critic import complete_rulings, critic_view, review_issues
 from analysis_service.deployment import Deployment
+from analysis_service.execution import seed_state
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.graph import (
     CRITIC_ROLE,
@@ -67,7 +68,6 @@ from analysis_service.graph import (
 )
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.report import InputRef, Report
-from analysis_service.sources import render_sources
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import CORPUS_DIR, repo_commit
 from evals.harness.bundle import check_out, reports_dir
@@ -112,7 +112,7 @@ def shared_keys(report: Report, case_id: str) -> dict[str, str]:
     return {
         STATE_SYSTEM_MODEL: render_model(model.model_dump(mode="json")),
         STATE_BOUNDARY_CROSSINGS: render_crossings(model.boundary_crossings()),
-        STATE_INPUT_TEXT: render_sources(sources),
+        STATE_INPUT_TEXT: seed_state(sources)[STATE_INPUT_TEXT],
     }
 
 
@@ -175,7 +175,9 @@ def _from_failure(directory: Path, case_id: str, framework: FrameworkName) -> Ar
         shared={
             STATE_SYSTEM_MODEL: state[STATE_SYSTEM_MODEL],
             STATE_BOUNDARY_CROSSINGS: state[STATE_BOUNDARY_CROSSINGS],
-            STATE_INPUT_TEXT: render_sources(load_case(CORPUS_DIR / case_id).sources),
+            STATE_INPUT_TEXT: seed_state(load_case(CORPUS_DIR / case_id).sources)[
+                STATE_INPUT_TEXT
+            ],
         },
         model=SystemModel.model_validate(state[STATE_VALID_MODEL]),
         assertions=(

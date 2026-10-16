@@ -314,16 +314,14 @@ def unreviewed_cases(root: Path) -> list[str]:
     and comes back the moment any file a covering sitting read changes —
     :func:`current_reviews` drops a review whose digests no longer match, so the
     return is fail-closed against a later corpus edit. A case that gains a
-    framework comes back too, carrying only that framework's work.
+    framework comes back too, carrying only that framework's work. Which
+    frameworks still wait is :func:`waiting`'s answer, which the rail reads too.
     """
     covered = current_reviews(root)
     return [
         case.meta.id
         for case in sittings.load_corpus(root / "evals" / "corpus")
-        if any(
-            framework not in covered.get(case.meta.id, {})
-            for framework in declared(root, case.meta.id)
-        )
+        if waiting(root, case.meta.id, covered)
     ]
 
 

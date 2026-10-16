@@ -120,3 +120,19 @@ def test_it_lives_outside_the_repo_root_check_only_by_resolution(tmp_path):
     inside = Path(REPO_ROOT / "evals" / ".." / "evals" / "x.html")
     with pytest.raises(PairingError):
         refuse_path_inside_repo(inside)
+
+
+def test_a_requirement_the_case_rules_out_and_the_run_applies_is_shown():
+    """``negatives_applied`` is the judged disagreement: the case says the
+    requirement does not apply, and the run applied it. The view shows it apart
+    from the unjudged over-applied ones, and counts it as applied."""
+    case = corpus_case("04-ml-inference-service")
+    score = score_applicability(case, Block([ruling("V9.1.1")]))
+
+    pairing = pair_case(case, Block([ruling("V9.1.1")]), score)
+
+    assert score.negatives_applied == ("V9.1.1",)
+    assert [pair.requirement for pair in pairing.negatives_applied] == ["V9.1.1"]
+    assert pairing.over_applied == ()
+    assert pairing.applied == 1
+    assert "V9.1.1" in render_html(pairing, "test")

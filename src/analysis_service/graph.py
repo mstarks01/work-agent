@@ -202,7 +202,7 @@ from analysis_service.knowledge import (
 )
 from analysis_service.links import LinkAnswer, apply_answers
 from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
-from analysis_service.model_tiers import ReviewIndependence, TierName
+from analysis_service.model_tiers import ReviewIndependence, TierName, tier_key
 from analysis_service.prompt_cache import remember_stable_prefix, stable_prefix
 from analysis_service.prompts import (
     compose_analyze_prompt,
@@ -500,9 +500,9 @@ class FrameworkNodes:
         fact and all of them run the same judgement on the same tier.
         """
         return {
-            **{lane.node_name: f"analyze/{self.name}" for lane in self.lanes},
-            self.node(CRITIC_ROLE): f"critic/{self.name}",
-            self.node(RECRITIC_ROLE): f"recritic/{self.name}",
+            **{lane.node_name: tier_key("analyze", self.name) for lane in self.lanes},
+            self.node(CRITIC_ROLE): tier_key("critic", self.name),
+            self.node(RECRITIC_ROLE): tier_key("recritic", self.name),
         }
 
 
@@ -2130,7 +2130,8 @@ def rulings_of(ruled: Sequence[Any], schemas: FrameworkSchemas) -> list[Ruling]:
 
     Public because it is the one reader of "what shape is a critic's answer",
     and the graph is not its only caller: ``evals/critic_review`` replays a
-    critic outside the graph and has to parse what comes back the same way.
+    critic outside the graph, and ``evals/harness/follow_up_policies.py``
+    reads an archived critic sample, and each has to parse it the same way.
     Parsing with the neutral :class:`~analysis_service.claims.Ruling` instead
     refuses every STRIDE ruling, because ``frameworks/stride/critic.md`` asks
     for a ``confidence`` the neutral model forbids.

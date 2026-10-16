@@ -667,7 +667,7 @@ def test_every_key_part_a_page_reads_is_the_part_it_means():
     """A page reads a fact key by position, and ``key_ref`` is the server's one
     reader of which part is which, so each position a page reads is held to
     the field it means."""
-    from analysis_service.fact_answers import _KEY_FIELDS
+    from analysis_service.claims import UNKNOWN_KEY_FIELDS
 
     means = {0: "element_id", 1: "attribute", 4: "question"}
     read = {
@@ -679,7 +679,19 @@ def test_every_key_part_a_page_reads_is_the_part_it_means():
     assert read, "no page reads a key part to check"
     assert read <= set(means), f"a page reads key parts {sorted(read - set(means))}"
     for index in read:
-        assert _KEY_FIELDS[index] == means[index]
+        assert UNKNOWN_KEY_FIELDS[index] == means[index]
+
+
+def test_the_key_field_list_names_each_part_of_a_key():
+    """``UNKNOWN_KEY_FIELDS`` states ``UnknownRef.key``'s order a second time,
+    so a reference with a distinct value in each field is put to both."""
+    from analysis_service.claims import UNKNOWN_KEY_FIELDS
+
+    ref = UnknownRef.model_construct(
+        **{name: f"value-of-{name}" for name in UNKNOWN_KEY_FIELDS}
+    )
+
+    assert ref.key == tuple(f"value-of-{name}" for name in UNKNOWN_KEY_FIELDS)
 
 
 def test_the_form_script_follows_a_run_the_report_page_started():

@@ -36,12 +36,18 @@ from google.genai import types
 
 from analysis_service.claims import AnalysisMarks, Ruling, UnknownKey
 from analysis_service.critic import complete_rulings, critic_view, review_issues
+from analysis_service.execution import seed_state
 from analysis_service.frameworks import FrameworkPackage, schemas_for
-from analysis_service.graph import merge_summary, render_fenced, rulings_of
+from analysis_service.graph import (
+    STATE_INPUT_TEXT,
+    merge_summary,
+    render_fenced,
+    rulings_of,
+)
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import compose_critic_prompt
 from analysis_service.skills import compose_critic_skills
-from analysis_service.sources import Source, render_sources
+from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 from evals.critic_review.model import CriticFixture
 from evals.harness.alignment import singular
@@ -100,7 +106,7 @@ def compose(
             ]
         ),
         "drafts": render_fenced(critic_view(drafts)),
-        "input_text": render_sources(sources),
+        STATE_INPUT_TEXT: seed_state(sources)[STATE_INPUT_TEXT],
     }
     prompt = compose_critic_prompt(prompt_loader)
     for name, block in filled.items():

@@ -417,7 +417,7 @@ def fact_questions(
 
 def _open(ref: UnknownRef, model: SystemModel) -> bool:
     """False for an attribute the model states; every other fact is open."""
-    element_id, attribute, *_ = ref.key
+    element_id, attribute = ref.element_id, ref.attribute
     return fact_kind(ref.key) != "attribute" or open_attribute(
         model, element_id, attribute
     )

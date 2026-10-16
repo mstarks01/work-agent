@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.answer_sets import AnswerSet
-from analysis_service.answer_state import passes_floor, question_set
+from analysis_service.answer_state import passes_floor, question_set, whose_turn
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion, early_questions
 from analysis_service.fact_answers import FactAnswer, key_ref
@@ -183,8 +183,8 @@ def _merge(
 ) -> list[EarlyQuestion]:
     """Each framework's own order, taken in turn by the effort each has had.
 
-    The next pick goes to the framework charged the fewest choices so far,
-    the first by name on a tie. A question one framework's list shares with
+    The next pick goes to the framework that
+    :func:`~analysis_service.answer_state.whose_turn` names. A question one framework's list shares with
     another is asked once, and charged to every framework that lists it.
     ``grouped`` takes a framework's next group whole, as the page shows a
     group, rather than its next question.
@@ -205,7 +205,7 @@ def _merge(
         open_names = [name for name, left in waiting.items() if left]
         if not open_names:
             return order
-        name = min(open_names, key=lambda each: (charged[each], each))
+        name = whose_turn(open_names, charged)
         first = waiting[name][0]
         picks = (
             [q for q in waiting[name] if q.group == first.group] if grouped else [first]

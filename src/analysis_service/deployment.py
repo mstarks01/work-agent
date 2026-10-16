@@ -334,9 +334,14 @@ class Deployment:
     def tier_of(self, graph_node: str) -> TierName:
         """The tier a *graph* node runs on, via its canonical tier-node name.
 
-        The one place this walk is written: it is two mappings deep — graph
-        node to canonical node, canonical node to tier — and callers that
-        re-derive it are how two of them come to disagree about a node's tier.
+        The walk is two mappings deep — graph node to canonical node,
+        canonical node to tier — and each step has one reader:
+        :func:`~analysis_service.graph.tier_node_by_graph_node` and
+        :meth:`~analysis_service.model_tiers.ModelTierConfig.resolve_tier`. This
+        composes the two for a caller that holds a deployment. The graph build
+        holds a :class:`~analysis_service.binding.NodeBinding` instead, and
+        composes the same two through its ``resolve_model`` and
+        ``resolve_sampling``.
 
         Built over everything this install **carries** rather than over one
         job's selection, which is what keeps a single gate serving every

@@ -456,15 +456,19 @@ def test_grounds_reads_a_lane_without_naming_any_framework_s_field():
     """The lane comes from the package's declaration, not from a field name.
 
     STRIDE stamps its lane into ``category`` and ASVS into ``chapter``. A fold
-    that spelled either would be a second definition to drift, so
-    :func:`~evals.harness.grounds.lane_of` reads ``IdRule.lane_field`` — which is
-    the same declaration the neutral resolver stamps through.
+    that spelled either would be a second definition to drift, so the grounds
+    count and the corpus lint read ``IdRule.lane_field`` through
+    :func:`~analysis_service.frameworks.lane_of` and
+    :func:`~evals.verify_corpus.record_lane` — the same declaration the neutral
+    resolver stamps through.
     """
-    from evals.harness.grounds import lane_of
+    from analysis_service.frameworks import lane_of
+    from evals.verify_corpus import record_lane
 
     claim = ruling("V6.2.1")
 
-    assert lane_of("asvs", claim) == "authentication"
+    assert lane_of(claim) == "authentication"
+    assert record_lane("asvs", {"chapter": "authentication"}) == "authentication"
     assert PACKAGES["asvs"].id_rule.lane_field == "chapter"
     assert PACKAGES["stride"].id_rule.lane_field == "category"
 
