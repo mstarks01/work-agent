@@ -1466,7 +1466,8 @@ def test_a_config_error_spelling_the_placeholder_is_not_substituted(tiers):
             frameworks=(),
             tiers=tiers,
             error=ConfigError("__CSP_NONCE__"),
-        )
+        ),
+        {},
     )
 
     nonce = re.search(r"'nonce-([^']+)'", page.csp).group(1)
