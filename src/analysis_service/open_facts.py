@@ -122,26 +122,27 @@ def label_of(ref: UnknownRef, names: Mapping[str, str]) -> str:
     """What a reader sees for one open fact: the question it asks.
 
     Every surface words a fact through this, so the form page, the report page,
-    ``/v1`` and a refusal ask it alike. The spelling is read through
-    :attr:`~analysis_service.claims.UnknownRef.spellings`.
+    ``/v1`` and a refusal ask it alike. The kind is read through
+    :attr:`~analysis_service.claims.UnknownRef.kind`.
     """
-    if ref.capability:
-        capability = CAPABILITIES.get(ref.capability)
-        return capability.question if capability else ref.capability
-    if "assertion" in ref.spellings:
-        return ref.assertion
-    if ref.question:
-        where = names.get(ref.element_id, ref.element_id)
-        kind = QUESTION_KINDS.get(ref.question)
-        return kind.template.format(element=where) if kind else ref.question
-    if ref.names_an_element:
-        where = names.get(ref.element_id, ref.element_id)
-        attribute = ref.attribute.replace("_", " ")
-        template = _ATTRIBUTE_QUESTIONS.get(
-            ref.attribute, f"What is the {attribute} for {{element}}?"
-        )
-        return template.format(element=where)
-    return ref.subject
+    where = names.get(ref.element_id, ref.element_id)
+    match ref.kind:
+        case "capability":
+            capability = CAPABILITIES.get(ref.capability)
+            return capability.question if capability else ref.capability
+        case "question":
+            kind = QUESTION_KINDS.get(ref.question)
+            return kind.template.format(element=where) if kind else ref.question
+        case "assertion":
+            return ref.assertion
+        case "attribute":
+            attribute = ref.attribute.replace("_", " ")
+            template = _ATTRIBUTE_QUESTIONS.get(
+                ref.attribute, f"What is the {attribute} for {{element}}?"
+            )
+            return template.format(element=where)
+        case "subject":
+            return ref.subject
 
 
 def group_of(ref: UnknownRef) -> tuple[str, str]:
@@ -150,17 +151,20 @@ def group_of(ref: UnknownRef) -> tuple[str, str]:
     One group for each question kind and each attribute, so a page asks each
     once and lists the elements under it. Every capability question is about
     the whole application, so they share one group. The heading is the kind's question
-    with its element made a pronoun, or the attribute's name.
+    with its element made a pronoun, or the attribute's name. The kind is read
+    through :attr:`~analysis_service.claims.UnknownRef.kind`.
     """
-    if ref.capability:
-        return CAPABILITY_GROUP, "About the application"
-    kind = QUESTION_KINDS.get(ref.question) if ref.question else None
-    if kind is not None:
-        heading = kind.template.replace("{element}'s", "its").replace("{element}", "it")
-        return ref.question, heading
-    if ref.names_an_element:
-        return ref.attribute, ref.attribute.replace("_", " ").capitalize()
-    return label_of(ref, {}), label_of(ref, {})
+    match ref.kind:
+        case "capability":
+            return CAPABILITY_GROUP, "About the application"
+        case "question" if ref.question in QUESTION_KINDS:
+            template = QUESTION_KINDS[ref.question].template
+            heading = template.replace("{element}'s", "its").replace("{element}", "it")
+            return ref.question, heading
+        case "attribute":
+            return ref.attribute, ref.attribute.replace("_", " ").capitalize()
+    label = label_of(ref, {})
+    return label, label
 
 
 def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, ...]:

@@ -22,9 +22,9 @@ from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.answer_state import question_set
 from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
 from analysis_service.capabilities import lineage
+from analysis_service.claims import _KIND_ORDER
 from analysis_service.early_questions import early_questions
 from analysis_service.fact_answers import (
-    _KIND_ORDER,
     MAX_DETAIL_CHARS,
     FactAnswer,
     FactKind,

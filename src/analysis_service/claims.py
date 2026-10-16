@@ -266,6 +266,16 @@ UnknownKey = tuple[str, str, str, str, str, str]
 #: The five ways :class:`UnknownRef` names an open fact.
 Spelling = Literal["question", "attribute", "assertion", "subject", "capability"]
 
+#: Which kind a reference names where it uses more than one spelling: the
+#: first here wins. :attr:`UnknownRef.kind` reads it.
+_KIND_ORDER: tuple[Spelling, ...] = (
+    "capability",
+    "question",
+    "assertion",
+    "attribute",
+    "subject",
+)
+
 
 class UnknownRef(BaseModel):
     """What a ``needs-info`` verdict says has to be answered.
@@ -406,6 +416,17 @@ class UnknownRef(BaseModel):
         return tuple(name for name, on in used.items() if on)
 
     @property
+    def kind(self) -> Spelling:
+        """Which of the five kinds of fact this reference names.
+
+        **The one reader of "which kind is this fact".** It reads
+        :attr:`spellings`, and where a reference uses more than one, the first
+        in :data:`_KIND_ORDER` wins. A reference that uses none is a subject.
+        """
+        used = self.spellings
+        return next((kind for kind in _KIND_ORDER if kind in used), "subject")
+
+    @property
     def key(self) -> UnknownKey:
         """The reference fields as one comparable value.
 
@@ -444,15 +465,19 @@ def name_unknown(ref: UnknownRef) -> str:
     **The one spelling of a reference in a message a re-ask reads**, so the
     three checks in :mod:`analysis_service.critic` that name one, and the
     sentence a ``needs-info`` carries, cannot describe the same fact four
-    ways. The spelling is read through :attr:`UnknownRef.spellings`.
+    ways. The kind is read through :attr:`UnknownRef.kind`.
     """
-    if "assertion" in ref.spellings:
-        return f"the open fact `{ref.assertion}`"
-    if ref.names_an_element:
-        return f"`{ref.attribute}` on `{ref.element_id}`"
-    if ref.capability:
-        return f"the capability `{ref.capability}`"
-    return f"`{ref.subject}`"
+    match ref.kind:
+        case "capability":
+            return f"the capability `{ref.capability}`"
+        case "question":
+            return f"the question `{ref.question}` about `{ref.element_id}`"
+        case "assertion":
+            return f"the open fact `{ref.assertion}`"
+        case "attribute":
+            return f"`{ref.attribute}` on `{ref.element_id}`"
+        case "subject":
+            return f"`{ref.subject}`"
 
 
 # How long an absent-element term may be. Exported because the producer must

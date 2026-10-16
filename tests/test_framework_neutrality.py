@@ -35,10 +35,11 @@ import inspect
 import pkgutil
 import re
 from pathlib import Path
+from types import FunctionType
 
 import pytest
 
-from analysis_service.claims import FRAMEWORK_NAMES
+from analysis_service.claims import FRAMEWORK_NAMES, Claim, FrameworkAnalysis
 from analysis_service.frameworks import CONTENT_LICENSE, PACKAGES, SCHEMAS
 from evals.harness.calibration import IDENTITY_VALIDATION
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
@@ -907,24 +908,24 @@ def test_no_page_names_a_framework():
     )
 
 
+def _hooks(base: type) -> list[str]:
+    """Every method the body of ``base`` declares: each is a hook a package may override."""
+    return [
+        name
+        for name, value in vars(base).items()
+        if not name.startswith("__")
+        and isinstance(value, FunctionType | classmethod | staticmethod)
+    ]
+
+
 #: Every hook a package may override, and the attribute the *caller* reaches it
 #: through. A package's own class is not the seam — the seam is whatever the
 #: service asks for, and an override anywhere else resolves to the neutral
-#: default.
+#: default. Read off the two neutral classes, so a hook added to either is
+#: checked with no edit here.
 NEUTRAL_HOOKS: dict[str, str] = {
-    "partition_proposals": "record",
-    "claim_marks": "record",
-    "lane_diagnostics": "record",
-    "misfiled": "record",
-    "ruled_out": "record",
-    "units_for": "record",
-    "settled_by_grounds": "record",
-    "unit_of": "record",
-    "unsupported": "record",
-    "unit_text": "record",
-    "text_of_unit": "record",
-    "scope_entries": "block",
-    "summarize": "block",
+    **dict.fromkeys(_hooks(Claim), "record"),
+    **dict.fromkeys(_hooks(FrameworkAnalysis), "block"),
 }
 
 
@@ -985,16 +986,11 @@ def test_no_package_override_is_orphaned():
     )
 
 
-def test_the_hook_table_names_only_real_hooks():
-    """Guards the guard: a hook nothing declares can never be orphaned."""
-    from analysis_service.claims import (
-        Claim,
-        FrameworkAnalysis,
-    )
-
-    for hook, attribute in NEUTRAL_HOOKS.items():
-        base = Claim if attribute == "record" else FrameworkAnalysis
-        assert hasattr(base, hook), f"{hook} is not a neutral hook on {base.__name__}"
+def test_the_hook_table_reads_both_neutral_classes():
+    """Guards the guard: a hook the table misses can never be orphaned."""
+    assert {"capability_keys", "settled_by_grounds"} <= NEUTRAL_HOOKS.keys()
+    assert {"summarize", "scope_entries"} <= NEUTRAL_HOOKS.keys()
+    assert set(_hooks(Claim)).isdisjoint(_hooks(FrameworkAnalysis))
 
 
 # ---------------------------------------------------------------------------
