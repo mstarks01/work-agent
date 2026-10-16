@@ -161,6 +161,47 @@ ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
 #: default (ADR 0087); a non-empty value other than an affirmative turns it
 #: off, and an unset or empty variable keeps the default.
 CAPABILITY_READER_VAR = "ANALYSIS_CAPABILITY_READER"
+#: Each optional pass, by its variable, with its default. The one reader of the
+#: defaults: :meth:`Deployment.from_env`, the Settings page and the doc test of
+#: the "Optional passes" table in ``Configuration.md`` read it (ADR 0091).
+PASS_FLAGS: dict[str, bool] = {
+    ASSERTIONS_VAR: True,
+    CAPABILITY_READER_VAR: True,
+    COMPACT_EXTRACTION_VAR: False,
+}
+
+#: Each located file or directory, by its field of :class:`ConfigPaths`: the
+#: variable that moves it, and the repo default.
+CONFIG_PATHS: dict[str, tuple[str, Path]] = {
+    "prompts": (PROMPTS_DIR_VAR, DEFAULT_PROMPTS_DIR),
+    "domains": (DOMAINS_DIR_VAR, DEFAULT_DOMAINS_DIR),
+    "frameworks": (FRAMEWORKS_DIR_VAR, DEFAULT_FRAMEWORKS_DIR),
+    "model_tiers": (MODEL_TIERS_VAR, DEFAULT_MODEL_TIERS_PATH),
+    "sampling": (SAMPLING_VAR, DEFAULT_SAMPLING_PATH),
+    "resilience": (RESILIENCE_VAR, DEFAULT_RESILIENCE_PATH),
+    "blessed_fingerprints": (
+        BLESSED_FINGERPRINTS_VAR,
+        DEFAULT_BLESSED_FINGERPRINTS_PATH,
+    ),
+    "frameworks_file": (FRAMEWORKS_VAR, DEFAULT_FRAMEWORKS_PATH),
+}
+
+
+def env_variables() -> tuple[str, ...]:
+    """Every variable that :meth:`Deployment.from_env` reads itself: the
+    config paths, the certification switch and the optional passes. The
+    loaders it calls export their own."""
+    return (
+        *(var for var, _ in CONFIG_PATHS.values()),
+        REQUIRE_CERTIFIED_VAR,
+        *PASS_FLAGS,
+    )
+
+
+def _pass(env: Mapping[str, str], var: str) -> bool:
+    """Whether the optional pass that ``var`` names runs, from its default in
+    :data:`PASS_FLAGS`."""
+    return env_flag(env, var, default=PASS_FLAGS[var])
 
 
 def _path(env: Mapping[str, str], var: str, default: Path) -> Path:
@@ -203,16 +244,10 @@ class ConfigPaths:
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> Self:
         return cls(
-            prompts=_path(env, PROMPTS_DIR_VAR, DEFAULT_PROMPTS_DIR),
-            domains=_path(env, DOMAINS_DIR_VAR, DEFAULT_DOMAINS_DIR),
-            frameworks=_path(env, FRAMEWORKS_DIR_VAR, DEFAULT_FRAMEWORKS_DIR),
-            model_tiers=_path(env, MODEL_TIERS_VAR, DEFAULT_MODEL_TIERS_PATH),
-            sampling=_path(env, SAMPLING_VAR, DEFAULT_SAMPLING_PATH),
-            resilience=_path(env, RESILIENCE_VAR, DEFAULT_RESILIENCE_PATH),
-            blessed_fingerprints=_path(
-                env, BLESSED_FINGERPRINTS_VAR, DEFAULT_BLESSED_FINGERPRINTS_PATH
-            ),
-            frameworks_file=_path(env, FRAMEWORKS_VAR, DEFAULT_FRAMEWORKS_PATH),
+            **{
+                field: _path(env, var, default)
+                for field, (var, default) in CONFIG_PATHS.items()
+            }
         )
 
 
@@ -302,10 +337,10 @@ class Deployment:
             paths=paths,
             require_certified=env_flag(env, REQUIRE_CERTIFIED_VAR),
             extraction_format=(
-                COMPACT_FORMAT if env_flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
+                COMPACT_FORMAT if _pass(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
             ),
-            assertions=env_flag(env, ASSERTIONS_VAR, default=True),
-            capability_reader=env_flag(env, CAPABILITY_READER_VAR, default=True),
+            assertions=_pass(env, ASSERTIONS_VAR),
+            capability_reader=_pass(env, CAPABILITY_READER_VAR),
             env=MappingProxyType(dict(env)),
         )
 

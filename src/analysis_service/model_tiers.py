@@ -671,6 +671,20 @@ class ModelTierConfig(BaseModel):
         return self.tiers[self.resolve_tier(node)]
 
 
+def env_variables() -> tuple[str, ...]:
+    """Every ``ANALYSIS_MODEL_*`` override this loader reads.
+
+    The one list of them: :func:`_apply_env_overrides` refuses each other
+    variable under the prefix.
+    """
+    return (
+        *(var for tier in TIER_NAMES for var in env_vars_for(tier)),
+        *(credentials_env_var_for(vendor) for vendor in VENDOR_NAMES),
+        *(charges_env_var_for(vendor) for vendor in VENDOR_NAMES),
+        *(upstreams_env_var_for(vendor) for vendor in VENDOR_NAMES),
+    )
+
+
 def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None:
     """Fold ``ANALYSIS_MODEL_{TIER}_{VENDOR,MODEL}`` overrides into the raw tables.
 
@@ -701,10 +715,7 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
     complete selection, and requiring a file edit to make them land would mean
     no deployment could configure itself from the environment alone.
     """
-    known = {var for tier in TIER_NAMES for var in env_vars_for(tier)}
-    known |= {credentials_env_var_for(vendor) for vendor in VENDOR_NAMES}
-    known |= {charges_env_var_for(vendor) for vendor in VENDOR_NAMES}
-    known |= {upstreams_env_var_for(vendor) for vendor in VENDOR_NAMES}
+    known = env_variables()
     unknown = sorted(
         var for var in env if var.startswith(_ENV_PREFIX) and var not in known
     )

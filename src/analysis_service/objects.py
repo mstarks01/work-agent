@@ -19,6 +19,7 @@ import os
 import re
 import stat
 from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol, cast, get_args
@@ -149,7 +150,7 @@ class FilesystemObjectStore:
         refuse_unread(
             env,
             ("ANALYSIS_OBJECT_",),
-            ("ANALYSIS_OBJECT_STORE", "ANALYSIS_OBJECT_ROOT"),
+            OBJECT_STORES["filesystem"].reads,
             "the filesystem object store",
         )
         value = env.get("ANALYSIS_OBJECT_ROOT", "")
@@ -277,19 +278,56 @@ def _s3_store(env: Mapping[str, str]) -> ObjectStore:
     return S3ObjectStore.from_env(env)
 
 
+#: The files that hold the static key pair of the ``api_key`` mode of the
+#: ``s3`` store, by the ``boto3`` argument that each one fills. They live here,
+#: and not in :mod:`~analysis_service.s3_objects`, so that a reader without the
+#: ``aws`` extra can name them.
+S3_KEY_FILES: dict[str, str] = {
+    "aws_access_key_id": "ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE",
+    "aws_secret_access_key": "ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE",
+}
+
+
+@dataclass(frozen=True)
+class ObjectStoreBackend:
+    """One ``ANALYSIS_OBJECT_STORE`` value: a row of :data:`OBJECT_STORES`.
+
+    No field has a default, so a new row states every fact.
+    """
+
+    #: Builds the store from the environment.
+    build: Callable[[Mapping[str, str]], ObjectStore]
+    #: Every ``ANALYSIS_OBJECT_*`` setting that this store reads. The store
+    #: refuses each other one, and the Settings page shows only these.
+    reads: tuple[str, ...]
+
+
 ObjectStoreName = Literal["filesystem", "s3"]
 
 #: Each ``ANALYSIS_OBJECT_STORE`` value, and how to build its store from the
 #: environment. The table answers for every name of :data:`ObjectStoreName`.
-OBJECT_STORES: dict[ObjectStoreName, Callable[[Mapping[str, str]], ObjectStore]] = {
-    "filesystem": FilesystemObjectStore.from_env,
-    "s3": _s3_store,
+OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
+    "filesystem": ObjectStoreBackend(
+        build=FilesystemObjectStore.from_env,
+        reads=("ANALYSIS_OBJECT_STORE", "ANALYSIS_OBJECT_ROOT"),
+    ),
+    "s3": ObjectStoreBackend(
+        build=_s3_store,
+        reads=(
+            "ANALYSIS_OBJECT_STORE",
+            "ANALYSIS_OBJECT_BUCKET",
+            "ANALYSIS_OBJECT_REGION",
+            "ANALYSIS_OBJECT_ENDPOINT",
+            "ANALYSIS_OBJECT_ADDRESSING",
+            "ANALYSIS_OBJECT_CREDENTIALS",
+            *S3_KEY_FILES.values(),
+        ),
+    ),
 }
 
 
 def build_object_store(env: Mapping[str, str]) -> ObjectStore:
     """Build the object store that ``ANALYSIS_OBJECT_STORE`` names; fail closed."""
     value = env.get("ANALYSIS_OBJECT_STORE", "")
-    return OBJECT_STORES[closed_setting(value, "ANALYSIS_OBJECT_STORE", OBJECT_STORES)](
-        env
-    )
+    name = closed_setting(value, "ANALYSIS_OBJECT_STORE", OBJECT_STORES)
+    return OBJECT_STORES[name].build(env)

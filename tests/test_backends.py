@@ -12,7 +12,12 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.objects import OBJECT_STORES, ObjectName, ObjectStoreName
+from analysis_service.objects import (
+    OBJECT_STORES,
+    ObjectName,
+    ObjectStoreBackend,
+    ObjectStoreName,
+)
 from analysis_service.sql_store import (
     DATABASE_CREDENTIALS,
     DATABASE_IAM,
@@ -20,6 +25,7 @@ from analysis_service.sql_store import (
     DIGEST_COLUMNS,
     Database,
     DatabaseCredentialMode,
+    DatabaseCredentials,
     DatabaseDriver,
     DatabaseIam,
     DatabaseIamName,
@@ -45,7 +51,15 @@ def test_each_table_answers_for_every_value_of_its_registry(table, registry):
 
 
 @pytest.mark.parametrize(
-    "row", [JobStoreBackend, Database, DatabaseIam, ObjectStoreEnv]
+    "row",
+    [
+        JobStoreBackend,
+        ObjectStoreBackend,
+        Database,
+        DatabaseCredentials,
+        DatabaseIam,
+        ObjectStoreEnv,
+    ],
 )
 def test_a_row_states_every_fact(row):
     """A default is how a new row stays silent about a fact."""

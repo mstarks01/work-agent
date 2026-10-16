@@ -11,6 +11,26 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping
 from typing import TypeVar
 
+#: The settings of the database of the ``sql`` job store. They live here, and
+#: not in :mod:`~analysis_service.sql_store`, so that a reader without the
+#: ``sql`` extra can name them. The rows of
+#: :data:`~analysis_service.sql_store.DATABASES` and
+#: :data:`~analysis_service.sql_store.DATABASE_CREDENTIALS` read them.
+DATABASE_URL_VAR = "ANALYSIS_DATABASE_URL"
+DATABASE_CREDENTIALS_VAR = "ANALYSIS_DATABASE_CREDENTIALS"
+DATABASE_PASSWORD_FILE_VAR = "ANALYSIS_DATABASE_PASSWORD_FILE"
+DATABASE_CA_FILE_VAR = "ANALYSIS_DATABASE_CA_FILE"
+DATABASE_IAM_VAR = "ANALYSIS_DATABASE_IAM"
+DATABASE_REGION_VAR = "ANALYSIS_DATABASE_REGION"
+DATABASE_VARIABLES = (
+    DATABASE_URL_VAR,
+    DATABASE_CREDENTIALS_VAR,
+    DATABASE_PASSWORD_FILE_VAR,
+    DATABASE_CA_FILE_VAR,
+    DATABASE_IAM_VAR,
+    DATABASE_REGION_VAR,
+)
+
 
 class StoreConfigError(ValueError):
     """A setting of the job store, the object store or the database is missing

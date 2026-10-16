@@ -24,12 +24,12 @@ from moto.core import set_initial_no_auth_action_count
 
 from analysis_service.aws_identity import PLATFORM_METHODS, platform_session
 from analysis_service.objects import (
+    S3_KEY_FILES,
     ObjectStore,
     ObjectStoreName,
     build_object_store,
     object_key,
 )
-from analysis_service.s3_objects import KEY_FILES
 from analysis_service.store_backends import build_store
 from analysis_service.store_settings import StoreConfigError
 from tests.sql_stores import (
@@ -271,7 +271,7 @@ def iam(env: dict[str, str]) -> dict[str, str]:
     """``env`` in the ``iam`` mode, with no key file."""
     return changed(
         env,
-        {"ANALYSIS_OBJECT_CREDENTIALS": "iam", **dict.fromkeys(KEY_FILES.values())},
+        {"ANALYSIS_OBJECT_CREDENTIALS": "iam", **dict.fromkeys(S3_KEY_FILES.values())},
     )
 
 

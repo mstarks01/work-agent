@@ -8,7 +8,9 @@ a redirected path is honoured everywhere rather than only on the service side.
 
 from __future__ import annotations
 
+import re
 import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -27,6 +29,7 @@ from analysis_service.deployment import (
     CAPABILITY_READER_VAR,
     COMPACT_EXTRACTION_VAR,
     MODEL_TIERS_VAR,
+    PASS_FLAGS,
     RESILIENCE_VAR,
     SAMPLING_VAR,
     ConfigPaths,
@@ -342,6 +345,40 @@ def test_an_entry_that_extracts_nothing_records_no_transport():
 
     assert seeded.extraction_format is None
     assert extracting.extraction_format == COMPACT_FORMAT
+
+
+# --- The optional passes ----------------------------------------------------
+
+#: What each optional pass sets on a Deployment.
+PASS_READS = {
+    ASSERTIONS_VAR: lambda deployment: deployment.assertions,
+    CAPABILITY_READER_VAR: lambda deployment: deployment.capability_reader,
+    COMPACT_EXTRACTION_VAR: (
+        lambda deployment: deployment.extraction_format == COMPACT_FORMAT
+    ),
+}
+
+
+def test_each_optional_pass_takes_its_default_from_pass_flags(monkeypatch):
+    assert set(PASS_READS) == set(PASS_FLAGS)
+    for var, read in PASS_READS.items():
+        assert read(Deployment.from_env(env=VERTEX_ENV)) is PASS_FLAGS[var]
+        monkeypatch.setitem(PASS_FLAGS, var, not PASS_FLAGS[var])
+        assert read(Deployment.from_env(env=VERTEX_ENV)) is PASS_FLAGS[var]
+
+
+def test_the_optional_passes_table_states_each_pass_and_its_default():
+    """The "Optional passes" table of ``Configuration.md`` agrees with
+    :data:`PASS_FLAGS`: one row for each pass, and "On by default" only in the
+    row of a pass that is on by default."""
+    doc = Path(__file__).resolve().parents[1] / "docs" / "Configuration.md"
+    section = doc.read_text(encoding="utf-8").split("### Optional passes\n", 1)[1]
+    section = section.split("\n#", 1)[0]
+    row = re.compile(r"^\| `(ANALYSIS_[A-Z_]+)` \|[^|]*\|(.*)\|$", re.MULTILINE)
+    rows = dict(row.findall(section))
+    assert set(rows) == set(PASS_FLAGS)
+    for var, text in rows.items():
+        assert ("On by default" in text) is PASS_FLAGS[var], var
 
 
 # --- The assertion pass -----------------------------------------------------
