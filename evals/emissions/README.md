@@ -43,6 +43,7 @@ wrote, and `evals/harness/archive.py` names the spelling each kind carries.
 | `20261015T-rule6-bcd` | extraction | the rule 6 narrowing of #1734 (`business-critical-data` is the operating records no other tag names), all 16 cases, five runs (QA-2026-10-15-02-E4); `20261012T-assets-rule6` is its before side |
 | `20261015T-rulings-refuted` | extraction | three ruled conventions as sentences on top of #1734 and #1735, all 16 cases, five runs (QA-2026-10-15-03-E1, refuted, never merged); `20261015T-rule4-app-process` is its before side for losses and `20261015T-rule6-bcd` for the tag |
 | `20261016T-rulings-two-sentences` | extraction | two corrected sentences for the console and the third-party rulings on top of #1749, all 16 cases, three runs and a case 14 pre-flight on luna through OpenAI (QA-2026-10-15-03-E2, refuted, never merged); `20261015T-rule4-app-process` is its before side, on another route |
+| `20261016T-rulings-exclusion` | extraction | the two corrected sentences plus the exclusion for a hosted service that is the described system, all 16 cases, five runs and a case 12 pre-flight on luna through OpenRouter flex (QA-2026-10-15-03-E3, null, never merged); `20261015T-rule4-app-process` is its before side for losses, on the same route, and `20261015T-rule6-bcd` for the tag |
 
 No archived arm ran the prompt now in the tree. `20261015T-rule4-app-process`
 ran without the rule 6 edit of #1734, and `20261015T-rule6-bcd` ran without the
