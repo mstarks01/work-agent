@@ -260,6 +260,28 @@ class TestAnExplicitNegativeIsNotAnExpectedPositive:
         # this one the case did judge.
         assert score.over_applied == ()
 
+    def test_applying_it_costs_precision_on_a_read_set(self, negative_case):
+        """A judged negative the run applies is a false positive the figure counts."""
+        frameworks = [
+            entry.model_copy(update={"reference_set": "exhaustive"})
+            if entry.name == "asvs"
+            else entry
+            for entry in negative_case.meta.frameworks
+        ]
+        read = replace(
+            negative_case,
+            meta=negative_case.meta.model_copy(update={"frameworks": frameworks}),
+        )
+        positives = self.positives(read)
+
+        score = score_applicability(
+            read, Block(ruling(r) for r in [*positives, "V9.1.1"])
+        )
+
+        assert score.negatives_applied == ("V9.1.1",)
+        assert score.precision == len(positives) / (len(positives) + 1)
+        assert pooled([score])["precision"] == round(score.precision, 4)
+
     def test_the_critic_rejecting_it_is_earned(self, negative_case):
         from evals.harness.applicability import score_yield
 

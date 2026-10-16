@@ -68,6 +68,11 @@ APPLIES: frozenset[str] = frozenset({"confirmed", "needs-info"})
 FRAMEWORK: FrameworkName = "asvs"
 
 
+#: The cells a run applied, which divide the precision figure. The per-case
+#: score and the pooled figures both sum these, so they count one denominator.
+APPLIED_CELLS = ("matched", "over_applied", "negatives_applied", "off_catalog")
+
+
 class ApplicabilityError(ValueError):
     """A case cannot be scored for ASVS at all."""
 
@@ -153,7 +158,9 @@ class ApplicabilityScore:
         """Of what the run said applies, how much the case expected.
 
         ``off_catalog`` counts against this: a claim naming a requirement the
-        level does not carry is still a claim the reader has to read.
+        level does not carry is still a claim the reader has to read. So does
+        ``negatives_applied``: a requirement the case judged not to apply is a
+        false positive when the run applies it.
 
         **``None`` on a sampled reference set**, which is every case until a
         **Case Sitting** clears one. The figure divides by the requirements the
@@ -171,7 +178,7 @@ class ApplicabilityScore:
         """
         if self.reference_set != "exhaustive":
             return None
-        applied = len(self.matched) + len(self.over_applied) + len(self.off_catalog)
+        applied = sum(len(getattr(self, cell)) for cell in APPLIED_CELLS)
         return len(self.matched) / applied if applied else 0.0
 
     def to_json(self) -> dict[str, Any]:
@@ -889,9 +896,7 @@ def pooled_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     must_find_missed = sum(len(row["must_find_missed"]) for row in rows)
     read = [row for row in rows if row["reference_set"] == "exhaustive"]
     read_matched = sum(len(row["matched"]) for row in read)
-    applied = read_matched + sum(
-        len(row["over_applied"]) + len(row["off_catalog"]) for row in read
-    )
+    applied = sum(len(row[cell]) for row in read for cell in APPLIED_CELLS)
     return {
         "cases": len(rows),
         "expected": expected,
