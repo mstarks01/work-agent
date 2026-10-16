@@ -56,8 +56,10 @@ def deployment_variables() -> tuple[str, ...]:
 def secret_vars() -> frozenset[str]:
     """Every variable that names a secret file.
 
-    **The one reader of that fact.** The Settings page, its write-only key
-    field and the file permission check call it. It collects the secret
+    **The one reader of that fact.** The Settings page and its write-only key
+    field call it. Each loader reads the file of one of these variables
+    through :func:`~analysis_service.vendors.read_secret`, which applies the
+    permission rule of a secret file. It collects the secret
     credential variables of each vendor and mode, the key files of the ``s3``
     object store, and the database password file. A ``_FILE`` suffix does not
     make a secret: ``ANALYSIS_TIERS_FILE`` names a config file, and
