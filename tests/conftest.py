@@ -11,6 +11,7 @@ from collections.abc import Iterator
 
 import pytest
 
+from analysis_service.config_files import SETTINGS_DIR_VAR
 from analysis_service.offline import OFFLINE_ENV
 from analysis_service.vendors import VENDORS, refused_var
 
@@ -41,6 +42,18 @@ def _selected_tiers(monkeypatch: pytest.MonkeyPatch) -> None:
         for mode in vendor.credentials:
             for var in vendor.secret_env_vars(mode):
                 monkeypatch.delenv(refused_var(var), raising=False)
+
+
+@pytest.fixture(scope="session")
+def _empty_settings_dir(tmp_path_factory: pytest.TempPathFactory) -> str:
+    return str(tmp_path_factory.mktemp("settings"))
+
+
+@pytest.fixture(autouse=True)
+def _settings_dir(monkeypatch: pytest.MonkeyPatch, _empty_settings_dir: str) -> None:
+    """Point the first-run app at an empty settings directory, so no test
+    reads the ``settings.env`` of the developer's machine."""
+    monkeypatch.setenv(SETTINGS_DIR_VAR, _empty_settings_dir)
 
 
 @pytest.fixture(autouse=True)

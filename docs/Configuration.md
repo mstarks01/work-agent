@@ -999,6 +999,42 @@ the curve, because it does not vary by deployment.
 
 ## Environment variables
 
+### The settings directory of the first-run app
+
+The first-run app reads its settings from the process environment and from
+`settings.env` in one settings directory. The `/v1` service reads only the
+process environment.
+
+The settings directory is `$XDG_CONFIG_HOME/work-agent/`. When
+`XDG_CONFIG_HOME` is unset or is not an absolute path, it is
+`~/.config/work-agent/`. Set `ANALYSIS_SETTINGS_DIR` in the process
+environment to use another directory. `settings.env` cannot set
+`ANALYSIS_SETTINGS_DIR`. A missing directory or a missing `settings.env` is not
+an error.
+
+`settings.env` has a strict format, so that the same file loads in systemd
+`EnvironmentFile=` and in `docker --env-file`:
+
+- Each line is `KEY=value` or an empty line. The app splits the file on `\n`
+  only.
+- `KEY` matches `ANALYSIS_[A-Z0-9_]+`, and it is one of the variables on this
+  page. Each key occurs one time.
+- The value is all of the text after the first `=`. The format has no quotes,
+  no `export`, no `$` expansion and no comments.
+- A value is printable, has 4,096 characters or fewer, has no whitespace at
+  either end, has no `\` and no `$`, and does not start with `'` or `"`. The
+  same rule applies to each of these variables in the process environment.
+
+```text
+ANALYSIS_MODEL_BASE_VENDOR=anthropic
+ANALYSIS_MODEL_BASE_MODEL=claude-sonnet-5
+ANALYSIS_ANTHROPIC_API_KEY_FILE=/home/integrator/.config/work-agent/anthropic_api_key
+```
+
+The engine does not start when a line breaks one of these rules, or when the
+process environment and `settings.env` set the same variable. The diagnostic
+page names the variable and the line number, and never the value.
+
 ### Config paths (override where files are read from)
 
 | Variable | Overrides |

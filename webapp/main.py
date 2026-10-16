@@ -149,6 +149,7 @@ from analysis_service.answer_state import (
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
 from analysis_service.claims import UnknownKey
+from analysis_service.config_files import SettingsFileError
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
 from analysis_service.engine import DEFAULT_CALLER
@@ -207,6 +208,7 @@ from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
+from analysis_service.settings_variables import deployment_env
 from analysis_service.sources import (
     ANSWERS_LABEL,
     MAX_SYSTEM_NAME_CHARS,
@@ -622,8 +624,9 @@ class Startup:
         )
 
 
-def build_startup() -> Startup:
-    """Resolve the config and prove the credentials, or convert the failure to a page.
+def build_startup(env: Mapping[str, str]) -> Startup:
+    """Resolve the config from ``env`` and prove the credentials, or convert
+    the failure to a page.
 
     Two stages, and the split is the whole content of the diagnostic. Resolving
     the :class:`~analysis_service.deployment.Deployment` reads the config files;
@@ -647,7 +650,7 @@ def build_startup() -> Startup:
     """
     deployment = None
     try:
-        deployment = Deployment.from_env(os.environ)
+        deployment = Deployment.from_env(env)
         deployment.runner(deployment.frameworks)
     except ConfigError as exc:
         logger.error("config error at startup: %s", exc)
@@ -1000,16 +1003,26 @@ async def _over_limit(request: Request, exc: SourcesOverLimit) -> JSONResponse:
 
 
 def create_app(
-    startup: Startup | None = None, workspace: Workspace | None = None
+    startup: Startup | None = None,
+    workspace: Workspace | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> FastAPI:
     """The ASGI app.
 
-    Both collaborators are injectable so the offline lane can drive the app
-    without credentials: ``startup`` supplies a stub runner, and ``workspace``
-    lets a test bound the jobs held or hand the app a store of its own.
+    The collaborators are injectable so the offline lane can drive the app
+    without credentials: ``startup`` supplies a stub runner, ``workspace``
+    lets a test bound the jobs held or hand the app a store of its own, and
+    ``env`` replaces the process environment.
 
-    The app builds the store and the workspace first, from the process
-    environment, before the Deployment and without it (ADR 0093). Without a
+    The app reads one mapping:
+    :func:`~analysis_service.settings_variables.deployment_env` adds the lines
+    of ``settings.env`` in the settings directory to the process environment
+    (ADR 0092). Where it refuses the file, the cell stays empty and the
+    diagnostic page names the refusal, and the store reads the process
+    environment alone.
+
+    The app builds the store and the workspace first, from that mapping,
+    before the Deployment and without it (ADR 0093). Without a
     ``workspace``, it builds its store with
     :func:`~analysis_service.store_backends.build_store` from the service's
     backend settings, and an unusable setting raises, also where the
@@ -1023,12 +1036,18 @@ def create_app(
     The app holds what the routes run on in one :class:`Cell`, as
     ``app.state.cell``.
     """
-    env = os.environ
+    process_env = os.environ if env is None else env
+    try:
+        env = deployment_env(process_env)
+    except SettingsFileError as exc:
+        logger.error("config error at startup: %s", exc)
+        env = process_env
+        startup = Startup(settings=None, frameworks=(), tiers=None, error=exc)
     if workspace is None:
         store = build_store({"ANALYSIS_JOB_STORE": "memory", **env})
         logger.info(store_note(store))
         workspace = Workspace(store=store)
-    state = build_startup() if startup is None else startup
+    state = build_startup(env) if startup is None else startup
     cell = Cell(state.current(workspace.store))
     app = FastAPI(
         title="Work Agent",
@@ -1058,7 +1077,7 @@ def create_app(
     async def form_page() -> Response:
         current = cell.current
         if current is None:
-            return response(diagnostic_page(state), status_code=503)
+            return response(diagnostic_page(state, env), status_code=503)
         return response(
             render(
                 _FORM_PAGE,
@@ -1636,7 +1655,7 @@ def _tier_lines(tiers: ModelTierConfig | None) -> str:
     )
 
 
-def diagnostic_page(state: Startup) -> RenderedPage:
+def diagnostic_page(state: Startup, env: Mapping[str, str]) -> RenderedPage:
     """The fail-closed page that replaces the form when config is unusable.
 
     Carries the raised message (safe by construction — these errors name the
@@ -1653,13 +1672,11 @@ def diagnostic_page(state: Startup) -> RenderedPage:
         _DIAGNOSTIC_PAGE,
         _DIAGNOSTIC_GRANTS,
         message=escape(str(state.error)),
-        vendors=_vendor_sections(state.tiers),
+        vendors=_vendor_sections(state.tiers, env),
     )
 
 
-def _vendor_sections(
-    tiers: ModelTierConfig | None, env: Mapping[str, str] | None = None
-) -> str:
+def _vendor_sections(tiers: ModelTierConfig | None, env: Mapping[str, str]) -> str:
     """Each bound vendor's declared mode and required variables, set or unset.
 
     ``required_env_vars`` comes from the same registry entry that performs the
@@ -1687,7 +1704,6 @@ def _vendor_sections(
     the page would mark every variable "set" while the run still failed at bind
     time, which is exactly the drift this section exists not to have.
     """
-    env = os.environ if env is None else env
     if tiers is None:
         # Covers both "the file is broken" and the ordinary first-run case where
         # it is fine but selects nothing. Which variables to set is a question
