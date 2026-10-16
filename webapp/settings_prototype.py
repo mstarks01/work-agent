@@ -362,3 +362,25 @@ _PAGE = """<!doctype html>
 </body>
 </html>
 """
+
+
+if __name__ == "__main__":
+    # PROTOTYPE only: serve the stub page alone on the network, for a headless
+    # host. The first-run app itself stays on loopback; this app has no other
+    # route, reads no setting and writes nothing.
+    import socket
+    import sys
+
+    import uvicorn
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+    from webapp.page import LOOPBACK_HOSTS, SecurityHeaders
+
+    port = 8017
+    hosts = [*LOOPBACK_HOSTS, socket.gethostname(), *sys.argv[1:]]
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
+    app.add_middleware(SecurityHeaders)
+    mount(app)
+    print(f"Settings prototype on port {port} for hosts {hosts}")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
