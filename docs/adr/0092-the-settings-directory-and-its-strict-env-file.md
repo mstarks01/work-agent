@@ -51,6 +51,16 @@ It refuses any other line and gives the line number. It also refuses a key
 that occurs two times. The same file loads in systemd `EnvironmentFile=` and
 in `docker --env-file`.
 
+**The value rule.** A value is printable (`str.isprintable()`), has 4,096
+characters or fewer, has no `\`, has no whitespace at either end, and does not
+start with `'` or `"`. The parser splits the file on `\n` only. One function in
+`config_files.py` holds the rule. The writer calls it, and the merge calls it
+for each value from the process environment and from `settings.env`. systemd
+removes whitespace at the ends of a value, reads `\` as an escape and as a line
+continuation, and reads a value that starts with a quote as quoted text that
+can span lines. Each refused form would give systemd a different value or a
+second entry.
+
 **The write.** The app makes the directory at the first save, not at
 startup. It makes the directory with mode `0700`. It
 writes each file to a new temporary file in the same directory with mode
