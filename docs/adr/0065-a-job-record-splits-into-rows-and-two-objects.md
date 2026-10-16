@@ -39,8 +39,12 @@ provider.
   that must parse a record of another version refuses it. A read of the job
   row parses no part that the version covers until the function accepts the
   version. These parts are the objects, the checkpoint, the resumption, the
-  answers, the fact keys, the framework selection and the node runs, and
-  `envelope_parts` names them. A read of a stored answer keeps the value
+  answers, the fact keys, the framework selection and the node runs.
+  `RECORD_FIELDS` states for each field of a record whether the version
+  covers it, and `envelope_parts` reads that table. The version does not
+  cover the events, the validation issues, the error or the
+  certification, because the status route and the report gate read them
+  for a record of any version. A read of a stored answer keeps the value
   that the service wrote when it admitted the answer, so a change to the
   wording of a question never makes a record unreadable. No migration rewrites a stored report, checkpoint or sources
   object ([#1532](https://github.com/mstarks01/work-agent/issues/1532)).

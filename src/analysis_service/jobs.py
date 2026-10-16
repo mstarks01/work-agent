@@ -136,35 +136,71 @@ def same_schema(version: str) -> bool:
     return version == SCHEMA_VERSION
 
 
-#: The parts of a record that an envelope never holds: nearly all of a
-#: record's weight, and each read by name after :func:`same_schema`.
-_OBJECT_PARTS = ("sources", "report", "checkpoint", "resumption")
+#: When an envelope holds a field of a record. ``always``: for a record of
+#: any version. ``same-schema``: only where :func:`same_schema` accepts the
+#: record's version, because the schema version covers the field's shape.
+#: ``never``: the field is read by name, after :func:`same_schema`.
+EnvelopeHold = Literal["always", "same-schema", "never"]
+
+#: How an envelope holds each field of :class:`JobRecord`. A test checks the
+#: keys against ``JobRecord.model_fields``, so each new field states its row.
+RECORD_FIELDS: dict[str, EnvelopeHold] = {
+    "id": "always",
+    "owner_id": "always",
+    "schema_version": "always",
+    "sources": "never",
+    "frameworks": "same-schema",
+    "system_name": "always",
+    "answers": "same-schema",
+    "shown_early": "same-schema",
+    "corrections": "same-schema",
+    "draft": "same-schema",
+    "revision": "always",
+    "skipped_early": "same-schema",
+    "resumption": "never",
+    "amends": "always",
+    "parent_revision": "always",
+    "carried": "same-schema",
+    "ask_questions": "always",
+    "checkpoint": "never",
+    "status": "always",
+    "created_at": "always",
+    "updated_at": "always",
+    # The status route and the run stream serve the events, the issues and
+    # the error for a record of any version. The schema version does not
+    # cover their shapes.
+    "events": "always",
+    "validation_issues": "always",
+    "error": "always",
+    "report": "never",
+    # The report route serves a report of any version, and the certification
+    # gate reads this field first, so a withheld report stays withheld.
+    "certification": "always",
+    "reserved_tokens": "always",
+    "measured_tokens": "always",
+    "unreported_nodes": "same-schema",
+}
 
 
 def envelope_parts(schema_version: str) -> dict[str, object]:
     """What an envelope of a record of ``schema_version`` holds in place of
-    each part it leaves out.
+    each part it leaves out: the field's default, or ``None`` where the
+    field has no default.
 
     **The one reader of "what does an envelope leave out"**, which both job
-    stores ask. The schema version covers two groups of parts. An envelope
-    never holds the objects. It holds the answers, the fact keys, the
-    selection and the node runs only where :func:`same_schema` accepts the
-    version. So no envelope parses a part of another version, and the run
-    list and the status route read a record of any version.
+    stores ask. It reads :data:`RECORD_FIELDS`. So no envelope parses a part
+    of another version, and the run list and the status route read a record
+    of any version.
     """
-    parts: dict[str, object] = dict.fromkeys(_OBJECT_PARTS)
-    if not same_schema(schema_version):
-        parts |= {
-            "frameworks": None,
-            "answers": NO_ANSWERS,
-            "shown_early": [],
-            "corrections": [],
-            "draft": NO_ANSWERS,
-            "skipped_early": [],
-            "carried": NO_ANSWERS,
-            "unreported_nodes": [],
-        }
-    return parts
+    left_out = {"never"} if same_schema(schema_version) else {"never", "same-schema"}
+    fields = JobRecord.model_fields
+    return {
+        name: None
+        if fields[name].is_required()
+        else fields[name].get_default(call_default_factory=True)
+        for name, hold in RECORD_FIELDS.items()
+        if hold in left_out
+    }
 
 
 # Stored on a failed job in place of any internal detail.

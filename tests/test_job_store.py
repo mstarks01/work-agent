@@ -24,6 +24,7 @@ from analysis_service.budgets import BudgetPolicy
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import (
     NON_LOCKING_STATUSES,
+    RECORD_FIELDS,
     RESTART_FAILURE_MESSAGE,
     Admission,
     Checkpoint,
@@ -1648,6 +1649,9 @@ class TestTheSchemaVersion:
             assert covered == (None, None, None, None)
         assert asyncio.run(store.sources(job, "alice")) == whole.sources
         assert asyncio.run(store.sources(job, "mallory")) is None
+
+    def test_every_field_states_how_an_envelope_holds_it(self):
+        assert RECORD_FIELDS.keys() == JobRecord.model_fields.keys()
 
     @pytest.mark.parametrize("version", [SCHEMA_VERSION, "2.10"])
     def test_an_envelope_holds_a_versioned_part_only_of_its_own_version(
