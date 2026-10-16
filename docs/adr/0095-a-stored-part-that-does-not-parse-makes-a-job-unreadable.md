@@ -4,7 +4,8 @@
 - **Date**: 2026-10-16
 - **Amends**: [ADR 0065](0065-a-job-record-splits-into-rows-and-two-objects.md),
   on which stored records a route can read
-- **Evidence**: the tests in this ADR's pull request
+- **Evidence**: the tests in this ADR's pull request, and in the pull
+  request that states that an unreadable job has ended
 
 ## Context
 
@@ -41,16 +42,28 @@ another schema version is**, by the maintainer's ruling 2026-10-16.
 - No value becomes another member of its set, and no migration rewrites the
   row. The restart scan leaves an unreadable job as stored and logs it.
 
+**An unreadable job has ended, whatever its stored status**, by the
+maintainer's ruling 2026-10-16. `ended` is the one reader of "has this job
+ended", and it asks `readable`.
+
+- Admission does not count an unreadable job in flight. Its charge still
+  counts against the token budgets.
+- Its owner can delete it. The owner check reads the `owner_id` column, so
+  another owner's delete answers as for a job that does not exist.
+- The retention sweep deletes it, as it deletes any job that has ended.
+- No stored status changes. The usage row of a deleted job keeps the stored
+  status, and a usage row holds no in-flight slot, because a store deletes
+  only a job that has ended.
+
 ## Consequences
 
 A change to a closed set that a row stores needs no version change to keep
 the list and the status route working. A job that holds a removed value
 stays unreadable, and its owner submits it again.
 
-`DELETE /v1/jobs/{id}` reads the status where it parses, so the owner can
-delete an unreadable job in a terminal status. Where the status does not
-parse, the delete returns `409`. The retention sweep also reads the status,
-so it keeps such a job.
-
-An unreadable job that is queued or running keeps its status. Admission
-counts it against its owner's in-flight jobs until a person removes the row.
+An unreadable job holds no in-flight slot, and its owner or the retention
+sweep can delete it, whatever its stored status. A job of another schema
+version is unreadable too, so a job that another version runs in a shared
+database is ended for this service. The restart scan still fails a queued or
+running job of another schema version, because it can read that job's
+envelope.

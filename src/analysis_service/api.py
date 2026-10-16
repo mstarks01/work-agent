@@ -95,13 +95,13 @@ from analysis_service.job_answers import (
     Withheld,
 )
 from analysis_service.jobs import (
-    TERMINAL_STATUSES,
     Admission,
     Envelope,
     JobRecord,
     JobStatus,
     JobStore,
     PipelineRunner,
+    ended,
     event_frames,
     execute_job,
     is_follow_up,
@@ -1029,14 +1029,13 @@ def create_app(
         """Delete a job in a terminal status, and keep its usage (ADR 0066).
 
         ``204`` where the job is deleted, and each route then reads it as
-        missing. ``409`` where the job is queued or running, or where its
-        stored status does not parse (ADR 0095). A missing job, another
-        owner's job and an ID of another shape share one ``404``.
+        missing. ``409`` where the job is queued or running and has not
+        :func:`~analysis_service.jobs.ended`: an unreadable job has ended,
+        whatever its stored status (ADR 0095). A missing job, another owner's
+        job and an ID of another shape share one ``404``.
         """
         record = await _answers(request).owned(job_id, owner_id)
-        if record.status is None:
-            raise UnreadableSchema(record.schema_version)
-        if record.status not in TERMINAL_STATUSES:
+        if not ended(record):
             raise HTTPException(
                 status_code=409,
                 detail="the job is queued or running; delete it when it ends",

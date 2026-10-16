@@ -16,6 +16,7 @@ import logging
 import os
 import sqlite3
 import stat
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,7 @@ from alembic.migration import MigrationContext
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
+from analysis_service import store_backends
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.api import create_app
 from analysis_service.certification import CertifyResult
@@ -644,6 +646,36 @@ def store_unlisted(database: str, job_id: str, case: str) -> None:
         assert connection.execute(statement, (value, job_id)).rowcount == 1
 
 
+#: Each value of :data:`UNLISTED` on a job that its stored status puts in
+#: flight. A removed status is itself the stored status.
+UNREADABLE_IN_FLIGHT = [
+    *(
+        (case, status)
+        for case in UNLISTED
+        if case != "a status"
+        for status in ("queued", "running")
+    ),
+    ("a status", "queued"),
+]
+
+
+def in_flight(
+    store: JobStore, status: str, days_ago: int = 0, owner: str = "alice"
+) -> str:
+    """The ID of a job of ``owner`` in ``status``, last updated ``days_ago``
+    days ago."""
+    record = JobRecord.create(
+        owner_id=owner,
+        sources=[Source.description("a web app storing orders")],
+        frameworks=sample_selection(),
+    )
+    if status == "running":
+        record.transition("running")
+    record.updated_at = datetime.now(UTC) - timedelta(days=days_ago, minutes=1)
+    asyncio.run(admit(store, record))
+    return record.id
+
+
 class TestAStoredValueThisServiceDoesNotList:
     """A stored part that does not parse makes the job unreadable, as another
     schema version does (ADR 0095, the maintainer's ruling of 2026-10-16)."""
@@ -686,16 +718,57 @@ class TestAStoredValueThisServiceDoesNotList:
             assert page.status_code == 409, page.text
             assert "submit the job again" in page.json()["detail"]
 
-    @pytest.mark.parametrize(("case", "deleted"), [*zip(UNLISTED, (204, 409, 204))])
-    def test_a_delete_reads_the_status_where_it_parses(self, env, case, deleted):
+    @pytest.mark.parametrize(("case", "status"), UNREADABLE_IN_FLIGHT)
+    def test_its_owner_deletes_it_and_another_owner_finds_nothing(
+        self, env, case, status
+    ):
+        """An unreadable job has ended, whatever its stored status (ADR 0095)."""
         store = build_store(env)
-        record = completed_job(store)
-        store_unlisted(database_of(env), record.id, case)
+        job = in_flight(store, status)
+        in_flight(store, "running", owner="bob")
+        store_unlisted(database_of(env), job, case)
         with TestClient(app_over(store)) as client:
-            response = client.delete(f"/v1/jobs/{record.id}", headers=auth())
-        assert response.status_code == deleted, response.text
-        if deleted == 409:
-            assert "submit the job again" in response.json()["detail"]
+            foreign = client.delete(f"/v1/jobs/{job}", headers=auth("bob-token"))
+            missing = client.delete(
+                f"/v1/jobs/job-{'0' * 32}", headers=auth("bob-token")
+            )
+            deleted = client.delete(f"/v1/jobs/{job}", headers=auth())
+        assert foreign.status_code == missing.status_code == 404, foreign.text
+        assert foreign.json() == missing.json()
+        assert deleted.status_code == 204, deleted.text
+
+    @pytest.mark.parametrize(("case", "status"), UNREADABLE_IN_FLIGHT)
+    def test_it_holds_no_slot(self, env, case, status):
+        store = build_store(env)
+        job = in_flight(store, status)
+        store_unlisted(database_of(env), job, case)
+        record = JobRecord.create(
+            owner_id="alice",
+            sources=[Source.description("a web app storing orders")],
+            frameworks=sample_selection(),
+        )
+        admission = asyncio.run(store.reserve(record, ceiling=1, budget=SEEDING_BUDGET))
+        assert admission.outcome == "admitted"
+
+    @pytest.mark.parametrize(("case", "status"), UNREADABLE_IN_FLIGHT)
+    def test_the_retention_sweep_removes_it_and_keeps_its_status(
+        self, env, case, status
+    ):
+        store = build_store(env)
+        job = in_flight(store, status, days_ago=30)
+        store_unlisted(database_of(env), job, case)
+        with sqlite3.connect(database_of(env)) as connection:
+            (stored,) = connection.execute(
+                "SELECT status FROM jobs WHERE id = ?", (job,)
+            ).fetchone()
+        assert asyncio.run(store.expired(datetime.now(UTC))) == [(job, "alice")]
+        asyncio.run(store_backends.expire_jobs(store, 1))
+        assert asyncio.run(store.owned(job, "alice")) is None
+        with sqlite3.connect(database_of(env)) as connection:
+            (kept,) = connection.execute(
+                "SELECT status FROM usage_rows WHERE job_id = ?", (job,)
+            ).fetchone()
+        assert kept == stored
 
     @pytest.mark.parametrize(
         "certification", ['{"certified": "maybe"}', '{"certified": true, "x": 1}']

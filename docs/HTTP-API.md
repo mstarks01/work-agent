@@ -44,7 +44,7 @@ token whose principal does not exist yet gets the same `404` as a missing job.
 | --- | --- | --- |
 | `POST` | `/v1/jobs` | Submit an ordered list of sources; returns a job handle. `429` when this token is already at its [concurrency ceiling](#how-many-jobs-you-may-run-at-once). |
 | `GET` | `/v1/jobs/{id}` | Poll: status, per-node progress, timestamps. Never the report. |
-| `DELETE` | `/v1/jobs/{id}` | Delete a job in a terminal status; `204`. `409` where the job is queued or running. See [Deleting a job](#deleting-a-job). |
+| `DELETE` | `/v1/jobs/{id}` | Delete a job that has ended; `204`. `409` where the job is queued or running. See [Deleting a job](#deleting-a-job). |
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
 | `GET` | `/v1/jobs/{id}/changes` | For a follow-up, how each finding moved since the report its answers came from: `new`, `unchanged`, `changed` (with the verdict before and after) or `gone`. Matched by claim identity, never by prose. `409` where the job is not a follow-up, where the earlier report is no longer held, or where either report is withheld or [from an older schema version](#a-job-from-an-older-schema-version). |
@@ -104,15 +104,17 @@ job of another version is ([ADR 0095](adr/0095-a-stored-part-that-does-not-parse
 `GET /v1/jobs/{id}` returns it with the status `unreadable`, the times, and
 no progress. Its events, its report and each route above return `409`, so a
 report whose certification does not parse is never served.
-`DELETE /v1/jobs/{id}` deletes it where its stored status is a terminal
-status, and returns `409` where the status does not parse.
+An unreadable job has ended, whatever its stored status. It takes none of
+your in-flight slots, `DELETE /v1/jobs/{id}` deletes it, and the
+[retention sweep](#retention) deletes it.
 
 ### Deleting a job
 
 `DELETE /v1/jobs/{id}` deletes a job and returns `204` with no body. Only the
-**Owner** can delete a job, and only a job in a terminal status: `completed`,
-`failed`, `rejected` or `awaiting-answers`. A `queued` or `running` job returns
-`409`, and the job stays as it is. A job that is not yours, a job that does not
+**Owner** can delete a job, and only a job that has ended: a job in a terminal
+status (`completed`, `failed`, `rejected` or `awaiting-answers`), or an
+[unreadable job](#a-job-from-an-older-schema-version). A `queued` or `running`
+job returns `409`, and the job stays as it is. A job that is not yours, a job that does not
 exist and an ID that is not `job-` with 32 lowercase hex digits all return the
 same `404`. The service checks the ID before it looks for the job.
 
@@ -634,7 +636,8 @@ over-sized body is refused whether or not it carries a token.
 ### How many jobs you may run at once
 
 Every rejection above is about the submission. One is about **you**: a token may
-hold only `max_active_jobs` jobs in flight — `queued` plus `running`.
+hold only `max_active_jobs` jobs in flight — `queued` plus `running`. An
+[unreadable job](#a-job-from-an-older-schema-version) is not in flight.
 [Input limits](Configuration.md#input-limits) gives the shipped value.
 
 | Status | Cause |
@@ -1087,9 +1090,10 @@ service keeps every job for ever. The value must be a whole number from 1 to
 
 When the period is set, a sweep in the service deletes each expired job. The
 sweep runs when the service starts and then once each hour, so a job stays
-for one hour after its period at most. The sweep deletes a job in a terminal
-status: `completed`, `failed`, `rejected` or `awaiting-answers`. It never
-deletes a `queued` or `running` job. The store checks the period again when it
+for one hour after its period at most. The sweep deletes a job that has
+ended: a job in a terminal status (`completed`, `failed`, `rejected` or
+`awaiting-answers`), or an [unreadable job](#a-job-from-an-older-schema-version).
+It never deletes a `queued` or `running` job. The store checks the period again when it
 deletes the job, so a job that changes after the sweep finds it stays. A swept job is deleted the same way as a
 job that its owner [deletes](#deleting-a-job): the job keeps its usage row,
 and the service log gets one line with the cause `retention`. The service
@@ -1151,7 +1155,7 @@ pair, so a new row runs every contract test. A new job store implements the
 | `report_json` | The owned job's report, already serialised. |
 | `events_after` | A job's status and the events past a cursor, and nothing else. |
 | `save` | The record back, for a job that already exists. |
-| `expired` | The ID and the owner ID of each job in a terminal status whose last update is before a given time. The retention sweep deletes each one through `delete`. |
+| `expired` | The ID and the owner ID of each job that has ended, in a terminal status or unreadable, whose last update is before a given time. The retention sweep deletes each one through `delete`. |
 | `sweep_orphans` | Deletes each object written before a given time that no job row names, except an object of a queued or running job, and returns the number of objects it removed. The orphan sweep calls it. |
 | `fail_in_flight` | Fails each `queued` or `running` job with the restart message and returns their IDs. It settles each job through `JobRecord.transition`, so the job keeps its full charge and gets a status event. It leaves an unreadable job as stored and logs it. |
 

@@ -106,6 +106,7 @@ from analysis_service.jobs import (
     UsageRow,
     check_bounds,
     check_save,
+    ended,
     envelope_parts,
     is_follow_up,
     locks_its_parent,
@@ -386,7 +387,28 @@ def _envelope(row: Row[Any], events: Sequence[str]) -> Envelope:
         created_at=row.created_at,
         updated_at=row.updated_at,
         status=status,
+        reserved_tokens=row.reserved_tokens,
+        measured_tokens=row.measured_tokens,
     )
+
+
+async def _events(connection: AsyncConnection, job_id: str) -> list[str]:
+    """The events of the job ``job_id``, as stored, in order."""
+    events = await connection.scalars(
+        select(job_events.c.event)
+        .where(job_events.c.job_id == job_id)
+        .order_by(job_events.c.seq)
+    )
+    return list(events.all())
+
+
+async def _ended(connection: AsyncConnection, row: Row[Any]) -> bool:
+    """:func:`~analysis_service.jobs.ended` of the job that the job row
+    ``row`` holds. A terminal stored status ends a job whether it parses or
+    not, so only a row whose stored status leaves it in flight is parsed."""
+    if row.status in TERMINAL_STATUSES:
+        return True
+    return ended(_envelope(row, await _events(connection, row.id)))
 
 
 def _part_of(row: Row[Any], parse: Callable[[], Any]) -> Any:
@@ -1019,7 +1041,15 @@ class SqlJobStore:
                 if revision != record.parent_revision:
                     return Admission(outcome="parent_moved", active=0)
             counted = await connection.execute(_counted(budget.window_start()))
-            held = [UsageRow(**row._mapping) for row in counted]
+            held: list[Envelope | UsageRow] = []
+            for row in counted:
+                live = None
+                if (
+                    row.owner_id == record.owner_id
+                    and row.status not in TERMINAL_STATUSES
+                ):
+                    live = await self._envelope_in(connection, row.job_id)
+                held.append(UsageRow(**row._mapping) if live is None else live)
             admission = check_bounds(record, held, ceiling=ceiling, budget=budget)
             if admission.outcome != "admitted":
                 return admission
@@ -1069,12 +1099,18 @@ class SqlJobStore:
             row = (await connection.execute(query)).one_or_none()
             if row is None:
                 return None
-            events = await connection.scalars(
-                select(job_events.c.event)
-                .where(job_events.c.job_id == row.id)
-                .order_by(job_events.c.seq)
-            )
-            return row, list(events.all())
+            return row, await _events(connection, row.id)
+
+    async def _envelope_in(
+        self, connection: AsyncConnection, job_id: str
+    ) -> Envelope | None:
+        """The envelope of the job row ``job_id``, read in ``connection``, or
+        ``None`` where no job row holds it: a usage row is all that is left."""
+        found = await connection.execute(select(jobs).where(jobs.c.id == job_id))
+        row = found.one_or_none()
+        if row is None:
+            return None
+        return _envelope(row, await _events(connection, job_id))
 
     async def get(self, job_id: str) -> JobRecord | None:
         found = await self._row(select(jobs).where(jobs.c.id == job_id))
@@ -1389,8 +1425,9 @@ class SqlJobStore:
     ) -> int | None:
         """Turn the owned job's row into a usage row, then delete its objects
         (ADR 0066). The number of objects removed, or ``None`` where the job
-        is not the owner's, not terminal or not last updated before
-        ``updated_before``, and nothing changes."""
+        is not the owner's, has not :func:`~analysis_service.jobs.ended` or
+        was not last updated before ``updated_before``, and nothing changes.
+        The usage row keeps the stored status as it is."""
         query = (
             select(jobs)
             .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
@@ -1401,7 +1438,7 @@ class SqlJobStore:
         async with self._transaction(writes=True) as connection:
             found = await connection.execute(query)
             row = found.one_or_none()
-            if row is None or row.status not in TERMINAL_STATUSES:
+            if row is None or not await _ended(connection, row):
                 return None
             await connection.execute(
                 insert(usage_rows).values(
@@ -1463,14 +1500,15 @@ class SqlJobStore:
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
         async with self._transaction() as connection:
             found = await connection.execute(
-                select(jobs.c.id, jobs.c.owner_id)
-                .where(
-                    jobs.c.status.in_(sorted(TERMINAL_STATUSES)),
-                    jobs.c.updated_at < before,
-                )
+                select(jobs)
+                .where(jobs.c.updated_at < before)
                 .order_by(jobs.c.updated_at, jobs.c.id)
             )
-            return [(row.id, row.owner_id) for row in found]
+            return [
+                (row.id, row.owner_id)
+                for row in found.all()
+                if await _ended(connection, row)
+            ]
 
     async def fail_in_flight(self) -> list[str]:
         """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.
