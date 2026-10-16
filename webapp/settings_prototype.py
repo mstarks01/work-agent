@@ -368,19 +368,37 @@ if __name__ == "__main__":
     # PROTOTYPE only: serve the stub page alone on the network, for a headless
     # host. The first-run app itself stays on loopback; this app has no other
     # route, reads no setting and writes nothing.
+    import argparse
     import socket
-    import sys
 
     import uvicorn
+    from fastapi.responses import PlainTextResponse
     from starlette.middleware.trustedhost import TrustedHostMiddleware
 
     from webapp.page import LOOPBACK_HOSTS, SecurityHeaders
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("hosts", nargs="*", help="extra names of this host")
+    parser.add_argument(
+        "--client", action="append", default=[], help="a client IP to accept"
+    )
+    args = parser.parse_args()
+
     port = 8017
-    hosts = [*LOOPBACK_HOSTS, socket.gethostname(), *sys.argv[1:]]
+    hosts = [*LOOPBACK_HOSTS, socket.gethostname(), *args.hosts]
+    clients = {"127.0.0.1", *args.client}
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+    @app.middleware("http")
+    async def accept_listed_clients(request: Request, call_next):
+        if request.client is None or request.client.host not in clients:
+            return PlainTextResponse("This client is not accepted.", status_code=403)
+        return await call_next(request)
+
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
     app.add_middleware(SecurityHeaders)
     mount(app)
-    print(f"Settings prototype on port {port} for hosts {hosts}")
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    print(f"Settings prototype on port {port}: hosts {hosts}, clients {clients}")
+    uvicorn.run(
+        app, host="0.0.0.0", port=port, log_level="warning", proxy_headers=False
+    )
