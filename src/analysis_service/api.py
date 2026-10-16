@@ -30,6 +30,7 @@ only a submission creates a principal.
 from __future__ import annotations
 
 import logging
+import os
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
@@ -808,7 +809,7 @@ def create_app(
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
-        lifespan=lambda app: store_lifespan(app.state.store),
+        lifespan=lambda app: store_lifespan(app.state.store, os.environ),
     )
     app.state.store = store if store is not None else build_store()
     app.state.event_streams = Counter()

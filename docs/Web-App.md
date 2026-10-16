@@ -221,9 +221,10 @@ uv run python webapp/main.py
 
 The app starts in the order of [the service](HTTP-API.md#the-startup), and a
 failed step stops the startup. The only difference is the `memory` default at
-the first step. The restart scan fails each run that was queued or running at
-the last stop, and the run shows a message that names the restart. Submit that
-run again.
+the first step. The app builds the store and runs these steps before it builds
+the engine, so they also run when the app serves the diagnostic page. The
+restart scan fails each run that was queued or running at the last stop, and
+the run shows a message that names the restart. Submit that run again.
 
 After a restart over a `sql` store, the list of analyses shows the runs from
 before the restart. Each report opens, and your drafts, saved answers and

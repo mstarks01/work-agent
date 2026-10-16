@@ -175,6 +175,7 @@ from analysis_service.job_answers import (
     RunnerFor,
     RunnerUnavailable,
     SaveConflict,
+    Start,
     Started,
     UnreadableSchema,
     Withheld,
@@ -301,7 +302,8 @@ class Settings:
 
 
 class Workspace:
-    """The jobs this process holds, and what runs them.
+    """The jobs this process holds: the store, the tasks that run them, and
+    the cap on them.
 
     The jobs live in a job store, capped at ``max_jobs``. The oldest job
     that waits for no answers is deleted first, and a job that waits for
@@ -309,70 +311,69 @@ class Workspace:
     instead. One job runs at a time (LLM10): the store's admission refuses a
     second while one is in flight, with a message rather than a queue. A
     restart keeps the jobs of a durable store and loses those of ``memory``.
+
+    The workspace holds nothing of the Deployment, so it outlives a swap of
+    the :class:`Cell`. Each read through the job operations takes the
+    :class:`~analysis_service.job_answers.JobAnswers` that the route read
+    from the cell.
     """
 
     def __init__(
-        self,
-        settings: Settings,
-        *,
-        store: JobStore | None = None,
-        max_jobs: int = MAX_RUNS,
+        self, *, store: JobStore | None = None, max_jobs: int = MAX_RUNS
     ) -> None:
         self.store: JobStore = InMemoryJobStore() if store is None else store
-        self.answers = JobAnswers(
-            store=self.store,
-            runner_for=settings.runner_for,
-            limits=settings.limits,
-            ceiling=1,
-            budget=settings.budget,
-            carries_catalog=settings.carries_catalog,
-            gate=settings.gate,
-        )
-        self._deadline = settings.deadline_seconds
         self._max_jobs = max_jobs
         self._tasks: set[asyncio.Task[None]] = set()
 
-    def start(self, record: JobRecord, runner: PipelineRunner) -> None:
-        """Run an admitted job on this process's event loop."""
-        task = asyncio.create_task(
-            execute_job(self.store, runner, record.id, deadline_seconds=self._deadline)
-        )
-        # Held so the task is not garbage-collected mid-flight.
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+    def start(self, deadline_seconds: float) -> Start:
+        """What runs an admitted job on this process's event loop, under
+        ``deadline_seconds``. A job keeps the runner and the deadline that it
+        got at admission, whatever the cell holds later."""
 
-    async def owner_id(self, job_id: str) -> str:
+        def run(record: JobRecord, runner: PipelineRunner) -> None:
+            task = asyncio.create_task(
+                execute_job(
+                    self.store, runner, record.id, deadline_seconds=deadline_seconds
+                )
+            )
+            # Held so the task is not garbage-collected mid-flight.
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
+
+        return run
+
+    async def owner_id(self, answers: JobAnswers, job_id: str) -> str:
         """The operator's owner ID, by :meth:`JobAnswers.owner_id`. Before the
         first submission the operator owns no job, so ``job_id`` reads as
         missing."""
-        return await self.answers.owner_id(OPERATOR, job_id)
+        return await answers.owner_id(OPERATOR, job_id)
 
-    async def owned(self, job_id: str) -> Envelope | None:
+    async def owned(self, answers: JobAnswers, job_id: str) -> Envelope | None:
         """The operator's job ``job_id``, as an envelope, or ``None``."""
         try:
-            return await self.answers.owned(job_id, await self.owner_id(job_id))
+            return await answers.owned(job_id, await self.owner_id(answers, job_id))
         except NoSuchJob:
             return None
 
-    async def envelope(self, job_id: str) -> JobRecord | None:
+    async def envelope(self, answers: JobAnswers, job_id: str) -> JobRecord | None:
         """The operator's job ``job_id``, as an envelope that parses, or
         ``None``. Raises :class:`UnreadableSchema` where it does not parse."""
         try:
-            return await self.answers.envelope(job_id, await self.owner_id(job_id))
+            return await answers.envelope(job_id, await self.owner_id(answers, job_id))
         except NoSuchJob:
             return None
 
-    async def parsable(self, job_id: str) -> JobRecord | None:
+    async def parsable(self, answers: JobAnswers, job_id: str) -> JobRecord | None:
         """The operator's job ``job_id``, as an envelope, or ``None``. Raises
         :class:`UnreadableSchema` where this app cannot parse the record."""
         try:
-            return await self.answers.parsable(job_id, await self.owner_id(job_id))
+            return await answers.parsable(job_id, await self.owner_id(answers, job_id))
         except NoSuchJob:
             return None
 
-    async def jobs(self) -> list[Envelope]:
+    async def jobs(self, answers: JobAnswers) -> list[Envelope]:
         """Every job of the operator, as envelopes, oldest first."""
-        owner_id = await self.answers.held_owner_id(OPERATOR)
+        owner_id = await answers.held_owner_id(OPERATOR)
         if owner_id is None:
             return []
         return await self.store.owned_jobs(owner_id)
@@ -392,7 +393,9 @@ class Workspace:
         return child is None or child.status != "completed"
 
     @asynccontextmanager
-    async def make_room(self, *, answering: str | None = None) -> AsyncIterator[None]:
+    async def make_room(
+        self, answers: JobAnswers, *, answering: str | None = None
+    ) -> AsyncIterator[None]:
         """Delete the oldest jobs that wait for nothing, once the body admits a
         new job, until that job fits.
 
@@ -409,7 +412,7 @@ class Workspace:
         """
         limit = self._max_jobs + (answering is not None)
         chosen_at = datetime.now(UTC)
-        held = await self.jobs()
+        held = await self.jobs(answers)
         removable = [
             job
             for job in held
@@ -428,18 +431,6 @@ class Workspace:
             await audited_delete(
                 self.store, job.id, job.owner_id, "workspace", updated_before=chosen_at
             )
-
-    def served(self, record: Envelope) -> bool:
-        """True where :meth:`JobAnswers.servable` lets this job's report be
-        served. Each view that links to a report or shows one asks it. A job
-        whose envelope does not parse has no report to serve."""
-        if not isinstance(record, JobRecord):
-            return False
-        try:
-            self.answers.servable(record)
-        except (NotCompleted, Withheld):
-            return False
-        return True
 
     async def parent_of(self, record: Envelope) -> str | None:
         """The job this one resumes or amends: :func:`parent_of` over the
@@ -467,10 +458,10 @@ class Workspace:
             current = above
         return current.id
 
-    async def snapshots(self) -> list[dict[str, object]]:
+    async def snapshots(self, answers: JobAnswers) -> list[dict[str, object]]:
         """Latest retained job per analysis, with its retained reports, newest first."""
         grouped: dict[str, list[Envelope]] = {}
-        for record in await self.jobs():
+        for record in await self.jobs(answers):
             grouped.setdefault(await self.workspace_id(record), []).append(record)
         snapshots = []
         for records in reversed(list(grouped.values())):
@@ -479,18 +470,21 @@ class Workspace:
                 if await self.waiting(record):
                     shown = record
                     break
-            snapshots.append(await self.snapshot(shown, records))
+            snapshots.append(await self.snapshot(answers, shown, records))
         return snapshots
 
     async def snapshot(
-        self, record: Envelope, related: list[Envelope] | None = None
+        self,
+        answers: JobAnswers,
+        record: Envelope,
+        related: list[Envelope] | None = None,
     ) -> dict[str, object]:
         """Public workspace metadata; descriptions only on the detail route."""
         if related is None:
             group = await self.workspace_id(record)
             related = [
                 item
-                for item in await self.jobs()
+                for item in await self.jobs(answers)
                 if await self.workspace_id(item) == group
             ]
         return {
@@ -508,9 +502,52 @@ class Workspace:
                     "generated_at": item.updated_at.isoformat(),
                 }
                 for item in related
-                if self.served(item)
+                if served(answers, item)
             ],
         }
+
+
+def served(answers: JobAnswers, record: Envelope) -> bool:
+    """True where :meth:`JobAnswers.servable` lets this job's report be
+    served. Each view that links to a report or shows one asks it. A job
+    whose envelope does not parse has no report to serve."""
+    if not isinstance(record, JobRecord):
+        return False
+    try:
+        answers.servable(record)
+    except (NotCompleted, Withheld):
+        return False
+    return True
+
+
+@dataclass(frozen=True)
+class Current:
+    """What the routes run on now: the job operations of one Deployment on
+    the running store, the job deadline, and what the pages show of it.
+
+    ``answers`` holds the runner, the bounds and the certification gate.
+    ``frameworks`` and ``tiers`` are the page view: what the picker offers
+    and allow-lists, and the tier lines. The Deployment stays in memory
+    through ``answers.runner_for`` while a request or a job holds it.
+    """
+
+    answers: JobAnswers
+    deadline_seconds: float
+    frameworks: tuple[FrameworkName, ...]
+    tiers: ModelTierConfig | None
+
+
+@dataclass
+class Cell:
+    """The one place that holds the :class:`Current` (ADR 0093).
+
+    ``current`` is ``None`` where the Deployment did not build, and the
+    diagnostic page then serves. A swap replaces ``current`` in one
+    assignment. Each route reads it one time, at its start, and uses only
+    that value, so one request never reads two Deployments.
+    """
+
+    current: Current | None
 
 
 DEFAULT_NAME = "Your system"
@@ -550,9 +587,9 @@ def _page_status(record: Envelope) -> JobStatus | Literal["unreadable"]:
 class Startup:
     """What starting up produced: what the app can offer, or the failure.
 
-    The app serves either way. If construction raised, every route that would
-    run a model is replaced by the diagnostic page, so no analysis can run on a
-    model nobody chose — fail-closed, but explained.
+    The app serves either way. If construction raised, the cell is empty and
+    every route that would run a model is replaced by the diagnostic page, so
+    no analysis can run on a model nobody chose — fail-closed, but explained.
 
     ``frameworks`` is what this install carries, which is what the picker
     offers and what :func:`_selection` allow-lists against. It is not itself a
@@ -565,9 +602,26 @@ class Startup:
     tiers: ModelTierConfig | None
     error: ConfigError | None
 
-    @property
-    def ok(self) -> bool:
-        return self.settings is not None
+    def current(self, store: JobStore) -> Current | None:
+        """What the routes run on, with the job operations on ``store``, or
+        ``None`` where the startup failed."""
+        settings = self.settings
+        if settings is None:
+            return None
+        return Current(
+            answers=JobAnswers(
+                store=store,
+                runner_for=settings.runner_for,
+                limits=settings.limits,
+                ceiling=1,
+                budget=settings.budget,
+                carries_catalog=settings.carries_catalog,
+                gate=settings.gate,
+            ),
+            deadline_seconds=settings.deadline_seconds,
+            frameworks=self.frameworks,
+            tiers=self.tiers,
+        )
 
 
 def build_startup() -> Startup:
@@ -956,28 +1010,36 @@ def create_app(
     without credentials: ``startup`` supplies a stub runner, and ``workspace``
     lets a test bound the jobs held or hand the app a store of its own.
 
-    Without a ``workspace``, the app builds its store with
-    :func:`~analysis_service.store_backends.build_store` from the service's backend
-    settings, and an unusable setting raises. Where ``ANALYSIS_JOB_STORE`` is
-    unset, the store is ``memory``, so a first run needs no setting. The app
-    logs :func:`store_note` for the store it built. At startup, before the app takes a request, the app runs
-    :func:`~analysis_service.store_backends.store_lifespan` over the store, as the
-    service does.
+    The app builds the store and the workspace first, from the process
+    environment, before the Deployment and without it (ADR 0093). Without a
+    ``workspace``, it builds its store with
+    :func:`~analysis_service.store_backends.build_store` from the service's
+    backend settings, and an unusable setting raises, also where the
+    Deployment then fails to build. Where ``ANALYSIS_JOB_STORE`` is unset,
+    the store is ``memory``, so a first run needs no setting. The app logs
+    :func:`store_note` for the store it built. At startup, before the app
+    takes a request, the app always runs
+    :func:`~analysis_service.store_backends.store_lifespan` over the store, as
+    the service does.
+
+    The app holds what the routes run on in one :class:`Cell`, as
+    ``app.state.cell``.
     """
-    state = build_startup() if startup is None else startup
-    if workspace is None and state.settings is not None:
-        store = build_store({"ANALYSIS_JOB_STORE": "memory", **os.environ})
+    env = os.environ
+    if workspace is None:
+        store = build_store({"ANALYSIS_JOB_STORE": "memory", **env})
         logger.info(store_note(store))
-        workspace = Workspace(state.settings, store=store)
+        workspace = Workspace(store=store)
+    state = build_startup() if startup is None else startup
+    cell = Cell(state.current(workspace.store))
     app = FastAPI(
         title="Work Agent",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
-        lifespan=lambda app: (
-            nullcontext() if workspace is None else store_lifespan(workspace.store)
-        ),
+        lifespan=lambda app: store_lifespan(workspace.store, env),
     )
+    app.state.cell = cell
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
     for refusal, status in _REFUSAL_STATUS.items():
@@ -996,7 +1058,8 @@ def create_app(
 
     @app.get("/", response_class=HTMLResponse)
     async def form_page() -> Response:
-        if not state.ok:
+        current = cell.current
+        if current is None:
             return response(diagnostic_page(state), status_code=503)
         return response(
             render(
@@ -1010,11 +1073,11 @@ def create_app(
                 workspace_style=(
                     Path(__file__).parent / "static" / "workspace.css"
                 ).read_text(encoding="utf-8"),
-                tiers=_tier_lines(state.tiers),
-                frameworks=_framework_fields(state.frameworks),
+                tiers=_tier_lines(current.tiers),
+                frameworks=_framework_fields(current.frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
-                store_note=escape(store_note(workspace.store)) if workspace else "",
+                store_note=escape(store_note(workspace.store)),
             )
         )
 
@@ -1025,18 +1088,21 @@ def create_app(
 
     @app.get("/workspace/runs")
     async def workspace_runs() -> Response:
-        if workspace is None:
+        current = cell.current
+        if current is None:
             return JSONResponse([])
-        return JSONResponse(await workspace.snapshots())
+        return JSONResponse(await workspace.snapshots(current.answers))
 
     @app.get("/workspace/runs/{run_id}")
     async def workspace_run(run_id: str) -> Response:
         """One analysis as the page reopens it: its latest job, with its
         questions where it waits, and its failure where it stopped."""
-        if workspace is None:
+        current = cell.current
+        if current is None:
             return no_such_run()
+        answers = current.answers
         store = workspace.store
-        record = await workspace.owned(run_id)
+        record = await workspace.owned(answers, run_id)
         if record is None:
             return no_such_run()
         owner_id = record.owner_id
@@ -1045,10 +1111,10 @@ def create_app(
             if locked is None:
                 break
             record = locked
-        record = await workspace.parsable(record.id)
+        record = await workspace.parsable(answers, record.id)
         if record is None:
             return no_such_run()
-        payload = await workspace.snapshot(record)
+        payload = await workspace.snapshot(answers, record)
         payload["completed_steps"] = [
             event.node for event in record.events if event.kind == "node"
         ]
@@ -1058,7 +1124,7 @@ def create_app(
         ]
         sources = await store.sources(record.id, owner_id)
         if sources is None:
-            await workspace.answers.missing(record, "sources")
+            await answers.missing(record, "sources")
         payload["description"] = "\n\n".join(
             source.text for source in sources if source.kind != "answers"
         )
@@ -1068,24 +1134,26 @@ def create_app(
             for issue in record.validation_issues
         ]
         if record.status == "awaiting-answers":
-            payload["questions"] = {
-                "run": record.id
-            } | await workspace.answers.questions(record.id, owner_id)
+            payload["questions"] = {"run": record.id} | await answers.questions(
+                record.id, owner_id
+            )
         return JSONResponse(payload)
 
     @app.post("/analyze")
     async def analyze(request: Request) -> Response:
+        current = cell.current
         if not is_same_origin(request):
             logger.warning("refused a POST /analyze that was not same-origin")
             return _message(403, "This request did not come from the app's own page.")
-        if workspace is None or state.settings is None:
+        if current is None:
             return unavailable()
+        answers = current.answers
 
         try:
             body = await request.json()
             sources = [Source.model_validate(source) for source in body["sources"]]
             refuse_answers_source(sources)
-            selection = _selection(state.frameworks, body["frameworks"])
+            selection = _selection(current.frameworks, body["frameworks"])
             ask_questions = body.get("questions") is True
             answers_from = body.get("answers_from")
             if answers_from is not None and not isinstance(answers_from, str):
@@ -1108,11 +1176,11 @@ def create_app(
                 "Expected a JSON body with a 'sources' list and a 'frameworks'"
                 " list naming frameworks this install carries.",
             )
-        breach = state.settings.limits.breach(sources)
+        breach = answers.limits.breach(sources)
         if breach is not None:
             return _message(400, breach.message)
-        submitter = await workspace.answers.submitter(OPERATOR)
-        carried = await workspace.answers.carried_from(
+        submitter = await answers.submitter(OPERATOR)
+        carried = await answers.carried_from(
             answers_from, submitter.owner_id, asks=ask_questions
         )
         record = JobRecord.create(
@@ -1124,9 +1192,11 @@ def create_app(
             ask_questions=ask_questions,
             reserved_tokens=budgets.estimate(sources, selection),
         )
-        async with workspace.make_room():
-            started = await workspace.answers.admit(
-                record, start=workspace.start, principal=submitter.new
+        async with workspace.make_room(answers):
+            started = await answers.admit(
+                record,
+                start=workspace.start(current.deadline_seconds),
+                principal=submitter.new,
             )
         return JSONResponse({"run": started.job_id})
 
@@ -1140,16 +1210,18 @@ def create_app(
         finished run has nothing to continue. A save answers with the
         new revision.
         """
+        current = cell.current
         if not is_same_origin(request):
             logger.warning("refused a POST /answer that was not same-origin")
             return _message(403, "This request did not come from the app's own page.")
-        if workspace is None:
+        if current is None:
             return unavailable()
+        answers = current.answers
         try:
             body = await request.json()
         except ValueError:
             body = None  # refused below, as every other malformed body is
-        questions = _questions_of(workspace, run_id)
+        questions = _questions_of(workspace, answers, run_id)
         try:
             raw = body["links"]
             raw_facts = body.get("facts", [])
@@ -1186,11 +1258,11 @@ def create_app(
                 "Expected a JSON body with a 'links' list and a 'facts' list of"
                 " answers this report asked for.",
             )
-        owner_id = await workspace.owner_id(run_id)
+        owner_id = await workspace.owner_id(answers, run_id)
         # A save starts no job, so it needs no room.
-        room = nullcontext() if save else workspace.make_room(answering=run_id)
+        room = nullcontext() if save else workspace.make_room(answers, answering=run_id)
         async with room:
-            outcome = await workspace.answers.answer(
+            outcome = await answers.answer(
                 run_id,
                 owner_id,
                 Answers(
@@ -1200,7 +1272,7 @@ def create_app(
                     presented=presented,
                     revision=revision,
                 ),
-                start=workspace.start,
+                start=workspace.start(current.deadline_seconds),
             )
         if isinstance(outcome, Started):
             return JSONResponse({"run": outcome.job_id})
@@ -1209,9 +1281,7 @@ def create_app(
             return JSONResponse({"saved": True, "revision": outcome.revision})
         # A save runs no model: the answers go onto the paused run, and the
         # list is read again off the model with them in.
-        return JSONResponse(
-            {"run": run_id} | await workspace.answers.questions(run_id, owner_id)
-        )
+        return JSONResponse({"run": run_id} | await answers.questions(run_id, owner_id))
 
     @app.post("/amend/{run_id}")
     async def amend(run_id: str, request: Request) -> Response:
@@ -1220,11 +1290,13 @@ def create_app(
         The new run reads the paused run's sources with the amendment added,
         pauses again, and carries the paused run's answers.
         """
+        current = cell.current
         if not is_same_origin(request):
             logger.warning("refused a POST /amend that was not same-origin")
             return _message(403, "This request did not come from the app's own page.")
-        if workspace is None:
+        if current is None:
             return unavailable()
+        answers = current.answers
         try:
             body = await request.json()
             text = body["text"]
@@ -1233,10 +1305,14 @@ def create_app(
                 raise TypeError
         except (ValueError, KeyError, TypeError):
             return _message(400, "Expected a JSON body with a 'text' and a 'revision'.")
-        owner_id = await workspace.owner_id(run_id)
-        async with workspace.make_room(answering=run_id):
-            started = await workspace.answers.amend(
-                run_id, owner_id, text, revision=revision, start=workspace.start
+        owner_id = await workspace.owner_id(answers, run_id)
+        async with workspace.make_room(answers, answering=run_id):
+            started = await answers.amend(
+                run_id,
+                owner_id,
+                text,
+                revision=revision,
+                start=workspace.start(current.deadline_seconds),
             )
         return JSONResponse({"run": started.job_id})
 
@@ -1244,21 +1320,24 @@ def create_app(
     async def events(run_id: str) -> Response:
         """The job's status and node events, as the store records them, until
         the job reaches a terminal status."""
-        if workspace is None or await workspace.envelope(run_id) is None:
+        current = cell.current
+        if current is None or await workspace.envelope(current.answers, run_id) is None:
             return PlainTextResponse("no such run", status_code=404)
         return StreamingResponse(
-            _stream(workspace, run_id),
+            _stream(workspace, current.answers, run_id),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
 
     @app.get("/report/{run_id}", response_class=HTMLResponse)
     async def report_page(run_id: str) -> Response:
-        if workspace is None:
+        current = cell.current
+        if current is None:
             return PlainTextResponse("no such report", status_code=404)
+        answers = current.answers
         try:
-            owner_id = await workspace.owner_id(run_id)
-            answerable = await workspace.answers.answerable(run_id, owner_id)
+            owner_id = await workspace.owner_id(answers, run_id)
+            answerable = await answers.answerable(run_id, owner_id)
         except (NoSuchJob, NotCompleted, Withheld):
             return PlainTextResponse("no such report", status_code=404)
         report = answerable.report
@@ -1270,22 +1349,26 @@ def create_app(
         # as for a parent that is gone.
         resumption = answerable.record.resumption
         parent = (
-            None if resumption is None else await workspace.owned(resumption.parent_id)
+            None
+            if resumption is None
+            else await workspace.owned(answers, resumption.parent_id)
         )
         previous = None
-        if parent is not None and readable(parent) and workspace.served(parent):
+        if parent is not None and readable(parent) and served(answers, parent):
             previous = await workspace.store.report(parent.id, owner_id)
         return response(render_report(report, answerable.state(), previous))
 
     @app.post("/correct/{run_id}")
     async def correct(run_id: str, request: Request) -> Response:
         """Correct a final report's answers, and run nothing (ADR 0054)."""
+        current = cell.current
         if not is_same_origin(request):
             logger.warning("refused a POST /correct that was not same-origin")
             return _message(403, "This request did not come from the app's own page.")
-        if workspace is None:
+        if current is None:
             return unavailable()
-        questions = _questions_of(workspace, run_id)
+        answers = current.answers
+        questions = _questions_of(workspace, answers, run_id)
         try:
             body = await request.json()
             raw = body["facts"]
@@ -1301,8 +1384,8 @@ def create_app(
                 "Expected a JSON body with a 'facts' list of corrections and a"
                 " 'revision'.",
             )
-        corrected = await workspace.answers.correct(
-            run_id, await workspace.owner_id(run_id), facts, revision=revision
+        corrected = await answers.correct(
+            run_id, await workspace.owner_id(answers, run_id), facts, revision=revision
         )
         return JSONResponse({"run": corrected.job_id})
 
@@ -1446,13 +1529,13 @@ class InvalidFactAnswer(Exception):
 
 
 def _questions_of(
-    workspace: Workspace, run_id: str
+    workspace: Workspace, answers: JobAnswers, run_id: str
 ) -> Callable[[], Awaitable[QuestionSet]]:
     """The run's Question Set, read only where a refusal needs a label."""
 
     async def read() -> QuestionSet:
-        answerable = await workspace.answers.answerable(
-            run_id, await workspace.owner_id(run_id)
+        answerable = await answers.answerable(
+            run_id, await workspace.owner_id(answers, run_id)
         )
         return answerable.state().questions
 
@@ -1491,7 +1574,9 @@ def _frame(event: str, data: dict[str, object]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
+async def _stream(
+    workspace: Workspace, answers: JobAnswers, run_id: str
+) -> AsyncIterator[str]:
     """Every event the store records for the job, as it records them, then
     one frame for how it ended.
 
@@ -1503,7 +1588,7 @@ async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
     async for frame in event_frames(workspace.store, run_id):
         yield frame
     try:
-        record = await workspace.envelope(run_id)
+        record = await workspace.envelope(answers, run_id)
     except UnreadableSchema as refusal:
         yield _frame("failed", {"message": str(refusal)})
         return
@@ -1512,7 +1597,7 @@ async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
     status = record.status
     if status == "awaiting-answers":
         try:
-            payload = await workspace.answers.questions(run_id, record.owner_id)
+            payload = await answers.questions(run_id, record.owner_id)
         except tuple(_REFUSAL_STATUS) as refusal:
             # The response has started, so a refusal is a frame, never a status.
             yield _frame("failed", {"message": str(refusal)})
@@ -1520,7 +1605,7 @@ async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
         yield _frame("questions", {"run": run_id} | payload)
     elif status == "completed":
         try:
-            workspace.answers.servable(record)
+            answers.servable(record)
         except Withheld as refusal:
             yield _frame("failed", {"message": str(refusal)})
             return

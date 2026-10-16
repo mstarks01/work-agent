@@ -1465,7 +1465,7 @@ class SweepSpy(InMemoryJobStore):
 async def passes_in_lifespan(store: SweepSpy, passes: int) -> None:
     """Start the store's lifespan, and wait until the orphan sweep ran
     ``passes`` times, for five seconds at most."""
-    async with store_backends.store_lifespan(store):
+    async with store_backends.store_lifespan(store, {}):
         for _ in range(500):
             if store.passes >= passes:
                 break

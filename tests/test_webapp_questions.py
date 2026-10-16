@@ -1232,10 +1232,9 @@ calls.push(...box.all("div").map(d => d.textContent).filter(t => t.includes("fix
 
 def _bounded(tiers, runner, max_jobs: int) -> TestClient:
     """A client over a workspace that holds at most ``max_jobs`` jobs."""
-    from tests.test_webapp import stub_settings
     from webapp.main import Workspace
 
-    workspace = Workspace(stub_settings(runner, catalog=False), max_jobs=max_jobs)
+    workspace = Workspace(max_jobs=max_jobs)
     return TestClient(
         app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
     )
@@ -1357,11 +1356,10 @@ def test_a_paused_run_goes_once_its_resumed_run_has_a_report(tiers):
 def test_the_run_an_answer_continues_is_never_deleted_for_it(tiers):
     """Room for an answer's run comes from other finished runs, never from
     the run the answer continues, however old."""
-    from tests.test_webapp import stub_settings
     from webapp.main import Workspace
 
     runner = PausingRunner(catalog=False)
-    workspace = Workspace(stub_settings(runner, catalog=False), max_jobs=2)
+    workspace = Workspace(max_jobs=2)
     with TestClient(
         app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
     ) as client:
@@ -1374,7 +1372,8 @@ def test_the_run_an_answer_continues_is_never_deleted_for_it(tiers):
         assert ran(client, child) == "completed"
 
         async def answer_the_oldest():
-            async with workspace.make_room(answering=oldest):
+            answers = client.app.state.cell.current.answers
+            async with workspace.make_room(answers, answering=oldest):
                 pass
 
         asyncio.run(answer_the_oldest())
@@ -3507,11 +3506,10 @@ def test_a_withheld_pause_ends_its_stream_with_a_frame_the_page_reads(
     """A pause the deployment's gate withholds tells the page why, rather than
     breaking the stream the page reads as an interrupted connection."""
     from analysis_service.job_answers import JobAnswers
-    from tests.test_webapp import stub_settings
     from webapp.main import Workspace
 
     runner = PausingRunner(catalog=False)
-    workspace = Workspace(stub_settings(runner, catalog=False))
+    workspace = Workspace()
     with TestClient(
         app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
     ) as client:
@@ -3530,10 +3528,9 @@ def test_a_held_run_without_its_sources_reads_as_this_service_s_defect(
 ):
     """``JobAnswers.missing`` says why a part is missing, so a held run whose
     sources are gone is a logged 500, never a 404 that reads as a deleted run."""
-    from tests.test_webapp import stub_settings
     from webapp.main import Workspace
 
-    workspace = Workspace(stub_settings(runner))
+    workspace = Workspace()
     with TestClient(
         app_for(tiers, runner, workspace=workspace), base_url=LOOPBACK
     ) as client:

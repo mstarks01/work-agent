@@ -37,7 +37,6 @@ from tests.test_webapp import (
     posted,
     run_to_completion,
     startup_for,
-    stub_settings,
 )
 from tests.test_webapp_questions import FACT, PausingRunner, ran, shown_list
 from webapp.main import OPERATOR, Workspace, create_app
@@ -138,7 +137,7 @@ class TestTheSettings:
         """The store states whether it is durable, so a class the note does not
         know never reads as durable."""
         store = ChangesTheOldestOnAdmission(InMemoryJobStore())
-        workspace = Workspace(stub_settings(), store=store)
+        workspace = Workspace(store=store)
         client = TestClient(
             create_app(startup_for(tiers), workspace), base_url=LOOPBACK
         )
@@ -183,7 +182,7 @@ class TestTheSettings:
         store = InMemoryJobStore()
         expired = completed_days_ago(store, 31)
         kept = completed_days_ago(store, 29)
-        workspace = Workspace(stub_settings(), store=store)
+        workspace = Workspace(store=store)
         client = TestClient(
             create_app(startup_for(tiers), workspace), base_url=LOOPBACK
         )
@@ -461,7 +460,7 @@ class ChangesTheOldestOnAdmission:
 class TestTheBound:
     def test_a_job_that_changes_after_it_was_chosen_stays(self, tiers):
         store = ChangesTheOldestOnAdmission(InMemoryJobStore())
-        workspace = Workspace(stub_settings(), store=store, max_jobs=2)
+        workspace = Workspace(store=store, max_jobs=2)
         client = TestClient(
             create_app(startup_for(tiers), workspace), base_url=LOOPBACK
         )
@@ -474,7 +473,7 @@ class TestTheBound:
         assert listed == {oldest, newest, started.json()["run"]}
 
     def test_each_delete_writes_the_line_with_the_cause_workspace(self, tiers, caplog):
-        workspace = Workspace(stub_settings(), max_jobs=1)
+        workspace = Workspace(max_jobs=1)
         client = TestClient(
             create_app(startup_for(tiers), workspace), base_url=LOOPBACK
         )

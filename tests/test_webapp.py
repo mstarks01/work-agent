@@ -225,7 +225,7 @@ def _reusing(tiers):
     from analysis_service.fact_answers import FactAnswer
 
     startup = startup_for(tiers)
-    workspace = Workspace(startup.settings)
+    workspace = Workspace()
     reusing = TestClient(create_app(startup, workspace), base_url=LOOPBACK)
     earlier = run_to_completion(reusing)
     record = asyncio.run(workspace.store.get(earlier))
@@ -561,7 +561,7 @@ def test_an_option_that_is_not_a_closed_set_fails_loudly(client):
 
 def test_the_workspace_deletes_the_oldest_finished_job_and_stays_bounded(tiers):
     """Untrusted prose and its report never accumulate without bound."""
-    workspace = Workspace(stub_settings(), max_jobs=3)
+    workspace = Workspace(max_jobs=3)
     with TestClient(
         create_app(startup_for(tiers), workspace), base_url=LOOPBACK
     ) as client:
@@ -578,7 +578,7 @@ def test_each_run_route_answers_a_malformed_id_as_a_missing_run_before_the_store
     """A run ID is a job ID, and each route checks its shape before the
     lookup (#1686)."""
     store = LookupSpy()
-    workspace = Workspace(stub_settings(), store=store)
+    workspace = Workspace(store=store)
     with TestClient(
         create_app(startup_for(tiers), workspace), base_url=LOOPBACK
     ) as client:
@@ -612,7 +612,7 @@ def test_answers_from_reads_a_malformed_id_as_a_missing_run_before_the_store(tie
     """A submission's ``answers_from`` is a job ID, and the analysis checks
     its shape before the lookup (#1686)."""
     store = LookupSpy()
-    workspace = Workspace(stub_settings(), store=store)
+    workspace = Workspace(store=store)
     with TestClient(
         create_app(startup_for(tiers), workspace), base_url=LOOPBACK
     ) as client:
@@ -651,9 +651,9 @@ def test_a_refused_submission_deletes_no_finished_job(tiers):
         stub_settings(),
         budget=WEBAPP_BUDGET.model_copy(update={"max_jobs_per_window": 2}),
     )
-    workspace = Workspace(settings, max_jobs=2)
+    startup = replace(startup_for(tiers), settings=settings)
     with TestClient(
-        create_app(startup_for(tiers), workspace), base_url=LOOPBACK
+        create_app(startup, Workspace(max_jobs=2)), base_url=LOOPBACK
     ) as client:
         runs = [run_to_completion(client) for _ in range(2)]
         refused = client.post("/analyze", json=posted("C"), headers=SAME_ORIGIN)
@@ -1780,7 +1780,7 @@ def test_the_operator_is_a_local_principal_that_the_first_run_creates(tiers):
     from webapp.main import OPERATOR
 
     startup = startup_for(tiers)
-    workspace = Workspace(startup.settings)
+    workspace = Workspace()
     client = TestClient(create_app(startup, workspace), base_url=LOOPBACK)
 
     assert client.get("/workspace/runs").json() == []
