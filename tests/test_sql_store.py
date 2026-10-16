@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import sqlite3
@@ -33,7 +34,10 @@ from analysis_service.jobs import (
     JobRecord,
     JobStore,
     Resumption,
+    UnreadableRecord,
+    UnreadableSchema,
     parent_of,
+    readable,
 )
 from analysis_service.objects import build_object_store, object_key
 from analysis_service.report import NodeRun
@@ -50,7 +54,7 @@ from tests.factories import (
     sample_selection,
     valid_model,
 )
-from tests.sql_stores import migrate, sql_env, sqlite_url
+from tests.sql_stores import database_of, migrate, sql_env, sqlite_url
 from tests.test_api import (
     TEST_DEADLINE_SECONDS,
     TEST_LIMITS,
@@ -615,6 +619,139 @@ class TestTheReport:
         record = completed_job(store)
         assert asyncio.run(store.delete(record.id, "alice")) == 2
         assert not report_file(env, record).parent.exists()
+
+
+#: A stored value that a closed set of this service does not list, for each
+#: closed set the maintainer's ruling of 2026-10-16 names: the statement that
+#: writes it, and the value.
+UNLISTED: dict[str, tuple[str, str]] = {
+    "an issue code": (
+        "UPDATE jobs SET validation_issues = ? WHERE id = ?",
+        json.dumps([{"code": "a-removed-code", "message": "the model is invalid"}]),
+    ),
+    "a status": ("UPDATE jobs SET status = ? WHERE id = ?", "a-removed-status"),
+    "an event kind": (
+        "UPDATE job_events SET event = ? WHERE job_id = ? AND seq = 1",
+        json.dumps({"seq": 1, "kind": "a-removed-kind", "at": "2026-10-16T00:00:00Z"}),
+    ),
+}
+
+
+def store_unlisted(database: str, job_id: str, case: str) -> None:
+    """Write the value of ``case`` into the stored job ``job_id``."""
+    statement, value = UNLISTED[case]
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(statement, (value, job_id)).rowcount == 1
+
+
+class TestAStoredValueThisServiceDoesNotList:
+    """A stored part that does not parse makes the job unreadable, as another
+    schema version does (ADR 0095, the maintainer's ruling of 2026-10-16)."""
+
+    @pytest.mark.parametrize("case", UNLISTED)
+    def test_the_list_holds_the_job_as_unreadable(self, env, case):
+        store = build_store(env)
+        kept = completed_job(store)
+        record = completed_job(store)
+        store_unlisted(database_of(env), record.id, case)
+        listed = asyncio.run(store.owned_jobs("alice"))
+        assert [item.id for item in listed] == [kept.id, record.id]
+        assert readable(listed[0])
+        assert isinstance(listed[1], UnreadableRecord)
+        assert not readable(listed[1])
+        assert listed[1].status == (None if case == "a status" else "completed")
+
+    @pytest.mark.parametrize("case", UNLISTED)
+    def test_the_status_route_says_unreadable_and_each_page_answers_409(
+        self, env, case
+    ):
+        store = build_store(env)
+        record = completed_job(store)
+        store_unlisted(database_of(env), record.id, case)
+        with TestClient(app_over(store)) as client:
+            status = client.get(f"/v1/jobs/{record.id}", headers=auth())
+            pages = [
+                client.get(f"/v1/jobs/{record.id}/{page}", headers=auth())
+                for page in ("report", "questions", "events")
+            ]
+        assert status.status_code == 200, status.text
+        assert status.json() == {
+            "job_id": record.id,
+            "status": "unreadable",
+            "created_at": status.json()["created_at"],
+            "updated_at": status.json()["updated_at"],
+            "progress": [],
+        }
+        for page in pages:
+            assert page.status_code == 409, page.text
+            assert "submit the job again" in page.json()["detail"]
+
+    @pytest.mark.parametrize(("case", "deleted"), [*zip(UNLISTED, (204, 409, 204))])
+    def test_a_delete_reads_the_status_where_it_parses(self, env, case, deleted):
+        store = build_store(env)
+        record = completed_job(store)
+        store_unlisted(database_of(env), record.id, case)
+        with TestClient(app_over(store)) as client:
+            response = client.delete(f"/v1/jobs/{record.id}", headers=auth())
+        assert response.status_code == deleted, response.text
+
+    @pytest.mark.parametrize(
+        "certification", ['{"certified": "maybe"}', '{"certified": true, "x": 1}']
+    )
+    def test_a_certification_that_does_not_parse_is_never_served(
+        self, env, certification
+    ):
+        store = build_store(env)
+        record = completed_job(store)
+        with TestClient(app_over(store)) as client:
+            served = client.get(f"/v1/jobs/{record.id}/report", headers=auth())
+            with sqlite3.connect(database_of(env)) as connection:
+                connection.execute(
+                    "UPDATE jobs SET certification = ? WHERE id = ?",
+                    (certification, record.id),
+                )
+            refused = client.get(f"/v1/jobs/{record.id}/report", headers=auth())
+        assert served.status_code == 200, served.text
+        assert refused.status_code == 409, refused.text
+
+    def test_a_part_read_by_name_that_does_not_parse_is_unreadable(self, env):
+        store = build_store(env)
+        record = completed_job(store)
+        sources = b'[{"x": 1}]'
+        report_file(env, record).with_name("sources.json").write_bytes(sources)
+        with sqlite3.connect(database_of(env)) as connection:
+            connection.execute(
+                "UPDATE jobs SET sources_sha256 = ? WHERE id = ?",
+                (hashlib.sha256(sources).hexdigest(), record.id),
+            )
+        with pytest.raises(UnreadableSchema):
+            asyncio.run(store.sources(record.id, "alice"))
+        with TestClient(app_over(store)) as client:
+            questions = client.get(f"/v1/jobs/{record.id}/questions", headers=auth())
+        assert questions.status_code == 409, questions.text
+
+    def test_the_restart_scan_leaves_an_unreadable_job_as_stored(self, env, caplog):
+        store = build_store(env)
+        job = queued(store)
+        store_unlisted(database_of(env), job, "an event kind")
+        with caplog.at_level(logging.ERROR, "analysis_service.sql_store"):
+            assert asyncio.run(store.fail_in_flight()) == []
+        assert job in caplog.text
+        with sqlite3.connect(database_of(env)) as connection:
+            (status,) = connection.execute(
+                "SELECT status FROM jobs WHERE id = ?", (job,)
+            ).fetchone()
+        assert status == "queued"
+        start(env)
+
+    def test_the_log_names_the_field_and_never_the_value(self, env, caplog):
+        store = build_store(env)
+        record = completed_job(store)
+        store_unlisted(database_of(env), record.id, "an issue code")
+        with caplog.at_level(logging.WARNING, "analysis_service.sql_store"):
+            asyncio.run(store.owned(record.id, "alice"))
+        assert "validation_issues.0.code" in caplog.text
+        assert "a-removed-code" not in caplog.text
 
 
 class TestTheObjectRoot:

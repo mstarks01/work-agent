@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from alembic.migration import MigrationContext
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -96,10 +96,13 @@ from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Admission,
     Checkpoint,
+    Envelope,
     JobEvent,
     JobRecord,
     JobStatus,
     Resumption,
+    UnreadableRecord,
+    UnreadableSchema,
     UsageRow,
     check_bounds,
     check_save,
@@ -302,6 +305,7 @@ _ADAPTERS: dict[str, TypeAdapter[Any]] = {
     for name in _JSON_FIELDS
 }
 _SOURCES: TypeAdapter[list[Source]] = TypeAdapter(list[Source])
+_STATUS: TypeAdapter[JobStatus] = TypeAdapter(JobStatus)
 
 
 def _json(name: str, value: object) -> str:
@@ -353,6 +357,47 @@ def _record(
     data["report"] = None if report is None else json.loads(report)
     data["events"] = [json.loads(text) for text in events]
     return JobRecord.model_validate(data, context=STORED)
+
+
+def _unparsed(job_id: str, error: ValidationError) -> None:
+    """Log where a stored part of the job ``job_id`` does not parse. The log
+    names each field and never the value that the field holds."""
+    fields = sorted({".".join(map(str, item["loc"])) for item in error.errors()})
+    logger.warning("job %s holds a part this service cannot parse: %s", job_id, fields)
+
+
+def _envelope(row: Row[Any], events: Sequence[str]) -> Envelope:
+    """The envelope a row holds, or an :class:`UnreadableRecord` where a
+    stored part does not parse (ADR 0095). The list and the status route read
+    the unreadable record, so one row never stops them."""
+    try:
+        return _record(row, None, None, events)
+    except ValidationError as error:
+        _unparsed(row.id, error)
+    try:
+        status: JobStatus | None = _STATUS.validate_python(row.status)
+    except ValidationError:
+        status = None
+    return UnreadableRecord(
+        id=row.id,
+        owner_id=row.owner_id,
+        schema_version=row.schema_version,
+        system_name=row.system_name,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        status=status,
+    )
+
+
+def _part_of(row: Row[Any], parse: Callable[[], Any]) -> Any:
+    """What ``parse`` reads of a part of the job ``row`` names, read by name.
+    Raises :class:`UnreadableSchema` where the part does not parse, as an
+    envelope that does not parse is unreadable (ADR 0095)."""
+    try:
+        return parse()
+    except ValidationError as error:
+        _unparsed(row.id, error)
+        raise UnreadableSchema(row.schema_version) from None
 
 
 def _event_rows(job_id: str, events: Sequence[JobEvent]) -> list[dict[str, Any]]:
@@ -1018,7 +1063,8 @@ class SqlJobStore:
         async with self._transaction() as connection:
             return await self._principal(connection, identity)
 
-    async def _load(self, query: Select[Any], *, whole: bool) -> JobRecord | None:
+    async def _row(self, query: Select[Any]) -> tuple[Row[Any], list[str]] | None:
+        """The job row that ``query`` selects, and its events as stored."""
         async with self._transaction() as connection:
             row = (await connection.execute(query)).one_or_none()
             if row is None:
@@ -1028,9 +1074,13 @@ class SqlJobStore:
                 .where(job_events.c.job_id == row.id)
                 .order_by(job_events.c.seq)
             )
-            texts = events.all()
-        if not whole:
-            return _record(row, None, None, texts)
+            return row, list(events.all())
+
+    async def get(self, job_id: str) -> JobRecord | None:
+        found = await self._row(select(jobs).where(jobs.c.id == job_id))
+        if found is None:
+            return None
+        row, texts = found
         sources = await self._object(row, "sources.json", row.sources_sha256)
         if sources is None:
             return None
@@ -1041,43 +1091,53 @@ class SqlJobStore:
                 return None
         return _record(row, sources, report, texts)
 
-    async def get(self, job_id: str) -> JobRecord | None:
-        return await self._load(select(jobs).where(jobs.c.id == job_id), whole=True)
-
-    async def owned(self, job_id: str, owner_id: str) -> JobRecord | None:
+    async def owned(self, job_id: str, owner_id: str) -> Envelope | None:
         """The record ``owner_id`` owns, as an envelope, or ``None``.
 
         It reads no object, and parses no part that the schema version covers.
         """
         query = select(jobs).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
-        return await self._load(query, whole=False)
+        found = await self._row(query)
+        return None if found is None else _envelope(*found)
 
     async def sources(self, job_id: str, owner_id: str) -> list[Source] | None:
         """The owned job's sources. The owner is checked on the row, before
         the object is read."""
         async with self._transaction() as connection:
             found = await connection.execute(
-                select(jobs.c.id, jobs.c.owner_id, jobs.c.sources_sha256).where(
-                    jobs.c.id == job_id, jobs.c.owner_id == owner_id
-                )
+                select(
+                    jobs.c.id,
+                    jobs.c.owner_id,
+                    jobs.c.schema_version,
+                    jobs.c.sources_sha256,
+                ).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
             )
             row = found.one_or_none()
         if row is None:
             return None
         data = await self._object(row, "sources.json", row.sources_sha256)
-        return None if data is None else _SOURCES.validate_json(data)
+        if data is None:
+            return None
+        return _part_of(row, lambda: _SOURCES.validate_json(data))
 
-    async def _report(self, job_id: str, owner_id: str) -> bytes | None:
+    async def _report(
+        self, job_id: str, owner_id: str
+    ) -> tuple[Row[Any], bytes] | None:
+        """The owned job's row and its report object, or ``None``."""
         async with self._transaction() as connection:
             found = await connection.execute(
-                select(jobs.c.id, jobs.c.owner_id, jobs.c.report_sha256).where(
-                    jobs.c.id == job_id, jobs.c.owner_id == owner_id
-                )
+                select(
+                    jobs.c.id,
+                    jobs.c.owner_id,
+                    jobs.c.schema_version,
+                    jobs.c.report_sha256,
+                ).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
             )
             row = found.one_or_none()
         if row is None or not _names(row, "report.json"):
             return None
-        return await self._object(row, "report.json", row.report_sha256)
+        data = await self._object(row, "report.json", row.report_sha256)
+        return None if data is None else (row, data)
 
     async def report_json(self, job_id: str, owner_id: str) -> dict[str, Any] | None:
         """The owned job's report as the object holds it, parsed as JSON only.
@@ -1085,26 +1145,29 @@ class SqlJobStore:
         It never parses the report as a :class:`Report`, so a report from an
         older schema version reads as stored.
         """
-        data = await self._report(job_id, owner_id)
-        return None if data is None else json.loads(data)
+        found = await self._report(job_id, owner_id)
+        return None if found is None else json.loads(found[1])
 
     async def report(self, job_id: str, owner_id: str) -> Report | None:
-        data = await self._report(job_id, owner_id)
-        return (
-            None if data is None else Report.model_validate_json(data, context=STORED)
-        )
+        found = await self._report(job_id, owner_id)
+        if found is None:
+            return None
+        row, data = found
+        return _part_of(row, lambda: Report.model_validate_json(data, context=STORED))
 
     async def _part(self, name: str, job_id: str, owner_id: str) -> Any:
         async with self._transaction() as connection:
-            text = await connection.scalar(
-                select(jobs.c[name]).where(
+            found = await connection.execute(
+                select(jobs.c.id, jobs.c.schema_version, jobs.c[name]).where(
                     jobs.c.id == job_id, jobs.c.owner_id == owner_id
                 )
             )
-        return (
-            None
-            if text is None
-            else _ADAPTERS[name].validate_json(text, context=STORED)
+            row = found.one_or_none()
+        if row is None or row._mapping[name] is None:
+            return None
+        text = row._mapping[name]
+        return _part_of(
+            row, lambda: _ADAPTERS[name].validate_json(text, context=STORED)
         )
 
     async def checkpoint(self, job_id: str, owner_id: str) -> Checkpoint | None:
@@ -1308,8 +1371,9 @@ class SqlJobStore:
             )
             return saved.rowcount == 1
 
-    async def owned_jobs(self, owner_id: str) -> list[JobRecord]:
-        """Every job of the owner, as envelopes, oldest first."""
+    async def owned_jobs(self, owner_id: str) -> list[Envelope]:
+        """Every job of the owner, as envelopes, oldest first. A job whose
+        envelope does not parse is an :class:`UnreadableRecord`."""
         async with self._transaction() as connection:
             found = await connection.scalars(
                 select(jobs.c.id)
@@ -1415,7 +1479,9 @@ class SqlJobStore:
         every store, so each failed job keeps its full charge and gets a
         status event. It reads each job as an envelope and writes only the
         columns that the transition and the error change, so it fails a job
-        of any schema version. A job in flight holds no report.
+        of any schema version. A job in flight holds no report. It leaves an
+        :class:`UnreadableRecord` as stored and logs it: no transition reads
+        its events, and no migration rewrites it (ADR 0095).
         """
         async with self._transaction() as connection:
             found = await connection.execute(
@@ -1428,6 +1494,9 @@ class SqlJobStore:
         for job_id, owner_id in in_flight:
             record = await self.owned(job_id, owner_id)
             if record is None:
+                continue
+            if not isinstance(record, JobRecord):
+                logger.error("the restart scan cannot fail unreadable job %s", job_id)
                 continue
             record.transition("failed")
             record.error = RESTART_FAILURE_MESSAGE

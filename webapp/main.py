@@ -106,7 +106,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Annotated, get_args
+from typing import Annotated, Literal, get_args
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -181,6 +181,7 @@ from analysis_service.job_answers import (
 )
 from analysis_service.jobs import (
     TERMINAL_STATUSES,
+    Envelope,
     InMemoryJobStore,
     JobRecord,
     JobStatus,
@@ -189,7 +190,7 @@ from analysis_service.jobs import (
     event_frames,
     execute_job,
     parent_of,
-    same_schema,
+    readable,
 )
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
@@ -346,10 +347,18 @@ class Workspace:
         missing."""
         return await self.answers.owner_id(OPERATOR, job_id)
 
-    async def owned(self, job_id: str) -> JobRecord | None:
+    async def owned(self, job_id: str) -> Envelope | None:
         """The operator's job ``job_id``, as an envelope, or ``None``."""
         try:
             return await self.answers.owned(job_id, await self.owner_id(job_id))
+        except NoSuchJob:
+            return None
+
+    async def envelope(self, job_id: str) -> JobRecord | None:
+        """The operator's job ``job_id``, as an envelope that parses, or
+        ``None``. Raises :class:`UnreadableSchema` where it does not parse."""
+        try:
+            return await self.answers.envelope(job_id, await self.owner_id(job_id))
         except NoSuchJob:
             return None
 
@@ -361,14 +370,14 @@ class Workspace:
         except NoSuchJob:
             return None
 
-    async def jobs(self) -> list[JobRecord]:
+    async def jobs(self) -> list[Envelope]:
         """Every job of the operator, as envelopes, oldest first."""
         owner_id = await self.answers.held_owner_id(OPERATOR)
         if owner_id is None:
             return []
         return await self.store.owned_jobs(owner_id)
 
-    async def waiting(self, record: JobRecord) -> bool:
+    async def waiting(self, record: Envelope) -> bool:
         """True while the job waits for answers.
 
         A job whose resumed job has not reached a report still waits: that
@@ -420,29 +429,32 @@ class Workspace:
                 self.store, job.id, job.owner_id, "workspace", updated_before=chosen_at
             )
 
-    def served(self, record: JobRecord) -> bool:
+    def served(self, record: Envelope) -> bool:
         """True where :meth:`JobAnswers.servable` lets this job's report be
-        served. Each view that links to a report or shows one asks it."""
+        served. Each view that links to a report or shows one asks it. A job
+        whose envelope does not parse has no report to serve."""
+        if not isinstance(record, JobRecord):
+            return False
         try:
             self.answers.servable(record)
         except (NotCompleted, Withheld):
             return False
         return True
 
-    async def parent_of(self, record: JobRecord) -> str | None:
+    async def parent_of(self, record: Envelope) -> str | None:
         """The job this one resumes or amends: :func:`parent_of` over the
         record with its resumption, which an envelope leaves out.
 
-        The resumption is read only where :func:`same_schema` accepts the
+        The resumption is read only where :func:`readable` accepts the
         record. A record of another schema version names only the job it
-        amends.
+        amends, and a record whose envelope does not parse names none.
         """
-        if not same_schema(record.schema_version):
-            return parent_of(record)
-        resumption = await self.store.resumption(record.id, record.owner_id)
-        return parent_of(record.model_copy(update={"resumption": resumption}))
+        if readable(record):
+            resumption = await self.store.resumption(record.id, record.owner_id)
+            return parent_of(record.model_copy(update={"resumption": resumption}))
+        return parent_of(record) if isinstance(record, JobRecord) else None
 
-    async def workspace_id(self, record: JobRecord) -> str:
+    async def workspace_id(self, record: Envelope) -> str:
         """The analysis this job belongs to: the root of its parent chain.
 
         A parent deleted since still names the root, so the group holds.
@@ -457,7 +469,7 @@ class Workspace:
 
     async def snapshots(self) -> list[dict[str, object]]:
         """Latest retained job per analysis, with its retained reports, newest first."""
-        grouped: dict[str, list[JobRecord]] = {}
+        grouped: dict[str, list[Envelope]] = {}
         for record in await self.jobs():
             grouped.setdefault(await self.workspace_id(record), []).append(record)
         snapshots = []
@@ -471,7 +483,7 @@ class Workspace:
         return snapshots
 
     async def snapshot(
-        self, record: JobRecord, related: list[JobRecord] | None = None
+        self, record: Envelope, related: list[Envelope] | None = None
     ) -> dict[str, object]:
         """Public workspace metadata; descriptions only on the detail route."""
         if related is None:
@@ -484,11 +496,11 @@ class Workspace:
         return {
             "run": record.id,
             "name": _name_of(record),
-            "status": _page_status(record.status),
+            "status": _page_status(record),
             # Whether the run stops for answers, so the page shows its
             # progress under the Questions tab rather than Reports.
-            "pauses": record.pauses(),
-            "frameworks": [selection.name for selection in record.frameworks or ()],
+            "pauses": isinstance(record, JobRecord) and record.pauses(),
+            "frameworks": [selection.name for selection in _selection_of(record)],
             "reports": [
                 {
                     "run": item.id,
@@ -512,13 +524,24 @@ _NAME_REFUSED = (
 )
 
 
-def _name_of(record: JobRecord) -> str:
+def _name_of(record: Envelope) -> str:
     return record.system_name or DEFAULT_NAME
 
 
-def _page_status(status: JobStatus) -> JobStatus:
+def _selection_of(record: Envelope) -> list[FrameworkSelection]:
+    """The selection the record holds: none on an envelope that leaves it out."""
+    if isinstance(record, JobRecord) and record.frameworks is not None:
+        return record.frameworks
+    return []
+
+
+def _page_status(record: Envelope) -> JobStatus | Literal["unreadable"]:
     """A job's status as the pages read it: a queued job is running, and a
-    rejected one stopped."""
+    rejected one stopped. A job whose envelope does not parse is
+    ``unreadable`` (ADR 0095)."""
+    if not isinstance(record, JobRecord):
+        return "unreadable"
+    status = record.status
     if status == "queued":
         return "running"
     return "failed" if status == "rejected" else status
@@ -1222,7 +1245,7 @@ def create_app(
     async def events(run_id: str) -> Response:
         """The job's status and node events, as the store records them, until
         the job reaches a terminal status."""
-        if workspace is None or await workspace.owned(run_id) is None:
+        if workspace is None or await workspace.envelope(run_id) is None:
             return PlainTextResponse("no such run", status_code=404)
         return StreamingResponse(
             _stream(workspace, run_id),
@@ -1251,11 +1274,7 @@ def create_app(
             None if resumption is None else await workspace.owned(resumption.parent_id)
         )
         previous = None
-        if (
-            parent is not None
-            and same_schema(parent.schema_version)
-            and workspace.served(parent)
-        ):
+        if parent is not None and readable(parent) and workspace.served(parent):
             previous = await workspace.store.report(parent.id, owner_id)
         return response(render_report(report, answerable.state(), previous))
 
@@ -1484,7 +1503,11 @@ async def _stream(workspace: Workspace, run_id: str) -> AsyncIterator[str]:
     """
     async for frame in event_frames(workspace.store, run_id):
         yield frame
-    record = await workspace.owned(run_id)
+    try:
+        record = await workspace.envelope(run_id)
+    except UnreadableSchema as refusal:
+        yield _frame("failed", {"message": str(refusal)})
+        return
     if record is None:
         return
     status = record.status

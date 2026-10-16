@@ -98,6 +98,15 @@ part of the job that the version covers: the sources, the checkpoint, the
 resumption and the report. The report route returns the report as the service
 stored it, so read its own `schema_version`. A job that is not yours reads as `404`, never as `409`.
 
+A job can also hold a stored value that the service no longer lists, such as
+a removed issue code, status or event kind. Such a job is unreadable, as a
+job of another version is ([ADR 0095](adr/0095-a-stored-part-that-does-not-parse-makes-a-job-unreadable.md)).
+`GET /v1/jobs/{id}` returns it with the status `unreadable`, the times, and
+no progress. Its events, its report and each route above return `409`, so a
+report whose certification does not parse is never served.
+`DELETE /v1/jobs/{id}` deletes it where its stored status is a terminal
+status, and returns `409` where the status does not parse.
+
 ### Deleting a job
 
 `DELETE /v1/jobs/{id}` deletes a job and returns `204` with no body. Only the
@@ -162,6 +171,9 @@ flowchart LR
   takes. `GET /v1/jobs/{id}/questions` lists what it asks, and
   `POST /v1/jobs/{id}/answers` continues it as a new job (see below). A waiting
   job takes none of your in-flight slots.
+- `unreadable` — only in the poll response, never a stored status. The job
+  holds a stored value that this service no longer lists. See
+  [A job from an older schema version](#a-job-from-an-older-schema-version).
 
 This mirrors the engine's three outcomes; the HTTP layer adds the queue,
 ownership, and delivery around them.
@@ -1134,14 +1146,14 @@ pair, so a new row runs every contract test. A new job store implements the
 | `principal` | The principal of an issuer and a `sub`, or nothing. It creates nothing. |
 | `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision and then its object store. The app calls it before the restart scan. |
 | `get` | The whole record, for the driver that runs the job. |
-| `owned` | The record an owner ID owns, as an envelope: without the sources, the report, the checkpoint and the resumption. For a job of another schema version, it also leaves out the answers, the fact keys, the framework selection and the node runs. These are the parts the schema version covers, so it reads a job of any version. It reads a stored facet answer with the value the service wrote when it admitted the answer. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
-| `sources` | The owned job's sources. A route reads them after it checks the job's schema version. |
+| `owned` | The record an owner ID owns, as an envelope: without the sources, the report, the checkpoint and the resumption. For a job of another schema version, it also leaves out the answers, the fact keys, the framework selection and the node runs. These are the parts the schema version covers, so it reads a job of any version. Where a stored part of the envelope does not parse, it returns an `UnreadableRecord`, so one row never stops a list. It reads a stored facet answer with the value the service wrote when it admitted the answer. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
+| `sources` | The owned job's sources. A route reads them after it checks that the job is readable. Raises `UnreadableSchema` where they do not parse. |
 | `report_json` | The owned job's report, already serialised. |
 | `events_after` | A job's status and the events past a cursor, and nothing else. |
 | `save` | The record back, for a job that already exists. |
 | `expired` | The ID and the owner ID of each job in a terminal status whose last update is before a given time. The retention sweep deletes each one through `delete`. |
 | `sweep_orphans` | Deletes each object written before a given time that no job row names, except an object of a queued or running job, and returns the number of objects it removed. The orphan sweep calls it. |
-| `fail_in_flight` | Fails each `queued` or `running` job with the restart message and returns their IDs. It settles each job through `JobRecord.transition`, so the job keeps its full charge and gets a status event. |
+| `fail_in_flight` | Fails each `queued` or `running` job with the restart message and returns their IDs. It settles each job through `JobRecord.transition`, so the job keeps its full charge and gets a status event. It leaves an unreadable job as stored and logs it. |
 
 Each read returns a record's `schema_version` as the record stored it, and no
 method changes it. The routes read it to [refuse a job from an older schema

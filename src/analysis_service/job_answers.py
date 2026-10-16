@@ -56,18 +56,20 @@ from analysis_service.jobs import (
     JOB_ID_PATTERN,
     Admission,
     Checkpoint,
+    Envelope,
     JobRecord,
     JobStatus,
     JobStore,
     PipelineRunner,
     Resumption,
-    same_schema,
+    UnreadableSchema,
+    readable,
 )
 from analysis_service.links import LinkAnswer, NoCatalogError, with_link_answers
 from analysis_service.pipeline import entry_of
 from analysis_service.principals import Identity, Principal, log_created
 from analysis_service.questions import question_fallback
-from analysis_service.report import SCHEMA_VERSION, Report
+from analysis_service.report import Report
 from analysis_service.report_conditions import corrected_findings
 from analysis_service.sources import Source, SourceLimits
 from analysis_service.system_model import SystemModel
@@ -207,21 +209,6 @@ class NotAdmitted(Exception):
 class SaveConflict(Exception):
     """A save landed on a job that moved: another save, a start, or a status
     change came first. Read the questions again."""
-
-
-class UnreadableSchema(Exception):
-    """The job's record has a schema version other than this service's (#1532).
-
-    This service cannot parse what such a record holds, and no migration
-    rewrites it, so the owner must submit the job again.
-    """
-
-    def __init__(self, version: str) -> None:
-        super().__init__(
-            f"the job was stored under schema version {version}, which this"
-            f" service (schema version {SCHEMA_VERSION}) cannot read; submit the"
-            " job again"
-        )
 
 
 @dataclass(frozen=True)
@@ -390,7 +377,7 @@ class JobAnswers:
         if result is not None:
             raise Withheld(result)
 
-    async def owned(self, job_id: str, owner_id: str) -> JobRecord:
+    async def owned(self, job_id: str, owner_id: str) -> Envelope:
         """The job the owner owns, without its heavy fields, or :class:`NoSuchJob`.
 
         **The one check of a requested job ID, and every route reads a job
@@ -403,6 +390,19 @@ class JobAnswers:
         record = await self.store.owned(job_id, owner_id)
         if record is None:
             raise NoSuchJob(job_id)
+        return record
+
+    async def envelope(self, job_id: str, owner_id: str) -> JobRecord:
+        """The owned job's envelope, of any schema version, where it parses.
+
+        Raises :class:`UnreadableSchema` for an
+        :class:`~analysis_service.jobs.UnreadableRecord`, so a route that
+        reads the status, the events or the certification never reads a part
+        that does not parse.
+        """
+        record = await self.owned(job_id, owner_id)
+        if not isinstance(record, JobRecord):
+            raise UnreadableSchema(record.schema_version)
         return record
 
     async def missing(self, record: JobRecord, part: str) -> NoReturn:
@@ -423,12 +423,13 @@ class JobAnswers:
         """The owned job, where this service can parse what its record holds.
 
         **The gate before every read that parses a stored record.** It raises
-        :class:`UnreadableSchema` where :func:`~analysis_service.jobs.same_schema`
-        refuses the record's version. Ownership is checked first, so a foreign
-        job reads as missing and never as unreadable.
+        :class:`UnreadableSchema` where :func:`~analysis_service.jobs.readable`
+        refuses the record: another schema version, or a stored part that does
+        not parse. Ownership is checked first, so a foreign job reads as
+        missing and never as unreadable.
         """
         record = await self.owned(job_id, owner_id)
-        if not same_schema(record.schema_version):
+        if not readable(record):
             raise UnreadableSchema(record.schema_version)
         return record
 

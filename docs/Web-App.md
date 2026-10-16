@@ -299,7 +299,10 @@ existing answer service.
 **Description**, **Questions** and **Reports** belong to the same analysis.
 Use **Analyses** to reopen a paused analysis or review its retained reports.
 Reopening a running analysis polls a read-only snapshot, leaving its original
-progress stream alone. Names are limited to 200 characters on one line. Search filters
+progress stream alone. An analysis that the app cannot read, because another
+schema version stored it or a stored value is one the app no longer lists,
+stays in the list. A run whose stored value the app no longer lists shows as
+**Cannot be read**. Its pages return `409` and ask you to submit it again. Names are limited to 200 characters on one line. Search filters
 the held analyses by name.
 
 The bound of 20 runs still applies. With the `memory` store, a restart clears
