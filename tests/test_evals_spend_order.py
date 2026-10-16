@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import argparse
 import json
+from typing import get_args
 
 import pytest
 
 from evals.critic_review import __main__ as critic_review
 from evals.harness import critic_replay, lane_replay, run
+from evals.harness.archive import CaseKind, kind_of
+from evals.harness.bundle import case_file
 from tests.test_evals_lane_replay import recorded  # noqa: F401  (fixture)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
@@ -36,6 +39,23 @@ def _bad_ledger(tmp_path):
     return ["--ledger", str(votes)]
 
 
+def _reports_is_a_file(tmp_path):
+    (tmp_path / "artifact.reports").write_text("", encoding="utf-8")
+    return ["--out", str(tmp_path / "artifact.json")]
+
+
+def _reports_is_a_dangling_link(tmp_path):
+    (tmp_path / "artifact.reports").symlink_to(tmp_path / "gone")
+    return ["--out", str(tmp_path / "artifact.json")]
+
+
+def _case_file_is_a_folder(tmp_path):
+    (tmp_path / "artifact.reports" / "01-payments-checkout.drafts.json").mkdir(
+        parents=True
+    )
+    return ["--out", str(tmp_path / "artifact.json")]
+
+
 @pytest.mark.parametrize(
     "given",
     [
@@ -43,8 +63,19 @@ def _bad_ledger(tmp_path):
         _bad_ledger,
         lambda tmp_path: ["--out", str(tmp_path / "missing" / "artifact.json")],
         lambda tmp_path: ["--out", str(tmp_path)],
+        _reports_is_a_file,
+        _reports_is_a_dangling_link,
+        _case_file_is_a_folder,
     ],
-    ids=["roster", "ledger", "out-folder", "out-is-a-folder"],
+    ids=[
+        "roster",
+        "ledger",
+        "out-folder",
+        "out-is-a-folder",
+        "reports-is-a-file",
+        "reports-is-a-dangling-link",
+        "case-file-is-a-folder",
+    ],
 )
 def test_a_sweep_refuses_a_bad_path_before_the_consent_gate(
     given, tmp_path, monkeypatch, capsys
@@ -130,3 +161,9 @@ def test_a_critic_review_refuses_a_bad_out_before_the_call(
 
     assert code == 1
     assert str(missing) in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("kind", get_args(CaseKind))
+def test_each_case_file_the_sweep_checks_reads_back_as_its_kind(kind):
+    """The pre-spend check and the archive reader name each case file alike."""
+    assert kind_of(case_file("artifact.json", "a-case", kind).name) == kind

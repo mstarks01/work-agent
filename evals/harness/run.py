@@ -118,7 +118,7 @@ from evals.harness.artifact import build as build_artifact
 from evals.harness.baseline import BASELINES_DIR
 from evals.harness.bundle import (
     assertions_from_reports,
-    check_out,
+    check_sweep_out,
     extractions_from_reports,
     heads_from_reports,
     optional_block,
@@ -1066,7 +1066,8 @@ def command_run(args: argparse.Namespace) -> int:
             signed_answers(cases) if args.mode in ("answered", "withheld") else None
         )
         votes, table = _standings_inputs(args)
-        check_out(args.out)
+        if args.out:
+            check_sweep_out(args.out, [case.id for case in cases])
     except (modes.EvalRunError, ledger.LedgerError, roster.RosterError) as refusal:
         print(refusal, file=sys.stderr)
         return 1

@@ -40,12 +40,13 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal, get_args
 
 __all__ = [
     "ARCHIVE_SPELLINGS",
     "KIND_NAMES",
     "KIND_SUFFIXES",
+    "CaseKind",
     "UnknownArchiveKind",
     "archive_bytes",
     "kind_of",
@@ -97,21 +98,20 @@ ARCHIVE_SPELLINGS: dict[str, Callable[[Any], str]] = {
 #: stray file whose name merely ends that way as one, and sort every key in it.
 KIND_NAMES: dict[str, str] = {"baseline.json": "manifest"}
 
+#: Each kind of file ``bundle`` writes per case, named ``<case>.<kind>.json``.
+#: ``bundle.case_file`` names each one, and ``bundle.check_sweep_out`` checks
+#: each one before a sweep spends.
+CaseKind = Literal[
+    "report", "drafts", "proposals", "lanes", "extraction", "assertions", "failure"
+]
+
 #: The kinds a reader recognises by a suffix, which is how ``bundle`` names the
-#: three files it writes per case. The artifact is absent on purpose: it is
+#: files it writes per case. The artifact is absent on purpose: it is
 #: named ``<stem>.json`` and no suffix separates it from any other JSON file, so
 #: the only honest answer for one is the name a Baseline manifest records in its
 #: ``artifact`` field. A reader that guessed instead would hand the artifact's
 #: spelling to every unrelated file it walked past.
-KIND_SUFFIXES: dict[str, str] = {
-    ".report.json": "report",
-    ".drafts.json": "drafts",
-    ".proposals.json": "proposals",
-    ".lanes.json": "lanes",
-    ".extraction.json": "extraction",
-    ".assertions.json": "assertions",
-    ".failure.json": "failure",
-}
+KIND_SUFFIXES: dict[str, str] = {f".{kind}.json": kind for kind in get_args(CaseKind)}
 
 
 class UnknownArchiveKind(LookupError):
