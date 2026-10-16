@@ -217,19 +217,22 @@ async def _sweep(store: JobStore, days: int | None) -> None:
 
 
 @asynccontextmanager
-async def store_lifespan(store: JobStore) -> AsyncIterator[None]:
+async def store_lifespan(
+    store: JobStore, env: Mapping[str, str]
+) -> AsyncIterator[None]:
     """Check the store, then fail each job in flight, before an app takes a request.
 
     **The one startup of a job store**: the ``/v1`` service and the web app
     both run it as the lifespan of their app, after they built the store from
-    the backend settings. The order is: the retention setting, the store's
-    startup check (the schema revision, then the object store), the restart
-    scan (#1529), then requests. A failed check stops the startup. The sweeps
+    the backend settings. ``env`` is the mapping that the app built the store
+    from, and the retention setting is read from it. The order is: the
+    retention setting, the store's startup check (the schema revision, then
+    the object store), the restart scan (#1529), then requests. A failed check stops the startup. The sweeps
     start after the restart scan and stop with the app: the orphan sweep
     always, because an owner delete can also leave an orphan, and the
     retention sweep where a retention period is set.
     """
-    days = retention_days()
+    days = retention_days(env)
     await store.startup_check()
     # The scan is correct for a single instance only. It fails every queued or
     # running job in the store, so with a second live instance on one store it

@@ -10,6 +10,11 @@ therefore read once per process, a deployment that redirects
 ``ANALYSIS_SAMPLING`` has its sweeps grading the configuration it runs, and the
 node-to-tier walk is written in one place.
 
+A process holds one Deployment at a time. The first-run app holds it in one
+cell and replaces it when a save on its Settings page passes (ADR 0093). A job
+runs to its end on the Deployment that admitted it. Every other process keeps
+one Deployment until it restarts.
+
 Configs load eagerly, and adapters and the graph do not. Reading five TOML files
 is cheap and needs no credentials, and it is where fail-closed belongs: a
 deployment either has a usable configuration or refuses to be constructed. The
