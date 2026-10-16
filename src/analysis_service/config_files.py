@@ -10,14 +10,21 @@ keep their own read.
 The first-run app reads ``settings.env`` from the settings directory, in the
 strict format of ADR 0092. :func:`value_refusal` is the one value rule: the
 reader's caller and the writer of the file call it.
+
+:func:`private_fd` is the one permission rule, in the manner of OpenSSH. Both
+drivers open the settings directory, ``settings.env`` and each secret file
+through it. :func:`secret_refusal` is the one rule for the content of a secret
+file.
 """
 
 from __future__ import annotations
 
 import os
 import re
+import stat
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -79,6 +86,56 @@ def settings_dir(env: Mapping[str, str]) -> Path:
     return base / "work-agent"
 
 
+@contextmanager
+def private_fd(
+    path: Path | str, error: type[Exception], *, secret: bool = False
+) -> Iterator[int]:
+    """A read-only descriptor of ``path``, a file or a directory, that passes
+    the permission rule.
+
+    **The one permission rule** (ADR 0092). The check reads the open
+    descriptor and not the path, so a file that replaces ``path`` after the
+    open does not pass. It raises ``error``, which names the path and its
+    mode, when:
+
+    - the group or other users can write ``path``;
+    - ``secret`` is set and other users can read ``path``. Group read stays
+      allowed, for a Kubernetes ``fsGroup`` mount;
+    - the owner is not the process user or root.
+
+    An ``OSError`` from the open goes to the caller.
+    """
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        status = os.fstat(fd)
+        mode = stat.S_IMODE(status.st_mode)
+        if mode & (stat.S_IWGRP | stat.S_IWOTH):
+            raise error(
+                f"{path}: mode {mode:04o} lets the group or other users write it"
+            )
+        if secret and mode & stat.S_IROTH:
+            raise error(f"{path}: mode {mode:04o} lets other users read it")
+        if status.st_uid not in (os.geteuid(), 0):
+            raise error(
+                f"{path}: the owner, uid {status.st_uid}, is not the process"
+                f" user (uid {os.geteuid()}) or root"
+            )
+        yield fd
+    finally:
+        os.close(fd)
+
+
+def read_private(
+    path: Path | str, error: type[Exception], *, secret: bool = False
+) -> bytes:
+    """The content of the file ``path``, read through :func:`private_fd`."""
+    with (
+        private_fd(path, error, secret=secret) as fd,
+        open(fd, "rb", closefd=False) as file,
+    ):
+        return file.read()
+
+
 def read_settings_env(path: Path) -> dict[str, SettingsLine]:
     """Each key of ``settings.env`` with its value and line number.
 
@@ -89,9 +146,13 @@ def read_settings_env(path: Path) -> dict[str, SettingsLine]:
     a Unicode line separator stays in a line, where the key pattern or the
     value rule refuses it. The caller applies :func:`value_refusal` and
     decides which keys it knows.
+
+    The directory and the file each pass :func:`private_fd` where they exist.
     """
     try:
-        text = path.read_bytes().decode("utf-8")
+        with private_fd(path.parent, SettingsFileError):
+            pass
+        text = read_private(path, SettingsFileError).decode("utf-8")
     except FileNotFoundError:
         return {}
     except UnicodeDecodeError as exc:
@@ -137,4 +198,23 @@ def value_refusal(value: str) -> str | None:
         return "holds a \\ or a $"
     if value.startswith(("'", '"')):
         return "starts with a quote"
+    return None
+
+
+def secret_refusal(value: str) -> str | None:
+    """Why the secret rule refuses ``value``, or ``None`` where it passes.
+
+    **The one secret rule.** A secret is not empty, is printable, has no
+    whitespace at either end and has 4,096 characters or fewer. A space, a
+    ``\\`` or a ``$`` inside it passes, because a database password can hold
+    them. The reason names the rule and never repeats the value.
+    """
+    if not value:
+        return "is empty"
+    if len(value) > MAX_VALUE_CHARS:
+        return f"is longer than {MAX_VALUE_CHARS:,} characters"
+    if not value.isprintable():
+        return "holds a character that is not printable"
+    if value != value.strip():
+        return "has whitespace at an end"
     return None

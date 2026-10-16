@@ -71,8 +71,7 @@ def _key_pair(env: Mapping[str, str]) -> boto3.Session:
             raise StoreConfigError(str(error)) from None
         if not value:
             raise StoreConfigError(
-                f"the api_key mode of the s3 object store needs {var};"
-                " it is unset, or its file is empty"
+                f"the api_key mode of the s3 object store needs {var}; it is unset"
             )
         pair[argument] = value
     return boto3.Session(**pair)

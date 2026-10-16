@@ -60,7 +60,9 @@ Then export the credentials for the vendor or vendors you selected.
 Each API key lives in a file, and a `_FILE` variable holds the file's path. An
 environment variable passes to each child process, but a file can have mode
 `0400`. The service refuses a key in `ANALYSIS_{VENDOR}_API_KEY`, and a tier on
-that vendor does not build. Write the key to a file that only you can read:
+that vendor does not build. The service also refuses a key file that other
+users can read ([File permissions](Configuration.md#file-permissions)). Write
+the key to a file that only you can read:
 
 ```sh
 mkdir -p ~/.config/analysis

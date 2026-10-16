@@ -48,6 +48,7 @@ LINE_BREAKS = ["\r", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", " ", " 
 def write_settings(directory: Path, text: str) -> Path:
     path = directory / "settings.env"
     path.write_text(text, encoding="utf-8", newline="")
+    path.chmod(0o600)
     return path
 
 
@@ -117,6 +118,7 @@ class TestTheReader:
 
     def test_a_file_that_is_not_utf8_is_refused(self, tmp_path):
         (tmp_path / "settings.env").write_bytes(b"ANALYSIS_A=\xff\n")
+        (tmp_path / "settings.env").chmod(0o600)
         with pytest.raises(SettingsFileError, match="is not UTF-8"):
             read_settings_env(tmp_path / "settings.env")
 

@@ -43,9 +43,9 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 from typing import Literal
 
+from analysis_service.config_files import read_private, secret_refusal
 from analysis_service.errors import ConfigError
 
 VendorName = Literal["vertex", "anthropic", "openai", "bedrock", "gemini", "openrouter"]
@@ -1275,20 +1275,28 @@ def refused_var(secret_var: str) -> str:
 
 
 def read_secret(env: Mapping[str, str], var: str) -> str:
-    """The stripped content of the file that ``var`` names, or ``""`` if ``var`` is unset.
+    """The secret in the file that ``var`` names, or ``""`` if ``var`` is unset.
 
-    Raises :class:`ProviderAuthError` when the file cannot be read. The message
-    names the variable and the error class, never the content (OWASP A09).
+    The secret is the content of the file without one final ``\\n``. Raises
+    :class:`ProviderAuthError` when the file cannot be read, when it fails
+    :func:`~analysis_service.config_files.private_fd` for a secret file, or
+    when the secret fails
+    :func:`~analysis_service.config_files.secret_refusal`. The message names
+    the variable or the file, and never the content (OWASP A09).
     """
     path = env.get(var, "").strip()
     if not path:
         return ""
     try:
-        return Path(path).read_text(encoding="utf-8").strip()
+        content = read_private(path, ProviderAuthError, secret=True)
+        value = content.decode("utf-8").removesuffix("\n")
     except (OSError, UnicodeDecodeError) as exc:
         raise ProviderAuthError(
             f"{var} names a file this service cannot read ({type(exc).__name__})"
         ) from exc
+    if refusal := secret_refusal(value):
+        raise ProviderAuthError(f"the secret in the file that {var} names {refusal}")
+    return value
 
 
 #: The registry. A missing key raises, which is the point: a table nobody can

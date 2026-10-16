@@ -915,7 +915,8 @@ that CA only. For Amazon RDS, give it the RDS `global-bundle.pem`.
 
 - `password`: the service reads the password from the file that
   `ANALYSIS_DATABASE_PASSWORD_FILE` names. Give the file mode `0400` and the
-  service user as its owner. The service refuses a password in
+  service user as its owner. The service refuses a file that breaks the
+  [permission rule](Configuration.md#file-permissions). It refuses a password in
   `ANALYSIS_DATABASE_PASSWORD`, because an environment variable passes to
   each child process.
 - `iam`: the deployment holds no password. `ANALYSIS_DATABASE_IAM` names the
@@ -1000,7 +1001,9 @@ for a store that does not resolve `<bucket>.<host>`.
   `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE` names the file that holds the access
   key ID, and `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` names the file that
   holds the secret access key. Give each file permissions that only the
-  service user can read. `ANALYSIS_OBJECT_ACCESS_KEY_ID` and
+  service user can read. The service refuses a file that breaks the
+  [permission rule](Configuration.md#file-permissions).
+  `ANALYSIS_OBJECT_ACCESS_KEY_ID` and
   `ANALYSIS_OBJECT_SECRET_ACCESS_KEY` stop the startup, so a key never sits in
   an environment variable.
 

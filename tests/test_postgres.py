@@ -42,6 +42,7 @@ URL = "postgresql+asyncpg://analysis@db.internal:5432/jobs"
 def env(tmp_path) -> dict[str, str]:
     password = tmp_path / "password"
     password.write_text("hunter2\n")
+    password.chmod(0o600)
     return {
         "ANALYSIS_DATABASE_URL": URL,
         "ANALYSIS_DATABASE_CREDENTIALS": "password",
@@ -181,8 +182,11 @@ class TestTheSettings:
     def test_an_empty_password_file_stops_the_startup(self, env, tmp_path):
         empty = tmp_path / "empty"
         empty.write_text("\n")
+        empty.chmod(0o600)
         env["ANALYSIS_DATABASE_PASSWORD_FILE"] = str(empty)
-        with pytest.raises(StoreConfigError, match="holds the database password"):
+        with pytest.raises(
+            StoreConfigError, match="ANALYSIS_DATABASE_PASSWORD_FILE names is empty"
+        ):
             engine_for(env)
 
 

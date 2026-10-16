@@ -173,7 +173,8 @@ from the file that the `_FILE` variable above names. It refuses a key in the
 environment variable without the `_FILE` suffix, such as
 `ANALYSIS_ANTHROPIC_API_KEY`, and a tier on that vendor does not build. An
 environment variable passes to each child process and shows in
-`/proc/<pid>/environ`, but a file can have mode `0400`.
+`/proc/<pid>/environ`, but a file can have mode `0400`. The service refuses a
+key file that other users can read; see [File permissions](#file-permissions).
 
 `iam` means **the platform supplies the identity**: the deployment passes
 no credential material, and the vendor's SDK resolves one from the environment
@@ -1034,6 +1035,35 @@ ANALYSIS_ANTHROPIC_API_KEY_FILE=/home/integrator/.config/work-agent/anthropic_ap
 The engine does not start when a line breaks one of these rules, or when the
 process environment and `settings.env` set the same variable. The diagnostic
 page names the variable and the line number, and never the value.
+
+### File permissions
+
+The first-run app and the `/v1` service check the permissions of each settings
+file and each secret file when they open it. The check reads the open file, so
+a file that replaces the path after the open does not pass. The service
+refuses:
+
+- the settings directory or `settings.env` when the group or other users can
+  write it;
+- a secret file when the group or other users can write it, or when other
+  users can read it. Group read is allowed, so a Kubernetes `fsGroup` mount
+  works;
+- a file whose owner is not the process user or root.
+
+A refusal names the file and its mode. A Kubernetes secret volume has mode
+`0644` by default, and a Docker secret has mode `0444`. Set the mode of each to
+`0440` or `0400`.
+
+A secret file is a file that one of these variables names: the `_FILE`
+variable of each vendor key, `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`,
+`ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` and `ANALYSIS_DATABASE_PASSWORD_FILE`.
+`ANALYSIS_TIERS_FILE` and `ANALYSIS_DATABASE_CA_FILE` do not name a secret.
+
+The secret is the content of the file without one final newline. The secret
+must not be empty, must be printable, must have no whitespace at either end,
+and must have 4,096 characters or fewer. A space, a `\` or a `$` inside a
+secret is allowed. A refusal names the variable and the rule, and never the
+secret.
 
 ### Config paths (override where files are read from)
 

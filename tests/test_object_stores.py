@@ -253,7 +253,9 @@ class TestTheSettings:
 
     def test_an_empty_key_file(self, env):
         Path(env["ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE"]).write_text("\n")
-        with pytest.raises(StoreConfigError, match="its file is empty"):
+        with pytest.raises(
+            StoreConfigError, match="ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE names is empty"
+        ):
             build_store(env)
 
     @pytest.mark.parametrize("addressing", ["virtual", "path", "PATH", ""])

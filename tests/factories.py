@@ -177,6 +177,7 @@ def secret_env(var: str, value: str) -> dict[str, str]:
     """The env that sets the secret file setting ``var`` to a file holding ``value``."""
     path = _KEY_DIR / hashlib.sha256(f"{var}={value}".encode()).hexdigest()[:16]
     path.write_text(value, encoding="utf-8")
+    path.chmod(0o600)
     return {var: str(path)}
 
 
