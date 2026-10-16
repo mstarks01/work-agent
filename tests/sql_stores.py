@@ -159,6 +159,11 @@ def sql_env(directory: Path, objects: ObjectStoreName = "filesystem") -> dict[st
     }
 
 
+def database_of(env: dict[str, str]) -> str:
+    """The path of the SQLite database that ``env`` names."""
+    return env["ANALYSIS_DATABASE_URL"].partition(":///")[2]
+
+
 def lane_url() -> URL:
     """``TEST_POSTGRES_URL``. Where it is unset, the test skips, or fails
     where ``REQUIRE_POSTGRES=1``."""

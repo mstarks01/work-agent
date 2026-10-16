@@ -33,7 +33,9 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     Resumption,
+    UnreadableRecord,
     envelope_parts,
+    readable,
     same_schema,
 )
 from analysis_service.objects import ObjectStore, build_object_store, object_key
@@ -1649,6 +1651,21 @@ class TestTheSchemaVersion:
             assert covered == (None, None, None, None)
         assert asyncio.run(store.sources(job, "alice")) == whole.sources
         assert asyncio.run(store.sources(job, "mallory")) is None
+
+    def test_readable_refuses_another_version_and_an_unreadable_record(self):
+        record = new_record()
+        unreadable = UnreadableRecord(
+            id=record.id,
+            owner_id=record.owner_id,
+            schema_version=SCHEMA_VERSION,
+            system_name=None,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+            status=None,
+        )
+        assert readable(record)
+        assert not readable(record.model_copy(update={"schema_version": "2.10"}))
+        assert not readable(unreadable)
 
     def test_every_field_states_how_an_envelope_holds_it(self):
         assert RECORD_FIELDS.keys() == JobRecord.model_fields.keys()

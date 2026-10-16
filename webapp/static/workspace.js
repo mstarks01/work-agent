@@ -24,7 +24,7 @@ const workspace = (() => {
     if (className) item.className = className;
     return item;
   };
-  const labels = {"running": "In progress", "awaiting-answers": "Questions ready", "completed": "Report ready", "failed": "Stopped"};
+  const labels = {"running": "In progress", "awaiting-answers": "Questions ready", "completed": "Report ready", "failed": "Stopped", "unreadable": "Cannot be read"};
   const message = (text) => { el("workspace-message").textContent = text; };
   const metadata = (data) => {
     el("description").readOnly = true;

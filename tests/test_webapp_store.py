@@ -28,8 +28,9 @@ from analysis_service.store_backends import build_store
 from analysis_service.store_settings import StoreConfigError
 from tests import test_webapp
 from tests.factories import SEEDING_BUDGET, sample_selection, valid_model
-from tests.sql_stores import sql_env
+from tests.sql_stores import database_of, sql_env
 from tests.test_api import completed_days_ago
+from tests.test_sql_store import UNLISTED, store_unlisted
 from tests.test_webapp import (
     LOOPBACK,
     SAME_ORIGIN,
@@ -385,6 +386,27 @@ class TestAStoredFacetAnswer:
         assert page.status_code == 200, page.text
 
 
+class TestAStoredValueThisServiceDoesNotList:
+    """A stored part that does not parse makes the run unreadable, as another
+    schema version does (ADR 0095, the maintainer's ruling of 2026-10-16)."""
+
+    @pytest.mark.parametrize("case", UNLISTED)
+    def test_the_list_shows_it_as_unreadable_and_each_page_answers_409(
+        self, tiers, durable, case
+    ):
+        with app(tiers) as client:
+            run = completed(client)
+        store_unlisted(database_of(durable), run, case)
+        with app(tiers) as client:
+            listed = client.get("/workspace/runs")
+            events = client.get(f"/events/{run}")
+        assert listed.status_code == 200, listed.text
+        statuses = {item["run"]: item["status"] for item in listed.json()}
+        assert statuses[run] == "unreadable"
+        assert events.status_code == 409, events.text
+        assert_listed_and_refused(tiers, run)
+
+
 def assert_listed_and_refused(tiers, run: str) -> None:
     """The list shows ``run``, and its run page and report page answer 409."""
     with app(tiers) as client:
@@ -395,11 +417,6 @@ def assert_listed_and_refused(tiers, run: str) -> None:
     assert run in {item["run"] for item in listed.json()}
     assert page.status_code == 409, page.text
     assert report.status_code == 409, report.text
-
-
-def database_of(env: dict[str, str]) -> str:
-    """The path of the SQLite database that ``env`` names."""
-    return env["ANALYSIS_DATABASE_URL"].partition(":///")[2]
 
 
 def queued_run(store) -> str:

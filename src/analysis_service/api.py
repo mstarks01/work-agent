@@ -35,7 +35,7 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from functools import partial
 from http import HTTPStatus
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, Any, Literal, TypeVar
 from uuid import uuid4
 
 import anyio.to_thread
@@ -96,6 +96,7 @@ from analysis_service.job_answers import (
 from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Admission,
+    Envelope,
     JobRecord,
     JobStatus,
     JobStore,
@@ -432,7 +433,9 @@ class JobStatusView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     job_id: str
-    status: JobStatus
+    #: ``unreadable`` where a stored part of the job does not parse (ADR
+    #: 0095). It is no status of the lifecycle, and no stored job holds it.
+    status: JobStatus | Literal["unreadable"]
     created_at: datetime
     updated_at: datetime
     progress: list[NodeCompletion]
@@ -503,7 +506,7 @@ async def _servable_report(
 ) -> dict[str, Any]:
     """The report payload this caller may read, or the refusal that withholds it."""
     answers = _answers(request)
-    record = await answers.owned(job_id, owner_id)
+    record = await answers.envelope(job_id, owner_id)
     answers.servable(record)
     store: JobStore = request.app.state.store
     payload = await store.report_json(job_id, owner_id)
@@ -609,7 +612,15 @@ async def require_owner(
     return await _answers(request).owner_id(identity, job_id)
 
 
-def _status_view(record: JobRecord) -> JobStatusView:
+def _status_view(record: Envelope) -> JobStatusView:
+    if not isinstance(record, JobRecord):
+        return JobStatusView(
+            job_id=record.id,
+            status="unreadable",
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+            progress=[],
+        )
     return JobStatusView(
         job_id=record.id,
         status=record.status,
@@ -1017,10 +1028,13 @@ def create_app(
         """Delete a job in a terminal status, and keep its usage (ADR 0066).
 
         ``204`` where the job is deleted, and each route then reads it as
-        missing. ``409`` where the job is queued or running. A missing job,
-        another owner's job and an ID of another shape share one ``404``.
+        missing. ``409`` where the job is queued or running, or where its
+        stored status does not parse (ADR 0095). A missing job, another
+        owner's job and an ID of another shape share one ``404``.
         """
         record = await _answers(request).owned(job_id, owner_id)
+        if record.status is None:
+            raise UnreadableSchema(record.schema_version)
         if record.status not in TERMINAL_STATUSES:
             raise HTTPException(
                 status_code=409,
@@ -1154,7 +1168,7 @@ def create_app(
     async def stream_events(
         job_id: str, request: Request, owner_id: str = Depends(require_owner)
     ) -> StreamingResponse:
-        await _answers(request).owned(job_id, owner_id)
+        await _answers(request).envelope(job_id, owner_id)
         streams: Counter[str] = request.app.state.event_streams
         if streams[owner_id] >= MAX_EVENT_STREAMS_PER_OWNER:
             raise HTTPException(

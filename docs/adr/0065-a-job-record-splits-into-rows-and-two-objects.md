@@ -8,7 +8,8 @@
   which defines the owner ID in each key
 - **Amended by**: [ADR 0066](0066-a-deleted-job-leaves-a-usage-row.md),
   under which a delete or an expiry removes the content and keeps a usage
-  row
+  row; [ADR 0095](0095-a-stored-part-that-does-not-parse-makes-a-job-unreadable.md),
+  under which a job whose stored part does not parse is unreadable
 
 ## Context
 

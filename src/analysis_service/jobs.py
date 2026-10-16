@@ -130,10 +130,26 @@ def same_schema(version: str) -> bool:
     """Whether ``version`` is this service's ``SCHEMA_VERSION``, exactly.
 
     **The one comparison of schema versions** (#1532). A record that another
-    version wrote can hold a shape this service cannot parse, so each route that
-    parses a stored record asks this first.
+    version wrote can hold a shape this service cannot parse, so
+    :func:`readable` asks this before a route parses a stored record.
     """
     return version == SCHEMA_VERSION
+
+
+class UnreadableSchema(Exception):
+    """This service cannot read the job's stored record (ADR 0095).
+
+    Another schema version wrote it (#1532), or a stored part holds a value
+    that a closed set of this service does not list. No migration rewrites
+    it, so the owner must submit the job again.
+    """
+
+    def __init__(self, version: str) -> None:
+        super().__init__(
+            f"this service (schema version {SCHEMA_VERSION}) cannot read the"
+            f" job, which was stored under schema version {version}; submit the"
+            " job again"
+        )
 
 
 #: When an envelope holds a field of a record. ``always``: for a record of
@@ -585,6 +601,44 @@ class JobRecord(BaseModel):
         self.updated_at = now
 
 
+class UnreadableRecord(BaseModel):
+    """A stored job whose envelope does not parse (ADR 0095).
+
+    A stored part can hold a value that a closed set of this service does not
+    list, such as an issue code, a status or an event kind. The store then
+    returns this in place of the envelope: the columns that parse, and no
+    part. No value becomes another member, and no migration rewrites the row.
+    :func:`readable` refuses it, as it refuses a record of another schema
+    version.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    owner_id: str
+    schema_version: str
+    system_name: str | None
+    created_at: datetime
+    updated_at: datetime
+    #: ``None`` where the stored status is not a :data:`JobStatus`.
+    status: JobStatus | None
+
+
+#: What an envelope read returns: the envelope, or the record it cannot parse.
+Envelope = JobRecord | UnreadableRecord
+
+
+def readable(record: Envelope) -> TypeGuard[JobRecord]:
+    """Whether this service can read every part of the stored ``record``.
+
+    **The one rule of a readable record**, which each route asks before it
+    parses a stored record. A record of another schema version and an
+    :class:`UnreadableRecord` are unreadable, and each such route refuses
+    them with :class:`UnreadableSchema`.
+    """
+    return isinstance(record, JobRecord) and same_schema(record.schema_version)
+
+
 # What one admission attempt did.
 #
 # Four refusals rather than one, because they clear at different times and a
@@ -698,13 +752,14 @@ class JobStore(Protocol):
 
     async def get(self, job_id: str) -> JobRecord | None: ...
 
-    async def owned(self, job_id: str, owner_id: str) -> JobRecord | None:
+    async def owned(self, job_id: str, owner_id: str) -> Envelope | None:
         """The record ``owner_id`` owns, as an envelope, or ``None``.
 
         An envelope leaves out each part that the schema version covers, as
         :func:`envelope_parts` names them. So an envelope reads a record of any
-        version, and a route reads those parts after :func:`same_schema`
-        accepts the version.
+        version, and a route reads those parts after :func:`readable`
+        accepts the record. Where the envelope does not parse, the store
+        returns an :class:`UnreadableRecord`.
         """
         ...
 
@@ -762,8 +817,10 @@ class JobStore(Protocol):
         revision: int,
     ) -> bool: ...
 
-    async def owned_jobs(self, owner_id: str) -> list[JobRecord]:
-        """Every job of the owner, as envelopes, oldest first."""
+    async def owned_jobs(self, owner_id: str) -> list[Envelope]:
+        """Every job of the owner, as envelopes, oldest first. A job whose
+        envelope does not parse is an :class:`UnreadableRecord`, so no row
+        stops the list."""
         ...
 
     async def delete(
@@ -1268,10 +1325,12 @@ class InMemoryJobStore:
         record.updated_at = datetime.now(UTC)
         return True
 
-    async def owned_jobs(self, owner_id: str) -> list[JobRecord]:
+    async def owned_jobs(self, owner_id: str) -> list[Envelope]:
         """Every job of the owner, as envelopes, oldest first.
 
         A deleted job is not listed: its usage row is admission's to read.
+        This store holds each record as it parsed it, so it holds no
+        :class:`UnreadableRecord`.
         """
         return [
             await self.owned(record.id, owner_id)  # type: ignore[misc]
