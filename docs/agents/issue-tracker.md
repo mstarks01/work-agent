@@ -55,7 +55,7 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** The last map, [#1522](https://github.com/mstarks01/work-agent/issues/1522), is under
+**None.** The last map, [#1760](https://github.com/mstarks01/work-agent/issues/1760), is under
 Completed maps. Chart a new one only against the bar at the end of this file.
 
 ### Completed maps
@@ -64,6 +64,24 @@ A completed map lives as a closed GitHub issue. Its tickets' resolution comments
 and the code holds the current state, so read the code first. Each map below settles the rules named
 beside it.
 
+- [#1760](https://github.com/mstarks01/work-agent/issues/1760) — a **Settings** page in the
+  first-run app. The spec [#1767](https://github.com/mstarks01/work-agent/issues/1767) holds the
+  build, as the tickets #1768 to #1777. The tree does not hold the build yet, so read the ADRs and
+  the spec.
+  - The loaders stay the only source of each type, closed set and bound. One page module holds
+    the group, the label and the mark of each **Deployment Setting** (ADR 0091).
+  - The page writes each change as an `ANALYSIS_*` override in `settings.env`, in
+    `$XDG_CONFIG_HOME/work-agent/`. It writes no TOML file. `settings.env` is strict `KEY=value`
+    with no quotes and no comments (ADR 0092).
+  - A save names its keys from an allow list, and the loaders hold each positive value rule
+    ([#1766](https://github.com/mstarks01/work-agent/issues/1766)).
+  - A save that passes replaces the Deployment in one cell, with no restart. A job in flight keeps
+    its runner, and job storage changes only on a restart (ADR 0093).
+  - Both drivers refuse a settings file or a secret file that the group or other users can write,
+    and a secret file that other users can read.
+  - A remote admin page for `/v1`, **Owner Preferences** and a `key_file` credential mode are out
+    of scope.
+  - The prototype is the tag `archive/prototype/settings-page-1762`.
 - [#1522](https://github.com/mstarks01/work-agent/issues/1522) — persistent storage for jobs,
   reports and sources. The build is in the tree: `analysis_service.sql_store`,
   `analysis_service.objects` and `analysis_service.store_backends` hold it.
