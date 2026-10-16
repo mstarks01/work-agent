@@ -226,11 +226,13 @@ Seven mechanical instances, each for a narrow question:
   front of a person names a framework. These cover the two ways of naming one
   that carry no literal.
 - **`test_no_package_override_is_orphaned`** — a package that overrides a
-  neutral hook is reached through the class the *caller* asks for. The hooks
-  reached through `package.record` and the two reached through the analysis
-  block are listed in `NEUTRAL_HOOKS`; an
-  override on any other class of the package resolves to the neutral default,
-  silently, and the package's intent is dropped with no error.
+  neutral hook is reached through the class the *caller* asks for.
+  `NEUTRAL_HOOKS` reads each method that `Claim` declares as a hook reached
+  through `package.record`, and each method that `FrameworkAnalysis` declares
+  as a hook reached through the analysis block. A new hook on either class is
+  checked with no edit to the table. An override on any other class of the
+  package resolves to the neutral default, silently, and the package's intent
+  is dropped with no error.
 - **`evals/harness/filler.py`** — whether a package's required justifications
   say anything, over a finished sweep. It reports rather than gates, because the
   honest threshold is unknown for every reading but one: a question pointed at

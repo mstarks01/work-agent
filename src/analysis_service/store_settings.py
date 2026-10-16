@@ -44,13 +44,13 @@ def refuse_unread(
     env: Mapping[str, str],
     prefixes: tuple[str, ...],
     read: Collection[str],
-    owner: str,
+    backend: str,
 ) -> None:
-    """Raise for each set setting under ``prefixes`` that ``owner`` does not read.
+    """Raise for each set setting under ``prefixes`` that ``backend`` does not read.
 
     **The one reader of a stray store setting.** A setting that the selected
     backend does not read would otherwise do nothing, and the operator would
-    think it applies. ``owner`` names the backend, for the message.
+    think it applies. ``backend`` names the backend, for the message.
     """
     stray = sorted(
         name
@@ -59,4 +59,6 @@ def refuse_unread(
     )
     if stray:
         pronoun = "it" if len(stray) == 1 else "them"
-        raise StoreConfigError(f"{owner} takes no {', '.join(stray)}; unset {pronoun}")
+        raise StoreConfigError(
+            f"{backend} takes no {', '.join(stray)}; unset {pronoun}"
+        )

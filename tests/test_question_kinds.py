@@ -288,3 +288,37 @@ def test_a_blank_assertion_names_no_open_row_on_any_surface():
         UnknownRef(element_id="e1", attribute="authentication"), {"e1": "Gateway"}
     )
     assert name_unknown(ref) == "`authentication` on `e1`"
+
+
+#: The fields of one sound reference of each kind.
+_ONE_KIND: dict[str, dict[str, str]] = {
+    "capability": {"capability": "browser-frontend"},
+    "question": {"element_id": "e1", "question": "capacity-limits"},
+    "assertion": {"assertion": "assertion:a~b~any~c"},
+    "attribute": {"element_id": "e1", "attribute": "authentication"},
+    "subject": {"subject": "Who signs in?"},
+}
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [(a, b) for a in _ONE_KIND for b in _ONE_KIND if a < b],
+)
+def test_every_surface_names_the_kind_that_fact_kind_reads(first, second):
+    """A reference with two spellings names one kind, and every surface asks it.
+
+    ``fact_kind`` decides the kind, so the label, the group and the re-ask
+    sentence each equal those of the sound reference of that kind alone.
+    """
+    from analysis_service.claims import name_unknown
+    from analysis_service.fact_answers import fact_kind
+    from analysis_service.open_facts import group_of
+
+    ref = UnknownRef(**(_ONE_KIND[first] | _ONE_KIND[second]))
+    sound = UnknownRef(**_ONE_KIND[fact_kind(ref.key)])
+    names = {"e1": "Gateway"}
+
+    assert len(ref.spellings) == 2
+    assert label_of(ref, names) == label_of(sound, names)
+    assert group_of(ref) == group_of(sound)
+    assert name_unknown(ref) == name_unknown(sound)

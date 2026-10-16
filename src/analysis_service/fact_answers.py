@@ -129,15 +129,6 @@ SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length
 #: The five kinds of fact are the five spellings of a reference to one.
 FactKind = Spelling
 
-#: Which kind a key names where it spells more than one: the first here wins.
-_KIND_ORDER: tuple[FactKind, ...] = (
-    "capability",
-    "question",
-    "assertion",
-    "attribute",
-    "subject",
-)
-
 
 #: The answers a facet takes, beside ``unknown``.
 FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
@@ -311,12 +302,10 @@ def attribute_place(key: UnknownKey) -> tuple[str, str]:
 def fact_kind(key: UnknownKey) -> FactKind:
     """Which of the five kinds of fact this key names.
 
-    Read off :attr:`~analysis_service.claims.UnknownRef.spellings`, so a field
-    of blank padding names no kind here either. A key that spells none is a
-    subject.
+    Read off :attr:`~analysis_service.claims.UnknownRef.kind`, so a label, a
+    group and an answer name one kind for one key.
     """
-    used = key_ref(key).spellings
-    return next((kind for kind in _KIND_ORDER if kind in used), "subject")
+    return key_ref(key).kind
 
 
 def fact_label(key: UnknownKey, model: SystemModel) -> str:
