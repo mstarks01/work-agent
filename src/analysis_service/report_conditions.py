@@ -50,10 +50,13 @@ def conditions(
     some facets: the finding is neither confirmed nor cleared, and nothing
     reads the fact as absent.
 
-    A finding waits on the facts its verdict's ``related_unknowns`` names, as
+    The card shows the facts the finding's verdict names in
+    ``related_unknowns``, as
     :attr:`~analysis_service.claims.ProposedVerdict.status` and
     :func:`~analysis_service.open_facts.open_facts` read them. A ground the
-    critic dismissed is not one.
+    critic dismissed is not one. The follow-up still asks that ground and
+    counts the finding as waiting on it
+    (:func:`~analysis_service.questions.follow_up_needs`).
     """
     names = element_names(model)
     said = {answer.key: answer for answer in answered}

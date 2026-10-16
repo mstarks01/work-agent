@@ -945,8 +945,9 @@ class Reading:
 
     ``catalog`` is the corrupted rows, with the corrupted ones assessed
     ``unsupported`` where the reading is reviewed; ``without`` is the same
-    reading with the corrupted rows retracted, and with each subject only they
-    named, which is what a lead lost to omission is measured against. ``changed`` names the corrupted rows.
+    reading with the corrupted rows retracted, and without each subject only
+    they named, which is what a lead lost to omission is measured against.
+    ``changed`` names the corrupted rows.
     """
 
     catalog: AssertionCatalog

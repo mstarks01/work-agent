@@ -520,7 +520,7 @@ def lane_of(claim: Claim) -> str | None:
     """The lane a claim was reached in, read from the field its package stamps.
 
     ``None`` for a package whose claims carry no lane field. The one reader for
-    the seams that key a claim by its lane: the fan-in's settled drop,
+    the seams that key a claim by its lane:
     :func:`~analysis_service.critic.finding_key` and the grounds count in
     ``evals/harness/grounds.py``. A reference record carries its lane in the
     same declared field, which ``evals/verify_corpus.py`` reads. The scorer
