@@ -694,6 +694,8 @@ class TestAStoredValueThisServiceDoesNotList:
         with TestClient(app_over(store)) as client:
             response = client.delete(f"/v1/jobs/{record.id}", headers=auth())
         assert response.status_code == deleted, response.text
+        if deleted == 409:
+            assert "submit the job again" in response.json()["detail"]
 
     @pytest.mark.parametrize(
         "certification", ['{"certified": "maybe"}', '{"certified": true, "x": 1}']
