@@ -45,6 +45,10 @@ finding as covered only when each facet of each kind it waits on has `yes`,
 `no` or `not applicable`. The count can then say less than the answers settle,
 and never more.
 
+> **Amended by [ADR 0073](0073-a-finding-can-wait-on-some-facets-and-an-answer-can-carry-a-detail.md).**
+> A finding can wait on some facets of a kind. An answer covers it once each
+> facet it needs has a known answer.
+
 **The pause page shows a kind as a table**, with a column for each facet, a
 row for each element, and a first row that sets a whole column. A column that
 holds for every element, such as "secrets in a secret store", takes one choice.

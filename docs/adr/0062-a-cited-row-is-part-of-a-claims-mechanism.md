@@ -22,6 +22,10 @@ The assertion pass is off by default, so no Baseline draft cites a row (ledger
 row `QA-2026-10-03-02-E9`). It is a supported setting, though, and a deployment
 that sets `ANALYSIS_ASSERTIONS` meets the gap today.
 
+> **Amended by [ADR 0075](0075-the-assertion-pass-runs-by-default.md).**
+> The assertion pass runs by default, so a default job has a catalog and
+> passes its rows.
+
 ## Decision
 
 **A cited assertion row adds its control to the mechanism.** The control is the

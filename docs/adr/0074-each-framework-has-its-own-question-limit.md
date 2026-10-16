@@ -38,6 +38,10 @@ place left. An answer counts toward the limit of each framework its question
 served, and toward every selected framework's limit where no list holds its
 question (`answer_state.question_set`).
 
+> **Amended by [ADR 0088](0088-field-questions-have-no-limit.md).**
+> Field questions have no limit. Capability questions keep the limit of 30
+> for each framework.
+
 The floors, the number of questions a round asks and the turn order do not
 change.
 
