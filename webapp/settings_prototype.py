@@ -428,6 +428,19 @@ _PAGE = """<!doctype html>
   table.settings tr.changed { background:var(--soft); }
   table.settings input[list] { min-width:12rem; }
   .table-wrap { overflow-x:auto; }
+  .multi { position:relative; }
+  .multi summary { list-style:none; cursor:pointer; border:1px solid var(--line);
+    border-radius:7px; padding:5px 26px 5px 8px; background:var(--canvas);
+    position:relative; min-width:12rem; }
+  .multi summary::-webkit-details-marker { display:none; }
+  .multi summary::after { content:"\\25BE"; position:absolute; right:9px; }
+  .multi-menu { position:absolute; z-index:5; left:0; right:0; margin-top:4px;
+    background:var(--canvas); border:1px solid var(--line); border-radius:7px;
+    box-shadow:0 6px 18px rgba(0,0,0,.12); padding:6px; }
+  .multi-menu label { display:flex; align-items:center; gap:8px; padding:6px 8px;
+    border-radius:5px; }
+  table.settings .multi-menu input { width:auto; margin:0; }
+  .multi-menu label:hover { background:var(--soft); }
   table.settings small { display:block; }
   table.settings tr.groupline th { background:var(--sidebar); font-size:12px; }
   .pending { position:sticky; top:16px; border:1px solid var(--line);

@@ -67,6 +67,9 @@ function check() {
       return fill(PROTO.messages["no-model"], { TIER: tier.toUpperCase() });
     }
   }
+  if (!draft["frameworks.carried"].length) {
+    return "config/frameworks.toml: 'carried' must be a non-empty list of framework names";
+  }
   const missing = ["base", "strong"].filter((t) => !draft[`tiers.${t}.vendor`]);
   if (missing.length) {
     return fill(PROTO.messages["no-vendor"], { tiers: JSON.stringify(missing).replaceAll('"', "'") });
@@ -146,6 +149,38 @@ function modelControl(s, id, set) {
   return h("span", {}, input, h("datalist", { id: listId }, known.map((m) => h("option", { value: m }))), note);
 }
 
+// A dropdown button that opens a panel of checkboxes, one for each option.
+function multiDropdown(s, id, set) {
+  const text = () => (draft[s.key].length ? draft[s.key].join(", ") : "None chosen");
+  const label = h("span", {}, text());
+  return h(
+    "details",
+    { class: "multi" },
+    h("summary", { id, "aria-label": `${s.label}: ${text()}` }, label),
+    h(
+      "div",
+      { class: "multi-menu", role: "group", "aria-label": s.label },
+      s.options.map((o) =>
+        h(
+          "label",
+          {},
+          h("input", {
+            type: "checkbox",
+            value: o,
+            checked: draft[s.key].includes(o),
+            onchange: (e) => {
+              const next = e.target.checked ? [...draft[s.key], o] : draft[s.key].filter((x) => x !== o);
+              set(s.options.filter((x) => next.includes(x)));
+              label.textContent = text();
+            },
+          }),
+          ` ${o}`,
+        ),
+      ),
+    ),
+  );
+}
+
 function control(s, onRedraw, suggest = false) {
   const id = `f-${s.key}`;
   if (locked(s)) {
@@ -157,6 +192,7 @@ function control(s, onRedraw, suggest = false) {
     else refresh();
   };
   if (suggest && /^tiers\.\w+\.model$/.test(s.key)) return modelControl(s, id, set);
+  if (suggest && s.kind === "multi") return multiDropdown(s, id, set);
   switch (s.kind) {
     case "choice":
       return h(
@@ -571,6 +607,20 @@ document.getElementById("scenario").addEventListener("click", () => {
   const params = new URLSearchParams(location.search);
   params.set("state", PROTO.state === "ready" ? "first-run" : "ready");
   location.search = `?${params}`;
+});
+// A dropdown closes on a click outside it and on Escape.
+document.addEventListener("click", (e) => {
+  for (const menu of document.querySelectorAll("details.multi[open]")) {
+    if (!menu.contains(e.target)) menu.open = false;
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    for (const menu of document.querySelectorAll("details.multi[open]")) {
+      menu.open = false;
+      menu.querySelector("summary").focus();
+    }
+  }
 });
 document.addEventListener("keydown", (e) => {
   if (e.target.closest("input, textarea, select, [contenteditable]")) return;
