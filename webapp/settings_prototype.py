@@ -26,6 +26,14 @@ _GRANTS = Grants(script=True, style=True)
 
 _TIERS = ("base", "strong", "review")
 _VENDORS = ["vertex", "anthropic", "openai", "bedrock", "gemini", "openrouter"]
+_VENDOR_NAMES = {
+    "vertex": "Vertex",
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "bedrock": "Bedrock",
+    "gemini": "Gemini",
+    "openrouter": "OpenRouter",
+}
 
 #: Real loader messages, captured from ``Deployment.from_env`` on 2026-10-16.
 LOADER_MESSAGES = {
@@ -103,6 +111,22 @@ _EXAMPLES = {
 }
 
 
+#: The note and setup command for each vendor in ``iam`` mode. The page module
+#: of ADR 0091 holds this fact; docs/First-Run.md gives the commands.
+_IAM_NOTES = {
+    "vertex": [
+        "Uses your Google login, so this page stores no key. Run this once on"
+        " this machine:",
+        "gcloud auth application-default login",
+    ],
+    "bedrock": [
+        "Uses your AWS identity, so this page stores no key: an attached role,"
+        " AWS_PROFILE or SSO. For SSO, run:",
+        "aws sso login",
+    ],
+}
+
+
 def _credential_settings(ready: bool) -> list[dict[str, object]]:
     """Each vendor's credential fields, read from its ``VENDORS`` row.
 
@@ -120,7 +144,7 @@ def _credential_settings(ready: bool) -> list[dict[str, object]]:
                 _setting(
                     f"credentials.{vendor}.mode",
                     "Credentials",
-                    f"{vendor.capitalize()} credential mode",
+                    f"{_VENDOR_NAMES[vendor]} credential mode",
                     "choice",
                     f"ANALYSIS_MODEL_CREDENTIALS_{vendor.upper()}",
                     options=modes,
@@ -142,7 +166,7 @@ def _credential_settings(ready: bool) -> list[dict[str, object]]:
                 _setting(
                     f"credentials.{vendor}.{words.replace(' ', '_').lower()}",
                     "Credentials",
-                    f"{vendor.capitalize()} {words}",
+                    f"{_VENDOR_NAMES[vendor]} {words}",
                     "secret" if secret else "text",
                     var,
                     "set" if stored else "",
@@ -371,6 +395,7 @@ def mount(app: FastAPI) -> None:
             "settings_dir": "~/.config/work-agent/settings",
             "models": _MODELS,
             "vendor_modes": _vendor_modes(),
+            "iam_notes": _IAM_NOTES,
             "mode_notes": {mode.value: note for mode, note in CREDENTIAL_MODE_NOTES.items()},
         }
         return response(
@@ -464,6 +489,9 @@ _PAGE = """<!doctype html>
     border-radius:5px; }
   table.settings .multi-menu input { width:auto; margin:0; }
   table.settings input[type=checkbox] { width:auto; margin:0; }
+  .hint.saved { color:var(--accent); }
+  .hint.missing { color:var(--error); }
+  table.settings .hint code { font-size:12px; color:var(--text); }
   .multi-menu label:hover { background:var(--soft); }
   table.settings small { display:block; }
   table.settings tr.groupline th { background:var(--sidebar); font-size:12px; }

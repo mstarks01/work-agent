@@ -243,16 +243,28 @@ function control(s, onRedraw, suggest = false) {
   }
 }
 
+// The iam note and setup command, on the first visible field of the vendor.
+function iamNote(s) {
+  const first = s.vendor && PROTO.settings.find((x) => x.vendor === s.vendor && visible(x)) === s;
+  if (!first || modeOf(s.vendor) !== "iam") return null;
+  const [text, command] = PROTO.iam_notes[s.vendor];
+  return h("small", { class: "hint" }, `${text} `, h("code", {}, command));
+}
+
+// A key's state, as a sentence: the page never shows the key itself.
+function keyState(s) {
+  return saved[s.key] === "set"
+    ? h("small", { class: "hint saved" }, "A key is saved. The page never shows it.")
+    : h("small", { class: "hint missing" }, "No key is saved.");
+}
+
 function tags(s) {
   const out = [];
-  if (s.kind === "secret") {
-    out.push(saved[s.key] === "set" ? h("span", { class: "tag" }, "set") : h("span", { class: "tag not" }, "not set"));
-  }
+  if (s.kind === "secret") out.push(keyState(s));
   if (s.source === "outside") out.push(h("span", { class: "tag outside" }, `set outside this page: ${s.env}`));
   if (s.mark === "shows") out.push(h("span", { class: "tag" }, "shown only"));
   if (s.restart) out.push(h("span", { class: "tag restart" }, "restart needed"));
-  const firstOfVendor = s.vendor && PROTO.settings.find((x) => x.vendor === s.vendor && visible(x)) === s;
-  if (firstOfVendor && modeOf(s.vendor)) out.push(h("small", { class: "hint" }, PROTO.mode_notes[modeOf(s.vendor)]));
+  out.push(iamNote(s));
   return out;
 }
 
@@ -465,12 +477,11 @@ function sourceOf(s) {
 // value the page only shows, and the vendor's credential mode.
 function valueNotes(s) {
   const notes = [];
-  if (s.kind === "secret") notes.push(h("small", { class: "hint" }, saved[s.key] === "set" ? "Set." : "Not set."));
+  if (s.kind === "secret") notes.push(keyState(s));
   if (s.restart) notes.push(h("small", { class: "hint" }, "Takes effect after a restart."));
   if (s.mark === "shows") notes.push(h("small", { class: "hint" }, `Shown only. ${s.reason}`));
   if (s.source === "outside") notes.push(h("small", { class: "hint" }, "Unset the variable to change this here."));
-  const firstOfVendor = s.vendor && PROTO.settings.find((x) => x.vendor === s.vendor && visible(x)) === s;
-  if (firstOfVendor && modeOf(s.vendor) === "iam") notes.push(h("small", { class: "hint" }, PROTO.mode_notes.iam));
+  notes.push(iamNote(s));
   return notes;
 }
 
