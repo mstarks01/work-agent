@@ -425,8 +425,9 @@ class UnknownRef(BaseModel):
 
 
 #: The fields of :class:`UnknownRef` in :attr:`UnknownRef.key` order, for a
-#: reader that holds a key and not its reference. A test holds the two equal;
-#: :func:`~analysis_service.fact_answers.key_ref` is the reader that uses it.
+#: reader that holds a key and not its reference. A test holds the two equal.
+#: :func:`~analysis_service.fact_answers.key_ref` and two
+#: :class:`~analysis_service.fact_answers.FactAnswer` validators use it.
 UNKNOWN_KEY_FIELDS = (
     "element_id",
     "attribute",

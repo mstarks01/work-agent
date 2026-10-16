@@ -209,7 +209,8 @@ class FollowUpNeeds:
     evidence: Mapping[Finding, frozenset[UnknownKey]]
     #: The open facts a ``needs-info`` verdict names.
     named: Mapping[Finding, frozenset[UnknownKey]]
-    #: Each conditional finding's open facts: the findings an answer can cover.
+    #: Each conditional finding's ``evidence`` and ``named`` facts together, so
+    #: a ground the critic dismissed is one. An answer to each covers the finding.
     waiting: Mapping[Finding, frozenset[UnknownKey]]
     #: Each draft's band, as its package ranks it.
     bands: Mapping[Finding, Band]
@@ -230,14 +231,23 @@ def follow_up_needs(
 ) -> FollowUpNeeds:
     """Every open fact each draft waits on, as :func:`fact_questions` reads them.
 
-    A fact ``earlier`` answers in full is not open. A finding waits on the
-    facts its verdict's ``related_unknowns`` names, as its card in
-    :func:`~analysis_service.report_conditions.conditions` says; a ground the
-    critic dismissed is evidence only. A finding that waits on a fact
-    ``earlier`` answers without settling it is not conditional, because no
-    answer in the list can cover it. **A finding that needs only some facets
-    of a kind** (:func:`~analysis_service.fact_answers.needs_of`) waits on it
-    until those facets are known, and no longer (ADR 0073).
+    A fact ``earlier`` answers in full is not open. **The verdict decides
+    whether a finding is conditional:** a ``needs-info`` finding is
+    conditional unless ``earlier`` answers a fact its verdict's
+    ``related_unknowns`` names without settling it, because no answer in the
+    list can cover it. Those are the facts its card in
+    :func:`~analysis_service.report_conditions.conditions` shows.
+
+    **A conditional finding waits on more than its card shows.** ``waiting``
+    joins its open grounds (``evidence``) and the open facts its verdict
+    names (``named``). So a ground the critic dismissed still ranks the
+    finding's facts in :func:`follow_up_order`, names the finding in
+    :attr:`FactQuestion.findings`, and must be answered before
+    :attr:`FactQuestion.covered_so_far` counts the finding.
+
+    **A finding that needs only some facets of a kind**
+    (:func:`~analysis_service.fact_answers.needs_of`) waits on it until those
+    facets are known, and no longer (ADR 0073).
     """
     evidence: dict[Finding, frozenset[UnknownKey]] = {}
     named: dict[Finding, frozenset[UnknownKey]] = {}

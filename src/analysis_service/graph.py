@@ -286,6 +286,17 @@ REJECT_NODE = "reject"
 PREPARE_NODE = "prepare"
 ASSEMBLE_NODE = "assemble"
 
+#: The shared half's LLM nodes, each against the tier node the tier config keys
+#: on. :func:`tier_node_by_graph_node` and each node's builder read it.
+_SHARED_TIER_NODES: Mapping[str, str] = MappingProxyType(
+    {
+        EXTRACT_NODE: "extract",
+        REPAIR_NODE: "repair",
+        ASSERT_NODE: "assert",
+        CAPABILITIES_NODE: "capabilities",
+    }
+)
+
 # The per-framework half. Each of these is a *role*, and a graph carries one
 # node per role per selected framework, named ``<role>_<framework>``; the lane
 # agents are named ``analyze_<framework>_<lane>``. See :class:`Lane` and
@@ -521,10 +532,7 @@ def tier_node_by_graph_node(
     only place that correspondence lives.**
     """
     return {
-        EXTRACT_NODE: "extract",
-        REPAIR_NODE: "repair",
-        ASSERT_NODE: "assert",
-        CAPABILITIES_NODE: "capabilities",
+        **_SHARED_TIER_NODES,
         **{
             node: tier
             for name in frameworks
@@ -2780,7 +2788,7 @@ def _extract_node(
     """
     return _llm_node(
         name=EXTRACT_NODE,
-        tier_node="extract",
+        tier_node=_SHARED_TIER_NODES[EXTRACT_NODE],
         instruction=compose_extract_prompt(prompt_loader, extraction_format),
         output_schema=EXTRACTION_SCHEMAS[extraction_format],
         output_key=STATE_EXTRACTED_MODEL,
@@ -2831,7 +2839,7 @@ def _assert_node(
     """The assertion node: the sources and the model in, one flat list out."""
     return _llm_node(
         name=ASSERT_NODE,
-        tier_node="assert",
+        tier_node=_SHARED_TIER_NODES[ASSERT_NODE],
         instruction=compose_assert_prompt(prompt_loader),
         output_schema=CatalogProposal,
         output_key=STATE_ASSERTION_PROPOSAL,
@@ -2848,7 +2856,7 @@ def _capabilities_node(
     """The capability reader: the sources in, the capabilities they state out."""
     return _llm_node(
         name=CAPABILITIES_NODE,
-        tier_node="capabilities",
+        tier_node=_SHARED_TIER_NODES[CAPABILITIES_NODE],
         instruction=compose_capabilities_prompt(prompt_loader),
         output_schema=CapabilityReading,
         output_key=STATE_CAPABILITY_READING,
@@ -3323,7 +3331,7 @@ def build_pipeline(
         )
         repair = _llm_node(
             name=REPAIR_NODE,
-            tier_node="repair",
+            tier_node=_SHARED_TIER_NODES[REPAIR_NODE],
             instruction=compose_repair_prompt(prompt_loader),
             output_schema=EmittedSystemModel,
             output_key=STATE_EXTRACTED_MODEL,

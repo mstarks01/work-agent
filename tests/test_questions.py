@@ -34,7 +34,7 @@ from analysis_service.assertions import (
     assertion_id,
     support_span,
 )
-from analysis_service.claims import UnknownRef
+from analysis_service.claims import FrameworkAnalysis, Ground, UnknownRef, Verdict
 from analysis_service.fact_answers import FactAnswer, fact_kind
 from analysis_service.fact_writes import answered_model, check_fact_answers
 from analysis_service.jobs import (
@@ -53,7 +53,7 @@ from analysis_service.links import (
 )
 from analysis_service.open_facts import open_attribute
 from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.questions import _by_band, fact_questions
+from analysis_service.questions import _by_band, fact_questions, follow_up_needs
 from analysis_service.report import Report
 from analysis_service.report_conditions import conditions
 from analysis_service.sources import ANSWERS_LABEL, Source, text_digest
@@ -61,8 +61,11 @@ from analysis_service.system_model import ZONE_ATTRIBUTE, Assumption
 from tests import test_open_facts
 from tests.factories import (
     DESCRIPTION_TEXT,
+    sample_analysis,
     sample_selection,
+    sample_threat,
     scripted_pipeline,
+    severity,
     valid_model,
 )
 
@@ -945,8 +948,9 @@ def test_a_fact_answered_i_do_not_know_leaves_the_list_and_the_count(report):
 
 @pytest.mark.parametrize("path", REPORTS, ids=lambda path: path.name[:2])
 def test_a_dismissed_ground_answered_i_do_not_know_leaves_the_finding_waiting(path):
-    """A finding waits on the facts its verdict names, as its card says, so
-    "I don't know" for a ground the critic dismissed leaves it conditional."""
+    """A finding stays conditional by the facts its verdict names, as its card
+    says, so "I don't know" for a ground the critic dismissed leaves it
+    conditional."""
     report = Report.model_validate_json(path.read_text(encoding="utf-8"))
     catalog = report.assertions.catalog if report.assertions else None
     dismissed = [
@@ -965,6 +969,89 @@ def test_a_dismissed_ground_answered_i_do_not_know_leaves_the_finding_waiting(pa
     again = fact_questions(report.analyses, report.system_model, catalog, earlier)
 
     assert finding in {f for question in again for f in question.findings}
+
+
+DISMISSED = UnknownRef(element_id="store:orders-db", attribute="encryption_at_rest")
+NAMED = UnknownRef(
+    element_id="flow:process:web-app>store:orders-db>store-order",
+    attribute="encryption_in_transit",
+)
+LOW_FACT = UnknownRef(
+    element_id="flow:entity:customer>process:web-app>login", attribute="operations"
+)
+
+
+def _unknown_ground(ref: UnknownRef) -> Ground:
+    return Ground(
+        kind="unknown-attribute", element_id=ref.element_id, attribute=ref.attribute
+    )
+
+
+def _dismissed_ground_analyses() -> list[FrameworkAnalysis]:
+    """A critical finding that cites two open grounds, one the critic dismissed,
+    and a low finding that waits on a third fact only the critic named."""
+    critical = sample_threat(
+        "S-01",
+        severity=severity("high", "high"),
+        grounds=[_unknown_ground(DISMISSED), _unknown_ground(NAMED)],
+        verdict=Verdict(
+            status="needs-info",
+            reason="The sources do not state this.",
+            related_unknowns=[NAMED],
+            immaterial_unknowns=[DISMISSED],
+        ),
+    )
+    low = sample_threat(
+        "S-02",
+        severity=severity("low", "low"),
+        verdict=Verdict(
+            status="needs-info",
+            reason="The sources do not state this.",
+            related_unknowns=[LOW_FACT],
+        ),
+    )
+    return [sample_analysis([critical, low])]
+
+
+def test_a_dismissed_ground_ranks_and_counts_with_its_finding_s_facts():
+    """The card shows only the facts the verdict names. The follow-up also
+    counts the finding's open grounds, so a ground the critic dismissed is
+    asked among the critical finding's facts, before the low finding's fact,
+    and the finding is covered only once it is answered too."""
+    analyses = _dismissed_ground_analyses()
+    model = valid_model()
+
+    card = conditions(analyses, model, [], [])["stride/S-01"]
+    questions = fact_questions(analyses, model, None)
+
+    assert [key for key, _, _ in card] == [NAMED.key]
+    assert [(q.key, q.basis, q.findings, q.covered_so_far) for q in questions] == [
+        (NAMED.key, "evidence", ("stride/S-01",), 0),
+        (DISMISSED.key, "evidence", ("stride/S-01",), 1),
+        (LOW_FACT.key, "critic", ("stride/S-02",), 2),
+    ]
+
+
+@pytest.mark.parametrize("path", REPORTS, ids=lambda path: path.name[:2])
+def test_the_follow_up_waits_on_the_card_s_facts_and_the_dismissed_grounds(path):
+    """The two readers of what a conditional finding waits on, held against
+    each other: the follow-up's facts are the card's facts and the open
+    grounds the critic dismissed, and no other."""
+    report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+    catalog = report.assertions.catalog if report.assertions else None
+    needs = follow_up_needs(report.analyses, report.system_model, catalog)
+    cards = conditions(report.analyses, report.system_model, [], [])
+    claims = {
+        (block.framework, claim.id): claim
+        for block in report.analyses
+        for claim in block.all_claims()
+    }
+    for finding, keys in needs.waiting.items():
+        framework, claim_id = finding
+        card = {key for key, _, _ in cards[f"{framework}/{claim_id}"]}
+        dismissed = claims[finding].verdict.dismissed_refs()
+        assert needs.named.get(finding, frozenset()) <= card, finding
+        assert keys - card <= dismissed, finding
 
 
 CAPACITY_FACETS = ("rate", "size", "concurrency", "quota")
