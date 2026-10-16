@@ -25,6 +25,7 @@ from analysis_service.capabilities import lineage
 from analysis_service.early_questions import early_questions
 from analysis_service.fact_answers import (
     _KIND_ORDER,
+    MAX_DETAIL_CHARS,
     FactAnswer,
     FactKind,
     answered_keys,
@@ -61,10 +62,11 @@ def open_description():
     return model
 
 
-def sized(key, length):
-    """An answer to ``key`` whose line is ``length`` characters."""
-    overhead = len(fact_line(FactAnswer(key=key, value="x"))) - 1
-    return FactAnswer(key=key, value="x" * (length - overhead))
+def widest(key, model, *, over=0):
+    """The longest answer to ``key`` that the check admits, ``over`` characters
+    longer, with the longest detail beside it."""
+    value = "x" * (answer_limit(key, model) + over)
+    return FactAnswer(key=key, value=value, detail="d" * MAX_DETAIL_CHARS)
 
 
 @pytest.mark.parametrize(
@@ -78,19 +80,19 @@ def sized(key, length):
 )
 class TestTheLineAnAnswerWrites:
     def test_the_longest_admitted_line_builds_its_span(self, key):
-        """An answer at the longest admitted line builds its span, because the
-        check bounds the line that the span quotes, not only the value.
+        """An answer at the limit, with the longest detail, writes the longest
+        line that a span quotes, and builds its span.
         """
         model = open_description()
-        answer = sized(key, MAX_QUOTE_CHARS)
+        answer = widest(key, model)
+        assert len(fact_line(answer)) == MAX_QUOTE_CHARS
         check_fact_answers([answer], model, None)
         apply_answers(AssertionCatalog(subjects=[], entries=[]), model, [], [answer])
 
     def test_one_character_more_is_refused_before_admission(self, key):
-        with pytest.raises(ValueError, match="line may hold"):
-            check_fact_answers(
-                [sized(key, MAX_QUOTE_CHARS + 1)], open_description(), None
-            )
+        model = open_description()
+        with pytest.raises(ValueError, match="may hold"):
+            check_fact_answers([widest(key, model, over=1)], model, None)
 
 
 def _admits_text(model, key):
@@ -128,6 +130,14 @@ def test_the_limit_a_page_shows_is_the_limit_the_check_admits(model, key):
     check_fact_answers([FactAnswer(key=key, value="x" * limit)], model, None)
     with pytest.raises((ValueError, ValidationError)):
         check_fact_answers([FactAnswer(key=key, value="x" * (limit + 1))], model, None)
+
+
+@pytest.mark.parametrize(("model", "key"), list(_free_text_facts()))
+def test_the_longest_detail_fits_beside_an_answer_at_the_limit(model, key):
+    """The limit a page shows leaves room in the line for any detail."""
+    limit = answer_limit(key, model)
+    answer = FactAnswer(key=key, value="x" * limit, detail="d" * MAX_DETAIL_CHARS)
+    check_fact_answers([answer], model, None)
 
 
 def test_a_subject_longer_than_a_reference_holds_is_refused():
@@ -1066,10 +1076,9 @@ class TestARefusalNamesItsFactByLabel:
         from analysis_service.fact_answers import fact_label
 
         key = (FLOW, "data_description", "", "", "", "")
-        with pytest.raises(ValueError, match="line may hold") as excinfo:
-            check_fact_answers(
-                [sized(key, MAX_QUOTE_CHARS + 1)], open_description(), None
-            )
+        model = open_description()
+        with pytest.raises(ValueError, match="may hold") as excinfo:
+            check_fact_answers([widest(key, model, over=1)], model, None)
         self.assert_readable(excinfo, fact_label(key, open_description()))
 
     def test_a_skip_of_a_question_not_shown_and_of_an_answered_one(self):

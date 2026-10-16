@@ -20,6 +20,7 @@ from analysis_service.fact_answers import (
     fact_status,
     needs_of,
 )
+from analysis_service.grounding import normalize, verify_normalized
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import SystemModel
@@ -81,14 +82,15 @@ def corrected_findings(
     ``earlier`` is the answers the report's run read. A finding rests on a
     corrected fact where it quotes the fact's line of the answers Source,
     grounds on the same element's attribute, or names the fact as one it waits
-    on.
+    on. A quote matches a line under the grounding ladder, which admitted it
+    (:func:`~analysis_service.grounding.verify_normalized`).
     """
     before = {fact.key: fact for fact in earlier}
-    lines = {
-        fact.key: " ".join(fact_line(before[fact.key]).split())
+    lines = [
+        normalize(fact_line(before[fact.key]))
         for fact in corrections
         if fact.key in before
-    }
+    ]
     keys = {fact.key for fact in corrections}
     attributes = {key[:2] for key in keys if fact_kind(key) == "attribute"}
 
@@ -102,11 +104,8 @@ def corrected_findings(
         for ground in claim.grounds:
             if (ground.element_id, ground.attribute) in attributes:
                 return True
-            quoted = " ".join(ground.text.split())
-            if (
-                ground.source_label == ANSWERS_LABEL
-                and quoted
-                and any(quoted in line for line in lines.values())
+            if ground.source_label == ANSWERS_LABEL and any(
+                verify_normalized(ground.text, line) for line in lines
             ):
                 return True
         return False

@@ -396,7 +396,8 @@ the reviewer named it (`critic`).
   `question` (one of a fixed list of questions about one element, such as
   "What limits bound the requests the Web App accepts?"), or `subject` (a
   question the reviewer wrote in its own words because no listed question
-  fitted).
+  fitted). A subject is one line, with no double quote and no control or
+  formatting character, and a key that names another subject is refused.
 - `basis` is `evidence` where a finding's own evidence rests on the fact, and
   `critic` where only the reviewer's verdict names it. The `evidence` questions
   come first, and their order does not change when the analysis runs again on
@@ -422,7 +423,9 @@ the reviewer named it (`critic`).
   them. `text` means free text.
 - `max_length` is the longest answer the fact admits, in characters. It is the
   least of the attribute's own limit, such as 200 for `authentication`, and
-  the room on the line the answer writes. One character more is refused.
+  the room on the line the answer writes. That room keeps space for the
+  longest `detail`, so an answer at `max_length` takes any detail. One
+  character more is refused.
 - `choices` lists the values the fact takes. A question kind that asks
   whether something holds, such as "Can content it takes run code with its
   authority?", takes `yes` or `no`. Empty means free text on one
@@ -1123,7 +1126,7 @@ pair, so a new row runs every contract test. A new job store implements the
 | `principal` | The principal of an issuer and a `sub`, or nothing. It creates nothing. |
 | `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision and then its object store. The app calls it before the restart scan. |
 | `get` | The whole record, for the driver that runs the job. |
-| `owned` | The record an owner ID owns, as an envelope: without the sources, the report, the checkpoint and the resumption, which are the parts the schema version covers. So it reads a job of any version. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
+| `owned` | The record an owner ID owns, as an envelope: without the sources, the report, the checkpoint and the resumption. For a job of another schema version, it also leaves out the answers, the fact keys, the framework selection and the node runs. These are the parts the schema version covers, so it reads a job of any version. It reads a stored facet answer with the value the service wrote when it admitted the answer. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
 | `sources` | The owned job's sources. A route reads them after it checks the job's schema version. |
 | `report_json` | The owned job's report, already serialised. |
 | `events_after` | A job's status and the events past a cursor, and nothing else. |

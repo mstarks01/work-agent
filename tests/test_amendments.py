@@ -27,7 +27,7 @@ from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import Checkpoint, JobRecord
 from analysis_service.pipeline import _seeded_state
-from analysis_service.sources import Source, SourceLimits
+from analysis_service.sources import ANSWERS_LABEL, Source, SourceLimits
 from tests.factories import DESCRIPTION_TEXT, sample_selection, valid_model
 from tests.test_api import auth
 from tests.test_links import catalog_client
@@ -231,7 +231,7 @@ class TestTheAmendRule:
             state,
             sources=(
                 *first.sources,
-                Source(kind="answers", label="Your answers", text="answer lines"),
+                Source(kind="answers", label=ANSWERS_LABEL, text="answer lines"),
             ),
         ).amend("Another fact.", revision=0, limits=ROOM)
         assert [s.label for s in again.sources][-2:] == [

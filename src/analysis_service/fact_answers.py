@@ -23,8 +23,9 @@ them, and :func:`fact_kind` says which.
   that quotes its line of the answers Source.
 
 **An answer's line fits the span that quotes it.** :func:`fact_line` writes
-each answer as one line of the answers Source, and the admission check
-refuses a line longer than
+each answer as one line of the answers Source. The admission check refuses
+an answer longer than :func:`~analysis_service.answer_forms.answer_limit`,
+which keeps the line, with the longest detail, within
 :data:`~analysis_service.assertions.MAX_QUOTE_CHARS`.
 
 **An answer of** ``unknown`` **says the submitter does not know.** It writes
@@ -37,8 +38,10 @@ sources (the maintainer's decision of 2026-09-25 on #1225).
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Collection, Mapping, Sequence
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -46,6 +49,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -59,15 +63,17 @@ from analysis_service.assertions import (
 )
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import Spelling, UnknownKey, UnknownRef
+from analysis_service.grounding import normalize
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
-from analysis_service.sources import plain_name
+from analysis_service.sources import FORMATTING_CATEGORIES, plain_name, quotable
 from analysis_service.system_model import SystemModel
 
 __all__ = [
     "FACET_ANSWERS",
     "MAX_FACT_ANSWERS",
     "MAX_HELD_FACTS",
+    "STORED",
     "FactAnswer",
     "FactKind",
     "FactStatus",
@@ -141,6 +147,11 @@ _KEY_FIELDS = (
 #: The answers a facet takes, beside ``unknown``.
 FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
 
+#: The validation context of a record that a store reads back. A stored
+#: answer keeps the ``value`` that the service wrote when it admitted the
+#: answer, so a later change to a facet's wording never makes it unreadable.
+STORED: Mapping[str, bool] = MappingProxyType({"stored": True})
+
 
 class FactAnswer(BaseModel):
     """One submitter answer to one open fact, named by the fact's key."""
@@ -162,9 +173,14 @@ class FactAnswer(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _facet_value(cls, data: Any) -> Any:
-        """Write ``value`` from ``facets``, one facet a clause, in the kind's order."""
-        if not isinstance(data, dict) or data.get("facets") is None:
+    def _facet_value(cls, data: Any, info: ValidationInfo) -> Any:
+        """Write ``value`` from ``facets``, one facet a clause, in the kind's order.
+
+        **The one writer of a facet answer's value**, at admission. A stored
+        answer, read under :data:`STORED`, keeps the value it holds.
+        """
+        stored = bool(info.context and info.context.get("stored"))
+        if stored or not isinstance(data, dict) or data.get("facets") is None:
             return data
         facets, key = data["facets"], data.get("key")
         question = ""
@@ -215,6 +231,11 @@ class FactAnswer(BaseModel):
             case ("assertion",):
                 return ("", "", ref.assertion, "", "", "")
             case ("subject",):
+                if not quotable(ref.subject):
+                    raise ValueError(
+                        "a subject is one line, with no double quote and no"
+                        " control or formatting character"
+                    )
                 return ("", "", "", ref.subject, "", "")
             case ("capability",):
                 return ("", "", "", "", "", ref.capability)
@@ -313,8 +334,25 @@ def fact_line(fact: FactAnswer) -> str:
     elif fact.kind == "assertion":
         line = f'The open question {assertion} is answered "{fact.value}".'
     else:
-        line = f'Asked "{subject}", the answer is "{fact.value}".'
+        line = f'Asked "{_phrase(subject)}", the answer is "{fact.value}".'
     return line + detail_note(fact.detail)
+
+
+def _phrase(value: str) -> str:
+    """``value`` as a phrase that its double quotes hold on one line.
+
+    A key admits only a :func:`~analysis_service.sources.quotable` subject,
+    so this returns it unchanged. Any other value folds its line breaks into
+    spaces, drops each control and formatting character, and writes each
+    double quote as a single quote, so the line says what its key says.
+    """
+    if quotable(value):
+        return value
+    return "".join(
+        "'" if '"' in normalize(char) else char
+        for char in " ".join(value.split())
+        if unicodedata.category(char) not in FORMATTING_CATEGORIES
+    )
 
 
 def detail_note(detail: str) -> str:

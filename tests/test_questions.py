@@ -326,7 +326,7 @@ class TestTheChecks:
             ("no authentication at all", "opens with 'no'"),
             ("unauthenticated", "opens with 'unauthenticated'"),
             ("   ", "is empty"),
-            ("x" * 201, "at most 200"),
+            ("x" * 201, "may hold 200 characters"),
         ],
     )
     def test_a_value_the_validity_gate_refuses_is_refused(self, value, rule):

@@ -15,7 +15,7 @@ import pytest
 
 from analysis_service.claims import ProposedVerdict, UnknownRef
 from analysis_service.critic import review_issues, snap_rulings
-from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_answers import STORED, FactAnswer
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.links import with_link_answers
 from analysis_service.open_facts import element_names, label_of
@@ -243,3 +243,14 @@ class TestTheFacets:
         written = FactAnswer(key=key, facets={"rate": "yes"})
         again = FactAnswer.model_validate(written.model_dump())
         assert again == written
+
+    def test_a_stored_answer_keeps_the_value_the_service_wrote(self):
+        """A reworded facet changes no stored answer, and a submission still
+        never writes the value."""
+        key = (STORE, "", "", "", "capacity-limits", "")
+        stored = FactAnswer(key=key, facets={"rate": "yes"}).model_dump()
+        stored["value"] = "An earlier wording of the rate facet? yes"
+        read = FactAnswer.model_validate(stored, context=STORED)
+        assert read.value == stored["value"]
+        with pytest.raises(ValueError, match="writes a facet answer"):
+            FactAnswer.model_validate(stored)

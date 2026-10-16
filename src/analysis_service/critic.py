@@ -64,6 +64,7 @@ from analysis_service.evidence import ground_gloss
 from analysis_service.frameworks import FrameworkSchemas, lane_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.references import snap
+from analysis_service.sources import quotable
 from analysis_service.system_model import (
     DataFlow,
     SystemModel,
@@ -362,6 +363,19 @@ def _unresolved_unknown_ref_issues(
                             " related_unknowns entry names no element"
                             " attribute, no open fact and no subject, so"
                             " nothing says what has to be answered",
+                        )
+                    )
+                elif not quotable(ref.subject):
+                    # An answer's line quotes the subject, and a lane quotes
+                    # that line with the submitter's authority (ADR 0043).
+                    issues.append(
+                        UnreconciledRuling.of(
+                            claim_id=ruling.id,
+                            kind="unresolved-unknown",
+                            message=f"claim {ruling.id!r} states a subject that"
+                            " an answer's line cannot quote: write the question"
+                            " on one line, with no double quote and no control"
+                            " or formatting character",
                         )
                     )
                 continue

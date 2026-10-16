@@ -21,12 +21,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.answer_sets import NO_ANSWERS
+from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import RESTART_FAILURE_MESSAGE, InMemoryJobStore, JobRecord
 from analysis_service.sources import Source
 from analysis_service.store_backends import build_store
 from analysis_service.store_settings import StoreConfigError
 from tests import test_webapp
-from tests.factories import SEEDING_BUDGET, sample_selection
+from tests.factories import SEEDING_BUDGET, sample_selection, valid_model
 from tests.sql_stores import sql_env
 from tests.test_api import completed_days_ago
 from tests.test_webapp import (
@@ -293,6 +294,52 @@ class TestARecordOfAnotherSchemaVersion:
         root = Path(durable["ANALYSIS_OBJECT_ROOT"])
         (root / owner_id / run / "sources.json").write_bytes(sources)
         assert_listed_and_refused(tiers, run)
+
+    @pytest.mark.parametrize(
+        "column",
+        [
+            "frameworks",
+            "answers",
+            "shown_early",
+            "corrections",
+            "draft",
+            "skipped_early",
+            "carried",
+            "unreported_nodes",
+        ],
+    )
+    def test_an_unparsable_json_column_is_never_parsed(self, tiers, durable, column):
+        with app(tiers) as client:
+            run = completed(client)
+        with sqlite3.connect(database_of(durable)) as connection:
+            connection.execute(
+                f"UPDATE jobs SET schema_version = '0.1', {column} = '[{{\"x\": 1}}]'"
+                " WHERE id = ?",
+                (run,),
+            )
+        assert_listed_and_refused(tiers, run)
+
+
+class TestAStoredFacetAnswer:
+    """A stored answer keeps the value the service wrote when it admitted it."""
+
+    def test_it_reads_under_another_facet_wording(self, tiers, durable):
+        with app(tiers) as client:
+            run = completed(client)
+        key = (valid_model().processes[0].id, "", "", "", "capacity-limits", "")
+        stored = FactAnswer(key=key, facets={"rate": "yes"}).model_dump(mode="json")
+        stored["value"] = "An earlier wording of the rate facet? yes"
+        held = json.dumps({"links": [], "facts": [stored]})
+        with sqlite3.connect(database_of(durable)) as connection:
+            connection.execute(
+                "UPDATE jobs SET answers = ?, corrections = ? WHERE id = ?",
+                (held, json.dumps([stored]), run),
+            )
+        with app(tiers) as client:
+            listed = client.get("/workspace/runs")
+            page = client.get(f"/workspace/runs/{run}")
+        assert listed.status_code == 200, listed.text
+        assert page.status_code == 200, page.text
 
 
 def assert_listed_and_refused(tiers, run: str) -> None:

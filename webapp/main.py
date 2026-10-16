@@ -193,6 +193,7 @@ from analysis_service.links import (
     LinkAnswer,
     NoCatalogError,
     components,
+    refuse_answers_source,
 )
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework, reference_labels
@@ -474,7 +475,7 @@ class Workspace:
             # Whether the run stops for answers, so the page shows its
             # progress under the Questions tab rather than Reports.
             "pauses": record.pauses(),
-            "frameworks": [selection.name for selection in record.frameworks],
+            "frameworks": [selection.name for selection in record.frameworks or ()],
             "reports": [
                 {
                     "run": item.id,
@@ -1011,7 +1012,7 @@ def create_app(
         ]
         payload["selection"] = [
             {"name": selection.name, "options": dict(selection.options)}
-            for selection in record.frameworks
+            for selection in record.whole_frameworks()
         ]
         sources = await store.sources(record.id, owner_id)
         if sources is None:
@@ -1041,6 +1042,7 @@ def create_app(
         try:
             body = await request.json()
             sources = [Source.model_validate(source) for source in body["sources"]]
+            refuse_answers_source(sources)
             selection = _selection(state.frameworks, body["frameworks"])
             ask_questions = body.get("questions") is True
             answers_from = body.get("answers_from")

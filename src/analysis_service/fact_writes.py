@@ -20,10 +20,9 @@ from collections.abc import Sequence
 from pydantic import ValidationError
 
 from analysis_service.analysis import control_state
-from analysis_service.answer_forms import answer_choices
+from analysis_service.answer_forms import answer_choices, answer_limit
 from analysis_service.assertions import (
     ABSENT,
-    MAX_QUOTE_CHARS,
     UNKNOWN,
     Assertion,
     AssertionCatalog,
@@ -150,10 +149,11 @@ def check_fact_answers(
                 raise ValueError(
                     f"the sources state {capability!r}, so it takes no answer"
                 )
-        if len(fact_line(answer)) > MAX_QUOTE_CHARS:
+        limit = answer_limit(answer.key, model)
+        if len(answer.value) > limit:
             raise ValueError(
-                f"an answer's line may hold {MAX_QUOTE_CHARS} characters; shorten"
-                f' the answer to "{fact_label(answer.key, model)}"'
+                f"an answer may hold {limit} characters; shorten the answer to"
+                f' "{fact_label(answer.key, model)}"'
             )
         if not reopen and answer.key in settled_before:
             _refuse_reopening(answer, settled_before[answer.key])
