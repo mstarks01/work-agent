@@ -57,8 +57,7 @@ LOADER_MESSAGES = {
         " input_type=dict]"
     ),
     "no-credential": (
-        "vendor '{vendor}' needs {var}; it is unset or empty (credential mode:"
-        " {mode})"
+        "vendor '{vendor}' needs {var}; it is unset or empty (credential mode: {mode})"
     ),
 }
 
@@ -69,9 +68,9 @@ def _model_suggestions() -> dict[str, list[str]]:
     A list of suggestions, not a closed set: the map lags each new model, and
     the model gate accepts a model the map does not name.
     """
-    import analysis_service.model_gate  # noqa: F401  pins the local map first
     import litellm
 
+    import analysis_service.model_gate  # noqa: F401  pins the local map first
     from analysis_service.vendors import vendor_for
 
     prefixes = {"vertex": "vertex_ai", "bedrock": "bedrock"}
@@ -115,13 +114,17 @@ _EXAMPLES = {
 #: of ADR 0091 holds this fact; docs/First-Run.md gives the commands.
 _IAM_NOTES = {
     "vertex": [
-        "Uses your Google login, so this page stores no key. Run this once on"
-        " this machine:",
+        (
+            "Uses your Google login, so this page stores no key. Run this once"
+            " on this machine:"
+        ),
         "gcloud auth application-default login",
     ],
     "bedrock": [
-        "Uses your AWS identity, so this page stores no key: an attached role,"
-        " AWS_PROFILE or SSO. For SSO, run:",
+        (
+            "Uses your AWS identity, so this page stores no key: an attached"
+            " role, AWS_PROFILE or SSO. For SSO, run:"
+        ),
         "aws sso login",
     ],
 }
@@ -151,7 +154,7 @@ def _credential_settings(ready: bool) -> list[dict[str, object]]:
                     vendor=vendor,
                 )
             )
-        variables = {}
+        variables: dict[str, tuple[bool, list[str]]] = {}
         for mode, source in row.credentials.items():
             for entry in source.env:
                 variables.setdefault(entry.var, (entry.secret, []))[1].append(
@@ -396,7 +399,9 @@ def mount(app: FastAPI) -> None:
             "models": _MODELS,
             "vendor_modes": _vendor_modes(),
             "iam_notes": _IAM_NOTES,
-            "mode_notes": {mode.value: note for mode, note in CREDENTIAL_MODE_NOTES.items()},
+            "mode_notes": {
+                mode.value: note for mode, note in CREDENTIAL_MODE_NOTES.items()
+            },
         }
         return response(
             render(
