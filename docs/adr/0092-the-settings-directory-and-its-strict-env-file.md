@@ -3,7 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-10-16
 - **Relates to**: map [#1760](https://github.com/mstarks01/work-agent/issues/1760),
-  ticket [#1763](https://github.com/mstarks01/work-agent/issues/1763)
+  tickets [#1763](https://github.com/mstarks01/work-agent/issues/1763) and
+  [#1764](https://github.com/mstarks01/work-agent/issues/1764)
 
 ## Context
 
@@ -25,18 +26,22 @@ app reads `ANALYSIS_SETTINGS_DIR` only from the process environment, because
 mode `0600`:
 
 - `settings.env`;
-- a copy of `model_tiers.toml`, `frameworks.toml` or `resilience.toml`, only
-  after the first save that changes a value in that file;
 - one secret file for each secret variable that `secret_vars()` names. The
   file name is the variable without `ANALYSIS_` and `_FILE`, in lower case:
   `ANALYSIS_ANTHROPIC_API_KEY_FILE` names `anthropic_api_key`.
 
-The directory holds no copy of `sampling.toml` or `blessed-fingerprints.toml`,
-because the page does not change them. A copy is a byte copy of the shipped
-file, with the changes of the save. `settings.env` names each copy through its
-path variable and an absolute path, for example `ANALYSIS_TIERS_FILE`. So
-`_path` stays the only reader of the location of a TOML file. The app does
-not merge a later shipped file into a copy.
+**No TOML file.** The page writes each changed value as its `ANALYSIS_*`
+override in `settings.env`, for example `ANALYSIS_MODEL_BASE_MODEL` or
+`ANALYSIS_TIMEOUT_MS`. The shipped TOML files stay the base, and the directory
+holds no copy of them. Each loader stays the only reader of its setting.
+
+**One new override.** `frameworks.toml` has one value that the page changes
+and that has no override: `carried`. `ANALYSIS_FRAMEWORKS_CARRIED` is that
+override. Its value is a list of framework names separated by commas, with no
+spaces, for example `asvs,stride`. Each name must be in `FrameworkName`. The
+framework loader refuses a duplicate name and an empty list. The variable
+replaces the `carried` list of the file and does not add to it. The framework
+loader is the only reader of the variable.
 
 **The format of `settings.env`.** Each line is `KEY=value`, or a blank line.
 `KEY` matches `ANALYSIS_[A-Z0-9_]+`. The value is all of the text after the
@@ -46,13 +51,13 @@ It refuses any other line and gives the line number. It also refuses a key
 that occurs two times. The same file loads in systemd `EnvironmentFile=` and
 in `docker --env-file`.
 
-**The write.** The app makes the directory and each copy at the first save
-that needs them, not at startup. It makes the directory with mode `0700`. It
+**The write.** The app makes the directory at the first save, not at
+startup. It makes the directory with mode `0700`. It
 writes each file to a new temporary file in the same directory with mode
 `0600` and `O_EXCL`, then calls `fsync` and `os.replace`. It does not change
 the mode of a directory or file that already exists. The permission check
 refuses a bad mode and names it. In one save, the app writes the secret files
-and the copies first, then `settings.env`, then deletes each file that the
+first, then `settings.env`, then deletes each file that the
 new `settings.env` does not name. A save that leaves no tier with a vendor
 removes that vendor's key line and its key file, and the page says so before
 the save.
@@ -64,10 +69,14 @@ writes the full file again on each save, so it would drop a comment without a
 message. Each extra form also needs a rule in the parser. A strict format
 refuses the line and loses nothing.
 
-**Code adds the path of a copy to the mapping** when the copy exists. That
-rule has no line in a file, so a person cannot see why the loader reads the
-copy. A line in `settings.env` shows it, and the conflict rule for a process
-variable covers it.
+**A copy of each TOML file that the page changes**, named in `settings.env`
+by its path variable. The runtime has no TOML writer. A copy that the app
+writes again from a model of its values loses the comments that explain each
+rule. A copy that the app edits in place needs a new dependency, and a line
+editor written for this purpose is a second reader of the TOML format. Each
+form of copy also keeps the shipped values of the day the app made it, so an
+upgrade does not reach it. An override changes one value and leaves the rest
+of the shipped file in force.
 
 **Keep a key file that no tier uses**, so that a switch back needs no new
 key. The page never shows a key again, and a secret on disk that no code
@@ -75,6 +84,15 @@ reads gives only exposure.
 
 ## Consequences
 
-A move of the directory breaks the absolute paths in `settings.env`. The fix
-is one line for each copy. A copy keeps the shipped values of the day the app
-made it. When a stale value fails a loader, the loader's own message shows.
+A move of the directory breaks the absolute path in each `_FILE` line of
+`settings.env`.
+
+An upgrade changes the shipped base under the overrides. An override keeps its
+value, so the page shows the shipped value beside it and offers a reset, which
+removes the line. When an upgrade renames or removes a variable, the startup
+refuses the line and names its key and line number. The page shows that line,
+and a save can remove it.
+
+`settings.env` is the main store of the changes of a person, and the TOML files
+hold the defaults. A person who reads `config/model_tiers.toml` sees no tier
+model. The Source column of the page shows where each value comes from.
