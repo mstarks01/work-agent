@@ -62,13 +62,18 @@ def flow_id_version_of_graph(raw: Mapping[str, Any]) -> int:
     Read off the IDs by shape, and a graph whose flows disagree raises: a
     mixture names no one rule, and a lift must not guess one. A graph with no
     flows is at the version this code writes, because there is nothing in it
-    that another version would spell differently.
+    that another version would spell differently. An ID no rule wrote carries
+    no version and does not decide the graph's: the replay names it as
+    ``malformed-flow-id``, and the lift resolves no endpoint for it.
     """
-    versions = {
-        flow_id_version(flow["id"])
-        for flow in raw.get("data_flows") or ()
-        if isinstance(flow.get("id"), str)
-    }
+    versions: set[int] = set()
+    for flow in raw.get("data_flows") or ():
+        if not isinstance(flow.get("id"), str):
+            continue
+        try:
+            versions.add(flow_id_version(flow["id"]))
+        except FlowIdError:
+            continue
     if len(versions) > 1:
         raise MigrationError(
             f"this graph's flow IDs sit at versions {sorted(versions)}; a"

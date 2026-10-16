@@ -439,6 +439,28 @@ class TestNormalizeElementIds:
         assert normalized.data_flows[0].source == "entity:ghost"
         assert "invalid-reference" in {i.code for i in validate(normalized)}
 
+    def test_an_endpoint_mistyped_follows_the_one_element_with_its_slug(self):
+        """The case 14 shape (QA-2026-10-15-03-E1): ``entity:partner-app`` is
+        declared and a flow names ``process:partner-app``."""
+        model = valid_model()
+        entity = model.external_entities[0]
+        model.data_flows[0].source = f"process:{entity.id.partition(':')[2]}"
+        normalized = normalize_element_ids(model)
+        assert normalized.data_flows[0].source == entity.id
+        assert normalized.data_flows[0].id.startswith(f"flow:{entity.id}>")
+        assert "invalid-reference" not in {i.code for i in validate(normalized)}
+
+    def test_an_endpoint_whose_slug_two_elements_carry_stays_dangling(self):
+        model = valid_model()
+        slug = model.external_entities[0].id.partition(":")[2]
+        twin = model.processes[0].model_copy(deep=True)
+        twin.id, twin.name = f"process:{slug}", model.external_entities[0].name
+        model.processes.append(twin)
+        model.data_flows[0].source = f"store:{slug}"
+        normalized = normalize_element_ids(model)
+        assert normalized.data_flows[0].source == f"store:{slug}"
+        assert "invalid-reference" in {i.code for i in validate(normalized)}
+
     def test_a_name_with_no_slug_keeps_its_emitted_id(self):
         model = valid_model()
         model.processes[0].name = "???"
