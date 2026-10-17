@@ -43,6 +43,7 @@ from analysis_service.critic import (
     endpoint_targets,
 )
 from analysis_service.frameworks.stride.record import StrideCategory
+from analysis_service.system_model import is_zone
 from evals.harness.verbs import same_action
 
 #: One case's **Data Flow**s as ``flow id -> (source id, destination id)``.
@@ -107,9 +108,7 @@ class Matcher(Protocol):
 def comparable_elements(element_ids: Iterable[str]) -> frozenset[str]:
     """The cited **Element**s the identity comparison reads: every one but a zone."""
     return frozenset(
-        element_id
-        for element_id in element_ids
-        if not element_id.startswith("boundary:")
+        element_id for element_id in element_ids if not is_zone(element_id)
     )
 
 

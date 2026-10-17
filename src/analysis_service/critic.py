@@ -73,8 +73,8 @@ from analysis_service.sources import quotable
 from analysis_service.system_model import (
     DataFlow,
     SystemModel,
-    TrustBoundary,
     attribute_names,
+    is_zone,
 )
 
 # Most severe first — the order a graded framework's ``claims`` array carries.
@@ -577,7 +577,7 @@ def endpoint_targets(
     """
     targets: set[str] = set()
     for element_id in element_ids:
-        if element_id.startswith(f"{TrustBoundary.id_prefix}:"):
+        if is_zone(element_id):
             continue
         endpoints = flows.get(element_id)
         if endpoints is None:

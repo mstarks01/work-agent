@@ -554,6 +554,29 @@ def _bound_element_references(
     return _ReferenceCheck(drafts, unresolved, dropped)
 
 
+def _drop_untargeted(
+    claims: Iterable[Claim],
+) -> tuple[list[Claim], list[DroppedClaim]]:
+    """Drop every claim its record says names no target, and mark it.
+
+    After the two passes that narrow ``affected_element_ids``, because either
+    can leave a claim on trust zones alone: the reference beside a zone goes
+    when the model does not contain it or the grounds do not reach it, and the
+    zone stays. The record says what a target is
+    (:meth:`~analysis_service.claims.Claim.untargeted`, ADR 0097).
+    """
+    kept: list[Claim] = []
+    dropped: list[DroppedClaim] = []
+    for claim in claims:
+        if reason := type(claim).untargeted(claim.affected_element_ids):
+            dropped.append(
+                DroppedClaim.of(claim_id=claim.id, title=claim.title, reason=reason)
+            )
+        else:
+            kept.append(claim)
+    return kept, dropped
+
+
 class _ScopeCheck(NamedTuple):
     drafts: list[Claim]
     unresolved: list[UnresolvedEvidence]
@@ -862,7 +885,8 @@ def join_drafts(
     # then drops grounds about none of the elements left. The other order lets
     # the scope pass strip the ground a claim's elements were bounded by.
     bounded = _bound_element_references(referenced.drafts, index, assertions)
-    scoped = _scope_grounds(bounded.drafts, index, assertions)
+    targeted, untargeted = _drop_untargeted(bounded.drafts)
+    scoped = _scope_grounds(targeted, index, assertions)
     checked = (
         _verify_quotes(scoped.drafts, sources)
         if sources
@@ -881,6 +905,7 @@ def join_drafts(
                 *duplicates,
                 *referenced.dropped,
                 *bounded.dropped,
+                *untargeted,
                 *scoped.dropped,
                 *checked.groundless,
             ],

@@ -542,6 +542,17 @@ class TrustBoundary(_Element):
 Element = ExternalEntity | Process | DataStore | DataFlow | TrustBoundary
 
 
+def is_zone(element_id: str) -> bool:
+    """Whether an element ID names a **Trust Boundary**.
+
+    A zone is the context a claim sits in rather than what it is about, so a
+    claim's targets drop it (:func:`~analysis_service.critic.endpoint_targets`)
+    and a framework whose claims must name a target refuses a claim that names
+    only zones (ADR 0097). The one reader of that test.
+    """
+    return element_id.startswith(f"{TrustBoundary.id_prefix}:")
+
+
 def attribute_names(element: Element) -> tuple[str, ...]:
     """The security-relevant attributes of one element, in declaration order.
 

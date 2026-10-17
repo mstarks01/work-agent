@@ -355,6 +355,17 @@ MAX_VALUE_CHARS = 200
 MAX_QUOTE_CHARS = 1000
 
 
+def keeps_text(value: str) -> bool:
+    """Whether free text keeps a character under the fold its identity key reads.
+
+    :func:`_value_key` and :func:`_scope_key` key free text by
+    :func:`~analysis_service.grounding.normalize`, which deletes markup as
+    well as whitespace. A value that folds to nothing would share one key with
+    every other such value, so the gate refuses it as ``illegal-value``.
+    """
+    return bool(normalize(value))
+
+
 @dataclass(frozen=True)
 class Predicate:
     """One registered predicate: what it means, and what a legal row looks like.
@@ -398,10 +409,8 @@ class Predicate:
         :data:`UNIVERSAL_TERMS` first, because both are legal for every
         predicate whatever its value kind. Then the kind: a ``term`` must be in
         the vocabulary, a ``reference`` must name a subject the catalog holds,
-        and ``text`` is anything the field's bound admits that keeps a
-        character under :func:`~analysis_service.grounding.normalize`, the
-        fold :func:`_value_key` reads. A value that folds to nothing has no key
-        of its own.
+        and ``text`` is anything the field's bound admits that
+        :func:`keeps_text`.
         """
         if value in UNIVERSAL_TERMS:
             return True
@@ -409,7 +418,7 @@ class Predicate:
             return value in self.terms
         if self.value == "reference":
             return value in known_subjects
-        return bool(normalize(value))
+        return keeps_text(value)
 
 
 #: The predicates this service registers, and the whole of what extraction may
@@ -1803,6 +1812,14 @@ def _entry_issues(
                 "illegal-value",
                 f"{entry.predicate!r} refers to"
                 f" {', '.join(sorted(predicate.refers_to))}, not {referent.type!r}",
+            )
+
+    for qualifier in entry.scope:
+        if not keeps_text(qualifier.value):
+            refuse(
+                "illegal-value",
+                f"the {qualifier.kind} qualifier {qualifier.value!r} is only"
+                " markup or whitespace, so it names no scope",
             )
 
     if entry.value == UNKNOWN and entry.reason is None:

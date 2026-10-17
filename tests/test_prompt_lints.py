@@ -1142,8 +1142,10 @@ def test_a_lane_skill_does_not_invite_a_verb_its_lane_refuses(lane, verb):
 #: :func:`~analysis_service.fan_in._drop_duplicate_ids` keeps the first draft
 #: and records the rest, so a contract that says a duplicate ID "fails the
 #: job" tells a lane agent the wrong consequence of its own mistake (#1082).
+#: STRIDE's ``DraftThreat.untargeted`` drops a threat that names only trust
+#: zones, and its contract says so (ADR 0097). ASVS refuses no such claim.
 OUTPUT_CONTRACT_RULES: dict[str, tuple[str, ...]] = {
-    "stride": ("lose the second",),
+    "stride": ("lose the second", "names only zones is dropped"),
     "asvs": ("loses the second draft",),
 }
 
