@@ -35,8 +35,7 @@ class TestSecretVars:
         vendor_secrets = {
             var
             for vendor in VENDORS.values()
-            for mode in vendor.credentials
-            for var in vendor.secret_env_vars(mode)
+            for var in vendor.all_env_vars(secret_only=True)
         }
         assert vendor_secrets
         assert secret_vars() == {

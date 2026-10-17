@@ -304,11 +304,7 @@ def _vendor_variables() -> set[str]:
             credentials_env_var_for(vendor),
             charges_env_var_for(vendor),
             upstreams_env_var_for(vendor),
-            *(
-                var
-                for mode in VENDORS[vendor].credential_modes
-                for var in VENDORS[vendor].required_env_vars(mode)
-            ),
+            *VENDORS[vendor].all_env_vars(),
         )
     }
 

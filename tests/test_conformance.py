@@ -993,7 +993,7 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
         for name, documented in cells.items():
             vendor = vendor_for(name)
             modes = {
-                mode: vendor.required_env_vars(mode) for mode in vendor.credentials
+                mode: vendor.required_env_vars(mode) for mode in vendor.credential_modes
             }
             assert documented in modes.values(), (
                 f"First-Run.md lists {documented} for {name}; the registry reads"

@@ -7,8 +7,10 @@ settings directory, and read only the HTTP response.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from hashlib import sha256
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,10 +29,11 @@ from analysis_service.config_files import (
 from analysis_service.settings_variables import deployment_env
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 from tests.test_webapp import LOOPBACK
-from webapp.main import create_app
+from webapp.main import Startup, build_startup, create_app
 
-#: A model that no fixture sets, so a page that names it read the file.
-HAND_MODEL = "gpt-4.1"
+#: A model that no fixture sets and that the model list suggests, so a page
+#: that names it read the file, and a save of it builds.
+OTHER_MODEL = "gpt-4.1"
 
 #: Each value form that the value rule refuses, with a marker that a message
 #: must never repeat.
@@ -49,11 +52,14 @@ REFUSED_VALUES = {
 LINE_BREAKS = ["\r", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", " ", " "]
 
 
-def write_settings(directory: Path, text: str) -> Path:
-    path = directory / "settings.env"
+def private_file(path: Path, text: str, mode: int = 0o600) -> Path:
     path.write_text(text, encoding="utf-8", newline="")
-    path.chmod(0o600)
+    path.chmod(mode)
     return path
+
+
+def write_settings(directory: Path, text: str) -> Path:
+    return private_file(directory / "settings.env", text)
 
 
 def env_in(directory: Path, **process: str) -> dict[str, str]:
@@ -212,9 +218,9 @@ class TestTheValueRule:
 
 class TestTheMerge:
     def test_settings_env_adds_its_lines(self, tmp_path):
-        write_settings(tmp_path, f"ANALYSIS_MODEL_BASE_MODEL={HAND_MODEL}\n")
+        write_settings(tmp_path, f"ANALYSIS_MODEL_BASE_MODEL={OTHER_MODEL}\n")
         env = deployment_env(env_in(tmp_path, PATH="/usr/bin"))
-        assert env["ANALYSIS_MODEL_BASE_MODEL"] == HAND_MODEL
+        assert env["ANALYSIS_MODEL_BASE_MODEL"] == OTHER_MODEL
         assert env["PATH"] == "/usr/bin"
 
     def test_a_missing_directory_adds_nothing(self, tmp_path):
@@ -222,7 +228,7 @@ class TestTheMerge:
         assert deployment_env(process) == process
 
     def test_a_variable_that_both_sources_set_is_refused(self, tmp_path):
-        write_settings(tmp_path, f"ANALYSIS_MODEL_BASE_MODEL={HAND_MODEL}\n")
+        write_settings(tmp_path, f"ANALYSIS_MODEL_BASE_MODEL={OTHER_MODEL}\n")
         process = env_in(tmp_path, ANALYSIS_MODEL_BASE_MODEL="gpt-4.1-mini")
         with pytest.raises(
             SettingsFileError,
@@ -269,6 +275,17 @@ class TestTheMerge:
         assert deployment_env(process) == process
 
 
+def settings_client(
+    directory: Path,
+    process: Mapping[str, str] = MappingProxyType({}),
+    build: Callable[[Mapping[str, str]], Startup] = build_startup,
+) -> TestClient:
+    """A client of the app on the settings directory ``directory``, with the
+    variables of ``process`` in the process environment."""
+    app = create_app(env=env_in(directory, **process), build=build)
+    return TestClient(app, base_url=LOOPBACK)
+
+
 def hand_written(**overrides: str) -> str:
     """A ``settings.env`` that selects every tier and its credentials."""
     lines = TEST_TIER_ENV | TEST_CREDENTIAL_ENV | overrides
@@ -277,17 +294,17 @@ def hand_written(**overrides: str) -> str:
 
 class TestTheFirstRunApp:
     def test_it_runs_on_a_hand_written_settings_env(self, tmp_path):
-        write_settings(tmp_path, hand_written(ANALYSIS_MODEL_BASE_MODEL=HAND_MODEL))
-        client = TestClient(create_app(env=env_in(tmp_path)), base_url=LOOPBACK)
+        write_settings(tmp_path, hand_written(ANALYSIS_MODEL_BASE_MODEL=OTHER_MODEL))
+        client = settings_client(tmp_path)
 
         page = client.get("/")
 
         assert page.status_code == 200
-        assert HAND_MODEL in page.text
+        assert OTHER_MODEL in page.text
 
     def test_it_carries_what_settings_env_names(self, tmp_path):
         write_settings(tmp_path, hand_written(ANALYSIS_FRAMEWORKS_CARRIED="stride"))
-        client = TestClient(create_app(env=env_in(tmp_path)), base_url=LOOPBACK)
+        client = settings_client(tmp_path)
 
         page = client.get("/")
 
@@ -297,8 +314,7 @@ class TestTheFirstRunApp:
 
     def test_a_conflict_stops_it_and_names_the_variable(self, tmp_path):
         write_settings(tmp_path, hand_written())
-        process = env_in(tmp_path, ANALYSIS_MODEL_BASE_MODEL=HAND_MODEL)
-        client = TestClient(create_app(env=process), base_url=LOOPBACK)
+        client = settings_client(tmp_path, {"ANALYSIS_MODEL_BASE_MODEL": OTHER_MODEL})
 
         page = client.get("/")
 
@@ -307,7 +323,7 @@ class TestTheFirstRunApp:
 
     def test_an_unknown_key_stops_it_and_names_the_key_and_line(self, tmp_path):
         write_settings(tmp_path, hand_written() + "ANALYSIS_RENAMED=1\n")
-        client = TestClient(create_app(env=env_in(tmp_path)), base_url=LOOPBACK)
+        client = settings_client(tmp_path)
 
         page = client.get("/")
 
@@ -317,7 +333,7 @@ class TestTheFirstRunApp:
 
     def test_a_refused_value_stops_it_without_the_value(self, tmp_path):
         write_settings(tmp_path, hand_written(ANALYSIS_MODEL_BASE_MODEL="SECRET\\x"))
-        client = TestClient(create_app(env=env_in(tmp_path)), base_url=LOOPBACK)
+        client = settings_client(tmp_path)
 
         page = client.get("/")
 

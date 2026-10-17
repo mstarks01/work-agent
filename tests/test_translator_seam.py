@@ -328,6 +328,6 @@ def test_the_credential_table_carries_no_address():
     deployment selects, so a mode nobody has selected still answers.
     """
     for vendor in VENDORS.values():
-        for mode, source in vendor.credentials.items():
+        for mode, source in vendor.credential_sources.items():
             kwargs = {entry.kwarg for entry in source.env}
             assert not kwargs & set(FORBIDDEN_ENDPOINT_KWARGS), (vendor.name, mode)

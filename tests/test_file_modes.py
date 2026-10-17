@@ -29,9 +29,12 @@ from analysis_service.jobs import InMemoryJobStore
 from analysis_service.vendors import ProviderAuthError, read_secret
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 from tests.test_api import FakeVerifier, auth, submission
-from tests.test_settings_env import env_in, hand_written, write_settings
-from tests.test_webapp import LOOPBACK
-from webapp.main import create_app
+from tests.test_settings_env import (
+    hand_written,
+    private_file,
+    settings_client,
+    write_settings,
+)
 
 #: The key file of the base tier, which the runner build reads.
 KEY_VAR = "ANALYSIS_OPENAI_API_KEY_FILE"
@@ -46,12 +49,6 @@ REFUSED_SECRETS = {
     "nul": "SE\x00CRET",
     "too long": "SECRET" + "x" * MAX_VALUE_CHARS,
 }
-
-
-def private_file(path: Path, text: str, mode: int = 0o600) -> Path:
-    path.write_text(text, encoding="utf-8", newline="")
-    path.chmod(mode)
-    return path
 
 
 def key_env(path: Path) -> dict[str, str]:
@@ -146,12 +143,12 @@ class TestTheSecretRule:
 class TestTheFirstRunApp:
     def page(self, directory: Path, **overrides: str):
         write_settings(directory, hand_written(**overrides))
-        client = TestClient(create_app(env=env_in(directory)), base_url=LOOPBACK)
+        client = settings_client(directory)
         return client.get("/")
 
     def test_a_settings_env_that_others_can_write_stops_it(self, tmp_path):
         write_settings(tmp_path, hand_written()).chmod(0o620)
-        client = TestClient(create_app(env=env_in(tmp_path)), base_url=LOOPBACK)
+        client = settings_client(tmp_path)
 
         page = client.get("/")
 

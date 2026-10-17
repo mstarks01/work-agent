@@ -12,6 +12,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import subprocess
+import sys
 import threading
 import time
 from dataclasses import replace
@@ -25,7 +27,13 @@ from analysis_service.certification import CertifyResult
 from analysis_service.model_gate import tool_models
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 from tests.test_runtime_certification import FP_A, CertifyingRunner
-from tests.test_settings_env import env_in, hand_written, write_settings
+from tests.test_settings_env import (
+    OTHER_MODEL,
+    env_in,
+    hand_written,
+    settings_client,
+    write_settings,
+)
 from tests.test_webapp import LOOPBACK, SAME_ORIGIN, posted, run_to_completion
 from tests.test_webapp_cell import Recording
 from tests.test_webapp_questions import PausingRunner, shown_list, start
@@ -35,13 +43,11 @@ from webapp.main import Startup, build_startup, create_app
 from webapp.settings_save import MAX_SAVE_BYTES
 
 BASE_MODEL = TEST_TIER_ENV["ANALYSIS_MODEL_BASE_MODEL"]
-#: A model in the model list whose output ceiling covers the shipped sampling.
-NEW_MODEL = "gpt-4.1"
 
 
-def test_the_new_model_is_one_the_list_suggests():
-    assert NEW_MODEL != BASE_MODEL
-    assert NEW_MODEL in tool_models("openai")
+def test_the_other_model_is_one_the_list_suggests():
+    assert OTHER_MODEL != BASE_MODEL
+    assert OTHER_MODEL in tool_models("openai")
 
 
 class Builds:
@@ -80,8 +86,7 @@ def app_on(tmp_path, settings: str | None = None, builds=None, **process: str):
     if settings is not None:
         write_settings(tmp_path, settings)
     builds = Builds() if builds is None else builds
-    app = create_app(env=env_in(tmp_path, **process), build=builds)
-    return TestClient(app, base_url=LOOPBACK), builds
+    return settings_client(tmp_path, process, build=builds), builds
 
 
 def revision(client) -> str:
@@ -105,24 +110,24 @@ class TestASaveThatPasses:
     def test_a_tier_model_writes_one_line_and_the_next_job_runs_on_it(self, tmp_path):
         client, builds = app_on(tmp_path, hand_written())
 
-        saved = save(client, {"tiers.base.model": NEW_MODEL})
+        saved = save(client, {"tiers.base.model": OTHER_MODEL})
         run_to_completion(client)
 
         assert saved.status_code == 200, saved.text
         lines = settings_text(tmp_path).splitlines()
         assert [line for line in lines if "BASE_MODEL" in line] == [
-            f"ANALYSIS_MODEL_BASE_MODEL={NEW_MODEL}"
+            f"ANALYSIS_MODEL_BASE_MODEL={OTHER_MODEL}"
         ]
-        assert builds.models == [BASE_MODEL, NEW_MODEL]
+        assert builds.models == [BASE_MODEL, OTHER_MODEL]
         assert builds.runners[1].jobs and not builds.runners[0].jobs
 
     def test_the_response_holds_the_new_page_data(self, tmp_path):
         client, _ = app_on(tmp_path, hand_written())
 
-        data = save(client, {"tiers.base.model": NEW_MODEL}).json()["settings"]
+        data = save(client, {"tiers.base.model": OTHER_MODEL}).json()["settings"]
 
         row = next(row for row in data["rows"] if row["key"] == "tiers.base.model")
-        assert (row["value"], row["source"]) == (NEW_MODEL, "page")
+        assert (row["value"], row["source"]) == (OTHER_MODEL, "page")
         assert data["revision"] == revision(client)
 
     def test_a_job_in_flight_finishes_on_the_deployment_that_admitted_it(
@@ -134,7 +139,7 @@ class TestASaveThatPasses:
         with client:
             started = client.post("/analyze", json=posted("A"), headers=SAME_ORIGIN)
             assert started.status_code == 200, started.text
-            assert save(client, {"tiers.base.model": NEW_MODEL}).status_code == 200
+            assert save(client, {"tiers.base.model": OTHER_MODEL}).status_code == 200
             run = started.json()["run"]
             events = client.get(f"/events/{run}").text
             after = run_to_completion(client)
@@ -176,8 +181,9 @@ class TestASaveThatPasses:
 
     def test_the_first_save_makes_the_directory_and_the_file_private(self, tmp_path):
         directory = tmp_path / "new" / "work-agent"
-        env = env_in(directory, **TEST_TIER_ENV, **TEST_CREDENTIAL_ENV)
-        client = TestClient(create_app(env=env, build=Builds()), base_url=LOOPBACK)
+        client = settings_client(
+            directory, TEST_TIER_ENV | TEST_CREDENTIAL_ENV, build=Builds()
+        )
 
         saved = save(client, {"resilience.timeout_ms": "5000"})
 
@@ -190,13 +196,13 @@ class TestASaveThatPasses:
         client, _ = app_on(tmp_path, hand_written())
         caplog.set_level(logging.INFO, logger="webapp")
 
-        save(client, {"tiers.base.model": NEW_MODEL, "resilience.timeout_ms": "5000"})
+        save(client, {"tiers.base.model": OTHER_MODEL, "resilience.timeout_ms": "5000"})
 
         lines = [
             r.getMessage() for r in caplog.records if "settings saved" in r.message
         ]
         assert lines == ["settings saved: tiers.base.model, resilience.timeout_ms"]
-        assert NEW_MODEL not in caplog.text
+        assert OTHER_MODEL not in caplog.text
 
 
 class TestAReset:
@@ -379,9 +385,7 @@ class TestAStaleSave:
             return built
 
         write_settings(tmp_path, hand_written())
-        client = TestClient(
-            create_app(env=env_in(tmp_path), build=edits), base_url=LOOPBACK
-        )
+        client = settings_client(tmp_path, build=edits)
 
         stale = save(client, {"resilience.attempts": "2"})
 
@@ -615,7 +619,7 @@ class TestAKeySave:
             client,
             {
                 "tiers.review.vendor": "openai",
-                "tiers.review.model": NEW_MODEL,
+                "tiers.review.model": OTHER_MODEL,
                 "credentials.openai.api_key": KEY,
             },
         )
@@ -640,7 +644,7 @@ class TestAKeySave:
             {
                 ANTHROPIC_KEY: KEY,
                 "tiers.review.vendor": "openai",
-                "tiers.review.model": NEW_MODEL,
+                "tiers.review.model": OTHER_MODEL,
             },
         )
         run_to_completion(client)
@@ -737,3 +741,22 @@ class TestAFirstRun:
         assert client.get("/").status_code == 200
         assert builds.runners[-1].jobs == [run]
         assert named_key(tmp_path).read_text(encoding="utf-8") == KEY
+
+
+def test_new_lines_refuse_a_setting_with_no_variable_under_optimize():
+    """``python -O`` removes an ``assert``, so the refusal must be a raise."""
+    script = (
+        "from webapp.settings_save import Save, saved_lines\n"
+        "saved_lines({}, Save('r', {'tiers.review_independence': 'x'}, ()), {})\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-O", "-c", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "ValueError: tiers.review_independence" in result.stderr

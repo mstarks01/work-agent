@@ -294,7 +294,7 @@ def test_the_credential_table_is_the_vendor_registry():
     registered = {
         (name, mode.value, vendor.required_env_vars(mode))
         for name, vendor in VENDORS.items()
-        for mode in vendor.credentials
+        for mode in vendor.credential_modes
     }
 
     assert documented == registered

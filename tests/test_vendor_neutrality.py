@@ -458,7 +458,7 @@ def test_every_variable_that_is_not_a_secret_has_a_shape():
     unshaped = sorted(
         f"{vendor.name}.{entry.var}"
         for vendor in VENDORS.values()
-        for source in vendor.credentials.values()
+        for source in vendor.credential_sources.values()
         for entry in source.env
         if (entry.shape is None) is not entry.secret
     )

@@ -26,7 +26,12 @@ from analysis_service.settings_variables import secret_vars
 from analysis_service.store_backends import env_variables as store_variables
 from analysis_service.vendors import VENDOR_NAMES
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV, secret_env
-from tests.test_settings_env import env_in, hand_written, write_settings
+from tests.test_settings_env import (
+    env_in,
+    hand_written,
+    settings_client,
+    write_settings,
+)
 from tests.test_webapp import LOOPBACK
 from webapp.main import Workspace, create_app
 from webapp.settings_page import SETTINGS
@@ -38,7 +43,7 @@ KEY = "sk-ant-page-must-never-show-this"
 def client_for(tmp_path, settings: str = "", **process: str) -> TestClient:
     if settings:
         write_settings(tmp_path, settings)
-    return TestClient(create_app(env=env_in(tmp_path, **process)), base_url=LOOPBACK)
+    return settings_client(tmp_path, process)
 
 
 def memory_client(tmp_path, **process: str) -> TestClient:
