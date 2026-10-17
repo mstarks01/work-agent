@@ -64,7 +64,7 @@ from analysis_service.store_settings import (
     StoreConfigError,
     closed_setting,
 )
-from analysis_service.vendors import VENDOR_NAMES, VENDORS, VendorName
+from analysis_service.vendors import VENDOR_NAMES, VENDORS
 from webapp.settings_page import IAM_SETUP, SETTINGS, Setting
 
 
@@ -75,7 +75,8 @@ def settings_view(
 ) -> dict[str, Any]:
     """The page's data: the rows, the unknown lines of ``settings.env``, the
     engine's error, the modes of each vendor, the ``iam`` notes and the model
-    suggestions.
+    suggestions of each vendor. The page's script picks the suggestions of a
+    tier from the vendor that the unsaved changes choose for it.
 
     ``defaults`` holds the values that the app gives a variable that no
     source sets, such as the first-run job store.
@@ -98,8 +99,6 @@ def settings_view(
         key: _value(setting, process_env, page, files, defaults)
         for key, setting in SETTINGS.items()
     }
-    effective = {key: row["value"] for key, row in values.items()}
-    vendors = _chosen_vendors(effective)
     owners = _vendor_rows()
     shown = owners.keys() | _store_rows(merged, defaults)
     hidden = _vendor_variables() | set(store_variables())
@@ -124,12 +123,6 @@ def settings_view(
             row |= {"secret": True, "key_saved": _key_saved(row.pop("value"))}
             row.pop("shipped", None)
         rows.append(row)
-    for tier in TIER_NAMES:
-        vendor = effective[f"tiers.{tier}.vendor"]
-        if vendor in vendors:
-            next(row for row in rows if row["key"] == f"tiers.{tier}.model")[
-                "suggests"
-            ] = vendor
     return {
         "error": None if error is None else str(error),
         "settings_file": str(path),
@@ -149,7 +142,7 @@ def settings_view(
             for vendor in VENDOR_NAMES
             if (setup := IAM_SETUP[vendor]) is not None
         ],
-        "models": {vendor: list(tool_models(vendor)) for vendor in vendors},
+        "models": {vendor: list(tool_models(vendor)) for vendor in VENDOR_NAMES},
     }
 
 
@@ -284,12 +277,6 @@ def _withheld(value: str) -> str | None:
 def _key_saved(path: str | None) -> bool:
     """Whether the secret variable names a file. The file is never opened."""
     return path is not None and Path(path).is_file()
-
-
-def _chosen_vendors(values: Mapping[str, str | None]) -> list[VendorName]:
-    """Each vendor that a tier names, once, in the order of ``VENDOR_NAMES``."""
-    chosen = {values[f"tiers.{tier}.vendor"] for tier in TIER_NAMES}
-    return [vendor for vendor in VENDOR_NAMES if vendor in chosen]
 
 
 def _vendor_variables() -> set[str]:
