@@ -255,19 +255,16 @@ class TestTheFourReadersOfOnePlace:
         the ledger answers with one vote that the runtime would have kept apart
         is a finding counted once and reported twice.
         """
-        for case in corpus:
-            flows = ModelIndex.of(case.model).flow_endpoints
-            for left, right in itertools.combinations(case.stride_claims(), 2):
-                same_key = _key(case, left, flows) == _key(case, right, flows)
-                same_place = endpoint_targets(
-                    left.affected_element_ids, flows
-                ) == endpoint_targets(right.affected_element_ids, flows)
-                if same_key:
-                    assert same_place and left.verb == right.verb, (
-                        f"{case.id}: {left.claim!r} and {right.claim!r} share a"
-                        " fingerprint and the runtime duplicate key would not"
-                        " pair them"
-                    )
+        pairs = _fingerprint_collisions(corpus)
+        assert pairs, "no pair shares a fingerprint, so nothing is checked"
+        for case_id, flows, left, right in pairs:
+            same_place = endpoint_targets(
+                left.affected_element_ids, flows
+            ) == endpoint_targets(right.affected_element_ids, flows)
+            assert same_place and left.verb == right.verb, (
+                f"{case_id}: {left.claim!r} and {right.claim!r} share a"
+                " fingerprint and the runtime duplicate key would not pair them"
+            )
 
     def test_one_fingerprint_implies_the_matcher_calls_them_one_claim(self, corpus):
         """The matcher is the loosest of the three, so it must implicate too.
@@ -276,26 +273,24 @@ class TestTheFourReadersOfOnePlace:
         the lane and verb are shared, so a fingerprint collision the matcher
         splits would mean a vote landing on a finding the scorer never matched.
         """
-        for case in corpus:
-            flows = ModelIndex.of(case.model).flow_endpoints
-            matcher = SubsetVerbIdentity({case.id: flows})
-            for left, right in itertools.combinations(case.stride_claims(), 2):
-                if _key(case, left, flows) != _key(case, right, flows):
-                    continue
-                pair = ClaimPair(
-                    case=case.id,
-                    category=left.category,
-                    reference_claim=left.claim,
-                    candidate_claim=right.claim,
-                    reference_element_ids=left.affected_element_ids,
-                    candidate_element_ids=right.affected_element_ids,
-                    reference_verb=left.verb,
-                    candidate_verb=right.verb,
-                )
-                assert matcher.equivalent(pair).match, (
-                    f"{case.id}: one fingerprint, two claims to the matcher:"
-                    f" {left.claim!r} and {right.claim!r}"
-                )
+        pairs = _fingerprint_collisions(corpus)
+        assert pairs, "no pair shares a fingerprint, so nothing is checked"
+        for case_id, flows, left, right in pairs:
+            matcher = SubsetVerbIdentity({case_id: flows})
+            pair = ClaimPair(
+                case=case_id,
+                category=left.category,
+                reference_claim=left.claim,
+                candidate_claim=right.claim,
+                reference_element_ids=left.affected_element_ids,
+                candidate_element_ids=right.affected_element_ids,
+                reference_verb=left.verb,
+                candidate_verb=right.verb,
+            )
+            assert matcher.equivalent(pair).match, (
+                f"{case_id}: one fingerprint, two claims to the matcher:"
+                f" {left.claim!r} and {right.claim!r}"
+            )
 
     def test_the_matcher_merges_strictly_more_than_the_fingerprint(self, corpus):
         """The gap between subset and equality, counted rather than argued.
@@ -324,9 +319,9 @@ class TestTheFourReadersOfOnePlace:
                     reference_verb=left.verb,
                     candidate_verb=right.verb,
                 )
-                if matcher.equivalent(pair).match and _key(case, left, flows) != _key(
-                    case, right, flows
-                ):
+                if matcher.equivalent(pair).match and _key(
+                    case.id, left, flows
+                ) != _key(case.id, right, flows):
                     wider += 1
 
         assert wider == MATCHER_WIDER_THAN_FINGERPRINT, (
@@ -336,16 +331,46 @@ class TestTheFourReadersOfOnePlace:
         )
 
 
-def _key(case: GoldenCase, claim: ReferenceThreat, flows) -> str:
+def _key(case_id: str, claim: ReferenceThreat, flows) -> str:
     value, _ = key_claim(
         "stride",
-        case.id,
+        case_id,
         claim.category,
         claim.affected_element_ids,
         flows,
         verb=claim.verb,
     )
     return value
+
+
+def _fingerprint_collisions(corpus):
+    """Every pair of claims in one case that share a fingerprint.
+
+    The corpus may hold no such pair, so a synthetic case comes first: one claim
+    on case 13's REST flow, written twice with its elements in two orders.
+    """
+    synthetic = tuple(
+        ReferenceThreat(
+            claim=f"an attacker alters a request on the REST flow ({order})",
+            tier="must-find",
+            affected_element_ids=elements,
+            category="tampering",
+            severity={"likelihood": "medium", "impact": "medium"},
+            verb="alter-in-transit",
+        )
+        for order, elements in (("forward", ON_REST), ("backward", ON_REST[::-1]))
+    )
+    claims = [("synthetic", SIBLING_FLOWS, synthetic)]
+    claims += [
+        (case.id, ModelIndex.of(case.model).flow_endpoints, case.stride_claims())
+        for case in corpus
+    ]
+    return [
+        (case_id, flows, left, right)
+        for case_id, flows, written in claims
+        for left, right in itertools.combinations(written, 2)
+        if _key(case_id, left, flows) == _key(case_id, right, flows)
+    ]
 
 
 #: Case 13's shape: two flows between one console and one API, and one other.
