@@ -72,16 +72,17 @@ class TestDeploymentVariables:
     def test_each_secret_is_a_deployment_variable(self):
         assert secret_vars() <= set(deployment_variables())
 
-    def test_each_sampling_name_is_one_the_loader_folds(self):
+    @pytest.mark.parametrize("var", sampling.env_variables())
+    def test_each_sampling_name_is_one_the_loader_folds(self, var):
         """The loader parses each name it reads; the export spells each one.
-        A name that the fold cannot place raises an error about the name, and
-        any other error is about the value."""
-        for var in sampling.env_variables():
-            try:
-                sampling._apply_env_overrides({}, {var: "?"})
-            except SamplingConfigError as error:
-                assert "unknown tier" not in str(error), var
-                assert "is not overridable" not in str(error), var
+        No offered param takes ``?``, so the loader refuses it for each name,
+        and the refusal is about the value, not the name."""
+        with pytest.raises(SamplingConfigError) as refused:
+            sampling.load_sampling(
+                PROJECT_ROOT / "config" / "sampling.toml", {var: "?"}
+            )
+        assert "unknown tier" not in str(refused.value)
+        assert "is not overridable" not in str(refused.value)
 
 
 class TestStorageRows:
