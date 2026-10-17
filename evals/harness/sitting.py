@@ -51,7 +51,7 @@ import hashlib
 import os
 import tempfile
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -840,7 +840,40 @@ def _files_of(case: GoldenCase) -> list[str]:
     )
 
 
-def check_marks(prepared: Prepared, marks: Mapping[str, Mark]) -> None:
+#: How a refusal names a mark that names no recorded finding, from the mark's
+#: position in the marks sent and its key.
+MarkName = Callable[[int, str], str]
+
+
+def mark_position(position: int, key: str) -> str:
+    """A mark by its position. An HTTP response names this: a key is caller text."""
+    return f"marks[{position}]"
+
+
+def mark_key(position: int, key: str) -> str:
+    """A mark by its key. A maintainer's command names this, to find the line."""
+    return key
+
+
+def unknown_marks(
+    prepared: Prepared, marks: Mapping[str, Mark]
+) -> list[tuple[int, str]]:
+    """Each mark naming no recorded finding of this case, as (position, key).
+
+    The position counts from zero in the order of ``marks``. A key that
+    :func:`current_marks` reads as an alias of a finding is known.
+    """
+    known = {
+        name
+        for target in prepared.mark_targets
+        for name in (target.fingerprint, *target.aliases)
+    }
+    return [(position, key) for position, key in enumerate(marks) if key not in known]
+
+
+def check_marks(
+    prepared: Prepared, marks: Mapping[str, Mark], name: MarkName = mark_position
+) -> None:
     """Refuse a mark key naming no recorded finding of this case.
 
     **One reader, three callers.** :func:`finish` asks it when a reader
@@ -848,14 +881,14 @@ def check_marks(prepared: Prepared, marks: Mapping[str, Mark]) -> None:
     :func:`evals.review_submission.validate` asks it of a merged file. A key
     the case does not carry is either a page that lost its targets or a request
     that never read one, and either way the mark answers nothing.
+
+    ``name`` says how the refusal names each mark. The default names its
+    position, so a caller's key never reaches a response.
     """
-    unknown = sorted(
-        set(current_marks(prepared, marks))
-        - {target.fingerprint for target in prepared.mark_targets}
-    )
-    if unknown:
+    if unknown := unknown_marks(prepared, marks):
+        named = ", ".join(name(position, key) for position, key in unknown)
         raise SittingError(
-            f"{prepared.case_id}: {', '.join(unknown)} names no recorded"
+            f"{prepared.case_id}: {named} names no recorded"
             " finding of this case, so the mark answers nothing"
         )
 
@@ -1021,6 +1054,7 @@ def sitting_problems(
     own_list: Sequence[str],
     opened_digests: Mapping[str, str],
     marks: Mapping[str, Mark],
+    name: MarkName = mark_position,
 ) -> list[str]:
     """Everything wrong with what one sitting claims to have read.
 
@@ -1035,6 +1069,8 @@ def sitting_problems(
 
     Every problem at once, because a reader may be hours away by email and a
     round trip has to carry every question.
+
+    ``name`` says how a problem names a mark; see :func:`check_marks`.
     """
     prepared = prepare(case_dir)
     case_id = prepared.case_id
@@ -1070,7 +1106,10 @@ def sitting_problems(
         problems.append(
             f"{case_id}: the review opened no reference set, so it judges nothing"
         )
-    for rule in (check_marks, partial(check_every_finding_marked, frameworks=read)):
+    for rule in (
+        partial(check_marks, name=name),
+        partial(check_every_finding_marked, frameworks=read),
+    ):
         try:
             rule(prepared, marks)
         except SittingError as exc:
@@ -1078,7 +1117,7 @@ def sitting_problems(
     try:
         marks = current_marks(prepared, marks)
     except SittingError:
-        # Already reported by check_marks above; the unread check below reads
+        # Already reported by the rules above; the unread check below reads
         # the keys as written rather than reporting the fold twice.
         pass
 

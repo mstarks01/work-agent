@@ -278,7 +278,7 @@ def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[st
     # imports this module.
     from evals.review_submission import validate
 
-    if problems := validate(envelope, root):
+    if problems := validate(envelope, root, name=sittings.mark_key):
         raise EnvelopeError("\n".join(problems))
 
     target = root / relative_path(envelope)

@@ -7,9 +7,12 @@ that the report lacks, found by nothing earlier in the pipeline.
 
 from __future__ import annotations
 
+import pytest
+
 from analysis_service.claims import CLAIM_BOUND_MARKS
 from analysis_service.report import Report
 from evals.harness import assembly
+from evals.harness.artifact import load_artifact
 from evals.harness.bundle import reports_dir
 from tests.test_evals_descendants import archive  # noqa: F401  (fixture)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
@@ -20,7 +23,7 @@ def _report_path(archive, case):  # noqa: F811
 
 
 def test_an_archive_assembles_to_its_own_report(archive, case):  # noqa: F811
-    (row,) = assembly.replay_artifact(archive, [case])
+    (row,) = assembly.replay_artifact(load_artifact(archive), [case])
 
     assert row.reported and row.replayed == row.reported
     assert row.rejected_replayed == row.rejected_reported
@@ -58,7 +61,7 @@ def test_a_ruled_draft_the_report_lacks_is_an_omission(archive, case):  # noqa: 
     report, gone = _without_claim(Report.model_validate_json(path.read_text()))
     path.write_text(report.model_dump_json())
 
-    (row,) = assembly.replay_artifact(archive, [case])
+    (row,) = assembly.replay_artifact(load_artifact(archive), [case])
 
     assert row.omitted == (gone,)
     assert row.unexplained == ()
@@ -78,7 +81,15 @@ def test_a_claim_assembly_files_elsewhere_is_unexplained(
 
     monkeypatch.setattr(assembly, "assemble_claims", rejects_first)
 
-    (row,) = assembly.replay_artifact(archive, [case])
+    (row,) = assembly.replay_artifact(load_artifact(archive), [case])
 
     assert len(row.unexplained) == 1
     assert row.omitted == ()
+
+
+def test_a_finished_case_with_no_report_is_named(archive, case):  # noqa: F811
+    """The artifact records the case as finished, so its report was lost."""
+    _report_path(archive, case).unlink()
+
+    with pytest.raises(assembly.EvalRunError, match=f"{case.id}: .* no report"):
+        assembly.replay_artifact(load_artifact(archive), [case])

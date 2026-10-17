@@ -75,7 +75,10 @@ def covers(root: Path, case_id: str, answers: envelopes.CaseAnswers) -> list[str
 
 
 def _case_problems(
-    root: Path, case_id: str, answers: envelopes.CaseAnswers
+    root: Path,
+    case_id: str,
+    answers: envelopes.CaseAnswers,
+    name: sittings.MarkName = sittings.mark_position,
 ) -> list[str]:
     """This case's answers, against the one reader every surface asks."""
     try:
@@ -84,15 +87,24 @@ def _case_problems(
             own_list=answers.own_list,
             opened_digests=answers.opened_digests,
             marks=answers.marks,
+            name=name,
         )
     except (CorpusError, sittings.SittingError, OSError, ValueError) as exc:
         return [f"{case_id}: {exc}"]
 
 
 def validate(
-    envelope: envelopes.Envelope, root: Path, *, author: str | None = None
+    envelope: envelopes.Envelope,
+    root: Path,
+    *,
+    author: str | None = None,
+    name: sittings.MarkName = sittings.mark_position,
 ) -> list[str]:
-    """Validate a contribution against the corpus and, in CI, the PR author."""
+    """Validate a contribution against the corpus and, in CI, the PR author.
+
+    ``name`` says how a problem names a mark: the app's routes keep the
+    default position, and a maintainer's command passes the key.
+    """
     problems: list[str] = []
     if author is not None and envelope.submitted_by != author:
         problems.append(
@@ -113,7 +125,7 @@ def validate(
         problems.append(f"the review names unknown cases: {unknown}")
     for case_id, answers in envelope.cases.items():
         if case_id in offered:
-            problems.extend(_case_problems(root, case_id, answers))
+            problems.extend(_case_problems(root, case_id, answers, name))
     return [*problems, *_ties_with(root, envelope)]
 
 
@@ -438,7 +450,7 @@ def verify_pull_request(root: Path, author: str) -> list[str]:
         return [*problems, str(exc)]
     if path.name != submission_name(envelope):
         problems.append(f"{rel}: expected filename {submission_name(envelope)!r}")
-    problems.extend(validate(envelope, root, author=author))
+    problems.extend(validate(envelope, root, author=author, name=sittings.mark_key))
     return problems
 
 

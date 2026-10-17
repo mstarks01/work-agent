@@ -42,7 +42,8 @@ from analysis_service.critic import CriticOutputError, assemble_claims
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
-from evals.harness.bundle import case_file
+from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
+from evals.harness.bundle import case_file, finished_report
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 
@@ -151,15 +152,15 @@ def replay_case(
 
 
 def replay_artifact(
-    artifact: Path, cases: Sequence[GoldenCase]
+    artifact: EvalArtifact, cases: Sequence[GoldenCase]
 ) -> list[AssemblyReplay]:
-    """Every framework block of every archived case, assembled again."""
+    """Every framework block of every finished case, assembled again."""
     rows = []
     for case in cases:
-        report_path = case_file(artifact, case.id, "report")
-        drafts_path = case_file(artifact, case.id, "drafts")
-        if not report_path.is_file():
+        report_path = finished_report(artifact, case.id)
+        if report_path is None:
             continue
+        drafts_path = case_file(artifact.path, case.id, "drafts")
         if not drafts_path.is_file():
             raise EvalRunError(
                 f"{drafts_path} is missing; assembly cannot run without the drafts"
@@ -181,14 +182,15 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 
 def command_assembly(args: argparse.Namespace) -> int:
     """Assemble every archived block again and name any claim it moves."""
-    cases = [
-        case
-        for case in development_cases(load_corpus(args.corpus))
-        if not args.case or case.id in args.case
-    ]
     try:
-        rows = replay_artifact(args.artifact, cases)
-    except EvalRunError as error:
+        artifact = load_artifact(args.artifact)
+        cases = [
+            case
+            for case in development_cases(load_corpus(args.corpus))
+            if case.id in artifact.cases and (not args.case or case.id in args.case)
+        ]
+        rows = replay_artifact(artifact, cases)
+    except (EvalRunError, ProvenanceError) as error:
         print(error, file=sys.stderr)
         return 1
     moved = 0

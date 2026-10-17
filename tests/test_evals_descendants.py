@@ -7,11 +7,15 @@ for a critic to decide, or removed by the fan-in.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from evals.harness import descendants
-from evals.harness.bundle import write_reports
+from evals.harness.artifact import load_artifact
+from evals.harness.bundle import reports_dir
 from tests import test_evals_run_grounds as grounds
+from tests.eval_factories import write_finished_sweep
 from tests.test_evals_modes import reaching_refs
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
@@ -19,9 +23,7 @@ from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 @pytest.fixture
 def archive(monkeypatch, case, tmp_path):  # noqa: F811
     run = grounds.sweep(monkeypatch, case, None)
-    out = tmp_path / "artifact.json"
-    write_reports(str(out), "analysis", run.runs)
-    return out
+    return write_finished_sweep(tmp_path / "artifact.json", run)
 
 
 def unmatched_reference(case, row):  # noqa: F811
@@ -48,14 +50,14 @@ def proposal_for(case, reference, title):  # noqa: F811
 
 
 def test_the_archive_replays_to_itself(archive, case):  # noqa: F811
-    (row,) = descendants.replay_artifact(archive, [case])
+    (row,) = descendants.replay_artifact(load_artifact(archive), [case])
 
     assert row.lower == row.archived == row.upper
     assert row.unruled == ()
 
 
 def test_an_injected_finding_is_left_for_a_critic_to_decide(archive, case):  # noqa: F811
-    (plain,) = descendants.replay_artifact(archive, [case])
+    (plain,) = descendants.replay_artifact(load_artifact(archive), [case])
     index, reference = unmatched_reference(case, plain)
     injected = {
         case.id: {
@@ -63,7 +65,7 @@ def test_an_injected_finding_is_left_for_a_critic_to_decide(archive, case):  # n
         }
     }
 
-    (row,) = descendants.replay_artifact(archive, [case], injected)
+    (row,) = descendants.replay_artifact(load_artifact(archive), [case], injected)
 
     assert index in row.upper, "the fan-in keeps it and it matches"
     assert index not in row.lower, "no critic ruled on it"
@@ -71,13 +73,13 @@ def test_an_injected_finding_is_left_for_a_critic_to_decide(archive, case):  # n
 
 
 def test_an_injected_finding_the_fan_in_removes_says_why(archive, case):  # noqa: F811
-    (plain,) = descendants.replay_artifact(archive, [case])
+    (plain,) = descendants.replay_artifact(load_artifact(archive), [case])
     index, reference = unmatched_reference(case, plain)
     broken = proposal_for(case, reference, "names nothing real")
     broken["affected_element_ids"] = ["process:not-in-the-model"]
     injected = {case.id: {reference.category: [broken]}}
 
-    (row,) = descendants.replay_artifact(archive, [case], injected)
+    (row,) = descendants.replay_artifact(load_artifact(archive), [case], injected)
 
     assert index not in row.upper
     assert [title for title, _ in row.dropped] == ["names nothing real"]
@@ -87,7 +89,25 @@ def test_a_sweep_without_proposals_is_refused_by_name(archive, case):  # noqa: F
     (archive.parent / f"{archive.stem}.reports" / f"{case.id}.proposals.json").unlink()
 
     with pytest.raises(descendants.EvalRunError, match="kept no lane proposals"):
-        descendants.replay_artifact(archive, [case])
+        descendants.replay_artifact(load_artifact(archive), [case])
+
+
+def test_a_finished_case_with_no_report_is_named(archive, case):  # noqa: F811
+    """The artifact records the case as finished, so its report was lost."""
+    (reports_dir(archive) / f"{case.id}.report.json").unlink()
+
+    with pytest.raises(descendants.EvalRunError, match=f"{case.id}: .* no report"):
+        descendants.replay_artifact(load_artifact(archive), [case])
+
+
+def test_a_case_the_artifact_does_not_list_is_named(archive, case):  # noqa: F811
+    """The sweep did not run the case, so no report of it is this sweep's."""
+    raw = json.loads(archive.read_text(encoding="utf-8"))
+    raw["cases"] = [name for name in raw["cases"] if name != case.id]
+    archive.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(descendants.EvalRunError, match=f"{case.id}: .* not list"):
+        descendants.replay_artifact(load_artifact(archive), [case])
 
 
 @pytest.mark.parametrize(
@@ -98,4 +118,6 @@ def test_an_injected_key_nothing_replays_is_refused(archive, case, keys, named):
     """A misspelled case would inject nothing, and a misspelled lane would crash."""
     case_id, lane = keys or (case.id, "spoofng")
     with pytest.raises(descendants.EvalRunError, match=named):
-        descendants.replay_artifact(archive, [case], {case_id: {lane: []}})
+        descendants.replay_artifact(
+            load_artifact(archive), [case], {case_id: {lane: []}}
+        )
