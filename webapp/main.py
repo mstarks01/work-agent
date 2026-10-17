@@ -1,8 +1,10 @@
 """The lite first-run web app — route step 3.
 
-Start it from a clone, with model auth already configured::
+Start it from a clone::
 
     uv run python webapp/main.py
+
+Its Settings page sets the models and the keys.
 
 It embeds the service in process: its jobs live in a service job store, and
 :mod:`analysis_service.job_answers` admits, stores and starts them for this

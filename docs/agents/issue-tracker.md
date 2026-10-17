@@ -66,8 +66,7 @@ beside it.
 
 - [#1760](https://github.com/mstarks01/work-agent/issues/1760) — a **Settings** page in the
   first-run app. The spec [#1767](https://github.com/mstarks01/work-agent/issues/1767) holds the
-  build, as the tickets #1768 to #1777. The tree does not hold the build yet, so read the ADRs and
-  the spec.
+  build, as the tickets #1768 to #1777.
   - The loaders stay the only source of each type, closed set and bound. One page module holds
     the group, the label and the mark of each **Deployment Setting** (ADR 0091).
   - The page writes each change as an `ANALYSIS_*` override in `settings.env`, in

@@ -34,6 +34,11 @@ Deployment stays in memory until no task holds its runner.
 builds, and the runner that the check builds from it, become the new cell.
 The app does not build them a second time.
 
+> **Amended by [#1777](https://github.com/mstarks01/work-agent/issues/1777).**
+> The check reads each new key from a staged file. A save that writes a key
+> therefore builds the Deployment again from the saved settings, and that build
+> becomes the new cell.
+
 **A Resumed Job.** `Deployment.selection` raises a typed `ConfigError`
 subclass when a selection names a framework that the Deployment does not
 carry. The subclass carries the text of the `SelectionError`. `JobAnswers.admit`
