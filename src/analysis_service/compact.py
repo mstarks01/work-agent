@@ -186,10 +186,10 @@ REF_TAGS: Mapping[str, str] = MappingProxyType(
 #: :func:`~analysis_service.system_model.make_flow_id` splices it into an
 #: element ID that is later rendered into a lane agent's prompt table. Holding a
 #: ref to ``[a-z0-9-]`` is what keeps a newline or a backtick run out of that
-#: table — see :data:`~analysis_service.system_model.ELEMENT_ID` for why the
-#: table's neighbours cannot fence it. A pattern on the declaration alone would
-#: bound every ref that resolves and none of the ones that do not, which is
-#: exactly backwards.
+#: table. The table carries no fence of its own, so a value with a newline and
+#: a backtick run there opens a block that swallows every fenced block after
+#: it. A pattern on the declaration alone would bound every ref that resolves
+#: and none of the ones that do not, which is exactly backwards.
 REF = rf"^[{''.join(sorted(REF_TAGS.values()))}]:[a-z0-9]+(?:-[a-z0-9]+)*$"
 
 #: A placement field: a zone ref, or the unknown sentinel for a component the

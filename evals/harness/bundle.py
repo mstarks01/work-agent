@@ -113,9 +113,11 @@ def reports_dir(out: str | Path) -> Path:
 def case_file(out: str | Path, case_id: str, kind: CaseKind) -> Path:
     """Where a sweep writes one case's file of ``kind``, given its artifact path.
 
-    Every writer and every reader of a case file takes its path from here,
-    and :func:`check_sweep_out` checks each kind, so the check before the
-    spend covers every write after it.
+    Every writer of a case file, and every reader of one named case, takes
+    its path from here. A reader that scans a folder for every case matches
+    the file name with :func:`~evals.harness.archive.case_suffix`.
+    :func:`check_sweep_out` checks each kind, so the check before the spend
+    covers every write after it.
     """
     return reports_dir(out) / f"{case_id}{case_suffix(kind)}"
 
