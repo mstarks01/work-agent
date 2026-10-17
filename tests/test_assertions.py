@@ -681,6 +681,12 @@ class TestWhatTheGateRefuses:
         why, held, reads = REFUSALS[code]
         assert code in codes(catalog_issues(held, **reads)), why
 
+    @pytest.mark.parametrize("value", ["`", "**", "_ _", "   "])
+    def test_a_qualifier_with_no_folded_form_is_an_illegal_value(self, value):
+        """``"`"`` and ``"**"`` fold to one empty scope key, so neither is a scope."""
+        held = catalog([stated(scope=[Qualifier(kind="principal", value=value)])])
+        assert "illegal-value" in codes(catalog_issues(held, sources=SOURCES))
+
     def test_every_refusal_code_has_a_fixture(self):
         """The table answers every code the gate raises, with nothing left over.
 

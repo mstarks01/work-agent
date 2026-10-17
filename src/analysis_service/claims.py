@@ -1171,6 +1171,21 @@ class Claim(BaseModel):
         return Ruling(id=draft.id, verdict=verdict)
 
     @classmethod
+    def untargeted(cls, element_ids: Sequence[str]) -> str:
+        """Why these element IDs give a claim nothing to be about, or ``""``.
+
+        Read by the record's own validators and by the fan-in after the passes
+        that narrow ``affected_element_ids``, so a claim left without a target
+        is a **Dropped Claim** with this reason. The neutral answer refuses
+        nothing: a package whose claims name a catalog requirement keys a claim
+        by that requirement, and a claim about the system as a whole names no
+        element at all. A package whose identity reads the targets overrides
+        this (ADR 0097).
+        """
+        del element_ids
+        return ""
+
+    @classmethod
     def unsupported(cls, proposal: Any) -> str:
         """Why one proposal may not become a draft, in the package's words, or ``""``.
 

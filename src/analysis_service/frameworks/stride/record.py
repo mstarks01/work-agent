@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from analysis_service.actions import ActionVerb
 from analysis_service.claims import (
@@ -42,6 +42,7 @@ from analysis_service.claims import (
     build_block_summary,
     derive_severity_level,
 )
+from analysis_service.system_model import is_zone
 
 __all__ = [
     "CATEGORY_LETTERS",
@@ -179,7 +180,8 @@ class DraftThreat(Claim):
     ``affected_element_ids`` is narrowed to ``min_length=1`` here where the base
     allows it to be empty. Every STRIDE finding is about something in the graph
     — that is what STRIDE-per-element *means* — so a threat naming no element is
-    a defect rather than a legal shape for this framework.
+    a defect rather than a legal shape for this framework. A threat naming only
+    trust zones is refused for the same reason (:meth:`untargeted`, ADR 0097).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -195,6 +197,31 @@ class DraftThreat(Claim):
     verb: ActionVerb
     severity: Severity
     mitigations: list[Mitigation] = Field(default_factory=list)
+
+    @field_validator("affected_element_ids")
+    @classmethod
+    def _names_a_target(cls, element_ids: list[str]) -> list[str]:
+        if reason := cls.untargeted(element_ids):
+            raise ValueError(reason)
+        return element_ids
+
+    @classmethod
+    def untargeted(cls, element_ids: Sequence[str]) -> str:
+        """A threat that names only trust zones, with the zones it names.
+
+        A zone is the context a threat sits in, so the threat's targets drop it
+        (:func:`~analysis_service.critic.endpoint_targets`). A threat naming
+        only zones has an empty target set, and two of them at different zones
+        are then one finding (ADR 0097). An empty list is ``min_length``'s
+        refusal, so it is not repeated here.
+        """
+        if not element_ids or not all(is_zone(one) for one in element_ids):
+            return ""
+        return (
+            f"names only trust zones ({', '.join(repr(one) for one in element_ids)});"
+            " a STRIDE threat names an element or a flow it acts on, and a zone"
+            " is only the context it sits in"
+        )
 
     @classmethod
     def claim_marks(cls, drafts: Sequence[Claim]) -> AnalysisMarks:
@@ -379,6 +406,16 @@ class ThreatProposal(Proposal):
     affected_element_ids: list[str] = Field(
         min_length=1, max_length=MAX_ELEMENTS_PER_PROPOSAL
     )
+
+    @field_validator("affected_element_ids")
+    @classmethod
+    def _names_a_target(cls, element_ids: list[str]) -> list[str]:
+        # The draft's own rule, so a proposal that validates resolves into a
+        # draft that validates.
+        if reason := DraftThreat.untargeted(element_ids):
+            raise ValueError(reason)
+        return element_ids
+
     # Narrowed with :class:`DraftThreat`'s, and for the reason that class gives:
     # a proposal that validates must resolve into a draft that validates. The
     # agent picks from the closed vocabulary; an unrecognised verb is refused by

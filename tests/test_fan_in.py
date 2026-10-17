@@ -125,6 +125,27 @@ class TestJoinDrafts:
         assert "process:does-not-exist" in mark.reason
         assert joined.marks.unresolved_references == []
 
+    def test_a_claim_left_naming_only_trust_zones_is_dropped_and_marked(self, model):
+        """A zone is no target (ADR 0097). A claim whose other references
+        resolve to nothing is left on zones alone, and is dropped with the rule
+        named rather than passed on to fold to an empty target set.
+
+        The draft rests on its quote alone and its prose names no element, so
+        the hop bound has nothing to bound by and the zone reaches this check.
+        """
+        draft = sample_draft(
+            affected_element_ids=["boundary:internal-network", "process:ghost"]
+        )
+        drafts = {"spoofing": [draft.model_copy(update={"grounds": draft.grounds[:1]})]}
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        assert joined.drafts == []
+        (mark,) = joined.marks.dropped_claims
+        assert mark.claim_id == "S-01"
+        assert "only trust zones" in mark.reason
+        assert "boundary:internal-network" in mark.reason
+
     def test_an_absent_element_beside_a_real_one_costs_only_itself(self, model):
         """The rule every other citation has: the reference is dropped and
         marked, and the claim stands on the elements that resolved."""

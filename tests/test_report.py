@@ -1,6 +1,7 @@
 """Tests for the STRIDE report schema: severity matrix, verdict shapes,
 report self-containment invariants, and JSON round-tripping."""
 
+import json
 from typing import get_args
 
 import pytest
@@ -40,6 +41,7 @@ from analysis_service.claims import (
 )
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.frameworks.stride.record import (
+    ThreatProposals,
     ThreatRulings,
     build_stride_summary,
 )
@@ -48,7 +50,9 @@ from analysis_service.sampling import TierSampling
 from analysis_service.system_model import all_attribute_names, attribute_names
 from tests.eval_factories import unreconciled
 from tests.factories import (
+    sample_draft,
     sample_fingerprint,
+    sample_proposal,
     sample_report,
     sample_threat,
     valid_model,
@@ -421,6 +425,38 @@ class TestThreat:
     def test_at_least_one_affected_element_is_required(self):
         with pytest.raises(ValidationError):
             sample_threat(affected_element_ids=[])
+
+    def test_a_threat_naming_only_trust_zones_is_refused(self):
+        """A zone is the context a threat sits in, so it is no target (ADR 0097).
+
+        Two such threats at different zones would fold to one empty target set
+        and so to one finding.
+        """
+        zones = ["boundary:internal-network", "boundary:public-internet"]
+        with pytest.raises(ValidationError, match="only trust zones"):
+            sample_threat(affected_element_ids=zones)
+        with pytest.raises(ValidationError, match="only trust zones"):
+            sample_draft(affected_element_ids=zones)
+        with pytest.raises(ValidationError, match="only trust zones"):
+            sample_proposal(affected_element_ids=zones)
+
+    def test_a_lane_batch_drops_a_proposal_naming_only_trust_zones(self):
+        """The batch salvages: the proposal is dropped and named, the batch stands."""
+        kept = sample_proposal().model_dump(mode="json")
+        zoned = {**kept, "sequence": 2, "affected_element_ids": ["boundary:dmz"]}
+        batch = ThreatProposals.model_validate_json(
+            json.dumps({"claims": [kept, zoned]})
+        )
+
+        assert [proposal.sequence for proposal in batch.claims] == [1]
+        (invalid,) = batch.invalid
+        assert "only trust zones" in invalid.error
+
+    def test_a_zone_beside_an_element_is_a_target(self):
+        threat = sample_threat(
+            affected_element_ids=["boundary:internal-network", "process:web-app"]
+        )
+        assert threat.affected_element_ids[1] == "process:web-app"
 
 
 class TestReportInvariants:

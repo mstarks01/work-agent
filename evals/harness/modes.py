@@ -127,6 +127,7 @@ from analysis_service.system_model import (
     SystemModel,
     TrustBoundary,
     flow_id_version,
+    is_zone,
     parse_flow_id,
 )
 from analysis_service.validation import ValidationIssue
@@ -394,16 +395,6 @@ class AttributeCheck:
             "blessed": self.blessed,
             "extracted": self.extracted,
         }
-
-
-def _is_zone(element_id: str) -> bool:
-    """Is this a trust zone, the element type the claim comparison never reads?
-
-    The one spelling of that test here, held to
-    :func:`~evals.harness.identity.comparable_elements` — which drops exactly
-    this population — by ``tests/test_evals_modes.py``.
-    """
-    return element_id.startswith(f"{TrustBoundary.id_prefix}:")
 
 
 def _endpoint_key(element_id: str) -> str:
@@ -930,9 +921,9 @@ class ExtractionScore:
         blessed = frozenset(
             key
             for key in _endpoint_keys(self.missing) | _endpoint_keys(self.matched)
-            if _is_zone(key)
+            if is_zone(key)
         )
-        gone = frozenset(key for key in self.endpoint_missing if _is_zone(key))
+        gone = frozenset(key for key in self.endpoint_missing if is_zone(key))
         return blessed, gone
 
     @property
@@ -972,7 +963,7 @@ class ExtractionScore:
         if not blessed:
             return 0.0
         credited = gone & frozenset(
-            credit.reference for credit in self.aliased if _is_zone(credit.reference)
+            credit.reference for credit in self.aliased if is_zone(credit.reference)
         )
         return (len(blessed) - len(gone) + len(credited)) / len(blessed)
 
@@ -2623,7 +2614,7 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
         f" its pairs (#961)"
     )
     zone_credits = sum(
-        1 for score in scores for credit in score.aliased if _is_zone(credit.reference)
+        1 for score in scores for credit in score.aliased if is_zone(credit.reference)
     )
     if zone_credits:
         sourced_zones = sum(score.sourced_zone_recall for score in scores) / len(scores)

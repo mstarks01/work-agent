@@ -20,7 +20,6 @@ from pydantic import Field
 
 from evals.harness import modes
 from evals.harness.alignment import Alignment, Pair
-from evals.harness.identity import comparable_elements
 from evals.harness.reference import load_case, load_corpus
 from evals.harness.structural import report_issues
 
@@ -2025,28 +2024,6 @@ class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
 
         assert score.aliased == ()
         assert score.sourced_zone_recall == score.zone_recall
-
-    def test_the_zone_test_and_the_claim_comparison_name_one_population(self):
-        """Two readers of "is this a zone", held to each other.
-
-        `modes._is_zone` decides which credits reach the zone figure and
-        `identity.comparable_elements` decides which elements a claim can cite.
-        A disagreement would put a credited element in neither figure or both.
-        """
-        from evals.harness.reference import load_corpus
-
-        corpus = Path(__file__).resolve().parents[1] / "evals" / "corpus"
-        ids = [
-            element.id
-            for case in load_corpus(corpus)
-            for element in case.model.elements()
-        ]
-        assert ids
-
-        by_is_zone = {element_id for element_id in ids if modes._is_zone(element_id)}
-        by_comparison = set(ids) - set(comparable_elements(ids))
-
-        assert by_is_zone == by_comparison
 
     def test_a_case_nobody_ruled_on_reads_the_strict_number(self):
         """An absent ruling is not a ruling that every name is the only one.
