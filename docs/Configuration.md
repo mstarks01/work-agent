@@ -1046,21 +1046,27 @@ an error.
 ```text
 ANALYSIS_MODEL_BASE_VENDOR=anthropic
 ANALYSIS_MODEL_BASE_MODEL=claude-sonnet-5
-ANALYSIS_ANTHROPIC_API_KEY_FILE=/home/integrator/.config/work-agent/anthropic_api_key
+ANALYSIS_ANTHROPIC_API_KEY_FILE=/home/integrator/.config/work-agent/anthropic_api_key.3f9c0a1b2d4e5f60
 ```
 
 The engine does not start when a line breaks one of these rules, or when the
 process environment and `settings.env` set the same variable. The diagnostic
 page names the variable and the line number, and never the value.
 
-The Settings page of the first-run app writes `settings.env`. It writes each key
-to its own file in the settings directory, with mode `0600`, and sets the
-`_FILE` variable of the key to the absolute path of the file. The file name is
-the variable without `ANALYSIS_` and `_FILE`, in lower case:
-`ANALYSIS_ANTHROPIC_API_KEY_FILE` names `anthropic_api_key`. A save writes the
-key files first, then `settings.env`. Then it deletes each of these key files
-that no variable names. A save that leaves no tier on a vendor removes the key
-line of that vendor, so the save also deletes its key file.
+The Settings page of the first-run app writes `settings.env`. It writes each
+saved key to a new file in the settings directory, with mode `0600`, and sets
+the `_FILE` variable of the key to the absolute path of the file. The file name
+is the variable without `ANALYSIS_` and `_FILE`, in lower case, then a dot and
+16 random hexadecimal characters: `ANALYSIS_ANTHROPIC_API_KEY_FILE` names a file
+such as `anthropic_api_key.3f9c0a1b2d4e5f60`. A save writes the new key files
+first, checks the settings on them, and then writes `settings.env`. The write of
+`settings.env` commits the save. When the save stops before that write, the old
+`settings.env` and its key files stay in force, and the app deletes the new key
+files. After the write, the app deletes each file in the settings directory that
+has this name form and that no variable of `settings.env` or of the process
+environment names. A file with another name is never deleted. A save that
+leaves no tier on a vendor removes the key line of that vendor, so the save also
+deletes its key file.
 
 ### File permissions
 

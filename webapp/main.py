@@ -1276,7 +1276,11 @@ def create_app(
                 if not committed:
                     delete_files(written.values())
             cell.current = built.current(workspace.store)
-            delete_files(unused_key_files(directory, saved_env))
+            try:
+                delete_files(unused_key_files(directory, saved_env))
+            except OSError as exc:
+                # The next save deletes each key file that this one left.
+                logger.warning("a key file that no variable names stays: %s", exc)
             logger.info("settings saved: %s", ", ".join([*save.changes, *save.remove]))
         return JSONResponse(
             {

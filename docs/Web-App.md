@@ -236,13 +236,15 @@ panel lists "a new key" and never the key.
 value rule of `settings.env`, and each key against the rule of a secret file
 ([File permissions](Configuration.md#file-permissions)). Then it builds a test
 Deployment and a job store from the new settings with the loaders that the
-startup uses. No check calls a provider. When a check fails, the app writes nothing, and the page lists one
+startup uses. No check calls a provider. When a check fails, the app changes nothing, and the page lists one
 message for each refusal. A message names the setting and the rule, and never
 repeats the value.
 
-When the checks pass, the app writes each key to its own file in the settings
-directory, then `settings.env`, and applies the new settings at once, with no
-restart:
+The check reads each new key from a new key file in the settings directory.
+When the checks pass, the app writes `settings.env` and applies the new
+settings at once, with no restart. The write of `settings.env` commits the save:
+when a check fails or a write fails, the app deletes the new key files, and the
+settings that were in force stay in force. After the save:
 
 - The next analysis runs on the new settings. An analysis that runs at the save
   finishes on the settings that started it.
@@ -256,9 +258,12 @@ restart:
   and deletes its key file. The panel says so before the save.
 
 The app makes the settings directory at the first save, with mode `0700`, and
-writes `settings.env` and each key file with mode `0600`.
+writes `settings.env` and each key file with mode `0600`. Each key save writes
+a key file with a new random name. After the write of `settings.env`, the app
+deletes each key file that no variable names, also a file that a stopped save
+left.
 [Configuration](Configuration.md#the-settings-directory-of-the-first-run-app)
-gives the name of each key file. Each save writes one log line that names
+gives the name form of a key file. Each save writes one log line that names
 the changed settings and no value.
 
 The page loads with a revision of `settings.env`. A save from a tab that loaded

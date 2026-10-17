@@ -55,8 +55,8 @@ diagnostic page, and that page links to the Settings page.
    shows a key field for each vendor that you choose.
 3. Click **Check and save**.
 
-The app checks the settings before it writes them. It writes each key to its
-own file in `~/.config/work-agent/`, with mode `0600`, and the other values to
+The app checks the settings before it saves them. It writes each key to a new
+file in `~/.config/work-agent/`, with mode `0600`, and the other values to
 `settings.env` in the same directory. The page never shows a key again. It says
 "A key is saved." The next analysis uses the new settings, with no restart. A
 save that leaves no tier on a vendor deletes the key file of that vendor, and

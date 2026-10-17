@@ -185,6 +185,7 @@ def saved_lines(
     ``drop``, numbered as the new file numbers them. A line keeps its place,
     and a new line goes at the end. A key setting's line holds the path that
     ``written``, from :func:`write_keys`, gives its variable."""
+    secrets = secret_vars()
     values = {var: line.value for var, line in lines.items() if var not in save.remove}
     for key, value in save.changes.items():
         var = SETTINGS[key].variable
@@ -192,7 +193,7 @@ def saved_lines(
         if value is None:
             values.pop(var, None)
         else:
-            values[var] = str(written[var]) if var in written else value
+            values[var] = str(written[var]) if var in secrets else value
     for var in drop:
         values.pop(var, None)
     return {
