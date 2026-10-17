@@ -219,7 +219,7 @@ def test_too_many_sources_is_a_caller_error():
         asyncio.run(engine.analyze(sources))
 
 
-def test_over_budget_sources_are_a_caller_error_naming_every_label():
+def test_over_budget_sources_are_a_caller_error_naming_every_position():
     engine = engine_for(StubPipelineRunner())
     half = TEST_LIMITS.max_total_bytes
     sources = [
@@ -229,8 +229,9 @@ def test_over_budget_sources_are_a_caller_error_naming_every_label():
 
     with pytest.raises(EngineInputError) as caught:
         asyncio.run(engine.analyze(sources))
-    assert "Doc" in str(caught.value)
-    assert "Call" in str(caught.value)
+    message = str(caught.value)
+    assert f"sources[0] {half} bytes, sources[1] {half} bytes" in message
+    assert "Doc" not in message
 
 
 def test_a_submission_at_the_budget_is_accepted():

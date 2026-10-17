@@ -1065,7 +1065,7 @@ class TestSkippingAPartAnswer:
 
 
 class TestARefusalNamesItsFactByLabel:
-    """Refusals printed a six-part key, which means nothing on a page (#1289)."""
+    """A refusal names a fact the job holds by its label, which a page shows (#1289)."""
 
     def assert_readable(self, excinfo, label):
         message = str(excinfo.value)
@@ -1087,9 +1087,8 @@ class TestARefusalNamesItsFactByLabel:
         asked = _asked_after([])
         shown = asked.early[0].key
         unshown = CAPACITY[:4] + ("x", "")
-        with pytest.raises(ValueError, match="only a question the page") as excinfo:
+        with pytest.raises(ValueError, match=r"skip\[0\]: only a question the page"):
             admit(asked, save=True, skips=[unshown])
-        self.assert_readable(excinfo, fact_label(unshown, asked.model))
         with pytest.raises(ValueError, match="not both") as excinfo:
             admit(
                 asked,
@@ -1099,16 +1098,17 @@ class TestARefusalNamesItsFactByLabel:
             )
         self.assert_readable(excinfo, fact_label(shown, asked.model))
 
-    def test_an_unasked_fact(self):
-        from analysis_service.fact_answers import fact_label
-
+    def test_an_unasked_fact_is_named_by_its_position(self):
+        """A key the job did not ask is the caller's, so the refusal repeats none of it."""
         key = (FLOW, "data_description", "", "", "", "")
         model = open_description()
-        with pytest.raises(ValueError, match="asked no question") as excinfo:
+        with pytest.raises(
+            ValueError, match=r"facts\[0\]: this job asked no"
+        ) as excinfo:
             check_answers(
                 [], [FactAnswer(key=key, value="orders")], model, None, frozenset()
             )
-        self.assert_readable(excinfo, fact_label(key, model))
+        assert FLOW not in str(excinfo.value)
 
 
 class TestOneResumedJob:

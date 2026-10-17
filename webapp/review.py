@@ -348,8 +348,7 @@ def create_app(session: Session) -> FastAPI:
         if body.verdict not in VERDICTS:
             raise HTTPException(
                 status_code=422,
-                detail=f"{body.verdict!r} is not a verdict;"
-                f" the set is {', '.join(VERDICTS)}",
+                detail=f"verdict is not one of {', '.join(VERDICTS)}",
             )
         verdict: Verdict = body.verdict  # type: ignore[assignment]
         try:

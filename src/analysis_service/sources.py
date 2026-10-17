@@ -36,7 +36,6 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
-from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, Self
@@ -298,12 +297,13 @@ class SourceLimits:
         """
         if not sources:
             return LimitBreach("empty", "a job carries at least one source")
-        repeated = self._repeated_labels(sources)
-        if repeated:
+        repeated = self._repeated_label(sources)
+        if repeated is not None:
+            at, first = repeated
             return LimitBreach(
                 "duplicate-label",
-                f"source labels must be unique within a job; repeated: "
-                f"{', '.join(repr(label) for label in repeated)}",
+                "source labels must be unique within a job; "
+                f"sources[{at}] repeats the label of sources[{first}]",
             )
         if len(sources) > self.max_sources:
             return LimitBreach(
@@ -322,8 +322,9 @@ class SourceLimits:
         return None
 
     @staticmethod
-    def _repeated_labels(sources: Sequence[Source]) -> list[str]:
-        """Labels used by more than one source, in first-seen order.
+    def _repeated_label(sources: Sequence[Source]) -> tuple[int, int] | None:
+        """The position of the first source whose label an earlier one holds,
+        and the position of that earlier one, or ``None``.
 
         A label is a **citation key**, not a caption: every ``source_excerpt``
         in the report names one, and the validity gate checks that name against
@@ -336,23 +337,24 @@ class SourceLimits:
         rewritten anywhere else here: renaming a caller's label would make the
         report cite something they did not submit.
         """
-        counts = Counter(source.label for source in sources)
-        seen: dict[str, None] = {}
-        for source in sources:
-            if counts[source.label] > 1:
-                seen[source.label] = None
-        return list(seen)
+        first: dict[str, int] = {}
+        for at, source in enumerate(sources):
+            if source.label in first:
+                return at, first[source.label]
+            first[source.label] = at
+        return None
 
     @staticmethod
     def _breakdown(sources: Sequence[Source]) -> str:
-        """Each source's size, keyed by label.
+        """Each source's size, keyed by its position in the job.
 
         The error names **no culprit**: there is no per-source cap, so nothing
         here is individually too big and the overspend belongs to the sum. What
         the caller needs is the arithmetic, so they can decide what to cut.
         """
         return ", ".join(
-            f"{source.label!r} {source.size_bytes()} bytes" for source in sources
+            f"sources[{at}] {source.size_bytes()} bytes"
+            for at, source in enumerate(sources)
         )
 
 

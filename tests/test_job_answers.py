@@ -370,7 +370,7 @@ class TestAnsweringAReport:
         store = InMemoryJobStore()
         job = TestTheRoutes().completed(store)
         wrong = (ASKED[0], "exposure", "", "", "", "")
-        with pytest.raises(Refused, match="exposure"):
+        with pytest.raises(Refused, match=r"facts\[0\]: no attribute"):
             asyncio.run(
                 operations(store).answer(
                     job,

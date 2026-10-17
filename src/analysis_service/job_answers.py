@@ -49,7 +49,7 @@ from analysis_service.claims import (
     UnknownRef,
 )
 from analysis_service.deployment import FrameworkNotCarried
-from analysis_service.errors import ConfigError
+from analysis_service.errors import ConfigError, refusal_text
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import LineageConflict
 from analysis_service.graph import Entry
@@ -776,4 +776,4 @@ class JobAnswers:
             )
             raise Refused(str(exc), contradiction) from exc
         except ValueError as exc:
-            raise Refused(str(exc)) from exc
+            raise Refused(refusal_text(exc)) from exc

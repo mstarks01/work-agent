@@ -129,7 +129,7 @@ class TestTheAnswersSource:
             LinkAnswer(principal="calling team", element="entity:customer"),
             LinkAnswer(principal="Calling teams", element=NONE_OF_THESE),
         ]
-        with pytest.raises(ValueError, match="answers one principal twice"):
+        with pytest.raises(ValueError, match="answers the principal of links"):
             with_link_answers([DESCRIPTION], links)
 
     def test_a_subject_adds_no_sentence_to_the_answers_source(self):

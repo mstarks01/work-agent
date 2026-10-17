@@ -29,8 +29,9 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -48,7 +49,6 @@ from analysis_service.assertions import (
 from analysis_service.claims import UnknownKey
 from analysis_service.fact_answers import (
     FactAnswer,
-    fact_label,
     fact_line,
     merged_facts,
     refuse_repeated_facts,
@@ -164,9 +164,12 @@ def _refuse_repeats(links: Sequence[LinkAnswer]) -> None:
     two the submitter meant.
     """
     principals = [fold(link.principal) for link in links]
-    repeated = sorted({key for key in principals if principals.count(key) > 1})
-    if repeated:
-        raise ValueError(f"links answers one principal twice: {', '.join(repeated)}")
+    for at, principal in enumerate(principals):
+        if principal in principals[:at]:
+            first = principals.index(principal)
+            raise ValueError(
+                f"links[{at}] answers the principal of links[{first}] again"
+            )
 
 
 def merged_links(
@@ -342,6 +345,19 @@ def apply_answers(
     return answered, [*issues, *unmatched]
 
 
+#: Why a link answer places nothing, by the issue :func:`apply_answers` raises
+#: for it. The issue's own message repeats what the caller sent, which a
+#: report may show its owner and a refusal never repeats.
+_LINK_REFUSALS: Mapping[str, str] = MappingProxyType(
+    {
+        "unmatched-link": "no principal in this catalog has that name,"
+        " so the answer places nothing",
+        "unknown-link-element": "the element is not a component of this model,"
+        " so the answer places nothing",
+    }
+)
+
+
 class NoCatalogError(ValueError):
     """A link answer to a job whose checkpoint holds no assertion catalog."""
 
@@ -378,20 +394,21 @@ def check_answers(
             "this report carries no assertion catalog, so it asked no link question"
         )
     answerable = {*asked_links, *(fold(link.principal) for link in earlier_links)}
-    for link in links:
+    for at, link in enumerate(links):
         if fold(link.principal) not in answerable:
-            raise ValueError(f"this job asked no question about {link.principal!r}")
+            raise ValueError(
+                f"links[{at}]: this job asked no question about its principal"
+            )
     check_fact_answers(facts, model, catalog, earlier, reopen=reopen)
     answered_before = {fact.key for fact in earlier}
-    for fact in facts:
+    for at, fact in enumerate(facts):
         if fact.key not in asked and fact.key not in answered_before:
-            raise ValueError(
-                f'this job asked no question "{fact_label(fact.key, model)}"'
-            )
-    if links and catalog is not None:
-        _, issues = apply_answers(catalog, model, links)
-        if issues:
-            raise ValueError(issues[0].message)
+            raise ValueError(f"facts[{at}]: this job asked no question about its fact")
+    if catalog is not None:
+        for at, link in enumerate(links):
+            _, issues = apply_answers(catalog, model, [link])
+            if issues:
+                raise ValueError(f"links[{at}]: {_LINK_REFUSALS[issues[0].code]}")
 
 
 def _link_rows(

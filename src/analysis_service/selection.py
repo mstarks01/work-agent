@@ -35,6 +35,7 @@ from typing import Any, Protocol, cast
 from pydantic import ValidationError
 
 from analysis_service.claims import FrameworkName
+from analysis_service.errors import error_place
 from analysis_service.frameworks import package_for
 from analysis_service.report import FrameworkSelection
 
@@ -122,18 +123,14 @@ def resolve_selection(
     # omitted is refused here rather than filled in with a value the caller
     # never chose. The message names the fields at fault and never their
     # values: a field is the package's own declaration, safe to show and the
-    # only way a submitter learns which option they left out; a value is the
-    # caller's body, which the cause carries for a local caller to read.
+    # only way a submitter learns which option they left out; a value, or a
+    # key the package does not declare, is the caller's body, which the cause
+    # carries for a local caller to read.
     for name, options in narrowed:
         try:
             package_for(name).options.model_validate(options)
         except ValidationError as exc:
-            fields = sorted(
-                {
-                    ".".join(str(part) for part in error["loc"]) or "options"
-                    for error in exc.errors()
-                }
-            )
+            fields = sorted({error_place(error) or "options" for error in exc.errors()})
             raise SelectionError(
                 f"options for framework {name!r} are invalid: {', '.join(fields)}"
             ) from exc

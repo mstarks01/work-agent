@@ -189,11 +189,14 @@ class FactAnswer(BaseModel):
         ids = {facet.id for facet in kind.facets}
         for facet, answer in facets.items():
             if facet not in ids:
-                raise ValueError(f"no facet {facet!r} of {question!r}")
+                raise ValueError(
+                    f"{question!r} has no facet by that ID; its facets are"
+                    f" {', '.join(sorted(ids))}"
+                )
             if answer not in (*FACET_ANSWERS, UNKNOWN):
                 raise ValueError(
-                    f"{answer!r} is not one of {', '.join(FACET_ANSWERS)} or"
-                    f" {UNKNOWN} for {facet!r}"
+                    f"the answer to {facet!r} is not one of"
+                    f" {', '.join(FACET_ANSWERS)} or {UNKNOWN}"
                 )
         given = [facet for facet in kind.facets if facet.id in facets]
         known = any(facets[facet.id] != UNKNOWN for facet in given)

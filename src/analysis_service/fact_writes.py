@@ -107,28 +107,36 @@ def check_fact_answers(
     not. **The rule holds for each facet:** a facet answered ``unknown`` is
     refused where an earlier answer gave it a known answer, whatever the other
     facets say.
+
+    **A refusal names an answer by its position in ``answers``, and never
+    repeats a value or a key part the caller sent.** It names a fact by its
+    label only after the key is checked against the model.
     """
     prepared = prepared_model(model, catalog)
     answered_before = {answer.key for answer in earlier}
     settled_before = {answer.key: answer for answer in earlier if answer.known}
     stated = prepared.capability_facts()
-    for answer in answers:
+    for at, answer in enumerate(answers):
         ref = key_ref(answer.key)
         element_id, attribute, assertion = ref.element_id, ref.attribute, ref.assertion
-        subject, question, capability = ref.subject, ref.question, ref.capability
+        question, capability = ref.question, ref.capability
         if len(ref.spellings) != 1:
-            raise ValueError(f"an answer's key names one fact, not {answer.key!r}")
+            raise ValueError(f"facts[{at}]: a key names one fact, in one spelling")
         kind = answer.kind
         if kind == "question":
             if question not in QUESTION_KINDS or model.get(element_id) is None:
-                raise ValueError(f"no question {question!r} about {element_id!r}")
+                raise ValueError(
+                    f"facts[{at}]: no question of that kind on that element"
+                )
             if answer_facets(answer.key) and answer.facets is None and answer.known:
                 raise ValueError(f"{question!r} is answered in its facets")
         elif kind == "attribute":
             element = model.get(element_id)
             answerable = () if element is None else attribute_names(element)
             if attribute not in answerable or attribute in _ENDPOINTS:
-                raise ValueError(f"no attribute {attribute!r} on {element_id!r}")
+                raise ValueError(
+                    f"facts[{at}]: no attribute of that name on that element"
+                )
             if answer.key not in answered_before and not open_attribute(
                 prepared, element_id, attribute
             ):
@@ -138,10 +146,10 @@ def check_fact_answers(
         elif kind == "assertion" and (
             catalog is None or answered_row(catalog, assertion) is None
         ):
-            raise ValueError(f"no open assertion row {assertion!r}")
+            raise ValueError(f"facts[{at}]: no open assertion row by that ID")
         elif kind == "capability":
             if capability not in CAPABILITIES:
-                raise ValueError(f"no capability {capability!r}")
+                raise ValueError(f"facts[{at}]: no capability by that name")
             known = stated.get(capability)
             if (
                 answer.key not in answered_before
@@ -153,9 +161,14 @@ def check_fact_answers(
                 )
         limit = answer_limit(answer.key, model)
         if len(answer.value) > limit:
+            # Every other kind's key is checked above; a subject is the caller's
+            # own text until the job is found to ask it.
+            named = (
+                "" if kind == "subject" else f' to "{fact_label(answer.key, model)}"'
+            )
             raise ValueError(
-                f"an answer may hold {limit} characters; shorten the answer to"
-                f' "{fact_label(answer.key, model)}"'
+                f"facts[{at}]: an answer may hold {limit} characters; shorten the"
+                f" answer{named}"
             )
         if not reopen and answer.key in settled_before:
             _refuse_reopening(answer, settled_before[answer.key])
@@ -164,8 +177,8 @@ def check_fact_answers(
         choices = answer_choices(answer.key, model, catalog)
         if choices and answer.value not in choices:
             raise ValueError(
-                f"{answer.value!r} is not one of {', '.join(choices)} for"
-                f" {attribute or assertion or subject or capability!r}"
+                f'facts[{at}]: the answer to "{fact_label(answer.key, model)}" is'
+                f" not one of {', '.join(choices)}"
             )
     _check_attribute_values(answers, model)
     _check_capability_lineage(answers, prepared, earlier)
