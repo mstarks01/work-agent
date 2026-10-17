@@ -80,6 +80,7 @@ from analysis_service.analysis import states_a_protocol
 from analysis_service.system_model import (
     UNKNOWN,
     DataFlow,
+    Element,
     SystemModel,
     flow_label,
     make_element_id,
@@ -205,7 +206,8 @@ class Ambiguity:
 
     For flows: interactions between one aligned endpoint pair that the
     discriminators do not tell apart. For nodes: two alias rulings that derive
-    one produced element. Listed, and paired with nothing.
+    one produced element, or two produced elements under one singularised
+    slug. Listed, and paired with nothing.
     """
 
     reference: tuple[str, ...]
@@ -304,23 +306,19 @@ def _align_nodes(
     produced_ids = [element.id for element in produced.elements()]
     held = frozenset(_nodes(produced_ids))
     pairs.extend(Pair(one, one, "exact") for one in sorted(nodes & held))
-    by_key: dict[str, str] = {}
-    for element in produced.elements():
-        if element.id in nodes or element_type(element.id) == DataFlow.id_prefix:
-            continue
-        try:
-            named = make_element_id(element_type(element.id), element.name)
-        except ValueError:
-            named = element.id
-        by_key.setdefault(slug_key(named), element.id)
+    by_key = _by_slug_key(
+        (_named_id(element), element.id)
+        for element in produced.elements()
+        if element.id not in nodes and element_type(element.id) != DataFlow.id_prefix
+    )
+    # Every produced element under the alias's key is a claim, so two
+    # spellings of one slug reach the ambiguity below as two claims.
     claims: dict[tuple[str, str], str] = {}
     for alias in case.meta.aliases:
         if alias.element in held or alias.element not in nodes:
             continue
-        found = by_key.get(
-            slug_key(make_element_id(element_type(alias.element), alias.name))
-        )
-        if found is not None and element_type(found) == element_type(alias.element):
+        key = slug_key(make_element_id(element_type(alias.element), alias.name))
+        for found in by_key.get(key, ()):
             claims.setdefault((alias.element, found), alias.excerpt)
     # One to one on both sides: a produced element two rulings derive, and a
     # blessed element two of its rulings found, are each listed and not paired.
@@ -357,20 +355,39 @@ def _align_respelled(
     """
     paired_reference = {pair.reference for pair in pairs}
     paired_produced = {pair.produced for pair in pairs}
-    by_key: dict[str, list[str]] = defaultdict(list)
-    for element_id in sorted(held - paired_produced):
-        by_key[slug_key(element_id)].append(element_id)
+    by_key = _by_slug_key((one, one) for one in held - paired_produced)
     # A singularised slug keeps its type prefix, so one key never crosses types.
     claims: dict[str, list[str]] = defaultdict(list)
     for reference in sorted(nodes - paired_reference):
         if slug_key(reference) in by_key:
             claims[slug_key(reference)].append(reference)
     for key, references in sorted(claims.items()):
-        found = tuple(by_key[key])
+        found = by_key[key]
         if len(references) == 1 and len(found) == 1:
             pairs.append(Pair(references[0], found[0], "respelled"))
         else:
             ambiguous.append(Ambiguity(tuple(references), found))
+
+
+def _by_slug_key(spelled: Iterable[tuple[str, str]]) -> dict[str, tuple[str, ...]]:
+    """Each singularised slug against every element ID spelled under it, sorted.
+
+    The one reader of a slug collision, for the alias rule and rule 3: a key
+    with two IDs is two candidates, and neither rule pairs it.
+    ``spelled`` holds each element's spelling beside its ID.
+    """
+    by_key: dict[str, list[str]] = defaultdict(list)
+    for spelling, element_id in spelled:
+        by_key[slug_key(spelling)].append(element_id)
+    return {key: tuple(sorted(ids)) for key, ids in by_key.items()}
+
+
+def _named_id(element: Element) -> str:
+    """The ID an element's name derives today, or its own ID where none derives."""
+    try:
+        return make_element_id(element_type(element.id), element.name)
+    except ValueError:
+        return element.id
 
 
 def _nodes(element_ids: Iterable[str]) -> Iterable[str]:
