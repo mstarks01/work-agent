@@ -56,6 +56,13 @@ def _case_file_is_a_folder(tmp_path):
     return ["--out", str(tmp_path / "artifact.json")]
 
 
+def _reports_holds_an_earlier_report(tmp_path):
+    reports = tmp_path / "artifact.reports"
+    reports.mkdir()
+    (reports / "01-payments-checkout.report.json").write_text("{}", encoding="utf-8")
+    return ["--out", str(tmp_path / "artifact.json")]
+
+
 @pytest.mark.parametrize(
     "given",
     [
@@ -66,6 +73,7 @@ def _case_file_is_a_folder(tmp_path):
         _reports_is_a_file,
         _reports_is_a_dangling_link,
         _case_file_is_a_folder,
+        _reports_holds_an_earlier_report,
     ],
     ids=[
         "roster",
@@ -75,6 +83,7 @@ def _case_file_is_a_folder(tmp_path):
         "reports-is-a-file",
         "reports-is-a-dangling-link",
         "case-file-is-a-folder",
+        "reports-holds-an-earlier-report",
     ],
 )
 def test_a_sweep_refuses_a_bad_path_before_the_consent_gate(
@@ -98,6 +107,30 @@ def test_a_sweep_refuses_a_bad_path_before_the_consent_gate(
 
     assert code == 1
     assert str(tmp_path) in capsys.readouterr().err
+
+
+def test_a_sweep_names_the_reports_folder_that_is_not_empty(
+    tmp_path, monkeypatch, capsys
+):
+    """A report an earlier sweep left would read as this sweep's result."""
+    monkeypatch.setattr(run.consent, "gate", _spend_point)
+    monkeypatch.setattr(run, "_run_mode", _spend_point)
+
+    code = run.main(
+        [
+            "run",
+            "--mode",
+            "analysis",
+            "--case",
+            "01-payments-checkout",
+            "--accept-cost",
+            "unknown",
+            *_reports_holds_an_earlier_report(tmp_path),
+        ]
+    )
+
+    assert code == 1
+    assert f"{tmp_path / 'artifact.reports'}: is not empty" in capsys.readouterr().err
 
 
 def test_a_critic_replay_refuses_a_bad_out_before_the_call(

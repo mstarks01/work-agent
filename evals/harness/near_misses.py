@@ -38,7 +38,6 @@ from evals.harness.identity import endpoint_form
 from evals.harness.losses import CaseLosses, Loss
 from evals.harness.reference import (
     RULINGS_FILE,
-    CorpusError,
     GoldenCase,
     ReferenceThreat,
     RulingVerdict,
@@ -256,8 +255,8 @@ def record(
 
     Returns how many rulings were written; a reading already ruled is skipped.
 
-    A case whose rulings no longer load is restored as it was and the whole
-    call refused, so a partly written ballot never stays in the tree.
+    Any exception restores each rulings file as it was and refuses the whole
+    call, so a partly written ballot never stays in the tree.
     """
     written: dict[Path, bytes | None] = {}
     added = 0
@@ -272,7 +271,7 @@ def record(
             added += _append(path, case_dir, row, reviewed_by, ballot_name)
         for path in written:
             load_case(path.parent)
-    except (CorpusError, ValueError):
+    except BaseException:
         for path, before in written.items():
             if before is None:
                 path.unlink(missing_ok=True)

@@ -15,6 +15,7 @@ import pytest
 
 from analysis_service.actions import VerbError
 from evals import verify_corpus
+from evals.harness.artifact import load_artifact
 from evals.harness.bundle import runs_from_reports, stride_threats
 from evals.harness.calibration import load_pairs
 from evals.harness.reference import flows_by_case, load_corpus
@@ -63,7 +64,10 @@ def pairs():
 
 @pytest.fixture(scope="module")
 def produced(corpus):
-    runs = runs_from_reports(BASELINE, corpus)
+    loaded = load_artifact(BASELINE)
+    runs = runs_from_reports(
+        loaded, [case for case in corpus if case.id in loaded.cases]
+    )
     return {case_id: stride_threats(run.report) for case_id, run in runs.items()}
 
 
