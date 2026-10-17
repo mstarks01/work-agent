@@ -16,12 +16,11 @@ from pathlib import Path
 import pytest
 
 from analysis_service.report import Report
-from evals.harness.artifact import ARTIFACT_VERSION, corpus_digest, load_artifact
+from evals.harness.artifact import corpus_digest, load_artifact
 from evals.harness.bundle import (
     reports_dir,
     runs_from_reports,
     stride_threats,
-    write_reports,
 )
 from evals.harness.content import prose, structural
 from evals.harness.fingerprint import components_for
@@ -29,7 +28,7 @@ from evals.harness.ledger import append
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import load_case
 from evals.harness.run import main
-from tests.eval_factories import cast
+from tests.eval_factories import cast, write_finished_sweep
 from tests.test_evals_run_grounds import CASE_DIR, sweep
 
 
@@ -42,28 +41,12 @@ def case():
 def swept(monkeypatch, case, tmp_path):
     """A finished sweep on disk: its artifact, its reports and its drafts."""
     run = sweep(monkeypatch, case, None)
-    out = tmp_path / "artifact.json"
-    write_reports(str(out), "analysis", run.runs)
-    out.write_text(
-        json.dumps(
-            {
-                "artifact_version": ARTIFACT_VERSION,
-                "mode": "analysis",
-                "cases": [case.id, "case-second"],
-                "trusted": True,
-                "structural_failures": [],
-                "repo_commit": {"commit": "0" * 40, "clean": True},
-                "corpus_digest": "0" * 64,
-                "mode_output": [],
-                # A run-level block, to prove a re-score leaves it alone.
-                "grounds_aggregate": {"grounds_per_threat": 1.5},
-                "provenance": run.provenance.to_json(),
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
+    # A run-level block, to prove a re-score leaves it alone.
+    return write_finished_sweep(
+        tmp_path / "artifact.json",
+        run,
+        grounds_aggregate={"grounds_per_threat": 1.5},
     )
-    return out
 
 
 @pytest.fixture

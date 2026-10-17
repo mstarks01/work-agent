@@ -48,7 +48,8 @@ from analysis_service.graph import (
 )
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex, SystemModel
-from evals.harness.bundle import case_file, stride_threats
+from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
+from evals.harness.bundle import case_file, finished_report, stride_threats
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
@@ -173,7 +174,7 @@ def lane_must_finds(
 
 
 def replay_artifact(
-    artifact: Path,
+    artifact: EvalArtifact,
     cases: Sequence[GoldenCase],
     injected: Mapping[str, Mapping[str, Sequence[Mapping[str, Any]]]] = {},
 ) -> list[Replayed]:
@@ -192,10 +193,10 @@ def replay_artifact(
             )
     rows = []
     for case in cases:
-        report_path = case_file(artifact, case.id, "report")
-        proposals_path = case_file(artifact, case.id, "proposals")
-        if not report_path.is_file():
+        report_path = finished_report(artifact, case.id)
+        if report_path is None:
             continue
+        proposals_path = case_file(artifact.path, case.id, "proposals")
         if not proposals_path.is_file():
             raise EvalRunError(
                 f"{proposals_path} is missing; the sweep kept no lane proposals,"
@@ -227,14 +228,15 @@ def command_descendants(args: argparse.Namespace) -> int:
     injected = (
         json.loads(args.inject.read_text(encoding="utf-8")) if args.inject else {}
     )
-    cases = [
-        case
-        for case in development_cases(load_corpus(args.corpus))
-        if not args.case or case.id in args.case
-    ]
     try:
-        rows = replay_artifact(args.artifact, cases, injected)
-    except EvalRunError as error:
+        artifact = load_artifact(args.artifact)
+        cases = [
+            case
+            for case in development_cases(load_corpus(args.corpus))
+            if case.id in artifact.cases and (not args.case or case.id in args.case)
+        ]
+        rows = replay_artifact(artifact, cases, injected)
+    except (EvalRunError, ProvenanceError) as error:
         print(error, file=sys.stderr)
         return 1
     print("case                               must-finds: archived  lower  upper")

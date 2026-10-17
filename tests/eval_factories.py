@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Iterable
 from pathlib import Path
+from typing import Any
 
 from analysis_service.actions import ActionVerb
 from analysis_service.claims import (
@@ -34,6 +35,7 @@ from analysis_service.vendors import vendor_for_route
 from evals import verify_corpus
 from evals.harness import ledger
 from evals.harness.artifact import ARTIFACT_VERSION
+from evals.harness.bundle import write_reports
 from evals.harness.identity import ClaimPair, ClaimRuling
 from evals.harness.ledger import Vote
 from evals.harness.provenance import RunProvenance
@@ -175,6 +177,27 @@ def write_sweep_document(path: Path, document: dict | None = None) -> Path:
         json.dumps(document or sweep_document(), indent=2), encoding="utf-8"
     )
     return path
+
+
+def write_finished_sweep(out: Path, run: Any, **blocks: Any) -> Path:
+    """A scripted sweep's reports and its artifact, with every case finished.
+
+    ``blocks`` adds or replaces top-level keys of the artifact.
+    """
+    write_reports(str(out), "analysis", run.runs)
+    document = {
+        "artifact_version": ARTIFACT_VERSION,
+        "mode": "analysis",
+        "cases": sorted(run.runs),
+        "trusted": True,
+        "structural_failures": [],
+        "repo_commit": {"commit": "0" * 40, "clean": True},
+        "corpus_digest": "0" * 64,
+        "mode_output": [],
+        "provenance": run.provenance.to_json(),
+        **blocks,
+    }
+    return write_sweep_document(out, document)
 
 
 CATEGORY_LETTERS = {

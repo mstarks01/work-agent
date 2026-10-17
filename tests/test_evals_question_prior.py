@@ -10,8 +10,13 @@ import pytest
 
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import PriorError, load_prior
-from evals.harness.question_prior import command_question_prior, count
+from evals.harness.artifact import load_artifact
+from evals.harness.bundle import reports_dir
+from evals.harness.modes import EvalRunError
+from evals.harness.question_prior import command_question_prior, count, samples_of
 from tests.factories import valid_model
+from tests.test_evals_descendants import archive  # noqa: F401  (fixture)
+from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
 BASELINE = "evals/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.json"
 STORE = "store:orders-db"
@@ -63,6 +68,14 @@ def test_the_command_writes_one_row_and_keeps_the_others(tmp_path):
     assert table["stride"].runs == (BASELINE,)
     assert table["stride"].cases == 13
     assert table["stride"].rates["DataFlow"]["authentication"] > 0
+
+
+def test_a_finished_case_with_no_report_is_named(archive, case):  # noqa: F811
+    """The artifact records the case as finished, so its report was lost."""
+    (reports_dir(archive) / f"{case.id}.report.json").unlink()
+
+    with pytest.raises(EvalRunError, match=f"{case.id}: .* no report"):
+        samples_of(load_artifact(archive), [], "stride", [case.id])
 
 
 @pytest.mark.parametrize(

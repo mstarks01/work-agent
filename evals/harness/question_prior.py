@@ -33,8 +33,14 @@ from analysis_service.early_questions import (
 from analysis_service.frameworks import PACKAGES
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
-from evals.harness.artifact import repo_commit
-from evals.harness.bundle import case_file
+from evals.harness.artifact import (
+    EvalArtifact,
+    ProvenanceError,
+    load_artifact,
+    repo_commit,
+)
+from evals.harness.bundle import finished_report
+from evals.harness.modes import EvalRunError
 from evals.harness.reference import (
     CorpusError,
     corpus_argument,
@@ -86,16 +92,16 @@ def count(samples: Iterable[Sample]) -> dict[str, dict[str, float]]:
 
 
 def samples_of(
-    artifact: Path,
+    artifact: EvalArtifact,
     replays: Sequence[Path],
     framework: FrameworkName,
     cases: Sequence[str],
 ) -> list[Sample]:
-    """Every sample the named runs hold for these cases."""
+    """Every sample the named runs hold for these finished cases."""
     out: list[Sample] = []
     for case in cases:
-        path = case_file(artifact, case, "report")
-        if not path.is_file():
+        path = finished_report(artifact, case)
+        if path is None:
             continue
         report = Report.model_validate_json(path.read_text(encoding="utf-8"))
         if not replays:
@@ -131,11 +137,16 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 def command_question_prior(args: argparse.Namespace) -> int:
     """Count one framework's prior and write its row, keeping the other rows."""
     try:
-        cases = [case.id for case in development_cases(load_corpus(args.corpus))]
-    except CorpusError as error:
+        artifact = load_artifact(args.artifact)
+        cases = [
+            case.id
+            for case in development_cases(load_corpus(args.corpus))
+            if case.id in artifact.cases
+        ]
+        samples = samples_of(artifact, args.replay, args.framework, cases)
+    except (CorpusError, EvalRunError, ProvenanceError) as error:
         print(error, file=sys.stderr)
         return 1
-    samples = samples_of(args.artifact, args.replay, args.framework, cases)
     if not samples:
         print("no development case has a report under that artifact", file=sys.stderr)
         return 1

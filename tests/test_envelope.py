@@ -160,7 +160,8 @@ class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
     def test_a_mark_naming_no_recorded_finding(self, tree):
         env = envelope(tree, {CASE: answers(tree, marks={"stride:nope": "agree"})})
 
-        with pytest.raises(EnvelopeError, match="names no recorded finding"):
+        # The import is a maintainer's command, so it names the key.
+        with pytest.raises(EnvelopeError, match="stride:nope names no recorded"):
             applied(tree, env)
         assert not written(tree)
 

@@ -394,6 +394,35 @@ def write_failures(out: str, failed: Mapping[str, Mapping[str, Any]]) -> None:
     print(f"{len(failed)} failed case(s) captured in {directory}")
 
 
+def finished_report(artifact: EvalArtifact, case_id: str) -> Path | None:
+    """The report the sweep wrote for one of its cases, or None for a failed case.
+
+    The artifact's ``mode_output`` says which cases failed. A failed case has
+    no report. A finished case with no report, and a failed case with one, are
+    refused by name: either file is not this sweep's. A case the artifact does
+    not list is refused too, because this sweep wrote no file for it.
+    """
+    if case_id not in artifact.cases:
+        raise modes.EvalRunError(
+            f"{case_id}: {artifact.path} does not list the case, so the sweep"
+            " did not run it"
+        )
+    path = case_file(artifact.path, case_id, "report")
+    if case_id in artifact.failed_cases():
+        if path.exists():
+            raise modes.EvalRunError(
+                f"{case_id}: the artifact records the case as failed, but"
+                f" {path} exists; an earlier sweep wrote it"
+            )
+        return None
+    if not path.exists():
+        raise modes.EvalRunError(
+            f"{case_id}: the artifact records the case as finished, but"
+            f" {reports_dir(artifact.path)} holds no report for it"
+        )
+    return path
+
+
 def runs_from_reports(
     artifact: EvalArtifact, cases: Sequence[GoldenCase]
 ) -> dict[str, Any]:
@@ -404,9 +433,8 @@ def runs_from_reports(
     A sweep whose directory carries a report and no drafts refuses here rather
     than scoring the half it can — re-run that sweep.
 
-    The artifact's ``mode_output`` says which cases failed. A failed case has
-    no report and is left out. A finished case with no report, and a failed
-    case with one, are refused by name: either file is not this sweep's.
+    :func:`finished_report` reads each case's report, so a failed case is
+    left out and a lost report is refused by name.
     """
     directory = reports_dir(artifact.path)
     if not directory.is_dir():
@@ -415,23 +443,12 @@ def runs_from_reports(
             " writes beside its artifact, not the artifact alone"
         )
 
-    failed = artifact.failed_cases()
     runs: dict[str, Any] = {}
     for case in cases:
-        report_path = case_file(artifact.path, case.id, "report")
-        drafts_path = case_file(artifact.path, case.id, "drafts")
-        if case.id in failed:
-            if report_path.exists():
-                raise modes.EvalRunError(
-                    f"{case.id}: the artifact records the case as failed, but"
-                    f" {report_path} exists; an earlier sweep wrote it"
-                )
+        report_path = finished_report(artifact, case.id)
+        if report_path is None:
             continue
-        if not report_path.exists():
-            raise modes.EvalRunError(
-                f"{case.id}: the artifact records the case as finished, but"
-                f" {directory} holds no report for it"
-            )
+        drafts_path = case_file(artifact.path, case.id, "drafts")
         if not drafts_path.exists():
             raise modes.EvalRunError(
                 f"{drafts_path} is missing; this sweep predates the drafts"

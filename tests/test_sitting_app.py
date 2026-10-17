@@ -643,7 +643,7 @@ class TestTheMarks:
         app, _, _ = client
         refused = self.marked(app, {"v2:0000000000000000": "agree"})
         assert refused.status_code == 409
-        assert "v2:0000000000000000" in refused.json()["detail"]
+        assert "marks[0] names no recorded finding" in refused.json()["detail"]
 
     def test_each_framework_prints_its_own_marks(self, client):
         """Selected off the fingerprint's components, never off a key prefix."""

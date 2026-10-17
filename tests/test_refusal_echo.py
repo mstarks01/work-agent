@@ -20,6 +20,15 @@ from tests import test_webapp
 from tests.factories import asking_threat, sample_report, sample_selection, valid_model
 from tests.test_api import admit, auth, make_client
 from tests.test_questions import DESCRIPTION
+from tests.test_sitting_app import (
+    CASE,
+    OWN_LIST,
+    browser,
+    build_tree,
+    every_mark,
+    read_and_record,
+    session_for,
+)
 from tests.test_webapp import SAME_ORIGIN, posted
 from tests.test_webapp_questions import (
     FACT,
@@ -307,3 +316,36 @@ def test_a_refused_amendment_never_prints_pydantic_s_input(tiers):
     )
     assert response.status_code == 400, response.text
     assert "input_value" not in response.text, response.text
+
+
+def test_a_sitting_refusal_names_a_mark_by_its_position(tmp_path):
+    """``POST /api/finish`` names a mark it refuses by its place in ``marks``."""
+    app = browser(session_for(build_tree(tmp_path), "ada", CASE))
+    app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+    marks = every_mark(app) | {MARKER: "agree"}
+
+    response = app.post(
+        "/api/finish",
+        json={"case": CASE, "marks": marks, "missing": [], "notes": ""},
+    )
+
+    assert response.status_code == 409, response.text
+    assert "echomarker" not in response.text.lower(), response.text
+    assert f"marks[{len(marks) - 1}]" in response.json()["detail"]
+
+
+def test_a_package_refusal_names_a_saved_mark_by_its_position(tmp_path):
+    """A recorded draft can take a mark later, and the package check refuses it."""
+    app = browser(session_for(build_tree(tmp_path), "ada", CASE))
+    assert read_and_record(app).status_code == 200
+    marks = every_mark(app) | {MARKER: "agree"}
+    app.post(
+        "/api/draft",
+        json={"case": CASE, "marks": marks, "missing": [], "notes": ""},
+    )
+
+    response = app.post("/api/contribution-preview", json={})
+
+    assert response.status_code == 409, response.text
+    assert "echomarker" not in response.text.lower(), response.text
+    assert f"marks[{len(marks) - 1}]" in response.json()["detail"]
