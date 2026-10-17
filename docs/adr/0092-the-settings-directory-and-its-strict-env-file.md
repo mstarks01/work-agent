@@ -67,23 +67,24 @@ continuation, and reads a value that starts with a quote as quoted text that
 can span lines. A shell that sources the file expands `$`. Each refused form
 would give one of these readers a different value or a second entry.
 
-**The write.** The app makes the directory at the first save, not at
-startup. It makes the directory with mode `0700`. It
-writes each file to a new temporary file in the same directory with mode
-`0600` and `O_EXCL`, then calls `fsync` and `os.replace`. It does not change
-the mode of a directory or file that already exists. The permission check
-refuses a bad mode and names it. In one save, the app writes each new secret
-file with `O_EXCL`, and the check builds the test Deployment on the new paths.
-That build becomes the new cell (ADR 0093). Then the app writes
-`settings.env`. The replace of `settings.env` is the only step that commits
-the save. When the save stops before it, the app deletes the new secret files,
-so the old `settings.env` and the old secret files stay in force. After it,
-the app deletes each file in the directory that has the name form of a secret
-file and that no secret variable of the process environment or of the new
-`settings.env` names. That step also deletes a file that a save left when
-the process stopped before the commit. A save that leaves no tier with a
-vendor removes that vendor's key line and its key file, and the page says so
-before the save.
+**The write.** The app makes the directory at the first save, not at startup.
+It makes the directory with mode `0700`. It writes each file to a new
+temporary file in the same directory with mode `0600` and `O_EXCL`, then calls
+`fsync` and `os.replace`. It does not change the mode of a directory or file
+that already exists. The permission check refuses a bad mode and names it. In
+one save, the app writes each new secret file with `O_EXCL`, and the check
+builds the test Deployment on the new paths. That build becomes the new cell
+(ADR 0093). Then the app writes `settings.env`. The replace of `settings.env`
+is the only step that commits the save. A failure after it, such as of the
+`fsync` on the directory, logs a warning and does not undo the save. When the
+save stops before it, the app deletes the new secret files, so the old
+`settings.env` and the old secret files stay in force. After it, the app
+deletes each file in the directory that has the name form of a secret file and
+that no secret variable of the process environment or of the new
+`settings.env` names. That step also deletes a file that a save left when the
+process stopped before the commit. A save that leaves no tier with a vendor
+removes that vendor's key line and its key file, and the page says so before
+the save.
 
 ## Considered options
 

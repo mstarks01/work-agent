@@ -7,6 +7,8 @@ settings directory, and read only the HTTP response.
 
 from __future__ import annotations
 
+import os
+import stat
 from collections.abc import Callable, Mapping
 from hashlib import sha256
 from pathlib import Path
@@ -15,6 +17,7 @@ from types import MappingProxyType
 import pytest
 from fastapi.testclient import TestClient
 
+from analysis_service import config_files
 from analysis_service.config_files import (
     MAX_VALUE_CHARS,
     SETTINGS_DIR_VAR,
@@ -67,6 +70,18 @@ def env_in(directory: Path, **process: str) -> dict[str, str]:
     return {SETTINGS_DIR_VAR: str(directory), **process}
 
 
+def fail_directory_fsync(monkeypatch) -> None:
+    """Make each ``fsync`` of a directory raise."""
+    fsync = config_files.os.fsync
+
+    def failing_on_a_directory(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(5, "Input/output error")
+        fsync(fd)
+
+    monkeypatch.setattr(config_files.os, "fsync", failing_on_a_directory)
+
+
 class TestTheWriter:
     def test_the_reader_reads_what_it_writes_with_the_same_revision(self, tmp_path):
         path = tmp_path / "settings.env"
@@ -114,6 +129,28 @@ class TestTheWriter:
         assert path.read_bytes() == b"first"
         assert path.stat().st_mode & 0o777 == 0o600
         assert path.parent.stat().st_mode & 0o777 == 0o700
+
+    def test_a_failed_directory_fsync_deletes_the_new_file(self, tmp_path, monkeypatch):
+        path = tmp_path / "key"
+        fail_directory_fsync(monkeypatch)
+
+        with pytest.raises(OSError, match="Input/output error"):
+            create_private(path, b"first")
+
+        assert not path.exists()
+
+    def test_a_failed_directory_fsync_after_the_replace_keeps_the_file(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        path = tmp_path / "settings.env"
+        write_settings_env(path, {"ANALYSIS_A": "1"})
+        fail_directory_fsync(monkeypatch)
+
+        write_settings_env(path, {"ANALYSIS_A": "2"})
+
+        assert path.read_text() == "ANALYSIS_A=2\n"
+        assert [entry.name for entry in tmp_path.iterdir()] == ["settings.env"]
+        assert "Input/output error" in caplog.text
 
     @pytest.mark.parametrize("form", sorted(REFUSED_VALUES))
     def test_it_writes_no_value_that_the_rule_refuses(self, tmp_path, form):

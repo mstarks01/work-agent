@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
+import stat
 import subprocess
 import sys
 import threading
@@ -23,6 +25,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from analysis_service import config_files
 from analysis_service.certification import CertifyResult
 from analysis_service.model_gate import tool_models
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
@@ -511,6 +514,24 @@ def failing(path, values):
     raise OSError(28, "No space left on device")
 
 
+def directory_fsync_fails_after_replace(monkeypatch) -> None:
+    """Make each ``fsync`` of a directory raise once an ``os.replace`` ran."""
+    replace_file, fsync = config_files.os.replace, config_files.os.fsync
+    replaced = []
+
+    def replacing(source, target):
+        replace_file(source, target)
+        replaced.append(target)
+
+    def failing_on_a_directory(fd):
+        if replaced and stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(5, "Input/output error")
+        fsync(fd)
+
+    monkeypatch.setattr(config_files.os, "replace", replacing)
+    monkeypatch.setattr(config_files.os, "fsync", failing_on_a_directory)
+
+
 class TestAKeySave:
     def test_it_writes_a_private_file_and_its_line(self, tmp_path):
         client, _ = app_on(tmp_path, hand_written())
@@ -674,6 +695,46 @@ class TestAKeySave:
         assert Path(old_key).read_text(encoding="utf-8") == OLD_KEY
         assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]
         assert builds.runners[0].jobs and not builds.runners[1].jobs
+
+    def test_a_failed_replace_of_settings_env_keeps_the_old_state(
+        self, tmp_path, monkeypatch
+    ):
+        old_key = key_on_disk(tmp_path)
+        client, builds = app_on(
+            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
+        )
+        before = settings_text(tmp_path)
+        monkeypatch.setattr(config_files.os, "replace", failing)
+
+        failed = save(client, {ANTHROPIC_KEY: KEY})
+        run_to_completion(client)
+
+        assert failed.status_code == 500, failed.text
+        assert settings_text(tmp_path) == before
+        assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]
+        assert Path(old_key).read_text(encoding="utf-8") == OLD_KEY
+        assert builds.runners[0].jobs and not builds.runners[1].jobs
+
+    def test_a_failed_directory_fsync_after_the_replace_keeps_the_save(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        old_key = key_on_disk(tmp_path)
+        client, builds = app_on(
+            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
+        )
+        directory_fsync_fails_after_replace(monkeypatch)
+
+        saved = save(client, {ANTHROPIC_KEY: KEY})
+        run_to_completion(client)
+
+        assert saved.status_code == 200, saved.text
+        assert f"ANALYSIS_ANTHROPIC_API_KEY_FILE={named_key(tmp_path)}" in (
+            settings_text(tmp_path).splitlines()
+        )
+        assert named_key(tmp_path).read_text(encoding="utf-8") == KEY
+        assert not Path(old_key).exists()
+        assert builds.runners[1].jobs and not builds.runners[0].jobs
+        assert "fsync" in caplog.text
 
     def test_a_failed_key_write_leaves_no_key_file(self, tmp_path, monkeypatch):
         client, _ = app_on(tmp_path, hand_written())
