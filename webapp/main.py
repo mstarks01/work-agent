@@ -151,7 +151,7 @@ from analysis_service.certification import CertificationGate
 from analysis_service.claims import UnknownKey
 from analysis_service.config_files import SettingsFileError
 from analysis_service.critic import SEVERITY_ORDER
-from analysis_service.deployment import Deployment
+from analysis_service.deployment import Deployment, FrameworkNotCarried
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
@@ -933,7 +933,8 @@ def _earlier_payload(
 
 #: Each typed refusal of the job operations and of the answer rules, with the
 #: status the page is answered under. The message is the refusal's own, which
-#: names the submitter's choices and never this deployment's configuration.
+#: names the submitter's choices and the frameworks the form offers, and never a
+#: setting of this deployment.
 _REFUSAL_STATUS: dict[type[Exception], int] = {
     NoSuchJob: 404,
     NotCompleted: 409,
@@ -945,6 +946,7 @@ _REFUSAL_STATUS: dict[type[Exception], int] = {
     UnreadableSchema: 409,
     WorkspaceFull: 409,
     RunnerUnavailable: 503,
+    FrameworkNotCarried: 409,
     JobDataMissing: 500,
 }
 
