@@ -1395,10 +1395,18 @@ class TestTheFrameworksTakeTurns:
         assert {name for q in first for name in q.frameworks} == set(BOTH)
 
     def test_a_part_still_follows_its_parent(self):
-        keys = [q.key for q in self.list_of(BOTH)]
-        for at, question in enumerate(self.list_of(BOTH)):
-            if question.parent in keys:
-                assert keys.index(question.parent) < at
+        """The merged list puts each parent before its parts. The shown list
+        holds no part beside its parent, since a part waits until its parent
+        is answered, so this reads the list the merge returns."""
+        listed = early_questions(valid_model(), BOTH, None)
+        place = {question.key: at for at, question in enumerate(listed)}
+        pairs = [
+            (place[question.parent], at)
+            for at, question in enumerate(listed)
+            if question.parent in place
+        ]
+        assert pairs, "a control: the merged list holds a part and its parent"
+        assert all(parent < part for parent, part in pairs)
 
     def test_the_selection_order_changes_nothing(self):
         backward = dict(reversed(BOTH.items()))
