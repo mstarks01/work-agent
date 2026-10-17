@@ -1,0 +1,517 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "Member",
+        "description": "A library member using the library service to borrow, renew or reserve books.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Members borrow, renew and reserve books through the library app on their phones.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "The sources do not state where members or their phones are located.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:desk-staff",
+        "name": "Desk staff",
+        "description": "Library desk personnel who handle loan problems and account changes.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Desk staff can extend a loan, clear a block on a member's account or mark a book as returned by hand",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "Everyone at the desk uses the same shared login; individual staff members and branches cannot be distinguished in the history.",
+        "kind": "human",
+        "trust_zone": "boundary:branch-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:library-app",
+        "name": "Library app",
+        "description": "A phone application through which members request loans, renewals and reservations.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The app on their phone calls the lending API.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:lending-api",
+        "name": "Lending API",
+        "description": "The REST API that is the sole stated interface for reading or writing loans and serves the circulation page.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "It's a REST API. JSON in, JSON out.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "The sources disagree about exposure. Lending service note: \"The lending API is internal-only.\" Interview transcript, Priya: \"The phones talk straight to the lending API over the internet.\" Authentication is also unverified: Priya said, \"I think it checks a token the app gets at sign-in\" and that she could not say what it accepts or does with a call it does not like.",
+        "technology": "REST API; JSON",
+        "trust_zone": "boundary:council-data-centre",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:self-service-kiosk",
+        "name": "Self-service kiosk",
+        "description": "A branch kiosk where members scan their library card and books being borrowed or returned.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every branch has self-service kiosks where a member scans their library card and the books they are borrowing or returning.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:loans-database",
+        "name": "Loans database",
+        "description": "The database containing members, loans, reservations, contact details and borrowing history.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Names, email addresses, home addresses and every member's full borrowing history live in the loans database.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "Priya corrected the earlier description of two databases: \"We merged those in the spring. It's one loans database now. The old reservations database is gone.\"",
+        "technology": "unknown",
+        "trust_zone": "boundary:council-data-centre",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:library-app>use-library-app",
+        "name": "use library app",
+        "description": "A member uses the library app to request lending-service actions.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Members borrow, renew and reserve books through the library app on their phones.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:library-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loan, renewal and reservation requests",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:library-app>process:lending-api>submit-loan-request",
+        "name": "submit loan request",
+        "description": "The library app calls the lending API with member and book or title information for loan, renewal and reservation actions.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The app on their phone calls the lending API. It says which book and which member",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "Authentication is unverified: Priya said, \"I think it checks a token the app gets at sign-in, but I'd have to look.\"",
+        "source": "process:library-app",
+        "destination": "process:lending-api",
+        "protocol": "REST",
+        "authentication": "unknown",
+        "data_description": "member and book or title information for loans, renewals and reservations",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:self-service-kiosk>process:lending-api>send-loan-return",
+        "name": "send loan or return",
+        "description": "A kiosk sends each scanned loan or return to the lending API.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The kiosks send each loan and each return to the lending API.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "The transcript does not establish whether kiosks communicate directly with the loans database; it only states what arrives at the API.",
+        "source": "process:self-service-kiosk",
+        "destination": "process:lending-api",
+        "protocol": "REST",
+        "authentication": "unknown",
+        "data_description": "loan and return records from scanned members and books",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:desk-staff>process:lending-api>change-loan-record",
+        "name": "change loan record",
+        "description": "Desk staff use the circulation page served by the lending API to extend loans, clear account blocks and mark books returned.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Desk staff can extend a loan, clear a block on a member's account or mark a book as returned by hand, through a circulation page the lending API serves.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "The shared account means the system records only that the desk made the change, not which person or branch.",
+        "source": "entity:desk-staff",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loan and member-account changes",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:lending-api>store:loans-database>read-write-loans",
+        "name": "read and write loans",
+        "description": "The lending API reads and writes the loans database.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The API is the only thing that reads or writes it.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "",
+        "source": "process:lending-api",
+        "destination": "store:loans-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "members, loans, reservations and borrowing history",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:branch-network",
+        "name": "Branch network",
+        "description": "The network on which branch kiosks and desk staff operate.",
+        "assets": [],
+        "source_excerpt": "The kiosks sit on the branch network.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:council-data-centre",
+        "name": "Council data centre",
+        "description": "The council data-centre zone where the lending API and loans database run.",
+        "assets": [],
+        "source_excerpt": "The lending API and the loans database run in the council data centre.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:internet",
+        "name": "Internet",
+        "description": "The network through which phones reach the lending API.",
+        "assets": [],
+        "source_excerpt": "The phones talk straight to the lending API over the internet.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The loans database is confidential because it contains names, email addresses, home addresses and full borrowing history.",
+        "element_id": "store:loans-database",
+        "attribute": "data_classification",
+        "basis": "The Interview transcript states: \"Names, email addresses, home addresses and every member's full borrowing history live in the loans database.\""
+      },
+      {
+        "assumption": "The lending API presents a web interface because it is described as a REST API.",
+        "element_id": "process:lending-api",
+        "attribute": "interface_kind",
+        "basis": "The Interview transcript states: \"It's a REST API. JSON in, JSON out.\" REST is an HTTP-family application interface."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "Member",
+        "description": "A library member using the library service to borrow, renew or reserve books.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Members borrow, renew and reserve books through the library app on their phones.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "The sources do not state where members or their phones are located.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:desk-staff",
+        "name": "Desk staff",
+        "description": "Library desk personnel who handle loan problems and account changes.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Desk staff can extend a loan, clear a block on a member's account or mark a book as returned by hand",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "Everyone at the desk uses the same shared login; individual staff members and branches cannot be distinguished in the history.",
+        "kind": "human",
+        "trust_zone": "boundary:branch-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:library-app",
+        "name": "Library app",
+        "description": "A phone application through which members request loans, renewals and reservations.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The app on their phone calls the lending API.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:lending-api",
+        "name": "Lending API",
+        "description": "The REST API that is the sole stated interface for reading or writing loans and serves the circulation page.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "It's a REST API. JSON in, JSON out.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "The sources disagree about exposure. Lending service note: \"The lending API is internal-only.\" Interview transcript, Priya: \"The phones talk straight to the lending API over the internet.\" Authentication is also unverified: Priya said, \"I think it checks a token the app gets at sign-in\" and that she could not say what it accepts or does with a call it does not like.",
+        "technology": "REST API; JSON",
+        "trust_zone": "boundary:council-data-centre",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:self-service-kiosk",
+        "name": "Self-service kiosk",
+        "description": "A branch kiosk where members scan their library card and books being borrowed or returned.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every branch has self-service kiosks where a member scans their library card and the books they are borrowing or returning.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:branch-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:loans-database",
+        "name": "Loans database",
+        "description": "The database containing members, loans, reservations, contact details and borrowing history.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Names, email addresses, home addresses and every member's full borrowing history live in the loans database.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "Priya corrected the earlier description of two databases: \"We merged those in the spring. It's one loans database now. The old reservations database is gone.\"",
+        "technology": "unknown",
+        "trust_zone": "boundary:council-data-centre",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:library-app>use-library-app",
+        "name": "use library app",
+        "description": "A member uses the library app to request lending-service actions.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Members borrow, renew and reserve books through the library app on their phones.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:library-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loan, renewal and reservation requests",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:library-app>process:lending-api>submit-loan-request",
+        "name": "submit loan request",
+        "description": "The library app calls the lending API with member and book or title information for loan, renewal and reservation actions.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The app on their phone calls the lending API. It says which book and which member",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "Authentication is unverified: Priya said, \"I think it checks a token the app gets at sign-in, but I'd have to look.\"",
+        "source": "process:library-app",
+        "destination": "process:lending-api",
+        "protocol": "REST",
+        "authentication": "unknown",
+        "data_description": "member and book or title information for loans, renewals and reservations",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:self-service-kiosk>process:lending-api>send-loan-or-return",
+        "name": "send loan or return",
+        "description": "A kiosk sends each scanned loan or return to the lending API.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The kiosks send each loan and each return to the lending API.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "The transcript does not establish whether kiosks communicate directly with the loans database; it only states what arrives at the API.",
+        "source": "process:self-service-kiosk",
+        "destination": "process:lending-api",
+        "protocol": "REST",
+        "authentication": "unknown",
+        "data_description": "loan and return records from scanned members and books",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:desk-staff>process:lending-api>change-loan-record",
+        "name": "change loan record",
+        "description": "Desk staff use the circulation page served by the lending API to extend loans, clear account blocks and mark books returned.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Desk staff can extend a loan, clear a block on a member's account or mark a book as returned by hand, through a circulation page the lending API serves.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "The shared account means the system records only that the desk made the change, not which person or branch.",
+        "source": "entity:desk-staff",
+        "destination": "process:lending-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "loan and member-account changes",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:lending-api>store:loans-database>read-and-write-loans",
+        "name": "read and write loans",
+        "description": "The lending API reads and writes the loans database.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The API is the only thing that reads or writes it.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "",
+        "source": "process:lending-api",
+        "destination": "store:loans-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "members, loans, reservations and borrowing history",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:branch-network",
+        "name": "Branch network",
+        "description": "The network on which branch kiosks and desk staff operate.",
+        "assets": [],
+        "source_excerpt": "The kiosks sit on the branch network.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:council-data-centre",
+        "name": "Council data centre",
+        "description": "The council data-centre zone where the lending API and loans database run.",
+        "assets": [],
+        "source_excerpt": "The lending API and the loans database run in the council data centre.",
+        "source_label": "Lending service note",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:internet",
+        "name": "Internet",
+        "description": "The network through which phones reach the lending API.",
+        "assets": [],
+        "source_excerpt": "The phones talk straight to the lending API over the internet.",
+        "source_label": "Interview transcript",
+        "source_speaker": "Priya",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The loans database is confidential because it contains names, email addresses, home addresses and full borrowing history.",
+        "element_id": "store:loans-database",
+        "attribute": "data_classification",
+        "basis": "The Interview transcript states: \"Names, email addresses, home addresses and every member's full borrowing history live in the loans database.\""
+      },
+      {
+        "assumption": "The lending API presents a web interface because it is described as a REST API.",
+        "element_id": "process:lending-api",
+        "attribute": "interface_kind",
+        "basis": "The Interview transcript states: \"It's a REST API. JSON in, JSON out.\" REST is an HTTP-family application interface."
+      }
+    ],
+    "capabilities": []
+  },
+  "issues": [],
+  "repair": null
+}
