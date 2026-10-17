@@ -66,6 +66,19 @@ def _offline(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(OFFLINE_ENV, "1")
 
 
+@pytest.fixture(autouse=True)
+def _no_cloud_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the ``boto3`` credential chain off the metadata endpoints of an
+    instance and of a container, so a test that finds no credential never
+    sends a request off the machine."""
+    monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
+    for var in (
+        "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+        "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+
 @pytest.fixture
 def supplied_transport(monkeypatch: pytest.MonkeyPatch) -> None:
     """Admit calls through the real translator to a transport the test supplies."""

@@ -35,6 +35,12 @@ The service turns the row into a usage row in one transaction, then deletes the
 objects. A sweep removes an object whose delete failed. Only a job in a
 terminal status can be deleted.
 
+> **Amended by [#1816](https://github.com/mstarks01/work-agent/issues/1816).**
+> A delete in an S3 bucket that keeps versions removes no content. So the `s3`
+> object store refuses, at the startup, a bucket whose versioning is `Enabled`
+> or `Suspended`. It does not delete versions, because Cloudflare R2 documents
+> no call that lists them.
+
 ## Considered options
 
 - **Remove the whole record.** Rejected: it resets the rate limit, the token

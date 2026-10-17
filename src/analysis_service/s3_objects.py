@@ -19,6 +19,9 @@ The ``boto3`` errors this module handles, and what each one becomes:
 * **A missing bucket** (HTTP 404) **and a refused access** (HTTP 403).
   :meth:`S3ObjectStore.check` turns each into a :class:`StoreConfigError`
   that names the cause, so the startup stops.
+* **A store that does not implement versioning.** ``GetBucketVersioning``
+  raises a ``ClientError`` with the code ``NotImplemented``, and the store
+  keeps no versions. Each other refusal of that call stops the startup.
 * **An endpoint that the service cannot reach, or a request it cannot sign.**
   ``botocore`` raises a ``BotoCoreError``: for example
   ``EndpointConnectionError``, ``SSLError`` or ``NoCredentialsError``.
@@ -221,10 +224,21 @@ class S3ObjectStore:
         return cls(client, bucket)
 
     async def check(self) -> None:
-        """Send ``HeadBucket``. A missing bucket, a refused credential or an
-        endpoint the service cannot reach stops the startup."""
+        """Send ``HeadBucket``, then ``GetBucketVersioning``. A missing
+        bucket, a refused credential, an endpoint the service cannot reach or
+        a bucket that keeps versions stops the startup.
+
+        A delete in a bucket that keeps versions removes nothing: it writes a
+        delete marker, and the object stays as an older version. So the
+        service could not remove a deleted or expired job's content (ADR
+        0066). ``Suspended`` stops the startup too, because the versions
+        written before the suspension stay.
+        """
         try:
             await asyncio.to_thread(self._client.head_bucket, Bucket=self._bucket)
+            versioning = await asyncio.to_thread(
+                _versioning, self._client, self._bucket
+            )
         except ClientError as error:
             status = _status(error)
             reason = _REFUSALS.get(
@@ -240,6 +254,12 @@ class S3ObjectStore:
                 f"the s3 object store cannot reach or sign a request to the bucket"
                 f" {self._bucket!r} ({type(error).__name__})"
             ) from None
+        if versioning is not None:
+            raise StoreConfigError(
+                f"the bucket {self._bucket!r} has versioning {versioning}, so a"
+                f" delete keeps each object as an older version; use a bucket"
+                f" that never had versioning turned on"
+            )
 
     async def put(self, key: str, data: bytes) -> None:
         await asyncio.to_thread(_put, self._client, self._bucket, key, data)
@@ -262,6 +282,24 @@ class S3ObjectStore:
             if not page.get("IsTruncated"):
                 break
             token = {"ContinuationToken": page["NextContinuationToken"]}
+
+
+def _versioning(client: Any, bucket: str) -> str | None:
+    """The versioning status of the bucket, ``Enabled`` or ``Suspended``, or
+    ``None`` where the bucket never had versioning or the store does not
+    implement it."""
+    try:
+        answer = client.get_bucket_versioning(Bucket=bucket)
+    except ClientError as error:
+        if _code(error) == "NotImplemented":
+            return None
+        raise StoreConfigError(
+            f"GetBucketVersioning on the bucket {bucket!r} failed with HTTP"
+            f" {_status(error)}: give the identity of the service"
+            f" s3:GetBucketVersioning on the bucket"
+        ) from None
+    status: str | None = answer.get("Status")
+    return status
 
 
 def _put(client: Any, bucket: str, key: str, data: bytes) -> None:

@@ -1017,18 +1017,25 @@ profile names, so only `ANALYSIS_OBJECT_ENDPOINT` selects the endpoint.
 
 Prepare the bucket before the first start:
 
-- Give the identity of the service `s3:ListBucket` on the bucket, and
-  `s3:GetObject`, `s3:PutObject` and `s3:DeleteObject` on its objects.
-  `HeadBucket` needs `s3:ListBucket`. Without it, a missing object reads as
-  a refused access, and the read fails.
+- Give the identity of the service `s3:ListBucket` and
+  `s3:GetBucketVersioning` on the bucket, and `s3:GetObject`, `s3:PutObject`
+  and `s3:DeleteObject` on its objects. `HeadBucket` needs `s3:ListBucket`.
+  Without it, a missing object reads as a refused access, and the read fails.
+- Use a bucket that never had versioning turned on. In a bucket that keeps
+  versions, a delete keeps the object as an older version, so the service
+  cannot remove the content of a deleted or expired job. A suspension does
+  not remove the versions written before it. Cloudflare R2 has no
+  versioning.
 - Block public access to the bucket. The API serves each report, and no reader
   needs the bucket.
 - Turn on the server-side encryption of the bucket where the provider has a
   setting for it.
 
-At the startup, the service sends `HeadBucket` to the bucket. A missing
-bucket, a refused credential or an endpoint that the service cannot reach
-stops the startup.
+At the startup, the service sends `HeadBucket` and then
+`GetBucketVersioning` to the bucket. A missing bucket, a refused credential,
+an endpoint that the service cannot reach or a bucket with versioning
+`Enabled` or `Suspended` stops the startup. A store that answers
+`GetBucketVersioning` with `NotImplemented` keeps no versions, and passes.
 
 #### The migration step
 
@@ -1077,7 +1084,7 @@ The service starts in this order, and a failure at a step stops the startup:
 2. It reads `ANALYSIS_RETENTION_DAYS`.
 3. The `sql` store checks that the schema is at the latest revision.
 4. The `sql` store checks the object store: for `filesystem`, the root, and
-   for `s3`, `HeadBucket` on the bucket.
+   for `s3`, `HeadBucket` and `GetBucketVersioning` on the bucket.
 5. The restart scan fails each `queued` or `running` job in the store.
 6. The service takes requests. The [orphan sweep](#orphan-objects) starts at
    the same time. Where a retention period is set, the
@@ -1089,6 +1096,12 @@ startup, so do not turn the lifespan off (for example with
 `uvicorn --lifespan off`). The scan is correct for a single instance only.
 With two instances on one shared store, the scan at the start of one instance
 fails the jobs that the other instance still runs.
+
+A store call that starts or ends a run has 60 seconds. Where the store refuses
+the write that ends a run, or does not answer in time, the service fails the
+job. The job keeps the charge that the run measured, and the service does not
+run it again. Where the store refuses that write too, the job stays `queued`
+or `running`, the log names the job, and the restart scan fails it.
 
 ### Retention
 
