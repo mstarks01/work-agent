@@ -8,8 +8,10 @@ a missing file on its own, and the keyring, which does not echo the reason —
 keep their own read.
 
 The first-run app reads ``settings.env`` from the settings directory, in the
-strict format of ADR 0092. :func:`value_refusal` is the one value rule: the
-reader's caller and the writer of the file call it.
+strict format of ADR 0092, and the Settings page writes it with
+:func:`write_settings_env`. :func:`value_refusal` is the one value rule: the
+reader's caller and the writer of the file call it. :func:`write_private` is
+the one writer of a file in the settings directory.
 
 :func:`private_fd` is the one permission rule, in the manner of OpenSSH. Both
 drivers open the settings directory, ``settings.env`` and each secret file
@@ -19,14 +21,18 @@ file.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
+import secrets
 import stat
 import tomllib
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, NamedTuple
+
+from pydantic import ValidationError
 
 from analysis_service.errors import ConfigError
 
@@ -54,6 +60,14 @@ class SettingsLine(NamedTuple):
     value: str
 
 
+class SettingsFile(NamedTuple):
+    """The lines of ``settings.env`` and the revision of the bytes they came
+    from: their SHA-256. A missing file has the revision of no bytes."""
+
+    revision: str
+    lines: dict[str, SettingsLine]
+
+
 def read_toml(path: Path | str, error: type[Exception]) -> dict[str, Any]:
     """Parse one TOML file, or raise ``error`` naming the file and the cause."""
     try:
@@ -62,6 +76,16 @@ def read_toml(path: Path | str, error: type[Exception]) -> dict[str, Any]:
         raise error(f"{path}: invalid TOML: {exc}") from exc
     except OSError as exc:
         raise error(f"{path}: cannot be read: {exc}") from exc
+
+
+def validation_problems(exc: ValidationError) -> str:
+    """Each problem of a config model's ``exc``, by its key path, without the
+    input value, so a message never repeats a value."""
+    return "; ".join(
+        f"{'.'.join(str(step) for step in error['loc']) or '(root)'}:"
+        f" {error['msg'].removeprefix('Value error, ')}"
+        for error in exc.errors(include_input=False, include_url=False)
+    )
 
 
 def env_flag(env: Mapping[str, str], var: str, *, default: bool = False) -> bool:
@@ -137,7 +161,13 @@ def read_private(
 
 
 def read_settings_env(path: Path) -> dict[str, SettingsLine]:
-    """Each key of ``settings.env`` with its value and line number.
+    """Each key of ``settings.env`` with its value and line number, by
+    :func:`read_settings`."""
+    return read_settings(path).lines
+
+
+def read_settings(path: Path) -> SettingsFile:
+    """The lines of ``settings.env`` and their revision, from one read.
 
     A missing file is no lines. Each line is ``KEY=value`` or empty, ``KEY``
     matches ``ANALYSIS_[A-Z0-9_]+``, and the value is all of the text after
@@ -152,13 +182,15 @@ def read_settings_env(path: Path) -> dict[str, SettingsLine]:
     try:
         with private_fd(path.parent, SettingsFileError):
             pass
-        text = read_private(path, SettingsFileError).decode("utf-8")
+        data = read_private(path, SettingsFileError)
     except FileNotFoundError:
-        return {}
-    except UnicodeDecodeError as exc:
-        raise SettingsFileError(f"{path}: is not UTF-8") from exc
+        data = b""
     except OSError as exc:
         raise SettingsFileError(f"{path}: cannot be read: {exc.strerror}") from exc
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise SettingsFileError(f"{path}: is not UTF-8") from exc
     lines: dict[str, SettingsLine] = {}
     for number, line in enumerate(text.split("\n"), start=1):
         if not line:
@@ -175,7 +207,51 @@ def read_settings_env(path: Path) -> dict[str, SettingsLine]:
                 f" {lines[key].number}"
             )
         lines[key] = SettingsLine(number, value)
-    return lines
+    return SettingsFile(hashlib.sha256(data).hexdigest(), lines)
+
+
+def write_settings_env(path: Path, values: Mapping[str, str]) -> None:
+    """Write ``values`` as ``settings.env``, one ``KEY=value`` line each, by
+    :func:`write_private`.
+
+    Each key must match the key pattern and each value must pass
+    :func:`value_refusal`, or it raises :class:`SettingsFileError` and writes
+    nothing.
+    """
+    for key, value in values.items():
+        if not _KEY.fullmatch(key):
+            raise SettingsFileError(f"{key!r} does not match {_KEY.pattern}")
+        if refusal := value_refusal(value):
+            raise SettingsFileError(f"{key} {refusal}")
+    data = "".join(f"{key}={value}\n" for key, value in values.items()).encode()
+    write_private(path, data)
+
+
+def write_private(path: Path, data: bytes) -> None:
+    """Replace the file ``path`` with ``data`` (ADR 0092).
+
+    The first write makes the directory with mode ``0700``. The directory must
+    then pass :func:`private_fd`. The data goes to a new temporary file in the
+    same directory, made with ``O_EXCL`` and mode ``0600``, then ``fsync`` and
+    ``os.replace`` put it at ``path``. The mode of a directory that exists does
+    not change.
+    """
+    os.makedirs(path.parent, mode=0o700, exist_ok=True)
+    with private_fd(path.parent, SettingsFileError) as directory:
+        temporary = path.parent / f".{path.name}.{secrets.token_hex(8)}"
+        fd = os.open(
+            temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
+        )
+        try:
+            with open(fd, "wb") as file:
+                file.write(data)
+                file.flush()
+                os.fsync(file.fileno())
+            os.replace(temporary, path)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
+        os.fsync(directory)
 
 
 def value_refusal(value: str) -> str | None:

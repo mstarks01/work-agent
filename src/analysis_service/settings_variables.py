@@ -11,6 +11,7 @@ call it.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 
 from analysis_service import (
     deployment,
@@ -24,6 +25,7 @@ from analysis_service import (
 from analysis_service.config_files import (
     SETTINGS_FILE,
     SettingsFileError,
+    SettingsLine,
     read_settings_env,
     settings_dir,
     value_refusal,
@@ -93,7 +95,15 @@ def deployment_env(process_env: Mapping[str, str]) -> dict[str, str]:
     A missing settings directory or ``settings.env`` adds nothing.
     """
     path = settings_dir(process_env) / SETTINGS_FILE
-    lines = read_settings_env(path)
+    return merged_env(process_env, read_settings_env(path), path)
+
+
+def merged_env(
+    process_env: Mapping[str, str], lines: Mapping[str, SettingsLine], path: Path
+) -> dict[str, str]:
+    """The process environment with ``lines``, the lines of the
+    ``settings.env`` at ``path``, added, under the refusals of
+    :func:`deployment_env`. A save checks the lines it will write with it."""
     known = set(deployment_variables())
     for var in sorted(known & process_env.keys()):
         if refusal := value_refusal(process_env[var]):

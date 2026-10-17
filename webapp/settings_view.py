@@ -11,6 +11,10 @@ follow the vendor of each tier and that vendor's mode, from the ``VENDORS``
 rows. The store rows follow the ``reads`` of the selected job store, object
 store and database. An entry marked ``excluded`` never shows.
 
+A row carries the closed set of its setting where the loader holds one, so
+the page offers a choice. The data carries the revision of ``settings.env``,
+which a save sends back (:mod:`webapp.settings_save`).
+
 No row carries a secret. A secret row carries only whether a key file exists,
 and this module never opens one. A value that holds a URL password is
 withheld.
@@ -23,11 +27,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.config_files import (
     SETTINGS_FILE,
     SettingsFileError,
     SettingsLine,
-    read_settings_env,
+    read_settings,
     read_toml,
     settings_dir,
 )
@@ -73,11 +78,11 @@ def settings_view(
     """
     path = settings_dir(process_env) / SETTINGS_FILE
     try:
-        lines = read_settings_env(path)
+        revision, lines = read_settings(path)
     except SettingsFileError:
         # The startup refused the file for the same reason, and the banner
-        # names it.
-        lines = {}
+        # names it. A save needs a revision, so the page cannot save.
+        revision, lines = None, {}
     known = set(deployment_variables())
     page = {var: line for var, line in lines.items() if var in known}
     merged = {
@@ -108,6 +113,7 @@ def settings_view(
             "mark": setting.mark,
             "reason": setting.reason,
             "restart": var in restart,
+            **_CONTROLS.get(key, {}),
         }
         if var in secrets:
             row |= {"secret": True, "key_saved": _key_saved(row.pop("value"))}
@@ -122,6 +128,7 @@ def settings_view(
     return {
         "error": None if error is None else str(error),
         "settings_file": str(path),
+        "revision": revision,
         "unknown": [
             {"key": var, "line": line.number}
             for var, line in lines.items()
@@ -136,6 +143,43 @@ def settings_view(
         ],
         "models": {vendor: list(tool_models(vendor)) for vendor in vendors},
     }
+
+
+def _controls() -> dict[str, dict[str, Any]]:
+    """The closed set of each Deployment Setting whose loader holds one, from
+    that loader's table, so the page offers a choice in place of free text.
+    ``multiple`` marks a list of names separated by commas."""
+    flag = ("true", "false")
+    choices: dict[str, tuple[str, ...]] = {
+        **{f"tiers.{tier}.vendor": VENDOR_NAMES for tier in TIER_NAMES},
+        **{
+            f"credentials.{vendor}.mode": tuple(VENDORS[vendor].credential_modes)
+            for vendor in VENDOR_NAMES
+        },
+        **{
+            f"charges.{vendor}": tuple(VENDORS[vendor].charge_modes)
+            for vendor in VENDOR_NAMES
+        },
+        **{
+            key: flag
+            for key, setting in SETTINGS.items()
+            if setting.variable in PASS_FLAGS
+        },
+        "certification.require_certified": flag,
+        "store.job_store": tuple(JOB_STORES),
+        "store.object_store": tuple(OBJECT_STORES),
+    }
+    return {
+        **{
+            key: {"options": list(options)}
+            for key, options in choices.items()
+            if options
+        },
+        "frameworks.carried": {"options": list(FRAMEWORK_NAMES), "multiple": True},
+    }
+
+
+_CONTROLS = _controls()
 
 
 class _Files:

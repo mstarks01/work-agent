@@ -585,6 +585,49 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
     assert fits
 
 
+def test_the_settings_page_saves_resets_and_refuses_a_stale_tab(browser, tmp_path):
+    from tests.test_settings_env import env_in, hand_written, write_settings
+    from webapp.main import create_app
+
+    write_settings(tmp_path, hand_written())
+    timeout = 'tr[data-key="resilience.timeout_ms"]'
+    for url in serve(create_app(env=env_in(tmp_path))):
+        page, errors = opened(browser, url + "/settings")
+        other, other_errors = opened(browser, url + "/settings")
+        page.locator(f"{timeout} input").fill(" 5000")
+        listed = page.locator("#changes-list").inner_text()
+        page.click("#save-changes")
+        page.wait_for_selector("#save-errors", state="visible")
+        refused = page.locator("#save-errors").inner_text()
+
+        page.locator(f"{timeout} input").fill("5000")
+        page.click("#save-changes")
+        page.wait_for_selector("#save-status", state="visible")
+        status = page.locator("#save-status").inner_text()
+        changed = page.locator(timeout).inner_text()
+        written = (tmp_path / "settings.env").read_text()
+
+        other.locator('tr[data-key="resilience.attempts"] input').fill("2")
+        other.click("#save-changes")
+        other.wait_for_selector("#save-errors", state="visible")
+        stale = other.locator("#save-errors").inner_text()
+
+        page.locator(f"{timeout} button.reset").click()
+        page.click("#save-changes")
+        page.wait_for_selector(f"{timeout} >> text=resilience.toml")
+        reset = (tmp_path / "settings.env").read_text()
+        page.close()
+        other.close()
+    assert errors == other_errors == [], f"the settings page raised: {errors}"
+    assert "Timeout ms" in listed and "5000" in listed
+    assert "whitespace" in refused and "5000" not in refused
+    assert "next analysis uses the new settings" in status
+    assert "this page" in changed and "Shipped:" in changed
+    assert "ANALYSIS_TIMEOUT_MS=5000" in written
+    assert "ANALYSIS_TIMEOUT_MS" not in reset
+    assert "Reload the page" in stale
+
+
 def test_workspace_mobile_has_no_page_overflow(page):
     page.set_viewport_size({"width": 390, "height": 844})
     pause(page)

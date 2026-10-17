@@ -1168,7 +1168,7 @@ class Vendor:
         """
         if MODEL_NAME.fullmatch(model) is None:
             raise ValueError(
-                f"{source}: {model!r} is not a model identifier; use 1 to 128"
+                f"{source}: is not a model identifier; use 1 to 128"
                 " letters, digits and the characters . _ : / @ -, with a letter"
                 " or digit first"
             )

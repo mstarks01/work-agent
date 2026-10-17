@@ -21,9 +21,11 @@ The security posture is deliberate throughout:
   no-auth and no-CORS posture is safe only there, because anything reachable is
   an unauthenticated proxy to somebody else's vendor bill. Remote,
   authenticated access is exactly what ``/v1`` already exists for.
-* No HTTP input touches model identity. Tier, vendor, model and sampling come
-  from ``config/`` alone. A form field that selected a model would be
-  unauthenticated control over what runs and what it costs (A01, LLM10). The
+* No job input touches model identity. Tier, vendor, model and sampling come
+  from the deployment's settings alone. A submission that selected a model
+  would be control over what runs and what it costs (A01, LLM10). The Settings
+  page changes the settings, and its save runs under the loopback bind, the
+  ``Host`` check and the ``Sec-Fetch-Site`` check of every writing route. The
   framework picker is a different thing: it selects which framework analyses the
   text, rather than which model does the analysing. It does change what a
   submission can spend, because each selected framework runs its own nodes. The
@@ -48,8 +50,8 @@ The security posture is deliberate throughout:
   land as text nodes. Server-side, the two f-string pages escape through
   :func:`~webapp.page.escape`, which is quote-safe, so where a value lands is
   not part of whether the escape is adequate.
-* CSRF: ``POST /analyze`` and ``POST /answer/{run}`` require
-  ``Sec-Fetch-Site: same-origin``. The header
+* CSRF: ``POST /analyze``, ``POST /answer/{run}`` and ``POST /settings``
+  require ``Sec-Fetch-Site: same-origin``. The header
   is browser-set and unspoofable from script, and it is checked before anything
   else, so a cross-origin caller cannot even start a run. The check is
   :func:`~webapp.page.is_same_origin`, which the two eval-side apps share
@@ -72,8 +74,8 @@ The security posture is deliberate throughout:
   ``/answer/{run}`` and ``/correct/{run}``, the form page reaches only its own
   origin, through ``connect-src 'self'`` for ``/example``, ``/analyze``,
   ``/answer/{run}``, ``/amend/{run}``, ``/events/{run}`` and
-  ``/workspace/runs``, the Settings page runs its script on the data in the
-  page and is granted no ``connect-src``, and the diagnostic page runs no
+  ``/workspace/runs``, the Settings page reaches only its own origin, to post
+  to ``/settings``, and the diagnostic page runs no
   script, so it is granted no ``script-src`` at all. Each page declares what it does as a
   :class:`~webapp.page.Grants`, and the policy follows from the declaration
   rather than from a string this file keeps. A page and its policy are built
@@ -150,7 +152,13 @@ from analysis_service.answer_state import (
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
 from analysis_service.claims import UnknownKey
-from analysis_service.config_files import SettingsFileError
+from analysis_service.config_files import (
+    SETTINGS_FILE,
+    SettingsFileError,
+    read_settings,
+    settings_dir,
+    write_settings_env,
+)
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment, FrameworkNotCarried
 from analysis_service.engine import DEFAULT_CALLER
@@ -209,7 +217,7 @@ from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError, resolve_selection
-from analysis_service.settings_variables import deployment_env
+from analysis_service.settings_variables import deployment_env, merged_env
 from analysis_service.sources import (
     ANSWERS_LABEL,
     MAX_SYSTEM_NAME_CHARS,
@@ -220,8 +228,10 @@ from analysis_service.store_backends import (
     JOB_STORE_VAR,
     audited_delete,
     build_store,
+    retention_days,
     store_lifespan,
 )
+from analysis_service.store_settings import StoreConfigError
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -239,6 +249,14 @@ from webapp.page import (
     render,
     response,
     script_json,
+)
+from webapp.settings_save import (
+    MAX_SAVE_BYTES,
+    Refusal,
+    parse_save,
+    refusals,
+    restart_keys,
+    saved_lines,
 )
 from webapp.settings_view import settings_view
 
@@ -271,9 +289,9 @@ _FORM_GRANTS = Grants(script=True, style=True, connect=True)
 #: carry the grant that would authorise one.
 _DIAGNOSTIC_GRANTS = Grants(style=True)
 
-#: The Settings page draws its table from the data in the page, and makes no
-#: request.
-_SETTINGS_GRANTS = Grants(script=True, style=True)
+#: The Settings page draws its table from the data in the page, and posts a
+#: save to ``/settings``.
+_SETTINGS_GRANTS = Grants(script=True, style=True, connect=True)
 
 #: The value of each store setting that this app gives where no source sets
 #: it: a first run keeps its jobs in memory.
@@ -668,7 +686,7 @@ def build_startup(env: Mapping[str, str]) -> Startup:
         deployment = Deployment.from_env(env)
         deployment.runner(deployment.frameworks)
     except ConfigError as exc:
-        logger.error("config error at startup: %s", exc)
+        logger.error("the Deployment did not build: %s", exc)
         tiers = deployment.tiers if deployment is not None else None
         return Startup(settings=None, frameworks=(), tiers=tiers, error=exc)
     return Startup(
@@ -1019,17 +1037,66 @@ async def _over_limit(request: Request, exc: SourcesOverLimit) -> JSONResponse:
     return _message(400, exc.breach.message)
 
 
+def check_saved(
+    env: Mapping[str, str], build: Callable[[Mapping[str, str]], Startup]
+) -> tuple[Startup, list[str]]:
+    """The check of the mapping that a save gives: the Startup that ``build``
+    makes from it, and the message of each loader that refuses it.
+
+    ``build`` builds the test Deployment and its runner, and the store check
+    runs :func:`~analysis_service.store_backends.build_store` and the
+    retention rule. No step calls a provider.
+    """
+    startup = build(env)
+    messages = [] if startup.error is None else [str(startup.error)]
+    try:
+        build_store({**STORE_DEFAULTS, **env})
+        retention_days(env)
+    except (StoreConfigError, ImportError) as exc:
+        messages.append(str(exc))
+    return startup, messages
+
+
+def _refused_save(found: Sequence[Refusal]) -> JSONResponse:
+    return JSONResponse(
+        {
+            "message": "The settings were not saved.",
+            "errors": [{"key": item.key, "message": item.message} for item in found],
+        },
+        status_code=422,
+    )
+
+
+async def _limited_body(request: Request, limit: int) -> bytes | None:
+    """The request body, or ``None`` where it is longer than ``limit`` bytes.
+    It stops the read at the first byte over the limit."""
+    data = bytearray()
+    async for chunk in request.stream():
+        data += chunk
+        if len(data) > limit:
+            return None
+    return bytes(data)
+
+
+_RELOAD_MESSAGE = (
+    "settings.env changed after this page loaded. Reload the page, then make"
+    " the change again."
+)
+
+
 def create_app(
     startup: Startup | None = None,
     workspace: Workspace | None = None,
     env: Mapping[str, str] | None = None,
+    build: Callable[[Mapping[str, str]], Startup] = build_startup,
 ) -> FastAPI:
     """The ASGI app.
 
     The collaborators are injectable so the offline lane can drive the app
     without credentials: ``startup`` supplies a stub runner, ``workspace``
     lets a test bound the jobs held or hand the app a store of its own, and
-    ``env`` replaces the process environment.
+    ``env`` replaces the process environment, and ``build`` replaces
+    :func:`build_startup` for the startup and for each save.
 
     The app reads one mapping:
     :func:`~analysis_service.settings_variables.deployment_env` adds the lines
@@ -1051,21 +1118,23 @@ def create_app(
     the service does.
 
     The app holds what the routes run on in one :class:`Cell`, as
-    ``app.state.cell``.
+    ``app.state.cell``. A save on the Settings page that passes replaces it
+    (ADR 0093).
     """
     process_env = os.environ if env is None else env
     try:
         env = deployment_env(process_env)
     except SettingsFileError as exc:
-        logger.error("config error at startup: %s", exc)
+        logger.error("settings.env was refused at startup: %s", exc)
         env = process_env
         startup = Startup(settings=None, frameworks=(), tiers=None, error=exc)
     if workspace is None:
         store = build_store({**STORE_DEFAULTS, **env})
         logger.info(store_note(store))
         workspace = Workspace(store=store)
-    state = build_startup(env) if startup is None else startup
+    state = build(env) if startup is None else startup
     cell = Cell(state.current(workspace.store))
+    save_lock = asyncio.Lock()
     app = FastAPI(
         title="Work Agent",
         docs_url=None,
@@ -1126,6 +1195,74 @@ def create_app(
                 settings=script_json(settings_view(process_env, error, STORE_DEFAULTS)),
                 workspace_style=_WORKSPACE_STYLE,
             )
+        )
+
+    @app.post("/settings")
+    async def save_settings(request: Request) -> Response:
+        """Check a save, write ``settings.env`` and swap the cell (ADR 0093).
+
+        One save at a time holds the lock from the revision check to the
+        swap. A save that the value rule, the test Deployment or the store
+        check refuses writes nothing, and its 422 holds one message for each
+        refusal. The response holds the new page data and the keys of each
+        store setting that takes effect after a restart.
+        """
+        if not is_same_origin(request):
+            logger.warning("refused a POST /settings that was not same-origin")
+            return _message(403, "This request did not come from the app's own page.")
+        media_type = request.headers.get("content-type", "").partition(";")[0]
+        if media_type.strip().lower() != "application/json":
+            return _message(415, "A save is a JSON body.")
+        body = await _limited_body(request, MAX_SAVE_BYTES)
+        if body is None:
+            return _message(413, f"A save is at most {MAX_SAVE_BYTES:,} bytes.")
+        try:
+            save = parse_save(json.loads(body))
+        except (ValueError, RecursionError):
+            return _message(
+                400,
+                "Expected a JSON object with a 'revision', a 'changes' object and"
+                " a 'remove' list.",
+            )
+        path = settings_dir(process_env) / SETTINGS_FILE
+        async with save_lock:
+            try:
+                revision, lines = read_settings(path)
+            except SettingsFileError as exc:
+                return _refused_save([Refusal(None, str(exc))])
+            if save.revision != revision:
+                return _message(409, _RELOAD_MESSAGE)
+            if found := refusals(save, process_env, lines):
+                return _refused_save(found)
+            saved = saved_lines(lines, save)
+            try:
+                saved_env = merged_env(process_env, saved, path)
+            except SettingsFileError as exc:
+                return _refused_save([Refusal(None, str(exc))])
+            built, messages = await asyncio.to_thread(check_saved, saved_env, build)
+            if messages:
+                return _refused_save([Refusal(None, message) for message in messages])
+            # A hand edit while the check ran is not written over.
+            if read_settings(path).revision != revision:
+                return _message(409, _RELOAD_MESSAGE)
+            try:
+                write_settings_env(
+                    path, {var: line.value for var, line in saved.items()}
+                )
+            except SettingsFileError as exc:
+                return _refused_save([Refusal(None, str(exc))])
+            except OSError as exc:
+                logger.error("settings.env could not be written: %s", exc)
+                return _message(500, f"{path} could not be written: {exc.strerror}")
+            cell.current = built.current(workspace.store)
+            logger.info("settings saved: %s", ", ".join([*save.changes, *save.remove]))
+        return JSONResponse(
+            {
+                "settings": settings_view(process_env, None, STORE_DEFAULTS),
+                "restart": restart_keys(
+                    {**STORE_DEFAULTS, **env}, {**STORE_DEFAULTS, **saved_env}
+                ),
+            }
         )
 
     @app.get("/example", response_class=PlainTextResponse)
@@ -1693,10 +1830,9 @@ def diagnostic_page(state: Startup, env: Mapping[str, str]) -> RenderedPage:
     **full** required set with the unset ones marked. Presence only.
 
     There is no retry button, deliberately: an environment variable cannot
-    change inside a running process, so a retry would appear to work for a
-    ``model_tiers.toml`` edit and silently do nothing for the credential case —
-    which is overwhelmingly the common one at this point on the route. One
-    instruction that is always right beats one that is conditionally right.
+    change inside a running process. The page sends the user to the Settings
+    page, whose save that passes fills the cell, and names a restart for a
+    variable of the process environment.
     """
     return render(
         _DIAGNOSTIC_PAGE,
@@ -1845,11 +1981,10 @@ _DIAGNOSTIC_PAGE = (
 <div class="problem"><code><!--message--></code></div>
 <h2>What this vendor needs</h2>
 <!--vendors-->
-<p>Set the missing variables, then <b>restart the app</b>:
-<code>uv run python webapp/main.py</code>. There is no retry button — a process
-cannot pick up an environment variable that changed after it started.</p>
-<p>The <a href="/settings">Settings page</a> shows each setting and where its
-value comes from.</p>
+<p>Correct the setting on the <a href="/settings">Settings page</a>. A save
+that passes starts the engine with no restart. A variable of the process
+environment changes only at a restart: set it, then <b>restart the app</b> with
+<code>uv run python webapp/main.py</code>.</p>
 <p>The full setup is <code>docs/First-Run.md</code> step 2; the vendor tables are
 in <code>docs/Configuration.md</code>, under "Models and vendors".</p>
 </body></html>

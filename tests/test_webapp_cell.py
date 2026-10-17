@@ -130,7 +130,7 @@ class TestTheStoreStartsWithoutTheDeployment:
 
     def test_an_unusable_store_setting_stops_it(self, tiers, monkeypatch):
         monkeypatch.setenv("ANALYSIS_JOB_STORE", "redis")
-        with pytest.raises(StoreConfigError, match="unknown value 'redis'"):
+        with pytest.raises(StoreConfigError, match="unknown value for"):
             create_app(broken(tiers))
 
     def test_an_unusable_retention_setting_stops_it(self, tiers, monkeypatch):

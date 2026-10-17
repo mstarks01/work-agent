@@ -347,11 +347,11 @@ class TestLoopbackControls:
 
         assert client.get("/settings").status_code == 400
 
-    def test_the_policy_grants_script_and_style_and_no_request(self, tmp_path):
+    def test_the_policy_grants_script_style_and_its_own_origin(self, tmp_path):
         csp = client_for(tmp_path).get("/settings").headers["Content-Security-Policy"]
 
         assert "script-src 'nonce-" in csp
-        assert "connect-src" not in csp
+        assert "connect-src 'self'" in csp
 
     @pytest.mark.parametrize("path", ["/", "/settings"])
     def test_the_first_run_nav_links_to_it(self, tmp_path, path):

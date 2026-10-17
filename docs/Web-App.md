@@ -101,14 +101,15 @@ base   → openai / gpt-4o-2024-08-06
 strong → vertex / gemini-2.5-pro
 ```
 
-Read-only. **No input to this app can influence which model runs** — not a form
-field, not a query parameter, not a header. The framework picker is not an
+Read-only. **No input to an analysis can influence which model runs** — not a
+form field, not a query parameter, not a header. The framework picker is not an
 exception to this: it chooses what the app analyses, never what analyses it.
 Model selection lives in
 [`config/model_tiers.toml`](../config/model_tiers.toml) and the `ANALYSIS_MODEL_*`
-overrides, and it stays there: the app has no authentication, so a model selector
-would be unauthenticated control over what runs and what it costs. To change
-models, edit the config and restart.
+overrides. To change a model, use the [Settings page](#the-settings-page). The
+app has no authentication, so its save accepts only a request from the app's own
+page on loopback: the same `Host` and `Sec-Fetch-Site` checks as each other
+writing route.
 
 It does not show credential status — the page appearing at all proves the
 credential check passed — and it does not show sampling parameters. The
@@ -179,18 +180,17 @@ page says so instead: fix the file named in the error first.
 The diagnostic page links to the [Settings page](#the-settings-page), which
 serves also when the engine does not build.
 
-**Recovery is always: fix it, then restart.** There is no retry button. A process
-cannot pick up an environment variable that changed after it started, so a retry
-would appear to work after a config-file edit and silently do nothing in the
-credential case, which is the common one at this point.
+**Recovery is a save on the Settings page.** When the save passes, the engine
+builds at once and the form shows, with no restart. The app does not watch its
+files or its environment: after a hand edit of a config file or of
+`settings.env`, or a change to the process environment, restart the app.
 
 ## The Settings page
 
 **Settings**, beside **Analyses**, shows each Deployment Setting in one table
 with three columns: Setting, Value and Source. A header row starts each group,
-and the search field above the table filters by setting name. The page only
-shows the settings. It serves also when the engine does not build, and a banner
-then shows the loader's message.
+and the search field above the table filters by setting name. It serves also
+when the engine does not build, and a banner then shows the loader's message.
 
 The Source column shows where each value comes from, in this order:
 
@@ -217,6 +217,43 @@ it. The note is not a refusal: the map lags each new model.
 
 A line of `settings.env` that this version does not read shows with its key and
 its line number. The startup refuses such a line, so the banner also names it.
+"Remove the line" adds its removal to the unsaved changes.
+
+### A save
+
+Change a value in the table, and the panel beside it lists each unsaved change
+with its old value and its new value. "Discard" drops them. "Reset to shipped"
+on a value from this page removes its line, so the shipped value applies again.
+A value from the process environment cannot change here: unset the variable
+first. A key does not save here.
+
+"Check and save" sends the changes. The server checks each value against the
+value rule of `settings.env`, then builds a test Deployment and a job store from
+the new settings with the loaders that the startup uses. No check calls a
+provider. When a check fails, the app writes nothing, and the page lists one
+message for each refusal. A message names the setting and the rule, and never
+repeats the value.
+
+When the checks pass, the app writes `settings.env` and applies the new settings
+at once, with no restart:
+
+- The next analysis runs on the new settings. An analysis that runs at the save
+  finishes on the settings that started it.
+- A change to the carried frameworks refuses a later answer to a paused analysis
+  that selected a removed framework, with a message that names it.
+- A change to `require_certified` or to a tier changes whether an older report
+  shows, as a restart does.
+- A job storage change does not apply until a restart. The page names each
+  changed job storage setting and tells you to restart the app.
+
+The app makes the settings directory at the first save, with mode `0700`, and
+writes `settings.env` with mode `0600`. Each save writes one log line that names
+the changed settings and no value.
+
+The page loads with a revision of `settings.env`. A save from a tab that loaded
+before another save, or before a hand edit of the file, is refused with a
+message to reload the page, so a save never writes over a change it did not
+see.
 
 ## Its limits, which are the point
 
