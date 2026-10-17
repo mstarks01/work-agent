@@ -184,14 +184,17 @@ def secret_env(var: str, value: str) -> dict[str, str]:
 def declared_env(vendor: VendorName, mode: CredentialMode) -> dict[str, str]:
     """A placeholder for every variable ``vendor`` needs under ``mode``.
 
-    Each secret arrives through a file, as :func:`secret_env` writes it.
+    Each secret arrives through a file, as :func:`secret_env` writes it. Each
+    other variable gets ``placeholder-1``, which matches each shape.
     """
     entry = vendor_for(vendor)
     secrets = entry.secret_env_vars(mode)
     env: dict[str, str] = {}
     for var in entry.required_env_vars(mode):
-        value = f"not-a-real-{var.lower()}"
-        env |= secret_env(var, value) if var in secrets else {var: value}
+        if var in secrets:
+            env |= secret_env(var, f"not-a-real-{var.lower()}")
+        else:
+            env[var] = "placeholder-1"
     return env
 
 

@@ -350,6 +350,13 @@ class TestPinValidation:
         with pytest.raises(ModelConfigError):
             validate_model_string(value, "vertex", source="tiers.strong.model")
 
+    @pytest.mark.parametrize(
+        "value", ["gemini 2.5-pro", "gemini-*", "gemini~2.5", "g" * 129]
+    )
+    def test_a_name_outside_the_charset_stops_the_load(self, config_path, value):
+        with pytest.raises(ModelConfigError, match="is not a model identifier"):
+            load_model_tiers(config_path(config_toml(strong=value)), env={})
+
     def test_the_registrys_refusal_arrives_as_a_config_error(self):
         """What this seam adds over ``Vendor.validate_model`` is the type.
 
@@ -653,6 +660,20 @@ class TestDeclaredCredentialMode:
         )
         with pytest.raises(ModelConfigError, match="credentials.bedrock"):
             load_model_tiers(path, env={})
+
+    def test_the_missing_mode_message_names_the_tier_and_the_setting(self, config_path):
+        path = config_path(
+            config_toml(
+                base_vendor="bedrock",
+                base="anthropic.claude-sonnet-4-6",
+            )
+        )
+        with pytest.raises(ModelConfigError) as refused:
+            load_model_tiers(path, env={})
+        message = str(refused.value)
+        assert "selected by tiers: base)" in message
+        assert "ANALYSIS_MODEL_CREDENTIALS_BEDROCK" in message
+        assert "input_value" not in message
 
     def test_a_multi_mode_vendor_nobody_selects_needs_no_declaration(self, config_path):
         """A vendor no tier calls needs no identity.
