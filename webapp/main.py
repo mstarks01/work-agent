@@ -572,6 +572,14 @@ class Current:
     tiers: ModelTierConfig | None
 
 
+class CellEmpty(Exception):
+    """The cell holds no :class:`Current`; ``response`` is the route's answer."""
+
+    def __init__(self, response: Response) -> None:
+        super().__init__()
+        self.response = response
+
+
 @dataclass
 class Cell:
     """The one place that holds the :class:`Current` (ADR 0093).
@@ -579,10 +587,18 @@ class Cell:
     ``current`` is ``None`` where the Deployment did not build, and the
     diagnostic page then serves. A swap replaces ``current`` in one
     assignment. Each route reads it one time, at its start, and uses only
-    that value, so one request never reads two Deployments.
+    that value, so one request never reads two Deployments. A route that
+    needs a :class:`Current` reads it with :meth:`read`.
     """
 
     current: Current | None
+
+    def read(self, empty: Callable[[], Response]) -> Current:
+        """The current value, or :class:`CellEmpty` with ``empty()``."""
+        current = self.current
+        if current is None:
+            raise CellEmpty(empty())
+        return current
 
 
 DEFAULT_NAME = "Your system"
@@ -1035,6 +1051,10 @@ async def _over_limit(request: Request, exc: SourcesOverLimit) -> JSONResponse:
     return _message(400, exc.breach.message)
 
 
+async def _cell_empty(request: Request, exc: CellEmpty) -> Response:
+    return exc.response
+
+
 def check_saved(
     env: Mapping[str, str], build: Callable[[Mapping[str, str]], Startup]
 ) -> tuple[Startup, list[str]]:
@@ -1149,6 +1169,7 @@ def create_app(
     app.exception_handler(AlreadyResumed)(_already_resumed)
     app.exception_handler(StaleRevision)(_stale)
     app.exception_handler(SourcesOverLimit)(_over_limit)
+    app.exception_handler(CellEmpty)(_cell_empty)
 
     def unavailable() -> JSONResponse:
         """The app came up without a runner: the diagnostic page says why."""
@@ -1159,9 +1180,9 @@ def create_app(
 
     @app.get("/", response_class=HTMLResponse)
     async def form_page() -> Response:
-        current = cell.current
-        if current is None:
-            return response(diagnostic_page(state, env), status_code=503)
+        current = cell.read(
+            lambda: response(diagnostic_page(state, env), status_code=503)
+        )
         return response(
             render(
                 _FORM_PAGE,
@@ -1295,18 +1316,14 @@ def create_app(
 
     @app.get("/workspace/runs")
     async def workspace_runs() -> Response:
-        current = cell.current
-        if current is None:
-            return JSONResponse([])
+        current = cell.read(lambda: JSONResponse([]))
         return JSONResponse(await workspace.snapshots(current.answers))
 
     @app.get("/workspace/runs/{run_id}")
     async def workspace_run(run_id: str) -> Response:
         """One analysis as the page reopens it: its latest job, with its
         questions where it waits, and its failure where it stopped."""
-        current = cell.current
-        if current is None:
-            return no_such_run()
+        current = cell.read(no_such_run)
         answers = current.answers
         store = workspace.store
         record = await workspace.owned(answers, run_id)
@@ -1348,12 +1365,10 @@ def create_app(
 
     @app.post("/analyze")
     async def analyze(request: Request) -> Response:
-        current = cell.current
         if not is_same_origin(request):
             logger.warning("refused a POST /analyze that was not same-origin")
             return _message(403, "This request did not come from the app's own page.")
-        if current is None:
-            return unavailable()
+        current = cell.read(unavailable)
         answers = current.answers
 
         try:
@@ -1417,12 +1432,10 @@ def create_app(
         finished run has nothing to continue. A save answers with the
         new revision.
         """
-        current = cell.current
         if not is_same_origin(request):
             logger.warning("refused a POST /answer that was not same-origin")
             return _message(403, "This request did not come from the app's own page.")
-        if current is None:
-            return unavailable()
+        current = cell.read(unavailable)
         answers = current.answers
         try:
             body = await request.json()
@@ -1497,12 +1510,10 @@ def create_app(
         The new run reads the paused run's sources with the amendment added,
         pauses again, and carries the paused run's answers.
         """
-        current = cell.current
         if not is_same_origin(request):
             logger.warning("refused a POST /amend that was not same-origin")
             return _message(403, "This request did not come from the app's own page.")
-        if current is None:
-            return unavailable()
+        current = cell.read(unavailable)
         answers = current.answers
         try:
             body = await request.json()
@@ -1527,9 +1538,13 @@ def create_app(
     async def events(run_id: str) -> Response:
         """The job's status and node events, as the store records them, until
         the job reaches a terminal status."""
-        current = cell.current
-        if current is None or await workspace.envelope(current.answers, run_id) is None:
+
+        def no_stream() -> Response:
             return PlainTextResponse("no such run", status_code=404)
+
+        current = cell.read(no_stream)
+        if await workspace.envelope(current.answers, run_id) is None:
+            return no_stream()
         return StreamingResponse(
             _stream(workspace, current.answers, run_id),
             media_type="text/event-stream",
@@ -1538,9 +1553,9 @@ def create_app(
 
     @app.get("/report/{run_id}", response_class=HTMLResponse)
     async def report_page(run_id: str) -> Response:
-        current = cell.current
-        if current is None:
-            return PlainTextResponse("no such report", status_code=404)
+        current = cell.read(
+            lambda: PlainTextResponse("no such report", status_code=404)
+        )
         answers = current.answers
         try:
             owner_id = await workspace.owner_id(answers, run_id)
@@ -1568,12 +1583,10 @@ def create_app(
     @app.post("/correct/{run_id}")
     async def correct(run_id: str, request: Request) -> Response:
         """Correct a final report's answers, and run nothing (ADR 0054)."""
-        current = cell.current
         if not is_same_origin(request):
             logger.warning("refused a POST /correct that was not same-origin")
             return _message(403, "This request did not come from the app's own page.")
-        if current is None:
-            return unavailable()
+        current = cell.read(unavailable)
         answers = current.answers
         questions = _questions_of(workspace, answers, run_id)
         try:

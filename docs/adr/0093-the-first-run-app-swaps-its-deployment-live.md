@@ -8,7 +8,7 @@
 
 ## Context
 
-A save on the **Settings** page of the first-run app applies without a
+A save on the Settings page of the first-run app applies without a
 restart. The owner chose this over a restart. Before this decision, each
 process built one **Deployment** at startup and kept it until it stopped. The
 routes of the first-run app read that Deployment through two objects, and one

@@ -60,7 +60,7 @@ class Setting:
     #: Where the shipped TOML file holds its base value: the field of
     #: :data:`~analysis_service.deployment.CONFIG_PATHS` that names the file,
     #: and the path of keys in it. ``None`` where no file holds one.
-    file_key: tuple[str, tuple[str, ...]] | None = None
+    file_key: tuple[deployment.ConfigPathName, tuple[str, ...]] | None = None
 
 
 @dataclass(frozen=True)
@@ -114,12 +114,12 @@ def _changes(
     variable: str,
     group: str,
     label: str,
-    file_key: tuple[str, tuple[str, ...]] | None = None,
+    file_key: tuple[deployment.ConfigPathName, tuple[str, ...]] | None = None,
 ) -> tuple[str, Setting]:
     return key, Setting(variable, group, label, "changes", "", file_key)
 
 
-def _tiers_file(*keys: str) -> tuple[str, tuple[str, ...]]:
+def _tiers_file(*keys: str) -> tuple[deployment.ConfigPathName, tuple[str, ...]]:
     return "model_tiers", keys
 
 

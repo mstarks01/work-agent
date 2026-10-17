@@ -59,7 +59,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from types import MappingProxyType
-from typing import Self
+from typing import Literal, Self
 
 from analysis_service.binding import (
     NodeBinding,
@@ -170,9 +170,21 @@ PASS_FLAGS: dict[str, bool] = {
     COMPACT_EXTRACTION_VAR: False,
 }
 
+#: The name of each located file or directory: a field of :class:`ConfigPaths`.
+ConfigPathName = Literal[
+    "prompts",
+    "domains",
+    "frameworks",
+    "model_tiers",
+    "sampling",
+    "resilience",
+    "blessed_fingerprints",
+    "frameworks_file",
+]
+
 #: Each located file or directory, by its field of :class:`ConfigPaths`: the
 #: variable that moves it, and the repo default.
-CONFIG_PATHS: dict[str, tuple[str, Path]] = {
+CONFIG_PATHS: dict[ConfigPathName, tuple[str, Path]] = {
     "prompts": (PROMPTS_DIR_VAR, DEFAULT_PROMPTS_DIR),
     "domains": (DOMAINS_DIR_VAR, DEFAULT_DOMAINS_DIR),
     "frameworks": (FRAMEWORKS_DIR_VAR, DEFAULT_FRAMEWORKS_DIR),

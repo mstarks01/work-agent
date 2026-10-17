@@ -209,3 +209,48 @@ def test_the_report_route_uses_the_gate_of_the_current_cell(tiers):
         withheld = client.get(f"/report/{run}")
 
     assert (served.status_code, withheld.status_code) == (200, 404)
+
+
+#: Each route that reads the cell, and what it gives while the cell is empty.
+EMPTY_CELL_RESPONSES = [
+    ("GET", "/workspace/runs", 200, []),
+    (
+        "GET",
+        "/workspace/runs/r",
+        404,
+        {"message": "This analysis is no longer available."},
+    ),
+    ("POST", "/analyze", 503, {"message": "no model"}),
+    ("POST", "/answer/r", 503, {"message": "no model"}),
+    ("POST", "/amend/r", 503, {"message": "no model"}),
+    ("POST", "/correct/r", 503, {"message": "no model"}),
+    ("GET", "/events/r", 404, "no such run"),
+    ("GET", "/report/r", 404, "no such report"),
+]
+
+
+@pytest.mark.parametrize(("method", "path", "status", "body"), EMPTY_CELL_RESPONSES)
+def test_each_route_gives_its_own_response_while_the_cell_is_empty(
+    tiers, method, path, status, body
+):
+    client = TestClient(create_app(broken(tiers)), base_url=LOOPBACK)
+    response = client.request(method, path, json={}, headers=SAME_ORIGIN)
+
+    assert response.status_code == status
+    assert (response.text if isinstance(body, str) else response.json()) == body
+
+
+def test_the_form_route_gives_the_diagnostic_page_while_the_cell_is_empty(tiers):
+    client = TestClient(create_app(broken(tiers)), base_url=LOOPBACK)
+    response = client.get("/")
+
+    assert response.status_code == 503
+    assert "no model" in response.text
+
+
+@pytest.mark.parametrize("path", ["/analyze", "/answer/r", "/amend/r", "/correct/r"])
+def test_a_cross_origin_post_is_refused_before_the_empty_cell(tiers, path):
+    client = TestClient(create_app(broken(tiers)), base_url=LOOPBACK)
+    response = client.post(path, json={}, headers={"Sec-Fetch-Site": "cross-site"})
+
+    assert response.status_code == 403

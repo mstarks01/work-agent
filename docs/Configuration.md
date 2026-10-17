@@ -1091,8 +1091,8 @@ variable of each vendor key, `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`,
 `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` and `ANALYSIS_DATABASE_PASSWORD_FILE`.
 `ANALYSIS_TIERS_FILE` and `ANALYSIS_DATABASE_CA_FILE` do not name a secret.
 
-The secret is the content of the file without one final newline. The secret
-must not be empty, must be printable, must have no whitespace at either end,
+The secret is the content of the file without one final newline, because an
+editor ends a file with a newline. The secret must not be empty, must be printable, must have no whitespace at either end,
 and must have 4,096 characters or fewer. A space, a `\` or a `$` inside a
 secret is allowed. A refusal names the variable and the rule, and never the
 secret.
