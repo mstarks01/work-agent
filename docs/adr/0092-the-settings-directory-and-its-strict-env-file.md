@@ -27,8 +27,11 @@ mode `0600`:
 
 - `settings.env`;
 - one secret file for each secret variable that `secret_vars()` names. The
-  file name is the variable without `ANALYSIS_` and `_FILE`, in lower case:
-  `ANALYSIS_ANTHROPIC_API_KEY_FILE` names `anthropic_api_key`.
+  file name is the variable without `ANALYSIS_` and `_FILE`, in lower case,
+  then a dot and 16 random hexadecimal characters from the `secrets` module:
+  `ANALYSIS_ANTHROPIC_API_KEY_FILE` names a file such as
+  `anthropic_api_key.3f9c0a1b2d4e5f60`. Each save of a key writes a new file.
+  The name holds no part of the key.
 
 **No TOML file.** The page writes each changed value as its `ANALYSIS_*`
 override in `settings.env`, for example `ANALYSIS_MODEL_BASE_MODEL` or
@@ -66,11 +69,18 @@ startup. It makes the directory with mode `0700`. It
 writes each file to a new temporary file in the same directory with mode
 `0600` and `O_EXCL`, then calls `fsync` and `os.replace`. It does not change
 the mode of a directory or file that already exists. The permission check
-refuses a bad mode and names it. In one save, the app writes the secret files
-first, then `settings.env`, then deletes each file that the
-new `settings.env` does not name. A save that leaves no tier with a vendor
-removes that vendor's key line and its key file, and the page says so before
-the save.
+refuses a bad mode and names it. In one save, the app writes each new secret
+file with `O_EXCL`, and the check builds the test Deployment on the new paths.
+That build becomes the new cell (ADR 0093). Then the app writes
+`settings.env`. The replace of `settings.env` is the only step that commits
+the save. When the save stops before it, the app deletes the new secret files,
+so the old `settings.env` and the old secret files stay in force. After it,
+the app deletes each file in the directory that has the name form of a secret
+file and that no secret variable of the process environment or of the new
+`settings.env` names. That step also deletes a file that a save left when
+the process stopped before the commit. A save that leaves no tier with a
+vendor removes that vendor's key line and its key file, and the page says so
+before the save.
 
 ## Considered options
 
@@ -91,6 +101,12 @@ of the shipped file in force.
 **Keep a key file that no tier uses**, so that a switch back needs no new
 key. The page never shows a key again, and a secret on disk that no code
 reads gives only exposure.
+
+**A fixed name for each secret file.** The old `settings.env` names the same
+file, so a save writes the new key into the file that the settings in force
+read before `settings.env` changes. A save that then fails leaves the new key
+in force. The Deployment reads a key file again for each new selection, so a
+check on a staged file also needs a second build on the final path.
 
 ## Consequences
 

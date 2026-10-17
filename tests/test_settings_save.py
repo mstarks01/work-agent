@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import threading
 import time
 from dataclasses import replace
+from pathlib import Path
 
 import httpx
 import pytest
@@ -28,7 +30,7 @@ from tests.test_webapp import LOOPBACK, SAME_ORIGIN, posted, run_to_completion
 from tests.test_webapp_cell import Recording
 from tests.test_webapp_questions import PausingRunner, shown_list, start
 from tests.test_webapp_settings import page_data, rows_of
-from webapp import main
+from webapp import main, settings_save
 from webapp.main import Startup, build_startup, create_app
 from webapp.settings_save import MAX_SAVE_BYTES
 
@@ -449,14 +451,40 @@ class TestAStoreChange:
 #: A key that no fixture holds, so a text that carries it leaked the key.
 KEY = "sk-saved-from-the-page-never-shown"
 ANTHROPIC_KEY = "credentials.anthropic.api_key"
+OLD_KEY = "sk-ant-an-older-key"
+#: The name form of a key file that a save writes.
+KEY_FILE = re.compile(r"(?P<stem>[a-z0-9_]+)\.[0-9a-f]{16}")
 
 
-def key_on_disk(tmp_path, name: str = "anthropic_api_key") -> str:
+def key_on_disk(tmp_path, name: str = "anthropic_api_key.0123456789abcdef") -> str:
     """A key file of the settings directory, as a save names it, and its line."""
     path = tmp_path / name
-    path.write_text("sk-ant-an-older-key", encoding="utf-8")
+    path.write_text(OLD_KEY, encoding="utf-8")
     path.chmod(0o600)
     return str(path)
+
+
+def named_key(tmp_path, var: str = "ANALYSIS_ANTHROPIC_API_KEY_FILE") -> Path:
+    """The key file that the ``var`` line of ``settings.env`` names."""
+    [value] = [
+        line.partition("=")[2]
+        for line in settings_text(tmp_path).splitlines()
+        if line.startswith(f"{var}=")
+    ]
+    return Path(value)
+
+
+def stems(tmp_path) -> list[str]:
+    """The name of each file in ``tmp_path``, with the token of a key file
+    replaced by ``*``."""
+    return sorted(
+        f"{match['stem']}.*" if (match := KEY_FILE.fullmatch(p.name)) else p.name
+        for p in tmp_path.iterdir()
+    )
+
+
+def failing(path, values):
+    raise OSError(28, "No space left on device")
 
 
 class TestAKeySave:
@@ -466,15 +494,51 @@ class TestAKeySave:
         saved = save(client, {ANTHROPIC_KEY: KEY})
 
         assert saved.status_code == 200, saved.text
-        path = tmp_path / "anthropic_api_key"
+        path = named_key(tmp_path)
+        assert path.parent == tmp_path
+        assert KEY_FILE.fullmatch(path.name)["stem"] == "anthropic_api_key"
         assert path.read_text(encoding="utf-8") == KEY
         assert path.stat().st_mode & 0o777 == 0o600
-        assert f"ANALYSIS_ANTHROPIC_API_KEY_FILE={path}\n" in settings_text(tmp_path)
-        assert sorted(p.name for p in tmp_path.iterdir()) == [
-            "anthropic_api_key",
-            "settings.env",
-        ]
+        assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]
         assert rows_of(client)[ANTHROPIC_KEY]["key_saved"] is True
+
+    def test_each_save_writes_a_new_file_and_deletes_the_old_one(self, tmp_path):
+        old_key = key_on_disk(tmp_path)
+        client, _ = app_on(
+            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
+        )
+
+        saved = save(client, {ANTHROPIC_KEY: KEY})
+
+        assert saved.status_code == 200, saved.text
+        assert str(named_key(tmp_path)) != old_key
+        assert named_key(tmp_path).read_text(encoding="utf-8") == KEY
+        assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]
+
+    def test_a_key_save_builds_the_deployment_once(self, tmp_path):
+        client, builds = app_on(tmp_path, hand_written())
+
+        saved = save(client, {ANTHROPIC_KEY: KEY})
+        run_to_completion(client)
+
+        assert saved.status_code == 200, saved.text
+        assert len(builds.runners) == 2
+        assert builds.runners[1].jobs
+
+    def test_the_built_deployment_reads_the_saved_key_file(self, tmp_path):
+        # A selection that the check did not build reads the key file again.
+        client, builds = app_on(tmp_path, hand_written())
+
+        saved = save(client, {ANTHROPIC_KEY: KEY})
+        started = client.post(
+            "/analyze",
+            json=posted("A web app talks to a database.", ["stride"]),
+            headers=SAME_ORIGIN,
+        )
+
+        assert saved.status_code == 200, saved.text
+        assert started.status_code == 200, started.text
+        assert len(builds.runners) == 2
 
     def test_the_key_reaches_no_response_page_file_or_log(self, tmp_path, caplog):
         client, _ = app_on(tmp_path, hand_written())
@@ -488,6 +552,7 @@ class TestAKeySave:
         for text in (refused.text, saved.text, page.text, settings_text(tmp_path)):
             assert KEY not in text
         assert KEY not in caplog.text
+        assert all(KEY not in p.name for p in tmp_path.iterdir())
 
     @pytest.mark.parametrize("key", [" sk-padded", "", "sk-\x07bell"])
     def test_a_key_that_the_secret_rule_refuses_names_the_setting(self, tmp_path, key):
@@ -512,6 +577,24 @@ class TestAKeySave:
         assert refused.status_code == 422, refused.text
         assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
 
+    def test_a_hand_edit_while_the_check_runs_leaves_no_key_file(
+        self, tmp_path, monkeypatch
+    ):
+        client, _ = app_on(tmp_path, hand_written())
+        check = main.check_saved
+
+        def editing(env, build):
+            with (tmp_path / "settings.env").open("a", encoding="utf-8") as file:
+                file.write("ANALYSIS_TIMEOUT_MS=5000\n")
+            return check(env, build)
+
+        monkeypatch.setattr(main, "check_saved", editing)
+
+        stale = save(client, {ANTHROPIC_KEY: KEY})
+
+        assert stale.status_code == 409, stale.text
+        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
+
     def test_the_key_files_come_first_and_the_deletion_last(
         self, tmp_path, monkeypatch
     ):
@@ -523,7 +606,7 @@ class TestAKeySave:
         write = main.write_settings_env
 
         def recording(path, values):
-            seen.append(sorted(p.name for p in tmp_path.iterdir()))
+            seen.append(stems(tmp_path))
             write(path, values)
 
         monkeypatch.setattr(main, "write_settings_env", recording)
@@ -538,35 +621,75 @@ class TestAKeySave:
         )
 
         assert saved.status_code == 200, saved.text
-        assert seen == [["anthropic_api_key", "openai_api_key", "settings.env"]]
-        assert sorted(p.name for p in tmp_path.iterdir()) == [
-            "openai_api_key",
-            "settings.env",
-        ]
+        assert seen == [["anthropic_api_key.*", "openai_api_key.*", "settings.env"]]
+        assert stems(tmp_path) == ["openai_api_key.*", "settings.env"]
         assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" not in settings_text(tmp_path)
 
-    def test_a_failed_write_of_settings_env_keeps_the_old_file_and_the_key_file(
+    def test_a_failed_write_of_settings_env_keeps_the_old_file_and_key(
         self, tmp_path, monkeypatch
     ):
         old_key = key_on_disk(tmp_path)
-        client, _ = app_on(
+        client, builds = app_on(
             tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
         )
         before = settings_text(tmp_path)
-
-        def failing(path, values):
-            raise OSError(28, "No space left on device")
-
         monkeypatch.setattr(main, "write_settings_env", failing)
 
         failed = save(
             client,
-            {"tiers.review.vendor": "openai", "tiers.review.model": NEW_MODEL},
+            {
+                ANTHROPIC_KEY: KEY,
+                "tiers.review.vendor": "openai",
+                "tiers.review.model": NEW_MODEL,
+            },
         )
+        run_to_completion(client)
 
         assert failed.status_code == 500, failed.text
         assert settings_text(tmp_path) == before
-        assert (tmp_path / "anthropic_api_key").is_file()
+        assert Path(old_key).read_text(encoding="utf-8") == OLD_KEY
+        assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]
+        assert builds.runners[0].jobs and not builds.runners[1].jobs
+
+    def test_a_failed_key_write_leaves_no_key_file(self, tmp_path, monkeypatch):
+        client, _ = app_on(tmp_path, hand_written())
+        create = settings_save.create_private
+        calls = []
+
+        def second_fails(path, data):
+            calls.append(path)
+            if len(calls) == 2:
+                raise OSError(28, "No space left on device")
+            create(path, data)
+
+        monkeypatch.setattr(settings_save, "create_private", second_fails)
+
+        failed = save(client, {ANTHROPIC_KEY: KEY, "credentials.openai.api_key": KEY})
+
+        assert failed.status_code == 500, failed.text
+        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
+
+    def test_a_save_deletes_only_unnamed_files_of_the_key_name_form(self, tmp_path):
+        # A save that stops before the swap, such as in a crash, can leave a
+        # key file that no variable names.
+        named = key_on_disk(tmp_path)
+        orphan = key_on_disk(tmp_path, "openai_api_key.fedcba9876543210")
+        process = key_on_disk(tmp_path, "gemini_api_key.00112233445566ff")
+        kept = ["anthropic_api_key", "notes.0123456789abcdef", "openai_api_key.1"]
+        for name in kept:
+            key_on_disk(tmp_path, name)
+        client, _ = app_on(
+            tmp_path,
+            hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=named),
+            ANALYSIS_GEMINI_API_KEY_FILE=process,
+        )
+
+        saved = save(client, {"resilience.timeout_ms": "5000"})
+
+        assert saved.status_code == 200, saved.text
+        assert not Path(orphan).exists()
+        assert Path(named).is_file() and Path(process).is_file()
+        assert all((tmp_path / name).is_file() for name in kept)
 
     def test_a_save_that_leaves_a_tier_on_the_vendor_keeps_its_key(self, tmp_path):
         old_key = key_on_disk(tmp_path)
@@ -577,7 +700,7 @@ class TestAKeySave:
         saved = save(client, {"resilience.timeout_ms": "5000"})
 
         assert saved.status_code == 200, saved.text
-        assert (tmp_path / "anthropic_api_key").is_file()
+        assert Path(old_key).is_file()
         assert f"ANALYSIS_ANTHROPIC_API_KEY_FILE={old_key}" in settings_text(tmp_path)
 
 
@@ -613,4 +736,4 @@ class TestAFirstRun:
         assert saved.status_code == 200, saved.text
         assert client.get("/").status_code == 200
         assert builds.runners[-1].jobs == [run]
-        assert (tmp_path / "anthropic_api_key").read_text(encoding="utf-8") == KEY
+        assert named_key(tmp_path).read_text(encoding="utf-8") == KEY

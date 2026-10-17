@@ -17,6 +17,7 @@ from analysis_service.config_files import (
     MAX_VALUE_CHARS,
     SETTINGS_DIR_VAR,
     SettingsFileError,
+    create_private,
     read_settings,
     read_settings_env,
     settings_dir,
@@ -96,6 +97,17 @@ class TestTheWriter:
             write_settings_env(tmp_path / "settings.env", {"ANALYSIS_A": "1"})
         tmp_path.chmod(0o700)
         assert not list(tmp_path.iterdir())
+
+    def test_a_new_file_is_private_and_never_replaces_one(self, tmp_path):
+        path = tmp_path / "work-agent" / "key"
+
+        create_private(path, b"first")
+        with pytest.raises(FileExistsError):
+            create_private(path, b"second")
+
+        assert path.read_bytes() == b"first"
+        assert path.stat().st_mode & 0o777 == 0o600
+        assert path.parent.stat().st_mode & 0o777 == 0o700
 
     @pytest.mark.parametrize("form", sorted(REFUSED_VALUES))
     def test_it_writes_no_value_that_the_rule_refuses(self, tmp_path, form):
