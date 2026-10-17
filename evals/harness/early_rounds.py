@@ -61,6 +61,7 @@ from analysis_service.fact_answers import (
 from analysis_service.jobs import Checkpoint
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
+from evals.harness.archive import case_suffix
 
 #: A replay that has not ended by this save is reported as not ending.
 MAX_SAVES = 50
@@ -361,14 +362,14 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
     takes the options of an archived job that chose it.
     """
     found: list[Replay] = []
-    paths = sorted(root.rglob("*.report.json"))
+    paths = sorted(root.rglob(f"*{case_suffix('report')}"))
     every: dict[FrameworkName, Mapping[str, Any]] = {}
     for path in paths:
         job = Report.model_validate_json(path.read_text(encoding="utf-8")).job
         for selection in job.frameworks:
             every.setdefault(selection.name, selection.options)
     for path in paths:
-        case = path.name.removesuffix(".report.json")
+        case = path.name.removesuffix(case_suffix("report"))
         blessed_path = corpus / case / "model.json"
         if not blessed_path.is_file():
             continue

@@ -42,7 +42,7 @@ from analysis_service.critic import CriticOutputError, assemble_claims
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
-from evals.harness.bundle import reports_dir
+from evals.harness.bundle import case_file
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 
@@ -154,11 +154,10 @@ def replay_artifact(
     artifact: Path, cases: Sequence[GoldenCase]
 ) -> list[AssemblyReplay]:
     """Every framework block of every archived case, assembled again."""
-    directory = reports_dir(artifact)
     rows = []
     for case in cases:
-        report_path = directory / f"{case.id}.report.json"
-        drafts_path = directory / f"{case.id}.drafts.json"
+        report_path = case_file(artifact, case.id, "report")
+        drafts_path = case_file(artifact, case.id, "drafts")
         if not report_path.is_file():
             continue
         if not drafts_path.is_file():

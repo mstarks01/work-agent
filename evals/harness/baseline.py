@@ -83,6 +83,7 @@ from evals.harness.artifact import (
     _ungraded,
     load_artifact,
 )
+from evals.harness.bundle import reports_dir
 from evals.harness.history import current_commit
 from evals.harness.prices import UnitPrices, price_calls
 
@@ -684,7 +685,7 @@ class _CheckedSweep:
 def _checked_sweep(source: Path, artifact: EvalArtifact, author: str) -> _CheckedSweep:
     """One sweep, refused unless its reports sit beside it and its cost prices."""
     payload = source.read_bytes()
-    reports = source.with_suffix(".reports")
+    reports = reports_dir(source)
     if not reports.is_dir() or not any(reports.iterdir()):
         raise BaselineError(
             f"{source}: has no reports directory beside it; the reports"
@@ -748,7 +749,7 @@ def assemble(root: Path, author: str, artifact_paths: list[Path]) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     for sweep in sweeps:
         (directory / f"{sweep.stem}.json").write_bytes(sweep.payload)
-        target_reports = directory / f"{sweep.stem}.reports"
+        target_reports = reports_dir(directory / f"{sweep.stem}.json")
         target_reports.mkdir(exist_ok=True)
         for file in sorted(sweep.reports.rglob("*")):
             if file.is_file():

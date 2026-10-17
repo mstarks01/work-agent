@@ -56,7 +56,7 @@ from typing import Any
 from analysis_service.claims import FrameworkName
 from analysis_service.system_model import ModelIndex, SystemModel
 from evals.harness.artifact import EvalArtifact, load_artifact
-from evals.harness.bundle import reports_dir
+from evals.harness.bundle import case_file, reports_dir
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import endpoint_form
 from evals.harness.provenance import ProvenanceError
@@ -356,7 +356,7 @@ def _content(
     try:
         for score in artifact.block("scores"):
             scope: Scope = (scored, str(score["case"]))
-            path = directory / f"{scope[1]}.report.json"
+            path = case_file(artifact.path, scope[1], "report")
             if not path.is_file():
                 return None
             raw = json.loads(path.read_text(encoding="utf-8"))

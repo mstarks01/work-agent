@@ -49,6 +49,7 @@ __all__ = [
     "CaseKind",
     "UnknownArchiveKind",
     "archive_bytes",
+    "case_suffix",
     "kind_of",
 ]
 
@@ -105,13 +106,19 @@ CaseKind = Literal[
     "report", "drafts", "proposals", "lanes", "extraction", "assertions", "failure"
 ]
 
+
+def case_suffix(kind: CaseKind) -> str:
+    """The end of each ``<case>.<kind>.json`` name: the one rule for the name."""
+    return f".{kind}.json"
+
+
 #: The kinds a reader recognises by a suffix, which is how ``bundle`` names the
 #: files it writes per case. The artifact is absent on purpose: it is
 #: named ``<stem>.json`` and no suffix separates it from any other JSON file, so
 #: the only honest answer for one is the name a Baseline manifest records in its
 #: ``artifact`` field. A reader that guessed instead would hand the artifact's
 #: spelling to every unrelated file it walked past.
-KIND_SUFFIXES: dict[str, str] = {f".{kind}.json": kind for kind in get_args(CaseKind)}
+KIND_SUFFIXES: dict[str, str] = {case_suffix(kind): kind for kind in get_args(CaseKind)}
 
 
 class UnknownArchiveKind(LookupError):

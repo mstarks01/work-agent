@@ -61,6 +61,7 @@ from analysis_service.questions import fact_questions
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness import audit
+from evals.harness.archive import case_suffix
 from evals.harness.early_rounds import MAX_SAVES, dont_know
 
 #: The frameworks a job selects, each with its options.
@@ -368,8 +369,8 @@ def paired(root: Path) -> list[Paired]:
     exhausted one is a development case and is read."""
     held = audit.still_held_out(audit.holdout_cases())
     by_case: dict[str, list[tuple[Path, Report]]] = defaultdict(list)
-    for path in sorted(root.rglob("*.report.json")):
-        case = path.name.removesuffix(".report.json")
+    for path in sorted(root.rglob(f"*{case_suffix('report')}")):
+        case = path.name.removesuffix(case_suffix("report"))
         if case in held:
             continue
         report = Report.model_validate_json(path.read_text(encoding="utf-8"))

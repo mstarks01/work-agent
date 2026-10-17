@@ -45,7 +45,7 @@ from analysis_service.frameworks.stride.record import Threat
 from analysis_service.report import Report
 from analysis_service.system_model import FLOW_ID_RULES
 from evals.harness import flow_ids, modes, replay
-from evals.harness.archive import CaseKind, archive_bytes
+from evals.harness.archive import CaseKind, archive_bytes, case_suffix
 from evals.harness.reference import GoldenCase
 
 
@@ -113,11 +113,11 @@ def reports_dir(out: str | Path) -> Path:
 def case_file(out: str | Path, case_id: str, kind: CaseKind) -> Path:
     """Where a sweep writes one case's file of ``kind``, given its artifact path.
 
-    Every writer in this module takes its path from here, and
-    :func:`check_sweep_out` checks each kind, so the check before the spend
-    covers every write after it.
+    Every writer and every reader of a case file takes its path from here,
+    and :func:`check_sweep_out` checks each kind, so the check before the
+    spend covers every write after it.
     """
-    return reports_dir(out) / f"{case_id}.{kind}.json"
+    return reports_dir(out) / f"{case_id}{case_suffix(kind)}"
 
 
 def check_sweep_out(out: str | Path, case_ids: Iterable[str]) -> None:
@@ -399,8 +399,8 @@ def runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, 
 
     runs: dict[str, Any] = {}
     for case in cases:
-        report_path = directory / f"{case.id}.report.json"
-        drafts_path = directory / f"{case.id}.drafts.json"
+        report_path = case_file(artifact, case.id, "report")
+        drafts_path = case_file(artifact, case.id, "drafts")
         if not report_path.exists():
             continue
         if not drafts_path.exists():
@@ -424,7 +424,7 @@ def runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, 
         # The lanes' proposals where the sweep archived them: `losses` reads
         # them for the `fan-in` cause, and a sweep from before they were kept
         # leaves that cause undecided rather than refused.
-        proposals_path = directory / f"{case.id}.proposals.json"
+        proposals_path = case_file(artifact, case.id, "proposals")
         proposals = (
             json.loads(proposals_path.read_text(encoding="utf-8"))
             if proposals_path.exists()
@@ -446,9 +446,9 @@ def _source_texts(case: GoldenCase) -> dict[str, str]:
 
 
 def _case_files(
-    artifact: Path, cases: Sequence[GoldenCase], suffix: str
+    artifact: Path, cases: Sequence[GoldenCase], kind: CaseKind
 ) -> list[tuple[GoldenCase, dict[str, Any]]]:
-    """Each case's saved file under ``suffix``, parsed, for the cases that have one."""
+    """Each case's saved file of ``kind``, parsed, for the cases that have one."""
     directory = reports_dir(artifact)
     if not directory.is_dir():
         raise modes.EvalRunError(
@@ -457,12 +457,13 @@ def _case_files(
         )
     found = []
     for case in cases:
-        path = directory / f"{case.id}{suffix}"
+        path = case_file(artifact, case.id, kind)
         if path.exists():
             found.append((case, json.loads(path.read_text(encoding="utf-8"))))
     if not found:
         raise modes.EvalRunError(
-            f"{directory} carries no {suffix} file for any case in the artifact"
+            f"{directory} carries no {case_suffix(kind)} file for any case in"
+            " the artifact"
         )
     return found
 
@@ -487,7 +488,7 @@ def extractions_from_reports(
     own issues, which the replay reports rather than skips.
     """
     results = {}
-    for case, written in _case_files(artifact, cases, ".extraction.json"):
+    for case, written in _case_files(artifact, cases, "extraction"):
         model, issues = parse_extraction(
             written["raw"], FULL_FORMAT, sources=_source_texts(case)
         )
@@ -525,7 +526,7 @@ def assertions_from_reports(
     a no-op on a proposal already at this version.
     """
     results = {}
-    for case, written in _case_files(artifact, cases, ".assertions.json"):
+    for case, written in _case_files(artifact, cases, "assertions"):
         lifted = _lift_proposal(written["proposal"], case)
         record = AssertionRecord.of(
             CatalogProposal.model_validate(lifted),
@@ -636,7 +637,7 @@ def heads_from_reports(
     still bring forward.
     """
     results = {}
-    for case, written in _case_files(artifact, cases, ".assertions.json"):
+    for case, written in _case_files(artifact, cases, "assertions"):
         results[case.id] = modes.AssertionResult(
             case_id=case.id,
             proposal=written.get("proposal", {}),

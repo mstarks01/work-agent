@@ -48,7 +48,7 @@ from analysis_service.graph import (
 )
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex, SystemModel
-from evals.harness.bundle import reports_dir, stride_threats
+from evals.harness.bundle import case_file, stride_threats
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
@@ -190,11 +190,10 @@ def replay_artifact(
             raise EvalRunError(
                 f"injected case {case_id}: {stray} is not a {FRAMEWORK} lane"
             )
-    directory = reports_dir(artifact)
     rows = []
     for case in cases:
-        report_path = directory / f"{case.id}.report.json"
-        proposals_path = directory / f"{case.id}.proposals.json"
+        report_path = case_file(artifact, case.id, "report")
+        proposals_path = case_file(artifact, case.id, "proposals")
         if not report_path.is_file():
             continue
         if not proposals_path.is_file():

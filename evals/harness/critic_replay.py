@@ -70,7 +70,7 @@ from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.report import InputRef, Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import CORPUS_DIR, repo_commit
-from evals.harness.bundle import check_out, reports_dir
+from evals.harness.bundle import case_file, check_out
 from evals.harness.lane_replay import load_material
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
@@ -122,13 +122,11 @@ def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
     A case that failed after its lanes ran wrote no report, only a failure dump
     of the graph's state, and that state holds the same material.
     """
-    directory = reports_dir(artifact)
-    if not (directory / f"{case_id}.report.json").is_file():
-        return _from_failure(directory, case_id, framework)
-    report = Report.model_validate_json(
-        (directory / f"{case_id}.report.json").read_text(encoding="utf-8")
-    )
-    if (directory / f"{case_id}.lanes.json").is_file():
+    report_path = case_file(artifact, case_id, "report")
+    if not report_path.is_file():
+        return _from_failure(artifact, case_id, framework)
+    report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
+    if case_file(artifact, case_id, "lanes").is_file():
         shared = load_material(artifact, case_id)["shared"]
     else:
         shared = shared_keys(report, case_id)
@@ -136,7 +134,7 @@ def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
     if block is None:
         raise EvalRunError(f"{case_id} carries no {framework} block")
     held = json.loads(
-        (directory / f"{case_id}.drafts.json").read_text(encoding="utf-8")
+        case_file(artifact, case_id, "drafts").read_text(encoding="utf-8")
     )
     record = PACKAGES[framework].record
     marks = AnalysisMarks(
@@ -155,7 +153,7 @@ def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
     )
 
 
-def _from_failure(directory: Path, case_id: str, framework: FrameworkName) -> Archived:
+def _from_failure(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
     """The material one critic call read, from a failed case's state dump.
 
     The rendered model and crossings are the keys ``prepare`` wrote. The dump
@@ -163,7 +161,7 @@ def _from_failure(directory: Path, case_id: str, framework: FrameworkName) -> Ar
     :func:`shared_keys` takes them for a report.
     """
     state = json.loads(
-        (directory / f"{case_id}.failure.json").read_text(encoding="utf-8")
+        case_file(artifact, case_id, "failure").read_text(encoding="utf-8")
     )["state"]
     nodes = FrameworkNodes(framework)
     record = PACKAGES[framework].record
