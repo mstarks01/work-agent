@@ -54,6 +54,14 @@ const visible = (row) =>
 const deletedKeys = () =>
   SETTINGS.rows.filter((row) => row.secret && row.key_saved && row.source === "page" && row.vendor && !chosenVendors().has(row.vendor));
 
+// The vendor whose models a tier's model row suggests: the vendor that the
+// unsaved changes choose for the tier.
+function suggests(row) {
+  const tier = /^tiers\.([^.]+)\.model$/.exec(row.key);
+  const vendor = tier && rowOf(`tiers.${tier[1]}.vendor`);
+  return vendor ? pending(vendor) : null;
+}
+
 function change(row, value) {
   if (value === (row.value ?? "")) changes.delete(row.key);
   else changes.set(row.key, value);
@@ -62,7 +70,7 @@ function change(row, value) {
 
 function textControl(row) {
   const attrs = { type: "text", "aria-label": row.label, value: pending(row) ?? "", placeholder: "Not set" };
-  if (row.suggests) attrs.list = `models-${row.suggests}`;
+  if (suggests(row)) attrs.list = `models-${suggests(row)}`;
   const input = h("input", attrs);
   input.addEventListener("input", () => change(row, input.value));
   return input;
@@ -134,8 +142,9 @@ function shownValue(row) {
 // A model that the pinned litellm map does not list still runs.
 function modelNote(row) {
   const value = pending(row);
-  if (!row.suggests || value == null) return null;
-  const known = SETTINGS.models[row.suggests] || [];
+  const vendor = suggests(row);
+  if (!vendor || value == null) return null;
+  const known = Object.hasOwn(SETTINGS.models, vendor) ? SETTINGS.models[vendor] : [];
   return known.includes(value) ? null : hint("Not in the model list. A check still runs it.");
 }
 

@@ -660,6 +660,43 @@ def test_the_settings_page_saves_a_key_with_the_vendor_that_needs_it(browser, tm
     assert (tmp_path / "anthropic_api_key").read_text(encoding="utf-8") == key
 
 
+def test_a_tier_model_suggests_the_models_of_the_vendor_just_chosen(browser, tmp_path):
+    from tests.test_settings_env import env_in, hand_written, write_settings
+    from webapp.main import create_app
+
+    write_settings(tmp_path, hand_written())
+    model = 'tr[data-key="tiers.review.model"]'
+    for url in serve(create_app(env=env_in(tmp_path))):
+        page, errors = opened(browser, url + "/settings")
+        page.wait_for_selector(model)
+        before = page.locator(f"{model} input").get_attribute("list")
+        page.select_option('tr[data-key="tiers.review.vendor"] select', "gemini")
+        after = page.locator(f"{model} input").get_attribute("list")
+        suggested = page.locator(f"#{after} option").count()
+        note = page.locator(model).inner_text()
+        page.close()
+    assert errors == [], f"the settings page raised: {errors}"
+    assert (before, after) == ("models-anthropic", "models-gemini")
+    assert suggested > 0
+    assert "Not in the model list" in note
+
+
+def test_a_saved_vendor_that_names_an_object_key_still_draws_the_table(
+    browser, tmp_path
+):
+    from tests.test_settings_env import env_in, hand_written, write_settings
+    from webapp.main import create_app
+
+    write_settings(tmp_path, hand_written(ANALYSIS_MODEL_REVIEW_VENDOR="__proto__"))
+    for url in serve(create_app(env=env_in(tmp_path))):
+        page, errors = opened(browser, url + "/settings")
+        page.wait_for_selector('tr[data-key="tiers.review.model"]')
+        note = page.locator('tr[data-key="tiers.review.model"]').inner_text()
+        page.close()
+    assert errors == [], f"the settings page raised: {errors}"
+    assert "Not in the model list" in note
+
+
 def test_workspace_mobile_has_no_page_overflow(page):
     page.set_viewport_size({"width": 390, "height": 844})
     pause(page)

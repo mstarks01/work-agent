@@ -19,6 +19,7 @@ from analysis_service.jobs import InMemoryJobStore
 from analysis_service.model_gate import tool_models
 from analysis_service.settings_variables import secret_vars
 from analysis_service.store_backends import env_variables as store_variables
+from analysis_service.vendors import VENDOR_NAMES
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV, secret_env
 from tests.test_settings_env import env_in, hand_written, write_settings
 from tests.test_webapp import LOOPBACK
@@ -275,11 +276,8 @@ class TestModelSuggestions:
         data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
 
         assert data["models"] == {
-            vendor: list(tool_models(vendor))
-            for vendor in ("vertex", "anthropic", "openai")
+            vendor: list(tool_models(vendor)) for vendor in VENDOR_NAMES
         }
-        rows = {row["key"]: row for row in data["rows"]}
-        assert rows["tiers.review.model"]["suggests"] == "anthropic"
 
     def test_each_suggestion_is_a_chat_model_that_calls_tools(self):
         import litellm
