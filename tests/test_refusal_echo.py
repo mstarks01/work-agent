@@ -344,7 +344,7 @@ def test_a_package_refusal_names_a_saved_mark_by_its_position(tmp_path):
         json={"case": CASE, "marks": marks, "missing": [], "notes": ""},
     )
 
-    response = app.post("/api/contribution-preview", json={})
+    response = app.post("/api/contribution-preview", json={"author": "ada"})
 
     assert response.status_code == 409, response.text
     assert "echomarker" not in response.text.lower(), response.text
