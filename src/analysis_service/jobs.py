@@ -1604,6 +1604,51 @@ class StubPipelineRunner:
         )
 
 
+#: How long one store call that starts or ends a run may take. A call that
+#: hangs past it counts as a failed call, so a finished run always ends its
+#: job. The calls of a run between those two run under the job deadline.
+STORE_TIMEOUT_SECONDS = 60.0
+
+_LEFT_TO_THE_RESTART_SCAN = "job %s stays as stored until the restart scan fails it"
+
+
+async def _store_outcome(store: JobStore, record: JobRecord) -> bool:
+    """Save ``record``, or fail the stored job where the save fails. True
+    where ``record`` was saved.
+
+    The fallback reads the job as stored, gives it the node runs that
+    ``record`` measured, and fails it. So the job keeps its full charge, and
+    its event log gains one status event. It never changes ``record``, which
+    can hold a completed transition and its event. Where the store refuses
+    the fallback too, the job stays as stored, and the restart scan fails it.
+    Neither path runs the runner again.
+    """
+    try:
+        async with asyncio.timeout(STORE_TIMEOUT_SECONDS):
+            await store.save(record)
+    except Exception:
+        logger.exception(
+            "job %s could not store its %s record", record.id, record.status
+        )
+    else:
+        return True
+    try:
+        async with asyncio.timeout(STORE_TIMEOUT_SECONDS):
+            stored = await store.get(record.id)
+            if stored is not None and stored.status not in TERMINAL_STATUSES:
+                stored.unreported_nodes = (
+                    record.report.nodes
+                    if record.report is not None
+                    else record.unreported_nodes
+                )
+                stored.transition("failed")
+                stored.error = record.error or GENERIC_FAILURE_MESSAGE
+                await store.save(stored)
+    except Exception:
+        logger.exception(_LEFT_TO_THE_RESTART_SCAN, record.id)
+    return False
+
+
 async def execute_job(
     store: JobStore,
     runner: PipelineRunner,
@@ -1637,14 +1682,24 @@ async def execute_job(
     different method rather than a shorter answer. The envelope enforces the
     same rule from the other side: a block missing from ``analyses`` is refused
     rather than served as a report the caller has to notice is short.
+
+    Each save that starts or ends the run goes through :func:`_store_outcome`,
+    so a store failure there fails the job and never leaves it ``running``
+    after its worker stops.
     """
-    record = await store.get(job_id)
+    try:
+        async with asyncio.timeout(STORE_TIMEOUT_SECONDS):
+            record = await store.get(job_id)
+    except Exception:
+        logger.exception(_LEFT_TO_THE_RESTART_SCAN, job_id)
+        return
     if record is None:
         logger.error("job %s vanished before execution", job_id)
         return
 
     record.transition("running")
-    await store.save(record)
+    if not await _store_outcome(store, record):
+        return
 
     async def on_node(node: str) -> None:
         record.record_node(node)
@@ -1665,7 +1720,7 @@ async def execute_job(
         )
         record.transition("failed")
         record.error = DEADLINE_FAILURE_MESSAGE
-        await store.save(record)
+        await _store_outcome(store, record)
         return
     except Exception as error:
         logger.exception("job %s failed in the pipeline", job_id)
@@ -1674,7 +1729,7 @@ async def execute_job(
             record.unreported_nodes = list(error.node_runs)
         record.transition("failed")
         record.error = GENERIC_FAILURE_MESSAGE
-        await store.save(record)
+        await _store_outcome(store, record)
         return
 
     try:
@@ -1688,7 +1743,7 @@ async def execute_job(
         logger.exception("job %s refused its outcome from the runner", job_id)
         record.transition("failed")
         record.error = GENERIC_FAILURE_MESSAGE
-    await store.save(record)
+    await _store_outcome(store, record)
 
 
 def _attach(record: JobRecord, outcome: PipelineOutcome) -> None:

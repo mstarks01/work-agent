@@ -345,6 +345,27 @@ def _job_row(record: JobRecord) -> dict[str, Any]:
 _FAILED_COLUMNS = ("status", "measured_tokens", "updated_at", "error")
 
 
+def _loads(text: str | bytes, *loc: str | int) -> Any:
+    """``text`` parsed as JSON. Text that does not parse raises a
+    :class:`ValidationError` at ``loc``, as a part that does not validate
+    does, so one handler reads both (ADR 0095). The error never holds the
+    text."""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as error:
+        raise ValidationError.from_exception_data(
+            JobRecord.__name__,
+            [
+                {
+                    "type": "json_invalid",
+                    "loc": loc,
+                    "input": None,
+                    "ctx": {"error": error.msg},
+                }
+            ],
+        ) from None
+
+
 def _record(
     row: Row[Any],
     sources: bytes | None,
@@ -361,12 +382,14 @@ def _record(
         if name in left_out:
             data[name] = left_out[name]
         elif name in _JSON_FIELDS:
-            data[name] = json.loads(value)
+            data[name] = _loads(value, name)
         else:
             data[name] = value
-    data["sources"] = None if sources is None else json.loads(sources)
-    data["report"] = None if report is None else json.loads(report)
-    data["events"] = [json.loads(text) for text in events]
+    data["sources"] = None if sources is None else _loads(sources, "sources")
+    data["report"] = None if report is None else _loads(report, "report")
+    data["events"] = [
+        _loads(text, "events", index) for index, text in enumerate(events)
+    ]
     return JobRecord.model_validate(data, context=STORED)
 
 

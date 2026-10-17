@@ -20,6 +20,7 @@ from typing import get_args
 
 import boto3
 import pytest
+from botocore.exceptions import ClientError
 from moto.core import set_initial_no_auth_action_count
 
 from analysis_service.aws_identity import PLATFORM_METHODS, platform_session
@@ -346,7 +347,8 @@ class TestTheIamMode:
 
 
 class TestTheStartupCheck:
-    """``HeadBucket`` runs at the startup, and each refusal stops it."""
+    """``HeadBucket`` and ``GetBucketVersioning`` run at the startup, and each
+    refusal stops it."""
 
     def test_a_missing_bucket(self, env):
         env["ANALYSIS_OBJECT_BUCKET"] = "jobs-missing"
@@ -364,6 +366,41 @@ class TestTheStartupCheck:
         env["ANALYSIS_OBJECT_ENDPOINT"] = "https://127.0.0.1:9"
         with pytest.raises(StoreConfigError, match="EndpointConnectionError"):
             start(env)
+
+    @pytest.mark.parametrize("status", ["Enabled", "Suspended"])
+    def test_a_bucket_that_keeps_versions(self, env, status):
+        """A delete there keeps each object as an older version (#1816)."""
+        client = boto3.Session(**TEST_KEYS).client("s3", region_name=TEST_REGION)
+        client.put_bucket_versioning(
+            Bucket=env["ANALYSIS_OBJECT_BUCKET"],
+            VersioningConfiguration={"Status": status},
+        )
+        with pytest.raises(StoreConfigError, match=f"has versioning {status},"):
+            start(env)
+
+    @pytest.mark.parametrize(
+        ("code", "status", "starts"),
+        [("NotImplemented", 501, True), ("AccessDenied", 403, False)],
+    )
+    def test_a_refused_versioning_call(self, env, code, status, starts):
+        """A store that does not implement versioning keeps no versions."""
+        objects = build_object_store(env)
+
+        def refuse(**_):
+            raise ClientError(
+                {
+                    "Error": {"Code": code},
+                    "ResponseMetadata": {"HTTPStatusCode": status},
+                },
+                "GetBucketVersioning",
+            )
+
+        objects._client.get_bucket_versioning = refuse
+        if starts:
+            asyncio.run(objects.check())
+        else:
+            with pytest.raises(StoreConfigError, match="s3:GetBucketVersioning"):
+                asyncio.run(objects.check())
 
 
 def test_each_boto3_call_runs_in_a_worker_thread(env, monkeypatch):
@@ -393,6 +430,7 @@ def test_each_boto3_call_runs_in_a_worker_thread(env, monkeypatch):
     loop = asyncio.run(every_call())
     assert {name for name, _ in calls} == {
         "HeadBucket",
+        "GetBucketVersioning",
         "PutObject",
         "GetObject",
         "HeadObject",

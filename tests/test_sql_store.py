@@ -25,26 +25,35 @@ from alembic.migration import MigrationContext
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
+from analysis_service import jobs as jobs_module
 from analysis_service import store_backends
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.api import create_app
 from analysis_service.certification import CertifyResult
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import (
+    GENERIC_FAILURE_MESSAGE,
     RESTART_FAILURE_MESSAGE,
     Checkpoint,
     JobRecord,
     JobStore,
+    PipelineCompleted,
     Resumption,
     UnreadableRecord,
     UnreadableSchema,
+    execute_job,
     parent_of,
     readable,
 )
 from analysis_service.objects import build_object_store, object_key
-from analysis_service.report import NodeRun
+from analysis_service.report import NodeRun, Report, TokenUsage
 from analysis_service.sources import Source
-from analysis_service.sql_store import METADATA, CorruptObject
+from analysis_service.sql_store import (
+    METADATA,
+    CorruptObject,
+    SqlJobStore,
+    engine_for,
+)
 from analysis_service.store_backends import JOB_STORES, build_store
 from analysis_service.store_settings import StoreConfigError
 from analysis_service.validation import ValidationIssue
@@ -65,7 +74,7 @@ from tests.test_api import (
     auth,
     submission,
 )
-from tests.test_job_store import DeletingReads, follow_up
+from tests.test_job_store import DeletingReads, follow_up, new_record
 from tests.test_resume import LINK
 from tests.test_webapp_questions import PausingRunner
 
@@ -627,10 +636,19 @@ class TestTheReport:
         assert not report_file(env, record).parent.exists()
 
 
-#: A stored value that a closed set of this service does not list, for each
-#: closed set the maintainer's ruling of 2026-10-16 names: the statement that
-#: writes it, and the value.
+#: A stored value that this service cannot read: a value that a closed set
+#: does not list, for each closed set the maintainer's ruling of 2026-10-16
+#: names, and text that is not JSON (#1816). Each entry holds the statement
+#: that writes the value, and the value.
 UNLISTED: dict[str, tuple[str, str]] = {
+    "row text that is not JSON": (
+        "UPDATE jobs SET validation_issues = ? WHERE id = ?",
+        "{",
+    ),
+    "event text that is not JSON": (
+        "UPDATE job_events SET event = ? WHERE job_id = ? AND seq = 1",
+        "{",
+    ),
     "an issue code": (
         "UPDATE jobs SET validation_issues = ? WHERE id = ?",
         json.dumps([{"code": "a-removed-code", "message": "the model is invalid"}]),
@@ -848,6 +866,169 @@ class TestAStoredValueThisServiceDoesNotList:
             asyncio.run(store.owned(record.id, "alice"))
         assert "validation_issues.0.code" in caplog.text
         assert "a-removed-code" not in caplog.text
+
+    def test_the_log_names_the_field_whose_text_is_not_json(self, env, caplog):
+        store = build_store(env)
+        record = completed_job(store)
+        store_unlisted(database_of(env), record.id, "event text that is not JSON")
+        with caplog.at_level(logging.WARNING, "analysis_service.sql_store"):
+            asyncio.run(store.owned(record.id, "alice"))
+        assert "['events.0']" in caplog.text
+
+
+#: The tokens that the run of :func:`metered_report` measured.
+METERED = 150
+
+
+def metered_report() -> Report:
+    """A report whose one node run measured :data:`METERED` tokens."""
+    usage = TokenUsage(prompt_tokens=METERED, total_tokens=METERED)
+    return sample_report().model_copy(
+        update={"nodes": [NodeRun(node="extract", duration_ms=10, usage=usage)]}
+    )
+
+
+class CountingRunner:
+    """A runner that completes with :func:`metered_report`, and counts its runs."""
+
+    def __init__(self) -> None:
+        self.runs = 0
+
+    async def run(self, record, on_node):
+        self.runs += 1
+        return PipelineCompleted(metered_report())
+
+
+class ReportPutFails:
+    """The object store of ``env``, whose put of a report raises ``OSError``,
+    or never returns where ``hang`` is set."""
+
+    def __init__(self, env: dict[str, str], *, hang: bool = False) -> None:
+        self.wrapped = build_object_store(env)
+        self.hang = hang
+
+    def __getattr__(self, name):
+        return getattr(self.wrapped, name)
+
+    async def put(self, key: str, data: bytes) -> None:
+        if not key.endswith("/report.json"):
+            await self.wrapped.put(key, data)
+        elif self.hang:
+            await asyncio.Event().wait()
+        else:
+            raise OSError("the disk is full")
+
+
+def executed(store: JobStore, runner: CountingRunner) -> JobRecord:
+    """The stored record of a new job after :func:`execute_job` ran it."""
+
+    async def scenario() -> JobRecord | None:
+        record = new_record()
+        await admit(store, record)
+        await execute_job(store, runner, record.id, deadline_seconds=5)
+        return await store.get(record.id)
+
+    stored = asyncio.run(scenario())
+    assert stored is not None
+    return stored
+
+
+def statuses(record: JobRecord) -> list[str | None]:
+    return [event.status for event in record.events if event.kind == "status"]
+
+
+class TestAStoreFailureAsARunStartsOrEnds:
+    """A store call that fails or hangs as a run starts or ends fails the job,
+    with the charge the run measured, and never runs it again (#1816)."""
+
+    def test_a_first_read_that_fails(self, env, monkeypatch, caplog):
+        store = build_store(env)
+        record = new_record()
+        asyncio.run(admit(store, record))
+
+        async def refuse(job_id):
+            raise OSError("the database is gone")
+
+        monkeypatch.setattr(store, "get", refuse)
+        runner = CountingRunner()
+        with caplog.at_level(logging.ERROR, "analysis_service.jobs"):
+            asyncio.run(execute_job(store, runner, record.id, deadline_seconds=5))
+        assert runner.runs == 0
+        assert "until the restart scan fails it" in caplog.text
+
+    def test_a_start_that_the_store_refuses(self, env, monkeypatch):
+        store = build_store(env)
+        write = SqlJobStore._write
+
+        async def refuse_the_start(self, record, values):
+            if record.status == "running":
+                raise OSError("the database refused the write")
+            await write(self, record, values)
+
+        monkeypatch.setattr(SqlJobStore, "_write", refuse_the_start)
+        runner = CountingRunner()
+        stored = executed(store, runner)
+        assert runner.runs == 0
+        assert stored.status == "failed"
+        assert "running" not in statuses(stored)
+
+    def test_a_report_put_that_fails(self, env):
+        store = SqlJobStore(engine_for(env), ReportPutFails(env))
+        runner = CountingRunner()
+        stored = executed(store, runner)
+        assert runner.runs == 1
+        assert stored.status == "failed"
+        assert stored.error == GENERIC_FAILURE_MESSAGE
+        assert stored.report is None
+        assert stored.measured_tokens == METERED
+        assert statuses(stored)[-2:] == ["running", "failed"]
+
+    def test_a_row_write_that_fails_after_the_report_put(self, env, monkeypatch):
+        store = build_store(env)
+        write = SqlJobStore._write
+
+        async def refuse_the_completion(self, record, values):
+            if record.status == "completed":
+                raise OSError("the database refused the write")
+            await write(self, record, values)
+
+        monkeypatch.setattr(SqlJobStore, "_write", refuse_the_completion)
+        runner = CountingRunner()
+        stored = executed(store, runner)
+        assert runner.runs == 1
+        assert stored.status == "failed"
+        assert stored.measured_tokens == METERED
+        assert statuses(stored)[-2:] == ["running", "failed"]
+        later = datetime.now(UTC) + timedelta(days=2)
+        assert asyncio.run(store.sweep_orphans(later)) == 1
+
+    def test_a_report_put_that_hangs(self, env, monkeypatch):
+        monkeypatch.setattr(jobs_module, "STORE_TIMEOUT_SECONDS", 0.05)
+        store = SqlJobStore(engine_for(env), ReportPutFails(env, hang=True))
+        stored = executed(store, CountingRunner())
+        assert stored.status == "failed"
+        assert stored.measured_tokens == METERED
+
+    def test_a_database_that_refuses_each_end_leaves_the_restart_scan_a_job(
+        self, env, monkeypatch, caplog
+    ):
+        store = build_store(env)
+        write = SqlJobStore._write
+
+        async def refuse_each_end(self, record, values):
+            if record.status != "running":
+                raise OSError("the database is gone")
+            await write(self, record, values)
+
+        monkeypatch.setattr(SqlJobStore, "_write", refuse_each_end)
+        runner = CountingRunner()
+        with caplog.at_level(logging.ERROR, "analysis_service.jobs"):
+            stored = executed(store, runner)
+        assert runner.runs == 1
+        assert stored.status == "running"
+        assert "until the restart scan fails it" in caplog.text
+        monkeypatch.setattr(SqlJobStore, "_write", write)
+        assert asyncio.run(store.fail_in_flight()) == [stored.id]
 
 
 class TestTheObjectRoot:
