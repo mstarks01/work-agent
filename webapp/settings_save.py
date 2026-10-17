@@ -11,16 +11,25 @@ A save is a JSON object of at most :data:`MAX_SAVE_BYTES`::
 value is a reset: the save removes the line, and the shipped value applies.
 ``remove`` names the lines of ``settings.env`` that this version does not
 read. A refusal names the setting and the rule, and never the value.
+
+The value of a key setting is the key text. The save writes it to the
+:func:`key_file` of its variable and sets the variable to that path. A save
+removes the key line of each vendor that no tier uses (:func:`unused_keys`),
+and then deletes each key file that no variable names
+(:func:`unused_key_files`).
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
-from analysis_service.config_files import SettingsLine, value_refusal
+from analysis_service.config_files import SettingsLine, secret_refusal, value_refusal
+from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.settings_variables import deployment_variables, secret_vars
 from analysis_service.store_backends import env_variables as store_variables
+from analysis_service.vendors import SECRET_FILE_SUFFIX, VENDORS
 from webapp.settings_page import SETTINGS
 
 #: The largest save body that the server reads.
@@ -75,8 +84,9 @@ def refusals(
 
     A change must name an entry of
     :data:`~webapp.settings_page.SETTINGS` marked ``changes``, whose variable
-    names no secret file and is not set in the process environment, and its
-    value must pass :func:`~analysis_service.config_files.value_refusal`. A
+    is not set in the process environment, and its value must pass
+    :func:`~analysis_service.config_files.value_refusal`, or
+    :func:`~analysis_service.config_files.secret_refusal` for a key. A
     removal must name a line of ``lines`` that this version does not read.
     """
     found = []
@@ -87,14 +97,13 @@ def refusals(
             found.append(Refusal(key, f"{key} is not a setting that this page changes"))
             continue
         var = setting.variable
-        if var in secrets:
-            message = f"{setting.label} is a key, and this page saves no key"
-        elif var in process_env:
+        rule = secret_refusal if var in secrets else value_refusal
+        if var in process_env:
             message = (
                 f"{setting.label}: the process environment sets {var}; unset it"
                 " to change this here"
             )
-        elif value is not None and (refusal := value_refusal(value)):
+        elif value is not None and (refusal := rule(value)):
             message = f"{setting.label} {refusal}"
         else:
             continue
@@ -110,11 +119,34 @@ def refusals(
     return found
 
 
+def saved_keys(save: Save) -> dict[str, str]:
+    """The key text of each key setting that ``save`` sets, by its variable."""
+    secrets = secret_vars()
+    return {
+        var: value
+        for key, value in save.changes.items()
+        if (var := SETTINGS[key].variable) in secrets and value is not None
+    }
+
+
+def key_file(directory: Path, var: str) -> Path:
+    """The absolute path of the file that a save writes for the key variable
+    ``var``: its name without ``ANALYSIS_`` and ``_FILE``, in lower case."""
+    name = var.removeprefix("ANALYSIS_").removesuffix(SECRET_FILE_SUFFIX).lower()
+    return directory.absolute() / name
+
+
 def saved_lines(
-    lines: Mapping[str, SettingsLine], save: Save
+    lines: Mapping[str, SettingsLine],
+    save: Save,
+    directory: Path,
+    drop: Collection[str] = (),
 ) -> dict[str, SettingsLine]:
-    """The lines of ``settings.env`` after ``save``, numbered as the new file
-    numbers them. A line keeps its place, and a new line goes at the end."""
+    """The lines of ``settings.env`` in ``directory`` after ``save``, without
+    the variables of ``drop``, numbered as the new file numbers them. A line
+    keeps its place, and a new line goes at the end. A key setting's line
+    holds its :func:`key_file`."""
+    keys = saved_keys(save)
     values = {var: line.value for var, line in lines.items() if var not in save.remove}
     for key, value in save.changes.items():
         var = SETTINGS[key].variable
@@ -122,7 +154,9 @@ def saved_lines(
         if value is None:
             values.pop(var, None)
         else:
-            values[var] = value
+            values[var] = str(key_file(directory, var)) if var in keys else value
+    for var in drop:
+        values.pop(var, None)
     return {
         var: SettingsLine(number, value)
         for number, (var, value) in enumerate(values.items(), start=1)
@@ -137,4 +171,28 @@ def restart_keys(running: Mapping[str, str], saved: Mapping[str, str]) -> list[s
         by_variable[var]
         for var in store_variables()
         if running.get(var) != saved.get(var)
+    ]
+
+
+def unused_keys(tiers: ModelTierConfig | None) -> frozenset[str]:
+    """The key variables of each vendor that no tier of ``tiers`` uses."""
+    used = set() if tiers is None else {tier.vendor for tier in tiers.tiers.values()}
+    return frozenset(
+        var
+        for name, vendor in VENDORS.items()
+        if name not in used
+        for mode in vendor.credentials
+        for var in vendor.secret_env_vars(mode)
+    )
+
+
+def unused_key_files(directory: Path, env: Mapping[str, str]) -> list[Path]:
+    """Each :func:`key_file` in ``directory`` that no key variable of ``env``
+    names."""
+    secrets = secret_vars()
+    named = {Path(env[var]).resolve() for var in secrets if env.get(var)}
+    return [
+        path
+        for var in sorted(secrets)
+        if (path := key_file(directory, var)).is_file() and path.resolve() not in named
     ]

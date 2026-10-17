@@ -6,10 +6,13 @@ line of ``settings.env`` ("this page"), then the shipped TOML file that the
 entry's ``file_key`` names, then the default. A value that ``settings.env``
 sets carries the shipped value beside it.
 
-The page shows a row only where a loader reads it now. The credential rows
-follow the vendor of each tier and that vendor's mode, from the ``VENDORS``
-rows. The store rows follow the ``reads`` of the selected job store, object
-store and database. An entry marked ``excluded`` never shows.
+The page shows a store row only where a loader reads it now: the store rows
+follow the ``reads`` of the selected job store, object store and database.
+A vendor row carries its vendor, and a credential row also the modes that
+read it, from the ``VENDORS`` rows. The page's script shows a vendor row
+where a tier names the vendor and the mode reads the row, with the unsaved
+changes applied, so one save sets a tier and its key. An entry marked
+``excluded`` never shows.
 
 A row carries the closed set of its setting where the loader holds one, so
 the page offers a choice. The data carries the revision of ``settings.env``,
@@ -61,7 +64,7 @@ from analysis_service.store_settings import (
     StoreConfigError,
     closed_setting,
 )
-from analysis_service.vendors import VENDOR_NAMES, VENDORS, CredentialMode, VendorName
+from analysis_service.vendors import VENDOR_NAMES, VENDORS, VendorName
 from webapp.settings_page import IAM_SETUP, SETTINGS, Setting
 
 
@@ -71,7 +74,8 @@ def settings_view(
     defaults: Mapping[str, str],
 ) -> dict[str, Any]:
     """The page's data: the rows, the unknown lines of ``settings.env``, the
-    engine's error, the ``iam`` notes and the model suggestions.
+    engine's error, the modes of each vendor, the ``iam`` notes and the model
+    suggestions.
 
     ``defaults`` holds the values that the app gives a variable that no
     source sets, such as the first-run job store.
@@ -96,8 +100,8 @@ def settings_view(
     }
     effective = {key: row["value"] for key, row in values.items()}
     vendors = _chosen_vendors(effective)
-    modes = {vendor: _mode(vendor, effective) for vendor in vendors}
-    shown = _vendor_rows(vendors, modes) | _store_rows(merged, defaults)
+    owners = _vendor_rows()
+    shown = owners.keys() | _store_rows(merged, defaults)
     hidden = _vendor_variables() | set(store_variables())
     restart = set(store_variables())
     secrets = secret_vars()
@@ -114,6 +118,7 @@ def settings_view(
             "reason": setting.reason,
             "restart": var in restart,
             **_CONTROLS.get(key, {}),
+            **(owners.get(var, {}) if var is not None else {}),
         }
         if var in secrets:
             row |= {"secret": True, "key_saved": _key_saved(row.pop("value"))}
@@ -135,11 +140,14 @@ def settings_view(
             if var not in known
         ],
         "rows": rows,
+        "modes": {
+            vendor: [mode.value for mode in VENDORS[vendor].credential_modes]
+            for vendor in VENDOR_NAMES
+        },
         "iam": [
             {"vendor": vendor, "note": setup.note, "command": setup.command}
-            for vendor in vendors
-            if modes[vendor] == CredentialMode.IAM
-            and (setup := IAM_SETUP[vendor]) is not None
+            for vendor in VENDOR_NAMES
+            if (setup := IAM_SETUP[vendor]) is not None
         ],
         "models": {vendor: list(tool_models(vendor)) for vendor in vendors},
     }
@@ -284,18 +292,6 @@ def _chosen_vendors(values: Mapping[str, str | None]) -> list[VendorName]:
     return [vendor for vendor in VENDOR_NAMES if vendor in chosen]
 
 
-def _mode(
-    vendor: VendorName, values: Mapping[str, str | None]
-) -> CredentialMode | None:
-    """The vendor's credential mode: its only one, else the declared one, else
-    ``None``."""
-    modes = VENDORS[vendor].credential_modes
-    if len(modes) == 1:
-        return modes[0]
-    declared = values[f"credentials.{vendor}.mode"]
-    return next((mode for mode in modes if mode.value == declared), None)
-
-
 def _vendor_variables() -> set[str]:
     """Every variable that belongs to one vendor."""
     return {
@@ -314,24 +310,25 @@ def _vendor_variables() -> set[str]:
     }
 
 
-def _vendor_rows(
-    vendors: list[VendorName], modes: Mapping[VendorName, CredentialMode | None]
-) -> set[str]:
-    """The vendor variables that the chosen vendors read: a mode where the
-    vendor allows more than one, a charge mode likewise, the upstreams where
-    the vendor has one to pin, and the credentials of the mode."""
-    shown = set()
-    for vendor in vendors:
+def _vendor_rows() -> dict[str, dict[str, Any]]:
+    """Each vendor variable that a vendor can read, with the vendor, and for a
+    credential variable the modes that read it: a mode where the vendor allows
+    more than one, a charge mode likewise, the upstreams where the vendor has
+    one to pin, and the credentials of each mode."""
+    rows: dict[str, dict[str, Any]] = {}
+    for vendor in VENDOR_NAMES:
         row = VENDORS[vendor]
         if len(row.credential_modes) > 1:
-            shown.add(credentials_env_var_for(vendor))
+            rows[credentials_env_var_for(vendor)] = {"vendor": vendor}
         if len(row.charge_modes) > 1:
-            shown.add(charges_env_var_for(vendor))
+            rows[charges_env_var_for(vendor)] = {"vendor": vendor}
         if row.upstream_pin is not None:
-            shown.add(upstreams_env_var_for(vendor))
-        if (mode := modes[vendor]) is not None:
-            shown.update(row.required_env_vars(mode))
-    return shown
+            rows[upstreams_env_var_for(vendor)] = {"vendor": vendor}
+        for mode in row.credential_modes:
+            for var in row.required_env_vars(mode):
+                owner = rows.setdefault(var, {"vendor": vendor, "modes": []})
+                owner["modes"].append(mode.value)
+    return rows
 
 
 def _store_rows(merged: Mapping[str, str], defaults: Mapping[str, str]) -> set[str]:

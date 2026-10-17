@@ -43,7 +43,32 @@ are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODE
 model names. It does not mean CI has successfully called them or that they are
 recommended for your cost and quality needs.
 
-Add one pair to `config/model_tiers.toml`. For example:
+### Use the Settings page
+
+The Settings page of the local app sets the models and the keys in one save.
+Start the app as [step 3](#3-start-the-local-app) states, and open
+<http://127.0.0.1:8000/settings>. Until each tier has a model, the app shows a
+diagnostic page, and that page links to the Settings page.
+
+1. In **Models**, choose a vendor and type a model for each tier.
+2. In **Credentials**, type the key of each vendor that a tier uses. The page
+   shows a key field for each vendor that you choose.
+3. Click **Check and save**.
+
+The app checks the settings before it writes them. It writes each key to its
+own file in `~/.config/work-agent/`, with mode `0600`, and the other values to
+`settings.env` in the same directory. The page never shows a key again. It says
+"A key is saved." The next analysis uses the new settings, with no restart. A
+save that leaves no tier on a vendor deletes the key file of that vendor, and
+the page tells you before the save. A vendor that needs an optional extra, such
+as Bedrock, needs it before the save: see the section of the vendor below.
+[Configuration](Configuration.md#the-settings-directory-of-the-first-run-app)
+gives the rules of the settings directory.
+
+### Set the models and the keys by hand
+
+The rest of this section sets the same values without the page. Add one pair to
+`config/model_tiers.toml`. For example:
 
 ```toml
 [tiers.base]
@@ -65,14 +90,14 @@ users can read ([File permissions](Configuration.md#file-permissions)). Write
 the key to a file that only you can read:
 
 ```sh
-mkdir -p ~/.config/analysis
-(umask 077 && printf '%s' 'sk-ant-...' >~/.config/analysis/anthropic.key)
+(umask 077 && mkdir -p ~/.config/work-agent &&
+  printf '%s' 'sk-ant-...' >~/.config/work-agent/anthropic_api_key)
 ```
 
 ### Anthropic
 
 ```sh
-export ANALYSIS_ANTHROPIC_API_KEY_FILE=~/.config/analysis/anthropic.key
+export ANALYSIS_ANTHROPIC_API_KEY_FILE=~/.config/work-agent/anthropic_api_key
 ```
 
 ### Bedrock
@@ -94,7 +119,7 @@ bedrock = "api_key"    # or "iam"
 Under `api_key`, export the key file and the region:
 
 ```sh
-export ANALYSIS_BEDROCK_API_KEY_FILE=~/.config/analysis/bedrock.key
+export ANALYSIS_BEDROCK_API_KEY_FILE=~/.config/work-agent/bedrock_api_key
 export ANALYSIS_BEDROCK_REGION=us-east-1
 ```
 
@@ -126,7 +151,7 @@ foundation model in each Region associated with it."
 ### Gemini
 
 ```sh
-export ANALYSIS_GEMINI_API_KEY_FILE=~/.config/analysis/gemini.key
+export ANALYSIS_GEMINI_API_KEY_FILE=~/.config/work-agent/gemini_api_key
 ```
 
 This is the Gemini Developer API, with a key from Google AI Studio. It serves
@@ -136,13 +161,13 @@ Cloud project. Select `vertex` when the platform supplies the identity.
 ### OpenAI
 
 ```sh
-export ANALYSIS_OPENAI_API_KEY_FILE=~/.config/analysis/openai.key
+export ANALYSIS_OPENAI_API_KEY_FILE=~/.config/work-agent/openai_api_key
 ```
 
 ### OpenRouter
 
 ```sh
-export ANALYSIS_OPENROUTER_API_KEY_FILE=~/.config/analysis/openrouter.key
+export ANALYSIS_OPENROUTER_API_KEY_FILE=~/.config/work-agent/openrouter_api_key
 ```
 
 OpenRouter is an aggregator: one endpoint in front of many providers' models.
@@ -288,7 +313,8 @@ When the app must remove a run, it removes the oldest run that does not wait
 for your answers.
 
 If configuration or credentials are missing, the app shows a diagnostic page
-instead of the analysis form.
+instead of the analysis form. The page links to the
+[Settings page](#use-the-settings-page).
 
 ## 4. Run the included example
 

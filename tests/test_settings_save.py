@@ -28,6 +28,7 @@ from tests.test_webapp import LOOPBACK, SAME_ORIGIN, posted, run_to_completion
 from tests.test_webapp_cell import Recording
 from tests.test_webapp_questions import PausingRunner, shown_list, start
 from tests.test_webapp_settings import page_data, rows_of
+from webapp import main
 from webapp.main import Startup, build_startup, create_app
 from webapp.settings_save import MAX_SAVE_BYTES
 
@@ -279,7 +280,6 @@ class TestARefusedSave:
             "sampling.base.temperature",
             "paths.model_tiers",
             "no.such.setting",
-            "credentials.anthropic.api_key",
         ],
     )
     def test_a_key_that_the_page_does_not_change_is_refused(self, tmp_path, key):
@@ -444,3 +444,173 @@ class TestAStoreChange:
         saved = save(client, {"resilience.timeout_ms": "5000"})
 
         assert saved.json()["restart"] == []
+
+
+#: A key that no fixture holds, so a text that carries it leaked the key.
+KEY = "sk-saved-from-the-page-never-shown"
+ANTHROPIC_KEY = "credentials.anthropic.api_key"
+
+
+def key_on_disk(tmp_path, name: str = "anthropic_api_key") -> str:
+    """A key file of the settings directory, as a save names it, and its line."""
+    path = tmp_path / name
+    path.write_text("sk-ant-an-older-key", encoding="utf-8")
+    path.chmod(0o600)
+    return str(path)
+
+
+class TestAKeySave:
+    def test_it_writes_a_private_file_and_its_line(self, tmp_path):
+        client, _ = app_on(tmp_path, hand_written())
+
+        saved = save(client, {ANTHROPIC_KEY: KEY})
+
+        assert saved.status_code == 200, saved.text
+        path = tmp_path / "anthropic_api_key"
+        assert path.read_text(encoding="utf-8") == KEY
+        assert path.stat().st_mode & 0o777 == 0o600
+        assert f"ANALYSIS_ANTHROPIC_API_KEY_FILE={path}\n" in settings_text(tmp_path)
+        assert sorted(p.name for p in tmp_path.iterdir()) == [
+            "anthropic_api_key",
+            "settings.env",
+        ]
+        assert rows_of(client)[ANTHROPIC_KEY]["key_saved"] is True
+
+    def test_the_key_reaches_no_response_page_file_or_log(self, tmp_path, caplog):
+        client, _ = app_on(tmp_path, hand_written())
+        caplog.set_level(logging.DEBUG)
+
+        refused = save(client, {ANTHROPIC_KEY: KEY, "tiers.base.model": "x y"})
+        saved = save(client, {ANTHROPIC_KEY: KEY})
+        page = client.get("/settings")
+
+        assert (refused.status_code, saved.status_code) == (422, 200)
+        for text in (refused.text, saved.text, page.text, settings_text(tmp_path)):
+            assert KEY not in text
+        assert KEY not in caplog.text
+
+    @pytest.mark.parametrize("key", [" sk-padded", "", "sk-\x07bell"])
+    def test_a_key_that_the_secret_rule_refuses_names_the_setting(self, tmp_path, key):
+        client, _ = app_on(tmp_path, hand_written())
+        before = settings_text(tmp_path)
+
+        refused = save(client, {ANTHROPIC_KEY: key})
+
+        assert refused.status_code == 422, refused.text
+        [error] = refused.json()["errors"]
+        assert error["key"] == ANTHROPIC_KEY
+        assert error["message"].startswith("anthropic api key ")
+        assert len(key) < 3 or key not in refused.text
+        assert settings_text(tmp_path) == before
+        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
+
+    def test_a_loader_refusal_leaves_no_key_file(self, tmp_path):
+        client, _ = app_on(tmp_path, hand_written())
+
+        refused = save(client, {ANTHROPIC_KEY: KEY, "resilience.timeout_ms": "0"})
+
+        assert refused.status_code == 422, refused.text
+        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
+
+    def test_the_key_files_come_first_and_the_deletion_last(
+        self, tmp_path, monkeypatch
+    ):
+        old_key = key_on_disk(tmp_path)
+        client, _ = app_on(
+            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
+        )
+        seen = []
+        write = main.write_settings_env
+
+        def recording(path, values):
+            seen.append(sorted(p.name for p in tmp_path.iterdir()))
+            write(path, values)
+
+        monkeypatch.setattr(main, "write_settings_env", recording)
+
+        saved = save(
+            client,
+            {
+                "tiers.review.vendor": "openai",
+                "tiers.review.model": NEW_MODEL,
+                "credentials.openai.api_key": KEY,
+            },
+        )
+
+        assert saved.status_code == 200, saved.text
+        assert seen == [["anthropic_api_key", "openai_api_key", "settings.env"]]
+        assert sorted(p.name for p in tmp_path.iterdir()) == [
+            "openai_api_key",
+            "settings.env",
+        ]
+        assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" not in settings_text(tmp_path)
+
+    def test_a_failed_write_of_settings_env_keeps_the_old_file_and_the_key_file(
+        self, tmp_path, monkeypatch
+    ):
+        old_key = key_on_disk(tmp_path)
+        client, _ = app_on(
+            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
+        )
+        before = settings_text(tmp_path)
+
+        def failing(path, values):
+            raise OSError(28, "No space left on device")
+
+        monkeypatch.setattr(main, "write_settings_env", failing)
+
+        failed = save(
+            client,
+            {"tiers.review.vendor": "openai", "tiers.review.model": NEW_MODEL},
+        )
+
+        assert failed.status_code == 500, failed.text
+        assert settings_text(tmp_path) == before
+        assert (tmp_path / "anthropic_api_key").is_file()
+
+    def test_a_save_that_leaves_a_tier_on_the_vendor_keeps_its_key(self, tmp_path):
+        old_key = key_on_disk(tmp_path)
+        client, _ = app_on(
+            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
+        )
+
+        saved = save(client, {"resilience.timeout_ms": "5000"})
+
+        assert saved.status_code == 200, saved.text
+        assert (tmp_path / "anthropic_api_key").is_file()
+        assert f"ANALYSIS_ANTHROPIC_API_KEY_FILE={old_key}" in settings_text(tmp_path)
+
+
+class TestAFirstRun:
+    def test_one_save_of_models_and_keys_fills_the_cell(self, tmp_path):
+        vertex = {
+            var: TEST_CREDENTIAL_ENV[var]
+            for var in ("ANALYSIS_VERTEX_PROJECT", "ANALYSIS_VERTEX_LOCATION")
+        }
+        flags = {
+            var: TEST_TIER_ENV[var]
+            for var in ("ANALYSIS_ASSERTIONS", "ANALYSIS_CAPABILITY_READER")
+        }
+        client, builds = app_on(tmp_path, **vertex, **flags)
+        assert client.get("/").status_code == 503
+
+        saved = save(
+            client,
+            {
+                **{
+                    f"tiers.{tier}.{field}": TEST_TIER_ENV[
+                        f"ANALYSIS_MODEL_{tier.upper()}_{field.upper()}"
+                    ]
+                    for tier in ("base", "strong", "review")
+                    for field in ("vendor", "model")
+                },
+                ANTHROPIC_KEY: KEY,
+                "credentials.openai.api_key": "sk-also-not-a-real-key",
+            },
+        )
+        run = run_to_completion(client)
+
+        assert saved.status_code == 200, saved.text
+        assert client.get("/").status_code == 200
+        assert builds.runners[-1].jobs == [run]
+        assert (tmp_path / "anthropic_api_key").read_text(encoding="utf-8") == KEY

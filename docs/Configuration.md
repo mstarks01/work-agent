@@ -6,8 +6,9 @@ stops startup. The loaders also reject incomplete tier selections, unknown node
 names, invalid framework packages, and model/sampling combinations that the
 pinned capability checks know will fail.
 
-This page is reference material. For a first setup, use
-[First run](First-Run.md). For definitions, use [Concepts](Concepts.md).
+This page is reference material. For a first setup, use the Settings page of
+the first-run app, as [First run](First-Run.md#use-the-settings-page) states.
+For definitions, use [Concepts](Concepts.md).
 
 Both [`Engine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 [HTTP app](HTTP-API.md) take the same environment; the tables below apply to both.
@@ -1051,6 +1052,15 @@ ANALYSIS_ANTHROPIC_API_KEY_FILE=/home/integrator/.config/work-agent/anthropic_ap
 The engine does not start when a line breaks one of these rules, or when the
 process environment and `settings.env` set the same variable. The diagnostic
 page names the variable and the line number, and never the value.
+
+The Settings page of the first-run app writes `settings.env`. It writes each key
+to its own file in the settings directory, with mode `0600`, and sets the
+`_FILE` variable of the key to the absolute path of the file. The file name is
+the variable without `ANALYSIS_` and `_FILE`, in lower case:
+`ANALYSIS_ANTHROPIC_API_KEY_FILE` names `anthropic_api_key`. A save writes the
+key files first, then `settings.env`. Then it deletes each of these key files
+that no variable names. A save that leaves no tier on a vendor removes the key
+line of that vendor, so the save also deletes its key file.
 
 ### File permissions
 
