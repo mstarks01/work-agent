@@ -440,6 +440,12 @@ install selects. The first two agree at import; the third is checked when a
 rather than failing on the first job. A deployment missing an
 `analyze/<name>` key for a framework it carries fails the same way.
 
+`ANALYSIS_FRAMEWORKS_CARRIED` replaces the `carried` list of the file. Its value
+is framework names separated by commas, with no spaces, for example
+`ANALYSIS_FRAMEWORKS_CARRIED=stride`. The loader refuses an empty value, a
+space, an empty name, a name that occurs two times and a name that this build
+does not know. Each refusal names the variable.
+
 ### Sampling
 
 `config/sampling.toml` (`version = 5`) pins decoding parameters **per tier**, in

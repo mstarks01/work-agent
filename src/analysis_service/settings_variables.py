@@ -14,6 +14,7 @@ from collections.abc import Mapping
 
 from analysis_service import (
     deployment,
+    framework_config,
     model_tiers,
     resilience,
     sampling,
@@ -43,6 +44,7 @@ def deployment_variables() -> tuple[str, ...]:
         dict.fromkeys(
             (
                 *deployment.env_variables(),
+                *framework_config.env_variables(),
                 *model_tiers.env_variables(),
                 *vendors.env_variables(),
                 *sampling.env_variables(),

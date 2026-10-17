@@ -36,6 +36,7 @@ from analysis_service.deployment import (
     Deployment,
 )
 from analysis_service.errors import ConfigError
+from analysis_service.framework_config import CARRIED_VAR, FrameworkConfigError
 from analysis_service.frameworks import PACKAGES, reads_capabilities
 from analysis_service.graph import FrameworkNodes
 from analysis_service.jobs import InMemoryJobStore
@@ -1177,6 +1178,31 @@ def test_require_certified_is_off_unless_explicitly_affirmative():
         ).gate.require_certified
         is True
     )
+
+
+def test_the_carried_variable_replaces_the_list_of_the_file():
+    assert Deployment.from_env(env=VERTEX_TIERS).frameworks == ("asvs", "stride")
+    narrowed = Deployment.from_env(env=VERTEX_TIERS | {CARRIED_VAR: "stride"})
+    assert narrowed.frameworks == ("stride",)
+
+
+def test_the_v1_service_carries_what_the_variable_names(monkeypatch):
+    for var, value in (VERTEX_ENV | {CARRIED_VAR: "stride"}).items():
+        monkeypatch.setenv(var, value)
+
+    app = create_app(store=InMemoryJobStore(), verifier=object())
+
+    assert app.state.frameworks == ("stride",)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["stride,stride", "asvs, stride", "asvs,,stride", "stride,owasp", ""],
+    ids=["duplicate", "space", "empty name", "unknown", "empty"],
+)
+def test_a_wrong_carried_value_is_refused_by_its_variable(value):
+    with pytest.raises(FrameworkConfigError, match=CARRIED_VAR):
+        Deployment.from_env(env=VERTEX_TIERS | {CARRIED_VAR: value})
 
 
 def test_config_paths_are_repo_relative_by_default():
