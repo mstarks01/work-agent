@@ -651,10 +651,10 @@ def test_the_unknown_comparison_scan_finds_one_when_there_is_one(tmp_path):
 # --- One reader of a case file's name -----------------------------------------
 #
 # A sweep writes ``<case>.<kind>.json`` into ``<artifact>.reports``.
-# ``bundle.case_file`` and ``bundle.reports_dir`` name those paths for the
-# writers, and ``check_sweep_out`` checks each one before a sweep spends. A
-# reader that spells a name out again reads the old name after the rule moves,
-# and its own test still passes.
+# ``bundle.case_file`` and ``bundle.reports_dir`` name those paths for every
+# writer and reader, and ``check_sweep_out`` checks each one before a sweep
+# spends. A reader that spells a name out keeps its own spelling when the rule
+# moves, and its own test still passes.
 
 #: Production roots. ``evals/experiments`` records the scripts an audit ran on
 #: the day, as frozen evidence, so no lint holds them to the live rule.
