@@ -72,8 +72,9 @@ The security posture is deliberate throughout:
   ``/answer/{run}`` and ``/correct/{run}``, the form page reaches only its own
   origin, through ``connect-src 'self'`` for ``/example``, ``/analyze``,
   ``/answer/{run}``, ``/amend/{run}``, ``/events/{run}`` and
-  ``/workspace/runs``, and the diagnostic page runs no script, so it is granted no
-  ``script-src`` at all. Each page declares what it does as a
+  ``/workspace/runs``, the Settings page runs its script on the data in the
+  page and is granted no ``connect-src``, and the diagnostic page runs no
+  script, so it is granted no ``script-src`` at all. Each page declares what it does as a
   :class:`~webapp.page.Grants`, and the policy follows from the declaration
   rather than from a string this file keeps. A page and its policy are built
   together as a :class:`~webapp.page.RenderedPage` and served through
@@ -215,7 +216,12 @@ from analysis_service.sources import (
     SourceLimits,
     clean_system_name,
 )
-from analysis_service.store_backends import audited_delete, build_store, store_lifespan
+from analysis_service.store_backends import (
+    JOB_STORE_VAR,
+    audited_delete,
+    build_store,
+    store_lifespan,
+)
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -234,6 +240,7 @@ from webapp.page import (
     response,
     script_json,
 )
+from webapp.settings_view import settings_view
 
 logger = logging.getLogger("webapp")
 
@@ -263,6 +270,14 @@ _FORM_GRANTS = Grants(script=True, style=True, connect=True)
 #: block and static prose. A page that has nothing to authorise should not
 #: carry the grant that would authorise one.
 _DIAGNOSTIC_GRANTS = Grants(style=True)
+
+#: The Settings page draws its table from the data in the page, and makes no
+#: request.
+_SETTINGS_GRANTS = Grants(script=True, style=True)
+
+#: The value of each store setting that this app gives where no source sets
+#: it: a first run keeps its jobs in memory.
+STORE_DEFAULTS = {JOB_STORE_VAR: "memory"}
 
 
 #: The identity of this app's one local operator, who owns every job it holds.
@@ -1046,7 +1061,7 @@ def create_app(
         env = process_env
         startup = Startup(settings=None, frameworks=(), tiers=None, error=exc)
     if workspace is None:
-        store = build_store({"ANALYSIS_JOB_STORE": "memory", **env})
+        store = build_store({**STORE_DEFAULTS, **env})
         logger.info(store_note(store))
         workspace = Workspace(store=store)
     state = build_startup(env) if startup is None else startup
@@ -1089,14 +1104,27 @@ def create_app(
                     for name in ("workspace.js", "answer_editor.js", "first_run.js")
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
-                workspace_style=(
-                    Path(__file__).parent / "static" / "workspace.css"
-                ).read_text(encoding="utf-8"),
+                workspace_style=_WORKSPACE_STYLE,
                 tiers=_tier_lines(current.tiers),
                 frameworks=_framework_fields(current.frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 store_note=escape(store_note(workspace.store)),
+            )
+        )
+
+    @app.get("/settings", response_class=HTMLResponse)
+    async def settings_page() -> Response:
+        """The Settings page. It serves also where the Deployment did not
+        build, with the startup's error in a banner."""
+        error = None if cell.current is not None else state.error
+        return response(
+            render(
+                _SETTINGS_PAGE,
+                _SETTINGS_GRANTS,
+                script=client_script("settings.js"),
+                settings=script_json(settings_view(process_env, error, STORE_DEFAULTS)),
+                workspace_style=_WORKSPACE_STYLE,
             )
         )
 
@@ -1791,6 +1819,10 @@ _STYLE = """
 """
 
 _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-8")
+_SETTINGS_PAGE = (Path(__file__).parent / "settings.html").read_text(encoding="utf-8")
+_WORKSPACE_STYLE = (Path(__file__).parent / "static" / "workspace.css").read_text(
+    encoding="utf-8"
+)
 
 #: The question toggle. Every install can pause: one with no catalog asks its
 #: early questions and no link question. The page lists the earlier analyses
@@ -1816,6 +1848,8 @@ _DIAGNOSTIC_PAGE = (
 <p>Set the missing variables, then <b>restart the app</b>:
 <code>uv run python webapp/main.py</code>. There is no retry button — a process
 cannot pick up an environment variable that changed after it started.</p>
+<p>The <a href="/settings">Settings page</a> shows each setting and where its
+value comes from.</p>
 <p>The full setup is <code>docs/First-Run.md</code> step 2; the vendor tables are
 in <code>docs/Configuration.md</code>, under "Models and vendors".</p>
 </body></html>

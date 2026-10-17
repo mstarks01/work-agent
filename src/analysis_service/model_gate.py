@@ -37,11 +37,12 @@ from __future__ import annotations
 import os
 import sys
 from collections.abc import Callable, Mapping
+from functools import cache
 from typing import Any, Literal
 
 from analysis_service.errors import ConfigError
 from analysis_service.offline import refuse_live_inference
-from analysis_service.vendors import SchemaRule, Vendor
+from analysis_service.vendors import SchemaRule, Vendor, VendorName, vendor_for
 
 
 class ModelGateError(ConfigError):
@@ -253,6 +254,39 @@ def model_info(vendor: Vendor, model: str) -> dict[str, Any] | None:
     except _litellm.exceptions.ModelNotMappedError:
         return None
     return info if info["key"] in _litellm.model_cost else None
+
+
+@cache
+def tool_models(name: VendorName) -> tuple[str, ...]:
+    """The chat models that call tools on the vendor ``name``, from the
+    pinned map.
+
+    **The one reader of the model list that the Settings page suggests.** A
+    name is listed where the map marks it a chat model that calls tools, the
+    map files it under the vendor's provider or one of its sub-maps (such as
+    ``vertex_ai-anthropic_models``), and :meth:`Vendor.validate_model` passes
+    it. The list only suggests: the map lags each new model, so a name that
+    it does not hold still runs.
+    """
+    vendor = vendor_for(name)
+    provider = vendor.litellm_provider
+    names = set()
+    for key, info in _litellm.model_cost.items():
+        filed = info.get("litellm_provider") or ""
+        usable = (
+            info.get("mode") == "chat"
+            and info.get("supports_function_calling")
+            and (filed == provider or filed.startswith(f"{provider}-"))
+        )
+        if not usable:
+            continue
+        model = key.removeprefix(vendor.prefix)
+        try:
+            vendor.validate_model(model, "the litellm map")
+        except ValueError:
+            continue
+        names.add(model)
+    return tuple(sorted(names))
 
 
 #: Each :data:`~analysis_service.vendors.SchemaRule`, as the function that

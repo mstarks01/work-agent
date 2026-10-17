@@ -176,10 +176,47 @@ to a run.
 If the tier config is what failed, there is no selected vendor to report and the
 page says so instead: fix the file named in the error first.
 
+The diagnostic page links to the [Settings page](#the-settings-page), which
+serves also when the engine does not build.
+
 **Recovery is always: fix it, then restart.** There is no retry button. A process
 cannot pick up an environment variable that changed after it started, so a retry
 would appear to work after a config-file edit and silently do nothing in the
 credential case, which is the common one at this point.
+
+## The Settings page
+
+**Settings**, beside **Analyses**, shows each Deployment Setting in one table
+with three columns: Setting, Value and Source. A header row starts each group,
+and the search field above the table filters by setting name. The page only
+shows the settings. It serves also when the engine does not build, and a banner
+then shows the loader's message.
+
+The Source column shows where each value comes from, in this order:
+
+| Source | Where the value comes from |
+| --- | --- |
+| process environment | A variable of the process. The row names the variable: unset it to change the value on the page. |
+| this page | A line of `settings.env` in the settings directory. The row shows the shipped value beside it, or "none shipped". |
+| the TOML file | The shipped file that its config path names, such as `config/resilience.toml`. |
+| default | The value that the loader gives when no source sets one. |
+
+The page shows only the rows that a loader reads now. The credential rows follow
+the vendor of each tier and that vendor's credential mode. A vendor in the `iam`
+mode shows a short note and its setup command. The job storage rows follow the
+selected job store, object store and database, and each one takes effect only
+after a restart. The sampling rows and review independence show "Shown only"
+and the reason.
+
+A key never shows. A key row says "A key is saved. The page never shows it." or
+"No key is saved.", and the page never opens the key file. A value that holds a
+password in a URL is not shown.
+
+The model of each tier shows a note when the pinned litellm map does not list
+it. The note is not a refusal: the map lags each new model.
+
+A line of `settings.env` that this version does not read shows with its key and
+its line number. The startup refuses such a line, so the banner also names it.
 
 ## Its limits, which are the point
 
@@ -279,6 +316,7 @@ Each policy grants only what its own page does:
 | Report | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/answer/{run}` and `/correct/{run}`. It loads nothing. |
 | Form | the same, for `/example`, `/analyze`, `/answer/{run}`, `/amend/{run}`, `/events/{run}` and `/workspace/runs`. |
 | Diagnostic | `style-src` nonce only — it runs no script, so it is granted none. |
+| Settings | `script-src`/`style-src` nonce. It draws its table from the data in the page and makes no request. |
 
 `base-uri` and `form-action` are `'none'` everywhere; the form posts through
 fetch, so a navigation away from it would be something going wrong. A page and

@@ -163,6 +163,10 @@ class TestTheStartupRefusals:
             ({"ANALYSIS_DATABASE_URL": None}, "set ANALYSIS_DATABASE_URL"),
             ({"ANALYSIS_DATABASE_URL": "not a url"}, "is not a database URL"),
             (
+                {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://u:hunter2@[::1/x"},
+                "is not a database URL$",
+            ),
+            (
                 {"ANALYSIS_DATABASE_URL": "sqlite+aiosqlite://user:hunter2@/x.db"},
                 "holds a password",
             ),
