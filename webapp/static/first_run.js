@@ -59,6 +59,66 @@
     }
   });
 
+  // A voice transcript, checked here so that only text leaves the page. The
+  // server never receives the file: the body carries the decoded text as a
+  // JSON string, as it does for a pasted description, so no file name, content
+  // type or multipart body reaches the server. The checks run before the text
+  // is kept, cheapest first: the size before a byte is read, then a strict
+  // UTF-8 decode, then no control character other than a tab or a line break.
+  // A refused file leaves the transcript the page holds as it was.
+  const transcriptFile = document.getElementById("transcript-file");
+  const transcriptNote = document.getElementById("transcript-note");
+  const maxTranscriptBytes = Number(transcriptFile.dataset.maxBytes);
+  const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/;
+  let transcript = null;
+  const holdTranscript = (text, name) => {
+    transcript = text;
+    document.getElementById("transcript-name").textContent = name;
+    transcriptNote.hidden = text === null;
+    box.required = text === null;
+  };
+  document.getElementById("upload").addEventListener("click", () => transcriptFile.click());
+  document.getElementById("transcript-remove").addEventListener(
+    "click", () => holdTranscript(null, ""),
+  );
+  transcriptFile.addEventListener("change", async () => {
+    const [file] = transcriptFile.files;
+    transcriptFile.value = "";
+    if (!file) return;
+    if (file.size > maxTranscriptBytes) {
+      fail(`This file is larger than the ${maxTranscriptBytes} bytes that one analysis can carry.`);
+      return;
+    }
+    let text;
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
+    } catch {
+      fail("The page could not read this file as UTF-8 text. Upload a plain text transcript.");
+      return;
+    }
+    if (CONTROL.test(text)) {
+      fail("This file holds control characters, so it is not a plain text transcript.");
+      return;
+    }
+    if (!text.trim()) {
+      fail("This file holds no text.");
+      return;
+    }
+    problem.hidden = true;
+    holdTranscript(text, file.name);
+  });
+
+  // The description goes with a transcript only where it holds text, and
+  // always where there is no transcript, so the service says what is missing.
+  const sources = () => [
+    ...(box.value.trim() || transcript === null
+      ? [{ kind: "description", label: "Pasted description", text: box.value }]
+      : []),
+    ...(transcript === null
+      ? []
+      : [{ kind: "transcript", label: "Uploaded transcript", text: transcript }]),
+  ];
+
   // Nodes and strings, never markup. replaceChildren() inserts a string as a
   // text node, so a source label or a validator message that spells markup
   // shows the characters the submitter typed. Same rule as the report viewer,
@@ -99,9 +159,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sources: [
-            { kind: "description", label: "Pasted description", text: box.value },
-          ],
+          sources: sources(),
           name: document.getElementById("analysis-name")?.value.trim() || "Your system",
           frameworks: selection(),
           questions: Boolean(ask && ask.checked),

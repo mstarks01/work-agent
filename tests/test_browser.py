@@ -760,6 +760,36 @@ def test_a_saved_vendor_that_names_an_object_key_still_draws_the_table(
     assert "Not in the model list" in note
 
 
+def test_an_uploaded_transcript_alone_starts_an_analysis(page):
+    """The button opens a file chooser, a binary file is refused on the page,
+    and a text file goes to ``/analyze`` as the one source, as text."""
+    page.locator('input[name="framework"]').first.check()
+
+    def upload(name: str, data: bytes) -> None:
+        with page.expect_file_chooser() as chosen:
+            page.click("#upload")
+        chosen.value.set_files({"name": name, "mimeType": "text/plain", "buffer": data})
+
+    upload("call.txt", b"\x89PNG\r\n\x1a\n\x00\x00")
+    page.wait_for_selector("#problem", state="visible")
+    assert "UTF-8" in page.inner_text("#problem")
+    assert page.is_hidden("#transcript-note")
+
+    upload("call.txt", "Ana: the web app talks to a database. — Ben: yes.".encode())
+    page.wait_for_selector("#transcript-note", state="visible")
+    assert page.inner_text("#transcript-name") == "call.txt"
+    with page.expect_request("**/analyze") as posted:
+        page.click("#go")
+    assert posted.value.post_data_json["sources"] == [
+        {
+            "kind": "transcript",
+            "label": "Uploaded transcript",
+            "text": "Ana: the web app talks to a database. — Ben: yes.",
+        }
+    ]
+    page.wait_for_selector("#asked", state="visible")
+
+
 def test_workspace_mobile_has_no_page_overflow(page):
     page.set_viewport_size({"width": 390, "height": 844})
     pause(page)

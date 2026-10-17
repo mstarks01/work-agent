@@ -362,6 +362,14 @@ label and a validator message both travel back to it over SSE, and neither is
 escaped for markup on the way. There is no escape helper on any page, which is
 what makes forgetting one impossible rather than merely unlikely.
 
+**An uploaded transcript reaches the server as text, never as a file.** The form
+page reads the file in the browser. It refuses a file larger than the
+deployment's `max_source_bytes` before it reads a byte, then refuses bytes that
+are not strict UTF-8, then refuses any control character other than a tab or a
+line break. `POST /analyze` receives the text as a `transcript` source in its
+JSON body, the same shape as a pasted description, so no route parses a file,
+a file name or a content type.
+
 **Every page carries a strict nonce CSP,** `default-src 'none'` with a fresh
 per-response nonce on each inline block and no `'unsafe-inline'` anywhere. A
 page declares what it does as a `Grants` in `webapp/page.py`, and its policy

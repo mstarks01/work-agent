@@ -352,6 +352,12 @@ Start with these parts of the result:
   the provider returned, and which execution fingerprint each call produced.
   These values support auditing; they do not establish that a finding is right.
 
+To analyze a recorded conversation, click **Upload transcript** and choose the
+transcript as a plain UTF-8 text file. The page refuses a file that is larger
+than one analysis can carry, is not UTF-8, or holds control characters. The
+service reads the transcript as a conversation, beside the description where
+you type one. **Remove** takes the transcript off the form.
+
 Then replace the example with your own description. State security controls
 that are actually known. When the input does not state an attribute, extraction
 uses `unknown`; code turns a claim resting on such an attribute into

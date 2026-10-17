@@ -188,6 +188,12 @@ def test_the_form_page_shows_the_resolved_tiers_read_only(client, tiers):
         assert f"<b>{tier}</b> → {selection.vendor} / {selection.model}" in page
 
 
+def test_the_transcript_input_carries_the_deployment_s_byte_limit(client):
+    """The page refuses an oversize file with the bound ``/analyze`` holds."""
+    limit = WEBAPP_LIMITS.max_total_bytes
+    assert f'data-max-bytes="{limit}"' in client.get("/").text
+
+
 def test_no_form_control_can_influence_which_model_runs(client, tiers):
     """The picker chooses what is analysed; nothing chooses what analyses it.
 
