@@ -44,15 +44,14 @@ wrote, and `evals/harness/archive.py` names the spelling each kind carries.
 | `20261015T-rulings-refuted` | extraction | three ruled conventions as sentences on top of #1734 and #1735, all 16 cases, five runs (QA-2026-10-15-03-E1, refuted, never merged); `20261015T-rule4-app-process` is its before side for losses and `20261015T-rule6-bcd` for the tag |
 | `20261016T-rulings-two-sentences` | extraction | two corrected sentences for the console and the third-party rulings on top of #1749, all 16 cases, three runs and a case 14 pre-flight on luna through OpenAI (QA-2026-10-15-03-E2, refuted, never merged); `20261015T-rule4-app-process` is its before side, on another route |
 | `20261016T-rulings-exclusion` | extraction | the two corrected sentences plus the exclusion for a hosted service that is the described system, all 16 cases, five runs and a case 12 pre-flight on luna through OpenRouter flex (QA-2026-10-15-03-E3, null, never merged); `20261015T-rule4-app-process` is its before side for losses, on the same route, and `20261015T-rule6-bcd` for the tag |
+| `20261017T-1813-name-rule` | extraction | the rule 3 sentence of #1813 (a `name` needs a Latin letter or digit, and the text's own spelling goes in `notes`), all 16 cases, five runs on each side on luna through OpenRouter flex: `before-r*` at `bbe33ef8`, `after-r*` at `7cc94c19` (QA-2026-10-17-01-E1, inconclusive) |
 
-No archived arm ran the prompt now in the tree. `20261015T-rule4-app-process`
-ran without the rule 6 edit of #1734, and `20261015T-rule6-bcd` ran without the
-rule 4 edit of #1735. To price an `extract.md` change, replay the arm that
-differs from the tree only in the rule your edit does not touch, and say so in
-the experiment row:
+`20261017T-1813-name-rule/after-r*` ran `extract.md` as it stands at `7cc94c19`.
+To price a later `extract.md` change, replay that arm as the before side if the
+prompt has not moved since, and say so in the experiment row:
 
 ```sh
-python -m evals.harness.run replay evals/emissions/20261015T-rule4-app-process/after-r*.json
+python -m evals.harness.run replay evals/emissions/20261017T-1813-name-rule/after-r*.json
 ```
 
 The heads sweep reads through `extract` and `assert` and keeps the catalog its
