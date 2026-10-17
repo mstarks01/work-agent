@@ -660,6 +660,56 @@ def test_the_settings_page_saves_a_key_with_the_vendor_that_needs_it(browser, tm
     assert (tmp_path / "anthropic_api_key").read_text(encoding="utf-8") == key
 
 
+@pytest.mark.parametrize(
+    "vendors",
+    [
+        {"base": "openai", "strong": "vertex", "review": "openai"},
+        {"base": "anthropic", "strong": "anthropic", "review": "anthropic"},
+        {"base": "anthropic", "strong": "vertex", "review": "openai"},
+    ],
+)
+def test_the_page_warns_of_each_key_line_that_the_save_removes(
+    browser, tmp_path, vendors
+):
+    """The page and the server each read which saved key a save removes:
+    the warnings before the save name the key lines that it removes."""
+    from analysis_service.settings_variables import secret_vars
+    from tests.test_settings_env import env_in, hand_written, write_settings
+    from webapp.main import create_app
+    from webapp.settings_page import SETTINGS
+
+    models = {
+        "openai": "gpt-4.1",
+        "anthropic": "claude-opus-5",
+        "vertex": "gemini-2.5-pro",
+    }
+    path = write_settings(tmp_path, hand_written())
+    before = path.read_text(encoding="utf-8")
+    for url in serve(create_app(env=env_in(tmp_path))):
+        page, errors = opened(browser, url + "/settings")
+        page.wait_for_selector('tr[data-key="tiers.base.model"]')
+        for tier, vendor in vendors.items():
+            page.select_option(f'tr[data-key="tiers.{tier}.vendor"] select', vendor)
+            page.fill(f'tr[data-key="tiers.{tier}.model"] input', models[vendor])
+        warned = {
+            item.get_attribute("data-key")
+            for item in page.locator("#changes-list li.warning").all()
+        }
+        page.click("#save-changes")
+        page.wait_for_selector("#save-status", state="visible")
+        page.close()
+    after = path.read_text(encoding="utf-8")
+    removed = {
+        key
+        for key, setting in SETTINGS.items()
+        if setting.variable in secret_vars()
+        and f"{setting.variable}=" in before
+        and f"{setting.variable}=" not in after
+    }
+    assert errors == [], f"the settings page raised: {errors}"
+    assert removed == warned
+
+
 def test_a_tier_model_suggests_the_models_of_the_vendor_just_chosen(browser, tmp_path):
     from tests.test_settings_env import env_in, hand_written, write_settings
     from webapp.main import create_app

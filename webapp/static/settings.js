@@ -50,7 +50,9 @@ const visible = (row) =>
   !row.vendor || (chosenVendors().has(row.vendor) && (!row.modes || row.modes.includes(chosenMode(row.vendor))));
 
 // Each saved key of settings.env that a save deletes, because no tier names
-// its vendor after the changes.
+// its vendor after the changes. The server reads the same rule in
+// `unused_keys` (webapp/settings_save.py), and a test in
+// tests/test_browser.py checks the two against each other.
 const deletedKeys = () =>
   SETTINGS.rows.filter((row) => row.secret && row.key_saved && row.source === "page" && row.vendor && !chosenVendors().has(row.vendor));
 

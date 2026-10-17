@@ -175,7 +175,12 @@ def restart_keys(running: Mapping[str, str], saved: Mapping[str, str]) -> list[s
 
 
 def unused_keys(tiers: ModelTierConfig | None) -> frozenset[str]:
-    """The key variables of each vendor that no tier of ``tiers`` uses."""
+    """The key variables of each vendor that no tier of ``tiers`` uses.
+
+    The page's script reads the same rule in ``deletedKeys`` to warn before
+    a save, and a test in ``tests/test_browser.py`` checks the two against
+    each other.
+    """
     used = set() if tiers is None else {tier.vendor for tier in tiers.tiers.values()}
     return frozenset(
         var
