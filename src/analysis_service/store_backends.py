@@ -18,7 +18,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from analysis_service.jobs import InMemoryJobStore, JobStore
-from analysis_service.objects import OBJECT_STORES, ObjectStore, build_object_store
+from analysis_service.objects import (
+    OBJECT_STORE_VAR,
+    OBJECT_STORES,
+    ObjectStore,
+    build_object_store,
+)
 from analysis_service.parsing import ascii_int
 from analysis_service.store_settings import (
     DATABASE_URL_VAR,
@@ -84,9 +89,17 @@ JOB_STORES: dict[JobStoreName, JobStoreBackend] = {
     "sql": JobStoreBackend(
         build=_sql_store,
         objects=True,
-        reads=(DATABASE_URL_VAR, "ANALYSIS_OBJECT_STORE"),
+        reads=(DATABASE_URL_VAR, OBJECT_STORE_VAR),
     ),
 }
+
+
+def job_store_name(env: Mapping[str, str]) -> JobStoreName:
+    """The row of :data:`JOB_STORES` that ``env`` selects; fail closed.
+
+    **The one reader of which job store an env selects.**
+    """
+    return closed_setting(env.get(JOB_STORE_VAR, ""), JOB_STORE_VAR, JOB_STORES)
 
 
 def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
@@ -101,7 +114,7 @@ def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
     store and opens no connection; :meth:`JobStore.startup_check` checks what
     the store reaches.
     """
-    name = closed_setting(env.get(JOB_STORE_VAR, ""), JOB_STORE_VAR, JOB_STORES)
+    name = job_store_name(env)
     backend = JOB_STORES[name]
     if backend.objects:
         return backend.build(env, build_object_store(env))

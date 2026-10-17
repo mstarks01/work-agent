@@ -1297,7 +1297,11 @@ class Vendor:
 
 
 def refused_var(secret_var: str) -> str:
-    """The variable that would hold the secret itself, which the service refuses."""
+    """The variable that would hold the secret itself, which the service refuses.
+
+    **The one reader of the file suffix of a key variable.** A variable
+    without the suffix comes back unchanged.
+    """
     return secret_var.removesuffix(SECRET_FILE_SUFFIX)
 
 

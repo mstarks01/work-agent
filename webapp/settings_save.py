@@ -29,7 +29,7 @@ from analysis_service.config_files import SettingsLine, secret_refusal, value_re
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.settings_variables import deployment_variables, secret_vars
 from analysis_service.store_backends import env_variables as store_variables
-from analysis_service.vendors import SECRET_FILE_SUFFIX, VENDORS
+from analysis_service.vendors import VENDORS, refused_var
 from webapp.settings_page import SETTINGS
 
 #: The largest save body that the server reads.
@@ -132,7 +132,7 @@ def saved_keys(save: Save) -> dict[str, str]:
 def key_file(directory: Path, var: str) -> Path:
     """The absolute path of the file that a save writes for the key variable
     ``var``: its name without ``ANALYSIS_`` and ``_FILE``, in lower case."""
-    name = var.removeprefix("ANALYSIS_").removesuffix(SECRET_FILE_SUFFIX).lower()
+    name = refused_var(var).removeprefix("ANALYSIS_").lower()
     return directory.absolute() / name
 
 

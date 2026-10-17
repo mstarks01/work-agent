@@ -304,17 +304,20 @@ class ObjectStoreBackend:
 
 ObjectStoreName = Literal["filesystem", "s3"]
 
+#: The setting that selects a row of :data:`OBJECT_STORES`.
+OBJECT_STORE_VAR = "ANALYSIS_OBJECT_STORE"
+
 #: Each ``ANALYSIS_OBJECT_STORE`` value, and how to build its store from the
 #: environment. The table answers for every name of :data:`ObjectStoreName`.
 OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
     "filesystem": ObjectStoreBackend(
         build=FilesystemObjectStore.from_env,
-        reads=("ANALYSIS_OBJECT_STORE", "ANALYSIS_OBJECT_ROOT"),
+        reads=(OBJECT_STORE_VAR, "ANALYSIS_OBJECT_ROOT"),
     ),
     "s3": ObjectStoreBackend(
         build=_s3_store,
         reads=(
-            "ANALYSIS_OBJECT_STORE",
+            OBJECT_STORE_VAR,
             "ANALYSIS_OBJECT_BUCKET",
             "ANALYSIS_OBJECT_REGION",
             "ANALYSIS_OBJECT_ENDPOINT",
@@ -326,8 +329,16 @@ OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
 }
 
 
+def object_store_name(env: Mapping[str, str]) -> ObjectStoreName:
+    """The row of :data:`OBJECT_STORES` that ``env`` selects; fail closed.
+
+    **The one reader of which object store an env selects.**
+    """
+    return closed_setting(
+        env.get(OBJECT_STORE_VAR, ""), OBJECT_STORE_VAR, OBJECT_STORES
+    )
+
+
 def build_object_store(env: Mapping[str, str]) -> ObjectStore:
     """Build the object store that ``ANALYSIS_OBJECT_STORE`` names; fail closed."""
-    value = env.get("ANALYSIS_OBJECT_STORE", "")
-    name = closed_setting(value, "ANALYSIS_OBJECT_STORE", OBJECT_STORES)
-    return OBJECT_STORES[name].build(env)
+    return OBJECT_STORES[object_store_name(env)].build(env)
