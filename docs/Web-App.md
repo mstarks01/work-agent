@@ -199,6 +199,7 @@ The Source column shows where each value comes from, in this order:
 | process environment | A variable of the process. The row names the variable: unset it to change the value on the page. |
 | this page | A line of `settings.env` in the settings directory. The row shows the shipped value beside it, or "none shipped". |
 | the TOML file | The shipped file that its config path names, such as `config/resilience.toml`. |
+| refused | The loader refuses the TOML file or its path. The row shows the loader's message in place of a value. |
 | default | The value that the loader gives when no source sets one. |
 
 The page shows only the rows that a loader reads now. The credential rows follow

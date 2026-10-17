@@ -913,6 +913,33 @@ def test_the_workspace_labels_each_page_status():
     )
 
 
+def _table_keys(page: str, table: str) -> set[str]:
+    """The quoted keys of the object literal ``const <table> = {...};`` in a
+    page's script, one key at the start of each line."""
+    body = re.search(
+        rf"const {table} = \{{(.*?)\n\s*\}};", page_javascript(page), re.DOTALL
+    )
+    assert body is not None, f"{page} holds no {table} table"
+    return set(re.findall(r'^\s*"([\w-]+)"\s*:', body.group(1), re.MULTILINE))
+
+
+def test_the_first_run_page_words_each_stop():
+    """``first_run.js`` has a sentence for each
+    :data:`~analysis_service.answer_state.Stop` and no other. A stop the table
+    lacks renders as ``undefined``."""
+    from analysis_service.answer_state import Stop
+
+    assert _table_keys("first_run.js", "stops") == set(get_args(Stop))
+
+
+def test_the_settings_page_shows_each_source():
+    """``settings.js`` shows each :data:`~webapp.settings_view.Source` and no
+    other. A source the table lacks throws, and the row does not render."""
+    from webapp.settings_view import Source
+
+    assert _table_keys("settings.js", "sources") == set(get_args(Source))
+
+
 @pytest.mark.parametrize("sink", HTML_STRING_SINKS)
 def test_the_viewer_has_no_html_string_sink(sink):
     """Decision 1, as a lint: there is no sink left to forget to escape."""

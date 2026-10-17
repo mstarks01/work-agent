@@ -28,9 +28,10 @@ the form. It never validates a value.
 
 - The page reads each closed set from the loader's own table, in
   `settings_view._controls`: the vendor names, the credential and charge
-  modes of each `VENDORS` row, the `PASS_FLAGS` table, the `JOB_STORES` and
-  `OBJECT_STORES` tables of `closed_setting`, and `FRAMEWORK_NAMES`. The page
-  shows every other setting as free text. The check build of a save tests
+  modes of each `VENDORS` row, the `PASS_FLAGS` table, the true-or-false
+  `require_certified` setting, each store setting in
+  `store_backends.CLOSED_SETTINGS`, and `FRAMEWORK_NAMES`. The page shows
+  every other setting as free text. The check build of a save tests
   that value with the loaders.
 - One page module in `webapp` holds only the facts that no loader holds: the
   group, the label, and one mark for each setting. The mark is "changes",

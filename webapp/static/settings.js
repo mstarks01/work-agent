@@ -174,14 +174,17 @@ function notes(row) {
   ];
 }
 
+// One entry for each source that settings_view.Source names.
+const sources = {
+  "process": (row) => [h("span", { class: "tag outside" }, "process environment"), hint(h("code", {}, row.variable))],
+  "page": () => h("span", { class: "tag" }, "this page"),
+  "file": (row) => h("code", {}, row.file),
+  "refused": (row) => [h("span", { class: "tag outside" }, "refused"), hint(h("code", {}, row.refusal))],
+  "default": () => h("span", { class: "tag" }, "default"),
+};
+
 function source(row) {
-  if (row.source === "process") {
-    return [h("span", { class: "tag outside" }, "process environment"), hint(h("code", {}, row.variable))];
-  }
-  if (row.source === "page") return h("span", { class: "tag" }, "this page");
-  if (row.source === "file") return h("code", {}, row.file);
-  if (row.source === "refused") return [h("span", { class: "tag outside" }, "refused"), hint(h("code", {}, row.refusal))];
-  return h("span", { class: "tag" }, "default");
+  return sources[row.source](row);
 }
 
 function iamRows() {

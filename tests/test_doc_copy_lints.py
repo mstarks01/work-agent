@@ -14,12 +14,15 @@ reworded guide then fails the check, and does not pass with nothing read.
 
 from __future__ import annotations
 
+import json
 import re
 import tomllib
 from pathlib import Path
+from typing import get_args
 
 import pytest
 from fastapi.routing import APIRoute
+from pydantic import TypeAdapter
 
 from analysis_service import resilience
 from analysis_service.answer_state import EARLY_RULES, POLICY_VERSION
@@ -29,7 +32,9 @@ from analysis_service.auth import (
     AuthConfigError,
     build_verifier,
 )
+from analysis_service.claims import GroundKind, Spelling, UnknownKey
 from analysis_service.deployment import ConfigPaths
+from analysis_service.fact_answers import FactAnswer, fact_kind
 from analysis_service.links import MAX_LINK_ANSWERS
 from analysis_service.model_tiers import LLM_NODES, SUPPORTED_VERSION, TIER_NAMES
 from analysis_service.resilience import ResilienceConfig, load_resilience
@@ -456,6 +461,60 @@ def test_the_question_limits_are_the_early_rules():
     assert int(limit[1]) == capability.limit
     assert field.limit is None
     assert int(links[1]) == MAX_LINK_ANSWERS
+
+
+# Fact questions and answers: the key and the kinds that FactAnswer reads.
+
+_JSON_FENCE = re.compile(r"^```json\n(.*?)^```", re.DOTALL | re.MULTILINE)
+
+
+def _keyed(value: object) -> list[dict]:
+    """Every JSON object in ``value``, at any depth, that holds a ``key``."""
+    if isinstance(value, list):
+        return [found for item in value for found in _keyed(item)]
+    if not isinstance(value, dict):
+        return []
+    own = [value] if "key" in value else []
+    return own + [found for item in value.values() for found in _keyed(item)]
+
+
+def test_each_fact_key_example_is_a_key_the_service_reads():
+    """A fact question's ``key`` and a fact answer read as the service reads them."""
+    keyed = [
+        found
+        for block in _JSON_FENCE.findall(HTTP_API.read_text(encoding="utf-8"))
+        if '"key"' in block
+        for found in _keyed(json.loads(block))
+    ]
+    questions = [row for row in keyed if "kind" in row]
+    answers = [row for row in keyed if "kind" not in row]
+
+    assert questions and len(answers) >= 2
+    for row in questions:
+        key = TypeAdapter(UnknownKey).validate_python(row["key"])
+        assert fact_kind(key) == row["kind"]
+    for row in answers:
+        FactAnswer.model_validate(row)
+
+
+def test_the_ground_block_and_table_name_every_ground_kind():
+    text = (DOCS / "Report-Schema.md").read_text(encoding="utf-8")
+    block = re.search(
+        r"^class Ground:\n    kind: \((.*?)\n    \)", text, re.DOTALL | re.MULTILINE
+    )
+    rows = table(text, "`kind`", "Carries", "Reads as")
+
+    assert block
+    assert set(re.findall(r'"([a-z-]+)"', block[1])) == set(get_args(GroundKind))
+    assert {backticked(row[0])[0] for row in rows} == set(get_args(GroundKind))
+
+
+def test_the_fact_kind_list_is_every_spelling():
+    text = HTTP_API.read_text(encoding="utf-8")
+    bullet = re.search(r"^- `kind` is (.*?)^- ", text, re.DOTALL | re.MULTILINE)
+
+    assert bullet
+    assert set(backticked(bullet[1])) == set(get_args(Spelling))
 
 
 # Model tiers: the loader's version and node keys.

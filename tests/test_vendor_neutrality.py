@@ -744,6 +744,34 @@ def test_no_document_counts_the_registry(path):
     )
 
 
+#: A prose tally of the kinds of ``GroundKind``, by the vendor tally's rule: a
+#: count of a closed set that the code holds is correct only until the next
+#: member lands. A tally counts ground kinds where its paragraph names a ground,
+#: so "five kinds of elements" stays out of scope.
+GROUND_TALLY = re.compile(
+    r"\b(?:three|four|five|six|seven|eight|nine|ten|\d+)\s+(?:ground\s+)?kinds\b",
+    re.IGNORECASE,
+)
+
+
+@pytest.mark.parametrize("path", PROSE, ids=lambda p: p.name)
+def test_no_document_counts_the_ground_kinds(path):
+    """Name the ground kinds, or write "each kind". Never write how many."""
+    paragraphs = re.split(r"\n\s*\n", path.read_text(encoding="utf-8"))
+    offenders = sorted(
+        {
+            match.group(0).lower()
+            for paragraph in paragraphs
+            if re.search(r"\bground", paragraph, re.IGNORECASE)
+            for match in GROUND_TALLY.finditer(paragraph)
+        }
+    )
+    assert not offenders, (
+        f"{path.name} counts ground kinds: {offenders}. Name the kinds, or"
+        " write it as a property, so the sentence stays true when a kind lands."
+    )
+
+
 # ---------------------------------------------------------------------------
 # A node's output schema is a vendor-neutral surface.
 #

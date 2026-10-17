@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import parse_qs, urlsplit
 
 from analysis_service.claims import FRAMEWORK_NAMES
@@ -79,6 +79,10 @@ from webapp.settings_page import EXAMPLES, IAM_SETUP, SETTINGS, Setting
 #: The value of each store setting that this app gives where no source sets
 #: it: a first run keeps its jobs in memory.
 STORE_DEFAULTS = {JOB_STORE_VAR: "memory"}
+
+#: Where a row's value comes from. ``refused`` is a file the loader refuses,
+#: which a row shows in place of a value. ``settings.js`` shows each one.
+Source = Literal["process", "page", "file", "refused", "default"]
 
 
 def with_store_defaults(env: Mapping[str, str]) -> dict[str, str]:
@@ -245,18 +249,10 @@ def _value(
     ``settings.env`` sets it."""
     var = setting.variable
     if var is not None and var in process_env:
-        return {
-            "value": _withheld(process_env[var]),
-            "source": "process",
-            "variable": var,
-        }
+        return _sourced("process", _withheld(process_env[var]), variable=var)
     base = _base(setting, files)
     if var is not None and var in page:
-        return {
-            "value": _withheld(page[var].value),
-            "source": "page",
-            "shipped": base["value"],
-        }
+        return _sourced("page", _withheld(page[var].value), shipped=base["value"])
     return base
 
 
@@ -268,16 +264,21 @@ def _base(setting: Setting, files: _Files) -> dict:
         try:
             path, value = files.lookup(*setting.file_key)
         except ConfigError as exc:
-            return {"value": None, "source": "refused", "refusal": str(exc)}
+            return _sourced("refused", None, refusal=str(exc))
         if value is not None:
-            return {"value": _override_form(value), "source": "file", "file": str(path)}
+            return _sourced("file", _override_form(value), file=str(path))
     var = setting.variable
     default: str | None = None
     if var in PASS_FLAGS:
         default = _override_form(PASS_FLAGS[var])
     elif var is not None:
         default = STORE_DEFAULTS.get(var)
-    return {"value": default, "source": "default"}
+    return _sourced("default", default)
+
+
+def _sourced(source: Source, value: str | None, **detail: str | None) -> dict[str, Any]:
+    """A row's value, where it comes from, and the detail that source shows."""
+    return {"value": value, "source": source, **detail}
 
 
 def _override_form(value: object) -> str:

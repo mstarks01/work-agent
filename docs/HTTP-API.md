@@ -400,7 +400,7 @@ the reviewer named it (`critic`).
 `critical` for STRIDE or `level 1` for ASVS:
 
 ```json
-{"key": ["flow:entity:customer>process:web-app>login", "encryption_in_transit", "", "", ""],
+{"key": ["flow:entity:customer>process:web-app>login", "encryption_in_transit", "", "", "", ""],
  "kind": "attribute", "basis": "evidence",
  "label": "Is the connection Customer → Web App encrypted?",
  "cited_by": 4, "covered_so_far": 3, "choices": [],
@@ -414,10 +414,12 @@ the reviewer named it (`critic`).
   service inferred), `assertion` (a fact
   about a principal, a credential or a component that the sources left open),
   `question` (one of a fixed list of questions about one element, such as
-  "What limits bound the requests the Web App accepts?"), or `subject` (a
+  "What limits bound the requests the Web App accepts?"), `subject` (a
   question the reviewer wrote in its own words because no listed question
-  fitted). A subject is one line, with no double quote and no control or
-  formatting character, and a key that names another subject is refused.
+  fitted), or `capability` (a closed fact about the whole application, such as
+  a browser frontend). A subject is one line, with no double quote and no
+  control or formatting character, and a key that names another subject is
+  refused.
 - `basis` is `evidence` where a finding's own evidence rests on the fact, and
   `critic` where only the reviewer's verdict names it. The `evidence` questions
   come first, and their order does not change when the analysis runs again on
@@ -468,8 +470,8 @@ Answer with `facts` beside or instead of `links`:
 
 ```json
 {"facts": [{"key": ["flow:entity:customer>process:web-app>login",
-                    "encryption_in_transit", "", "", ""], "value": "TLS 1.3"},
-           {"key": ["process:web-app", "", "", "", "capacity-limits"],
+                    "encryption_in_transit", "", "", "", ""], "value": "TLS 1.3"},
+           {"key": ["process:web-app", "", "", "", "capacity-limits", ""],
             "facets": {"rate": "yes", "quota": "not applicable"}}]}
 ```
 
@@ -538,7 +540,8 @@ own words, such as an exception to a "yes". It follows the answer on its line
 of the answers source, and no code reads a fact out of it. Each fact question
 also carries `history`, what became of it at the pause: `skipped` (you skipped
 it), `unanswered` (it was shown and left blank), `partial` (some facets were
-answered), or `open` (it was never shown).
+answered), `unknown` (the answer was "I don't know"), or `open` (it was never
+shown).
 A follow-up must add information: a new or moved link, or an answer whose
 known content changes. Where every answer is `unknown` or repeats an earlier
 answer, it is refused with `400`, no job starts, and the follow-up is still

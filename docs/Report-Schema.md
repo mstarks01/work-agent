@@ -352,6 +352,7 @@ class Ground:
         | "derived-fact"
         | "absent-element"
         | "assertion"
+        | "unknown-assertion"
     )
     text: str  # quote: the verbatim span, ≤1000 chars
     source_label: str  # quote: names one of input.sources
@@ -359,7 +360,7 @@ class Ground:
     attribute: str  # either attribute kind: the attribute relied on
     flow_id: str  # derived-fact: a data flow in system_model
     term: str  # absent-element: a word no element's text names
-    assertion: str  # assertion: a row's identity in assertions.catalog
+    assertion: str  # either assertion kind: a row's identity in assertions.catalog
 ```
 
 | `kind` | Carries | Reads as |
