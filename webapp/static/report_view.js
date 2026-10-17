@@ -520,26 +520,17 @@
       card.append(why);
     }
 
-    // The facts a needs-info finding waits on, each by what it asks and why
-    // it is still open. The critic's own sentence restates them, so it moves
-    // under the toggle rather than repeating above it.
-    const conditional = t.verdict.status === "needs-info" && t.verdict.related_unknowns.length;
-    const waits = conditional ? (CONDITIONS[`${t.framework}/${t.id}`] || []) : [];
-    if (conditional) {
+    // The facts a needs-info finding waits on, each by the label the server
+    // gives it and why it is still open. The critic's own sentence restates
+    // them, so it moves under the toggle rather than repeating above it.
+    const waits = CONDITIONS[`${t.framework}/${t.id}`] || [];
+    if (waits.length) {
       const u = el("div","unknown");
       u.append(el("b", null, "Needs info."), " Missing information:");
-      if (waits.length) {
-        const list = el("ul");
-        waits.forEach(w => list.append(el("li", null, `${w.label} — ${WHY_OPEN[w.status] || w.status}`)));
-        u.append(list, el("div", null,
-          "Until these are confirmed, this finding is neither confirmed nor cleared."));
-      } else {
-        u.append(" ");
-        t.verdict.related_unknowns.forEach((r, i) => {
-          if (i) u.append(", ");
-          u.append(ref(r.element_id), " → ", code(r.attribute));
-        });
-      }
+      const list = el("ul");
+      waits.forEach(w => list.append(el("li", null, `${w.label} — ${WHY_OPEN[w.status] || w.status}`)));
+      u.append(list, el("div", null,
+        "Until these are confirmed, this finding is neither confirmed nor cleared."));
       card.append(u);
     }
 
@@ -577,7 +568,7 @@
     // `details` element, so the browser does the toggling, keyboard included.
     const prov = el("details","prov");
     prov.append(el("summary", null, "Show technical provenance"));
-    if (conditional && t.verdict.reason) {
+    if (waits.length && t.verdict.reason) {
       const reason = el("div","field");
       reason.append(lbl("The critic's reason"), el("br"), prose(t.verdict.reason));
       prov.append(reason);
@@ -671,10 +662,9 @@
           body.append(el("div", "lbl", "Review"));
           body.append(proseEl("p", null, claim.verdict.reason));
         }
-        (claim.verdict.related_unknowns || []).forEach(u => {
+        (CONDITIONS[`${block.framework}/${claim.id}`] || []).forEach(w => {
           body.append(el("div", "lbl", "Still to answer"));
-          body.append(proseEl("p", null,
-            u.subject || `${u.attribute} on ${u.element_id}`));
+          body.append(el("p", null, w.label));
         });
       } else if (entry) {
         if (entry.reason) body.append(proseEl("p", null, entry.reason));
