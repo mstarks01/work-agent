@@ -380,7 +380,7 @@ def flow_label(flow_id: str) -> str:
 #: Stated on the field because :func:`derive_element_id` cannot always be asked.
 #: It raises when an element's *name* slugs to empty -- a name of ``"!!!"`` --
 #: and the ``id-mismatch`` rule that would otherwise pin the ID to the derived
-#: one is skipped exactly then, so the emitted ID survived verbatim with only a
+#: one checks only the prefix then, so the emitted slug survives with only a
 #: length bound. ``references.py`` records that hole as a reference-resolution
 #: one; it is also a fencing one, because an element ID is rendered into a lane
 #: agent's prompt in a table that carries no fence of its own, and a value with

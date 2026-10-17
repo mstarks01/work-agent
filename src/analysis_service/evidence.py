@@ -650,8 +650,7 @@ def _element_gloss(element: Element) -> str:
         return f"flow, `{element.source}` to `{element.destination}`"
     if isinstance(element, TrustBoundary):
         return "trust boundary"
-    kind = element.id.partition(":")[0]
-    return f"{kind} in `{element.trust_zone}`"
+    return f"{element.id_prefix} in `{element.trust_zone}`"
 
 
 def _gloss(

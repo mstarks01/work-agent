@@ -68,6 +68,11 @@ def test_only_a_renaming_code_brings_the_flows_in():
     assert repair_scope(issues, previous) == ("elements", ["process:web-app"])
 
 
+def test_an_id_mismatch_puts_the_flows_through_the_element_in_scope():
+    """The repair of an ID that does not fit its element changes the ID."""
+    assert "id-mismatch" in RENAMING_CODES
+
+
 def test_every_renaming_code_is_a_real_issue_code():
     assert RENAMING_CODES <= set(get_args(IssueCode))
 
