@@ -424,10 +424,18 @@ class ModelTierConfig(BaseModel):
             allowed = vendor_for(vendor).credential_modes
             if len(allowed) > 1:
                 names = ", ".join(sorted(m.value for m in allowed))
+                tiers = ", ".join(
+                    tier
+                    for tier in TIER_NAMES
+                    if tier in self.bound_tiers
+                    and tier in self.tiers
+                    and self.tiers[tier].vendor == vendor
+                )
                 problems.append(
-                    f"vendor {vendor!r} allows more than one credential mode"
-                    f" ({names}), so credentials.{vendor} must declare which"
-                    " one this deployment uses"
+                    f"vendor {vendor!r} (selected by tiers: {tiers}) allows more"
+                    f" than one credential mode ({names}); declare the one this"
+                    f" deployment uses in credentials.{vendor} or"
+                    f" {credentials_env_var_for(vendor)}"
                 )
         return problems
 
@@ -926,4 +934,9 @@ def load_model_tiers(
     try:
         return ModelTierConfig(**raw)
     except ValidationError as exc:
-        raise ModelConfigError(f"{path}: {exc}") from exc
+        problems = "; ".join(
+            f"{'.'.join(str(step) for step in error['loc']) or '(root)'}:"
+            f" {error['msg'].removeprefix('Value error, ')}"
+            for error in exc.errors(include_input=False, include_url=False)
+        )
+        raise ModelConfigError(f"{path}: {problems}") from exc

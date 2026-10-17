@@ -88,6 +88,10 @@ Every one is reached through a single adapter (LiteLLM); there is no per-vendor
 code path, and Gemini reaches Vertex the same way everything else does. The pair above is deliberately
 mixed, because that is an ordinary configuration rather than an advanced one.
 
+**A model identifier holds 1 to 128 characters.** Each character is a letter,
+a digit or one of `.`, `_`, `:`, `/`, `@` and `-`, and the first is a letter or
+a digit. The startup refuses another name before it applies the rules below.
+
 **A Bedrock model identifier carries the family segment.** Claude on Bedrock is
 `[<scope>.]anthropic.claude-<name>-<major>[-<minor>]`, with an optional date and
 an optional `-v<n>[:<m>]` build tail — `anthropic.claude-opus-5`, or
@@ -167,6 +171,12 @@ like `vertex` + an API key cannot be written down:
 | `openrouter` | `api_key` | `ANALYSIS_OPENROUTER_API_KEY_FILE` |
 
 <!-- /every-vendor -->
+
+Each variable that is not a key must match a pattern, or the tier does not
+build. A region or a location, such as `ANALYSIS_BEDROCK_REGION`, matches
+`[a-z0-9-]{1,32}`. `ANALYSIS_VERTEX_PROJECT` matches
+`[a-z][a-z0-9-]{4,28}[a-z0-9]`, so the service refuses a domain-scoped project
+such as `example.com:proj`.
 
 `api_key` means the deployment passes the key. The service reads the key only
 from the file that the `_FILE` variable above names. It refuses a key in the
@@ -1333,8 +1343,8 @@ backend.
 | `ANALYSIS_DATABASE_REGION` | an AWS region, for example `eu-west-1` | Required by `rds`. Refused by `password`. |
 | `ANALYSIS_DATABASE_CA_FILE` | the path of a PEM file of CA certificates | Optional, for PostgreSQL. Unset trusts the system CA bundle. |
 | `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
-| `ANALYSIS_OBJECT_BUCKET` | the name of a bucket | Required by `s3`. |
-| `ANALYSIS_OBJECT_REGION` | the name of a region | Required by `s3`. |
+| `ANALYSIS_OBJECT_BUCKET` | the name of a bucket: 3 to 63 lower-case letters, digits, `.` and `-`, with a letter or a digit at each end | Required by `s3`. |
+| `ANALYSIS_OBJECT_REGION` | the name of a region, which matches `[a-z0-9-]{1,32}` | Required by `s3`. |
 | `ANALYSIS_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. |
 | `ANALYSIS_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. |
 | `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3`. |

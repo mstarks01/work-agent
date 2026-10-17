@@ -33,6 +33,7 @@ or the text of a provider's error.
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import datetime
 from typing import Any, Literal, get_args
@@ -50,11 +51,16 @@ from analysis_service.store_settings import (
     refuse_unread,
 )
 from analysis_service.vendors import (
+    REGION,
     CredentialMode,
     ProviderAuthError,
     read_secret,
     refused_var,
 )
+
+#: An S3 bucket name: 3 to 63 lower-case letters, digits, dots and hyphens,
+#: with a letter or digit at each end.
+_BUCKET = re.compile(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]")
 
 #: How a request names the bucket: in the host name, or in the path. The
 #: values are the ``addressing_style`` values of ``botocore``.
@@ -150,10 +156,12 @@ def _endpoint(env: Mapping[str, str]) -> str | None:
     return value
 
 
-def _required(env: Mapping[str, str], var: str) -> str:
+def _required(env: Mapping[str, str], var: str, shape: re.Pattern[str]) -> str:
     value = env.get(var, "").strip()
     if not value:
         raise StoreConfigError(f"set {var} for the s3 object store")
+    if shape.fullmatch(value) is None:
+        raise StoreConfigError(f"{var} must match {shape.pattern}")
     return value
 
 
@@ -196,8 +204,8 @@ class S3ObjectStore:
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> S3ObjectStore:
         _refuse_stray_settings(env)
-        bucket = _required(env, "ANALYSIS_OBJECT_BUCKET")
-        region = _required(env, "ANALYSIS_OBJECT_REGION")
+        bucket = _required(env, "ANALYSIS_OBJECT_BUCKET", _BUCKET)
+        region = _required(env, "ANALYSIS_OBJECT_REGION", REGION)
         addressing = closed_setting(
             env.get("ANALYSIS_OBJECT_ADDRESSING", "").strip() or "virtual",
             "ANALYSIS_OBJECT_ADDRESSING",

@@ -453,6 +453,22 @@ def test_no_vendor_field_has_a_default():
     )
 
 
+def test_every_variable_that_is_not_a_secret_has_a_shape():
+    """A value that is not a secret is checked against its shape at the build."""
+    unshaped = sorted(
+        f"{vendor.name}.{entry.var}"
+        for vendor in VENDORS.values()
+        for source in vendor.credentials.values()
+        for entry in source.env
+        if (entry.shape is None) is not entry.secret
+    )
+    assert not unshaped, (
+        f"these entries break the rule: {unshaped}. An entry that is not a"
+        " secret needs a shape, and a secret entry takes none, because"
+        " secret_refusal is its rule."
+    )
+
+
 def test_every_vendor_declares_at_least_one_credential_mode():
     # ``.get``, so a row missing from the registry is reported here rather
     # than raising. This module has to survive a half-built registry: that is

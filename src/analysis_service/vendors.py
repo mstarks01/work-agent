@@ -114,6 +114,18 @@ VERTEX_LOCATION_VAR = "ANALYSIS_VERTEX_LOCATION"
 # would let a token nobody chose authenticate a run.
 BEDROCK_REGION_VAR = "ANALYSIS_BEDROCK_REGION"
 
+#: A cloud region or location. The Vertex location, the Bedrock region and the
+#: S3 object store region all match it in full.
+REGION = re.compile(r"[a-z0-9-]{1,32}")
+
+#: A Google Cloud project ID. The domain-scoped form ``example.com:proj`` does
+#: not match.
+VERTEX_PROJECT = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]")
+
+#: The characters of a model identifier, from 1 to 128 of them.
+#: :meth:`Vendor.validate_model` checks it first.
+MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}")
+
 
 class ProviderAuthError(ConfigError):
     """Outbound provider credentials are missing or unusable.
@@ -256,11 +268,16 @@ class _CredentialVar:
     secret ones, because that is what must never survive into a job summary.
     A region is required and is not a secret, and one list answering both
     questions gave the wrong answer to the second.
+
+    ``shape`` is the pattern that a value which is not a secret must match in
+    full. A secret entry has no shape, because
+    :func:`~analysis_service.config_files.secret_refusal` is its rule.
     """
 
     kwarg: str
     var: str
     secret: bool
+    shape: re.Pattern[str] | None
 
 
 @dataclass(frozen=True)
@@ -298,7 +315,8 @@ def _api_key_var(vendor: VendorName) -> str:
 def _api_key_source(vendor: VendorName) -> _CredentialSource:
     """The source every key-bearing vendor shares: its own scoped variable, and nothing fixed."""
     return _CredentialSource(
-        env=(_CredentialVar("api_key", _api_key_var(vendor), secret=True),), fixed={}
+        env=(_CredentialVar("api_key", _api_key_var(vendor), secret=True, shape=None),),
+        fixed={},
     )
 
 
@@ -1148,8 +1166,12 @@ class Vendor:
         ``source`` names where the string came from (a config key or an env var)
         so the error points ops at the knob to turn.
         """
-        if not model or model != model.strip():
-            raise ValueError(f"{source}: {model!r} is not a model identifier")
+        if MODEL_NAME.fullmatch(model) is None:
+            raise ValueError(
+                f"{source}: {model!r} is not a model identifier; use 1 to 128"
+                " letters, digits and the characters . _ : / @ -, with a letter"
+                " or digit first"
+            )
         resource = _resource_form(model)
         if resource is not None:
             raise ValueError(
@@ -1266,6 +1288,11 @@ class Vendor:
                 f"vendor {self.name!r} needs {entry.var};"
                 f" it is unset or empty (credential mode: {mode.value})"
             )
+        if entry.shape is not None and entry.shape.fullmatch(value) is None:
+            raise ProviderAuthError(
+                f"vendor {self.name!r} needs {entry.var} to match"
+                f" {entry.shape.pattern}; it does not"
+            )
         return value
 
 
@@ -1328,9 +1355,17 @@ VENDORS: dict[VendorName, Vendor] = {
         credentials={
             CredentialMode.IAM: _CredentialSource(
                 env=(
-                    _CredentialVar("vertex_project", VERTEX_PROJECT_VAR, secret=False),
                     _CredentialVar(
-                        "vertex_location", VERTEX_LOCATION_VAR, secret=False
+                        "vertex_project",
+                        VERTEX_PROJECT_VAR,
+                        secret=False,
+                        shape=VERTEX_PROJECT,
+                    ),
+                    _CredentialVar(
+                        "vertex_location",
+                        VERTEX_LOCATION_VAR,
+                        secret=False,
+                        shape=REGION,
                     ),
                 ),
                 fixed={},
@@ -1401,8 +1436,15 @@ VENDORS: dict[VendorName, Vendor] = {
             # use.
             CredentialMode.API_KEY: _CredentialSource(
                 env=(
-                    _CredentialVar("api_key", _api_key_var("bedrock"), secret=True),
-                    _CredentialVar("aws_region_name", BEDROCK_REGION_VAR, secret=False),
+                    _CredentialVar(
+                        "api_key", _api_key_var("bedrock"), secret=True, shape=None
+                    ),
+                    _CredentialVar(
+                        "aws_region_name",
+                        BEDROCK_REGION_VAR,
+                        secret=False,
+                        shape=REGION,
+                    ),
                 ),
                 fixed={},
             ),
@@ -1420,7 +1462,12 @@ VENDORS: dict[VendorName, Vendor] = {
             # The terminal branch has no ceiling.
             CredentialMode.IAM: _CredentialSource(
                 env=(
-                    _CredentialVar("aws_region_name", BEDROCK_REGION_VAR, secret=False),
+                    _CredentialVar(
+                        "aws_region_name",
+                        BEDROCK_REGION_VAR,
+                        secret=False,
+                        shape=REGION,
+                    ),
                 ),
                 fixed={"api_key": ""},
             ),

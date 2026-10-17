@@ -22,7 +22,9 @@ from analysis_service.vendors import (
     _CATCH_ALL,
     _CLAUDE_RULE,
     CREDENTIAL_MODE_NOTES,
+    MODEL_NAME,
     REASONING_KWARG,
+    REGION,
     SECRET_FILE_SUFFIX,
     VENDOR_NAMES,
     VENDORS,
@@ -164,7 +166,7 @@ class TestCredentialModes:
         the next one will not.
         """
         vendor = vendor_for(name)
-        env = dict.fromkeys(vendor.required_env_vars(mode), "value")
+        env = dict.fromkeys(vendor.required_env_vars(mode), "example-1")
         kwargs = vendor.credential_kwargs(env, mode)
         assert kwargs.get("api_key", "") == "", (
             f"{name} under {mode.value} passes a credential value; this mode"
@@ -301,12 +303,15 @@ class TestPlatformIdentity:
     def test_vertex_passes_a_project_and_a_location_and_no_credential(self):
         kwargs = vendor_for("vertex").credential_kwargs(
             {
-                "ANALYSIS_VERTEX_PROJECT": "p",
+                "ANALYSIS_VERTEX_PROJECT": "my-project",
                 "ANALYSIS_VERTEX_LOCATION": "us-east5",
             },
             CredentialMode.IAM,
         )
-        assert kwargs == {"vertex_project": "p", "vertex_location": "us-east5"}
+        assert kwargs == {
+            "vertex_project": "my-project",
+            "vertex_location": "us-east5",
+        }
 
     def test_no_google_credentials_file_is_required(self):
         """Corporate Google IAM runs without a credentials file.
@@ -316,7 +321,10 @@ class TestPlatformIdentity:
         ``vertex_llm_base.load_auth`` takes ``credentials=None`` and calls
         ``google.auth.default()``, which resolves exactly that identity.
         """
-        env = {"ANALYSIS_VERTEX_PROJECT": "p", "ANALYSIS_VERTEX_LOCATION": "us-east5"}
+        env = {
+            "ANALYSIS_VERTEX_PROJECT": "my-project",
+            "ANALYSIS_VERTEX_LOCATION": "us-east5",
+        }
         assert "GOOGLE_APPLICATION_CREDENTIALS" not in env
         assert vendor_for("vertex").credential_kwargs(env, CredentialMode.IAM)
 
@@ -332,10 +340,96 @@ class TestPlatformIdentity:
         "missing", ["ANALYSIS_VERTEX_PROJECT", "ANALYSIS_VERTEX_LOCATION"]
     )
     def test_each_addressing_variable_is_still_required(self, missing):
-        env = {"ANALYSIS_VERTEX_PROJECT": "p", "ANALYSIS_VERTEX_LOCATION": "us-east5"}
+        env = {
+            "ANALYSIS_VERTEX_PROJECT": "my-project",
+            "ANALYSIS_VERTEX_LOCATION": "us-east5",
+        }
         del env[missing]
         with pytest.raises(ProviderAuthError, match=missing):
             vendor_for("vertex").credential_kwargs(env, CredentialMode.IAM)
+
+
+class TestValueShapes:
+    """A model name, a project and a region each match one pattern in full."""
+
+    VERTEX_ENV: ClassVar[dict[str, str]] = {
+        "ANALYSIS_VERTEX_PROJECT": "my-project",
+        "ANALYSIS_VERTEX_LOCATION": "us-east5",
+    }
+
+    @pytest.mark.parametrize(
+        ("var", "value"),
+        [
+            ("ANALYSIS_VERTEX_PROJECT", "example.com:proj"),
+            ("ANALYSIS_VERTEX_PROJECT", "proj"),
+            ("ANALYSIS_VERTEX_PROJECT", "my-project-"),
+            ("ANALYSIS_VERTEX_LOCATION", "US-EAST5"),
+            ("ANALYSIS_VERTEX_LOCATION", "r" * 33),
+        ],
+    )
+    def test_a_vertex_value_off_its_shape_is_refused(self, var, value):
+        env = {**self.VERTEX_ENV, var: value}
+        with pytest.raises(ProviderAuthError, match=f"needs {var} to match"):
+            vendor_for("vertex").credential_kwargs(env, CredentialMode.IAM)
+
+    def test_the_refusal_does_not_repeat_the_value(self):
+        env = {**self.VERTEX_ENV, "ANALYSIS_VERTEX_PROJECT": "example.com:proj"}
+        with pytest.raises(ProviderAuthError) as refused:
+            vendor_for("vertex").credential_kwargs(env, CredentialMode.IAM)
+        assert "example.com" not in str(refused.value)
+
+    def test_a_bedrock_region_off_its_shape_is_refused(self):
+        env = {"ANALYSIS_BEDROCK_REGION": "us_east_1"}
+        with pytest.raises(ProviderAuthError, match="ANALYSIS_BEDROCK_REGION"):
+            vendor_for("bedrock").credential_kwargs(env, CredentialMode.IAM)
+
+    def test_every_region_reads_one_constant(self):
+        from analysis_service import s3_objects
+
+        regions = {
+            entry.var: entry.shape
+            for vendor in VENDORS.values()
+            for source in vendor.credentials.values()
+            for entry in source.env
+            if entry.kwarg in {"vertex_location", "aws_region_name"}
+        }
+        assert set(regions) == {"ANALYSIS_VERTEX_LOCATION", "ANALYSIS_BEDROCK_REGION"}
+        assert all(shape is REGION for shape in regions.values())
+        assert s3_objects.REGION is REGION
+
+    def test_the_charset_refuses_only_price_rows_and_aliases_in_the_map(self):
+        """The charset refuses two kinds of name in the pinned litellm map.
+
+        A Bedrock name with a ``*`` where a region goes is a price row, and not
+        a name a vendor serves. An OpenRouter ``~...-latest`` name is a
+        floating alias, which the floating-word rule refuses too. Each other
+        mapped name passes the charset, so the later rules decide it.
+        """
+        from litellm import model_cost
+
+        by_prefix = {vendor.prefix: vendor for vendor in VENDORS.values()}
+        mapped = [
+            (vendor, model)
+            for key in model_cost
+            for prefix, separator, model in [key.partition("/")]
+            if (vendor := by_prefix.get(f"{prefix}{separator}")) is not None and model
+        ]
+        refused = sorted(
+            model for _, model in mapped if MODEL_NAME.fullmatch(model) is None
+        )
+        assert len(mapped) > 300
+        assert refused
+        assert all(
+            model.startswith("*/")
+            or (model.startswith("~") and model.endswith("-latest"))
+            for model in refused
+        ), refused
+        for vendor, model in mapped:
+            if MODEL_NAME.fullmatch(model) is not None:
+                try:
+                    vendor.validate_model(model, "test")
+                except ValueError as exc:
+                    assert "is not a model identifier" not in str(exc)
 
 
 class TestWhichVariablesAreSecret:

@@ -192,6 +192,13 @@ class TestTheSettings:
         [
             ({"ANALYSIS_OBJECT_BUCKET": None}, "set ANALYSIS_OBJECT_BUCKET"),
             ({"ANALYSIS_OBJECT_REGION": " "}, "set ANALYSIS_OBJECT_REGION"),
+            ({"ANALYSIS_OBJECT_BUCKET": "Jobs"}, "ANALYSIS_OBJECT_BUCKET must match"),
+            ({"ANALYSIS_OBJECT_BUCKET": "jobs_1"}, "ANALYSIS_OBJECT_BUCKET must match"),
+            ({"ANALYSIS_OBJECT_BUCKET": "j" * 64}, "ANALYSIS_OBJECT_BUCKET must match"),
+            (
+                {"ANALYSIS_OBJECT_REGION": "EU-WEST-1"},
+                "ANALYSIS_OBJECT_REGION must match",
+            ),
             (
                 {"ANALYSIS_OBJECT_ENDPOINT": "http://objects.example"},
                 "must be an https URL",
