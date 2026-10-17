@@ -467,6 +467,36 @@ class TestBothRoutesFollowAnEndpointByOneRule:
 
         assert on_full == on_compact == (expected, expected is None)
 
+    @pytest.mark.parametrize(
+        ("name", "refused"),
+        [("!!!", True), ("数据库", True), ("İ", False), ("\u212a", False)],
+    )
+    def test_the_routes_refuse_one_set_of_names(self, name, refused):
+        """One rule decides which names have a slug, on both routes.
+
+        ``İ`` and the Kelvin sign have no ASCII letter, and each still slugs.
+        """
+        full = valid_model().model_dump(mode="json")
+        compact = as_compact(full)
+        full["processes"][0]["name"] = name
+        compact["processes"][0]["name"] = name
+
+        results = [
+            parse_extraction(payload, extraction_format)
+            for payload, extraction_format in (
+                (full, FULL_FORMAT),
+                (compact, COMPACT_FORMAT),
+            )
+        ]
+
+        for model, _ in results:
+            assert model is not None
+        on_full, on_compact = (
+            [(issue.code, issue.field) for issue in issues] for _, issues in results
+        )
+        assert on_full == on_compact
+        assert (("empty-slug", "name") in on_full) is refused
+
     def test_both_routes_read_one_set_of_zoned_types(self):
         """The full route reads ``zoned_elements()``, the compact route the
         ``ZonedElement`` union; a type in one and not the other splits them."""
@@ -500,20 +530,15 @@ class TestMalformedOutputFailsExplicitly:
 
         assert issues[0].message.startswith("processes.0.exposure")
 
-    def test_a_name_that_slugs_to_nothing_is_refused(self):
-        """There is no emitted ID here to fall back on, so the name must slug.
-
-        The full route lets such a name through with its emitted ID standing
-        unchecked — a hole ``system_model`` records. This route closes it,
-        because an element whose ID cannot be derived has no identity at all.
-        """
+    def test_a_name_that_slugs_to_nothing_is_refused_by_the_gate(self):
+        """The gate refuses the name, so the repair pass reads a full model."""
         payload = compact_fixture()
         payload["processes"][0]["name"] = "!!!"
 
         model, issues = parse_extraction(payload, COMPACT_FORMAT)
 
-        assert model is None
-        assert codes(issues) == ["schema"]
+        assert model is not None
+        assert codes(issues) == ["empty-slug"]
 
     def test_a_ref_outside_the_slug_vocabulary_is_refused(self):
         """The ref pattern is a fence, not a tidiness rule.

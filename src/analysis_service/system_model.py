@@ -377,18 +377,8 @@ def flow_label(flow_id: str) -> str:
 #: ``<prefix>:<slug>``, or any version's flow shape, taken from
 #: :data:`FLOW_ID_RULES` so the schema admits every version whose decoder ships.
 #:
-#: Stated on the field because :func:`derive_element_id` cannot always be asked.
-#: It raises when an element's *name* slugs to empty -- a name of ``"!!!"`` --
-#: and the ``id-mismatch`` rule that would otherwise pin the ID to the derived
-#: one checks only the prefix then, so the emitted slug survives with only a
-#: length bound. ``references.py`` records that hole as a reference-resolution
-#: one; it is also a fencing one, because an element ID is rendered into a lane
-#: agent's prompt in a table that carries no fence of its own, and a value with
-#: a newline and a backtick run there opens a block that swallows every fenced
-#: block after it. A self-sized fence is only safe while its neighbours are
-#: fenced too.
-#:
-#: The 300-character bound on the field is the other half of that fence, and
+#: It bounds an ID a model emitted before the gate compares that ID with
+#: :func:`derive_element_id`. The field also carries a 300-character bound, and
 #: version 2 spends 9 to 13 characters of it: the two endpoint prefixes, their
 #: colons and the third delimiter, less the four ``-to-`` costs. Measured over
 #: the corpus the longest derived flow ID is 83 characters, so the headroom is
@@ -1150,8 +1140,8 @@ def _rewrite_id(
     """Overwrite one element's ID with its derived form, recording the change.
 
     A name that normalizes to an empty slug has no derived form; the emitted ID
-    is left alone so the validity gate reports it rather than this pass
-    guessing at it.
+    is left alone, and the validity gate refuses the element as ``empty-slug``
+    rather than this pass guessing at it.
 
     An emitted ID in ``ambiguous`` — one more than one element arrived with —
     still gives way to the derived ID, because the name is authoritative, but

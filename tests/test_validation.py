@@ -57,20 +57,19 @@ class TestDeterministicIds:
         assert issues[0].element_id == "flow:login"
         assert "flow:entity:customer>process:web-app>login" in issues[0].message
 
-    def test_an_id_with_the_prefix_of_another_type_is_reported(self):
-        """A name that slugs to empty has no derived ID, and the ID it carries
-        must still start with its own type's prefix."""
+    @pytest.mark.parametrize("name", ["数据库", "!!!", "'"])
+    def test_a_name_that_slugs_to_empty_is_refused(self, name):
+        """A name with no slug has no derived ID, so the element has no identity."""
         data = valid_model().model_dump(mode="json")
         data["trust_boundaries"].append(
-            {"id": "process:ghost", "name": "数据库", "kind": "other"}
+            {"id": "process:ghost", "name": name, "kind": "other"}
         )
 
         _, issues = parse_and_validate(data, normalize_ids=True)
 
-        assert [(i.code, i.element_id) for i in issues] == [
-            ("id-mismatch", "process:ghost")
+        assert [(i.code, i.element_id, i.field) for i in issues] == [
+            ("empty-slug", "process:ghost", "name")
         ]
-        assert "'boundary'" in issues[0].message
 
 
 class TestReferentialIntegrity:
@@ -626,8 +625,9 @@ class TestExcerptLabelsSnap:
 
 class TestTheElementTypeHasOneRule:
     """An element's type is its class. A reader that holds an element reads
-    the class; a reader that holds only an ID reads its prefix, and the gate
-    refuses each element whose prefix is not its class's.
+    the class; a reader that holds only an ID reads its prefix. Only an element
+    whose name slugs to empty keeps an ID that the class did not derive, and
+    the gate refuses each such element.
     """
 
     @staticmethod
@@ -656,22 +656,15 @@ class TestTheElementTypeHasOneRule:
             for element in model.elements()
             if _ELEMENT_TYPES[element.id.partition(":")[0]] is not type(element)
         }
-        refused = {i.element_id for i in issues if i.code == "id-mismatch"}
+        refused = {i.element_id for i in issues if i.code == "empty-slug"}
         assert prefix_disagrees == refused == {"entity:ghost", "process:ghost"}
 
 
 class TestAnElementIdCannotCarryStructure:
-    """An element ID is rendered into a lane agent's prompt, in a roster table
-    that carries no fence of its own -- correctly, because a table is what the
-    agent is meant to read.
+    """The schema admits an emitted ID only in the shape a derived ID has.
 
-    That is safe only while an ID is a slug. It is derived as one, and the
-    `id-mismatch` rule pins the emitted ID to the derived one -- except that
-    `derive_element_id` raises when the element's *name* slugs to empty, and the
-    rule checks only the prefix then. So a name of `"!!!"` carried an arbitrary ID,
-    bounded only by a length, into instruction position: with a newline and a
-    backtick run it opened a block that swallowed every fenced block after it,
-    the caller's own fenced sources among them.
+    An ID that is not a typed slug fails as `schema`, whatever the element's
+    name, before the gate compares the ID with the derived one.
     """
 
     def _model_with_id(self, element_id: str, name: str) -> dict:

@@ -220,13 +220,6 @@ ZONE_REF = (
 #: ID of another.
 PROVISIONAL_PREFIX = "ref_"
 
-#: A name that :func:`~analysis_service.system_model.normalize_name` can slug.
-#: It needs one ASCII alphanumeric character; a name of ``"!!!"`` normalizes to
-#: an empty slug and has no derived ID at all. The full route lets such a name
-#: through with its emitted ID standing unchecked; this route refuses it at the
-#: schema, because here there is no emitted ID to fall back on.
-NAMEABLE = r"[A-Za-z0-9]"
-
 
 def _ref_field(pattern: str = REF) -> Any:
     """One field holding a ref: the length bound and the pattern together.
@@ -261,7 +254,7 @@ class _CompactElement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     ref: str = _ref_field()
-    name: str = Field(min_length=1, max_length=200, pattern=NAMEABLE)
+    name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
     assets: list[str] = assets_field()
     source_excerpt: str = Field(default="", max_length=1000)

@@ -27,27 +27,20 @@ safe.
 The argument comes first, because it says how often the guard binds. An element
 ID is ``derive_element_id``'s output, and every ID a validated model carries
 equals it: the gate's ``id-mismatch`` rule enforces that for every element, on
-every path, whether or not the caller asked for normalization. That output runs
+every path, whether or not the caller asked for normalization, and its
+``empty-slug`` rule refuses each element that has no derived ID. That output runs
 through :func:`~analysis_service.system_model.normalize_name`, which lowercases
 the name, elides an apostrophe and maps every other character outside
 ``[a-z0-9]`` to ``-``. An ID therefore carries neither an uppercase character
 nor a space, and folding one cannot merge two elements a run could otherwise
 tell apart.
 
-There is one hole, and it is why the guard exists rather than decorating the
-module. ``normalize_name`` raises on a name that slugs to nothing, and the gate
-answers that by checking only the ID's prefix for that element rather than
-guessing its slug.
-Two elements named ``"!!!"`` and ``"???"`` may therefore carry ``process:FOO``
-and ``process:foo`` and pass. Under a fold alone they would be one element.
-Under the guard, the reference matches two known spellings, resolves to neither,
-and is left for the caller's check exactly as an unresolvable reference is.
-
 Source labels are the caller's bytes rather than derived slugs, so the argument
 does not hold for them at all. ``"System description"`` and ``"SYSTEM
-DESCRIPTION"`` are two distinct labels a job may legally carry at once. That is
-the same situation the hole produces, met by the same guard, which is what lets
-one function serve both without either being a special case.
+DESCRIPTION"`` are two distinct labels a job may legally carry at once. Under a
+fold alone they would be one label. Under the guard, the reference matches two
+known spellings, resolves to neither, and is left for the caller's check exactly
+as an unresolvable reference is.
 
 Two further rungs are refused, for the reason ``grounding`` refuses
 punctuation-blindness: a rung nobody has measured is a precision cost nobody has

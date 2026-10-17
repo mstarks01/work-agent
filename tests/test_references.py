@@ -53,16 +53,6 @@ class TestCanonical:
         labels = {"System description", "SYSTEM DESCRIPTION"}
         assert canonical("System description", labels) == "System description"
 
-    def test_two_ids_differing_only_in_case_resolve_to_neither(self):
-        """The hole the guard is for, pinned as a case rather than an argument.
-
-        ``normalize_name`` raises on a name that slugs to nothing and the gate
-        checks only the ID's prefix rather than guessing, so a model naming every
-        element ``"!!!"`` and ``"???"`` really can carry both of these at once.
-        """
-        assert canonical("process:foo", {"process:FOO", "process:foo"}) == "process:foo"
-        assert canonical("Process:Foo", {"process:FOO", "process:foo"}) == ""
-
 
 class TestRefusedRungs:
     """The two rungs this module deliberately does not have.

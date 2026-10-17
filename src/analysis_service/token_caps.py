@@ -122,7 +122,11 @@ TOKEN_CAPS: dict[str, int] = {
     # flow's `encryption_in_transit` (QA-2026-10-13-05). Terra read "over
     # HTTPS" as a protocol only and left the encryption open on nine flows of
     # the example, where luna and the blessed references record it.
-    "prompts/extract": 4170,
+    #
+    # It says that a `name` needs a Latin letter or digit (ADR 0096). A name
+    # with neither has no ID, and the gate refuses it as `empty-slug` and
+    # spends the repair pass; the rule tells the model how to name such a thing.
+    "prompts/extract": 4700,
     # The compact transport's delta, appended after the body above. It is the
     # whole cost of the route on the input side, paid on every extraction call
     # and cacheable, against the output it removes — see

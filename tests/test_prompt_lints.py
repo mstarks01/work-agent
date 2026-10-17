@@ -961,6 +961,10 @@ EXTRACTION_FAILURE_RULES: dict[str, tuple[str, str]] = {
         EXTRACT_COMPACT_PROMPT_NAME,
     ),
     "id-mismatch": ("IDs are recomputed from the names you give", EXTRACT_PROMPT_NAME),
+    "empty-slug": (
+        "A `name` needs at least one Latin letter or digit",
+        EXTRACT_PROMPT_NAME,
+    ),
     "invalid-reference": (
         "Both endpoints must be zoned elements you have already created",
         EXTRACT_PROMPT_NAME,
