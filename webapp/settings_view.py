@@ -48,12 +48,13 @@ from analysis_service.model_tiers import (
     credentials_env_var_for,
     upstreams_env_var_for,
 )
-from analysis_service.objects import OBJECT_STORES
+from analysis_service.objects import OBJECT_STORES, object_store_name
 from analysis_service.settings_variables import deployment_variables, secret_vars
 from analysis_service.store_backends import (
     JOB_STORE_VAR,
     JOB_STORES,
     RETENTION_DAYS_VAR,
+    job_store_name,
 )
 from analysis_service.store_backends import (
     env_variables as store_variables,
@@ -62,24 +63,32 @@ from analysis_service.store_settings import (
     DATABASE_URL_VAR,
     DATABASE_VARIABLES,
     StoreConfigError,
-    closed_setting,
 )
 from analysis_service.vendors import VENDOR_NAMES, VENDORS
 from webapp.settings_page import IAM_SETUP, SETTINGS, Setting
+
+#: The value of each store setting that this app gives where no source sets
+#: it: a first run keeps its jobs in memory.
+STORE_DEFAULTS = {JOB_STORE_VAR: "memory"}
+
+
+def with_store_defaults(env: Mapping[str, str]) -> dict[str, str]:
+    """``env`` over :data:`STORE_DEFAULTS`: the settings that this app's store
+    is built from.
+
+    **The one reader of the app's store defaults.**
+    """
+    return {**STORE_DEFAULTS, **env}
 
 
 def settings_view(
     process_env: Mapping[str, str],
     error: ConfigError | None,
-    defaults: Mapping[str, str],
 ) -> dict[str, Any]:
     """The page's data: the rows, the unknown lines of ``settings.env``, the
     engine's error, the modes of each vendor, the ``iam`` notes and the model
     suggestions of each vendor. The page's script picks the suggestions of a
     tier from the vendor that the unsaved changes choose for it.
-
-    ``defaults`` holds the values that the app gives a variable that no
-    source sets, such as the first-run job store.
     """
     path = settings_dir(process_env) / SETTINGS_FILE
     try:
@@ -96,11 +105,11 @@ def settings_view(
     }
     files = _Files(merged)
     values = {
-        key: _value(setting, process_env, page, files, defaults)
+        key: _value(setting, process_env, page, files)
         for key, setting in SETTINGS.items()
     }
     owners = _vendor_rows()
-    shown = owners.keys() | _store_rows(merged, defaults)
+    shown = owners.keys() | _store_rows(merged)
     hidden = _vendor_variables() | set(store_variables())
     restart = set(store_variables())
     secrets = secret_vars()
@@ -214,7 +223,6 @@ def _value(
     process_env: Mapping[str, str],
     page: Mapping[str, SettingsLine],
     files: _Files,
-    defaults: Mapping[str, str],
 ) -> dict[str, Any]:
     """The value of one setting and its source, with the shipped value where
     ``settings.env`` sets it."""
@@ -225,7 +233,7 @@ def _value(
             "source": "process",
             "variable": var,
         }
-    base = _base(setting, files, defaults)
+    base = _base(setting, files)
     if var is not None and var in page:
         return {
             "value": _withheld(page[var].value),
@@ -235,7 +243,7 @@ def _value(
     return base
 
 
-def _base(setting: Setting, files: _Files, defaults: Mapping[str, str]) -> dict:
+def _base(setting: Setting, files: _Files) -> dict:
     """The value of a setting with no override: from its TOML file, else the
     default, else ``None``."""
     if setting.file_key is not None:
@@ -247,7 +255,7 @@ def _base(setting: Setting, files: _Files, defaults: Mapping[str, str]) -> dict:
     if var in PASS_FLAGS:
         default = _text(PASS_FLAGS[var])
     elif var is not None:
-        default = defaults.get(var)
+        default = STORE_DEFAULTS.get(var)
     return {"value": default, "source": "default"}
 
 
@@ -318,25 +326,19 @@ def _vendor_rows() -> dict[str, dict[str, Any]]:
     return rows
 
 
-def _store_rows(merged: Mapping[str, str], defaults: Mapping[str, str]) -> set[str]:
+def _store_rows(merged: Mapping[str, str]) -> set[str]:
     """The store variables that the selected job store, object store and
     database read."""
-    env = {**defaults, **merged}
+    env = with_store_defaults(merged)
     shown = {JOB_STORE_VAR, RETENTION_DAYS_VAR}
     try:
-        job_store = JOB_STORES[
-            closed_setting(env.get(JOB_STORE_VAR, ""), JOB_STORE_VAR, JOB_STORES)
-        ]
+        job_store = JOB_STORES[job_store_name(env)]
     except StoreConfigError:
         return shown
     shown.update(job_store.reads)
     if job_store.objects:
         try:
-            name = closed_setting(
-                env.get("ANALYSIS_OBJECT_STORE", ""),
-                "ANALYSIS_OBJECT_STORE",
-                OBJECT_STORES,
-            )
+            name = object_store_name(env)
         except StoreConfigError:
             pass
         else:

@@ -39,7 +39,7 @@ from analysis_service.model_tiers import (
     env_vars_for,
     upstreams_env_var_for,
 )
-from analysis_service.vendors import VENDOR_NAMES, VENDORS, VendorName
+from analysis_service.vendors import VENDOR_NAMES, VENDORS, VendorName, refused_var
 
 #: What the page does with a setting.
 Mark = Literal["changes", "shows", "excluded"]
@@ -188,7 +188,7 @@ def _credential_settings() -> list[tuple[str, Setting]]:
             var for mode in row.credentials for var in row.required_env_vars(mode)
         )
         for var in variables:
-            stem = var.removeprefix(f"ANALYSIS_{vendor.upper()}_").removesuffix("_FILE")
+            stem = refused_var(var).removeprefix(f"ANALYSIS_{vendor.upper()}_")
             entries.append(
                 _changes(
                     f"credentials.{vendor}.{stem.lower()}",

@@ -287,6 +287,22 @@ class TestARecordOfAnotherSchemaVersion:
     shows the run, and each page that parses the record answers 409.
     """
 
+    def test_the_list_links_no_report_that_the_report_page_refuses(
+        self, tiers, durable
+    ):
+        with app(tiers) as client:
+            run = completed(client)
+        with sqlite3.connect(database_of(durable)) as connection:
+            connection.execute(
+                "UPDATE jobs SET schema_version = '0.1' WHERE id = ?", (run,)
+            )
+        with app(tiers) as client:
+            listed = client.get("/workspace/runs").json()
+            report = client.get(f"/report/{run}")
+        assert report.status_code == 409, report.text
+        linked = {item["run"] for snapshot in listed for item in snapshot["reports"]}
+        assert run not in linked
+
     def test_an_unparsable_resumption_is_never_parsed(self, tiers, durable):
         with app(tiers) as client:
             answered = completed(client)

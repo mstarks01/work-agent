@@ -230,7 +230,6 @@ from analysis_service.sources import (
     clean_system_name,
 )
 from analysis_service.store_backends import (
-    JOB_STORE_VAR,
     audited_delete,
     build_store,
     retention_days,
@@ -267,7 +266,7 @@ from webapp.settings_save import (
     unused_key_files,
     unused_keys,
 )
-from webapp.settings_view import settings_view
+from webapp.settings_view import settings_view, with_store_defaults
 
 logger = logging.getLogger("webapp")
 
@@ -301,11 +300,6 @@ _DIAGNOSTIC_GRANTS = Grants(style=True)
 #: The Settings page draws its table from the data in the page, and posts a
 #: save to ``/settings``.
 _SETTINGS_GRANTS = Grants(script=True, style=True, connect=True)
-
-#: The value of each store setting that this app gives where no source sets
-#: it: a first run keeps its jobs in memory.
-STORE_DEFAULTS = {JOB_STORE_VAR: "memory"}
-
 
 #: The identity of this app's one local operator, who owns every job it holds.
 #: It is the caller the engine names for an in-process run, under the reserved
@@ -550,10 +544,11 @@ class Workspace:
 
 
 def served(answers: JobAnswers, record: Envelope) -> bool:
-    """True where :meth:`JobAnswers.servable` lets this job's report be
-    served. Each view that links to a report or shows one asks it. A job
-    whose envelope does not parse has no report to serve."""
-    if not isinstance(record, JobRecord):
+    """True where this app can read the job's record and
+    :meth:`JobAnswers.servable` lets its report be served. Each view that
+    links to a report or shows one asks it. The report page refuses a record
+    that :func:`readable` refuses, so no view links to its report."""
+    if not readable(record):
         return False
     try:
         answers.servable(record)
@@ -1059,7 +1054,7 @@ def check_saved(
     startup = build(env)
     messages = [] if startup.error is None else [str(startup.error)]
     try:
-        build_store({**STORE_DEFAULTS, **env})
+        build_store(with_store_defaults(env))
         retention_days(env)
     except (StoreConfigError, ImportError) as exc:
         messages.append(str(exc))
@@ -1155,7 +1150,7 @@ def create_app(
         env = process_env
         startup = Startup(settings=None, frameworks=(), tiers=None, error=exc)
     if workspace is None:
-        store = build_store({**STORE_DEFAULTS, **env})
+        store = build_store(with_store_defaults(env))
         logger.info(store_note(store))
         workspace = Workspace(store=store)
     state = build(env) if startup is None else startup
@@ -1218,7 +1213,7 @@ def create_app(
                 _SETTINGS_PAGE,
                 _SETTINGS_GRANTS,
                 script=client_script("settings.js"),
-                settings=script_json(settings_view(process_env, error, STORE_DEFAULTS)),
+                settings=script_json(settings_view(process_env, error)),
                 workspace_style=_WORKSPACE_STYLE,
             )
         )
@@ -1315,9 +1310,9 @@ def create_app(
             logger.info("settings saved: %s", ", ".join([*save.changes, *save.remove]))
         return JSONResponse(
             {
-                "settings": settings_view(process_env, None, STORE_DEFAULTS),
+                "settings": settings_view(process_env, None),
                 "restart": restart_keys(
-                    {**STORE_DEFAULTS, **env}, {**STORE_DEFAULTS, **saved_env}
+                    with_store_defaults(env), with_store_defaults(saved_env)
                 ),
             }
         )
@@ -1595,7 +1590,7 @@ def create_app(
             else await workspace.owned(answers, resumption.parent_id)
         )
         previous = None
-        if parent is not None and readable(parent) and served(answers, parent):
+        if parent is not None and served(answers, parent):
             previous = await workspace.store.report(parent.id, owner_id)
         return response(render_report(report, answerable.state(), previous))
 
@@ -1845,6 +1840,8 @@ async def _stream(
             return
         yield _frame("questions", {"run": run_id} | payload)
     elif status == "completed":
+        # The envelope read above refuses an unreadable record. The frame
+        # names why a report is withheld, which :func:`served` does not give.
         try:
             answers.servable(record)
         except Withheld as refusal:
