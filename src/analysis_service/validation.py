@@ -9,11 +9,11 @@ holding an inference. The admission cap on model size
 extraction passes through before any category-agent spend.
 
 ID derivation lives in code: callers passing ``normalize_ids`` to
-:func:`parse_and_validate` get their IDs canonicalized before the gate runs.
-``id-mismatch`` then reaches the extraction pipeline only for a name that slugs
-to empty: such an element keeps its emitted ID, and the gate refuses it when
-the ID's prefix is not its type's. An element's type is its class, and the ID
-prefix of every admitted element is that class's ``id_prefix``.
+:func:`parse_and_validate` get their IDs canonicalized before the gate runs, so
+``id-mismatch`` is unreachable from the extraction pipeline. The rule stays
+enforced here for models that arrive hand-authored. A name that slugs to empty
+has no derived ID, and the gate refuses it as ``empty-slug`` on every route
+(ADR 0096). So every admitted element carries the ID its class and name derive.
 
 Errors are structured (:class:`ValidationIssue`) so the repair pass can feed
 them back to the extraction agent verbatim. Category agents only ever see models for
@@ -57,6 +57,7 @@ IssueCode = Literal[
     "duplicate-id",
     "duplicate-ref",
     "id-mismatch",
+    "empty-slug",
     "invalid-reference",
     "no-trust-zones",
     "illegal-asset-tag",
@@ -161,28 +162,27 @@ def validate(
         try:
             expected = derive_element_id(element)
         except ValueError:
-            expected = None
-        if expected is not None and element.id != expected:
             issues.append(
                 ValidationIssue(
-                    code="id-mismatch",
-                    message=f"element ID {element.id!r} is not the deterministic"
-                    f" typed slug for its type and name; expected {expected!r}",
+                    code="empty-slug",
+                    message=f"element {element.id!r} has the name"
+                    f" {element.name!r}, which has no letter or digit for its ID;"
+                    " write the name in Latin letters or digits",
                     element_id=element.id,
-                    field="id",
+                    field="name",
                 )
             )
-        elif element.id.partition(":")[0] != element.id_prefix:
-            issues.append(
-                ValidationIssue(
-                    code="id-mismatch",
-                    message=f"element ID {element.id!r} does not start with"
-                    f" {element.id_prefix!r}, the prefix of its type; give the"
-                    " element a name of letters or digits, so its ID derives",
-                    element_id=element.id,
-                    field="id",
+        else:
+            if element.id != expected:
+                issues.append(
+                    ValidationIssue(
+                        code="id-mismatch",
+                        message=f"element ID {element.id!r} is not the deterministic"
+                        f" typed slug for its type and name; expected {expected!r}",
+                        element_id=element.id,
+                        field="id",
+                    )
                 )
-            )
 
         for tag in element.assets:
             if tag not in CORE_ASSET_TAGS:
@@ -647,9 +647,9 @@ def parse_and_validate(
     failures return ``(None, issues)`` — fail closed, never a partial model.
 
     ``normalize_ids`` runs :func:`~analysis_service.system_model.normalize_element_ids`
-    over the parsed model first, so ``id-mismatch`` reaches only an element
-    whose name slugs to empty, and returns the normalized model for the caller
-    to carry forward. It is **off by default and on only where a model arrives from a model**: hand-
+    over the parsed model first, making ``id-mismatch`` unreachable and
+    returning the normalized model for the caller to carry forward. It is
+    **off by default and on only where a model arrives from a model**: hand-
     authored artifacts — the golden corpus above all — want a mismatch
     reported, because there the two disagreeing fields are an authoring error
     a human should see rather than a slug to canonicalize. It carries the same
@@ -706,12 +706,15 @@ def parse_and_validate(
     return model, issues + validate(model, max_elements, sources)
 
 
-#: The issue codes whose repair changes an element's ID. ``duplicate-id``: two
-#: elements hold one ID, and the repair either names them apart or keeps one of
-#: them. ``id-mismatch``: the ID does not fit the element, and the repair gives
-#: it a name its ID derives from. A code absent from this set keeps its
-#: element's ID, which is the safe default: the flows stay pinned.
-RENAMING_CODES: frozenset[str] = frozenset({"duplicate-id", "id-mismatch"})
+#: The issue codes whose repair changes an element's *name*, and therefore its
+#: ID. ``duplicate-id``: two elements hold one ID, and the repair either names
+#: them apart or keeps one of them. ``empty-slug``: the name has no slug, and
+#: the repair gives the element a name that derives an ID. ``id-mismatch`` is
+#: not here because :func:`~analysis_service.system_model.normalize_element_ids`
+#: settles it before this gate runs, so no extraction reaches the repair pass
+#: carrying one. A code absent from this set keeps its element's ID, which is
+#: the safe default: the flows stay pinned.
+RENAMING_CODES: frozenset[str] = frozenset({"duplicate-id", "empty-slug"})
 
 
 def repair_scope(

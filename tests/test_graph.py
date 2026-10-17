@@ -42,7 +42,7 @@ from analysis_service.claims import (
     UnknownRef,
     UnresolvedMention,
 )
-from analysis_service.compact import COMPACT_FORMAT
+from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.critic import CriticOutputError
 from analysis_service.deployment import DEFAULT_PROMPTS_DIR
 from analysis_service.frameworks import (
@@ -72,6 +72,7 @@ from analysis_service.system_model import (
     normalize_element_ids,
 )
 from analysis_service.validation import ValidationIssue
+from evals.bench.deterministic import as_compact
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     DESCRIPTION_TEXT,
@@ -1273,6 +1274,19 @@ def test_validate_sends_an_expanded_model_that_fails_the_gate_to_repair():
     assert event.actions.route == graph.ROUTE_INVALID
     assert "p:nowhere" in ctx.state[graph.STATE_VALIDATION_ISSUES]
     assert "ref_" not in ctx.state[graph.STATE_PREVIOUS_MODEL]
+
+
+@pytest.mark.parametrize("extraction_format", [FULL_FORMAT, COMPACT_FORMAT])
+def test_validate_sends_a_name_that_slugs_to_empty_to_repair(extraction_format):
+    """Both routes refuse the name at the gate, so both spend the repair pass."""
+    full = valid_model().model_dump(mode="json")
+    payload = as_compact(full) if extraction_format == COMPACT_FORMAT else full
+    payload["processes"][0]["name"] = "!!!"
+    ctx = FakeContext()
+    event = graph.validate_extraction(ctx, KEYS, payload, None, extraction_format)
+
+    assert event.actions.route == graph.ROUTE_INVALID
+    assert "empty-slug" in ctx.state[graph.STATE_VALIDATION_ISSUES]
 
 
 def test_validate_rejects_an_emission_that_is_not_a_compact_model():
