@@ -202,7 +202,8 @@ The Source column shows where each value comes from, in this order:
 | default | The value that the loader gives when no source sets one. |
 
 The page shows only the rows that a loader reads now. The credential rows follow
-the vendor of each tier and that vendor's credential mode. A vendor in the `iam`
+the vendor of each tier and that vendor's credential mode, with the unsaved
+changes applied, so one save sets a tier and its key. A vendor in the `iam`
 mode shows a short note and its setup command. The job storage rows follow the
 selected job store, object store and database, and each one takes effect only
 after a restart. The sampling rows and review independence show "Shown only"
@@ -212,8 +213,9 @@ A key never shows. A key row says "A key is saved. The page never shows it." or
 "No key is saved.", and the page never opens the key file. A value that holds a
 password in a URL is not shown.
 
-The model of each tier shows a note when the pinned litellm map does not list
-it. The note is not a refusal: the map lags each new model.
+The model field of each tier suggests the models that the pinned litellm map
+lists for the vendor of the tier. A model that the map does not list shows a
+note. The note is not a refusal: the map lags each new model.
 
 A line of `settings.env` that this version does not read shows with its key and
 its line number. The startup refuses such a line, so the banner also names it.
@@ -223,19 +225,24 @@ its line number. The startup refuses such a line, so the banner also names it.
 
 Change a value in the table, and the panel beside it lists each unsaved change
 with its old value and its new value. "Discard" drops them. "Reset to shipped"
-on a value from this page removes its line, so the shipped value applies again.
-A value from the process environment cannot change here: unset the variable
-first. A key does not save here.
+on a value from this page that has a shipped value removes its line, so the
+shipped value applies again. A value from the process environment cannot change
+here: unset the variable first.
+
+A key field only writes. Type a key to save it, or to replace the saved key. The
+panel lists "a new key" and never the key.
 
 "Check and save" sends the changes. The server checks each value against the
-value rule of `settings.env`, then builds a test Deployment and a job store from
-the new settings with the loaders that the startup uses. No check calls a
-provider. When a check fails, the app writes nothing, and the page lists one
+value rule of `settings.env`, and each key against the rule of a secret file
+([File permissions](Configuration.md#file-permissions)). Then it builds a test
+Deployment and a job store from the new settings with the loaders that the
+startup uses. No check calls a provider. When a check fails, the app writes nothing, and the page lists one
 message for each refusal. A message names the setting and the rule, and never
 repeats the value.
 
-When the checks pass, the app writes `settings.env` and applies the new settings
-at once, with no restart:
+When the checks pass, the app writes each key to its own file in the settings
+directory, then `settings.env`, and applies the new settings at once, with no
+restart:
 
 - The next analysis runs on the new settings. An analysis that runs at the save
   finishes on the settings that started it.
@@ -245,9 +252,13 @@ at once, with no restart:
   shows, as a restart does.
 - A job storage change does not apply until a restart. The page names each
   changed job storage setting and tells you to restart the app.
+- A save that leaves no tier on a vendor removes the key line of that vendor
+  and deletes its key file. The panel says so before the save.
 
 The app makes the settings directory at the first save, with mode `0700`, and
-writes `settings.env` with mode `0600`. Each save writes one log line that names
+writes `settings.env` and each key file with mode `0600`.
+[Configuration](Configuration.md#the-settings-directory-of-the-first-run-app)
+gives the name of each key file. Each save writes one log line that names
 the changed settings and no value.
 
 The page loads with a revision of `settings.env`. A save from a tab that loaded
@@ -333,7 +344,7 @@ of those words.
 
 ## How the pages are protected
 
-Two rules, held over all three pages rather than only the report page.
+Two rules, held over every page rather than only the report page.
 
 **Untrusted text reaches the DOM as text.** Every value the submitter can
 influence renders as `textContent` or as a constructed node, never by assigning
@@ -353,7 +364,7 @@ Each policy grants only what its own page does:
 | Report | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/answer/{run}` and `/correct/{run}`. It loads nothing. |
 | Form | the same, for `/example`, `/analyze`, `/answer/{run}`, `/amend/{run}`, `/events/{run}` and `/workspace/runs`. |
 | Diagnostic | `style-src` nonce only — it runs no script, so it is granted none. |
-| Settings | `script-src`/`style-src` nonce. It draws its table from the data in the page and makes no request. |
+| Settings | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/settings`. It draws its table from the data in the page. |
 
 `base-uri` and `form-action` are `'none'` everywhere; the form posts through
 fetch, so a navigation away from it would be something going wrong. A page and
