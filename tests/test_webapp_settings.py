@@ -52,6 +52,7 @@ def page_data(response) -> dict:
         response.text,
         re.DOTALL,
     )
+    assert block is not None, "the page carries no settings data"
     return json.loads(block.group(1))
 
 
