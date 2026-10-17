@@ -65,6 +65,15 @@ class SelectionError(ValueError):
     """
 
 
+class NotCarried(SelectionError):
+    """A selection that names a framework this install does not carry.
+
+    The one name condition that a change of configuration can cause after a
+    job exists: a paused job keeps its selection while a save of the
+    settings changes what the install carries (ADR 0093).
+    """
+
+
 def resolve_names(
     carried: Collection[FrameworkName], names: Sequence[str]
 ) -> list[FrameworkName]:
@@ -88,7 +97,7 @@ def resolve_names(
         )
     unknown = [name for name in names if name not in carried]
     if unknown:
-        raise SelectionError(
+        raise NotCarried(
             f"this install does not carry {', '.join(unknown)};"
             f" it carries {', '.join(carried)}"
         )

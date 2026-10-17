@@ -93,7 +93,7 @@ from analysis_service.model_tiers import ModelTierConfig, TierName, load_model_t
 from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.resilience import ResilienceConfig, load_resilience
 from analysis_service.sampling import SamplingConfig, load_sampling
-from analysis_service.selection import SelectionError, resolve_names
+from analysis_service.selection import NotCarried, SelectionError, resolve_names
 
 # Two layouts resolve to the same defaults, not fetched at run time either way.
 # A wheel built from this project bundles prompts/, domains/, frameworks/ and
@@ -218,6 +218,16 @@ def _path(env: Mapping[str, str], var: str, default: Path) -> Path:
     if not value.strip():
         raise ConfigError(f"{var} is set but empty")
     return Path(value.strip())
+
+
+class FrameworkNotCarried(ConfigError):
+    """A job's selection names a framework that this Deployment does not carry.
+
+    A live swap can remove a framework that a paused job selected, so a
+    Resumed Job meets it at admission. The message is the text of the
+    :class:`~analysis_service.selection.NotCarried` refusal, which names the
+    framework, and both drivers answer it with a 409 (ADR 0093).
+    """
 
 
 @dataclass(frozen=True)
@@ -362,12 +372,16 @@ class Deployment:
         one reader of the name rule. This seam holds names and no options — a
         graph is looked up by the frameworks it runs, and two jobs naming the
         same frameworks with different options share one — so it reads the
-        name rule alone. The options were checked where the selection was
-        built, and a check here would refuse every package whose options
-        require a field, on every job.
+        name rule alone. A name that this install does not carry raises
+        :class:`FrameworkNotCarried`, and every other refusal a plain
+        :class:`~analysis_service.errors.ConfigError`. The options were
+        checked where the selection was built, and a check here would refuse
+        every package whose options require a field, on every job.
         """
         try:
             return tuple(resolve_names(self.frameworks, frameworks))
+        except NotCarried as exc:
+            raise FrameworkNotCarried(str(exc)) from exc
         except SelectionError as exc:
             raise ConfigError(str(exc)) from exc
 

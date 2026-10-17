@@ -85,6 +85,11 @@ one the HTTP route and the engine read, so the three entry points agree. A submi
 leaves out an option its framework needs is refused before any model runs, with a
 message naming the field.
 
+A paused run keeps the frameworks it selected. When the settings no longer
+carry one of them, a continue of that run is refused with a message that names
+the framework. You can still save answers on it, and the run continues when the
+settings carry the framework again.
+
 ## What it shows you
 
 **The models it is about to use**, one line per tier — whichever pair you

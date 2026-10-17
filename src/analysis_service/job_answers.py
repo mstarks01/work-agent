@@ -48,6 +48,7 @@ from analysis_service.claims import (
     UnknownKey,
     UnknownRef,
 )
+from analysis_service.deployment import FrameworkNotCarried
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import LineageConflict
@@ -712,12 +713,19 @@ class JobAnswers:
         bounds are observable from outside the caller they refused, and the
         log carries the deployment-wide figure a response withholds.
 
+        A selection that names a framework the Deployment no longer carries
+        passes :class:`~analysis_service.deployment.FrameworkNotCarried`
+        through, because its message names the framework and no setting.
+
         ``principal`` is the new principal of a first submission
         (:attr:`Submitter.new`). The store creates it with the job, and this
         method writes the one log line that records it.
         """
         try:
             runner = self.runner_for(record.selection(), entry_of(record))
+        except FrameworkNotCarried as exc:
+            logger.warning("job %s not admitted: %s", record.id, exc)
+            raise
         except ConfigError as exc:
             logger.error("cannot build a runner for job %s: %s", record.id, exc)
             raise RunnerUnavailable() from None

@@ -73,7 +73,7 @@ from analysis_service.auth import (
 )
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkName, UnknownKey
-from analysis_service.deployment import Deployment
+from analysis_service.deployment import Deployment, FrameworkNotCarried
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
 from analysis_service.frameworks import PACKAGES
@@ -720,6 +720,7 @@ _REFUSAL_STATUS: dict[type[Exception], int] = {
     UnreadableSchema: 409,
     JobDataMissing: 500,
     RunnerUnavailable: 503,
+    FrameworkNotCarried: 409,
 }
 
 
