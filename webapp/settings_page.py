@@ -324,13 +324,9 @@ EXAMPLES: dict[str, str] = {
     "resilience.global_max_tokens_per_window": "100000000",
     "store.retention_days": "30",
     "store.database_url": "postgresql+asyncpg://analysis@db.example.com/analysis",
-    "store.database_credentials": "password",
-    "store.database_iam": "rds",
     "store.database_region": "us-east-1",
     "store.object_root": "/var/lib/analysis/objects",
     "store.object_bucket": "analysis-jobs",
     "store.object_region": "us-east-1",
     "store.object_endpoint": "https://s3.example.com",
-    "store.object_addressing": "virtual",
-    "store.object_credentials": "iam",
 }

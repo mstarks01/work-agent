@@ -24,13 +24,12 @@ from analysis_service.sql_store import (
     DATABASES,
     DIGEST_COLUMNS,
     Database,
-    DatabaseCredentialMode,
     DatabaseCredentials,
     DatabaseDriver,
     DatabaseIam,
-    DatabaseIamName,
 )
 from analysis_service.store_backends import JOB_STORES, JobStoreBackend, JobStoreName
+from analysis_service.store_settings import DatabaseCredentialMode, DatabaseIamName
 from tests.sql_stores import OBJECT_ENVS, ObjectStoreEnv
 from tests.test_job_store import BACKEND_PAIRS
 

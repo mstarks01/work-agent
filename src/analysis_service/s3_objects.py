@@ -36,7 +36,7 @@ import asyncio
 import re
 from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import datetime
-from typing import Any, Literal, get_args
+from typing import Any, get_args
 from urllib.parse import urlsplit
 
 import boto3
@@ -44,7 +44,7 @@ from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from analysis_service.aws_identity import platform_session
-from analysis_service.objects import OBJECT_STORES, S3_KEY_FILES
+from analysis_service.objects import OBJECT_STORES, S3_KEY_FILES, Addressing
 from analysis_service.store_settings import (
     StoreConfigError,
     closed_setting,
@@ -61,10 +61,6 @@ from analysis_service.vendors import (
 #: An S3 bucket name: 3 to 63 lower-case letters, digits, dots and hyphens,
 #: with a letter or digit at each end.
 _BUCKET = re.compile(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]")
-
-#: How a request names the bucket: in the host name, or in the path. The
-#: values are the ``addressing_style`` values of ``botocore``.
-Addressing = Literal["virtual", "path"]
 
 
 def _key_pair(env: Mapping[str, str]) -> boto3.Session:
