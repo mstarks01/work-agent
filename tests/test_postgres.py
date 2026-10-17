@@ -80,7 +80,7 @@ class TestTheSettings:
                 {"ANALYSIS_DATABASE_CREDENTIALS": None},
                 "set ANALYSIS_DATABASE_CREDENTIALS",
             ),
-            ({"ANALYSIS_DATABASE_CREDENTIALS": "trust"}, "unknown value 'trust'"),
+            ({"ANALYSIS_DATABASE_CREDENTIALS": "trust"}, "unknown value for"),
             (
                 {"ANALYSIS_DATABASE_PASSWORD_FILE": None},
                 "set ANALYSIS_DATABASE_PASSWORD_FILE",
@@ -222,7 +222,7 @@ class TestTheIamCredentials:
         ("change", "message"),
         [
             ({"ANALYSIS_DATABASE_IAM": None}, "set ANALYSIS_DATABASE_IAM"),
-            ({"ANALYSIS_DATABASE_IAM": "entra"}, "unknown value 'entra'"),
+            ({"ANALYSIS_DATABASE_IAM": "entra"}, "unknown value for"),
             ({"ANALYSIS_DATABASE_REGION": None}, "set ANALYSIS_DATABASE_REGION"),
             (
                 {"ANALYSIS_DATABASE_REGION": "EU_WEST_1"},

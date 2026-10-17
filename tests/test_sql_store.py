@@ -133,9 +133,9 @@ class TestTheStartupRefusals:
         ("change", "message"),
         [
             ({"ANALYSIS_JOB_STORE": None}, "set ANALYSIS_JOB_STORE"),
-            ({"ANALYSIS_JOB_STORE": "redis"}, "unknown value 'redis'"),
+            ({"ANALYSIS_JOB_STORE": "redis"}, "unknown value for"),
             ({"ANALYSIS_OBJECT_STORE": None}, "set ANALYSIS_OBJECT_STORE"),
-            ({"ANALYSIS_OBJECT_STORE": "tape"}, "unknown value 'tape'"),
+            ({"ANALYSIS_OBJECT_STORE": "tape"}, "unknown value for"),
             (
                 {
                     "ANALYSIS_JOB_STORE": "memory",
@@ -176,7 +176,7 @@ class TestTheStartupRefusals:
             ),
             (
                 {"ANALYSIS_DATABASE_URL": "postgresql+psycopg2://db/jobs"},
-                "unknown value 'postgresql\\+psycopg2'",
+                "unknown value for",
             ),
             (
                 {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://analysis@db.internal"},

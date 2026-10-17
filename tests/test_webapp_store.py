@@ -146,7 +146,7 @@ class TestTheSettings:
     @pytest.mark.parametrize(
         ("setting", "value", "message"),
         [
-            ("ANALYSIS_JOB_STORE", "redis", "unknown value 'redis'"),
+            ("ANALYSIS_JOB_STORE", "redis", "unknown value for"),
             ("ANALYSIS_JOB_STORE", "", "set ANALYSIS_JOB_STORE"),
             (
                 "ANALYSIS_OBJECT_STORE",

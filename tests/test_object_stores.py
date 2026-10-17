@@ -224,9 +224,9 @@ class TestTheSettings:
                 {"ANALYSIS_OBJECT_ENDPOINT": "https://objects.example:port"},
                 "is not a URL",
             ),
-            ({"ANALYSIS_OBJECT_ADDRESSING": "dns"}, "unknown value 'dns'"),
+            ({"ANALYSIS_OBJECT_ADDRESSING": "dns"}, "unknown value for"),
             ({"ANALYSIS_OBJECT_CREDENTIALS": None}, "set ANALYSIS_OBJECT_CREDENTIALS"),
-            ({"ANALYSIS_OBJECT_CREDENTIALS": "token"}, "unknown value 'token'"),
+            ({"ANALYSIS_OBJECT_CREDENTIALS": "token"}, "unknown value for"),
             (
                 {"ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE": None},
                 "needs ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE",

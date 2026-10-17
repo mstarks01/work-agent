@@ -45,8 +45,8 @@ def closed_setting(value: str, setting: str, table: Mapping[Name, object]) -> Na
 
     **The one reader of a closed setting**: the job store, the object store,
     the database and their credential modes all read theirs here. ``setting``
-    names where the value comes from, for the message. The value is never read
-    from a request.
+    names where the value comes from, for the message, which never repeats the
+    value. The value is never read from a request.
     """
     value = value.strip().lower()
     if not value:
@@ -55,9 +55,7 @@ def closed_setting(value: str, setting: str, table: Mapping[Name, object]) -> Na
         if name == value:
             return name
     known = ", ".join(sorted(table))
-    raise StoreConfigError(
-        f"unknown value {value!r} for {setting}; known values: {known}"
-    )
+    raise StoreConfigError(f"unknown value for {setting}; known values: {known}")
 
 
 def refuse_unread(

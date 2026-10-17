@@ -103,7 +103,8 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.config_files import read_toml
+from analysis_service.config_files import read_toml, validation_problems
+from analysis_service.errors import ConfigError
 from analysis_service.parsing import is_version
 from analysis_service.retry import RetryBudget, RetryPolicy
 from analysis_service.sources import SourceLimits
@@ -160,7 +161,7 @@ def env_variables() -> tuple[str, ...]:
     return tuple(var for var, _ in ENV_OVERRIDES.values())
 
 
-class ResilienceConfigError(ValueError):
+class ResilienceConfigError(ConfigError):
     """The resilience configuration is invalid or unusable."""
 
 
@@ -330,7 +331,9 @@ def _override(
     try:
         return parse(value)
     except ValueError as exc:
-        raise ResilienceConfigError(f"{var}: {value!r} is not valid: {exc}") from exc
+        raise ResilienceConfigError(
+            f"{var} is not a valid {getattr(parse, '__name__', 'value')}"
+        ) from exc
 
 
 def load_resilience(
@@ -368,4 +371,4 @@ def load_resilience(
     try:
         return ResilienceConfig(**raw)
     except ValidationError as exc:
-        raise ResilienceConfigError(f"{path}: {exc}") from exc
+        raise ResilienceConfigError(f"{path}: {validation_problems(exc)}") from exc

@@ -47,7 +47,7 @@ from typing import Literal, Self, get_args
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from analysis_service.claims import FRAMEWORK_NAMES
-from analysis_service.config_files import read_toml
+from analysis_service.config_files import read_toml, validation_problems
 from analysis_service.errors import ConfigError
 from analysis_service.parsing import is_version
 from analysis_service.vendors import (
@@ -934,9 +934,4 @@ def load_model_tiers(
     try:
         return ModelTierConfig(**raw)
     except ValidationError as exc:
-        problems = "; ".join(
-            f"{'.'.join(str(step) for step in error['loc']) or '(root)'}:"
-            f" {error['msg'].removeprefix('Value error, ')}"
-            for error in exc.errors(include_input=False, include_url=False)
-        )
-        raise ModelConfigError(f"{path}: {problems}") from exc
+        raise ModelConfigError(f"{path}: {validation_problems(exc)}") from exc

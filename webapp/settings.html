@@ -17,6 +17,15 @@
     color:var(--muted); white-space:nowrap; }
   .tag.outside { border-color:var(--accent); color:var(--accent); }
   .not-set { color:var(--muted); font-style:italic; }
+  .settings-layout { display:grid; grid-template-columns:minmax(0,1fr) 18rem; gap:24px; align-items:start; }
+  .changes-panel { border:1px solid var(--line); border-radius:8px; padding:12px; position:sticky; top:16px; }
+  .changes-panel h2 { font-size:15px; margin:0 0 8px; }
+  .changes-panel ul { padding-left:18px; margin:0 0 12px; font-size:13px; }
+  .changes-panel .actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .choices { border:0; padding:0; margin:0; display:flex; gap:12px; flex-wrap:wrap; }
+  table.settings input[type=text], table.settings select { width:100%; max-width:22rem; }
+  .saved { border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin-bottom:16px; }
+  @media (max-width: 800px) { .settings-layout { grid-template-columns:minmax(0,1fr); } .changes-panel { position:static; } }
 </style>
 </head>
 <body>
@@ -33,15 +42,31 @@
       <h1>Settings</h1>
       <div id="engine-error" class="problem" role="alert" hidden></div>
       <div id="unknown-lines" class="problem" role="alert" hidden></div>
-      <label class="field-label" for="settings-search">Find a setting</label>
-      <input type="search" id="settings-search" class="settings-search" placeholder="Name of a setting">
-      <div class="table-wrap">
-        <table class="settings">
-          <thead><tr><th scope="col">Setting</th><th scope="col">Value</th><th scope="col">Source</th></tr></thead>
-          <tbody id="settings-rows"></tbody>
-        </table>
+      <div id="save-errors" class="problem" role="alert" hidden></div>
+      <div id="save-status" class="saved" role="status" hidden></div>
+      <div class="settings-layout">
+        <div>
+          <label class="field-label" for="settings-search">Find a setting</label>
+          <input type="search" id="settings-search" class="settings-search" placeholder="Name of a setting">
+          <div class="table-wrap">
+            <table class="settings">
+              <thead><tr><th scope="col">Setting</th><th scope="col">Value</th><th scope="col">Source</th></tr></thead>
+              <tbody id="settings-rows"></tbody>
+            </table>
+          </div>
+          <p class="hint">A save writes <code id="settings-file"></code> and applies at once, except a job storage setting, which takes effect after a restart. A hand edit of the file applies after a restart.</p>
+        </div>
+        <aside class="changes-panel" aria-labelledby="changes-heading">
+          <h2 id="changes-heading">Unsaved changes</h2>
+          <p id="changes-empty" class="hint">No changes.</p>
+          <ul id="changes-list"></ul>
+          <div class="actions">
+            <button type="button" id="save-changes" class="primary" disabled>Check and save</button>
+            <button type="button" id="discard-changes" disabled>Discard</button>
+          </div>
+        </aside>
       </div>
-      <p class="hint">This page only shows the settings. To change one, edit <code id="settings-file"></code> or the process environment, then restart the app.</p>
+      <div id="model-lists"></div>
     </main>
   </div>
 </div>

@@ -7,6 +7,7 @@ settings directory, and read only the HTTP response.
 
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -16,9 +17,11 @@ from analysis_service.config_files import (
     MAX_VALUE_CHARS,
     SETTINGS_DIR_VAR,
     SettingsFileError,
+    read_settings,
     read_settings_env,
     settings_dir,
     value_refusal,
+    write_settings_env,
 )
 from analysis_service.settings_variables import deployment_env
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
@@ -55,6 +58,59 @@ def write_settings(directory: Path, text: str) -> Path:
 def env_in(directory: Path, **process: str) -> dict[str, str]:
     """A process environment whose settings directory is ``directory``."""
     return {SETTINGS_DIR_VAR: str(directory), **process}
+
+
+class TestTheWriter:
+    def test_the_reader_reads_what_it_writes_with_the_same_revision(self, tmp_path):
+        path = tmp_path / "settings.env"
+
+        write_settings_env(path, {"ANALYSIS_A": "1", "ANALYSIS_B": "x/y"})
+
+        assert path.read_text() == "ANALYSIS_A=1\nANALYSIS_B=x/y\n"
+        assert read_settings(path).revision == sha256(path.read_bytes()).hexdigest()
+        assert read_settings_env(path)["ANALYSIS_B"].value == "x/y"
+
+    def test_a_missing_file_has_the_revision_of_no_bytes(self, tmp_path):
+        assert read_settings(tmp_path / "settings.env").revision == sha256().hexdigest()
+
+    def test_the_first_write_makes_a_private_directory(self, tmp_path):
+        path = tmp_path / "a" / "work-agent" / "settings.env"
+
+        write_settings_env(path, {"ANALYSIS_A": "1"})
+
+        assert path.parent.stat().st_mode & 0o777 == 0o700
+        assert path.stat().st_mode & 0o777 == 0o600
+        assert [entry.name for entry in path.parent.iterdir()] == ["settings.env"]
+
+    def test_it_keeps_the_mode_of_a_directory_that_exists(self, tmp_path):
+        tmp_path.chmod(0o750)
+
+        write_settings_env(tmp_path / "settings.env", {"ANALYSIS_A": "1"})
+
+        assert tmp_path.stat().st_mode & 0o777 == 0o750
+
+    def test_it_refuses_a_directory_that_others_can_write(self, tmp_path):
+        tmp_path.chmod(0o777)
+
+        with pytest.raises(SettingsFileError, match="mode 0777"):
+            write_settings_env(tmp_path / "settings.env", {"ANALYSIS_A": "1"})
+        tmp_path.chmod(0o700)
+        assert not list(tmp_path.iterdir())
+
+    @pytest.mark.parametrize("form", sorted(REFUSED_VALUES))
+    def test_it_writes_no_value_that_the_rule_refuses(self, tmp_path, form):
+        path = tmp_path / "settings.env"
+
+        with pytest.raises(SettingsFileError) as refused:
+            write_settings_env(path, {"ANALYSIS_A": REFUSED_VALUES[form]})
+
+        assert "SECRET" not in str(refused.value)
+        assert not path.exists()
+
+    @pytest.mark.parametrize("key", ["analysis_a", "ANALYSIS_A=B", "OTHER"])
+    def test_it_writes_no_key_outside_the_pattern(self, tmp_path, key):
+        with pytest.raises(SettingsFileError):
+            write_settings_env(tmp_path / "settings.env", {key: "1"})
 
 
 class TestTheSettingsDirectory:
