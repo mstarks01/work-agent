@@ -239,10 +239,10 @@ def write_private(path: Path, data: bytes) -> None:
     same directory, made by :func:`create_private`'s rule, then ``os.replace``
     puts it at ``path``. The mode of a directory that exists does not change.
 
-    It returns once the replace is done: a caller reads a return as "the new
-    file is in place", and an exception as "the old file stays". A failure of
+    It returns once the replace is done: a caller reads a return as "``data``
+    is at ``path``", and an exception as "``path`` is as it was". A failure of
     the ``fsync`` on the directory after the replace logs a warning and does
-    not raise, because the new file is in place.
+    not raise, because ``data`` is at ``path``.
     """
     with _private_directory(path.parent) as directory:
         temporary = path.parent / f".{path.name}.{secrets.token_hex(8)}"
