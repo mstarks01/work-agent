@@ -708,20 +708,25 @@ _REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
 
 
 #: Each typed refusal of :mod:`analysis_service.job_answers` and of the answer
-#: rules, with the status it answers under. The message is the refusal's own.
-_REFUSAL_STATUS: dict[type[Exception], int] = {
+#: rules that both HTTP drivers answer by a table, with the status it answers
+#: under. The first-run app reads this table too. The message is the refusal's
+#: own.
+JOB_REFUSAL_STATUS: dict[type[Exception], int] = {
     NoSuchJob: 404,
     NotCompleted: 409,
     NoCatalog: 400,
     Refused: 400,
     SaveConflict: 409,
-    AlreadyResumed: 409,
     NoCatalogError: 409,
     UnreadableSchema: 409,
     JobDataMissing: 500,
     RunnerUnavailable: 503,
     FrameworkNotCarried: 409,
 }
+
+#: The refusals that the ``/v1`` routes answer by a table. The first-run app
+#: answers :class:`AlreadyResumed` with a handler of its own.
+_REFUSAL_STATUS = {**JOB_REFUSAL_STATUS, AlreadyResumed: 409}
 
 
 async def _refusal_response(status: int, request: Request, exc: Exception):

@@ -153,6 +153,7 @@ from analysis_service.answer_state import (
     SourcesOverLimit,
     StaleRevision,
 )
+from analysis_service.api import JOB_REFUSAL_STATUS
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
 from analysis_service.claims import UnknownKey
@@ -165,7 +166,7 @@ from analysis_service.config_files import (
     write_settings_env,
 )
 from analysis_service.critic import SEVERITY_ORDER
-from analysis_service.deployment import Deployment, FrameworkNotCarried
+from analysis_service.deployment import Deployment
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
@@ -181,15 +182,11 @@ from analysis_service.frameworks import PACKAGES, package_for
 from analysis_service.job_answers import (
     DraftSaved,
     JobAnswers,
-    JobDataMissing,
-    NoCatalog,
     NoSuchJob,
     NotAdmitted,
     NotCompleted,
     Refused,
     RunnerFor,
-    RunnerUnavailable,
-    SaveConflict,
     Start,
     Started,
     UnreadableSchema,
@@ -199,7 +196,6 @@ from analysis_service.jobs import (
     Envelope,
     InMemoryJobStore,
     JobRecord,
-    JobStatus,
     JobStore,
     PipelineRunner,
     ended,
@@ -211,7 +207,6 @@ from analysis_service.jobs import (
 from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
-    NoCatalogError,
     components,
     refuse_answers_source,
 )
@@ -973,22 +968,14 @@ def _earlier_payload(
 
 
 #: Each typed refusal of the job operations and of the answer rules, with the
-#: status the page is answered under. The message is the refusal's own, which
+#: status the page is answered under: the ``/v1`` table, and the refusals that
+#: only this app answers by a table. The message is the refusal's own, which
 #: names the submitter's choices and the frameworks the form offers, and never a
 #: setting of this deployment.
 _REFUSAL_STATUS: dict[type[Exception], int] = {
-    NoSuchJob: 404,
-    NotCompleted: 409,
+    **JOB_REFUSAL_STATUS,
     Withheld: 409,
-    NoCatalog: 400,
-    NoCatalogError: 409,
-    Refused: 400,
-    SaveConflict: 409,
-    UnreadableSchema: 409,
     WorkspaceFull: 409,
-    RunnerUnavailable: 503,
-    FrameworkNotCarried: 409,
-    JobDataMissing: 500,
 }
 
 #: What the page says where a save in another tab moved the answers first.
