@@ -184,10 +184,7 @@ def _credential_settings() -> list[tuple[str, Setting]]:
     ``credentials.bedrock.region``."""
     entries = []
     for vendor, row in VENDORS.items():
-        variables = dict.fromkeys(
-            var for mode in row.credentials for var in row.required_env_vars(mode)
-        )
-        for var in variables:
+        for var in row.all_env_vars():
             stem = refused_var(var).removeprefix(f"ANALYSIS_{vendor.upper()}_")
             entries.append(
                 _changes(

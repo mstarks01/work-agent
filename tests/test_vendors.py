@@ -332,7 +332,7 @@ class TestPlatformIdentity:
         # An operator who sets it still gets it, through ADC's own chain.
         # Nothing here names it or requires it.
         for vendor in VENDORS.values():
-            for source in vendor.credentials.values():
+            for source in vendor.credential_sources.values():
                 for entry in source.env:
                     assert entry.var != "GOOGLE_APPLICATION_CREDENTIALS"
 
@@ -389,7 +389,7 @@ class TestValueShapes:
         regions = {
             entry.var: entry.shape
             for vendor in VENDORS.values()
-            for source in vendor.credentials.values()
+            for source in vendor.credential_sources.values()
             for entry in source.env
             if entry.kwarg in {"vertex_location", "aws_region_name"}
         }
@@ -455,7 +455,9 @@ class TestWhichVariablesAreSecret:
 
     @pytest.mark.parametrize(
         ("vendor", "mode"),
-        sorted((name, mode) for name, v in VENDORS.items() for mode in v.credentials),
+        sorted(
+            (name, mode) for name, v in VENDORS.items() for mode in v.credential_modes
+        ),
     )
     def test_every_secret_names_a_file(self, vendor, mode):
         """A secret without the suffix would refuse its own variable."""
@@ -473,11 +475,30 @@ class TestWhichVariablesAreSecret:
     # ``StrEnum``, so the pairs order as the strings they spell.
     @pytest.mark.parametrize(
         ("vendor", "mode"),
-        sorted((name, mode) for name, v in VENDORS.items() for mode in v.credentials),
+        sorted(
+            (name, mode) for name, v in VENDORS.items() for mode in v.credential_modes
+        ),
     )
     def test_the_secret_set_is_a_subset_of_the_required_set(self, vendor, mode):
         entry = vendor_for(vendor)
         assert set(entry.secret_env_vars(mode)) <= set(entry.required_env_vars(mode))
+
+    def test_all_env_vars_spans_every_mode_once(self):
+        bedrock = vendor_for("bedrock")
+        required = [
+            var
+            for mode in bedrock.credential_modes
+            for var in bedrock.required_env_vars(mode)
+        ]
+        secret = [
+            var
+            for mode in bedrock.credential_modes
+            for var in bedrock.secret_env_vars(mode)
+        ]
+
+        assert len(required) > len(set(required))
+        assert bedrock.all_env_vars() == tuple(dict.fromkeys(required))
+        assert bedrock.all_env_vars(secret_only=True) == tuple(dict.fromkeys(secret))
 
 
 #: The bare spelling's minor version, which OpenRouter writes with a dot. Used

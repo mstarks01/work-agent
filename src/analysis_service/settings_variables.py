@@ -72,8 +72,7 @@ def secret_vars() -> frozenset[str]:
     vendor_secrets = {
         var
         for vendor in vendors.VENDORS.values()
-        for mode in vendor.credentials
-        for var in vendor.secret_env_vars(mode)
+        for var in vendor.all_env_vars(secret_only=True)
     }
     return frozenset(
         {*vendor_secrets, *S3_KEY_FILES.values(), DATABASE_PASSWORD_FILE_VAR}

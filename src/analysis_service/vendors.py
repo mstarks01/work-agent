@@ -6,9 +6,9 @@ provider is not how to call it. It is three facts the adapter cannot supply:
 * the router prefix LiteLLM dispatches on — ``vertex_ai/``, ``anthropic/``,
   ``openai/``, ``bedrock/``, ``gemini/`` or ``openrouter/`` — which is also the
   vendor half of an **Execution Identity** fingerprint;
-* the credential modes a vendor allows, which :attr:`Vendor.credentials` holds
-  and a deployment declares from. Vertex admits no raw-API-key path under any
-  adapter (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
+* the credential modes a vendor allows, which :attr:`Vendor.credential_sources`
+  holds and a deployment declares from. Vertex admits no raw-API-key path under
+  any adapter (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
   unrepresentable rather than validated against;
 * the floating-form rule for model identifiers, which differs by model family
   rather than by vendor. Claude carries a canonical identifier of its own shape,
@@ -983,8 +983,8 @@ class Vendor:
     #: its own charge is a figure resting on that description.
     #:
     #: A mapping rather than a flag, on the same reasoning as
-    #: :attr:`credentials`: a vendor with a choice makes the deployment declare
-    #: which entry applies, and
+    #: :attr:`credential_sources`: a vendor with a choice makes the deployment
+    #: declare which entry applies, and
     #: :meth:`analysis_service.model_tiers.ModelTierConfig._charge_mode_problems`
     #: is
     #: what makes that self-completing.
@@ -999,7 +999,7 @@ class Vendor:
     #: a ``[credentials]`` key for a single-mode vendor is an error, and a
     #: missing key for a multi-mode vendor is an error. Both read
     #: :attr:`credential_modes`.
-    credentials: Mapping[CredentialMode, _CredentialSource]
+    credential_sources: Mapping[CredentialMode, _CredentialSource]
     #: Which family rules apply to this vendor's identifiers, in order, with
     #: the catch-all last.
     #:
@@ -1050,8 +1050,9 @@ class Vendor:
 
     @property
     def credential_modes(self) -> tuple[CredentialMode, ...]:
-        """Every mode this vendor allows, in the order :attr:`credentials` lists them."""
-        return tuple(self.credentials)
+        """Every mode this vendor allows, in the order that
+        :attr:`credential_sources` lists them."""
+        return tuple(self.credential_sources)
 
     @property
     def sole_credential_mode(self) -> CredentialMode:
@@ -1241,7 +1242,7 @@ class Vendor:
         right about which variables are missing.
         """
         try:
-            return self.credentials[mode]
+            return self.credential_sources[mode]
         except KeyError as exc:
             allowed = ", ".join(sorted(m.value for m in self.credential_modes))
             raise ValueError(
@@ -1269,6 +1270,15 @@ class Vendor:
         wrong-region request.
         """
         return tuple(entry.var for entry in self._source_for(mode).env if entry.secret)
+
+    def all_env_vars(self, *, secret_only: bool = False) -> tuple[str, ...]:
+        """The variables of every mode this vendor allows, once each, in mode
+        order: those of :meth:`required_env_vars`, or with ``secret_only``
+        those of :meth:`secret_env_vars`."""
+        read = self.secret_env_vars if secret_only else self.required_env_vars
+        return tuple(
+            dict.fromkeys(var for mode in self.credential_modes for var in read(mode))
+        )
 
     def _require(
         self, env: Mapping[str, str], entry: _CredentialVar, mode: CredentialMode
@@ -1356,7 +1366,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # Workload Identity binding, a metadata server, or an operator's own
         # ``GOOGLE_APPLICATION_CREDENTIALS``, through ADC's chain rather than
         # through anything this registry names.
-        credentials={
+        credential_sources={
             CredentialMode.IAM: _CredentialSource(
                 env=(
                     _CredentialVar(
@@ -1392,7 +1402,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # The pinned litellm applies the same rewrite on this path itself, so
         # the wire does not change. Applying it here keeps the rule ours.
         schema_rules=(_every_model("bounds_described"),),
-        credentials={CredentialMode.API_KEY: _api_key_source("anthropic")},
+        credential_sources={CredentialMode.API_KEY: _api_key_source("anthropic")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
     ),
@@ -1408,7 +1418,7 @@ VENDORS: dict[VendorName, Vendor] = {
         upstream_pin=None,
         prompt_cache=_GPT_PROMPT_CACHE,
         schema_rules=(_CLAUDE_BOUNDS, _every_model("as_built")),
-        credentials={CredentialMode.API_KEY: _api_key_source("openai")},
+        credential_sources={CredentialMode.API_KEY: _api_key_source("openai")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
     ),
@@ -1432,7 +1442,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # 400 for ``minimum``, ``maximum``, ``multipleOf``, ``minLength`` and
         # ``maxLength`` (structured-outputs page, read 2026-10-02).
         schema_rules=(_every_model("bounds_described"),),
-        credentials={
+        credential_sources={
             # Under ``API_KEY`` Bedrock passes a bearer token and a region.
             # litellm's ``_sign_request`` reads the bearer off the ``api_key``
             # parameter, sets the ``Authorization`` header and skips SigV4
@@ -1514,7 +1524,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # environment whenever ``api_key`` is absent. Two ambient names for one
         # provider, and the registry declares neither: the key is read from
         # this service's own variable, as it is for every key-bearing vendor.
-        credentials={CredentialMode.API_KEY: _api_key_source("gemini")},
+        credential_sources={CredentialMode.API_KEY: _api_key_source("gemini")},
         # The Developer API serves Gemini alone today, and it still lists the
         # Claude rule: ``get_llm_provider`` resolves ``gemini/claude-opus-5`` to
         # this provider without complaint, and a family rule follows the family.
@@ -1608,7 +1618,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # the ``HTTP-Referer`` and ``X-Title`` headers it sends, defaulting to
         # its own project's values. Those are attribution headers rather than
         # credentials, and this service states no value for either.
-        credentials={CredentialMode.API_KEY: _api_key_source("openrouter")},
+        credential_sources={CredentialMode.API_KEY: _api_key_source("openrouter")},
         # Claude under a third spelling, and everything else OpenRouter fronts
         # — 90-odd families in the pinned map — reaching the catch-all, where
         # only the shared denylist applies, gateway segment and all.
@@ -1623,10 +1633,7 @@ def env_variables() -> tuple[str, ...]:
     """Every credential variable of every vendor and mode, once each."""
     return tuple(
         dict.fromkeys(
-            var
-            for vendor in VENDORS.values()
-            for mode in vendor.credentials
-            for var in vendor.required_env_vars(mode)
+            var for vendor in VENDORS.values() for var in vendor.all_env_vars()
         )
     )
 

@@ -189,7 +189,8 @@ def saved_lines(
     values = {var: line.value for var, line in lines.items() if var not in save.remove}
     for key, value in save.changes.items():
         var = SETTINGS[key].variable
-        assert var is not None, key
+        if var is None:
+            raise ValueError(f"{key} has no variable; refusals() refuses it")
         if value is None:
             values.pop(var, None)
         else:
@@ -225,8 +226,7 @@ def unused_keys(tiers: ModelTierConfig | None) -> frozenset[str]:
         var
         for name, vendor in VENDORS.items()
         if name not in used
-        for mode in vendor.credentials
-        for var in vendor.secret_env_vars(mode)
+        for var in vendor.all_env_vars(secret_only=True)
     )
 
 
