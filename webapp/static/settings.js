@@ -71,7 +71,8 @@ function change(row, value) {
 }
 
 function textControl(row) {
-  const attrs = { type: "text", "aria-label": row.label, value: pending(row) ?? "", placeholder: "Not set" };
+  const placeholder = row.example ? `e.g. ${row.example}` : "Not set";
+  const attrs = { type: "text", "aria-label": row.label, value: pending(row) ?? "", placeholder };
   if (suggests(row)) attrs.list = `models-${suggests(row)}`;
   const input = h("input", attrs);
   input.addEventListener("input", () => change(row, input.value));

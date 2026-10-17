@@ -298,3 +298,39 @@ SETTINGS = _table(
         *_deployment_settings(),
     ]
 )
+
+#: The example value that the page shows in each free-text field, keyed by
+#: the Deployment Setting. Each one passes the loader of its setting, which a
+#: test checks. A key field and a choice have none. A setting that no value
+#: passes has none: the upstreams of a vendor that routes to one provider, the
+#: charges of a vendor with one charge mode, and the CA file, whose loader
+#: opens the file that the value names.
+EXAMPLES: dict[str, str] = {
+    **{f"tiers.{tier}.model": "gpt-4.1" for tier in TIER_NAMES},
+    "upstreams.openrouter": "anthropic",
+    "credentials.vertex.project": "my-project-123",
+    "credentials.vertex.location": "us-central1",
+    "credentials.bedrock.region": "us-east-1",
+    "resilience.attempts": "3",
+    "resilience.timeout_ms": "300000",
+    "resilience.max_source_bytes": "102400",
+    "resilience.max_sources": "10",
+    "resilience.job_deadline_ms": "900000",
+    "resilience.retry_budget_ratio": "0.1",
+    "resilience.max_active_jobs": "3",
+    "resilience.budget_window_seconds": "3600",
+    "resilience.max_jobs_per_window": "30",
+    "resilience.max_tokens_per_window": "20000000",
+    "resilience.global_max_tokens_per_window": "100000000",
+    "store.retention_days": "30",
+    "store.database_url": "postgresql+asyncpg://analysis@db.example.com/analysis",
+    "store.database_credentials": "password",
+    "store.database_iam": "rds",
+    "store.database_region": "us-east-1",
+    "store.object_root": "/var/lib/analysis/objects",
+    "store.object_bucket": "analysis-jobs",
+    "store.object_region": "us-east-1",
+    "store.object_endpoint": "https://s3.example.com",
+    "store.object_addressing": "virtual",
+    "store.object_credentials": "iam",
+}

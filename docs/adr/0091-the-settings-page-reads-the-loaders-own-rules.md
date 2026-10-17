@@ -26,9 +26,12 @@ the form. It never validates a value.
 
 **The loaders stay the only source of each type, closed set and bound.**
 
-- The page reads a type through `model_json_schema()` on `ModelTierConfig`
-  and `ResilienceConfig`. For the other settings, it reads the `VENDORS`
-  rows, the `closed_setting` tables, and `typing.get_args` on a bare Literal.
+- The page reads each closed set from the loader's own table, in
+  `settings_view._controls`: the vendor names, the credential and charge
+  modes of each `VENDORS` row, the `PASS_FLAGS` table, the `JOB_STORES` and
+  `OBJECT_STORES` tables of `closed_setting`, and `FRAMEWORK_NAMES`. The page
+  shows every other setting as free text. The check build of a save tests
+  that value with the loaders.
 - One page module in `webapp` holds only the facts that no loader holds: the
   group, the label, and one mark for each setting. The mark is "changes",
   "shows", or "excluded" with a reason. The key of an entry is the Deployment
@@ -36,9 +39,11 @@ the form. It never validates a value.
   that sets it.
 - `secret_vars()` in `analysis_service` is the one reader of "this variable
   names a secret file". It collects the flags from `VENDORS`, from the S3 key
-  files and from the database password file. The page, the write-only key
-  field and the file permission check call it. A variable is not a secret
-  because its name ends in `_FILE`: `ANALYSIS_TIERS_FILE` and
+  files and from the database password file. Only the Settings page modules
+  call it: the page and its write-only key field. The file permission check
+  does not call it. Each loader reads its secret file through `read_secret`,
+  which applies the rule of a secret file through `private_fd`. A variable is
+  not a secret because its name ends in `_FILE`: `ANALYSIS_TIERS_FILE` and
   `ANALYSIS_DATABASE_CA_FILE` are not secrets.
 - The settings that the store loaders read need a restart, as one group. The
   prefixes come from the store loaders' own tuples, not from a new list.

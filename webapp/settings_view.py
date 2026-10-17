@@ -17,8 +17,9 @@ changes applied, so one save sets a tier and its key. An entry marked
 ``excluded`` never shows.
 
 A row carries the closed set of its setting where the loader holds one, so
-the page offers a choice. The data carries the revision of ``settings.env``,
-which a save sends back (:mod:`webapp.settings_save`).
+the page offers a choice, and the example of a free-text setting from
+:data:`~webapp.settings_page.EXAMPLES`. The data carries the revision of
+``settings.env``, which a save sends back (:mod:`webapp.settings_save`).
 
 No row carries a secret. A secret row carries only whether a key file exists,
 and this module never opens one. A value that holds a URL password is
@@ -67,7 +68,7 @@ from analysis_service.store_settings import (
     StoreConfigError,
 )
 from analysis_service.vendors import VENDOR_NAMES, VENDORS
-from webapp.settings_page import IAM_SETUP, SETTINGS, Setting
+from webapp.settings_page import EXAMPLES, IAM_SETUP, SETTINGS, Setting
 
 #: The value of each store setting that this app gives where no source sets
 #: it: a first run keeps its jobs in memory.
@@ -127,6 +128,7 @@ def settings_view(
             "mark": setting.mark,
             "reason": setting.reason,
             "restart": var in restart,
+            "example": EXAMPLES.get(key),
             **_CONTROLS.get(key, {}),
             **(owners.get(var, {}) if var is not None else {}),
         }

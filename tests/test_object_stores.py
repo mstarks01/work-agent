@@ -112,6 +112,17 @@ def test_the_filesystem_listing_enters_and_holds_no_symbolic_link(tmp_path):
     assert set(asyncio.run(listing(objects))) == {KEY}
 
 
+def test_a_refused_object_root_names_its_setting_and_not_its_path(tmp_path):
+    env = filesystem_env(tmp_path) | {"ANALYSIS_OBJECT_ROOT": str(tmp_path / "qzxv")}
+    objects = build_object_store(env)
+
+    with pytest.raises(StoreConfigError) as refused:
+        asyncio.run(objects.check())
+
+    assert "ANALYSIS_OBJECT_ROOT" in str(refused.value)
+    assert "qzxv" not in str(refused.value)
+
+
 class TestTheFilesystemFollowsNoLink:
     """No put, read or delete passes through a symbolic link at a folder of a
     key, so none reaches the files the link points to."""

@@ -506,12 +506,10 @@ class ModelTierConfig(BaseModel):
                     f"upstreams.{vendor} names no upstream; list at least one, or"
                     " remove the key"
                 )
-            else:
-                problems += [
-                    f"upstreams.{vendor} entry {name!r} is not a provider slug"
-                    for name in names
-                    if not UPSTREAM_SLUG.fullmatch(name)
-                ]
+            elif not all(UPSTREAM_SLUG.fullmatch(name) for name in names):
+                problems.append(
+                    f"upstreams.{vendor} holds an entry that is not a provider slug"
+                )
         return problems
 
     def upstreams_for(self, vendor: VendorName) -> tuple[str, ...]:
@@ -663,7 +661,7 @@ class ModelTierConfig(BaseModel):
             return None
         shared_model = family_identifier(analyze.model)
         if shared_model == family_identifier(critic.model):
-            return f"both run the model {shared_model!r}"
+            return "both run one model"
         return None
 
     def resolve_tier(self, node: str) -> TierName:

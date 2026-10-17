@@ -14,20 +14,25 @@ from collections import Counter
 
 import pytest
 
-from analysis_service import sampling
+from analysis_service import s3_objects, sampling
 from analysis_service.deployment import BLESSED_FINGERPRINTS_VAR, CONFIG_PATHS
-from analysis_service.model_tiers import TIER_NAMES
+from analysis_service.model_tiers import TIER_NAMES, load_model_tiers
 from analysis_service.objects import S3_KEY_FILES
+from analysis_service.resilience import load_resilience
 from analysis_service.sampling import SamplingConfigError
 from analysis_service.settings_variables import deployment_variables, secret_vars
-from analysis_service.sql_store import DATABASE_CREDENTIALS, DATABASES
+from analysis_service.sql_store import DATABASE_CREDENTIALS, DATABASE_IAM, DATABASES
+from analysis_service.store_backends import build_store, retention_days
 from analysis_service.store_settings import (
     DATABASE_PASSWORD_FILE_VAR,
     DATABASE_VARIABLES,
+    closed_setting,
 )
-from analysis_service.vendors import VENDORS, CredentialMode
+from analysis_service.vendors import REGION, VENDORS, CredentialMode, vendor_for
+from tests.factories import PROJECT_ROOT, TEST_TIER_ENV, declared_env, secret_env
 from webapp import settings_page
-from webapp.settings_page import IAM_SETUP, SETTINGS
+from webapp.settings_page import EXAMPLES, IAM_SETUP, SETTINGS
+from webapp.settings_view import _CONTROLS
 
 
 class TestSecretVars:
@@ -152,3 +157,101 @@ class TestThePageModule:
             and node.value.value.id == "Literal"
         ]
         assert literals == ["Mark"]
+
+
+#: The settings of a PostgreSQL job store with a filesystem object store, from
+#: the examples. Each store example is checked over this base.
+STORE_BASE = {
+    "ANALYSIS_JOB_STORE": "sql",
+    "ANALYSIS_DATABASE_URL": EXAMPLES["store.database_url"],
+    "ANALYSIS_DATABASE_CREDENTIALS": EXAMPLES["store.database_credentials"],
+    **secret_env(DATABASE_PASSWORD_FILE_VAR, "not-a-real-password"),
+    "ANALYSIS_OBJECT_STORE": "filesystem",
+    "ANALYSIS_OBJECT_ROOT": EXAMPLES["store.object_root"],
+}
+
+#: The settings over :data:`STORE_BASE` of an ``s3`` object store with the key
+#: pair, which reads the other object settings.
+S3_STORE = {
+    "ANALYSIS_OBJECT_STORE": "s3",
+    "ANALYSIS_OBJECT_ROOT": "",
+    "ANALYSIS_OBJECT_BUCKET": EXAMPLES["store.object_bucket"],
+    "ANALYSIS_OBJECT_REGION": EXAMPLES["store.object_region"],
+    "ANALYSIS_OBJECT_CREDENTIALS": "api_key",
+    **{
+        var: secret_env(var, f"not-a-real-{var.lower()}")[var]
+        for var in S3_KEY_FILES.values()
+    },
+}
+
+
+def _passes_its_loader(key: str, example: str) -> None:
+    """Run ``example`` through the loader that reads ``key``; raise where the
+    loader refuses it.
+
+    The IAM settings of the database and the iam mode of the object store need
+    the identity of a platform to build a store, so they run through the
+    closed set and the shape that the loader checks first.
+    """
+    var = SETTINGS[key].variable
+    assert var is not None, key
+    if key.startswith("tiers."):
+        for vendor in VENDORS.values():
+            vendor.validate_model(example, key)
+    elif key.startswith("upstreams."):
+        tiers = PROJECT_ROOT / "config" / "model_tiers.toml"
+        load_model_tiers(tiers, TEST_TIER_ENV | {var: example})
+    elif key.startswith("credentials."):
+        vendor = vendor_for(key.split(".")[1])
+        for mode in vendor.credential_modes:
+            if var in vendor.required_env_vars(mode):
+                env = declared_env(vendor.name, mode) | {var: example}
+                vendor.credential_kwargs(env, mode)
+    elif key.startswith("resilience."):
+        load_resilience(PROJECT_ROOT / "config" / "resilience.toml", {var: example})
+    elif key == "store.database_iam":
+        closed_setting(example, var, DATABASE_IAM)
+    elif key == "store.database_region":
+        assert REGION.fullmatch(example)
+    elif key == "store.object_credentials":
+        closed_setting(example, var, s3_objects.CREDENTIALS)
+    else:
+        s3 = (
+            S3_STORE
+            if var.startswith("ANALYSIS_OBJECT_") and key != "store.object_root"
+            else {}
+        )
+        env = STORE_BASE | s3 | {var: example}
+        build_store({name: value for name, value in env.items() if value})
+        retention_days(env)
+
+
+class TestTheExamples:
+    @pytest.mark.parametrize("key", sorted(EXAMPLES))
+    def test_each_example_passes_the_loader_of_its_setting(self, key):
+        _passes_its_loader(key, EXAMPLES[key])
+
+    def test_each_free_text_field_has_one(self):
+        """A key field and a choice have none. A setting that no value passes
+        has none: the upstreams of a vendor that routes to one provider, the
+        charges of a vendor with one charge mode, and the CA file, whose loader
+        opens the file."""
+        no_example = {
+            f"upstreams.{name}"
+            for name, vendor in VENDORS.items()
+            if vendor.upstream_pin is None
+        }
+        no_example |= {
+            f"charges.{name}"
+            for name, vendor in VENDORS.items()
+            if len(vendor.charge_modes) < 2
+        }
+        no_example.add("store.database_ca_file")
+        free_text = {
+            key
+            for key, setting in SETTINGS.items()
+            if setting.mark == "changes"
+            and setting.variable not in secret_vars()
+            and "options" not in _CONTROLS.get(key, {})
+        }
+        assert set(EXAMPLES) == free_text - no_example
