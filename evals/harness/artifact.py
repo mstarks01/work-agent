@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -219,6 +219,10 @@ class EvalArtifact:
                 f" artifact_version {ARTIFACT_VERSION}"
             )
         return self.raw[key]
+
+    def failed_cases(self) -> frozenset[str]:
+        """The cases this sweep ran and wrote no report for, from ``mode_output``."""
+        return _failed_cases(self.block("mode_output"))
 
 
 def load_artifact(path: Path | str) -> EvalArtifact:
@@ -416,6 +420,18 @@ def figures_corpus(raw: Mapping[str, Any]) -> str | None:
     return held if isinstance(held, str) else None
 
 
+def _failed_cases(payloads: Iterable[Mapping[str, Any]]) -> frozenset[str]:
+    """The cases a ``mode_output`` records as ran and not finished.
+
+    Each such entry carries a ``run_failure`` or a ``grounds_failure`` key.
+    """
+    return frozenset(
+        str(payload["case"])
+        for payload in payloads
+        if "run_failure" in payload or "grounds_failure" in payload
+    )
+
+
 def _completion(sweep: Sweep, cases: Sequence[str]) -> dict[str, int]:
     """The denominators every aggregate in the artifact is conditional on.
 
@@ -424,15 +440,10 @@ def _completion(sweep: Sweep, cases: Sequence[str]) -> dict[str, int]:
     from there rather than from ``structural_failures``, which holds one entry
     per *issue* and includes issues a finished report raised.
     """
-    failed = sum(
-        1
-        for payload in sweep.run.payloads
-        if "run_failure" in payload or "grounds_failure" in payload
-    )
     return {
         "attempted": len(cases),
         "scored": len(sweep.scores),
-        "failed": failed,
+        "failed": len(_failed_cases(sweep.run.payloads)),
         "stopped_before": len(sweep.run.stopped_before),
     }
 

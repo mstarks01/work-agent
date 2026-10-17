@@ -330,3 +330,34 @@ def test_a_ruling_signed_by_nobody_is_refused(tmp_path, corpus, reviewed_by):
         )
 
     assert (corpus / CASE / RULINGS_FILE).read_bytes() == before
+
+
+def test_any_fault_after_a_write_leaves_the_file_as_it_was(
+    tmp_path, corpus, monkeypatch
+):
+    """The restore runs for every exception, not only for a refused ruling."""
+    case = load_case(corpus / CASE)
+    issued = _issue(tmp_path, case, _tampering_draft(case, 3))
+    returned = tmp_path / "returned.csv"
+    _write(
+        returned,
+        [{"n": "1", "verdict": "same", "note": "why"}],
+        ["n", "verdict", "note"],
+    )
+    answered = near_misses.returned_rows(issued, returned)
+    before = (corpus / CASE / RULINGS_FILE).read_bytes()
+
+    calls = []
+
+    def fault_on_the_reload(case_dir):
+        calls.append(case_dir)
+        if len(calls) > 1:
+            raise OSError("the disk failed")
+        return load_case(case_dir)
+
+    monkeypatch.setattr(near_misses, "load_case", fault_on_the_reload)
+
+    with pytest.raises(OSError, match="the disk failed"):
+        near_misses.record(answered, corpus, "reader", "ballot")
+
+    assert (corpus / CASE / RULINGS_FILE).read_bytes() == before

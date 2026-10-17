@@ -46,6 +46,7 @@ from analysis_service.report import Report
 from analysis_service.system_model import FLOW_ID_RULES
 from evals.harness import flow_ids, modes, replay
 from evals.harness.archive import CaseKind, archive_bytes, case_suffix
+from evals.harness.artifact import EvalArtifact
 from evals.harness.reference import GoldenCase
 
 
@@ -126,10 +127,19 @@ def check_sweep_out(out: str | Path, case_ids: Iterable[str]) -> None:
     The sweep writes the artifact, makes :func:`reports_dir` beside it, and
     writes each :func:`case_file` in that folder. A folder that does not exist
     yet is made in the artifact's folder, which :func:`check_out` reads.
+
+    A folder that holds a file is refused. The sweep writes no report for a
+    case that fails, so a report an earlier sweep left there would read as
+    this sweep's result.
     """
     check_out(out)
     folder = reports_dir(out)
     if folder.is_dir():
+        if any(folder.iterdir()):
+            raise modes.EvalRunError(
+                f"{folder}: is not empty; it holds the files of an earlier sweep."
+                " Give a new --out, or move that folder"
+            )
         check_out(
             *(
                 case_file(out, case_id, kind)
@@ -382,27 +392,44 @@ def write_failures(out: str, failed: Mapping[str, Mapping[str, Any]]) -> None:
     print(f"{len(failed)} failed case(s) captured in {directory}")
 
 
-def runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, Any]:
+def runs_from_reports(
+    artifact: EvalArtifact, cases: Sequence[GoldenCase]
+) -> dict[str, Any]:
     """Read a finished sweep's saved reports and drafts back into runs.
 
     The pair is what a score needs: the report holds what survived the critic
     and the drafts hold what it was handed, and critic yield is the difference.
     A sweep whose directory carries a report and no drafts refuses here rather
     than scoring the half it can — re-run that sweep.
+
+    The artifact's ``mode_output`` says which cases failed. A failed case has
+    no report and is left out. A finished case with no report, and a failed
+    case with one, are refused by name: either file is not this sweep's.
     """
-    directory = reports_dir(artifact)
+    directory = reports_dir(artifact.path)
     if not directory.is_dir():
         raise modes.EvalRunError(
             f"{directory} does not exist; a score reads the reports a sweep"
             " writes beside its artifact, not the artifact alone"
         )
 
+    failed = artifact.failed_cases()
     runs: dict[str, Any] = {}
     for case in cases:
-        report_path = case_file(artifact, case.id, "report")
-        drafts_path = case_file(artifact, case.id, "drafts")
-        if not report_path.exists():
+        report_path = case_file(artifact.path, case.id, "report")
+        drafts_path = case_file(artifact.path, case.id, "drafts")
+        if case.id in failed:
+            if report_path.exists():
+                raise modes.EvalRunError(
+                    f"{case.id}: the artifact records the case as failed, but"
+                    f" {report_path} exists; an earlier sweep wrote it"
+                )
             continue
+        if not report_path.exists():
+            raise modes.EvalRunError(
+                f"{case.id}: the artifact records the case as finished, but"
+                f" {directory} holds no report for it"
+            )
         if not drafts_path.exists():
             raise modes.EvalRunError(
                 f"{drafts_path} is missing; this sweep predates the drafts"
@@ -424,7 +451,7 @@ def runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, 
         # The lanes' proposals where the sweep archived them: `losses` reads
         # them for the `fan-in` cause, and a sweep from before they were kept
         # leaves that cause undecided rather than refused.
-        proposals_path = case_file(artifact, case.id, "proposals")
+        proposals_path = case_file(artifact.path, case.id, "proposals")
         proposals = (
             json.loads(proposals_path.read_text(encoding="utf-8"))
             if proposals_path.exists()

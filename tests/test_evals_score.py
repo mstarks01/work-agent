@@ -54,6 +54,7 @@ def swept(monkeypatch, case, tmp_path):
                 "structural_failures": [],
                 "repo_commit": {"commit": "0" * 40, "clean": True},
                 "corpus_digest": "0" * 64,
+                "mode_output": [],
                 # A run-level block, to prove a re-score leaves it alone.
                 "grounds_aggregate": {"grounds_per_threat": 1.5},
                 "provenance": run.provenance.to_json(),
@@ -555,13 +556,33 @@ class TestItRefusesRatherThanScoringHalf:
                 ]
             )
 
+    def test_a_finished_case_with_no_report_is_named(
+        self, swept, tmp_path, case, roster_path
+    ):
+        """The artifact records the case as finished, so its report was lost."""
+        (reports_dir(swept) / f"{case.id}.report.json").unlink()
+
+        with pytest.raises(EvalRunError, match=f"{case.id}: .* no report"):
+            _score(swept, tmp_path, roster_path)
+
+    def test_a_report_for_a_failed_case_is_refused(
+        self, swept, tmp_path, case, roster_path
+    ):
+        """This sweep wrote no report for a failed case, so another sweep did."""
+        raw = json.loads(swept.read_text(encoding="utf-8"))
+        raw["mode_output"] = [{"case": case.id, "run_failure": "a fault"}]
+        swept.write_text(json.dumps(raw), encoding="utf-8")
+
+        with pytest.raises(EvalRunError, match=f"{case.id}: .* failed"):
+            _score(swept, tmp_path, roster_path)
+
     def test_drafts_under_a_framework_no_package_names_are_refused(self, swept, case):
         path = reports_dir(swept) / f"{case.id}.drafts.json"
         drafts = json.loads(path.read_text(encoding="utf-8"))
         path.write_text(json.dumps({**drafts, "strid": []}), encoding="utf-8")
 
         with pytest.raises(EvalRunError, match="'strid'"):
-            runs_from_reports(swept, [case])
+            runs_from_reports(load_artifact(swept), [case])
 
     def test_an_artifact_with_no_reports_directory_is_refused(
         self, swept, tmp_path, roster_path
@@ -581,3 +602,16 @@ class TestItRefusesRatherThanScoringHalf:
                     str(roster_path),
                 ]
             )
+
+
+def _score(artifact: Path, tmp_path: Path, roster_path: Path) -> int:
+    return main(
+        [
+            "score",
+            str(artifact),
+            "--ledger",
+            str(tmp_path / "none"),
+            "--roster",
+            str(roster_path),
+        ]
+    )

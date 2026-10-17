@@ -1417,7 +1417,7 @@ def command_score(args: argparse.Namespace) -> int:
         print(f"{path}: none of its cases are in {args.corpus}", file=sys.stderr)
         return 1
 
-    runs = runs_from_reports(path, cases)
+    runs = runs_from_reports(loaded, cases)
     frameworks = tuple(
         sorted(
             {block.framework for run in runs.values() for block in run.report.analyses}
@@ -1463,7 +1463,7 @@ def command_near_misses(args: argparse.Namespace) -> int:
     if not cases:
         print(f"{path}: none of its cases are in {args.corpus}", file=sys.stderr)
         return 1
-    runs = runs_from_reports(path, cases)
+    runs = runs_from_reports(loaded, cases)
     frameworks = tuple(
         sorted(
             {block.framework for run in runs.values() for block in run.report.analyses}
@@ -1547,8 +1547,9 @@ def command_price_verbs(args: argparse.Namespace) -> int:
     analysed: dict[str, Any] = {}
     if args.artifact is not None:
         path = Path(args.artifact)
-        cases = [case for case in corpus if case.id in load_artifact(path).cases]
-        runs = runs_from_reports(path, cases)
+        loaded = load_artifact(path)
+        cases = [case for case in corpus if case.id in loaded.cases]
+        runs = runs_from_reports(loaded, cases)
         produced = {
             case_id: stride_threats(run.report)
             for case_id, run in runs.items()
@@ -1614,7 +1615,7 @@ def command_pairing(args: argparse.Namespace) -> int:
         print(f"{path} carries no case {args.case!r}", file=sys.stderr)
         return 1
 
-    runs = runs_from_reports(path, [case])
+    runs = runs_from_reports(loaded, [case])
     block = next(
         (
             candidate
