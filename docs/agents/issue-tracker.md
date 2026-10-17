@@ -64,7 +64,7 @@ A completed map lives as a closed GitHub issue. Its tickets' resolution comments
 and the code holds the current state, so read the code first. Each map below settles the rules named
 beside it.
 
-- [#1760](https://github.com/mstarks01/work-agent/issues/1760) — a **Settings** page in the
+- [#1760](https://github.com/mstarks01/work-agent/issues/1760) — a Settings page in the
   first-run app. The spec [#1767](https://github.com/mstarks01/work-agent/issues/1767) holds the
   build, as the tickets #1768 to #1777.
   - The loaders stay the only source of each type, closed set and bound. One page module holds

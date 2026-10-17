@@ -12,11 +12,18 @@ import ast
 import importlib
 import inspect
 from collections import Counter
+from dataclasses import fields
+from typing import get_args
 
 import pytest
 
 from analysis_service import sampling
-from analysis_service.deployment import BLESSED_FINGERPRINTS_VAR, CONFIG_PATHS
+from analysis_service.deployment import (
+    BLESSED_FINGERPRINTS_VAR,
+    CONFIG_PATHS,
+    ConfigPathName,
+    ConfigPaths,
+)
 from analysis_service.model_tiers import TIER_NAMES, load_model_tiers
 from analysis_service.objects import S3_KEY_FILES
 from analysis_service.resilience import load_resilience
@@ -122,6 +129,15 @@ class TestThePageModule:
         }
         assert set(excluded) == {var for var, _ in CONFIG_PATHS.values()}
         assert "Promotion" in excluded[BLESSED_FINGERPRINTS_VAR].reason
+
+    def test_each_file_key_names_a_config_path(self):
+        """``_Files.lookup`` reads ``CONFIG_PATHS`` by the field a file key
+        names, and the Literal of the names spans the same fields."""
+        names = {field.name for field in fields(ConfigPaths)}
+        assert set(get_args(ConfigPathName)) == set(CONFIG_PATHS) == names
+        for key, setting in SETTINGS.items():
+            if setting.file_key is not None:
+                assert setting.file_key[0] in CONFIG_PATHS, key
 
     def test_a_reason_comes_with_each_mark_but_changes(self):
         for key, setting in SETTINGS.items():

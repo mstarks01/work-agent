@@ -8,7 +8,7 @@
 
 ## Context
 
-The **Settings** page of the first-run app writes the **Deployment Settings**
+The Settings page of the first-run app writes the **Deployment Settings**
 to one directory outside the checkout. The app makes one mapping from the
 process environment and `settings.env` in that directory, and gives it to
 `Deployment.from_env`. A file on the user's disk is hard to change after a
@@ -31,7 +31,10 @@ mode `0600`:
   then a dot and 16 random hexadecimal characters from the `secrets` module:
   `ANALYSIS_ANTHROPIC_API_KEY_FILE` names a file such as
   `anthropic_api_key.3f9c0a1b2d4e5f60`. Each save of a key writes a new file.
-  The name holds no part of the key.
+  The name holds no part of the key. The secret is the content of the file
+  without one final newline, and the rule of no whitespace at either end
+  applies after that newline is removed, because an editor ends a file with
+  a newline.
 
 **No TOML file.** The page writes each changed value as its `ANALYSIS_*`
 override in `settings.env`, for example `ANALYSIS_MODEL_BASE_MODEL` or

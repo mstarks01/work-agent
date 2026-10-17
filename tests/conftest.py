@@ -49,7 +49,9 @@ def _empty_settings_dir(tmp_path_factory: pytest.TempPathFactory) -> str:
 
 
 @pytest.fixture(autouse=True)
-def _settings_dir(monkeypatch: pytest.MonkeyPatch, _empty_settings_dir: str) -> None:
+def _isolate_settings_dir(
+    monkeypatch: pytest.MonkeyPatch, _empty_settings_dir: str
+) -> None:
     """Point the first-run app at an empty settings directory, so no test
     reads the ``settings.env`` of the developer's machine."""
     monkeypatch.setenv(SETTINGS_DIR_VAR, _empty_settings_dir)

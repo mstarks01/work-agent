@@ -7,7 +7,7 @@
 
 ## Context
 
-The **Settings** page of the first-run app changes and shows **Deployment
+The Settings page of the first-run app changes and shows **Deployment
 Settings**. For each setting, the page must know the type, the allowed values,
 the group, whether the setting is a secret, and whether a change needs a
 restart.

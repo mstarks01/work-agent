@@ -42,7 +42,12 @@ from analysis_service.config_files import (
     read_toml,
     settings_dir,
 )
-from analysis_service.deployment import CONFIG_PATHS, PASS_FLAGS, config_path
+from analysis_service.deployment import (
+    CONFIG_PATHS,
+    PASS_FLAGS,
+    ConfigPathName,
+    config_path,
+)
 from analysis_service.errors import ConfigError
 from analysis_service.model_gate import tool_models
 from analysis_service.model_tiers import (
@@ -205,9 +210,11 @@ class _Files:
 
     def __init__(self, merged: Mapping[str, str]) -> None:
         self._merged = merged
-        self._read: dict[str, tuple[Path, dict[str, Any]] | ConfigError] = {}
+        self._read: dict[ConfigPathName, tuple[Path, dict[str, Any]] | ConfigError] = {}
 
-    def lookup(self, field: str, keys: tuple[str, ...]) -> tuple[Path, object]:
+    def lookup(
+        self, field: ConfigPathName, keys: tuple[str, ...]
+    ) -> tuple[Path, object]:
         """The file of ``field`` and the value at ``keys`` in it, or ``None``
         where the file does not hold one. Raises the loader's
         :class:`ConfigError` where the loader refuses the path or the file."""
@@ -263,17 +270,17 @@ def _base(setting: Setting, files: _Files) -> dict:
         except ConfigError as exc:
             return {"value": None, "source": "refused", "refusal": str(exc)}
         if value is not None:
-            return {"value": _text(value), "source": "file", "file": str(path)}
+            return {"value": _override_form(value), "source": "file", "file": str(path)}
     var = setting.variable
     default: str | None = None
     if var in PASS_FLAGS:
-        default = _text(PASS_FLAGS[var])
+        default = _override_form(PASS_FLAGS[var])
     elif var is not None:
         default = STORE_DEFAULTS.get(var)
     return {"value": default, "source": "default"}
 
 
-def _text(value: object) -> str:
+def _override_form(value: object) -> str:
     """A TOML value in the form of its override."""
     if isinstance(value, bool):
         return "true" if value else "false"
