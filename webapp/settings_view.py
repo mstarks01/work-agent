@@ -4,7 +4,9 @@ the value comes from (#1775).
 A value comes from one of four sources. The process environment wins, then a
 line of ``settings.env`` ("this page"), then the shipped TOML file that the
 entry's ``file_key`` names, then the default. A value that ``settings.env``
-sets carries the shipped value beside it.
+sets carries the shipped value beside it. The page locates each TOML file with
+the loader's reader, and where the loader refuses the path or the file, a row
+of that file shows the refusal in place of a value.
 
 The page shows a store row only where a loader reads it now: the store rows
 follow the ``reads`` of the selected job store, object store and database.
@@ -39,7 +41,7 @@ from analysis_service.config_files import (
     read_toml,
     settings_dir,
 )
-from analysis_service.deployment import CONFIG_PATHS, PASS_FLAGS
+from analysis_service.deployment import CONFIG_PATHS, PASS_FLAGS, config_path
 from analysis_service.errors import ConfigError
 from analysis_service.model_gate import tool_models
 from analysis_service.model_tiers import (
@@ -197,21 +199,23 @@ class _Files:
 
     def __init__(self, merged: Mapping[str, str]) -> None:
         self._merged = merged
-        self._read: dict[str, tuple[Path, dict[str, Any]]] = {}
+        self._read: dict[str, tuple[Path, dict[str, Any]] | ConfigError] = {}
 
     def lookup(self, field: str, keys: tuple[str, ...]) -> tuple[Path, object]:
         """The file of ``field`` and the value at ``keys`` in it, or ``None``
-        where the file does not hold one or cannot be read."""
+        where the file does not hold one. Raises the loader's
+        :class:`ConfigError` where the loader refuses the path or the file."""
         if field not in self._read:
             var, default = CONFIG_PATHS[field]
-            path = Path(self._merged.get(var) or default)
             try:
-                raw = read_toml(path, ConfigError)
-            except ConfigError:
-                # The loader refuses the file too, and the banner names it.
-                raw = {}
-            self._read[field] = (path, raw)
-        path, found = self._read[field]
+                path = config_path(self._merged, var, default)
+                self._read[field] = (path, read_toml(path, ConfigError))
+            except ConfigError as exc:
+                self._read[field] = exc
+        read = self._read[field]
+        if isinstance(read, ConfigError):
+            raise read
+        path, found = read
         value: object = found
         for key in keys:
             value = value.get(key) if isinstance(value, dict) else None
@@ -245,9 +249,13 @@ def _value(
 
 def _base(setting: Setting, files: _Files) -> dict:
     """The value of a setting with no override: from its TOML file, else the
-    default, else ``None``."""
+    default, else ``None``. Where the loader refuses the file, the value is the
+    refusal."""
     if setting.file_key is not None:
-        path, value = files.lookup(*setting.file_key)
+        try:
+            path, value = files.lookup(*setting.file_key)
+        except ConfigError as exc:
+            return {"value": None, "source": "refused", "refusal": str(exc)}
         if value is not None:
             return {"value": _text(value), "source": "file", "file": str(path)}
     var = setting.variable

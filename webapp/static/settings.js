@@ -177,6 +177,7 @@ function source(row) {
   }
   if (row.source === "page") return h("span", { class: "tag" }, "this page");
   if (row.source === "file") return h("code", {}, row.file);
+  if (row.source === "refused") return [h("span", { class: "tag outside" }, "refused"), hint(h("code", {}, row.refusal))];
   return h("span", { class: "tag" }, "default");
 }
 

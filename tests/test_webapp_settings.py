@@ -14,7 +14,12 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service.deployment import DEFAULT_RESILIENCE_PATH
+from analysis_service.deployment import (
+    DEFAULT_RESILIENCE_PATH,
+    RESILIENCE_VAR,
+    ConfigPaths,
+)
+from analysis_service.errors import ConfigError
 from analysis_service.jobs import InMemoryJobStore
 from analysis_service.model_gate import tool_models
 from analysis_service.settings_variables import secret_vars
@@ -157,6 +162,33 @@ class TestTheSource:
 
         assert rows["resilience.attempts"]["value"] == "4"
         assert rows["resilience.attempts"]["file"] == str(moved)
+
+    def test_a_config_path_moves_as_the_loader_reads_it(self, tmp_path):
+        """The page reads a config path with the loader's reader, so a path
+        with spaces around it names the same file at both."""
+        padded = f"  {DEFAULT_RESILIENCE_PATH}  "
+        rows = rows_of(client_for(tmp_path, hand_written(), ANALYSIS_RESILIENCE=padded))
+
+        loaded = ConfigPaths.from_env({RESILIENCE_VAR: padded}).resilience
+        assert rows["resilience.attempts"]["file"] == str(loaded)
+
+    def test_a_config_path_the_loader_refuses_shows_the_refusal(self, tmp_path):
+        """A set-but-empty path stops the startup, and a row of its file shows
+        that refusal in place of a value of the shipped file."""
+        rows = rows_of(client_for(tmp_path, hand_written(), ANALYSIS_RESILIENCE=""))
+
+        with pytest.raises(ConfigError) as refusal:
+            ConfigPaths.from_env({RESILIENCE_VAR: ""})
+        row = rows["resilience.attempts"]
+        assert (
+            row.items()
+            >= {
+                "value": None,
+                "source": "refused",
+                "refusal": str(refusal.value),
+            }.items()
+        )
+        assert "file" not in row
 
 
 class TestSecrets:

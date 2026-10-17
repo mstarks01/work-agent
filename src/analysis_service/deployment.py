@@ -204,8 +204,9 @@ def _pass(env: Mapping[str, str], var: str) -> bool:
     return env_flag(env, var, default=PASS_FLAGS[var])
 
 
-def _path(env: Mapping[str, str], var: str, default: Path) -> Path:
+def config_path(env: Mapping[str, str], var: str, default: Path) -> Path:
     """One located file or directory: the variable's value, or the repo default.
+    The one reader of a config path, for the loader and the Settings page.
 
     A set-but-empty variable raises rather than falling back, matching every
     other loader here: it is a deploy mistake, and silently reading the repo
@@ -255,7 +256,7 @@ class ConfigPaths:
     def from_env(cls, env: Mapping[str, str]) -> Self:
         return cls(
             **{
-                field: _path(env, var, default)
+                field: config_path(env, var, default)
                 for field, (var, default) in CONFIG_PATHS.items()
             }
         )
