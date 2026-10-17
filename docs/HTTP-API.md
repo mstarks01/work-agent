@@ -70,6 +70,10 @@ has **blessed** (approved by a measured run, in
 - the run is **unexercised** (a tier the graph declares produced no fingerprint
   at all) — always refused, and not reachable on a run that produced a report.
 
+These refusals are a rule of the HTTP surfaces only. The in-process
+`Engine.analyze` returns the report with its certification, because its caller
+is trusted code.
+
 A job that waits on answers is checked over the nodes it ran before it paused,
 and the questions route and the answers route refuse under the same two rules.
 The job that your answers start carries the result of the job you answered,

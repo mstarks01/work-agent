@@ -34,6 +34,7 @@ from analysis_service import (
     SourceLimits,
     StubPipelineRunner,
 )
+from analysis_service.api import JOB_REFUSAL_STATUS
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.deployment import Deployment
 from analysis_service.jobs import JOB_ID_PATTERN, AdmissionOutcome, JobRecord
@@ -892,6 +893,18 @@ def page_javascript(name: str) -> str:
 def viewer_javascript() -> str:
     """The report viewer's script."""
     return page_javascript("report_view.js")
+
+
+def test_the_workspace_labels_each_page_status():
+    """``workspace.js`` labels every status that ``_page_status`` sends, and
+    no other. A status the table lacks renders as its raw key."""
+    from webapp.main import PageStatus
+
+    body = re.search(r"const labels = \{(.*?)\};", page_javascript("workspace.js"))
+    assert body is not None, "workspace.js holds no labels table"
+    assert set(re.findall(r'"([\w-]+)"\s*:', body.group(1))) == set(
+        get_args(PageStatus)
+    )
 
 
 @pytest.mark.parametrize("sink", HTML_STRING_SINKS)
@@ -1768,17 +1781,44 @@ def _driver_apps(tiers):
     return {"api": client.app, "webapp": create_app(startup_for(tiers))}
 
 
+def _raised_by(module) -> set[type[Exception]]:
+    """Each exception class that ``module`` raises by name: a ``raise X(...)``,
+    and a bare ``raise`` in a handler that names the classes it passes on."""
+    import ast
+    import inspect
+
+    def names(node: ast.expr | None) -> list[str]:
+        if isinstance(node, ast.Call):
+            node = node.func
+        if isinstance(node, ast.Tuple):
+            return [name for item in node.elts for name in names(item)]
+        return [node.id] if isinstance(node, ast.Name) else []
+
+    raised: set[str] = set()
+    for node in ast.walk(ast.parse(inspect.getsource(module))):
+        if isinstance(node, ast.Raise) and node.exc is not None:
+            raised.update(names(node.exc))
+        elif isinstance(node, ast.ExceptHandler) and any(
+            isinstance(line, ast.Raise) and line.exc is None for line in node.body
+        ):
+            raised.update(names(node.type))
+    return {getattr(module, name) for name in raised}
+
+
 def test_both_drivers_answer_every_refusal_of_the_module(tiers):
     """A refusal neither driver handles is answered as a 500, so each driver
-    holds a handler for every exception the module exports."""
+    holds a handler for every exception the module exports or raises."""
     import analysis_service.job_answers as module
 
-    refusals = {
+    exported = {
         held
         for held in (getattr(module, name) for name in module.__all__)
         if isinstance(held, type) and issubclass(held, Exception)
     }
-    assert refusals, "the module exports no refusal: the scan read nothing"
+    refusals = exported | _raised_by(module)
+    assert exported, "the module exports no refusal: the scan read nothing"
+    assert refusals > exported, "the module passes no refusal on: the scan read nothing"
+    assert set(JOB_REFUSAL_STATUS) <= refusals, "a row names no refusal of the module"
     for driver, app in _driver_apps(tiers).items():
         missing = refusals - set(app.exception_handlers)
         assert not missing, f"{driver} has no handler for {missing}"

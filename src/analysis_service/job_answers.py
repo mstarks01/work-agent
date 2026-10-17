@@ -370,7 +370,10 @@ class JobAnswers:
 
         **The one reader of "may this report be served".** The report route
         and every read derived from the report ask it, so a report the gate
-        withholds cannot reach a caller through a view of it.
+        withholds cannot reach a caller through a view of it. The HTTP surfaces
+        apply this rule: the ``/v1`` routes and the first-run app. The
+        in-process :meth:`~analysis_service.engine.Engine.analyze` does not ask
+        it, because its caller is trusted code.
         """
         if record.status != "completed":
             raise NotCompleted(record.status)
