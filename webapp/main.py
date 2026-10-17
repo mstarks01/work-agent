@@ -96,15 +96,17 @@ import asyncio
 import json
 import logging
 import os
+import secrets
 from collections.abc import (
     AsyncIterator,
     Awaitable,
     Callable,
     Collection,
+    Iterator,
     Mapping,
     Sequence,
 )
-from contextlib import asynccontextmanager, nullcontext
+from contextlib import asynccontextmanager, contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
@@ -157,6 +159,7 @@ from analysis_service.config_files import (
     SettingsFileError,
     read_settings,
     settings_dir,
+    write_private,
     write_settings_env,
 )
 from analysis_service.critic import SEVERITY_ORDER
@@ -253,10 +256,14 @@ from webapp.page import (
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
     Refusal,
+    key_file,
     parse_save,
     refusals,
     restart_keys,
+    saved_keys,
     saved_lines,
+    unused_key_files,
+    unused_keys,
 )
 from webapp.settings_view import settings_view
 
@@ -1078,6 +1085,23 @@ async def _limited_body(request: Request, limit: int) -> bytes | None:
     return bytes(data)
 
 
+@contextmanager
+def staged_keys(directory: Path, keys: Mapping[str, str]) -> Iterator[dict[str, Path]]:
+    """Each key text of ``keys`` in a new private file in ``directory``, by its
+    variable, for the check of a save. On exit, it deletes each staged file
+    that the save did not move to its :func:`~webapp.settings_save.key_file`."""
+    staged: dict[str, Path] = {}
+    try:
+        for var, text in keys.items():
+            name = key_file(directory, var).name
+            staged[var] = directory / f".{name}.{secrets.token_hex(8)}.staged"
+            write_private(staged[var], text.encode())
+        yield staged
+    finally:
+        for path in staged.values():
+            path.unlink(missing_ok=True)
+
+
 _RELOAD_MESSAGE = (
     "settings.env changed after this page loaded. Reload the page, then make"
     " the change again."
@@ -1199,13 +1223,16 @@ def create_app(
 
     @app.post("/settings")
     async def save_settings(request: Request) -> Response:
-        """Check a save, write ``settings.env`` and swap the cell (ADR 0093).
+        """Check a save, write it and swap the cell (ADR 0092, ADR 0093).
 
         One save at a time holds the lock from the revision check to the
-        swap. A save that the value rule, the test Deployment or the store
-        check refuses writes nothing, and its 422 holds one message for each
-        refusal. The response holds the new page data and the keys of each
-        store setting that takes effect after a restart.
+        swap. A save that the value rule, the secret rule, the test
+        Deployment or the store check refuses writes nothing, and its 422
+        holds one message for each refusal. The check reads each new key
+        from a staged file. A save that passes writes the key files first,
+        then ``settings.env``, and then deletes each key file that no
+        variable names. The response holds the new page data and the keys of
+        each store setting that takes effect after a restart.
         """
         if not is_same_origin(request):
             logger.warning("refused a POST /settings that was not same-origin")
@@ -1225,6 +1252,7 @@ def create_app(
                 " a 'remove' list.",
             )
         path = settings_dir(process_env) / SETTINGS_FILE
+        directory = path.parent
         async with save_lock:
             try:
                 revision, lines = read_settings(path)
@@ -1234,26 +1262,53 @@ def create_app(
                 return _message(409, _RELOAD_MESSAGE)
             if found := refusals(save, process_env, lines):
                 return _refused_save(found)
-            saved = saved_lines(lines, save)
             try:
-                saved_env = merged_env(process_env, saved, path)
-            except SettingsFileError as exc:
-                return _refused_save([Refusal(None, str(exc))])
-            built, messages = await asyncio.to_thread(check_saved, saved_env, build)
-            if messages:
-                return _refused_save([Refusal(None, message) for message in messages])
-            # A hand edit while the check ran is not written over.
-            if read_settings(path).revision != revision:
-                return _message(409, _RELOAD_MESSAGE)
-            try:
-                write_settings_env(
-                    path, {var: line.value for var, line in saved.items()}
+                saved_env = merged_env(
+                    process_env, saved_lines(lines, save, directory), path
                 )
+                with staged_keys(directory, saved_keys(save)) as staged:
+                    check_env = saved_env | {
+                        var: str(staged_path) for var, staged_path in staged.items()
+                    }
+                    built, messages = await asyncio.to_thread(
+                        check_saved, check_env, build
+                    )
+                    if messages:
+                        return _refused_save(
+                            [Refusal(None, message) for message in messages]
+                        )
+                    # A hand edit while the check ran is not written over.
+                    if read_settings(path).revision != revision:
+                        return _message(409, _RELOAD_MESSAGE)
+                    drop = unused_keys(built.tiers)
+                    saved = saved_lines(lines, save, directory, drop)
+                    saved_env = merged_env(process_env, saved, path)
+                    moved = [var for var in staged if var not in drop]
+                    for var in moved:
+                        os.replace(staged[var], saved_env[var])
+                    write_settings_env(
+                        path, {var: line.value for var, line in saved.items()}
+                    )
             except SettingsFileError as exc:
                 return _refused_save([Refusal(None, str(exc))])
             except OSError as exc:
-                logger.error("settings.env could not be written: %s", exc)
-                return _message(500, f"{path} could not be written: {exc.strerror}")
+                logger.error("the settings could not be written: %s", exc)
+                return _message(
+                    500, f"The settings could not be written: {exc.strerror}"
+                )
+            for unused in unused_key_files(directory, saved_env):
+                unused.unlink(missing_ok=True)
+            if moved:
+                # The check read each key from its staged file, and the
+                # runner of a later selection reads the key file again.
+                built = await asyncio.to_thread(build, saved_env)
+                if built.error is not None:
+                    logger.error("the saved settings did not build: %s", built.error)
+                    return _message(
+                        500,
+                        "The settings were saved, but the engine did not build"
+                        f" on them: {built.error}. Restart the app.",
+                    )
             cell.current = built.current(workspace.store)
             logger.info("settings saved: %s", ", ".join([*save.changes, *save.remove]))
         return JSONResponse(

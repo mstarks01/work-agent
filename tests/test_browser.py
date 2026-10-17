@@ -628,6 +628,38 @@ def test_the_settings_page_saves_resets_and_refuses_a_stale_tab(browser, tmp_pat
     assert "Reload the page" in stale
 
 
+def test_the_settings_page_saves_a_key_with_the_vendor_that_needs_it(browser, tmp_path):
+    from tests.test_settings_env import env_in, hand_written, write_settings
+    from webapp.main import create_app
+
+    key = "sk-typed-in-the-browser-never-shown"
+    write_settings(tmp_path, hand_written())
+    vendor = 'tr[data-key="tiers.review.vendor"] select'
+    key_row = 'tr[data-key="credentials.anthropic.api_key"]'
+    for url in serve(create_app(env=env_in(tmp_path))):
+        page, errors = opened(browser, url + "/settings")
+        page.wait_for_selector(key_row)
+        page.select_option(vendor, "openai")
+        hidden = page.locator(key_row).count()
+        warned = page.locator("#changes-list").inner_text()
+
+        page.select_option(vendor, "anthropic")
+        page.locator(f"{key_row} input").fill(key)
+        listed = page.locator("#changes-list").inner_text()
+        page.click("#save-changes")
+        page.wait_for_selector("#save-status", state="visible")
+        shown = page.locator(key_row).inner_text()
+        html = page.content()
+        page.close()
+    assert errors == [], f"the settings page raised: {errors}"
+    assert hidden == 0
+    assert "deletes the saved anthropic api key" in warned
+    assert "a new key" in listed and key not in listed
+    assert "A key is saved" in shown
+    assert key not in html
+    assert (tmp_path / "anthropic_api_key").read_text(encoding="utf-8") == key
+
+
 def test_workspace_mobile_has_no_page_overflow(page):
     page.set_viewport_size({"width": 390, "height": 844})
     pause(page)

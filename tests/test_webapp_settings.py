@@ -216,43 +216,36 @@ class TestSecrets:
 
 
 class TestWhatTheSelectionShows:
-    def test_only_the_chosen_vendors_and_their_modes_show(self, tmp_path):
-        settings = hand_written(
-            ANALYSIS_MODEL_REVIEW_VENDOR="bedrock",
-            ANALYSIS_MODEL_REVIEW_MODEL="anthropic.claude-opus-4-5-20251101-v1:0",
-            ANALYSIS_MODEL_CREDENTIALS_BEDROCK="iam",
-            ANALYSIS_BEDROCK_REGION="us-east-1",
-        )
-        rows = rows_of(client_for(tmp_path, settings))
-
-        assert {
-            "credentials.bedrock.mode",
-            "credentials.bedrock.region",
-            "credentials.openai.api_key",
-            "credentials.vertex.project",
-        } <= rows.keys()
-        assert "credentials.bedrock.api_key" not in rows
-        assert "credentials.anthropic.api_key" not in rows
-        assert not any(key.startswith("credentials.gemini") for key in rows)
-        assert "credentials.vertex.mode" not in rows
-
-    def test_a_vendor_with_two_modes_and_none_declared_shows_only_its_mode(
+    def test_each_vendor_row_carries_its_vendor_and_the_modes_that_read_it(
         self, tmp_path
     ):
-        settings = hand_written(
-            ANALYSIS_MODEL_REVIEW_VENDOR="bedrock",
-            ANALYSIS_MODEL_REVIEW_MODEL="anthropic.claude-opus-4-5-20251101-v1:0",
-        )
-        rows = rows_of(client_for(tmp_path, settings))
+        rows = rows_of(client_for(tmp_path, hand_written()))
 
-        assert "credentials.bedrock.mode" in rows
-        assert "credentials.bedrock.region" not in rows
+        marks = {
+            key: (row["vendor"], row.get("modes"))
+            for key, row in rows.items()
+            if "vendor" in row
+        }
+        assert marks["credentials.bedrock.mode"] == ("bedrock", None)
+        assert marks["credentials.bedrock.api_key"] == ("bedrock", ["api_key"])
+        assert marks["credentials.bedrock.region"] == ("bedrock", ["api_key", "iam"])
+        assert marks["credentials.vertex.project"] == ("vertex", ["iam"])
+        assert marks["charges.openrouter"] == ("openrouter", None)
+        assert "credentials.vertex.mode" not in rows
+        assert {key for key in rows if key.startswith("credentials.")} <= marks.keys()
 
-    def test_an_iam_vendor_carries_its_setup_command(self, tmp_path):
+    def test_the_data_carries_the_modes_of_each_vendor(self, tmp_path):
         data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
 
-        assert [setup["vendor"] for setup in data["iam"]] == ["vertex"]
-        assert data["iam"][0]["command"] == "gcloud auth application-default login"
+        assert data["modes"]["bedrock"] == ["api_key", "iam"]
+        assert data["modes"]["vertex"] == ["iam"]
+
+    def test_each_iam_vendor_carries_its_setup_command(self, tmp_path):
+        data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
+
+        setups = {setup["vendor"]: setup["command"] for setup in data["iam"]}
+        assert setups.keys() == {"bedrock", "vertex"}
+        assert setups["vertex"] == "gcloud auth application-default login"
 
     def test_the_memory_store_shows_no_database_or_object_setting(self, tmp_path):
         rows = rows_of(client_for(tmp_path, hand_written()))

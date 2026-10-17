@@ -1,7 +1,9 @@
 // The Settings page: one table of each Deployment Setting, with its value and
 // the source of the value, and a panel of the unsaved changes. `SETTINGS`
 // comes from webapp/settings_view.py, and a save posts to /settings
-// (webapp/settings_save.py). Each value lands as text, never as markup.
+// (webapp/settings_save.py). Each value lands as text, never as markup. A key
+// field only writes: the page never gets a key, and puts a typed key in no
+// attribute.
 
 let SETTINGS = JSON.parse(document.getElementById("settings").textContent);
 
@@ -31,6 +33,27 @@ function pending(row) {
   return value === null ? row.shipped : value;
 }
 
+const TIER_VENDOR = /^tiers\.[^.]+\.vendor$/;
+
+// Each vendor that a tier names, with the unsaved changes applied.
+const chosenVendors = () =>
+  new Set(SETTINGS.rows.filter((row) => TIER_VENDOR.test(row.key)).map(pending).filter(Boolean));
+
+// The credential mode of a vendor: its only one, else the chosen one.
+function chosenMode(vendor) {
+  const modes = SETTINGS.modes[vendor];
+  return modes.length === 1 ? modes[0] : pending(rowOf(`credentials.${vendor}.mode`));
+}
+
+// A vendor row shows where a tier names the vendor and its mode reads the row.
+const visible = (row) =>
+  !row.vendor || (chosenVendors().has(row.vendor) && (!row.modes || row.modes.includes(chosenMode(row.vendor))));
+
+// Each saved key of settings.env that a save deletes, because no tier names
+// its vendor after the changes.
+const deletedKeys = () =>
+  SETTINGS.rows.filter((row) => row.secret && row.key_saved && row.source === "page" && row.vendor && !chosenVendors().has(row.vendor));
+
 function change(row, value) {
   if (value === (row.value ?? "")) changes.delete(row.key);
   else changes.set(row.key, value);
@@ -55,7 +78,10 @@ function choiceControl(row) {
     if (option === now) attrs.selected = "";
     select.append(h("option", attrs, option));
   }
-  select.addEventListener("change", () => change(row, select.value));
+  select.addEventListener("change", () => {
+    change(row, select.value);
+    fill(currentFilter());
+  });
   return select;
 }
 
@@ -76,6 +102,18 @@ function multipleControl(row) {
   );
 }
 
+function keyControl(row) {
+  const input = h("input", {
+    type: "password",
+    "aria-label": row.label,
+    autocomplete: "off",
+    placeholder: row.key_saved ? "Type a key to replace the saved key" : "Type the key",
+  });
+  input.value = changes.get(row.key) ?? "";
+  input.addEventListener("input", () => change(row, input.value));
+  return input;
+}
+
 function control(row) {
   if (row.multiple) return multipleControl(row);
   if (row.options) return choiceControl(row);
@@ -85,7 +123,8 @@ function control(row) {
 // The value, or a key's state: the page never shows a key.
 function shownValue(row) {
   if (row.secret) {
-    return row.key_saved ? hint("A key is saved. The page never shows it.") : hint("No key is saved.");
+    const state = row.key_saved ? hint("A key is saved. The page never shows it.") : hint("No key is saved.");
+    return row.source === "process" ? state : [keyControl(row), state];
   }
   if (editable(row)) return control(row);
   if (row.value == null) return h("span", { class: "not-set" }, "Not set");
@@ -133,7 +172,8 @@ function source(row) {
 }
 
 function iamRows() {
-  return SETTINGS.iam.map((setup) =>
+  const chosen = SETTINGS.iam.filter((setup) => chosenVendors().has(setup.vendor) && chosenMode(setup.vendor) === "iam");
+  return chosen.map((setup) =>
     h(
       "tr",
       {},
@@ -160,7 +200,7 @@ function fill(filter) {
   const groups = [...new Set(SETTINGS.rows.map((row) => row.group))];
   for (const group of groups) {
     const rows = SETTINGS.rows.filter(
-      (row) => row.group === group && `${row.label} ${row.key}`.toLowerCase().includes(filter),
+      (row) => row.group === group && visible(row) && `${row.label} ${row.key}`.toLowerCase().includes(filter),
     );
     const extra = group === "Credentials" && !filter ? iamRows() : [];
     if (!rows.length && !extra.length) continue;
@@ -188,8 +228,21 @@ function panel() {
   list.replaceChildren();
   for (const [key, value] of changes) {
     const row = rowOf(key);
-    const after = value === null ? [shown(row.shipped), " (shipped)"] : [shown(value)];
-    list.append(h("li", { "data-key": key }, h("b", {}, row.label), ": ", shown(row.value), " → ", after));
+    if (!visible(row)) continue;
+    let before = shown(row.value);
+    let after = value === null ? [shown(row.shipped), " (shipped)"] : [shown(value)];
+    if (row.secret) {
+      before = row.key_saved ? "a saved key" : "no key";
+      after = value === null ? "no key" : "a new key";
+    }
+    list.append(h("li", { "data-key": key }, h("b", {}, row.label), ": ", before, " → ", after));
+  }
+  if (changes.size) {
+    for (const row of deletedKeys()) {
+      list.append(
+        h("li", { "data-key": row.key, class: "warning" }, `No tier uses ${row.vendor} after this save, so the save deletes the saved ${row.label}.`),
+      );
+    }
   }
   for (const key of removals) list.append(h("li", { "data-key": key }, "Remove the line ", h("code", {}, key)));
   const count = changes.size + removals.size;
@@ -229,7 +282,7 @@ async function save() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         revision: SETTINGS.revision,
-        changes: Object.fromEntries(changes),
+        changes: Object.fromEntries([...changes].filter(([key]) => visible(rowOf(key)))),
         remove: [...removals],
       }),
     });
