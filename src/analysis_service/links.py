@@ -267,12 +267,7 @@ class LinkQuestion:
 
 def components(model: SystemModel) -> tuple[str, ...]:
     """Every element ID a link answer may name, in model order."""
-    prefixes = SUBJECT_PREFIXES["component"]
-    return tuple(
-        element.id
-        for element in model.elements()
-        if element.id.split(":", 1)[0] in prefixes
-    )
+    return tuple(element.id for element in model.zoned_elements())
 
 
 def link_questions(

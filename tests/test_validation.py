@@ -4,6 +4,10 @@ from typing import ClassVar
 
 import pytest
 
+from analysis_service.assertions import _ELEMENT_TYPES
+from analysis_service.early_questions import element_type
+from analysis_service.evidence import _element_gloss
+from analysis_service.links import components
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import UNKNOWN, SystemModel, make_flow_id
 from analysis_service.validation import (
@@ -52,6 +56,21 @@ class TestDeterministicIds:
         issues = [i for i in validate(model) if i.code == "id-mismatch"]
         assert issues[0].element_id == "flow:login"
         assert "flow:entity:customer>process:web-app>login" in issues[0].message
+
+    def test_an_id_with_the_prefix_of_another_type_is_reported(self):
+        """A name that slugs to empty has no derived ID, and the ID it carries
+        must still start with its own type's prefix."""
+        data = valid_model().model_dump(mode="json")
+        data["trust_boundaries"].append(
+            {"id": "process:ghost", "name": "数据库", "kind": "other"}
+        )
+
+        _, issues = parse_and_validate(data, normalize_ids=True)
+
+        assert [(i.code, i.element_id) for i in issues] == [
+            ("id-mismatch", "process:ghost")
+        ]
+        assert "'boundary'" in issues[0].message
 
 
 class TestReferentialIntegrity:
@@ -605,6 +624,42 @@ class TestExcerptLabelsSnap:
         assert "invalid-reference" in codes(issues)
 
 
+class TestTheElementTypeHasOneRule:
+    """An element's type is its class. A reader that holds an element reads
+    the class; a reader that holds only an ID reads its prefix, and the gate
+    refuses each element whose prefix is not its class's.
+    """
+
+    @staticmethod
+    def _mistyped() -> dict:
+        data = valid_model().model_dump(mode="json")
+        process = {**data["processes"][0], "id": "entity:ghost", "name": "进程"}
+        data["processes"].append(process)
+        data["trust_boundaries"].append(
+            {"id": "process:ghost", "name": "数据库", "kind": "other"}
+        )
+        return data
+
+    def test_the_readers_agree_with_the_class(self):
+        model, issues = parse_and_validate(self._mistyped(), normalize_ids=True)
+        assert model is not None
+        zoned = [element.id for element in model.zoned_elements()]
+
+        assert list(components(model)) == zoned
+        for element in model.elements():
+            assert element_type(element) == type(element).__name__
+            assert _element_gloss(element).startswith(
+                ("flow,", "trust boundary", f"{element.id_prefix} in ")
+            )
+        prefix_disagrees = {
+            element.id
+            for element in model.elements()
+            if _ELEMENT_TYPES[element.id.partition(":")[0]] is not type(element)
+        }
+        refused = {i.element_id for i in issues if i.code == "id-mismatch"}
+        assert prefix_disagrees == refused == {"entity:ghost", "process:ghost"}
+
+
 class TestAnElementIdCannotCarryStructure:
     """An element ID is rendered into a lane agent's prompt, in a roster table
     that carries no fence of its own -- correctly, because a table is what the
@@ -613,7 +668,7 @@ class TestAnElementIdCannotCarryStructure:
     That is safe only while an ID is a slug. It is derived as one, and the
     `id-mismatch` rule pins the emitted ID to the derived one -- except that
     `derive_element_id` raises when the element's *name* slugs to empty, and the
-    rule is skipped exactly then. So a name of `"!!!"` carried an arbitrary ID,
+    rule checks only the prefix then. So a name of `"!!!"` carried an arbitrary ID,
     bounded only by a length, into instruction position: with a newline and a
     backtick run it opened a block that swallowed every fenced block after it,
     the caller's own fenced sources among them.

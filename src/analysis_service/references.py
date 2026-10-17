@@ -36,7 +36,8 @@ tell apart.
 
 There is one hole, and it is why the guard exists rather than decorating the
 module. ``normalize_name`` raises on a name that slugs to nothing, and the gate
-answers that by skipping ``id-mismatch`` for that element rather than guessing.
+answers that by checking only the ID's prefix for that element rather than
+guessing its slug.
 Two elements named ``"!!!"`` and ``"???"`` may therefore carry ``process:FOO``
 and ``process:foo`` and pass. Under a fold alone they would be one element.
 Under the guard, the reference matches two known spellings, resolves to neither,

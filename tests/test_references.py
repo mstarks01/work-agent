@@ -57,7 +57,7 @@ class TestCanonical:
         """The hole the guard is for, pinned as a case rather than an argument.
 
         ``normalize_name`` raises on a name that slugs to nothing and the gate
-        skips ``id-mismatch`` rather than guessing, so a model naming every
+        checks only the ID's prefix rather than guessing, so a model naming every
         element ``"!!!"`` and ``"???"`` really can carry both of these at once.
         """
         assert canonical("process:foo", {"process:FOO", "process:foo"}) == "process:foo"
