@@ -364,6 +364,11 @@ class TestAssertionIdentity:
         )
         assert assertion_id(row).endswith(f"~{ABSENT}")
 
+    @pytest.mark.parametrize("value", ["`", "**", "_ _", "   "])
+    def test_a_text_value_with_no_folded_form_is_refused(self, value):
+        """``"`"`` and ``"**"`` fold to one empty key, so neither is a value."""
+        assert not REGISTRY["authentication-mechanism"].admits(value, ())
+
     def test_an_unregistered_predicate_has_no_identity(self):
         """The value key depends on the predicate, so the gate reports it first."""
         with pytest.raises(KeyError):

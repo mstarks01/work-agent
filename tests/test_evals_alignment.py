@@ -641,3 +641,27 @@ class TestTwoRulingsForOneElement:
             "process:airflow-scheduler",
             "process:scheduler-job",
         )
+
+    def test_an_alias_two_produced_spellings_share_is_an_ambiguity(self):
+        """Two produced elements under one singularised slug: the alias rule
+        lists the collision and pairs neither, as rule 3 does."""
+        golden = case("03")
+        model = renamed(golden.model, "process:ingest-scheduler", "Airflow scheduler")
+        raw = model.model_dump()
+        raw["processes"].append(
+            dict(
+                raw["processes"][0],
+                id="process:airflow-schedulers",
+                name="Airflow schedulers",
+            )
+        )
+        aligned = align(golden, SystemModel.model_validate(raw))
+
+        assert aligned.by_evidence("alias") == ()
+        assert "process:ingest-scheduler" in aligned.unaligned_reference
+        (ambiguity,) = aligned.ambiguous
+        assert ambiguity.reference == ("process:ingest-scheduler",)
+        assert ambiguity.produced == (
+            "process:airflow-scheduler",
+            "process:airflow-schedulers",
+        )

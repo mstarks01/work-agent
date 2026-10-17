@@ -398,7 +398,10 @@ class Predicate:
         :data:`UNIVERSAL_TERMS` first, because both are legal for every
         predicate whatever its value kind. Then the kind: a ``term`` must be in
         the vocabulary, a ``reference`` must name a subject the catalog holds,
-        and ``text`` is anything the field's bound admits.
+        and ``text`` is anything the field's bound admits that keeps a
+        character under :func:`~analysis_service.grounding.normalize`, the
+        fold :func:`_value_key` reads. A value that folds to nothing has no key
+        of its own.
         """
         if value in UNIVERSAL_TERMS:
             return True
@@ -406,7 +409,7 @@ class Predicate:
             return value in self.terms
         if self.value == "reference":
             return value in known_subjects
-        return bool(value.strip())
+        return bool(normalize(value))
 
 
 #: The predicates this service registers, and the whole of what extraction may
