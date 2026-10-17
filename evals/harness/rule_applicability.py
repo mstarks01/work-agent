@@ -337,11 +337,11 @@ def simulate_questions(fixture: Fixture) -> QuestionRun:
         saves += 1
         given: dict[UnknownKey, str] = {}
         for question in shown:
-            key = key_ref(question.key).capability
-            if key not in CAPABILITIES:
+            if question.kind != "capability":
                 conformance += 1
                 answered_for[question.key] = question.frameworks
                 continue
+            key = key_ref(question.key).capability
             answer = FactAnswer(
                 key=question.key, value=TRUTH_ANSWERS[fixture.truth.get(key, "unknown")]
             )

@@ -841,3 +841,70 @@ def test_a_keyboard_answers_skips_and_starts_with_no_pointer(page):
     _tab_to(page, "active.id === 'continue'")
     page.keyboard.press("Enter")
     page.wait_for_url("**/report/**")
+
+
+#: A capability and a question kind: the open facts no "<attribute> on
+#: <element>" wording can name.
+WAITS_ON = (
+    {"capability": "browser-frontend"},
+    {"element_id": "process:web-app", "question": "audit-evidence"},
+)
+
+
+class _WaitingAsvsRunner(web.PausingRunner):
+    """Completes with an ASVS ruling that waits on :data:`WAITS_ON`."""
+
+    def _stub_block(self, selection):
+        from analysis_service.claims import UnknownRef, Verdict
+        from tests.test_asvs import _block, sample_asvs_claim
+
+        if selection.name != "asvs":
+            return super()._stub_block(selection)
+        waiting = sample_asvs_claim().model_copy(
+            update={
+                "grounds": [],
+                "verdict": Verdict(
+                    status="needs-info",
+                    reason="The sources do not state this.",
+                    related_unknowns=[UnknownRef(**ref) for ref in WAITS_ON],
+                ),
+            }
+        )
+        return _block(selection.options["level"], [waiting])
+
+
+@pytest.fixture
+def waiting_asvs(tiers):
+    """The first-run app over :class:`_WaitingAsvsRunner`."""
+    app = web.app_for(tiers, _WaitingAsvsRunner(catalog=False), catalog=False)
+    yield from serve(app)
+
+
+def test_a_report_names_each_open_fact_by_its_label(browser, waiting_asvs):
+    """The card and the requirement row name each open fact by the label the
+    server computes, never as "<attribute> on <element>"."""
+    from analysis_service.claims import UnknownRef
+    from analysis_service.open_facts import label_of
+
+    context = browser.new_context(base_url=waiting_asvs)
+    page = context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto("/")
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+
+    labels = [
+        label_of(UnknownRef(**ref), {"process:web-app": "Web App"}) for ref in WAITS_ON
+    ]
+    unit = page.locator("details.unit", has_text="Still to answer")
+    unit.locator("summary").click()
+    row = unit.locator("div.lbl:text-is('Still to answer') + p").all_inner_texts()
+    card = page.locator(".unknown", has_text=labels[0]).locator("li")
+    listed = [text.split(" — ")[0] for text in card.all_text_contents()]
+    context.close()
+
+    assert errors == [], f"the page raised: {errors}"
+    assert row == labels
+    assert listed == labels

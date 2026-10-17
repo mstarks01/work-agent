@@ -322,3 +322,49 @@ def test_every_surface_names_the_kind_that_fact_kind_reads(first, second):
     assert label_of(ref, names) == label_of(sound, names)
     assert group_of(ref) == group_of(sound)
     assert name_unknown(ref) == name_unknown(sound)
+
+
+#: A reference with two spellings: a closed attribute and a question kind. Its
+#: kind is ``question``, so no reader may take the attribute path for it.
+_QUESTION_OVER_CLOSED_ATTRIBUTE = UnknownRef(
+    element_id="process:web-app", attribute="exposure", question="capacity-limits"
+)
+
+
+def test_a_gate_asks_a_question_that_names_a_closed_attribute_too(monkeypatch):
+    """The gate list routes on the kind, not on the attribute field."""
+    from dataclasses import replace
+
+    from analysis_service import early_questions
+    from analysis_service.frameworks import PACKAGES
+
+    ref = _QUESTION_OVER_CLOSED_ATTRIBUTE
+    package = replace(PACKAGES["asvs"], precondition_facts=lambda model: (ref,))
+    monkeypatch.setattr(early_questions, "PACKAGES", {"asvs": package})
+
+    asked = early_questions._gate_questions(
+        valid_model(), {"asvs": "undecidable"}, None, {}
+    )
+
+    assert [(q.key, q.kind) for q in asked] == [(ref.key, "question")]
+
+
+def test_a_question_left_out_is_not_settled_by_a_closed_attribute():
+    """The reason a listed question left routes on the kind, not on the
+    attribute field."""
+    from analysis_service.answer_state import _left_out
+    from analysis_service.early_questions import _question
+
+    model = valid_model()
+    question = _question(
+        _QUESTION_OVER_CLOSED_ATTRIBUTE.key,
+        model,
+        None,
+        {},
+        reasons=(),
+        frameworks=("stride",),
+    )
+
+    reason = _left_out(question, {"stride": "satisfied"}, {}, model)
+
+    assert reason == "no-longer-needed-by-selected-units"

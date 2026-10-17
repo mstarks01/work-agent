@@ -497,7 +497,7 @@ def _gate_questions(
         if state != "undecidable":
             continue
         for ref in PACKAGES[name].precondition_facts(model):
-            if ref.attribute and not open_attribute(
+            if ref.kind == "attribute" and not open_attribute(
                 model, ref.element_id, ref.attribute
             ):
                 continue

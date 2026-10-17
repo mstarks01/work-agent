@@ -964,19 +964,25 @@ def _left_out(
     if "satisfied" not in states:
         return "gate-undecided" if "undecidable" in states else "gate-refuted"
     ref = key_ref(question.key)
-    if ref.capability:
+    if ref.kind == "capability":
         fact = facts.get(ref.capability)
         if fact is None or fact.state == "unknown":
             return "no-longer-needed-by-selected-units"
         return "parent-absent" if fact.derived_from else "fact-settled"
-    if ref.attribute and not open_attribute(prepared, ref.element_id, ref.attribute):
+    if ref.kind == "attribute" and not open_attribute(
+        prepared, ref.element_id, ref.attribute
+    ):
         return "fact-settled"
     return "no-longer-needed-by-selected-units"
 
 
 def _settled(done: Iterable[SkipKey]) -> set[str]:
     """The capabilities whose questions ``done`` holds."""
-    return {key_ref(key).capability for key in done if not isinstance(key, str)}
+    return {
+        ref.capability
+        for key in done
+        if not isinstance(key, str) and (ref := key_ref(key)).kind == "capability"
+    }
 
 
 def _rankable(
@@ -1231,7 +1237,7 @@ def limit_place(key: UnknownKey) -> UnknownKey | str:
     once with one shared answer. A capability question is its own place.
     """
     ref = key_ref(key)
-    return key if ref.capability else group_of(ref)[0]
+    return key if ref.kind == "capability" else group_of(ref)[0]
 
 
 def grouped(questions: Sequence[EarlyQuestion]) -> tuple[EarlyQuestion, ...]:
