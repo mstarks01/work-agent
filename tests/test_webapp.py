@@ -894,6 +894,18 @@ def viewer_javascript() -> str:
     return page_javascript("report_view.js")
 
 
+def test_the_workspace_labels_each_page_status():
+    """``workspace.js`` labels every status that ``_page_status`` sends, and
+    no other. A status the table lacks renders as its raw key."""
+    from webapp.main import PageStatus
+
+    body = re.search(r"const labels = \{(.*?)\};", page_javascript("workspace.js"))
+    assert body is not None, "workspace.js holds no labels table"
+    assert set(re.findall(r'"([\w-]+)"\s*:', body.group(1))) == set(
+        get_args(PageStatus)
+    )
+
+
 @pytest.mark.parametrize("sink", HTML_STRING_SINKS)
 def test_the_viewer_has_no_html_string_sink(sink):
     """Decision 1, as a lint: there is no sink left to forget to escape."""

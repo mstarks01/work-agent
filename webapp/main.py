@@ -608,7 +608,11 @@ def _selection_of(record: Envelope) -> list[FrameworkSelection]:
     return []
 
 
-def _page_status(record: Envelope) -> JobStatus | Literal["unreadable"]:
+#: A job's status as the pages read it. ``workspace.js`` labels each one.
+PageStatus = Literal["running", "awaiting-answers", "completed", "failed", "unreadable"]
+
+
+def _page_status(record: Envelope) -> PageStatus:
     """A job's status as the pages read it: a queued job is running, and a
     rejected one stopped. A job whose envelope does not parse is
     ``unreadable`` (ADR 0095)."""
