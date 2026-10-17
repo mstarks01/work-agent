@@ -23,6 +23,7 @@ file.
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import re
 import secrets
@@ -36,6 +37,8 @@ from typing import Any, NamedTuple
 from pydantic import ValidationError
 
 from analysis_service.errors import ConfigError
+
+logger = logging.getLogger(__name__)
 
 #: The variable that moves the settings directory. The app reads it from the
 #: process environment only, because ``settings.env`` cannot name its own
@@ -235,6 +238,11 @@ def write_private(path: Path, data: bytes) -> None:
     then pass :func:`private_fd`. The data goes to a new temporary file in the
     same directory, made by :func:`create_private`'s rule, then ``os.replace``
     puts it at ``path``. The mode of a directory that exists does not change.
+
+    It returns once the replace is done: a caller reads a return as "the new
+    file is in place", and an exception as "the old file stays". A failure of
+    the ``fsync`` on the directory after the replace logs a warning and does
+    not raise, because the new file is in place.
     """
     with _private_directory(path.parent) as directory:
         temporary = path.parent / f".{path.name}.{secrets.token_hex(8)}"
@@ -244,7 +252,12 @@ def write_private(path: Path, data: bytes) -> None:
         except BaseException:
             temporary.unlink(missing_ok=True)
             raise
-        os.fsync(directory)
+        try:
+            os.fsync(directory)
+        except OSError as exc:
+            logger.warning(
+                "%s is in place, but the directory fsync failed: %s", path, exc
+            )
 
 
 def create_private(path: Path, data: bytes) -> None:
@@ -253,11 +266,16 @@ def create_private(path: Path, data: bytes) -> None:
 
     The first write makes the directory with mode ``0700``, and the directory
     must then pass :func:`private_fd`. The file is made with ``O_EXCL`` and
-    mode ``0600``, and ``fsync`` runs on the file and the directory.
+    mode ``0600``, and ``fsync`` runs on the file and the directory. Where the
+    ``fsync`` on the directory fails, it deletes the file and raises.
     """
     with _private_directory(path.parent) as directory:
         _create(path, data)
-        os.fsync(directory)
+        try:
+            os.fsync(directory)
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
 
 
 @contextmanager
