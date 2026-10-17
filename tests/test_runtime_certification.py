@@ -8,6 +8,8 @@ provider — the runner is a stand-in and the manifests are built in memory.
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -18,6 +20,8 @@ from analysis_service.certification import (
     CertificationGate,
     CertifyResult,
 )
+from analysis_service.deployment import Deployment
+from analysis_service.engine import Engine
 from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
@@ -26,8 +30,14 @@ from analysis_service.jobs import (
     PipelineOutcome,
     StubPipelineRunner,
 )
-from analysis_service.sources import SourceLimits
-from tests.factories import DEFAULT_FRAMEWORKS, SEEDING_BUDGET
+from analysis_service.sources import Source, SourceLimits
+from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    SEEDING_BUDGET,
+    TEST_CREDENTIAL_ENV,
+    TEST_TIER_ENV,
+    sample_selection,
+)
 from tests.test_api import FakeVerifier, auth, submit
 
 FP_A = "a" * 64
@@ -195,3 +205,36 @@ class TestNothingReachesTheClientView:
         )
         app.state.certification = None
         assert fetch_report(TestClient(app)).status_code == 200
+
+
+class TestWithholdingIsARuleOfTheHttpSurfaces:
+    def test_the_engine_returns_a_report_that_v1_withholds(self):
+        """An in-process caller is trusted code: ``Engine.analyze`` returns
+        the report with its certification, even where the Deployment requires
+        a certified run. ``/v1`` withholds the same run (ruling, 2026-10-17)."""
+        result = CertifyResult(
+            certified=False,
+            uncertified=({"node": "critic", "fingerprint": FP_A},),
+        )
+        deployment = Deployment.from_env(
+            env=TEST_TIER_ENV
+            | TEST_CREDENTIAL_ENV
+            | {"ANALYSIS_REQUIRE_CERTIFIED": "true"}
+        )
+        assert deployment.gate.withholds(result)
+        engine = Engine(
+            CertifyingRunner(result),
+            limits=TEST_LIMITS,
+            deadline_seconds=30,
+            frameworks=sample_selection(),
+        )
+
+        outcome = asyncio.run(engine.analyze([Source.description("a web shop")]))
+        response = fetch_report(make_client(result, deployment.gate))
+
+        assert isinstance(outcome, PipelineCompleted)
+        assert outcome.certification == result
+        assert response.status_code == 409
+        assert response.json()["uncertified_nodes"] == [
+            {"node": "critic", "fingerprint": FP_A}
+        ]

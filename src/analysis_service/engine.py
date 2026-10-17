@@ -227,6 +227,13 @@ class Engine:
         ``on_node``, if given, is awaited with each node name as it completes,
         for progress or tracing.
 
+        The engine withholds no report. Withholding an uncertified report is a
+        rule of the HTTP surfaces, which ask
+        :meth:`~analysis_service.job_answers.JobAnswers.servable`.
+        An in-process caller is trusted code, so a completed run returns its
+        report with its certification, even where ``ANALYSIS_REQUIRE_CERTIFIED``
+        is set. The caller reads the certification and decides.
+
         The run is bounded by this deployment's ``job_deadline_ms``, and
         expiry raises :class:`EngineDeadlineError`. The bound belongs here
         rather than to each caller for the reason
