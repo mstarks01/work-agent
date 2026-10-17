@@ -144,7 +144,7 @@ function modelNote(row) {
   const value = pending(row);
   const vendor = suggests(row);
   if (!vendor || value == null) return null;
-  const known = SETTINGS.models[vendor] || [];
+  const known = Object.hasOwn(SETTINGS.models, vendor) ? SETTINGS.models[vendor] : [];
   return known.includes(value) ? null : hint("Not in the model list. A check still runs it.");
 }
 

@@ -681,6 +681,22 @@ def test_a_tier_model_suggests_the_models_of_the_vendor_just_chosen(browser, tmp
     assert "Not in the model list" in note
 
 
+def test_a_saved_vendor_that_names_an_object_key_still_draws_the_table(
+    browser, tmp_path
+):
+    from tests.test_settings_env import env_in, hand_written, write_settings
+    from webapp.main import create_app
+
+    write_settings(tmp_path, hand_written(ANALYSIS_MODEL_REVIEW_VENDOR="__proto__"))
+    for url in serve(create_app(env=env_in(tmp_path))):
+        page, errors = opened(browser, url + "/settings")
+        page.wait_for_selector('tr[data-key="tiers.review.model"]')
+        note = page.locator('tr[data-key="tiers.review.model"]').inner_text()
+        page.close()
+    assert errors == [], f"the settings page raised: {errors}"
+    assert "Not in the model list" in note
+
+
 def test_workspace_mobile_has_no_page_overflow(page):
     page.set_viewport_size({"width": 390, "height": 844})
     pause(page)
