@@ -69,7 +69,7 @@ from analysis_service.graph import (
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import lane_closing
 from evals.harness.artifact import repo_commit
-from evals.harness.bundle import check_out, reports_dir
+from evals.harness.bundle import case_file, check_out
 from evals.harness.descendants import FRAMEWORK as SCORED
 from evals.harness.descendants import lane_must_finds
 from evals.harness.modes import EvalRunError, case_framework_options
@@ -101,7 +101,7 @@ def lane_of(framework: FrameworkName, name: str) -> Lane:
 
 def load_material(artifact: Path, case_id: str) -> dict[str, Any]:
     """One case's captured lane material, or a refusal saying why there is none."""
-    path = reports_dir(artifact) / f"{case_id}.lanes.json"
+    path = case_file(artifact, case_id, "lanes")
     if not path.is_file():
         raise EvalRunError(
             f"{path} is missing; the sweep predates the lane capture (#1091),"

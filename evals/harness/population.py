@@ -49,6 +49,7 @@ from analysis_service.evidence import prepared_view
 from analysis_service.reassess import Verdict, reassess
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
+from evals.harness.archive import case_suffix
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
@@ -212,7 +213,7 @@ def label(path: Path) -> str:
     The run as well as the case, because two runs of one case are two
     populations, and a key by case alone let the second overwrite the first.
     """
-    return str(path.with_name(path.name.removesuffix(".report.json")))
+    return str(path.with_name(path.name.removesuffix(case_suffix("report"))))
 
 
 def assertion_reports(

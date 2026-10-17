@@ -43,6 +43,7 @@ from analysis_service.questions import (
     follow_up_order,
 )
 from analysis_service.report import Report
+from evals.harness.archive import case_suffix
 
 #: The owner effort, in choices, at which each order is read.
 BUDGETS = (1, 2, 3, 5, 10, 15, 20)
@@ -212,8 +213,8 @@ def crossed(baseline: Path, samples: Sequence[Path]) -> list[Reading]:
     read again would be.
     """
     found = []
-    for path in sorted(baseline.rglob("*.report.json")):
-        case = path.name.removesuffix(".report.json")
+    for path in sorted(baseline.rglob(f"*{case_suffix('report')}")):
+        case = path.name.removesuffix(case_suffix("report"))
         sources = [sample / f"{case}.rulings.json" for sample in samples]
         if not all(source.is_file() for source in sources):
             continue
@@ -233,7 +234,7 @@ def crossed(baseline: Path, samples: Sequence[Path]) -> list[Reading]:
 def sweep(root: Path) -> list[Reading]:
     """Every archived report of one framework under ``root``."""
     found = []
-    for path in sorted(root.rglob("*.report.json")):
+    for path in sorted(root.rglob(f"*{case_suffix('report')}")):
         report = Report.model_validate_json(path.read_text(encoding="utf-8"))
         if len(report.job.frameworks) == 1:
             found.extend(readings(str(path), report))

@@ -34,6 +34,8 @@ from analysis_service.assertions import QUALIFIED_SPELLING, UNKNOWN
 from analysis_service.claims import ATTRIBUTE_GROUNDS
 from analysis_service.sources import FORMATTING_CATEGORIES
 from analysis_service.system_model import Element, all_attribute_names
+from evals.harness.archive import CaseKind, case_suffix
+from evals.harness.bundle import REPORTS_SUFFIX
 from evals.harness.reference import CASE_FILES, MUST_FIND
 from evals.harness.roster import STANDINGS
 from tests.source_tree import REPO_ROOT, parse, source_files
@@ -644,3 +646,90 @@ def test_the_unknown_comparison_scan_finds_one_when_there_is_one(tmp_path):
     )
 
     assert _unknown_comparisons(probe, _qualifiable_attributes()) == [3, 5]
+
+
+# --- One reader of a case file's name -----------------------------------------
+#
+# A sweep writes ``<case>.<kind>.json`` into ``<artifact>.reports``.
+# ``bundle.case_file`` and ``bundle.reports_dir`` name those paths for the
+# writers, and ``check_sweep_out`` checks each one before a sweep spends. A
+# reader that spells a name out again reads the old name after the rule moves,
+# and its own test still passes.
+
+#: Production roots. ``evals/experiments`` records the scripts an audit ran on
+#: the day, as frozen evidence, so no lint holds them to the live rule.
+_CASE_NAME_ROOTS = ("src", "evals", "webapp")
+_FROZEN_SCRIPTS = "evals/experiments"
+
+
+def _case_name_spellings() -> frozenset[str]:
+    """Each literal that spells a case file name or a reports-dir suffix."""
+    suffixes = {case_suffix(kind) for kind in get_args(CaseKind)}
+    return frozenset(
+        {*suffixes, *(f"*{suffix}" for suffix in suffixes), REPORTS_SUFFIX}
+    )
+
+
+def _spelled_case_names(tree: ast.AST, spellings: frozenset[str]) -> list[int]:
+    """Each line holding a string constant that is one of ``spellings``."""
+    return sorted(
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and node.value in spellings
+    )
+
+
+def test_every_case_file_name_comes_from_the_bundle():
+    """A reader and a writer of a case file take its name from one rule.
+
+    The one literal is ``REPORTS_SUFFIX`` itself, in ``bundle``. Every other
+    site calls ``case_file``, ``reports_dir`` or ``case_suffix``.
+    """
+    spellings = _case_name_spellings()
+    found = [
+        f"{relative}:{line}"
+        for path in source_files(*_CASE_NAME_ROOTS)
+        if not (relative := path.relative_to(REPO_ROOT).as_posix()).startswith(
+            _FROZEN_SCRIPTS
+        )
+        for line in _spelled_case_names(parse(path), spellings)
+    ]
+
+    assert found == [f"evals/harness/bundle.py:{_reports_suffix_line()}"], (
+        f"these sites spell a case file name out: {found}. Call"
+        " bundle.case_file, bundle.reports_dir or archive.case_suffix."
+    )
+
+
+def _reports_suffix_line() -> int:
+    """The line that defines ``REPORTS_SUFFIX``, the one allowed literal."""
+    tree = parse(REPO_ROOT / "evals" / "harness" / "bundle.py")
+    return next(
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "REPORTS_SUFFIX"
+            for target in node.targets
+        )
+    )
+
+
+def test_the_case_name_scan_finds_one_when_there_is_one(tmp_path):
+    """Positive control: a path, a glob and a suffix strip, each spelled out."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "def read(directory, case, artifact):\n"
+        '    report = directory / f"{case}.report.json"\n'
+        '    found = directory.glob("*.drafts.json")\n'
+        '    name = report.name.removesuffix(".lanes.json")\n'
+        '    folder = artifact.with_suffix(".reports")\n'
+        '    return "the *.report.json files"\n',
+        encoding="utf-8",
+    )
+
+    found = _spelled_case_names(
+        ast.parse(probe.read_text(encoding="utf-8")), _case_name_spellings()
+    )
+
+    assert found == [2, 3, 4, 5]

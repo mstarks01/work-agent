@@ -34,7 +34,7 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import repo_commit
-from evals.harness.bundle import reports_dir
+from evals.harness.bundle import case_file
 from evals.harness.reference import (
     CorpusError,
     corpus_argument,
@@ -92,10 +92,9 @@ def samples_of(
     cases: Sequence[str],
 ) -> list[Sample]:
     """Every sample the named runs hold for these cases."""
-    directory = reports_dir(artifact)
     out: list[Sample] = []
     for case in cases:
-        path = directory / f"{case}.report.json"
+        path = case_file(artifact, case, "report")
         if not path.is_file():
             continue
         report = Report.model_validate_json(path.read_text(encoding="utf-8"))

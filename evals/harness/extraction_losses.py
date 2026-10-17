@@ -54,7 +54,7 @@ from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
 from analysis_service.system_model import SystemModel, normalize_element_ids
-from evals.harness.bundle import reports_dir
+from evals.harness.bundle import case_file
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.modes import ExtractionResult, ExtractionScore, score_extraction
 from evals.harness.provenance import ProvenanceError
@@ -246,7 +246,7 @@ def extracted_model(artifact_path: Path | str, case_id: str) -> SystemModel:
     service applies, so a report whose model would not load is refused by
     name rather than scored as an empty extraction.
     """
-    path = reports_dir(artifact_path) / f"{case_id}.report.json"
+    path = case_file(artifact_path, case_id, "report")
     if not path.is_file():
         raise ProvenanceError(
             f"{path}: no report for {case_id}; an end-to-end run's extracted"

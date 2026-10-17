@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from analysis_service.report import NodeRun, Report
+from evals.harness.archive import case_suffix
 
 #: The path an execution that sent no schema counts under.
 NO_SCHEMA = "none"
@@ -64,7 +65,7 @@ def schema_paths(nodes: Iterable[NodeRun]) -> dict[str, NodeSchemaPaths]:
 def sweep(root: Path) -> dict[str, NodeSchemaPaths]:
     """:func:`schema_paths` over every archived report under ``root``."""
     nodes = []
-    for path in sorted(root.rglob("*.report.json")):
+    for path in sorted(root.rglob(f"*{case_suffix('report')}")):
         report = Report.model_validate_json(path.read_text(encoding="utf-8"))
         nodes.extend(report.nodes)
     return schema_paths(nodes)

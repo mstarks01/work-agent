@@ -79,6 +79,7 @@ from analysis_service.report import Report
 from evals import verify_corpus
 from evals.harness import baseline, bundle
 from evals.harness import queue as review_queue
+from evals.harness.archive import case_suffix
 from evals.harness.artifact import load_artifact
 from evals.harness.fingerprint import FingerprintError, identifier_of, lane_field
 from evals.harness.ledger import (
@@ -586,14 +587,14 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], str]
     config = baseline.configuration_label(load_artifact(path))
 
     findings: list[review_queue.Finding] = []
-    for report_path in sorted(reports_dir.glob("*.report.json")):
+    for report_path in sorted(reports_dir.glob(f"*{case_suffix('report')}")):
         # Validated into the record rather than read as raw JSON. A vote stores
         # digests of the claim it answered, and those are computed from the
         # package's own record -- so a second reading assembled out of a dict
         # here would key a vote to a claim the rest of the harness never sees.
         # `bundle.runs_from_reports` already reads these files this way.
         report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
-        case = report_path.name.removesuffix(".report.json")
+        case = report_path.name.removesuffix(case_suffix("report"))
         rows = row_controls(report.assertions.catalog if report.assertions else None)
         for block in report.analyses:
             findings += [

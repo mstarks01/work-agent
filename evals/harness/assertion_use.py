@@ -18,8 +18,9 @@ from pydantic import ValidationError
 
 from analysis_service.assertion_use import AssertionUse, assertion_use
 from analysis_service.report import Report
+from evals.harness.archive import case_suffix
 
-REPORT_GLOB = "*.report.json"
+REPORT_GLOB = f"*{case_suffix('report')}"
 
 
 def report_paths(paths: Sequence[Path]) -> list[Path]:
@@ -93,7 +94,7 @@ def command_assertion_use(args: argparse.Namespace) -> int:
             if use is None:
                 no_pass += 1
             else:
-                rows.append((path.name.removesuffix(".report.json"), use))
+                rows.append((path.name.removesuffix(case_suffix("report")), use))
     except OSError as error:
         print(f"cannot read the reports: {error}", file=sys.stderr)
         return 1

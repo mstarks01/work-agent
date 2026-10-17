@@ -68,7 +68,7 @@ from analysis_service.parsing import non_negative
 from analysis_service.sources import text_digest
 from evals.harness import falsify
 from evals.harness.artifact import load_artifact
-from evals.harness.bundle import assertions_from_reports
+from evals.harness.bundle import assertions_from_reports, case_file
 from evals.harness.modes import AssertionResult
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.replay import replay_assertions, signed_reference
@@ -839,7 +839,7 @@ def command_gates(args: argparse.Namespace) -> int:
     """Read the gates against one treatment run. It runs no model."""
     try:
         artifact = json.loads(args.artifact.read_text(encoding="utf-8"))
-        report_path = args.artifact.with_suffix(".reports") / f"{args.case}.report.json"
+        report_path = case_file(args.artifact, args.case, "report")
         report = json.loads(report_path.read_text(encoding="utf-8"))
         spread = {} if args.spread is None else read_spread(args.spread, GATES)
     except (OSError, ValueError) as error:
