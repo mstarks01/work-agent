@@ -23,6 +23,7 @@ import os
 import socket
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -657,7 +658,12 @@ def test_the_settings_page_saves_a_key_with_the_vendor_that_needs_it(browser, tm
     assert "a new key" in listed and key not in listed
     assert "A key is saved" in shown
     assert key not in html
-    assert (tmp_path / "anthropic_api_key").read_text(encoding="utf-8") == key
+    [line] = [
+        line
+        for line in (tmp_path / "settings.env").read_text(encoding="utf-8").split("\n")
+        if line.startswith("ANALYSIS_ANTHROPIC_API_KEY_FILE=")
+    ]
+    assert Path(line.partition("=")[2]).read_text(encoding="utf-8") == key
 
 
 @pytest.mark.parametrize(

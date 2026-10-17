@@ -10,8 +10,9 @@ keep their own read.
 The first-run app reads ``settings.env`` from the settings directory, in the
 strict format of ADR 0092, and the Settings page writes it with
 :func:`write_settings_env`. :func:`value_refusal` is the one value rule: the
-reader's caller and the writer of the file call it. :func:`write_private` is
-the one writer of a file in the settings directory.
+reader's caller and the writer of the file call it. :func:`write_private`
+replaces a file in the settings directory, and :func:`create_private` makes a
+new one. Both make the file by one rule.
 
 :func:`private_fd` is the one permission rule, in the manner of OpenSSH. Both
 drivers open the settings directory, ``settings.env`` and each secret file
@@ -232,26 +233,50 @@ def write_private(path: Path, data: bytes) -> None:
 
     The first write makes the directory with mode ``0700``. The directory must
     then pass :func:`private_fd`. The data goes to a new temporary file in the
-    same directory, made with ``O_EXCL`` and mode ``0600``, then ``fsync`` and
-    ``os.replace`` put it at ``path``. The mode of a directory that exists does
-    not change.
+    same directory, made by :func:`create_private`'s rule, then ``os.replace``
+    puts it at ``path``. The mode of a directory that exists does not change.
     """
-    os.makedirs(path.parent, mode=0o700, exist_ok=True)
-    with private_fd(path.parent, SettingsFileError) as directory:
+    with _private_directory(path.parent) as directory:
         temporary = path.parent / f".{path.name}.{secrets.token_hex(8)}"
-        fd = os.open(
-            temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
-        )
+        _create(temporary, data)
         try:
-            with open(fd, "wb") as file:
-                file.write(data)
-                file.flush()
-                os.fsync(file.fileno())
             os.replace(temporary, path)
         except BaseException:
             temporary.unlink(missing_ok=True)
             raise
         os.fsync(directory)
+
+
+def create_private(path: Path, data: bytes) -> None:
+    """Make the new file ``path`` with ``data`` (ADR 0092), or raise
+    :class:`FileExistsError` where ``path`` exists.
+
+    The first write makes the directory with mode ``0700``, and the directory
+    must then pass :func:`private_fd`. The file is made with ``O_EXCL`` and
+    mode ``0600``, and ``fsync`` runs on the file and the directory.
+    """
+    with _private_directory(path.parent) as directory:
+        _create(path, data)
+        os.fsync(directory)
+
+
+@contextmanager
+def _private_directory(path: Path) -> Iterator[int]:
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    with private_fd(path, SettingsFileError) as directory:
+        yield directory
+
+
+def _create(path: Path, data: bytes) -> None:
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        with open(fd, "wb") as file:
+            file.write(data)
+            file.flush()
+            os.fsync(file.fileno())
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
 
 
 def value_refusal(value: str) -> str | None:
