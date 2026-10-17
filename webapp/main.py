@@ -49,7 +49,12 @@ The security posture is deliberate throughout:
   uses one. This is the primary control, and the CSP
   below is defence in depth behind it. The form page is included: a source label
   and a validator message both carry submitter bytes onto it over SSE, and both
-  land as text nodes. Server-side, the two f-string pages escape through
+  land as text nodes. An uploaded transcript is a file only inside the
+  browser: the page checks its size, decodes it as strict UTF-8 and refuses a
+  control character before it keeps the text, and ``/analyze`` receives that
+  text as a ``transcript`` source in the JSON body. No route takes a file, so
+  no file name, content type or multipart body reaches the server.
+  Server-side, the two f-string pages escape through
   :func:`~webapp.page.escape`, which is quote-safe, so where a value lands is
   not part of whether the escape is adequate.
 * CSRF: ``POST /analyze``, ``POST /answer/{run}`` and ``POST /settings``
@@ -1171,6 +1176,7 @@ def create_app(
                 frameworks=_framework_fields(current.frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
+                source_limit=str(current.answers.limits.max_total_bytes),
                 store_note=escape(store_note(workspace.store)),
             )
         )

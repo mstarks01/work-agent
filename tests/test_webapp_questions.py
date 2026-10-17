@@ -554,9 +554,12 @@ const ids = {};
 for (const id of ["analyze","description","ticks","problem","go","load","ask",
                   "asked","questions","list","earlier","save","continue","status",
                   "status-text","answer-problem","skip","no-rest","no-rest-hint","skipped","more",
-                  "answer_limits","save-status","changes"])
+                  "answer_limits","save-status","changes","upload","transcript-file",
+                  "transcript-note","transcript-name","transcript-remove"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
+ids["transcript-file"].dataset.maxBytes = "64";
+ids["transcript-file"].files = [];
 ids.ask.checked = true;
 ids.answer_limits.textContent = LIMITS;
 globalThis.document = {
@@ -667,6 +670,82 @@ await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
     ]
     assert first["answers_from"] == "job-earlier"
     assert "answers_from" not in second
+
+
+# Picks a stand-in file of ``bytes`` in the transcript input. A read of its
+# content records a "read" call, and each refusal records a "problem" call.
+_PICK = """
+const pick = async (bytes) => {
+  ids["transcript-file"].files = [{ name: "call.txt", size: bytes.length,
+    arrayBuffer: async () => { calls.push({ url: "read" });
+      return Uint8Array.from(bytes).buffer; } }];
+  ids.problem.hidden = true;
+  await ids["transcript-file"].listeners.change(); await settle();
+  if (!ids.problem.hidden) calls.push({ url: "problem", body: ids.problem.children.join("") });
+};
+const submit = async () => {
+  await ids.analyze.listeners.submit({ preventDefault() {} }); await settle(); };
+"""
+
+
+def _posted_sources(steps: str) -> list[list[dict]]:
+    calls = _run_form_script(_PICK + steps)["calls"]
+    return [call["body"]["sources"] for call in calls if call["url"] == "/analyze"]
+
+
+TRANSCRIPT = {"kind": "transcript", "label": "Uploaded transcript", "text": "Ana: hi"}
+
+
+def test_an_uploaded_transcript_posts_as_a_transcript_source():
+    """The text goes as a ``transcript`` source, beside a description only
+    where the description holds text, and Remove takes it off the form."""
+    steps = """
+await pick([...new TextEncoder().encode("Ana: hi")]);
+await submit();
+ids.description.value = "A shop.";
+await submit();
+await ids["transcript-remove"].listeners.click();
+await submit();
+"""
+    alone, beside, removed = _posted_sources(steps)
+    description = {"kind": "description", "label": "Pasted description"}
+
+    assert alone == [TRANSCRIPT]
+    assert beside == [description | {"text": "A shop."}, TRANSCRIPT]
+    assert removed == [description | {"text": "A shop."}]
+
+
+@pytest.mark.parametrize(
+    ("data", "refusal", "read"),
+    [
+        ("[...new Uint8Array(65)].map(() => 65)", "larger than the 64 bytes", False),
+        ("[0xff, 0xfe, 0x41, 0x00]", "could not read this file as UTF-8", True),
+        ("[0x41, 0x00, 0x42]", "control characters", True),
+        ("[0x1b, 0x5b, 0x32, 0x4a]", "control characters", True),
+        ("[0x20, 0x0a]", "holds no text", True),
+    ],
+)
+def test_a_file_that_is_not_text_is_refused_before_it_is_kept(data, refusal, read):
+    """An oversize file is refused before a byte is read, and bytes that are
+    not plain UTF-8 text never reach the body."""
+    steps = f"await pick({data});\nawait submit();"
+    calls = _run_form_script(_PICK + steps)["calls"]
+    problems = [call["body"] for call in calls if call["url"] == "problem"]
+    posted = [call["body"]["sources"] for call in calls if call["url"] == "/analyze"]
+
+    assert len(problems) == 1
+    assert refusal in problems[0]
+    assert ({"url": "read"} in calls) is read
+    assert [source["kind"] for source in posted[0]] == ["description"]
+
+
+def test_a_refused_file_keeps_the_transcript_the_page_holds():
+    steps = """
+await pick([...new TextEncoder().encode("Ana: hi")]);
+await pick([0x00]);
+await submit();
+"""
+    assert _posted_sources(steps) == [[TRANSCRIPT]]
 
 
 def test_an_unanswered_question_is_left_out_of_the_answers():
