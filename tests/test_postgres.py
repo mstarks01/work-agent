@@ -225,6 +225,10 @@ class TestTheIamCredentials:
             ({"ANALYSIS_DATABASE_IAM": "entra"}, "unknown value 'entra'"),
             ({"ANALYSIS_DATABASE_REGION": None}, "set ANALYSIS_DATABASE_REGION"),
             (
+                {"ANALYSIS_DATABASE_REGION": "EU_WEST_1"},
+                "ANALYSIS_DATABASE_REGION must match",
+            ),
+            (
                 {"ANALYSIS_DATABASE_PASSWORD_FILE": "/run/secrets/password"},
                 (
                     "with iam credentials takes no ANALYSIS_DATABASE_PASSWORD_FILE;"

@@ -114,8 +114,8 @@ VERTEX_LOCATION_VAR = "ANALYSIS_VERTEX_LOCATION"
 # would let a token nobody chose authenticate a run.
 BEDROCK_REGION_VAR = "ANALYSIS_BEDROCK_REGION"
 
-#: A cloud region or location. The Vertex location, the Bedrock region and the
-#: S3 object store region all match it in full.
+#: A cloud region or location. The Vertex location, the Bedrock region, the S3
+#: object store region and the RDS database region all match it in full.
 REGION = re.compile(r"[a-z0-9-]{1,32}")
 
 #: A Google Cloud project ID. The domain-scoped form ``example.com:proj`` does

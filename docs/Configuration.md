@@ -1340,7 +1340,7 @@ backend.
 | `ANALYSIS_DATABASE_CREDENTIALS` | `password`, `iam` | Required for PostgreSQL. Refused for SQLite. |
 | `ANALYSIS_DATABASE_PASSWORD_FILE` | the path of a file that holds the password | Required by `password`. The only way to give the password. Refused by `iam`. |
 | `ANALYSIS_DATABASE_IAM` | `rds` | Required by `iam`. Refused by `password`. |
-| `ANALYSIS_DATABASE_REGION` | an AWS region, for example `eu-west-1` | Required by `rds`. Refused by `password`. |
+| `ANALYSIS_DATABASE_REGION` | an AWS region that matches `[a-z0-9-]{1,32}`, for example `eu-west-1` | Required by `rds`. Refused by `password`. |
 | `ANALYSIS_DATABASE_CA_FILE` | the path of a PEM file of CA certificates | Optional, for PostgreSQL. Unset trusts the system CA bundle. |
 | `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
 | `ANALYSIS_OBJECT_BUCKET` | the name of a bucket: 3 to 63 lower-case letters, digits, `.` and `-`, with a letter or a digit at each end | Required by `s3`. |

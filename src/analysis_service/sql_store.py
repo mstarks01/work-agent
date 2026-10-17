@@ -137,6 +137,7 @@ from analysis_service.store_settings import (
     refuse_unread,
 )
 from analysis_service.vendors import (
+    REGION,
     ProviderAuthError,
     read_secret,
     refused_var,
@@ -496,6 +497,8 @@ def _rds_token(url: URL, env: Mapping[str, str]) -> Callable[[], Awaitable[str]]
     region = env.get(DATABASE_REGION_VAR, "").strip()
     if not region:
         raise StoreConfigError(f"set {DATABASE_REGION_VAR} for an RDS IAM token")
+    if REGION.fullmatch(region) is None:
+        raise StoreConfigError(f"{DATABASE_REGION_VAR} must match {REGION.pattern}")
     session = platform_session("the rds token of the database")
     client = session.client("rds", region_name=region)
 

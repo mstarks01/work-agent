@@ -384,7 +384,7 @@ class TestValueShapes:
             vendor_for("bedrock").credential_kwargs(env, CredentialMode.IAM)
 
     def test_every_region_reads_one_constant(self):
-        from analysis_service import s3_objects
+        from analysis_service import s3_objects, sql_store
 
         regions = {
             entry.var: entry.shape
@@ -396,6 +396,7 @@ class TestValueShapes:
         assert set(regions) == {"ANALYSIS_VERTEX_LOCATION", "ANALYSIS_BEDROCK_REGION"}
         assert all(shape is REGION for shape in regions.values())
         assert s3_objects.REGION is REGION
+        assert sql_store.REGION is REGION
 
     def test_the_charset_refuses_only_price_rows_and_aliases_in_the_map(self):
         """The charset refuses two kinds of name in the pinned litellm map.
