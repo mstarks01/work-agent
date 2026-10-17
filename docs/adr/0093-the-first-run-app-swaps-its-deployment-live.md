@@ -19,9 +19,10 @@ one Deployment and admit the job under another.
 ## Decision
 
 **One cell.** The first-run app holds one cell. The cell holds one frozen
-object: the `Deployment`, the view that the pages show (the carried
-frameworks and the tiers), the job deadline, and a `JobAnswers` on the
-running store. A save builds the new object completely, then replaces the
+object: a `JobAnswers` on the running store, the job deadline, and the view
+that the pages show (the carried frameworks and the tiers). The `JobAnswers`
+holds the Deployment's runner, bounds and certification gate; the cell holds
+no `Deployment` field. A save builds the new object completely, then replaces the
 cell in one assignment. Each route reads the cell one time, at its start, and
 uses only that value. The `Workspace` keeps the store, the tasks and the job
 cap, and it is not in the cell.
