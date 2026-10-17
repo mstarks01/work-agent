@@ -73,7 +73,7 @@ from pydantic import BaseModel
 # Imported first so the model-cost map is pinned before anything reaches
 # litellm; `vendor_keyed_tables` imports every shipped module.
 from analysis_service import model_gate  # noqa: F401
-from analysis_service.sql_store import DatabaseCredentialMode
+from analysis_service.store_settings import DatabaseCredentialMode
 from analysis_service.vendors import (
     VENDOR_NAMES,
     VENDORS,

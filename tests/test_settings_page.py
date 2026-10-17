@@ -9,24 +9,24 @@ settings that their stores read.
 from __future__ import annotations
 
 import ast
+import importlib
 import inspect
 from collections import Counter
 
 import pytest
 
-from analysis_service import s3_objects, sampling
+from analysis_service import sampling
 from analysis_service.deployment import BLESSED_FINGERPRINTS_VAR, CONFIG_PATHS
 from analysis_service.model_tiers import TIER_NAMES, load_model_tiers
 from analysis_service.objects import S3_KEY_FILES
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import SamplingConfigError
 from analysis_service.settings_variables import deployment_variables, secret_vars
-from analysis_service.sql_store import DATABASE_CREDENTIALS, DATABASE_IAM, DATABASES
+from analysis_service.sql_store import DATABASE_CREDENTIALS, DATABASES
 from analysis_service.store_backends import build_store, retention_days
 from analysis_service.store_settings import (
     DATABASE_PASSWORD_FILE_VAR,
     DATABASE_VARIABLES,
-    closed_setting,
 )
 from analysis_service.vendors import REGION, VENDORS, CredentialMode, vendor_for
 from tests.factories import PROJECT_ROOT, TEST_TIER_ENV, declared_env, secret_env
@@ -159,12 +159,61 @@ class TestThePageModule:
         assert literals == ["Mark"]
 
 
+def _closed_settings() -> list[tuple[str, list[str]]]:
+    """Each Deployment Setting variable that a loader reads with
+    :func:`~analysis_service.store_settings.closed_setting`, and the set that the loader passes it.
+
+    The scan reads each call in the source of the package, and evaluates its
+    setting and its table in the namespace of the module of the call. A call
+    whose setting is not a variable, such as the driver of the database URL,
+    names a part of a free-text value, so the scan leaves it out.
+    """
+    package = PROJECT_ROOT / "src" / "analysis_service"
+    found = {}
+    for path in sorted(package.glob("*.py")):
+        tree = ast.parse(path.read_text())
+        calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "closed_setting"
+        ]
+        if not calls:
+            continue
+        namespace = vars(importlib.import_module(f"analysis_service.{path.stem}"))
+        for call in calls:
+            variable = eval(ast.unparse(call.args[1]), namespace)
+            if variable in deployment_variables():
+                table = eval(ast.unparse(call.args[2]), namespace)
+                found[variable] = sorted(str(name) for name in table)
+    return sorted(found.items())
+
+
+class TestTheChoices:
+    def test_the_scan_finds_each_closed_store_setting(self):
+        assert {variable for variable, _ in _closed_settings()} >= {
+            "ANALYSIS_JOB_STORE",
+            "ANALYSIS_OBJECT_STORE",
+            "ANALYSIS_DATABASE_CREDENTIALS",
+        }
+
+    @pytest.mark.parametrize(
+        ("variable", "names"),
+        _closed_settings(),
+        ids=[variable for variable, _ in _closed_settings()],
+    )
+    def test_the_page_offers_the_closed_set_of_its_loader(self, variable, names):
+        [key] = [key for key, row in SETTINGS.items() if row.variable == variable]
+        assert sorted(_CONTROLS.get(key, {}).get("options", [])) == names
+
+
 #: The settings of a PostgreSQL job store with a filesystem object store, from
 #: the examples. Each store example is checked over this base.
 STORE_BASE = {
     "ANALYSIS_JOB_STORE": "sql",
     "ANALYSIS_DATABASE_URL": EXAMPLES["store.database_url"],
-    "ANALYSIS_DATABASE_CREDENTIALS": EXAMPLES["store.database_credentials"],
+    "ANALYSIS_DATABASE_CREDENTIALS": "password",
     **secret_env(DATABASE_PASSWORD_FILE_VAR, "not-a-real-password"),
     "ANALYSIS_OBJECT_STORE": "filesystem",
     "ANALYSIS_OBJECT_ROOT": EXAMPLES["store.object_root"],
@@ -189,9 +238,8 @@ def _passes_its_loader(key: str, example: str) -> None:
     """Run ``example`` through the loader that reads ``key``; raise where the
     loader refuses it.
 
-    The IAM settings of the database and the iam mode of the object store need
-    the identity of a platform to build a store, so they run through the
-    closed set and the shape that the loader checks first.
+    The region of the database needs the identity of a platform to build a
+    store, so it runs through the shape that the loader checks first.
     """
     var = SETTINGS[key].variable
     assert var is not None, key
@@ -209,12 +257,8 @@ def _passes_its_loader(key: str, example: str) -> None:
                 vendor.credential_kwargs(env, mode)
     elif key.startswith("resilience."):
         load_resilience(PROJECT_ROOT / "config" / "resilience.toml", {var: example})
-    elif key == "store.database_iam":
-        closed_setting(example, var, DATABASE_IAM)
     elif key == "store.database_region":
         assert REGION.fullmatch(example)
-    elif key == "store.object_credentials":
-        closed_setting(example, var, s3_objects.CREDENTIALS)
     else:
         s3 = (
             S3_STORE

@@ -54,6 +54,7 @@ from analysis_service.model_tiers import (
 from analysis_service.objects import OBJECT_STORES, object_store_name
 from analysis_service.settings_variables import deployment_variables, secret_vars
 from analysis_service.store_backends import (
+    CLOSED_SETTINGS,
     JOB_STORE_VAR,
     JOB_STORES,
     RETENTION_DAYS_VAR,
@@ -180,8 +181,11 @@ def _controls() -> dict[str, dict[str, Any]]:
             if setting.variable in PASS_FLAGS
         },
         "certification.require_certified": flag,
-        "store.job_store": tuple(JOB_STORES),
-        "store.object_store": tuple(OBJECT_STORES),
+        **{
+            key: CLOSED_SETTINGS[setting.variable]
+            for key, setting in SETTINGS.items()
+            if setting.variable in CLOSED_SETTINGS
+        },
     }
     return {
         **{

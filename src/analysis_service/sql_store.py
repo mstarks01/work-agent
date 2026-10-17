@@ -132,6 +132,8 @@ from analysis_service.store_settings import (
     DATABASE_PASSWORD_FILE_VAR,
     DATABASE_REGION_VAR,
     DATABASE_URL_VAR,
+    DatabaseCredentialMode,
+    DatabaseIamName,
     StoreConfigError,
     closed_setting,
     refuse_unread,
@@ -514,8 +516,6 @@ def _rds_token(url: URL, env: Mapping[str, str]) -> Callable[[], Awaitable[str]]
     return token
 
 
-DatabaseIamName = Literal["rds"]
-
 #: Each provider of IAM tokens that ``ANALYSIS_DATABASE_IAM`` can name. The
 #: table answers for every name of :data:`DatabaseIamName`.
 DATABASE_IAM: dict[DatabaseIamName, DatabaseIam] = {
@@ -566,8 +566,6 @@ class DatabaseCredentials:
     #: each other one, and the Settings page shows only these.
     reads: tuple[str, ...]
 
-
-DatabaseCredentialMode = Literal["password", "iam"]
 
 #: How a connection gets its password, for each value of
 #: ``ANALYSIS_DATABASE_CREDENTIALS``. The table answers for every name of

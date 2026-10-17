@@ -9,7 +9,7 @@ store module can read its settings here.
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 #: The settings of the database of the ``sql`` job store. They live here, and
 #: not in :mod:`~analysis_service.sql_store`, so that a reader without the
@@ -30,6 +30,13 @@ DATABASE_VARIABLES = (
     DATABASE_IAM_VAR,
     DATABASE_REGION_VAR,
 )
+
+#: Each value of ``ANALYSIS_DATABASE_CREDENTIALS``: the names of the rows of
+#: :data:`~analysis_service.sql_store.DATABASE_CREDENTIALS`.
+DatabaseCredentialMode = Literal["password", "iam"]
+#: Each value of ``ANALYSIS_DATABASE_IAM``: the names of the rows of
+#: :data:`~analysis_service.sql_store.DATABASE_IAM`.
+DatabaseIamName = Literal["rds"]
 
 
 class StoreConfigError(ValueError):

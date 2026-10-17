@@ -15,23 +15,29 @@ from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Literal, get_args
 
 from analysis_service.jobs import InMemoryJobStore, JobStore
 from analysis_service.objects import (
     OBJECT_STORE_VAR,
     OBJECT_STORES,
+    Addressing,
     ObjectStore,
     build_object_store,
 )
 from analysis_service.parsing import ascii_int
 from analysis_service.store_settings import (
+    DATABASE_CREDENTIALS_VAR,
+    DATABASE_IAM_VAR,
     DATABASE_URL_VAR,
     DATABASE_VARIABLES,
+    DatabaseCredentialMode,
+    DatabaseIamName,
     StoreConfigError,
     closed_setting,
     refuse_unread,
 )
+from analysis_service.vendors import CredentialMode
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +97,20 @@ JOB_STORES: dict[JobStoreName, JobStoreBackend] = {
         objects=True,
         reads=(DATABASE_URL_VAR, OBJECT_STORE_VAR),
     ),
+}
+
+
+#: The closed set of each store setting that a loader reads with
+#: :func:`~analysis_service.store_settings.closed_setting`, by its variable,
+#: from the type or the table that the loader checks. The Settings page offers
+#: each set as a choice.
+CLOSED_SETTINGS: dict[str, tuple[str, ...]] = {
+    JOB_STORE_VAR: tuple(JOB_STORES),
+    OBJECT_STORE_VAR: tuple(OBJECT_STORES),
+    "ANALYSIS_OBJECT_ADDRESSING": get_args(Addressing),
+    "ANALYSIS_OBJECT_CREDENTIALS": tuple(mode.value for mode in CredentialMode),
+    DATABASE_CREDENTIALS_VAR: get_args(DatabaseCredentialMode),
+    DATABASE_IAM_VAR: get_args(DatabaseIamName),
 }
 
 
