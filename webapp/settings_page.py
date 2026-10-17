@@ -2,7 +2,8 @@
 
 Each entry of :data:`SETTINGS` is one **Deployment Setting**, keyed by the
 setting, such as ``tiers.strong.model``. An entry holds the variable that sets
-it, its group, its label and its mark. The mark says what the page does with
+it, its group, its label, its mark, and the key of the shipped TOML file that
+holds its base value. The mark says what the page does with
 the setting: it ``changes`` it, it ``shows`` it with a reason, or it leaves it
 out (``excluded``) with a reason.
 
@@ -56,6 +57,10 @@ class Setting:
     mark: Mark
     #: Why the page does not change it. Empty where the mark is ``changes``.
     reason: str
+    #: Where the shipped TOML file holds its base value: the field of
+    #: :data:`~analysis_service.deployment.CONFIG_PATHS` that names the file,
+    #: and the path of keys in it. ``None`` where no file holds one.
+    file_key: tuple[str, tuple[str, ...]] | None = None
 
 
 @dataclass(frozen=True)
@@ -104,8 +109,18 @@ def _words(name: str) -> str:
     return name.replace("_", " ").lower().capitalize()
 
 
-def _changes(key: str, variable: str, group: str, label: str) -> tuple[str, Setting]:
-    return key, Setting(variable, group, label, "changes", "")
+def _changes(
+    key: str,
+    variable: str,
+    group: str,
+    label: str,
+    file_key: tuple[str, tuple[str, ...]] | None = None,
+) -> tuple[str, Setting]:
+    return key, Setting(variable, group, label, "changes", "", file_key)
+
+
+def _tiers_file(*keys: str) -> tuple[str, tuple[str, ...]]:
+    return "model_tiers", keys
 
 
 def _model_settings() -> list[tuple[str, Setting]]:
@@ -114,13 +129,26 @@ def _model_settings() -> list[tuple[str, Setting]]:
         vendor_var, model_var = env_vars_for(tier)
         name = tier.capitalize()
         entries += [
-            _changes(f"tiers.{tier}.vendor", vendor_var, "Models", f"{name} vendor"),
-            _changes(f"tiers.{tier}.model", model_var, "Models", f"{name} model"),
+            _changes(
+                f"tiers.{tier}.{field}",
+                var,
+                "Models",
+                f"{name} {field}",
+                _tiers_file("tiers", tier, field),
+            )
+            for field, var in (("vendor", vendor_var), ("model", model_var))
         ]
     entries.append(
         (
             "tiers.review_independence",
-            Setting(None, "Models", "Review independence", "shows", _UNCERTIFIED),
+            Setting(
+                None,
+                "Models",
+                "Review independence",
+                "shows",
+                _UNCERTIFIED,
+                _tiers_file("review_independence"),
+            ),
         )
     )
     for vendor in VENDOR_NAMES:
@@ -130,18 +158,21 @@ def _model_settings() -> list[tuple[str, Setting]]:
                 credentials_env_var_for(vendor),
                 "Credentials",
                 f"{vendor} credential mode",
+                _tiers_file("credentials", vendor),
             ),
             _changes(
                 f"charges.{vendor}",
                 charges_env_var_for(vendor),
                 "Models",
                 f"{vendor} charges",
+                _tiers_file("charges", vendor),
             ),
             _changes(
                 f"upstreams.{vendor}",
                 upstreams_env_var_for(vendor),
                 "Models",
                 f"{vendor} upstream providers",
+                _tiers_file("upstreams", vendor),
             ),
         ]
     return entries
@@ -179,6 +210,7 @@ def _sampling_settings() -> list[tuple[str, Setting]]:
                 f"{tier.capitalize()} {param.replace('_', ' ')}",
                 "shows",
                 _UNCERTIFIED,
+                ("sampling", ("tiers", tier, param)),
             ),
         )
         for tier in TIER_NAMES
@@ -188,7 +220,13 @@ def _sampling_settings() -> list[tuple[str, Setting]]:
 
 def _deployment_settings() -> list[tuple[str, Setting]]:
     entries = [
-        _changes(f"resilience.{field}", var, "Resilience and limits", _words(field))
+        _changes(
+            f"resilience.{field}",
+            var,
+            "Resilience and limits",
+            _words(field),
+            ("resilience", (field,)),
+        )
         for field, (var, _) in resilience.ENV_OVERRIDES.items()
     ]
     entries += [
@@ -206,6 +244,7 @@ def _deployment_settings() -> list[tuple[str, Setting]]:
             framework_config.CARRIED_VAR,
             "Frameworks",
             "Frameworks carried",
+            ("frameworks_file", ("carried",)),
         )
     )
     entries.append(

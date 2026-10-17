@@ -558,6 +558,33 @@ def test_workspace_reopens_grouped_questions_and_renders_names_as_text(page):
     page.wait_for_selector("#asked", state="visible")
 
 
+def test_the_settings_page_runs_its_script(browser, tmp_path):
+    from tests.test_settings_env import env_in, hand_written, write_settings
+    from webapp.main import create_app
+
+    write_settings(
+        tmp_path, hand_written(ANALYSIS_MODEL_REVIEW_MODEL="claude-sonnet-5-5")
+    )
+    for url in serve(create_app(env=env_in(tmp_path, ANALYSIS_MAX_SOURCES="5"))):
+        page, errors = opened(browser, url + "/settings")
+        page.wait_for_selector("#settings-rows tr[data-key]")
+        review = page.locator('tr[data-key="tiers.review.model"]').inner_text()
+        sources = page.locator('tr[data-key="resilience.max_sources"]').inner_text()
+        page.fill("#settings-search", "timeout")
+        found = page.locator("#settings-rows tr[data-key]").all_inner_texts()
+        page.set_viewport_size({"width": 390, "height": 844})
+        fits = page.evaluate(
+            "document.documentElement.scrollWidth <= window.innerWidth"
+        )
+        page.close()
+    assert errors == [], f"the settings page raised: {errors}"
+    assert "Not in the model list" in review
+    assert "Shipped: none shipped" in review
+    assert "ANALYSIS_MAX_SOURCES" in sources
+    assert found and all("imeout" in row for row in found)
+    assert fits
+
+
 def test_workspace_mobile_has_no_page_overflow(page):
     page.set_viewport_size({"width": 390, "height": 844})
     pause(page)

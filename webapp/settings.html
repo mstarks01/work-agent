@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · Work Agent</title>
+<style nonce="__CSP_NONCE__"><!--workspace_style-->
+  .settings-search { max-width:24rem; margin-bottom:16px; }
+  .table-wrap { overflow-x:auto; }
+  table.settings { display:table; width:100%; border-collapse:collapse; font-size:13px; }
+  table.settings th, table.settings td { text-align:left; padding:8px; vertical-align:top;
+    border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+  table.settings tr.groupline th { background:var(--sidebar); font-size:12px; }
+  table.settings small { display:block; }
+  table.settings code { font-size:12px; }
+  .tag { font-size:11px; padding:1px 7px; border-radius:999px; border:1px solid var(--line);
+    color:var(--muted); white-space:nowrap; }
+  .tag.outside { border-color:var(--accent); color:var(--accent); }
+  .not-set { color:var(--muted); font-style:italic; }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="workspace">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Work Agent home"><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg>Work Agent</a>
+    <nav aria-label="Workspace"><a class="new-analysis" href="/">New analysis</a><a href="/?view=analyses">Analyses</a><a href="/settings" aria-current="page">Settings</a></nav>
+    <div class="workspace-identity"><span class="avatar" aria-hidden="true">ME</span><span>Personal workspace<small>Only you · this computer</small></span></div>
+  </aside>
+  <div class="workspace-body">
+    <header class="breadcrumb">Personal workspace <span aria-hidden="true">/</span> <span>Settings</span></header>
+    <main id="main">
+      <h1>Settings</h1>
+      <div id="engine-error" class="problem" role="alert" hidden></div>
+      <div id="unknown-lines" class="problem" role="alert" hidden></div>
+      <label class="field-label" for="settings-search">Find a setting</label>
+      <input type="search" id="settings-search" class="settings-search" placeholder="Name of a setting">
+      <div class="table-wrap">
+        <table class="settings">
+          <thead><tr><th scope="col">Setting</th><th scope="col">Value</th><th scope="col">Source</th></tr></thead>
+          <tbody id="settings-rows"></tbody>
+        </table>
+      </div>
+      <p class="hint">This page only shows the settings. To change one, edit <code id="settings-file"></code> or the process environment, then restart the app.</p>
+    </main>
+  </div>
+</div>
+<script type="application/json" id="settings" nonce="__CSP_NONCE__"><!--settings--></script>
+<script nonce="__CSP_NONCE__"><!--script--></script>
+</body>
+</html>

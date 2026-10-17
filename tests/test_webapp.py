@@ -1220,6 +1220,7 @@ def test_no_page_can_be_framed(client, broken_client):
         "form": client.get("/"),
         "report": client.get(f"/report/{run_id}"),
         "diagnostic": broken_client.get("/"),
+        "settings": broken_client.get("/settings"),
     }
     for page, response in served.items():
         csp = response.headers["Content-Security-Policy"]
@@ -1393,13 +1394,15 @@ def test_the_form_page_carries_no_escape_helper():
     assert "escape(" not in form_javascript()
 
 
-@pytest.mark.parametrize("page", ["form", "diagnostic", "report"])
+@pytest.mark.parametrize("page", ["form", "diagnostic", "report", "settings"])
 def test_every_page_ships_a_nonce_csp(client, broken_client, page):
     """No page is served bare, and each nonce covers its own page's blocks."""
     if page == "form":
         response = client.get("/")
     elif page == "diagnostic":
         response = broken_client.get("/")
+    elif page == "settings":
+        response = broken_client.get("/settings")
     else:
         response = client.get(f"/report/{run_to_completion(client)}")
 
@@ -1446,9 +1449,10 @@ def test_the_diagnostic_page_is_granted_no_script_at_all(broken_client):
 def test_every_page_render_gets_a_fresh_nonce(client, broken_client):
     """A nonce reused across responses is not a nonce."""
     for page_client in (client, broken_client):
-        first = page_client.get("/").headers["Content-Security-Policy"]
-        second = page_client.get("/").headers["Content-Security-Policy"]
-        assert first != second
+        for path in ("/", "/settings"):
+            first = page_client.get(path).headers["Content-Security-Policy"]
+            second = page_client.get(path).headers["Content-Security-Policy"]
+            assert first != second
 
 
 def test_a_config_error_spelling_the_placeholder_is_not_substituted(tiers):
@@ -1518,7 +1522,12 @@ def test_the_event_stream_still_streams_under_the_header_middleware(client):
 PAGE_SCRIPTS = {
     "webapp/sitting.py": "sitting.js",
     "webapp/review.py": ("review_queue.js", "review_finding.js"),
-    "webapp/main.py": ("workspace.js", "answer_editor.js", "first_run.js"),
+    "webapp/main.py": (
+        "workspace.js",
+        "answer_editor.js",
+        "first_run.js",
+        "settings.js",
+    ),
     "webapp/offline_sitting.py": "offline_sitting.js",
     "webapp/report_view.html": ("answer_editor.js", "report_view.js"),
 }

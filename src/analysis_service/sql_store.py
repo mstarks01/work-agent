@@ -799,7 +799,9 @@ def database_url(env: Mapping[str, str]) -> URL:
         raise StoreConfigError(f"set {DATABASE_URL_VAR} for the sql job store")
     try:
         url = make_url(value)
-    except ArgumentError:
+    except (ArgumentError, ValueError):
+        # SQLAlchemy raises a bare ValueError for a host or a port that does
+        # not parse, and its message repeats a part of the URL.
         raise StoreConfigError(f"{DATABASE_URL_VAR} is not a database URL") from None
     if url.password is not None or any("password" in key.lower() for key in url.query):
         raise StoreConfigError(
@@ -814,6 +816,31 @@ def _database(url: URL) -> Database:
     return DATABASES[
         closed_setting(url.drivername, f"the driver of {DATABASE_URL_VAR}", DATABASES)
     ]
+
+
+def database_reads(env: Mapping[str, str]) -> tuple[str, ...]:
+    """The database settings that the settings in ``env`` select: the reads
+    of the row of :data:`DATABASES` for the driver of the URL, and of the row
+    of :data:`DATABASE_CREDENTIALS` where the database reads a mode.
+
+    The Settings page shows only these. Where the URL or the mode names no
+    row, the list stops at the setting that names none.
+    """
+    try:
+        reads = _database(database_url(env)).reads
+    except StoreConfigError:
+        return (DATABASE_URL_VAR,)
+    if DATABASE_CREDENTIALS_VAR not in reads:
+        return reads
+    try:
+        mode = closed_setting(
+            env.get(DATABASE_CREDENTIALS_VAR, ""),
+            DATABASE_CREDENTIALS_VAR,
+            DATABASE_CREDENTIALS,
+        )
+    except StoreConfigError:
+        return reads
+    return reads + DATABASE_CREDENTIALS[mode].reads
 
 
 def create_database(env: Mapping[str, str]) -> None:
