@@ -217,6 +217,16 @@ class TestTheFirstRunApp:
         assert page.status_code == 200
         assert HAND_MODEL in page.text
 
+    def test_it_carries_what_settings_env_names(self, tmp_path):
+        write_settings(tmp_path, hand_written(ANALYSIS_FRAMEWORKS_CARRIED="stride"))
+        client = TestClient(create_app(env=env_in(tmp_path)), base_url=LOOPBACK)
+
+        page = client.get("/")
+
+        assert page.status_code == 200
+        assert 'value="stride"' in page.text
+        assert 'value="asvs"' not in page.text
+
     def test_a_conflict_stops_it_and_names_the_variable(self, tmp_path):
         write_settings(tmp_path, hand_written())
         process = env_in(tmp_path, ANALYSIS_MODEL_BASE_MODEL=HAND_MODEL)

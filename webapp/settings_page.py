@@ -12,7 +12,8 @@ tiers and the vendors of :mod:`~analysis_service.model_tiers`, the credential
 variables of each ``VENDORS`` row, the offered params of
 :mod:`~analysis_service.sampling`, the overrides of
 :mod:`~analysis_service.resilience`, the optional passes and the config paths
-of :mod:`~analysis_service.deployment`, and the store settings of
+of :mod:`~analysis_service.deployment`, the carried frameworks of
+:mod:`~analysis_service.framework_config`, and the store settings of
 :mod:`~analysis_service.store_backends`. The test of this module holds the
 variables of :data:`SETTINGS` against
 :func:`~analysis_service.settings_variables.deployment_variables`.
@@ -23,7 +24,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from analysis_service import deployment, resilience, sampling, store_backends
+from analysis_service import (
+    deployment,
+    framework_config,
+    resilience,
+    sampling,
+    store_backends,
+)
 from analysis_service.model_tiers import (
     TIER_NAMES,
     charges_env_var_for,
@@ -193,6 +200,14 @@ def _deployment_settings() -> list[tuple[str, Setting]]:
         )
         for var in deployment.PASS_FLAGS
     ]
+    entries.append(
+        _changes(
+            "frameworks.carried",
+            framework_config.CARRIED_VAR,
+            "Frameworks",
+            "Frameworks carried",
+        )
+    )
     entries.append(
         _changes(
             "certification.require_certified",
