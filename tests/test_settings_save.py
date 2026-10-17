@@ -235,8 +235,10 @@ class TestAReset:
         refused = save(client, remove=["ANALYSIS_MODEL_BASE_MODEL", "ANALYSIS_ABSENT"])
 
         assert refused.status_code == 422
-        keys = [error["key"] for error in refused.json()["errors"]]
-        assert keys == ["ANALYSIS_MODEL_BASE_MODEL", "ANALYSIS_ABSENT"]
+        errors = refused.json()["errors"]
+        assert [error["key"] for error in errors] == ["ANALYSIS_MODEL_BASE_MODEL", None]
+        assert errors[1]["message"].startswith("remove[1] ")
+        assert "ANALYSIS_ABSENT" not in refused.text
 
 
 class TestARefusedSave:
@@ -305,21 +307,23 @@ class TestARefusedSave:
         assert "qzxv" not in refused.text
 
     @pytest.mark.parametrize(
-        "key",
+        ("key", "named"),
         [
-            "tiers.review_independence",
-            "sampling.base.temperature",
-            "paths.model_tiers",
-            "no.such.setting",
+            ("tiers.review_independence", "tiers.review_independence"),
+            ("sampling.base.temperature", "sampling.base.temperature"),
+            ("paths.model_tiers", "paths.model_tiers"),
+            ("no.such.setting", None),
         ],
     )
-    def test_a_key_that_the_page_does_not_change_is_refused(self, tmp_path, key):
+    def test_a_key_that_the_page_does_not_change_is_refused(self, tmp_path, key, named):
+        """A key the page lists is named; a key the caller made up is not."""
         client, _ = app_on(tmp_path, hand_written())
 
         refused = save(client, {key: "x"})
 
         assert refused.status_code == 422, refused.text
-        assert [error["key"] for error in refused.json()["errors"]] == [key]
+        assert [error["key"] for error in refused.json()["errors"]] == [named]
+        assert (key in refused.text) == (named is not None)
 
     def test_a_key_that_the_process_environment_sets_is_refused(self, tmp_path):
         client, _ = app_on(tmp_path, hand_written(), ANALYSIS_TIMEOUT_MS="5000")

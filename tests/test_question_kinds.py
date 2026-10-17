@@ -224,7 +224,7 @@ class TestTheFacets:
     @pytest.mark.parametrize(
         ("facets", "error"),
         [
-            ({"nope": "yes"}, "no facet"),
+            ({"nope": "yes"}, "has no facet"),
             ({"rate": "sometimes"}, "is not one of"),
             ({}, "at least one facet"),
         ],

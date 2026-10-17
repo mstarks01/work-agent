@@ -74,7 +74,7 @@ from analysis_service.auth import (
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.deployment import Deployment, FrameworkNotCarried
-from analysis_service.errors import ConfigError
+from analysis_service.errors import ConfigError, error_place, refusal_text
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
@@ -863,7 +863,7 @@ def create_app(
         found = exc.errors()
         errors = [
             {
-                "loc": ".".join(str(part) for part in error["loc"]),
+                "loc": error_place(error),
                 "msg": error["msg"],
             }
             for error in found[:MAX_RENDERED_ERRORS]
@@ -941,7 +941,7 @@ def create_app(
         try:
             sources = answers.submitted_sources(submission.sources, submission.links)
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise HTTPException(status_code=400, detail=refusal_text(exc)) from exc
         breach = request.app.state.limits.breach(sources)
         if breach is not None:
             raise HTTPException(

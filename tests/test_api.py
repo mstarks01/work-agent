@@ -446,7 +446,7 @@ class TestInputLadder:
         assert response.headers["content-type"] == "application/problem+json"
         assert "at least one source" in response.json()["detail"]
 
-    def test_rung_three_a_repeated_label_is_422_naming_the_label(self):
+    def test_rung_three_a_repeated_label_is_422_naming_the_positions(self):
         # A label is the citation key every source_excerpt names. Two sources
         # sharing one both resolve against the gate's label set, so the report
         # would cite 'Notes' with no way to say which 'Notes' it quoted.
@@ -465,7 +465,8 @@ class TestInputLadder:
         assert response.headers["content-type"] == "application/problem+json"
         detail = response.json()["detail"]
         assert "unique" in detail
-        assert "Notes" in detail
+        assert "sources[1] repeats the label of sources[0]" in detail
+        assert "Notes" not in detail
 
     def test_a_repeated_label_is_refused_at_any_size(self):
         # Not a budget question: two tiny sources are nowhere near either cap,
@@ -533,8 +534,9 @@ class TestInputLadder:
         assert response.status_code == 413
         detail = response.json()["detail"]
         assert str(TEST_LIMITS.max_total_bytes) in detail
-        for label in ("Doc", "Call", "Standup"):
-            assert label in detail
+        for at in range(3):
+            assert f"sources[{at}] {half} bytes" in detail
+        assert "Doc" not in detail
 
     def test_shape_is_checked_before_size(self):
         # A submission that is both malformed and over-count hears about the

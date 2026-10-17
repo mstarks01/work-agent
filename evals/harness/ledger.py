@@ -245,8 +245,7 @@ class Vote:
             )
         if self.reason is not None and self.reason not in REASONS:
             raise LedgerError(
-                f"{self.reason!r} is not a reason code; the set is"
-                f" {', '.join(sorted(REASONS))}"
+                f"reason is not a reason code; the set is {', '.join(sorted(REASONS))}"
             )
         # A row states the case twice: once as the descriptive `case` a reviewer
         # reads, and once inside `components.scope`, which the key is made of.

@@ -99,12 +99,21 @@ def refusals(
     :func:`~analysis_service.config_files.value_refusal`, or
     :func:`~analysis_service.config_files.secret_refusal` for a key. A
     removal must name a line of ``lines`` that this version does not read.
+    A refusal names a key the caller made up by its position, never by the
+    key.
     """
     found = []
     secrets = secret_vars()
-    for key, value in save.changes.items():
+    for at, (key, value) in enumerate(save.changes.items()):
         setting = SETTINGS.get(key)
-        if setting is None or setting.mark != "changes" or setting.variable is None:
+        if setting is None:
+            found.append(
+                Refusal(
+                    None, f"changes key {at} is not a setting that this page changes"
+                )
+            )
+            continue
+        if setting.mark != "changes" or setting.variable is None:
             found.append(Refusal(key, f"{key} is not a setting that this page changes"))
             continue
         var = setting.variable
@@ -124,7 +133,13 @@ def refusals(
         Refusal(
             var, f"{var} is not a line of settings.env that this version does not read"
         )
-        for var in save.remove
+        if var in known
+        else Refusal(
+            None,
+            f"remove[{at}] is not a line of settings.env that this version does not"
+            " read",
+        )
+        for at, var in enumerate(save.remove)
         if var in known or var not in lines
     ]
     return found

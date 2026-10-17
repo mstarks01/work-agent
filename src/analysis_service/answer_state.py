@@ -636,11 +636,11 @@ class QuestionSet:
         may show.
         """
         listed = {question.key for question in self.early}
-        for key in presented:
+        for at, key in enumerate(presented):
             if key not in listed:
                 raise ValueError(
-                    "only a question this list holds is recorded as shown:"
-                    f' "{fact_label(key, self.model)}"'
+                    f"presented[{at}]: only a question this list holds is recorded"
+                    " as shown"
                 )
         return tuple(dict.fromkeys(presented))
 
@@ -668,11 +668,10 @@ class QuestionSet:
             raise ValueError("a correction changes at least one answer")
         refuse_repeated_facts(facts)
         current = {f.key: f for f in merged_facts(earlier_facts, corrections)}
-        for fact in facts:
+        for at, fact in enumerate(facts):
             if fact.key not in current:
                 raise ValueError(
-                    "only an answer the report read can be corrected:"
-                    f' "{fact_label(fact.key, self.model)}"'
+                    f"facts[{at}]: only an answer the report read can be corrected"
                 )
         check_fact_answers(
             facts, self.model, self.catalog, list(current.values()), reopen=True
@@ -707,11 +706,10 @@ class QuestionSet:
             question.key: question.principal for question in self.links
         }
         shown |= {key: fact_label(key, self.model) for key in presented}
-        for key in skips:
+        for at, key in enumerate(skips):
             if key not in shown:
-                named = key if isinstance(key, str) else fact_label(key, self.model)
                 raise ValueError(
-                    f'only a question the page presented is skipped: "{named}"'
+                    f"skip[{at}]: only a question the page presented is skipped"
                 )
             if key in complete:
                 raise ValueError(

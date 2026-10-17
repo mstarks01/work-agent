@@ -502,7 +502,7 @@ class TestTheAnswerEndpoint:
         twice = {"principal": "Customer Accounts", "element": "none"}
         response = answer(client, paused, LINK, twice)
         assert response.status_code == 400
-        assert "twice" in response.json()["message"]
+        assert "answers the principal of links[0] again" in response.json()["message"]
 
     def test_a_malformed_answer_is_refused(self, tiers, runner):
         client = client_for(tiers, runner)
