@@ -562,6 +562,7 @@ def test_workspace_reopens_grouped_questions_and_renders_names_as_text(page):
 def test_the_settings_page_runs_its_script(browser, tmp_path):
     from tests.test_settings_env import env_in, hand_written, write_settings
     from webapp.main import create_app
+    from webapp.settings_page import EXAMPLES
 
     write_settings(
         tmp_path, hand_written(ANALYSIS_MODEL_REVIEW_MODEL="claude-sonnet-5-5")
@@ -571,6 +572,10 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
         page.wait_for_selector("#settings-rows tr[data-key]")
         review = page.locator('tr[data-key="tiers.review.model"]').inner_text()
         sources = page.locator('tr[data-key="resilience.max_sources"]').inner_text()
+        location, key = (
+            page.locator(f'tr[data-key="{row}"] input').get_attribute("placeholder")
+            for row in ("credentials.vertex.location", "credentials.openai.api_key")
+        )
         page.fill("#settings-search", "timeout")
         found = page.locator("#settings-rows tr[data-key]").all_inner_texts()
         page.set_viewport_size({"width": 390, "height": 844})
@@ -582,6 +587,8 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
     assert "Not in the model list" in review
     assert "Shipped: none shipped" in review
     assert "ANALYSIS_MAX_SOURCES" in sources
+    assert location == f"e.g. {EXAMPLES['credentials.vertex.location']}"
+    assert key is not None and "e.g." not in key
     assert found and all("imeout" in row for row in found)
     assert fits
 

@@ -986,7 +986,7 @@ class TestReviewIndependence:
         text = self.critic_on(
             "review", "distinct_model", review_vendor=VENDOR, review=STRONG
         )
-        with pytest.raises(ModelConfigError, match="both run the model"):
+        with pytest.raises(ModelConfigError, match="both run one model"):
             load_model_tiers(config_path(text), env={})
 
     def test_a_gateway_route_cannot_satisfy_a_distinct_provider(self, config_path):
@@ -1050,7 +1050,7 @@ class TestReviewIndependence:
             review_vendor="openrouter",
             review="openai/gpt-5.6",
         )
-        with pytest.raises(ModelConfigError, match="both run the model 'gpt-5.6'"):
+        with pytest.raises(ModelConfigError, match="both run one model"):
             load_model_tiers(config_path(text + self.CHARGES), env={})
 
     def test_a_gateway_route_to_another_model_is_still_distinct(self, config_path):

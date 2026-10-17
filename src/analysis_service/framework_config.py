@@ -113,13 +113,11 @@ def _split(value: str) -> list[str]:
 def _carried(names: Sequence[str], where: str) -> tuple[FrameworkName, ...]:
     """``names`` as the carried set, when no name repeats and each one is in
     the closed vocabulary. ``where`` opens each refusal."""
-    repeated = sorted({name for name in names if names.count(name) > 1})
-    if repeated:
-        raise FrameworkConfigError(f"{where} repeats {', '.join(repeated)}")
-    unknown = sorted(set(names) - set(FRAMEWORK_NAMES))
-    if unknown:
+    if len(set(names)) < len(names):
+        raise FrameworkConfigError(f"{where} names a framework more than once")
+    if not set(names) <= set(FRAMEWORK_NAMES):
         raise FrameworkConfigError(
-            f"{where} names frameworks this build cannot spell:"
-            f" {', '.join(unknown)}; it knows {sorted(get_args(FrameworkName))}"
+            f"{where} names a framework that this build cannot spell;"
+            f" it knows {sorted(get_args(FrameworkName))}"
         )
     return cast(tuple[FrameworkName, ...], tuple(names))

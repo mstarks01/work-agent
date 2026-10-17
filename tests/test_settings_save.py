@@ -282,6 +282,26 @@ class TestARefusedSave:
         assert builds.runners[0].jobs
 
     @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("tiers.base.model", "qzxv-latest"),
+            ("tiers.base.model", "projects/p/locations/l/endpoints/qzxv"),
+            ("tiers.base.model", "arn:aws:bedrock:qzxv"),
+            ("tiers.review.model", "claude-qzxv"),
+            ("upstreams.openrouter", "/qzxv"),
+            ("frameworks.carried", "qzxv"),
+            ("frameworks.carried", "qzxv,qzxv"),
+        ],
+    )
+    def test_a_loader_refusal_never_repeats_the_value(self, tmp_path, key, value):
+        client, _ = app_on(tmp_path, hand_written())
+
+        refused = save(client, {key: value})
+
+        assert refused.status_code == 422, refused.text
+        assert "qzxv" not in refused.text
+
+    @pytest.mark.parametrize(
         "key",
         [
             "tiers.review_independence",

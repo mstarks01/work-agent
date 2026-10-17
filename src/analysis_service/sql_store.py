@@ -670,7 +670,11 @@ def _sqlite_file(url: URL) -> Path:
         raise StoreConfigError(
             f"{DATABASE_URL_VAR} must name a SQLite file by an absolute path"
         )
-    check_private(path.parent, "the directory of the database file", directory=True)
+    check_private(
+        path.parent,
+        f"the directory of the database file that {DATABASE_URL_VAR} names",
+        directory=True,
+    )
     return path
 
 
@@ -687,7 +691,11 @@ def _sqlite(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
         DATABASES["sqlite+aiosqlite"].reads,
         "a SQLite database",
     )
-    check_private(_sqlite_file(url), "the database file", directory=False)
+    check_private(
+        _sqlite_file(url),
+        f"the database file that {DATABASE_URL_VAR} names",
+        directory=False,
+    )
     return {}
 
 

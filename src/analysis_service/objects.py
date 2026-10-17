@@ -80,9 +80,9 @@ def check_private(path: Path, label: str, *, directory: bool) -> None:
     file), owned by another user, or open to a group or to others.
 
     **The one rule of a private path.** The object root and a SQLite database
-    file both hold content, and both pass it. ``label`` names the path in the
-    error. A symbolic link is neither a directory nor a regular file, so it
-    is refused.
+    file both hold content, and both pass it. ``label`` names the path and its
+    setting in the error, which never repeats the path. A symbolic link is
+    neither a directory nor a regular file, so it is refused.
     """
     kind, is_kind, mode = (
         ("a directory", stat.S_ISDIR, "0700")
@@ -92,14 +92,14 @@ def check_private(path: Path, label: str, *, directory: bool) -> None:
     try:
         held = os.lstat(path)
     except FileNotFoundError:
-        raise StoreConfigError(f"{label} {str(path)!r} does not exist") from None
+        raise StoreConfigError(f"{label} does not exist") from None
     if not is_kind(held.st_mode):
-        raise StoreConfigError(f"{label} {str(path)!r} is not {kind}")
+        raise StoreConfigError(f"{label} is not {kind}")
     if held.st_uid != os.geteuid():
-        raise StoreConfigError(f"another user owns {label} {str(path)!r}")
+        raise StoreConfigError(f"another user owns {label}")
     if held.st_mode & 0o077:
         raise StoreConfigError(
-            f"a group or others can open {label} {str(path)!r}; set its mode to {mode}"
+            f"a group or others can open {label}; set its mode to {mode}"
         )
 
 
@@ -164,7 +164,11 @@ class FilesystemObjectStore:
     async def check(self) -> None:
         """Refuse a root that is missing, not a directory, owned by another user,
         or open to a group or to others."""
-        check_private(self._root, "the object root", directory=True)
+        check_private(
+            self._root,
+            "the object root that ANALYSIS_OBJECT_ROOT names",
+            directory=True,
+        )
 
     async def put(self, key: str, data: bytes) -> None:
         await asyncio.to_thread(_write, self._root, key.split("/"), data)

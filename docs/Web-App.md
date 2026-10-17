@@ -217,6 +217,10 @@ The model field of each tier suggests the models that the pinned litellm map
 lists for the vendor of the tier. A model that the map does not list shows a
 note. The note is not a refusal: the map lags each new model.
 
+Each text field that is not a key shows an example value that its loader
+accepts, such as "e.g. us-central1". A field that no value passes shows "Not
+set", for example the upstreams of a vendor that routes to one provider.
+
 A line of `settings.env` that this version does not read shows with its key and
 its line number. The startup refuses such a line, so the banner also names it.
 "Remove the line" adds its removal to the unsaved changes.

@@ -1165,7 +1165,8 @@ class Vendor:
         check.
 
         ``source`` names where the string came from (a config key or an env var)
-        so the error points ops at the knob to turn.
+        so the error points ops at the knob to turn. The error never repeats
+        the model.
         """
         if MODEL_NAME.fullmatch(model) is None:
             raise ValueError(
@@ -1176,7 +1177,7 @@ class Vendor:
         resource = _resource_form(model)
         if resource is not None:
             raise ValueError(
-                f"{source}: {model!r} names {resource} rather than a model build;"
+                f"{source}: names {resource} rather than a model build;"
                 " a resource can be repointed at other weights and its identifier"
                 " reaches the execution fingerprint, so name the model itself"
             )
@@ -1185,12 +1186,10 @@ class Vendor:
         )
         if word is not None:
             reason = _FLOATING_WORDS[word].format(word=word)
-            raise ValueError(
-                f"{source}: {model!r} {reason}; use the pinned model identifier"
-            )
+            raise ValueError(f"{source}: {reason}; use the pinned model identifier")
         rule = self._rule_for(model)
         if rule.pinned is not None and rule.pinned.fullmatch(model) is None:
-            raise ValueError(f"{source}: {model!r} is not pinned — {rule.hint}")
+            raise ValueError(f"{source}: is not pinned — {rule.hint}")
         return model
 
     def _rule_for(self, model: str) -> _FormRule:
