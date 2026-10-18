@@ -155,12 +155,12 @@ def test_a_sweep_without_the_capture_is_refused_by_name(tmp_path):
 def test_material_without_the_user_turn_is_refused(tmp_path):
     out = tmp_path / "artifact.json"
     reports_dir(out).mkdir()
-    (reports_dir(out) / "c.lanes.json").write_text(
+    (reports_dir(out) / "01-payments-checkout.lanes.json").write_text(
         json.dumps({"prepared": None, "shared": {}, "lanes": {}})
     )
 
     with pytest.raises(EvalRunError, match="no user turn"):
-        lane_replay.load_material(out, "c")
+        lane_replay.load_material(out, "01-payments-checkout")
 
 
 def test_a_lane_the_package_does_not_have_is_refused_with_the_real_ones():

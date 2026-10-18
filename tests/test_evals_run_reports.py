@@ -80,10 +80,10 @@ def test_every_finished_case_keeps_a_report(monkeypatch, case, tmp_path):
         f"{case.id}.lanes.json",
         f"{case.id}.proposals.json",
         f"{case.id}.report.json",
-        "case-second.drafts.json",
-        "case-second.lanes.json",
-        "case-second.proposals.json",
-        "case-second.report.json",
+        "02-iot-fleet-telemetry.drafts.json",
+        "02-iot-fleet-telemetry.lanes.json",
+        "02-iot-fleet-telemetry.proposals.json",
+        "02-iot-fleet-telemetry.report.json",
     ], "the drafts ride beside the report, because `score` reads both"
 
 
@@ -130,10 +130,10 @@ def test_a_case_that_died_leaves_no_report(monkeypatch, case, tmp_path):
 
     written = sorted(path.name for path in reports_dir(out).iterdir())
     assert written == [
-        "case-second.drafts.json",
-        "case-second.lanes.json",
-        "case-second.proposals.json",
-        "case-second.report.json",
+        "02-iot-fleet-telemetry.drafts.json",
+        "02-iot-fleet-telemetry.lanes.json",
+        "02-iot-fleet-telemetry.proposals.json",
+        "02-iot-fleet-telemetry.report.json",
     ]
 
 

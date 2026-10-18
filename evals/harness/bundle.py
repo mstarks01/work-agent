@@ -46,8 +46,8 @@ from analysis_service.report import Report
 from analysis_service.system_model import FLOW_ID_RULES
 from evals.harness import flow_ids, modes, replay
 from evals.harness.archive import CaseKind, archive_bytes, case_suffix
-from evals.harness.artifact import EvalArtifact, load_artifact
-from evals.harness.reference import GoldenCase
+from evals.harness.artifact import CORPUS_DIR, EvalArtifact, load_artifact
+from evals.harness.reference import GoldenCase, case_ids
 
 
 def framework_block(report: Report, framework: FrameworkName) -> FrameworkAnalysis:
@@ -119,7 +119,13 @@ def case_file(out: str | Path, case_id: str, kind: CaseKind) -> Path:
     the file name with :func:`~evals.harness.archive.case_suffix`.
     :func:`check_sweep_out` checks each kind, so the check before the spend
     covers every write after it.
+
+    A case ID that is not in the case set of the shipped corpus is refused.
+    The ID comes from an artifact or a flag, and only a corpus case names a
+    file inside the folder.
     """
+    if case_id not in case_ids(CORPUS_DIR):
+        raise modes.EvalRunError(f"{case_id!r} is not a case of {CORPUS_DIR}")
     return reports_dir(out) / f"{case_id}{case_suffix(kind)}"
 
 
@@ -402,6 +408,25 @@ KEPT_WHEN_FAILED: frozenset[CaseKind] = frozenset(
 )
 
 
+#: The case files that each sweep mode writes for a finished case. The writers
+#: in ``run._run_mode`` decide each row: :func:`write_reports` writes four kinds
+#: for a mode in ``REPORTING_MODES``, :func:`write_extractions` writes the
+#: emission of a run that went through ``extract``, and :func:`write_assertions`
+#: writes the catalog for a mode that ``replay.KEEPS`` names. A finished
+#: ``heads`` case carries no emission: its outcome holds the catalog alone.
+#: Keyed by ``modes.MODE_ENTRIES``, so a new mode needs a row here.
+FINISHED_KINDS: Mapping[str, frozenset[CaseKind]] = {
+    "extraction": frozenset({"extraction"}),
+    "assertions": frozenset({"assertions"}),
+    "heads": frozenset({"assertions"}),
+    "analysis": frozenset({"report", "drafts", "proposals", "lanes"}),
+    "direct-facts": frozenset({"report", "drafts", "proposals", "lanes"}),
+    "answered": frozenset({"report", "drafts", "proposals", "lanes"}),
+    "withheld": frozenset({"report", "drafts", "proposals", "lanes"}),
+    "end-to-end": frozenset({"report", "drafts", "proposals", "lanes", "extraction"}),
+}
+
+
 def finished_file(artifact: EvalArtifact, case_id: str, kind: CaseKind) -> Path | None:
     """The file of ``kind`` the sweep wrote for one of its cases, or None.
 
@@ -439,15 +464,14 @@ def finished_file(artifact: EvalArtifact, case_id: str, kind: CaseKind) -> Path 
 def runs_from_reports(
     artifact: EvalArtifact, cases: Sequence[GoldenCase]
 ) -> dict[str, Any]:
-    """Read a finished sweep's saved reports and drafts back into runs.
+    """Read a finished sweep's saved reports, drafts and proposals back into runs.
 
-    The pair is what a score needs: the report holds what survived the critic
-    and the drafts hold what it was handed, and critic yield is the difference.
-    A sweep whose directory carries a report and no drafts refuses here rather
-    than scoring the half it can — re-run that sweep.
+    The report holds what survived the critic and the drafts hold what it was
+    handed, and critic yield is the difference. ``losses`` reads the lanes'
+    proposals for the ``fan-in`` cause.
 
-    :func:`finished_file` reads each case's report, so a failed case is
-    left out and a lost report is refused by name.
+    :func:`finished_file` reads each case's files, so a failed case is left
+    out and a lost file of a finished case is refused by name.
     """
     directory = reports_dir(artifact.path)
     if not directory.is_dir():
@@ -461,13 +485,10 @@ def runs_from_reports(
         report_path = finished_file(artifact, case.id, "report")
         if report_path is None:
             continue
-        drafts_path = case_file(artifact.path, case.id, "drafts")
-        if not drafts_path.exists():
-            raise modes.EvalRunError(
-                f"{drafts_path} is missing; this sweep predates the drafts"
-                " being written beside its report, so its critic yield cannot"
-                " be recomputed. Re-run the sweep rather than scoring half of it"
-            )
+        drafts_path = finished_file(artifact, case.id, "drafts")
+        proposals_path = finished_file(artifact, case.id, "proposals")
+        # A finished case: finished_file returns each path or raises.
+        assert drafts_path is not None and proposals_path is not None
         report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
         raw = json.loads(drafts_path.read_text(encoding="utf-8"))
         if stray := sorted(set(raw) - set(PACKAGES)):
@@ -480,15 +501,7 @@ def runs_from_reports(
             )
             for framework, claims in raw.items()
         }
-        # The lanes' proposals where the sweep archived them: `losses` reads
-        # them for the `fan-in` cause, and a sweep from before they were kept
-        # leaves that cause undecided rather than refused.
-        proposals_path = case_file(artifact.path, case.id, "proposals")
-        proposals = (
-            json.loads(proposals_path.read_text(encoding="utf-8"))
-            if proposals_path.exists()
-            else {}
-        )
+        proposals = json.loads(proposals_path.read_text(encoding="utf-8"))
         runs[case.id] = modes.AnalysisRun(
             report=report, drafts=drafts, proposals=proposals
         )

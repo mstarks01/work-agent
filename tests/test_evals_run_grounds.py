@@ -205,7 +205,9 @@ def sweep(
         sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml"),
     )
     monkeypatch.setattr(modes, "build_eval_pipeline", lambda *a, **k: pipeline)
-    second = replace(case, meta=case.meta.model_copy(update={"id": "case-second"}))
+    second = replace(
+        case, meta=case.meta.model_copy(update={"id": "02-iot-fleet-telemetry"})
+    )
     later = [
         replace(case, meta=case.meta.model_copy(update={"id": f"case-{n + 3}"}))
         for n in range(trailing)
@@ -281,7 +283,10 @@ def _queued_for(
 def test_a_clean_sweep_measures_every_case(monkeypatch, case):
     run = sweep(monkeypatch, case, None)
 
-    assert [entry.case_id for entry in run.grounds] == [case.id, "case-second"]
+    assert [entry.case_id for entry in run.grounds] == [
+        case.id,
+        "02-iot-fleet-telemetry",
+    ]
     assert run.grounds_failures == []
     assert all(entry.ground_count == len(STRIDE_CATEGORIES) for entry in run.grounds)
 
@@ -316,7 +321,10 @@ def test_a_claim_that_lost_every_ground_is_dropped_and_the_case_still_measures(
     run = sweep(monkeypatch, case, broken)
 
     assert run.grounds_failures == []
-    assert [entry.case_id for entry in run.grounds] == [case.id, "case-second"]
+    assert [entry.case_id for entry in run.grounds] == [
+        case.id,
+        "02-iot-fleet-telemetry",
+    ]
     first, second = run.grounds
     assert [mark.claim_id for mark in first.dropped] == ["S-01"]
     assert first.threat_count == len(STRIDE_CATEGORIES) - 1
@@ -345,7 +353,7 @@ def test_a_dead_case_is_counted_and_the_sweep_continues(monkeypatch, case):
     assert any(failure.startswith(f"{case.id}:") for failure in run.failures)
     assert run.payloads[0]["grounds_failure"]["kind"] == "other"
     assert "grounds" not in run.payloads[0]
-    assert [entry.case_id for entry in run.grounds] == ["case-second"]
+    assert [entry.case_id for entry in run.grounds] == ["02-iot-fleet-telemetry"]
 
 
 def test_a_case_that_fails_at_report_validation_is_still_metered(monkeypatch, case):
@@ -367,7 +375,7 @@ def test_a_case_that_fails_at_report_validation_is_still_metered(monkeypatch, ca
     run = sweep(monkeypatch, case, None)
 
     assert [f.kind for f in run.grounds_failures] == ["other"]
-    assert [entry.case_id for entry in run.grounds] == ["case-second"]
+    assert [entry.case_id for entry in run.grounds] == ["02-iot-fleet-telemetry"]
     # Both cases ran the critic; the dead one's execution is counted too, and
     # the usage fold that prices the sweep reads the same executions list.
     assert run.latency["critic_stride"].executions == 2
@@ -437,7 +445,7 @@ def test_a_provider_fault_stops_the_sweep_without_losing_the_finished_cases(
     # it is the sweep's failure and not one of the cases nobody attempted.
     # Counting it in both prices a billed case as one the sweep never reached.
     assert run.stopped_before == ("case-3",)
-    assert run.payloads[-1]["case"] == "case-second"
+    assert run.payloads[-1]["case"] == "02-iot-fleet-telemetry"
 
 
 def test_the_stopping_fault_names_its_type_even_when_its_message_is_empty(
@@ -463,7 +471,7 @@ def test_a_measured_fault_still_runs_the_rest_of_the_sweep(monkeypatch, case):
     run = sweep(monkeypatch, case, DEAD)
 
     assert run.stopped_before == ()
-    assert [entry.case_id for entry in run.grounds] == ["case-second"]
+    assert [entry.case_id for entry in run.grounds] == ["02-iot-fleet-telemetry"]
 
 
 def test_every_measured_fault_is_one_the_failure_recorder_can_classify():
@@ -501,7 +509,7 @@ def test_a_critic_that_fails_its_gate_is_captured_and_the_sweep_continues(
     run = sweep(monkeypatch, case, None, critic_first=[silent_on_spoofing])
 
     assert run.stopped_before == ()
-    assert [entry.case_id for entry in run.grounds] == ["case-second"]
+    assert [entry.case_id for entry in run.grounds] == ["02-iot-fleet-telemetry"]
     assert run.payloads[0]["run_failure"].startswith(f"{case.id}: ")
     assert list(run.failed_states) == [case.id]
     captured = run.failed_states[case.id]
@@ -565,7 +573,7 @@ class TestCasesInFlight:
 
         assert [payload["case"] for payload in run.payloads] == [
             case.id,
-            "case-second",
+            "02-iot-fleet-telemetry",
             "case-3",
             "case-4",
         ]
@@ -638,7 +646,7 @@ class TestCasesInFlight:
         # measured whole rather than discarded with it.
         measured = [entry.case_id for entry in run.grounds]
         assert len(measured) == 1
-        assert set(measured) <= {case.id, "case-second"}
+        assert set(measured) <= {case.id, "02-iot-fleet-telemetry"}
         assert any("more credits" in failure for failure in run.failures)
         # Three and four are the batch nobody attempted.
         assert run.stopped_before == ("case-3", "case-4")

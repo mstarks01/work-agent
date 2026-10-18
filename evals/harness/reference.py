@@ -998,14 +998,22 @@ def corpus_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _case_dirs(corpus_dir: Path) -> list[Path]:
+    """Each case's folder in the corpus, in stable numeric-prefix order."""
+    return [path for path in sorted(corpus_dir.iterdir()) if path.is_dir()]
+
+
+def case_ids(corpus_dir: Path | str) -> frozenset[str]:
+    """The case set of the corpus: the name of each case folder."""
+    return frozenset(path.name for path in _case_dirs(Path(corpus_dir)))
+
+
 def load_corpus(corpus_dir: Path | str) -> tuple[GoldenCase, ...]:
     """Every case in the corpus, in stable numeric-prefix order."""
     corpus_dir = Path(corpus_dir)
     if not corpus_dir.is_dir():
         raise CorpusError(f"corpus root is not a directory: {corpus_dir}")
-    cases = tuple(
-        load_case(path) for path in sorted(corpus_dir.iterdir()) if path.is_dir()
-    )
+    cases = tuple(load_case(path) for path in _case_dirs(corpus_dir))
     if not cases:
         raise CorpusError(f"no cases under {corpus_dir}")
     return cases
