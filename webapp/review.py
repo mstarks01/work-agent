@@ -79,7 +79,6 @@ from analysis_service.report import Report
 from evals import verify_corpus
 from evals.harness import baseline, bundle
 from evals.harness import queue as review_queue
-from evals.harness.archive import case_suffix
 from evals.harness.artifact import load_artifact
 from evals.harness.fingerprint import FingerprintError, identifier_of, lane_field
 from evals.harness.ledger import (
@@ -570,30 +569,25 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], str]
     sweep, not one per report: the models, the sampling and the frameworks are
     facts about the run, and every case in it shares them.
     """
-    # The one definition of the reports directory is the harness's: `bundle`
-    # replaces the artifact's suffix, and a name composed here would be a
-    # second definition nothing compares to the first.
-    reports_dir = bundle.reports_dir(path)
-    if not reports_dir.is_dir():
-        raise FileNotFoundError(
-            f"{reports_dir} does not exist; a queue is built from the reports a"
-            " sweep writes beside its artifact, not from the artifact alone"
-        )
-
     # Loaded, not opened: the label is computed from the five parts a
     # Baseline's identity carries, and the loader is what decides that an
     # artifact holds them.
-    config = baseline.configuration_label(load_artifact(path))
+    artifact = load_artifact(path)
+    config = baseline.configuration_label(artifact)
 
     findings: list[review_queue.Finding] = []
-    for report_path in sorted(reports_dir.glob(f"*{case_suffix('report')}")):
+    for case in artifact.cases:
+        # `bundle.finished_file` refuses a finished case whose report is lost,
+        # and is None for a failed case, which has no report.
+        report_path = bundle.finished_file(artifact, case, "report")
+        if report_path is None:
+            continue
         # Validated into the record rather than read as raw JSON. A vote stores
         # digests of the claim it answered, and those are computed from the
         # package's own record -- so a second reading assembled out of a dict
         # here would key a vote to a claim the rest of the harness never sees.
         # `bundle.runs_from_reports` already reads these files this way.
         report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
-        case = report_path.name.removesuffix(case_suffix("report"))
         rows = row_controls(report.assertions.catalog if report.assertions else None)
         for block in report.analyses:
             findings += [

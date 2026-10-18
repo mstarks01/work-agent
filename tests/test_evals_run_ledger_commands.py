@@ -10,11 +10,10 @@ Deterministic and free of provider calls, so they gate on every PR.
 
 from __future__ import annotations
 
-from evals.harness.bundle import reports_dir
 from evals.harness.fingerprint import Components, version_for
 from evals.harness.ledger import append, load
 from evals.harness.run import main
-from tests.eval_factories import cast, produced_threat, write_sweep_document
+from tests.eval_factories import cast, produced_threat, write_report_sweep
 from tests.factories import sample_report
 
 
@@ -110,16 +109,8 @@ def _sweep(tmp_path, name="artifact.json", claims=None):
     The artifact is a document the loader accepts, because ``review`` names the
     sweep's configuration and reads it from there.
     """
-    artifact = write_sweep_document(tmp_path / name)
-    # From the harness's own helper: composing the name here is what let this
-    # fixture agree with a review app looking in the wrong place.
-    reports = reports_dir(tmp_path / name)
-    reports.mkdir()
     report = sample_report(threats=[_claim()] if claims is None else list(claims))
-    (reports / "01-payments-checkout.report.json").write_text(
-        report.model_dump_json(), encoding="utf-8"
-    )
-    return artifact
+    return write_report_sweep(tmp_path / name, "01-payments-checkout", report)
 
 
 def test_review_reports_what_is_waiting(tmp_path, capsys):

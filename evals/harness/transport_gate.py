@@ -30,7 +30,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-from evals.harness.bundle import reports_dir
+from evals.harness.artifact import load_artifact
+from evals.harness.bundle import finished_file
 
 #: Each quality figure against the margin ADR 0035 allows it, in the order the
 #: record tabulates them. A table rather than six comparisons, so a figure added
@@ -205,24 +206,26 @@ CRITERIA: tuple[Criterion, ...] = (
 
 
 def load(name: str, paths: Sequence[Path]) -> Arm:
-    """One arm from its five artifacts, with the reports beside each.
+    """One arm from its five artifacts, with the extraction files beside each.
 
-    Where the reports sit is :func:`evals.harness.bundle.reports_dir`'s rule
-    and is called rather than re-spelled: the writer and this reader disagreeing
-    about it would make the gate silently read no reports at all, and an arm
-    with no reports passes both failure-rate criteria.
+    Each case the artifact lists is read through
+    :func:`evals.harness.bundle.finished_file`, so a finished case whose file
+    is lost is refused by name. A failed case is read where it kept the file.
     """
-    artifacts = tuple(
-        json.loads(path.read_text(encoding="utf-8")) for path in sorted(paths)
-    )
+    artifacts = [load_artifact(path) for path in sorted(paths)]
     reports = tuple(
         tuple(
-            json.loads(report.read_text(encoding="utf-8"))
-            for report in sorted(reports_dir(path).glob("*.json"))
+            json.loads(path.read_text(encoding="utf-8"))
+            for case_id in artifact.cases
+            if (path := finished_file(artifact, case_id, "extraction")) is not None
         )
-        for path in sorted(paths)
+        for artifact in artifacts
     )
-    return Arm(name=name, artifacts=artifacts, reports=reports)
+    return Arm(
+        name=name,
+        artifacts=tuple(artifact.raw for artifact in artifacts),
+        reports=reports,
+    )
 
 
 def refusals(full: Arm, compact: Arm) -> list[str]:
