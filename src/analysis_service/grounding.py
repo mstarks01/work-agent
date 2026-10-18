@@ -272,6 +272,18 @@ def normalize(text: str) -> str:
     return " ".join(folded.split())
 
 
+def keeps_text(text: str) -> bool:
+    """Whether ``text`` keeps a character under :func:`normalize`.
+
+    **The one reader of that test.** :func:`normalize` deletes markup as well
+    as whitespace, so a piece of a quote that folds to nothing is no fragment.
+    The assertion gate keys free text by the same fold, so a value that folds
+    to nothing would share one key with every other such value, and the gate
+    refuses it as ``illegal-value``.
+    """
+    return bool(normalize(text))
+
+
 def verify_quote(quote: str, source: str) -> bool:
     """Does ``quote`` appear in ``source`` under the pinned ladder?
 
@@ -302,7 +314,7 @@ def fragments(quote: str) -> tuple[str, ...]:
     carries one of them, so a span's quote is the words its offsets hold
     rather than the whole quote they were cut from (#961).
     """
-    return tuple(raw.strip() for raw in _ELLIPSIS.split(quote) if normalize(raw))
+    return tuple(raw.strip() for raw in _ELLIPSIS.split(quote) if keeps_text(raw))
 
 
 def match_normalized(

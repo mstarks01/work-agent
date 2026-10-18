@@ -199,6 +199,19 @@ Where two readers must stay, test them against each other, so they cannot
 disagree in silence. That is the fallback, not the fix to reach for first. The
 `reviewed/2026-09-09` tag message records a case.
 
+### Add the lint that refuses a second reader
+
+A fix that makes one reader adds, in the same pull request, a lint that refuses
+a second reader. The lint walks the tree for the expression that applies the
+rule and names each site; every site but the one reader fails it. Put it in
+`tests/test_one_reader_lints.py`, or in the lint file that holds that kind of
+rule. Show that it fails on a deliberate second reader, then revert that.
+
+Without the lint, the next reader of the rule surfaces one pull request at a
+time: the case-file rule took six (#1807, #1825, #1830, #1831, #1833, #1834).
+Where no AST pattern can find the rule, say so in the pull request body and
+name the test that holds the readers against each other.
+
 ### Make the harness that proved the bug the regression test
 
 The input that reproduced the defect is the honest one. A simpler test written

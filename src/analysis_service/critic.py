@@ -341,7 +341,7 @@ def _unresolved_unknown_ref_issues(
                     )
                 )
                 continue
-            if ref.question:
+            if ref.kind == "question":
                 # A kind of question about an element: the kind is the
                 # table's, and the element is the model's, so both are checked
                 # and nothing else is.

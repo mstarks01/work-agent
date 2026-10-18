@@ -18,6 +18,7 @@ import pytest
 from analysis_service.analysis import control_state
 from analysis_service.system_model import SystemModel
 from evals.harness import extraction_losses
+from evals.harness.artifact import load_artifact
 from evals.harness.bundle import reports_dir
 from evals.harness.extraction_losses import (
     FATES,
@@ -26,7 +27,7 @@ from evals.harness.extraction_losses import (
     pooled,
     refuse_unpaired,
 )
-from evals.harness.provenance import ProvenanceError
+from evals.harness.modes import EvalRunError
 from evals.harness.reference import load_case
 from evals.harness.stability import load_runs
 from tests.test_evals_provenance import provenance, sampling  # noqa: F401
@@ -117,7 +118,10 @@ class TestTheFourFates:
         write_report_model(end, CASE, case.model, matched=(0, 2))
         runs = load_runs([end, analysis])
         rows = attribute_handoff(
-            runs[0], runs[1], {CASE: case}, {CASE: extracted_model(end, CASE)}
+            runs[0],
+            runs[1],
+            {CASE: case},
+            {CASE: extracted_model(load_artifact(end), CASE)},
         )
 
         assert len(rows) == 1
@@ -168,7 +172,10 @@ class TestWhatTheModelLacked:
         write_report_model(end, CASE, without_flow(case.model, flow_id))
         runs = load_runs([end, analysis])
         rows = attribute_handoff(
-            runs[0], runs[1], {CASE: case}, {CASE: extracted_model(end, CASE)}
+            runs[0],
+            runs[1],
+            {CASE: case},
+            {CASE: extracted_model(load_artifact(end), CASE)},
         )
         row = {e.reference: e for e in rows[0].fates}[str(index)]
 
@@ -198,7 +205,10 @@ class TestWhatTheModelLacked:
         write_report_model(end, CASE, without_flow(case.model, flow_id))
         runs = load_runs([end, analysis])
         rows = attribute_handoff(
-            runs[0], runs[1], {CASE: case}, {CASE: extracted_model(end, CASE)}
+            runs[0],
+            runs[1],
+            {CASE: case},
+            {CASE: extracted_model(load_artifact(end), CASE)},
         )
         row = {e.reference: e for e in rows[0].fates}[str(index)]
 
@@ -236,7 +246,10 @@ class TestWhatTheModelLacked:
         write_report_model(end, CASE, model)
         runs = load_runs([end, analysis])
         rows = attribute_handoff(
-            runs[0], runs[1], {CASE: case}, {CASE: extracted_model(end, CASE)}
+            runs[0],
+            runs[1],
+            {CASE: case},
+            {CASE: extracted_model(load_artifact(end), CASE)},
         )
         row = {e.reference: e for e in rows[0].fates}[str(index)]
 
@@ -341,8 +354,8 @@ class TestWhatIsRefused:
             analysis_matched=[0],
             references=4,
         )
-        with pytest.raises(ProvenanceError, match="no report for"):
-            extracted_model(end, CASE)
+        with pytest.raises(EvalRunError, match=f"{CASE}: .* holds no report file"):
+            extracted_model(load_artifact(end), CASE)
 
     def test_a_reference_count_the_corpus_does_not_hold_is_refused(
         self,

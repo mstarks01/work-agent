@@ -49,12 +49,12 @@ import json
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
 from analysis_service.system_model import SystemModel, normalize_element_ids
-from evals.harness.bundle import case_file
+from evals.harness.artifact import EvalArtifact
+from evals.harness.bundle import finished_file
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.modes import ExtractionResult, ExtractionScore, score_extraction
 from evals.harness.provenance import ProvenanceError
@@ -238,20 +238,23 @@ def refuse_unpaired(end_to_end: ScoredRun, analysis: ScoredRun) -> None:
     refuse_incomparable([end_to_end, analysis])
 
 
-def extracted_model(artifact_path: Path | str, case_id: str) -> SystemModel:
+def extracted_model(artifact: EvalArtifact, case_id: str) -> SystemModel:
     """The model the end-to-end run's lanes read for one case, off its report.
 
     The report embeds the model it was written against, which for an
-    end-to-end run is the extraction. Read through the same validator the
-    service applies, so a report whose model would not load is refused by
-    name rather than scored as an empty extraction.
+    end-to-end run is the extraction. The report is read through
+    :func:`~evals.harness.bundle.finished_file`, so a lost report of a
+    finished case is refused by name. A failed case has no report, so it is
+    refused too. The model goes through the same validator the service
+    applies, so a report whose model would not load is refused by name rather
+    than scored as an empty extraction.
     """
-    path = case_file(artifact_path, case_id, "report")
-    if not path.is_file():
+    path = finished_file(artifact, case_id, "report")
+    if path is None:
         raise ProvenanceError(
-            f"{path}: no report for {case_id}; an end-to-end run's extracted"
-            " model is read off its report, so the fates cannot say what the"
-            " model lacked"
+            f"{case_id}: the artifact records the case as failed, so it has no"
+            " report; an end-to-end run's extracted model is read off its"
+            " report, so the fates cannot say what the model lacked"
         )
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))

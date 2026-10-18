@@ -82,6 +82,7 @@ from analysis_service.system_model import (
     DataFlow,
     Element,
     SystemModel,
+    derive_element_id,
     flow_label,
     make_element_id,
     normalize_name,
@@ -357,16 +358,15 @@ def _align_respelled(
     paired_produced = {pair.produced for pair in pairs}
     by_key = _by_slug_key((one, one) for one in held - paired_produced)
     # A singularised slug keeps its type prefix, so one key never crosses types.
-    claims: dict[str, list[str]] = defaultdict(list)
-    for reference in sorted(nodes - paired_reference):
-        if slug_key(reference) in by_key:
-            claims[slug_key(reference)].append(reference)
+    claims = _by_slug_key((one, one) for one in nodes - paired_reference)
     for key, references in sorted(claims.items()):
+        if key not in by_key:
+            continue
         found = by_key[key]
         if len(references) == 1 and len(found) == 1:
             pairs.append(Pair(references[0], found[0], "respelled"))
         else:
-            ambiguous.append(Ambiguity(tuple(references), found))
+            ambiguous.append(Ambiguity(references, found))
 
 
 def _by_slug_key(spelled: Iterable[tuple[str, str]]) -> dict[str, tuple[str, ...]]:
@@ -385,7 +385,7 @@ def _by_slug_key(spelled: Iterable[tuple[str, str]]) -> dict[str, tuple[str, ...
 def _named_id(element: Element) -> str:
     """The ID an element's name derives today, or its own ID where none derives."""
     try:
-        return make_element_id(element_type(element.id), element.name)
+        return derive_element_id(element)
     except ValueError:
         return element.id
 
