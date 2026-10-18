@@ -46,8 +46,8 @@ from analysis_service.report import Report
 from analysis_service.system_model import FLOW_ID_RULES
 from evals.harness import flow_ids, modes, replay
 from evals.harness.archive import CaseKind, archive_bytes, case_suffix
-from evals.harness.artifact import EvalArtifact, load_artifact
-from evals.harness.reference import GoldenCase
+from evals.harness.artifact import CORPUS_DIR, EvalArtifact, load_artifact
+from evals.harness.reference import GoldenCase, case_ids
 
 
 def framework_block(report: Report, framework: FrameworkName) -> FrameworkAnalysis:
@@ -119,7 +119,13 @@ def case_file(out: str | Path, case_id: str, kind: CaseKind) -> Path:
     the file name with :func:`~evals.harness.archive.case_suffix`.
     :func:`check_sweep_out` checks each kind, so the check before the spend
     covers every write after it.
+
+    A case ID that is not in the case set of the shipped corpus is refused.
+    The ID comes from an artifact or a flag, and only a corpus case names a
+    file inside the folder.
     """
+    if case_id not in case_ids(CORPUS_DIR):
+        raise modes.EvalRunError(f"{case_id!r} is not a case of {CORPUS_DIR}")
     return reports_dir(out) / f"{case_id}{case_suffix(kind)}"
 
 
@@ -400,6 +406,25 @@ def write_failures(out: str, failed: Mapping[str, Mapping[str, Any]]) -> None:
 KEPT_WHEN_FAILED: frozenset[CaseKind] = frozenset(
     {"extraction", "assertions", "failure"}
 )
+
+
+#: The case files that each sweep mode writes for a finished case. The writers
+#: in ``run._run_mode`` decide each row: :func:`write_reports` writes four kinds
+#: for a mode in ``REPORTING_MODES``, :func:`write_extractions` writes the
+#: emission of a run that went through ``extract``, and :func:`write_assertions`
+#: writes the catalog for a mode that ``replay.KEEPS`` names. A finished
+#: ``heads`` case carries no emission: its outcome holds the catalog alone.
+#: Keyed by ``modes.MODE_ENTRIES``, so a new mode needs a row here.
+FINISHED_KINDS: Mapping[str, frozenset[CaseKind]] = {
+    "extraction": frozenset({"extraction"}),
+    "assertions": frozenset({"assertions"}),
+    "heads": frozenset({"assertions"}),
+    "analysis": frozenset({"report", "drafts", "proposals", "lanes"}),
+    "direct-facts": frozenset({"report", "drafts", "proposals", "lanes"}),
+    "answered": frozenset({"report", "drafts", "proposals", "lanes"}),
+    "withheld": frozenset({"report", "drafts", "proposals", "lanes"}),
+    "end-to-end": frozenset({"report", "drafts", "proposals", "lanes", "extraction"}),
+}
 
 
 def finished_file(artifact: EvalArtifact, case_id: str, kind: CaseKind) -> Path | None:

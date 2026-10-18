@@ -15,7 +15,7 @@ from evals.harness import bundle, modes
 from evals.harness import transport_gate as gate
 from tests.eval_factories import sweep_document, write_sweep_document
 
-CASES = ("01-a", "02-b", "03-c")
+CASES = ("01-payments-checkout", "02-iot-fleet-telemetry", "03-batch-data-pipeline")
 
 
 def _artifact(emitted: float, figures: dict[str, float], reasoning: float = 100.0):
@@ -85,7 +85,7 @@ def test_one_case_below_its_floor_vetoes_a_holding_corpus_mean():
     for artifact in compact.artifacts:
         artifact["mode_output"][0]["recall"] = 0.5
     passed, reading = gate._veto(full, compact)
-    assert not passed and "01-a/recall" in reading
+    assert not passed and "01-payments-checkout/recall" in reading
 
 
 def test_an_arm_missing_its_reports_is_refused_rather_than_passed():

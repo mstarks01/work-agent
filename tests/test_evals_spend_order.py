@@ -17,6 +17,7 @@ from evals.critic_review import __main__ as critic_review
 from evals.harness import critic_replay, lane_replay, run
 from evals.harness.archive import CaseKind, kind_of
 from evals.harness.bundle import case_file
+from evals.harness.modes import EvalRunError
 from tests.test_evals_lane_replay import recorded  # noqa: F401  (fixture)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
@@ -199,4 +200,13 @@ def test_a_critic_review_refuses_a_bad_out_before_the_call(
 @pytest.mark.parametrize("kind", get_args(CaseKind))
 def test_each_case_file_the_sweep_checks_reads_back_as_its_kind(kind):
     """The pre-spend check and the archive reader name each case file alike."""
-    assert kind_of(case_file("artifact.json", "a-case", kind).name) == kind
+    assert (
+        kind_of(case_file("artifact.json", "01-payments-checkout", kind).name) == kind
+    )
+
+
+@pytest.mark.parametrize("case_id", ["../x", "a/b", "99-not-a-case"])
+def test_a_case_file_refuses_a_case_outside_the_corpus(case_id):
+    """A case ID from an artifact or a flag never names a path outside the folder."""
+    with pytest.raises(EvalRunError, match="is not a case of"):
+        case_file("artifact.json", case_id, "report")

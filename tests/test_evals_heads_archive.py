@@ -20,7 +20,7 @@ from analysis_service.assertions import (
     Subject,
 )
 from evals.harness import modes, replay
-from evals.harness.bundle import reports_dir, write_assertions
+from evals.harness.bundle import FINISHED_KINDS, reports_dir, write_assertions
 
 
 def result(case_id: str = "01-payments-checkout", **overrides) -> modes.AssertionResult:
@@ -107,3 +107,22 @@ def test_a_mode_the_replay_does_not_read_archives_nothing(tmp_path: Path) -> Non
     for mode in unreplayable:
         write_assertions(out, mode, {"01-payments-checkout": result()})
         assert not (reports_dir(out) / "01-payments-checkout.assertions.json").exists()
+
+
+def test_every_mode_says_which_files_a_finished_case_writes() -> None:
+    """A mode with no row is a sweep whose lost case file a Baseline cannot see."""
+    assert set(FINISHED_KINDS) == set(modes.MODE_ENTRIES), (
+        "FINISHED_KINDS and MODE_ENTRIES disagree: give each mode one row in"
+        " evals/harness/bundle.py, and no other."
+    )
+
+
+@pytest.mark.parametrize("mode", sorted(modes.MODE_ENTRIES))
+def test_each_row_agrees_with_the_writers(mode: str) -> None:
+    """Each row answers the gate of each writer that ``run._run_mode`` calls."""
+    kinds = FINISHED_KINDS[mode]
+    reporting = mode in modes.REPORTING_MODES
+    assert {"report", "drafts", "proposals", "lanes"} <= kinds or not reporting
+    assert not {"report", "drafts", "proposals", "lanes"} & kinds or reporting
+    assert ("assertions" in kinds) == (replay.KEEPS.get(mode) == "catalog")
+    assert "extraction" not in kinds or mode in modes.EXTRACTING_MODES

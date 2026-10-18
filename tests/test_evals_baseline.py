@@ -32,19 +32,25 @@ from evals.harness.baseline import (
     price_sweep,
     verify,
 )
+from evals.harness.bundle import FINISHED_KINDS, case_file, reports_dir
 from evals.harness.prices import UnitPrices
 from tests.eval_factories import SWEEP_COMMIT, sweep_document
 
+#: A corpus case, because ``case_file`` refuses a case ID outside the corpus.
+CASE = "01-payments-checkout"
+
 
 def write_sweep(directory: Path, document: dict, stem: str = "art") -> Path:
+    """One finished case's artifact, with every file its mode writes for it."""
+    document = document | {"cases": [CASE], "mode_output": [{"case": CASE}]}
     path = directory / f"{stem}.json"
     path.write_text(json.dumps(document, indent=2), encoding="utf-8")
-    reports = directory / f"{stem}.reports"
-    reports.mkdir()
-    (reports / "01-a-case.report.json").write_text(
-        json.dumps({"claims": [], "seed": document["certification"]["seed"]}),
-        encoding="utf-8",
-    )
+    reports_dir(path).mkdir()
+    for kind in FINISHED_KINDS[document["mode"]]:
+        case_file(path, CASE, kind).write_text(
+            json.dumps({"claims": [], "seed": document["certification"]["seed"]}),
+            encoding="utf-8",
+        )
     return path
 
 
@@ -779,6 +785,14 @@ class TestAssembleAndVerify:
         source = tmp_path / "bare.json"
         source.write_text(json.dumps(sweep_document(), indent=2), encoding="utf-8")
         with pytest.raises(BaselineError, match="no reports directory"):
+            assemble(tmp_path, "ada", [source])
+
+    @pytest.mark.parametrize("kind", sorted(FINISHED_KINDS["end-to-end"]))
+    def test_a_finished_case_with_a_lost_file_is_refused(self, tmp_path, priced, kind):
+        """A non-empty reports folder is not enough: each finished case needs each file."""
+        source = write_sweep(tmp_path, sweep_document())
+        case_file(source, CASE, kind).unlink()
+        with pytest.raises(BaselineError, match=f"holds no {kind} file"):
             assemble(tmp_path, "ada", [source])
 
     def test_a_refused_later_sweep_copies_nothing(self, tmp_path, priced):

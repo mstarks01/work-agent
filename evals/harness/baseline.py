@@ -83,8 +83,9 @@ from evals.harness.artifact import (
     _ungraded,
     load_artifact,
 )
-from evals.harness.bundle import reports_dir
+from evals.harness.bundle import FINISHED_KINDS, finished_file, reports_dir
 from evals.harness.history import current_commit
+from evals.harness.modes import EvalRunError
 from evals.harness.prices import UnitPrices, price_calls
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
@@ -683,7 +684,13 @@ class _CheckedSweep:
 
 
 def _checked_sweep(source: Path, artifact: EvalArtifact, author: str) -> _CheckedSweep:
-    """One sweep, refused unless its reports sit beside it and its cost prices."""
+    """One sweep, refused unless its case files sit beside it and its cost prices.
+
+    Each case the artifact lists is read through
+    :func:`~evals.harness.bundle.finished_file`, once for each kind that
+    :data:`~evals.harness.bundle.FINISHED_KINDS` gives for the sweep's mode.
+    So a finished case with a lost file is refused by name.
+    """
     payload = source.read_bytes()
     reports = reports_dir(source)
     if not reports.is_dir() or not any(reports.iterdir()):
@@ -692,6 +699,12 @@ def _checked_sweep(source: Path, artifact: EvalArtifact, author: str) -> _Checke
             " are what the free sitting path reads, so a Baseline stores"
             " sweeps with their reports or not at all"
         )
+    try:
+        for case_id in artifact.cases:
+            for kind in FINISHED_KINDS[artifact.mode]:
+                finished_file(artifact, case_id, kind)
+    except EvalRunError as error:
+        raise BaselineError(f"{source}: {error}") from error
     return _CheckedSweep(
         stem=f"{author}-{hashlib.sha256(payload).hexdigest()[:8]}",
         payload=payload,

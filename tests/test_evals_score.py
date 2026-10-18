@@ -443,7 +443,7 @@ class TestWhatARescoreTouches:
         payload = scored(swept)
         assert payload["grounds_aggregate"] == {"grounds_per_threat": 1.5}
         assert payload["provenance"]
-        assert payload["cases"] == ["01-payments-checkout", "case-second"]
+        assert payload["cases"] == ["01-payments-checkout", "02-iot-fleet-telemetry"]
 
     def test_every_scored_instrument_writes_its_keys(
         self, swept, tmp_path, roster_path
