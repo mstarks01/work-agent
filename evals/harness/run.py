@@ -1690,11 +1690,12 @@ def command_extraction_losses(args: argparse.Namespace) -> int:
         end_to_end, analysis = load_runs([args.end_to_end, args.analysis])
         extraction_losses.refuse_unpaired(end_to_end, analysis)
         corpus = {case.id: case for case in development_cases(load_corpus(args.corpus))}
+        end_artifact = load_artifact(args.end_to_end)
         models = {}
         for framework, case_id in sorted(end_to_end.cases & analysis.cases):
             if extraction_losses.names_elements(framework) and case_id in corpus:
                 models[case_id] = extraction_losses.extracted_model(
-                    args.end_to_end, case_id
+                    end_artifact, case_id
                 )
         rows = extraction_losses.attribute_handoff(end_to_end, analysis, corpus, models)
     except (ProvenanceError, CorpusError, modes.EvalRunError, ValueError) as error:

@@ -43,7 +43,7 @@ from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
-from evals.harness.bundle import case_file, finished_file
+from evals.harness.bundle import finished_file
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 
@@ -160,11 +160,9 @@ def replay_artifact(
         report_path = finished_file(artifact, case.id, "report")
         if report_path is None:
             continue
-        drafts_path = case_file(artifact.path, case.id, "drafts")
-        if not drafts_path.is_file():
-            raise EvalRunError(
-                f"{drafts_path} is missing; assembly cannot run without the drafts"
-            )
+        drafts_path = finished_file(artifact, case.id, "drafts")
+        # A finished case: finished_file returns the path or raises.
+        assert drafts_path is not None
         report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
         held = json.loads(drafts_path.read_text(encoding="utf-8"))
         for block in report.analyses:

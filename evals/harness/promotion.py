@@ -68,7 +68,7 @@ from analysis_service.parsing import non_negative
 from analysis_service.sources import text_digest
 from evals.harness import falsify
 from evals.harness.artifact import load_artifact
-from evals.harness.bundle import assertions_from_reports, case_file
+from evals.harness.bundle import assertions_from_reports, finished_file
 from evals.harness.modes import AssertionResult, EvalRunError
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.replay import replay_assertions, signed_reference
@@ -837,13 +837,22 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def command_gates(args: argparse.Namespace) -> int:
-    """Read the gates against one treatment run. It runs no model."""
+    """Read the gates against one treatment run. It runs no model.
+
+    The report is read through :func:`~evals.harness.bundle.finished_file`, so
+    a lost report of a finished case, and a failed case, are refused by name.
+    """
     try:
         artifact = json.loads(args.artifact.read_text(encoding="utf-8"))
-        report_path = case_file(args.artifact, args.case, "report")
+        report_path = finished_file(load_artifact(args.artifact), args.case, "report")
+        if report_path is None:
+            raise EvalRunError(
+                f"{args.case}: the artifact records the case as failed, so it"
+                " has no report to read the gates against"
+            )
         report = json.loads(report_path.read_text(encoding="utf-8"))
         spread = {} if args.spread is None else read_spread(args.spread, GATES)
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, EvalRunError) as error:
         print(f"cannot read: {error}", file=sys.stderr)
         return 1
     try:

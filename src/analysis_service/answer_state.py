@@ -1200,7 +1200,7 @@ def recommended(
         # questions takes one place, and a capability question its own.
         counted: dict[str, set[UnknownKey | str]] = defaultdict(set)
         for key, served in answered_for.items():
-            if (kind == "capability") == bool(key_ref(key).capability):
+            if (kind == "capability") == (key_ref(key).kind == "capability"):
                 for name in served:
                     counted[name].add(limit_place(key))
         eligible = [question for question in rankable if _early_kind(question) == kind]

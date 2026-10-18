@@ -60,6 +60,7 @@ from typing import Literal, get_args
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.claims import FrameworkName
+from analysis_service.errors import error_place
 from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.system_model import ModelIndex
 from evals import build_review_docs as docs
@@ -312,10 +313,12 @@ def first_problem(error: ValidationError) -> str:
 
     The whole report names every field at once and reads as a stack trace.
     The reader's next step is to open the file this message already names, so
-    one field and one reason is what carries them there.
+    one field and one reason is what carries them there. The place comes from
+    :func:`~analysis_service.errors.error_place`, because a sitting route
+    returns this message, and a refusal never repeats a key the caller sent.
     """
     first = error.errors()[0]
-    where = ".".join(str(part) for part in first["loc"]) or "the file"
+    where = error_place(first) or "the file"
     return f"{where} — {first['msg']}"
 
 

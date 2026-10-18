@@ -11,6 +11,7 @@ design #926 settled as gates nobody can read until it is measured.
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 from pathlib import Path
@@ -29,6 +30,8 @@ from evals.harness import promotion
 from evals.harness.reference import load_corpus
 from evals.harness.replay import signed_reference
 from evals.harness.run import COMMANDS
+from tests.test_evals_descendants import archive  # noqa: F401  (fixture)
+from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FLOW = "flow:entity:shopper>process:storefront-api>place-order"
@@ -264,12 +267,12 @@ class TestRecallIsReadOffTheReport:
     """Required-fact recall, from the catalog a report embeds."""
 
     def report(self, entries) -> dict:
-        case = next(
-            case
-            for case in load_corpus(promotion.CORPUS)
-            if case.id == "01-payments-checkout"
+        checkout = next(
+            one
+            for one in load_corpus(promotion.CORPUS)
+            if one.id == "01-payments-checkout"
         )
-        reference = signed_reference(promotion.CORPUS, case)
+        reference = signed_reference(promotion.CORPUS, checkout)
         assert reference is not None
         rows = list(entries(reference))
         record = AssertionRecord(
@@ -278,7 +281,7 @@ class TestRecallIsReadOffTheReport:
         )
         return {
             "input": {
-                "sources": [{"sha256": text_digest(s.text)} for s in case.sources]
+                "sources": [{"sha256": text_digest(s.text)} for s in checkout.sources]
             },
             "assertions": record.model_dump(mode="json"),
         }
@@ -394,3 +397,16 @@ class TestASpreadFileIsRefusedWhereItIsNotASpread:
         assert promotion.read_spread(path, promotion.GATES) == {
             "must-find-coverage": 0.0
         }
+
+
+def test_the_gates_refuse_a_report_of_a_failed_case(archive, case, capsys):  # noqa: F811
+    """This sweep wrote no report for a failed case, so another sweep did."""
+    raw = json.loads(archive.read_text(encoding="utf-8"))
+    raw["mode_output"] = [{"case": case.id, "run_failure": "a fault"}]
+    archive.write_text(json.dumps(raw), encoding="utf-8")
+    args = argparse.Namespace(artifact=archive, case=case.id, spread=None, recall=[])
+
+    assert promotion.command_gates(args) == 1
+    assert f"{case.id}: the artifact records the case as failed" in (
+        capsys.readouterr().err
+    )

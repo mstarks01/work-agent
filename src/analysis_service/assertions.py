@@ -73,6 +73,7 @@ from analysis_service.grounding import (
     IndexedSource,
     fragments,
     index_source,
+    keeps_text,
     locate_quote,
     normalize,
     placements,
@@ -353,17 +354,6 @@ MAX_VALUE_CHARS = 200
 
 #: What a quote may run to, matching a **Source Excerpt**.
 MAX_QUOTE_CHARS = 1000
-
-
-def keeps_text(value: str) -> bool:
-    """Whether free text keeps a character under the fold its identity key reads.
-
-    :func:`_value_key` and :func:`_scope_key` key free text by
-    :func:`~analysis_service.grounding.normalize`, which deletes markup as
-    well as whitespace. A value that folds to nothing would share one key with
-    every other such value, so the gate refuses it as ``illegal-value``.
-    """
-    return bool(normalize(value))
 
 
 @dataclass(frozen=True)

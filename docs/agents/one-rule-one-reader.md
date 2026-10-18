@@ -10,6 +10,11 @@ Where a second reader is unavoidable — an app and an offline gate, a harness
 check and a corpus lint — test the two **against each other**, never each
 against its own expectation.
 
+**A fix that makes one reader adds the lint that refuses a second reader, in
+the same pull request.** `tests/test_one_reader_lints.py` holds the form: an
+AST walk that names each site that applies the rule. See "Add the lint that
+refuses a second reader" in `docs/agents/code-review.md`.
+
 Examples of one question with two readers, each tested separately: what an
 UNREVIEWED key is (substring vs `ast`); whether a finding is answered
 (`queue.build` vs `Session.remaining`); which UNREVIEWED table is the table

@@ -171,6 +171,7 @@ from analysis_service.critic import (
     review,
 )
 from analysis_service.domains import select_domain_packs
+from analysis_service.errors import error_place
 from analysis_service.evidence import (
     evidence_catalog,
     prepared_view,
@@ -2449,9 +2450,7 @@ def _check_options(
         try:
             package_for(name).options.model_validate(options.get(name) or {})
         except ValidationError as exc:
-            fields = sorted(
-                ".".join(str(part) for part in error["loc"]) for error in exc.errors()
-            )
+            fields = sorted({error_place(error) or "options" for error in exc.errors()})
             problems.append(f"{name}: {', '.join(fields)}")
     if problems:
         raise MissingFrameworkOptions(

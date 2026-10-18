@@ -3083,6 +3083,16 @@ def test_a_driver_that_seeds_no_options_is_told_which_framework_needs_what():
     assert graph.STATE_FRAMEWORK_OPTIONS in message
 
 
+def test_the_options_refusal_names_no_key_the_caller_invented():
+    """The refusal names the options of the framework, never the invented key."""
+    with pytest.raises(graph.MissingFrameworkOptions) as caught:
+        graph._check_options(["asvs"], {"asvs": {"level": 1, "hunter2": 1}})
+
+    message = str(caught.value)
+    assert "asvs: options" in message
+    assert "hunter2" not in message
+
+
 def test_a_framework_needing_no_options_needs_nothing_seeded():
     """The STRIDE-only path is unchanged: an empty options model validates."""
     ctx = finish(FakeContext())

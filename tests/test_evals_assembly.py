@@ -93,3 +93,11 @@ def test_a_finished_case_with_no_report_is_named(archive, case):  # noqa: F811
 
     with pytest.raises(assembly.EvalRunError, match=f"{case.id}: .* no report"):
         assembly.replay_artifact(load_artifact(archive), [case])
+
+
+def test_a_finished_case_with_no_drafts_is_named(archive, case):  # noqa: F811
+    """The artifact records the case as finished, so its drafts were lost."""
+    (reports_dir(archive) / f"{case.id}.drafts.json").unlink()
+
+    with pytest.raises(assembly.EvalRunError, match=f"{case.id}: .* no drafts"):
+        assembly.replay_artifact(load_artifact(archive), [case])
