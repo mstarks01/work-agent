@@ -35,7 +35,7 @@ from analysis_service.vendors import vendor_for_route
 from evals import verify_corpus
 from evals.harness import ledger
 from evals.harness.artifact import ARTIFACT_VERSION, EvalArtifact, load_artifact
-from evals.harness.bundle import write_reports
+from evals.harness.bundle import case_file, reports_dir, write_reports
 from evals.harness.identity import ClaimPair, ClaimRuling
 from evals.harness.ledger import Vote
 from evals.harness.provenance import RunProvenance
@@ -193,6 +193,24 @@ def write_emission_sweep(
         ],
     }
     return load_artifact(write_sweep_document(out, document))
+
+
+def write_report_sweep(
+    out: Path, case_id: str, report: Any, document: dict | None = None
+) -> Path:
+    """A sweep artifact whose listed cases all finished, and one case's report.
+
+    ``document`` defaults to a sweep of ``case_id`` alone. A case it lists
+    beside ``case_id`` finished and has no report, which is a lost report.
+    """
+    document = document or sweep_document(cases=(case_id,))
+    document["mode_output"] = [{"case": case} for case in document["cases"]]
+    artifact = write_sweep_document(out, document)
+    reports_dir(artifact).mkdir()
+    case_file(artifact, case_id, "report").write_text(
+        report.model_dump_json(), encoding="utf-8"
+    )
+    return artifact
 
 
 def write_finished_sweep(out: Path, run: Any, **blocks: Any) -> Path:

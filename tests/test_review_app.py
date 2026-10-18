@@ -15,11 +15,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.frameworks import PACKAGES
-from evals.harness import bundle
 from evals.harness import queue as review_queue
 from evals.harness.artifact import load_artifact
 from evals.harness.baseline import configuration_label
 from evals.harness.ledger import Ledger, append, load
+from evals.harness.modes import EvalRunError
 from evals.harness.provenance import ProvenanceError
 from tests.eval_factories import (
     SAMPLE_CONTENT,
@@ -28,7 +28,7 @@ from tests.eval_factories import (
     cast,
     produced_threat,
     sweep_document,
-    write_sweep_document,
+    write_report_sweep,
 )
 from tests.factories import sample_report
 from tests.test_asvs import _block as asvs_block
@@ -330,16 +330,7 @@ class TestReadingSeveralSweeps:
         hand-built dict here invents keys, and then the app and the test agree
         with each other about a fact no producer produces.
         """
-        artifact = write_sweep_document(tmp_path / name, document)
-        # Named by the harness's own helper rather than composed here, so the
-        # app and the harness cannot disagree about the directory without a
-        # test noticing.
-        reports = bundle.reports_dir(artifact)
-        reports.mkdir()
-        (reports / "01-payments-checkout.report.json").write_text(
-            report.model_dump_json(), encoding="utf-8"
-        )
-        return artifact
+        return write_report_sweep(tmp_path / name, STEADY.case, report, document)
 
     @staticmethod
     def _stride(title="A finding", category="spoofing"):
@@ -389,7 +380,10 @@ class TestReadingSeveralSweeps:
         """Neither sweep may be named as though it were the whole input."""
         first = self._sweep(tmp_path, "one.json", self._stride())
         second = self._sweep(
-            tmp_path, "two.json", self._stride(), sweep_document(temperature=0.7)
+            tmp_path,
+            "two.json",
+            self._stride(),
+            sweep_document(temperature=0.7, cases=(STEADY.case,)),
         )
 
         _, configs = findings_from_artifacts([first, second])
@@ -397,6 +391,14 @@ class TestReadingSeveralSweeps:
         assert configs["01-payments-checkout"] == ", ".join(
             sorted(configuration_label(load_artifact(path)) for path in (first, second))
         )
+
+    def test_a_lost_report_is_refused_by_name(self, tmp_path):
+        """A finished case the artifact lists must have its report."""
+        document = sweep_document(cases=(STEADY.case, "02-lost-case"))
+        artifact = self._sweep(tmp_path, "one.json", self._stride(), document)
+
+        with pytest.raises(EvalRunError, match="02-lost-case"):
+            findings_from_artifacts([artifact])
 
     def test_an_artifact_the_loader_refuses_stops_the_queue(self, tmp_path):
         """The app names a sweep, so a file that is not one is refused here.

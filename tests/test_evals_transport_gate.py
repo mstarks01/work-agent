@@ -11,7 +11,9 @@ import json
 
 import pytest
 
+from evals.harness import bundle, modes
 from evals.harness import transport_gate as gate
+from tests.eval_factories import sweep_document, write_sweep_document
 
 CASES = ("01-a", "02-b", "03-c")
 
@@ -114,15 +116,29 @@ def test_every_criterion_the_record_states_is_in_the_table():
     )
 
 
-def test_the_gate_reads_a_real_artifact_from_disk(tmp_path):
-    """``load`` finds the reports by ``bundle.reports_dir``'s rule, not its own."""
-    artifact = tmp_path / "full-r1.json"
-    artifact.write_text(json.dumps(_artifact(1000.0, {})), encoding="utf-8")
-    reports = tmp_path / "full-r1.reports"
-    reports.mkdir()
-    for case in CASES:
-        (reports / f"{case}.extraction.json").write_text(
+def _sweep_on_disk(out, cases=CASES):
+    """One extraction sweep's artifact, with an extraction file for each case."""
+    document = sweep_document(cases=CASES) | _artifact(1000.0, {})
+    artifact = write_sweep_document(out, document | {"mode": "extraction"})
+    bundle.reports_dir(artifact).mkdir()
+    for case in cases:
+        bundle.case_file(artifact, case, "extraction").write_text(
             json.dumps({"issues": []}), encoding="utf-8"
         )
-    arm = gate.load("full", [artifact])
+    return artifact
+
+
+def test_the_gate_reads_a_real_artifact_from_disk(tmp_path):
+    """``load`` finds each case's file through ``bundle.finished_file``."""
+    arm = gate.load("full", [_sweep_on_disk(tmp_path / "full-r1.json")])
     assert arm.emitted == [1000.0] and arm.validity == [1.0]
+
+
+def test_a_lost_extraction_is_refused_by_name(tmp_path):
+    """A stray file of another kind must not stand in for the lost one."""
+    artifact = _sweep_on_disk(tmp_path / "full-r1.json", cases=CASES[:2])
+    bundle.case_file(artifact, CASES[0], "assertions").write_text(
+        json.dumps({"issues": []}), encoding="utf-8"
+    )
+    with pytest.raises(modes.EvalRunError, match=CASES[2]):
+        gate.load("full", [artifact])
