@@ -724,7 +724,7 @@ def _score_runs(
                 produced,
                 flows_by_case[case.id],
                 block,
-                proposed=runs[case.id].proposals.get("stride"),
+                proposed=runs[case.id].proposals.get("stride", {}),
             )
         )
     return (

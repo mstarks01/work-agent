@@ -454,8 +454,8 @@ place and wrote another action), `merged`, `misfiled` (the finding sits in
 another lane), the critic, `fan-in` (the lane proposed it and the fan-in
 removed it, or narrowed its elements off the place), the place (a rule led
 there and nothing was drafted), or `unled`. A `place` or `unled` row also says
-whether a surviving draft sits one element over. A sweep that archived no lane
-proposals cannot decide `fan-in`, and the block's `proposals_read` says so. `attribution` is ASVS's, by stage.
+whether a surviving draft sits one element over. A case whose lanes proposed
+nothing has no `fan-in` row, and the block's `proposed_nothing` says so. `attribution` is ASVS's, by stage.
 
 Both split a critic charge in two. A row carrying a non-empty `re_ask` names a
 claim the *first* critic pass got wrong, so the ruling that lost it came out of

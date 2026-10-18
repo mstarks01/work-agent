@@ -23,7 +23,7 @@ from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import lane_closing
 from analysis_service.system_model import ModelIndex
 from evals.harness import lane_replay
-from evals.harness.bundle import reports_dir, write_reports
+from evals.harness.bundle import case_file, reports_dir, write_reports
 from evals.harness.descendants import lane_must_finds
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
@@ -33,10 +33,16 @@ from evals.harness.reference import DEFAULT_CORPUS
 from evals.harness.scorer import score_case
 from evals.reference_facts import load_facts
 from tests import test_evals_run_grounds as grounds
+from tests.eval_factories import write_emission_sweep
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
 PACKAGE_LOADER = MarkdownLoader(REPO_ROOT / "frameworks" / "stride")
 PROMPT_LOADER = MarkdownLoader(REPO_ROOT / "prompts")
+
+
+def finished(out, case_id):
+    """The artifact of a sweep whose one case finished."""
+    return write_emission_sweep(out, "analysis", [case_id])
 
 
 def record_requests(monkeypatch) -> list[tuple[str, list]]:
@@ -67,7 +73,7 @@ def recorded(monkeypatch, case, tmp_path):  # noqa: F811
 
 def test_every_lane_request_is_rebuilt_byte_for_byte(recorded, case):  # noqa: F811
     out, seen = recorded
-    material = lane_replay.load_material(out, case.id)
+    material = lane_replay.load_material(finished(out, case.id), case.id)
     sent = {instruction: contents for instruction, contents in seen}
 
     for lane in FrameworkNodes("stride").lanes:
@@ -82,7 +88,7 @@ def test_every_lane_request_is_rebuilt_byte_for_byte(recorded, case):  # noqa: F
 
 def test_a_replay_parses_the_answer_under_the_package_schema(recorded, case):  # noqa: F811
     out, _ = recorded
-    material = lane_replay.load_material(out, case.id)
+    material = lane_replay.load_material(finished(out, case.id), case.id)
     asked: list[str] = []
 
     async def call(instruction, turn):
@@ -101,7 +107,7 @@ def test_a_replay_parses_the_answer_under_the_package_schema(recorded, case):  #
 
 def test_an_appended_part_follows_the_captured_turn(recorded, case):  # noqa: F811
     out, _ = recorded
-    material = lane_replay.load_material(out, case.id)
+    material = lane_replay.load_material(finished(out, case.id), case.id)
     _, captured = asyncio.run(
         lane_replay.compose(
             material, "stride", "spoofing", PACKAGE_LOADER, PROMPT_LOADER
@@ -131,7 +137,7 @@ def test_an_appended_part_follows_the_captured_turn(recorded, case):  # noqa: F8
 
 def test_an_answer_outside_the_schema_is_refused(recorded, case):  # noqa: F811
     out, _ = recorded
-    material = lane_replay.load_material(out, case.id)
+    material = lane_replay.load_material(finished(out, case.id), case.id)
 
     async def call(instruction, turn):
         return json.dumps({"threats": []})
@@ -144,23 +150,73 @@ def test_an_answer_outside_the_schema_is_refused(recorded, case):  # noqa: F811
         )
 
 
-def test_a_sweep_without_the_capture_is_refused_by_name(tmp_path):
-    out = tmp_path / "artifact.json"
-    reports_dir(out).mkdir()
+def test_a_finished_case_with_a_lost_lanes_file_is_refused(recorded, case):  # noqa: F811
+    out, _ = recorded
+    case_file(out, case.id, "lanes").unlink()
 
-    with pytest.raises(EvalRunError, match="predates the lane capture"):
-        lane_replay.load_material(out, "01-payments-checkout")
+    with pytest.raises(EvalRunError, match="holds no lanes file"):
+        lane_replay.load_material(finished(out, case.id), case.id)
+
+
+def test_a_failed_case_is_refused_and_its_stale_file_is_not_read(recorded, case):  # noqa: F811
+    """A lanes file beside a failed case is an earlier sweep's, never this one's."""
+    out, _ = recorded
+    failed = write_emission_sweep(out, "analysis", [case.id], failed=[case.id])
+
+    with pytest.raises(EvalRunError, match="an earlier sweep wrote it"):
+        lane_replay.load_material(failed, case.id)
+    case_file(out, case.id, "lanes").unlink()
+    with pytest.raises(EvalRunError, match="wrote no lane material"):
+        lane_replay.load_material(failed, case.id)
+
+
+def test_a_case_the_artifact_does_not_list_is_refused(recorded, case):  # noqa: F811
+    out, _ = recorded
+
+    with pytest.raises(EvalRunError, match="does not list the case"):
+        lane_replay.load_material(finished(out, "02-other"), case.id)
+
+
+def test_the_command_refuses_a_failed_case_before_the_call(
+    recorded,
+    case,  # noqa: F811
+    monkeypatch,
+    capsys,
+):
+    out, _ = recorded
+    write_emission_sweep(out, "analysis", [case.id], failed=[case.id])
+
+    def no_call(*args, **kwargs):
+        raise AssertionError("the command reached the paid call")
+
+    monkeypatch.setattr(lane_replay, "node_call", no_call)
+    args = argparse.Namespace(
+        artifact=out,
+        case=case.id,
+        lane="spoofing",
+        framework="stride",
+        accept_cost="unknown",
+        append=None,
+        fresh_leads=False,
+        prepare_today=None,
+        out=None,
+    )
+
+    assert lane_replay.command_lane_replay(args) == 1
+    assert "an earlier sweep wrote it" in capsys.readouterr().err
 
 
 def test_material_without_the_user_turn_is_refused(tmp_path):
     out = tmp_path / "artifact.json"
     reports_dir(out).mkdir()
-    (reports_dir(out) / "01-payments-checkout.lanes.json").write_text(
+    case_file(out, "01-payments-checkout", "lanes").write_text(
         json.dumps({"prepared": None, "shared": {}, "lanes": {}})
     )
 
     with pytest.raises(EvalRunError, match="no user turn"):
-        lane_replay.load_material(out, "01-payments-checkout")
+        lane_replay.load_material(
+            finished(out, "01-payments-checkout"), "01-payments-checkout"
+        )
 
 
 def test_a_lane_the_package_does_not_have_is_refused_with_the_real_ones():
@@ -171,7 +227,7 @@ def test_a_lane_the_package_does_not_have_is_refused_with_the_real_ones():
 def test_the_fidelity_check_fails_on_material_the_lane_never_had(recorded, case):  # noqa: F811
     """The control for the byte-for-byte test: a changed lead is a new request."""
     out, seen = recorded
-    material = lane_replay.load_material(out, case.id)
+    material = lane_replay.load_material(finished(out, case.id), case.id)
     material["lanes"]["stride"]["spoofing"]["candidates"] = "a lead nobody wrote"
 
     instruction, _ = asyncio.run(
@@ -223,7 +279,7 @@ def test_the_closing_table_answers_for_every_package():
 def test_fresh_leads_on_todays_run_are_the_leads_it_captured(recorded, case):  # noqa: F811
     """One reader: rebuilt with today's code, every lane's inputs are the captured ones."""
     out, _ = recorded
-    material = lane_replay.load_material(out, case.id)
+    material = lane_replay.load_material(finished(out, case.id), case.id)
 
     for lane in FrameworkNodes("stride").lanes:
         rebuilt = lane_replay.fresh_leads(
@@ -297,7 +353,9 @@ def test_todays_prepare_without_a_catalog_is_what_a_run_captured(recorded, case)
 
     prepared = lane_replay.prepare_today(case, "stride", "none")
 
-    assert prepared.material == lane_replay.load_material(out, case.id)
+    assert prepared.material == lane_replay.load_material(
+        finished(out, case.id), case.id
+    )
 
 
 def test_the_signed_arm_changes_only_what_the_catalog_reaches(case):  # noqa: F811

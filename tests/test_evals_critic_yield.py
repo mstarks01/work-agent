@@ -273,6 +273,34 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     assert "killed-real 0/1" in printed
 
 
+def test_a_case_with_no_stride_proposal_is_charged_as_proposing_nothing(case):
+    """The archived proposals are required, so a missing STRIDE batch is a fact.
+
+    It means that the lanes proposed nothing, and never that the sweep kept no
+    proposals.
+    """
+    from evals.harness import modes, run
+
+    kept = _draft_for(_must_find(case), 1)
+    analysis = modes.AnalysisRun(
+        report=_report_with(case, [promote(kept)]),
+        drafts={"stride": (kept,)},
+        proposals={},
+    )
+    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+
+    _, _, (charged,) = run._score_runs(
+        [case],
+        {case.id: analysis},
+        _identity_matcher([kept]),
+        Ledger(),
+        {case.id: flows},
+    )
+
+    assert charged.proposed_nothing
+    assert "fan-in" not in {loss.cause for loss in charged.losses}
+
+
 def test_a_holdout_case_is_scored_and_charged_no_losses(case):
     # #744: the score is reported, apart; the per-miss causes are never built.
     import dataclasses
@@ -446,7 +474,7 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
         produced,
         flows,
         Block(produced),
-        proposed=None,
+        proposed={},
     )
 
     critic_rows = [loss for loss in charged.losses if loss.cause == "critic"]

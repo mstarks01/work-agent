@@ -85,10 +85,10 @@ def test_an_injected_finding_the_fan_in_removes_says_why(archive, case):  # noqa
     assert [title for title, _ in row.dropped] == ["names nothing real"]
 
 
-def test_a_sweep_without_proposals_is_refused_by_name(archive, case):  # noqa: F811
-    (archive.parent / f"{archive.stem}.reports" / f"{case.id}.proposals.json").unlink()
+def test_a_finished_case_with_a_lost_proposals_file_is_refused(archive, case):  # noqa: F811
+    (reports_dir(archive) / f"{case.id}.proposals.json").unlink()
 
-    with pytest.raises(descendants.EvalRunError, match="kept no lane proposals"):
+    with pytest.raises(descendants.EvalRunError, match="holds no proposals file"):
         descendants.replay_artifact(load_artifact(archive), [case])
 
 
