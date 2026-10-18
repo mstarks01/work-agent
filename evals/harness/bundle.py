@@ -464,15 +464,14 @@ def finished_file(artifact: EvalArtifact, case_id: str, kind: CaseKind) -> Path 
 def runs_from_reports(
     artifact: EvalArtifact, cases: Sequence[GoldenCase]
 ) -> dict[str, Any]:
-    """Read a finished sweep's saved reports and drafts back into runs.
+    """Read a finished sweep's saved reports, drafts and proposals back into runs.
 
-    The pair is what a score needs: the report holds what survived the critic
-    and the drafts hold what it was handed, and critic yield is the difference.
-    A sweep whose directory carries a report and no drafts refuses here rather
-    than scoring the half it can — re-run that sweep.
+    The report holds what survived the critic and the drafts hold what it was
+    handed, and critic yield is the difference. ``losses`` reads the lanes'
+    proposals for the ``fan-in`` cause.
 
-    :func:`finished_file` reads each case's report, so a failed case is
-    left out and a lost report is refused by name.
+    :func:`finished_file` reads each case's files, so a failed case is left
+    out and a lost file of a finished case is refused by name.
     """
     directory = reports_dir(artifact.path)
     if not directory.is_dir():
@@ -486,13 +485,10 @@ def runs_from_reports(
         report_path = finished_file(artifact, case.id, "report")
         if report_path is None:
             continue
-        drafts_path = case_file(artifact.path, case.id, "drafts")
-        if not drafts_path.exists():
-            raise modes.EvalRunError(
-                f"{drafts_path} is missing; this sweep predates the drafts"
-                " being written beside its report, so its critic yield cannot"
-                " be recomputed. Re-run the sweep rather than scoring half of it"
-            )
+        drafts_path = finished_file(artifact, case.id, "drafts")
+        proposals_path = finished_file(artifact, case.id, "proposals")
+        # A finished case: finished_file returns each path or raises.
+        assert drafts_path is not None and proposals_path is not None
         report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
         raw = json.loads(drafts_path.read_text(encoding="utf-8"))
         if stray := sorted(set(raw) - set(PACKAGES)):
@@ -505,15 +501,7 @@ def runs_from_reports(
             )
             for framework, claims in raw.items()
         }
-        # The lanes' proposals where the sweep archived them: `losses` reads
-        # them for the `fan-in` cause, and a sweep from before they were kept
-        # leaves that cause undecided rather than refused.
-        proposals_path = case_file(artifact.path, case.id, "proposals")
-        proposals = (
-            json.loads(proposals_path.read_text(encoding="utf-8"))
-            if proposals_path.exists()
-            else {}
-        )
+        proposals = json.loads(proposals_path.read_text(encoding="utf-8"))
         runs[case.id] = modes.AnalysisRun(
             report=report, drafts=drafts, proposals=proposals
         )

@@ -521,13 +521,14 @@ class TestItWritesNothingInsideAMergedBaseline:
 
 
 class TestItRefusesRatherThanScoringHalf:
-    def test_a_sweep_with_no_drafts_is_refused(
-        self, swept, tmp_path, case, roster_path
+    @pytest.mark.parametrize("kind", ["drafts", "proposals"])
+    def test_a_sweep_with_a_lost_case_file_is_refused(
+        self, swept, tmp_path, case, roster_path, kind
     ):
-        """Critic yield is the difference between the drafts and the report."""
-        (reports_dir(swept) / f"{case.id}.drafts.json").unlink()
+        """Critic yield reads the drafts, and the fan-in cause the proposals."""
+        (reports_dir(swept) / f"{case.id}.{kind}.json").unlink()
 
-        with pytest.raises(Exception, match="Re-run the sweep"):
+        with pytest.raises(Exception, match=f"holds no {kind} file"):
             main(
                 [
                     "score",

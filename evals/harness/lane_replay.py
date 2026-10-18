@@ -107,6 +107,11 @@ def load_material(artifact: Path, case_id: str) -> dict[str, Any]:
             f"{path} is missing; the sweep predates the lane capture (#1091),"
             " so no lane's request can be rebuilt from it"
         )
+    return material_at(path)
+
+
+def material_at(path: Path) -> dict[str, Any]:
+    """The lane material in one ``<case>.lanes.json``, or a refusal."""
     material: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     if material.get("prepared") is None:
         raise EvalRunError(

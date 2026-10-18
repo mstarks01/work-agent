@@ -18,12 +18,6 @@ report's assertion catalog. The user turn is ADK's ``to_user_content`` over
 :func:`~analysis_service.graph.rulings_of`. ``tests/test_evals_critic_replay.py``
 holds the rebuilt request against the one a real graph run sent.
 
-**A sweep with no lane capture.** A sweep older than ``<case>.lanes.json``
-still holds the model its lanes read, embedded in the report, and both
-job-wide keys are rendered from that model. :func:`shared_keys` renders them
-with the functions ``prepare`` calls, and the test holds the result against a
-capture.
-
 **The prompt files are today's.** The command prints both commits.
 """
 
@@ -61,17 +55,21 @@ from analysis_service.graph import (
     FrameworkNodes,
     critic_instruction,
     merge_summary,
-    render_crossings,
     render_fenced,
-    render_model,
     rulings_of,
 )
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.report import InputRef, Report
+from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
-from evals.harness.artifact import CORPUS_DIR, repo_commit
-from evals.harness.bundle import case_file, check_out
-from evals.harness.lane_replay import load_material
+from evals.harness.artifact import (
+    CORPUS_DIR,
+    EvalArtifact,
+    ProvenanceError,
+    load_artifact,
+    repo_commit,
+)
+from evals.harness.bundle import check_out, finished_file
+from evals.harness.lane_replay import material_at
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
 from evals.harness.provenance import REPO_ROOT
@@ -95,47 +93,27 @@ class Archived:
     assertions: AssertionRecord | None
 
 
-def shared_keys(report: Report, case_id: str) -> dict[str, str]:
-    """The job-wide keys the critic read, from the report and the corpus case.
-
-    The report embeds the model but keeps only digests of the sources, so the
-    sources come from the corpus case and must match the report's digest.
-    """
-    model = report.system_model
-    sources = load_case(CORPUS_DIR / case_id).sources
-    digest = InputRef.of(system_name=report.input.system_name, sources=sources)
-    if digest.source_sha256 != report.input.source_sha256:
-        raise EvalRunError(
-            f"{case_id}'s corpus sources are not the ones the report was run on,"
-            " so the critic's input text cannot be rebuilt"
-        )
-    return {
-        STATE_SYSTEM_MODEL: render_model(model.model_dump(mode="json")),
-        STATE_BOUNDARY_CROSSINGS: render_crossings(model.boundary_crossings()),
-        STATE_INPUT_TEXT: seed_state(sources)[STATE_INPUT_TEXT],
-    }
-
-
-def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
+def load(artifact: EvalArtifact, case_id: str, framework: FrameworkName) -> Archived:
     """The drafts, marks, report and job-wide keys one critic call read.
 
-    A case that failed after its lanes ran wrote no report, only a failure dump
-    of the graph's state, and that state holds the same material.
+    Each file is read through :func:`~evals.harness.bundle.finished_file`, so
+    a lost file of a finished case is refused by name. A case that failed
+    after its lanes ran wrote no report, only a failure dump of the graph's
+    state, and that state holds the same material.
     """
-    report_path = case_file(artifact, case_id, "report")
-    if not report_path.is_file():
+    report_path = finished_file(artifact, case_id, "report")
+    if report_path is None:
         return _from_failure(artifact, case_id, framework)
+    drafts_path = finished_file(artifact, case_id, "drafts")
+    lanes_path = finished_file(artifact, case_id, "lanes")
+    # A finished case: finished_file returns each path or raises.
+    assert drafts_path is not None and lanes_path is not None
     report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
-    if case_file(artifact, case_id, "lanes").is_file():
-        shared = load_material(artifact, case_id)["shared"]
-    else:
-        shared = shared_keys(report, case_id)
+    shared = material_at(lanes_path)["shared"]
     block = next((b for b in report.analyses if b.framework == framework), None)
     if block is None:
         raise EvalRunError(f"{case_id} carries no {framework} block")
-    held = json.loads(
-        case_file(artifact, case_id, "drafts").read_text(encoding="utf-8")
-    )
+    held = json.loads(drafts_path.read_text(encoding="utf-8"))
     record = PACKAGES[framework].record
     marks = AnalysisMarks(
         repaired_quotes=list(block.repaired_quotes),
@@ -153,16 +131,21 @@ def load(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
     )
 
 
-def _from_failure(artifact: Path, case_id: str, framework: FrameworkName) -> Archived:
+def _from_failure(
+    artifact: EvalArtifact, case_id: str, framework: FrameworkName
+) -> Archived:
     """The material one critic call read, from a failed case's state dump.
 
     The rendered model and crossings are the keys ``prepare`` wrote. The dump
-    keeps no sources, so they come from the corpus case, as
-    :func:`shared_keys` takes them for a report.
+    keeps no sources, so they come from the corpus case.
     """
-    state = json.loads(
-        case_file(artifact, case_id, "failure").read_text(encoding="utf-8")
-    )["state"]
+    dump = finished_file(artifact, case_id, "failure")
+    if dump is None:
+        raise EvalRunError(
+            f"{case_id}: the artifact records the case as failed, and it kept no"
+            " failure dump, so the critic's input cannot be rebuilt"
+        )
+    state = json.loads(dump.read_text(encoding="utf-8"))["state"]
     nodes = FrameworkNodes(framework)
     record = PACKAGES[framework].record
     return Archived(
@@ -318,13 +301,13 @@ def command_critic_replay(args: argparse.Namespace) -> int:
     try:
         refuse_holdout(args.case)
         check_out(args.out, args.raw)
-        archived = load(args.artifact, args.case, args.framework)
-    except (CorpusError, EvalRunError, FileNotFoundError) as error:
+        artifact = load_artifact(args.artifact)
+        archived = load(artifact, args.case, args.framework)
+    except (CorpusError, EvalRunError, ProvenanceError, FileNotFoundError) as error:
         print(error, file=sys.stderr)
         return 1
-    ran_at = json.loads(args.artifact.read_text(encoding="utf-8"))["repo_commit"]
     print(
-        f"material from {ran_at.get('commit')}; prompt files from"
+        f"material from {artifact.commit.commit}; prompt files from"
         f" {repo_commit().commit}"
     )
     spent: list[float | None] = []
