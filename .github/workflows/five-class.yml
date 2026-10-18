@@ -1,0 +1,45 @@
+# The pre-merge review's record: a pull request that changes a code path holds
+# a "## Five-class read" section in its body, with one entry for each defect
+# class of docs/agents/code-review.md. .github/scripts/five_class_read.py holds
+# the rule and the class names.
+#
+# Its own workflow, so an edited pull request body is checked without running
+# the whole offline suite again.
+name: Five-class read
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  five-class:
+    name: Five-class read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The base branch's copy of the script, so a pull request that edits the
+      # script does not pass its own check. A base that holds no copy runs the
+      # pull request's copy. The body reaches the script through the
+      # environment, never through the command line, because a pull request
+      # author writes it.
+      - name: Pull request body
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          check="$RUNNER_TEMP/five_class_read.py"
+          if ! git show "$BASE_SHA:.github/scripts/five_class_read.py" > "$check" 2>/dev/null; then
+            cp .github/scripts/five_class_read.py "$check"
+          fi
+          python3 "$check" "$BASE_SHA" "$HEAD_SHA"

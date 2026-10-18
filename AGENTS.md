@@ -22,6 +22,9 @@ Run a **pre-merge review** on each pull request's diff, and a **checkpoint
 round** over a range of merged commits. Read your own fix diff against the five
 defect classes, because a fix is the riskiest code in the tree.
 
+CI requires a `## Five-class read` section, with one entry for each class,
+in the body of each pull request that changes code.
+
 A round starts from `git tag -l 'reviewed/*' --sort=-creatordate | head -1` and
 ends in a new annotated `reviewed/<date>` tag. Read that tag's message before
 you report a finding: it lists what was left open by decision. See

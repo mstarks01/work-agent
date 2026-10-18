@@ -37,6 +37,15 @@ tag message records one case of each kind.
 The diff, against the five defect classes below, and against the fix habits at
 the end of this guide.
 
+Write the result in the pull request body, under the heading
+`## Five-class read`, with one entry for each class by its name in the table
+below. CI requires the section on each pull request that changes a code path:
+`src/`, `webapp/`, `evals/harness/`, `prompts/`, `frameworks/`, `tests/`,
+`.githooks/`, `.github/workflows/` or `.github/scripts/`. The check
+`Five-class read` (`.github/workflows/five-class.yml`) runs again when the body
+is edited. `.github/scripts/five_class_read.py` holds the class names, and
+`tests/test_five_class_read.py` holds them to the table below.
+
 ## The five defect classes
 
 Every finding in this repository's record — ten audit rounds, the range review
