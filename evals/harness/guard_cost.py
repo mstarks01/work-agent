@@ -45,7 +45,7 @@ from analysis_service.frameworks import PACKAGES, FrameworkName
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import validate
 from evals.harness.artifact import load_artifact
-from evals.harness.bundle import assertions_from_reports, extractions_from_reports
+from evals.harness.bundle import assertions_from_reports, listed_extractions
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import ProvenanceError
 from evals.harness.reference import (
@@ -161,12 +161,13 @@ def price(
 ) -> Priced:
     """Every archived proposal against every archived graph of its case."""
     by_id = {case.id: case for case in cases}
-    extracted = [extractions_from_reports(path, cases) for path in graphs]
+    extracted = [listed_extractions(path, cases) for path in graphs]
     pairings = refused = 0
     costs = []
     for path in proposals:
-        held = [case for case in cases if case.id in load_artifact(path).cases]
-        for case_id, result in assertions_from_reports(path, held).items():
+        artifact = load_artifact(path)
+        held = [case for case in cases if case.id in artifact.cases]
+        for case_id, result in assertions_from_reports(artifact, held).items():
             case = by_id[case_id]
             sources = {source.label: source.text for source in case.sources}
             proposal = CatalogProposal.model_validate(result.proposal)

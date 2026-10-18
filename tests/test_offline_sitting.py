@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -68,6 +69,21 @@ class TestThePageCarriesTheWholeMethod:
         assert case["part_one"], "the reader meets the system here"
         assert case["part_two"], "and rules on the recorded sets here"
         assert case["targets"], "with one target per recorded finding"
+
+    def test_each_target_carries_the_aliases_the_merge_reads(self, corpus, body):
+        """The page resolves a restored key through the server's own table."""
+        sent = {
+            target["fingerprint"]: target["aliases"]
+            for case in body["cases"]
+            for target in case["targets"]
+        }
+        read = {
+            target.fingerprint: list(target.aliases)
+            for case in body["cases"]
+            for target in sittings.prepare(corpus / case["case"]).mark_targets
+        }
+        assert sent == read
+        assert any(sent.values()), "a corpus with no alias proves nothing"
 
     def test_every_declared_framework_reaches_the_reader(self, corpus, body):
         """A sitting rules on every set together, so the page carries them all."""
@@ -486,20 +502,24 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
     def test_a_mark_for_a_target_that_is_gone_does_not_count(self):
         assert self.state_of({"a": "found", "stale": "found"}) == "draft"
 
-    def test_a_restored_file_drops_a_mark_for_a_target_that_is_gone(self):
+    #: One target ``a`` whose older key is ``old``.
+    TARGETS = ({"fingerprint": "a", "aliases": ["old"], "claims": []},)
+
+    def restored(self, marks: dict, targets: Sequence[dict] = TARGETS) -> dict:
+        """The marks the page's own restore block keeps for one case."""
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on PATH to run the page's own block")
         source = client_script("offline_sitting.js")
         start, end = "function restore(text) {", "\nconst picker = "
         block = start + source.split(start, 1)[1].split(end, 1)[0]
-        saved = {
+        data = {
             "envelope": 1,
-            "cases": {"c": {"marks": {"a": "found", "stale": "found"}}},
+            "cases": [{"case": "c", "digests": {}, "targets": list(targets)}],
         }
+        saved = {"envelope": 1, "cases": {"c": {"marks": marks}}}
         harness = (
-            "const DATA = {envelope: 1, cases: [{case: 'c', digests: {},"
-            " targets: [{fingerprint: 'a', claims: []}]}]};\n"
+            f"const DATA = {json.dumps(data)};\n"
             "const BY_ID = {c: DATA.cases[0]};\n"
             "const answers = {};\nconst draw = () => {};\nconst alert = () => {};\n"
             f"{block}\n"
@@ -517,4 +537,26 @@ class TestACaseIsReadyOnlyWhenEveryTargetIsMarked:
                 check=False,
             )
         assert done.returncode == 0, done.stderr
-        assert json.loads(done.stdout) == {"a": "found"}
+        return json.loads(done.stdout)
+
+    def test_a_restored_file_drops_a_mark_for_a_target_that_is_gone(self):
+        assert self.restored({"a": "found", "stale": "found"}) == {"a": "found"}
+
+    def test_a_restored_mark_under_an_alias_marks_its_finding(self):
+        assert self.restored({"old": "missed"}) == {"a": "missed"}
+
+    def test_two_restored_keys_of_one_finding_that_disagree_carry_neither(self):
+        assert self.restored({"a": "found", "old": "missed"}) == {}
+
+    def test_the_page_reads_a_restored_key_as_the_merge_reads_it(self, corpus, body):
+        """Two readers of one alias table, held to one answer over a real case."""
+        case = next(c for c in body["cases"] if any(t["aliases"] for t in c["targets"]))
+        prepared = sittings.prepare(corpus / case["case"])
+        marks = {
+            (target.aliases or (target.fingerprint,))[0]: sittings.MARKS[index % 2]
+            for index, target in enumerate(prepared.mark_targets)
+        }
+
+        assert self.restored(marks, case["targets"]) == sittings.current_marks(
+            prepared, marks
+        )

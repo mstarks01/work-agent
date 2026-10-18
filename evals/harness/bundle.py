@@ -46,7 +46,7 @@ from analysis_service.report import Report
 from analysis_service.system_model import FLOW_ID_RULES
 from evals.harness import flow_ids, modes, replay
 from evals.harness.archive import CaseKind, archive_bytes, case_suffix
-from evals.harness.artifact import EvalArtifact
+from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.reference import GoldenCase
 
 
@@ -394,21 +394,34 @@ def write_failures(out: str, failed: Mapping[str, Mapping[str, Any]]) -> None:
     print(f"{len(failed)} failed case(s) captured in {directory}")
 
 
-def finished_report(artifact: EvalArtifact, case_id: str) -> Path | None:
-    """The report the sweep wrote for one of its cases, or None for a failed case.
+#: The case files a failed case may carry: the emission its run reached, which
+#: is the record most worth reading back, and what its session held. A failed
+#: case has no report.
+KEPT_WHEN_FAILED: frozenset[CaseKind] = frozenset(
+    {"extraction", "assertions", "failure"}
+)
 
-    The artifact's ``mode_output`` says which cases failed. A failed case has
-    no report. A finished case with no report, and a failed case with one, are
-    refused by name: either file is not this sweep's. A case the artifact does
-    not list is refused too, because this sweep wrote no file for it.
+
+def finished_file(artifact: EvalArtifact, case_id: str, kind: CaseKind) -> Path | None:
+    """The file of ``kind`` the sweep wrote for one of its cases, or None.
+
+    The artifact's ``mode_output`` says which cases failed. A finished case
+    must have the file, and one without it is refused by name. A failed case
+    has no report, so a failed case with one is refused by name: that file is
+    not this sweep's. A failed case may carry a kind in
+    :data:`KEPT_WHEN_FAILED`, and it is None where it carries none. A case the
+    artifact does not list is refused too, because this sweep wrote no file
+    for it.
     """
     if case_id not in artifact.cases:
         raise modes.EvalRunError(
             f"{case_id}: {artifact.path} does not list the case, so the sweep"
             " did not run it"
         )
-    path = case_file(artifact.path, case_id, "report")
+    path = case_file(artifact.path, case_id, kind)
     if case_id in artifact.failed_cases():
+        if kind in KEPT_WHEN_FAILED:
+            return path if path.exists() else None
         if path.exists():
             raise modes.EvalRunError(
                 f"{case_id}: the artifact records the case as failed, but"
@@ -418,7 +431,7 @@ def finished_report(artifact: EvalArtifact, case_id: str) -> Path | None:
     if not path.exists():
         raise modes.EvalRunError(
             f"{case_id}: the artifact records the case as finished, but"
-            f" {reports_dir(artifact.path)} holds no report for it"
+            f" {reports_dir(artifact.path)} holds no {kind} file for it"
         )
     return path
 
@@ -433,7 +446,7 @@ def runs_from_reports(
     A sweep whose directory carries a report and no drafts refuses here rather
     than scoring the half it can — re-run that sweep.
 
-    :func:`finished_report` reads each case's report, so a failed case is
+    :func:`finished_file` reads each case's report, so a failed case is
     left out and a lost report is refused by name.
     """
     directory = reports_dir(artifact.path)
@@ -445,7 +458,7 @@ def runs_from_reports(
 
     runs: dict[str, Any] = {}
     for case in cases:
-        report_path = finished_report(artifact, case.id)
+        report_path = finished_file(artifact, case.id, "report")
         if report_path is None:
             continue
         drafts_path = case_file(artifact.path, case.id, "drafts")
@@ -492,10 +505,16 @@ def _source_texts(case: GoldenCase) -> dict[str, str]:
 
 
 def _case_files(
-    artifact: Path, cases: Sequence[GoldenCase], kind: CaseKind
+    artifact: EvalArtifact, cases: Sequence[GoldenCase], kind: CaseKind
 ) -> list[tuple[GoldenCase, dict[str, Any]]]:
-    """Each case's saved file of ``kind``, parsed, for the cases that have one."""
-    directory = reports_dir(artifact)
+    """Each case's saved file of ``kind``, parsed, through :func:`finished_file`.
+
+    Every finished case of a sweep that keeps ``kind`` has the file, so a lost
+    one is refused by name. A failed case is read where it kept the file, and
+    it is skipped where it kept none. That skip is the only one: no kind is
+    optional for a finished case.
+    """
+    directory = reports_dir(artifact.path)
     if not directory.is_dir():
         raise modes.EvalRunError(
             f"{directory} does not exist; a replay reads the files a sweep"
@@ -503,8 +522,8 @@ def _case_files(
         )
     found = []
     for case in cases:
-        path = case_file(artifact, case.id, kind)
-        if path.exists():
+        path = finished_file(artifact, case.id, kind)
+        if path is not None:
             found.append((case, json.loads(path.read_text(encoding="utf-8"))))
     if not found:
         raise modes.EvalRunError(
@@ -515,7 +534,7 @@ def _case_files(
 
 
 def extractions_from_reports(
-    artifact: Path, cases: Sequence[GoldenCase]
+    artifact: EvalArtifact, cases: Sequence[GoldenCase]
 ) -> dict[str, modes.ExtractionResult]:
     """Read a finished extraction sweep's saved emissions back, re-parsed.
 
@@ -550,8 +569,21 @@ def extractions_from_reports(
     return results
 
 
+def listed_extractions(
+    path: Path, cases: Sequence[GoldenCase]
+) -> dict[str, modes.ExtractionResult]:
+    """:func:`extractions_from_reports` over the cases of ``cases`` the sweep lists.
+
+    For a reader that pairs every archived graph with each corpus case, where
+    a sweep of some of the cases is still a graph of each case it ran.
+    """
+    artifact = load_artifact(path)
+    listed = [case for case in cases if case.id in artifact.cases]
+    return extractions_from_reports(artifact, listed)
+
+
 def assertions_from_reports(
-    artifact: Path, cases: Sequence[GoldenCase]
+    artifact: EvalArtifact, cases: Sequence[GoldenCase]
 ) -> dict[str, modes.AssertionResult]:
     """Read a finished assertion sweep's saved proposals back, re-resolved.
 
@@ -660,7 +692,7 @@ def _redrawn_entry(entry, moved: Mapping[str, str]):
 
 
 def heads_from_reports(
-    artifact: Path, cases: Sequence[GoldenCase]
+    artifact: EvalArtifact, cases: Sequence[GoldenCase]
 ) -> dict[str, modes.AssertionResult]:
     """Read a finished head-only sweep's saved catalogs back, as they were built.
 

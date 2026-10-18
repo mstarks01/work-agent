@@ -52,6 +52,7 @@ from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports
+from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -227,10 +228,11 @@ def assertion_reports(
     runs the same resolver and quarantine as a job, so a refused row is
     counted by the same reader either way.
     """
-    held = [case for case in cases if case.id in load_artifact(path).cases]
+    artifact = load_artifact(path)
+    held = [case for case in cases if case.id in artifact.cases]
     by_id = {case.id: case for case in held}
     reports = {}
-    for case_id, result in assertions_from_reports(path, held).items():
+    for case_id, result in assertions_from_reports(artifact, held).items():
         case = by_id[case_id]
         record = AssertionRecord.of(
             CatalogProposal.model_validate(result.proposal),
@@ -264,7 +266,7 @@ def command_freeze_population(args: argparse.Namespace) -> int:
         if not reports:
             raise PopulationError("name at least one report or assertion sweep")
         frozen = freeze(reports)
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, EvalRunError) as error:
         print(f"cannot freeze: {error}", file=sys.stderr)
         return 1
     args.out.parent.mkdir(parents=True, exist_ok=True)

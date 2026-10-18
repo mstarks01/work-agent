@@ -34,7 +34,7 @@ from analysis_service.sampling import TierSampling
 from analysis_service.vendors import vendor_for_route
 from evals import verify_corpus
 from evals.harness import ledger
-from evals.harness.artifact import ARTIFACT_VERSION
+from evals.harness.artifact import ARTIFACT_VERSION, EvalArtifact, load_artifact
 from evals.harness.bundle import write_reports
 from evals.harness.identity import ClaimPair, ClaimRuling
 from evals.harness.ledger import Vote
@@ -177,6 +177,22 @@ def write_sweep_document(path: Path, document: dict | None = None) -> Path:
         json.dumps(document or sweep_document(), indent=2), encoding="utf-8"
     )
     return path
+
+
+def write_emission_sweep(
+    out: Path, mode: str, cases: Iterable[str], failed: Iterable[str] = ()
+) -> EvalArtifact:
+    """The artifact of a sweep whose case files a test wrote beside ``out``.
+
+    Each case in ``failed`` carries a ``run_failure`` in ``mode_output``.
+    """
+    document = sweep_document(cases=tuple(cases)) | {
+        "mode": mode,
+        "mode_output": [
+            {"case": case_id, "run_failure": "scripted"} for case_id in failed
+        ],
+    }
+    return load_artifact(write_sweep_document(out, document))
 
 
 def write_finished_sweep(out: Path, run: Any, **blocks: Any) -> Path:

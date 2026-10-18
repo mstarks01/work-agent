@@ -51,9 +51,10 @@ from evals.harness.bundle import (
     write_assertions,
     write_extractions,
 )
-from evals.harness.modes import AssertionResult, ExtractionResult
+from evals.harness.modes import AssertionResult, EvalRunError, ExtractionResult
 from evals.harness.reference import load_corpus
 from evals.harness.run import main, replay_artifact
+from tests.eval_factories import write_emission_sweep
 from tests.test_evals_alignment import case, renamed
 from tests.test_evals_extraction_losses import CASE
 from tests.test_evals_provenance import provenance, sampling  # noqa: F401
@@ -1183,7 +1184,9 @@ class TestAnArchivedCatalogIsRedrawnFromItsLabels:
     def test_the_archive_reads_back_under_todays_rule(self):
         """The one live row, over the sweep this repository archived."""
         golden = case("01")
-        result = heads_from_reports(ARMS / "arm-A.json", [golden])[golden.id]
+        result = heads_from_reports(load_artifact(ARMS / "arm-A.json"), [golden])[
+            golden.id
+        ]
         subjects = {one.id for one in result.catalog.subjects}
 
         assert "principal:order-services-own-service-account" in subjects
@@ -1208,7 +1211,9 @@ class TestTheBundleReadsBackWhatItWrote:
             {golden.id: ExtractionResult(golden.id, model, tuple(issues), raw=raw)},
         )
 
-        (read,) = extractions_from_reports(out, [golden]).values()
+        artifact = write_emission_sweep(out, "extraction", [golden.id])
+
+        (read,) = extractions_from_reports(artifact, [golden]).values()
 
         assert read.raw == raw
         assert read.extracted == model
@@ -1230,7 +1235,9 @@ class TestTheBundleReadsBackWhatItWrote:
             },
         )
 
-        (read,) = extractions_from_reports(out, [golden]).values()
+        artifact = write_emission_sweep(out, "end-to-end", [golden.id])
+
+        (read,) = extractions_from_reports(artifact, [golden]).values()
 
         assert read.raw == broken
         assert read.repair == repaired
@@ -1271,16 +1278,73 @@ class TestTheBundleReadsBackWhatItWrote:
             },
         )
 
-        (read,) = assertions_from_reports(out, [golden]).values()
+        artifact = write_emission_sweep(out, "assertions", [golden.id])
+
+        (read,) = assertions_from_reports(artifact, [golden]).values()
 
         assert read.proposal == proposal
         assert [e.predicate for e in read.catalog.entries] == ["internet-exposure"]
 
     def test_a_missing_bundle_is_refused_by_name(self, golden, tmp_path):
-        from evals.harness.modes import EvalRunError
+        artifact = write_emission_sweep(
+            tmp_path / "none.json", "extraction", [golden.id]
+        )
 
         with pytest.raises(EvalRunError, match="does not exist"):
-            extractions_from_reports(tmp_path / "none.json", [golden])
+            extractions_from_reports(artifact, [golden])
+
+
+class TestAFinishedCaseMustHaveItsFile:
+    """A lost case file is refused by name, and a failed case is read if it kept one."""
+
+    @pytest.fixture(scope="class")
+    def goldens(self):
+        return case("01"), case("02")
+
+    def extraction(self, golden):
+        raw = golden.model.model_dump(mode="json")
+        return ExtractionResult(golden.id, None, (), raw=raw)
+
+    def assertion(self, golden):
+        return AssertionResult(
+            golden.id,
+            {"assertions": []},
+            AssertionRecord(proposed=0, catalog=AssertionCatalog()),
+        )
+
+    def test_a_finished_case_with_no_extraction_is_named(self, goldens, tmp_path):
+        kept, lost = goldens
+        out = tmp_path / "sweep.json"
+        write_extractions(str(out), "extraction", {kept.id: self.extraction(kept)})
+        artifact = write_emission_sweep(out, "extraction", [kept.id, lost.id])
+
+        with pytest.raises(EvalRunError, match=f"{lost.id}: .* finished"):
+            extractions_from_reports(artifact, goldens)
+
+    @pytest.mark.parametrize(
+        ("mode", "reader"),
+        [("assertions", assertions_from_reports), ("heads", heads_from_reports)],
+    )
+    def test_a_finished_case_with_no_catalog_is_named(
+        self, goldens, tmp_path, mode, reader
+    ):
+        kept, lost = goldens
+        out = tmp_path / "sweep.json"
+        write_assertions(str(out), mode, {kept.id: self.assertion(kept)})
+        artifact = write_emission_sweep(out, mode, [kept.id, lost.id])
+
+        with pytest.raises(EvalRunError, match=f"{lost.id}: .* finished"):
+            reader(artifact, goldens)
+
+    def test_a_failed_case_is_read_where_it_kept_its_emission(self, goldens, tmp_path):
+        kept, lost = goldens
+        out = tmp_path / "sweep.json"
+        write_extractions(str(out), "extraction", {kept.id: self.extraction(kept)})
+        artifact = write_emission_sweep(
+            out, "extraction", [kept.id, lost.id], failed=[kept.id, lost.id]
+        )
+
+        assert list(extractions_from_reports(artifact, goldens)) == [kept.id]
 
 
 #: The artifacts alone. An emission file beside one is named by a suffix the
@@ -1561,7 +1625,7 @@ class TestBindingAProposalToAnExtractedGraph:
     @pytest.fixture(scope="class")
     def proposal(self, golden):
         bench = next(p for p in ARTIFACTS if "luna-r1" in p.name)
-        return assertions_from_reports(bench, [golden])[golden.id]
+        return assertions_from_reports(load_artifact(bench), [golden])[golden.id]
 
     def bound(self, golden, proposal, model, graph="graph"):
         return replay.bind_assertions(

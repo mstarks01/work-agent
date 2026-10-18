@@ -121,6 +121,7 @@ from evals.harness.bundle import (
     check_sweep_out,
     extractions_from_reports,
     heads_from_reports,
+    listed_extractions,
     optional_block,
     runs_from_reports,
     stride_threats,
@@ -1656,7 +1657,7 @@ def command_stability(args: argparse.Namespace) -> int:
         stability = compare_runs(runs)
         calibration = [load_runs(paths) for paths in (args.calibrate or ())]
         measured = band(runs, calibration=calibration, rows=_rows(args.row))
-    except (ProvenanceError, ValueError) as error:
+    except (ProvenanceError, modes.EvalRunError, ValueError) as error:
         print(f"cannot compare: {error}", file=sys.stderr)
         return 1
 
@@ -1696,7 +1697,7 @@ def command_extraction_losses(args: argparse.Namespace) -> int:
                     args.end_to_end, case_id
                 )
         rows = extraction_losses.attribute_handoff(end_to_end, analysis, corpus, models)
-    except (ProvenanceError, CorpusError, ValueError) as error:
+    except (ProvenanceError, CorpusError, modes.EvalRunError, ValueError) as error:
         print(f"cannot attribute: {error}", file=sys.stderr)
         return 1
     warnings = extraction_losses.warnings_for(end_to_end, analysis)
@@ -1783,7 +1784,7 @@ def replay_artifact(
         )
 
     if replay.KEEPS[loaded.mode] == "extraction":
-        extracted = extractions_from_reports(path, held)
+        extracted = extractions_from_reports(loaded, held)
         return sweep(
             extractions=tuple(
                 replay.replay_extraction(case, extracted[case.id])
@@ -1796,9 +1797,9 @@ def replay_artifact(
     # element IDs and the archived catalog is what a replay grades. Every other
     # assertion sweep was shown the blessed model and re-resolves against it.
     proposed = (
-        heads_from_reports(path, held)
+        heads_from_reports(loaded, held)
         if loaded.mode == "heads"
-        else assertions_from_reports(path, held)
+        else assertions_from_reports(loaded, held)
     )
     graded = []
     for case in held:
@@ -1831,7 +1832,7 @@ def command_bind(args: argparse.Namespace) -> int:
     try:
         cases = development_cases(load_corpus(corpus_dir))
         graphs = [
-            (path.name, extractions_from_reports(path, cases))
+            (path.name, listed_extractions(path, cases))
             for path in map(Path, args.graphs)
         ]
         sweeps = [bind_artifact(Path(path), cases, graphs) for path in args.proposals]
@@ -1863,7 +1864,7 @@ def bind_artifact(
     held = [case for case in cases if case.id in loaded.cases]
     if not held:
         raise modes.EvalRunError(f"{path}: none of its cases are in the corpus")
-    proposed = assertions_from_reports(path, held)
+    proposed = assertions_from_reports(loaded, held)
     return replay.BindingSweep(
         artifact=path.name,
         arm=replay.arm_of(loaded),

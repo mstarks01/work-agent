@@ -21,7 +21,9 @@ from analysis_service.assertions import (
     Subject,
 )
 from evals.harness import modes, replay
+from evals.harness.artifact import EvalArtifact
 from evals.harness.bundle import heads_from_reports
+from tests.eval_factories import write_emission_sweep
 
 
 def catalog() -> AssertionCatalog:
@@ -40,10 +42,9 @@ def catalog() -> AssertionCatalog:
     )
 
 
-def sweep(tmp_path: Path, corpus_case) -> Path:
-    """One archived head-only sweep: an artifact path and the files beside it."""
-    artifact = tmp_path / "heads.json"
-    artifact.write_text("{}", encoding="utf-8")
+def sweep(tmp_path: Path, corpus_case) -> EvalArtifact:
+    """One archived head-only sweep: an artifact and the files beside it."""
+    artifact = write_emission_sweep(tmp_path / "heads.json", "heads", [corpus_case.id])
     reports = tmp_path / "heads.reports"
     reports.mkdir()
     (reports / f"{corpus_case.id}.assertions.json").write_text(

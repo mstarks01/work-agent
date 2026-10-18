@@ -218,6 +218,12 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         work = held or sittings.Draft(case=prepared.case_id)
         covered = review_submissions.current_reviews(session.root)
         moved = _moved(session, prepared, held)
+        # The page draws a mark by its finding's current key, so a draft key
+        # under an older rule is sent as the key the merge reads it as.
+        try:
+            marks = sittings.current_marks(prepared, work.marks)
+        except sittings.SittingError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         _served(session, prepared, held, prepared.shared_files)
         return JSONResponse(
             {
@@ -233,7 +239,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 "waiting": review_submissions.waiting(
                     session.root, prepared.case_id, covered
                 ),
-                "marks": work.marks,
+                "marks": marks,
                 "missing": work.missing,
                 "notes": work.notes,
                 "moved": moved,

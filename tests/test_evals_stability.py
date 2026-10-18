@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from evals.harness.artifact import ARTIFACT_VERSION, DECLARED_KEYS, load_artifact
+from evals.harness.modes import EvalRunError
 from evals.harness.provenance import ProvenanceError
 from evals.harness.stability import (
     Band,
@@ -87,6 +88,7 @@ def write_run(tmp_path, name, record, scores, **overrides) -> Path:
         "models": {"tiers": {"strong": "openai/gpt-4.1"}, "tiers_config_version": "3"},
         "scores": scores,
         "applicability": [],
+        "mode_output": [],
     } | overrides
     path = tmp_path / name
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -565,6 +567,18 @@ class TestContentStability:
 
         assert entry.severity_held is None and entry.place_held is None
         assert aggregate_stability([entry])["place_held"] is None
+
+    def test_a_scored_case_with_no_report_is_named(self, tmp_path, sampling):  # noqa: F811
+        """A lost report is not a run copied without its reports."""
+        lost = "02-iot-fleet-telemetry"
+        record = provenance(sampling)
+        a = write_run(
+            tmp_path, "a.json", record, [score(self.CASE, 1, [0]), score(lost, 1, [0])]
+        )
+        write_reports(a, self.CASE, {0: ("high", [])})
+
+        with pytest.raises(EvalRunError, match=f"{lost}: .* finished"):
+            load_runs([a])
 
     def test_a_bundle_missing_a_matched_claim_is_refused_by_name(
         self,

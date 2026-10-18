@@ -90,8 +90,15 @@ def payload(corpus_dir: Path, submitted_by: str, submitted_for: str) -> dict:
                 "title": prepared.title,
                 "part_one": prepared.part_one_blocks,
                 "part_two": prepared.part_two_blocks,
+                # Each target's aliases are the table the merge reads through
+                # current_marks, so a restored draft keyed by an older rule
+                # marks the finding the server would read it as.
                 "targets": [
-                    {"fingerprint": target.fingerprint, "claims": list(target.claims)}
+                    {
+                        "fingerprint": target.fingerprint,
+                        "aliases": list(target.aliases),
+                        "claims": list(target.claims),
+                    }
                     for target in prepared.mark_targets
                 ],
                 "digests": prepared.digests,

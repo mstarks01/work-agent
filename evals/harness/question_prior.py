@@ -39,7 +39,7 @@ from evals.harness.artifact import (
     load_artifact,
     repo_commit,
 )
-from evals.harness.bundle import finished_report
+from evals.harness.bundle import finished_file
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import (
     CorpusError,
@@ -100,7 +100,7 @@ def samples_of(
     """Every sample the named runs hold for these finished cases."""
     out: list[Sample] = []
     for case in cases:
-        path = finished_report(artifact, case)
+        path = finished_file(artifact, case, "report")
         if path is None:
             continue
         report = Report.model_validate_json(path.read_text(encoding="utf-8"))

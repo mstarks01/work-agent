@@ -538,6 +538,56 @@ def test_the_offline_sitting_page_runs_its_script(browser, tmp_path):
     assert case_title(corpus) in text
 
 
+def test_the_offline_sitting_page_shows_a_restored_mark_keyed_by_an_alias(
+    browser, tmp_path
+):
+    """A draft keyed before a version moved still marks its finding."""
+    from evals.harness import sitting as sittings
+    from evals.harness.envelope import VERSION
+    from evals.harness.reference import ANONYMOUS
+    from tests import test_sitting_app as sitting
+    from webapp.offline_sitting import build
+
+    corpus = sitting.build_tree(tmp_path) / "evals" / "corpus"
+    case_dir = next(
+        path
+        for path in sorted(corpus.iterdir())
+        if path.is_dir() and any(t.aliases for t in sittings.prepare(path).mark_targets)
+    )
+    prepared = sittings.prepare(case_dir)
+    target = next(t for t in prepared.mark_targets if t.aliases)
+    mark = sittings.MARKS[0]
+    draft = {
+        "envelope": VERSION,
+        "cases": {
+            prepared.case_id: {
+                "own_list": ["x" * sittings.MIN_OWN_LIST],
+                "marks": {target.aliases[0]: mark},
+            }
+        },
+    }
+    written = tmp_path / "sitting.html"
+    written.write_text(build(corpus, "ada", ANONYMOUS), encoding="utf-8")
+    page, errors = opened(browser, written.as_uri())
+    page.set_input_files(
+        "#file",
+        files=[
+            {
+                "name": "draft.json",
+                "mimeType": "application/json",
+                "buffer": json.dumps(draft).encode("utf-8"),
+            }
+        ],
+    )
+    page.get_by_role("button", name=prepared.title).click()
+    radios = page.locator(f'input[name="m-{target.fingerprint}"]')
+    checked = [radios.nth(i).is_checked() for i in range(radios.count())]
+    page.close()
+
+    assert errors == [], f"the offline sitting page raised: {errors}"
+    assert checked == [option == mark for option in sittings.MARKS]
+
+
 def test_workspace_reopens_grouped_questions_and_renders_names_as_text(page):
     page.fill("#analysis-name", '<img src=x onerror="alert(1)">')
     pause(page)
