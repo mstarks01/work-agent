@@ -385,12 +385,12 @@ class UnknownRef(BaseModel):
 
     @property
     def names_an_element(self) -> bool:
-        """Is this the model-reference spelling? Asked in three places.
+        """Is this the model-reference spelling? It reads :attr:`kind`.
 
         A question kind names an element too, but asks a question the model
-        holds no field for, so it is its own spelling rather than this one.
+        holds no field for, so it is its own kind rather than this one.
         """
-        return bool(self.element_id or self.attribute) and not self.question
+        return self.kind == "attribute"
 
     @property
     def spellings(self) -> tuple[Spelling, ...]:
