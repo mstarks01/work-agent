@@ -87,7 +87,7 @@ def charge(
         unresolved_references=cut,
     )
     return attribute_case(
-        case, score, drafts, produced, flows, block, proposed=proposed
+        case, score, drafts, produced, flows, block, proposed=proposed or {}
     )
 
 
@@ -923,14 +923,16 @@ class TestAFanInDrop:
         assert loss.proposal_title == "proposed at the place"
         assert loss.fan_in_reasons == ("quote not in source",)
         assert loss.place_relation == "equal"
-        assert charged.proposals_read
+        assert not charged.proposed_nothing
 
-    def test_a_sweep_with_no_proposals_cannot_decide_it_and_says_so(self, case, flows):
-        charged = charge(case, flows, [], [], proposed=None)
+    def test_lanes_that_proposed_nothing_have_no_fan_in_row_and_say_so(
+        self, case, flows
+    ):
+        charged = charge(case, flows, [], [], proposed={})
 
         assert "fan-in" not in {loss.cause for loss in charged.losses}
-        assert not charged.proposals_read
-        assert pooled([charged])["proposals_read"] == 0
+        assert charged.proposed_nothing
+        assert pooled([charged])["proposed_nothing"] == 1
 
     def test_a_proposal_under_another_action_is_not_this_finding(self, case, flows):
         reference = case.stride_claims()[0]

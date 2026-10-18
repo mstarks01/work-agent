@@ -68,8 +68,13 @@ from analysis_service.graph import (
 )
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import lane_closing
-from evals.harness.artifact import repo_commit
-from evals.harness.bundle import case_file, check_out
+from evals.harness.artifact import (
+    EvalArtifact,
+    ProvenanceError,
+    load_artifact,
+    repo_commit,
+)
+from evals.harness.bundle import check_out, finished_file
 from evals.harness.descendants import FRAMEWORK as SCORED
 from evals.harness.descendants import lane_must_finds
 from evals.harness.modes import EvalRunError, case_framework_options
@@ -99,13 +104,18 @@ def lane_of(framework: FrameworkName, name: str) -> Lane:
     return lanes[name]
 
 
-def load_material(artifact: Path, case_id: str) -> dict[str, Any]:
-    """One case's captured lane material, or a refusal saying why there is none."""
-    path = case_file(artifact, case_id, "lanes")
-    if not path.is_file():
+def load_material(artifact: EvalArtifact, case_id: str) -> dict[str, Any]:
+    """One case's captured lane material, or a refusal saying why there is none.
+
+    The file is read through :func:`~evals.harness.bundle.finished_file`, so a
+    lost file of a finished case is refused by name. A failed case wrote no
+    lane material, so it is refused too.
+    """
+    path = finished_file(artifact, case_id, "lanes")
+    if path is None:
         raise EvalRunError(
-            f"{path} is missing; the sweep predates the lane capture (#1091),"
-            " so no lane's request can be rebuilt from it"
+            f"{case_id}: the artifact records the case as failed, so the sweep"
+            " wrote no lane material for it"
         )
     return material_at(path)
 
@@ -318,7 +328,8 @@ def command_lane_replay(args: argparse.Namespace) -> int:
                 f" prompt files from {repo_commit().commit}"
             )
         else:
-            material = load_material(args.artifact, args.case)
+            artifact = load_artifact(args.artifact)
+            material = load_material(artifact, args.case)
             if args.fresh_leads:
                 material = fresh_leads(
                     material,
@@ -327,12 +338,11 @@ def command_lane_replay(args: argparse.Namespace) -> int:
                     args.lane,
                     MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
                 )
-            ran_at = json.loads(args.artifact.read_text(encoding="utf-8"))
             print(
-                f"material from {ran_at['repo_commit'].get('commit')}; prompt files"
+                f"material from {artifact.commit.commit}; prompt files"
                 f" from {repo_commit().commit}"
             )
-    except (CorpusError, EvalRunError) as error:
+    except (CorpusError, EvalRunError, ProvenanceError) as error:
         print(error, file=sys.stderr)
         return 1
     lane = lane_of(args.framework, args.lane)

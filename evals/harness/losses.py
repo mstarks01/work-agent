@@ -39,9 +39,9 @@ Seven causes, decided in this order for one missed reference:
   **narrowed** its elements off the reference's place, which is #441's rule
   that a claim cites only what its grounds reach. The row names the proposal's
   title, the draft where one was kept, and the reasons the block's own marks
-  recorded. Read off the lane's archived proposals, so a sweep that archived
-  none cannot tell this cause from ``place`` or ``unled``;
-  :attr:`CaseLosses.proposals_read` says which a row is.
+  recorded. Read off the lanes' archived proposals, which every finished case
+  carries. A case whose lanes proposed nothing has no ``fan-in`` row, and
+  :attr:`CaseLosses.proposed_nothing` says so.
 * ``place``: a candidate rule led the lane to the reference's elements and no
   draft cites them. The lead did not take.
 * ``unled``: no rule fired on the reference's elements and no draft cites
@@ -257,10 +257,10 @@ class CaseLosses:
     #: on every deployment that ran no assertion node, and that *is* the
     #: reading: the layer backed nothing.
     assertion_backed: AssertionBacking = field(default_factory=AssertionBacking)
-    #: Whether the lane proposals were archived and read. ``False`` means the
-    #: ``fan-in`` cause could not be decided here, and a ``place`` or ``unled``
-    #: row may be a proposal the fan-in removed.
-    proposals_read: bool = False
+    #: Whether the archived proposals hold no STRIDE lane batch. ``True``
+    #: means the lanes proposed nothing, so a miss here is never a ``fan-in``
+    #: row: the lanes wrote no proposal for the fan-in to remove.
+    proposed_nothing: bool = False
 
     @property
     def by_cause(self) -> dict[str, int]:
@@ -284,7 +284,7 @@ class CaseLosses:
     def to_json(self) -> dict[str, Any]:
         return {
             "case": self.case,
-            "proposals_read": self.proposals_read,
+            "proposed_nothing": self.proposed_nothing,
             "by_cause": self.by_cause,
             "re_asked_by_cause": self.re_asked_by_cause,
             "displaced_by_cause": self.displaced_by_cause,
@@ -408,13 +408,12 @@ def attribute_case(
     flows: FlowMap,
     block: FrameworkAnalysis,
     *,
-    proposed: Mapping[str, Any] | None,
+    proposed: Mapping[str, Any],
 ) -> CaseLosses:
     """Charge each of one case's misses to its cause.
 
-    ``proposed`` is the lanes' archived STRIDE proposals, keyed by lane, or
-    ``None`` for a sweep that archived none, which leaves the ``fan-in`` cause
-    undecided and says so on the row.
+    ``proposed`` is the lanes' archived STRIDE proposals, keyed by lane. An
+    empty mapping means that the lanes proposed nothing.
 
     ``drafts`` are the pre-critic drafts and ``produced`` the report's claims,
     the two sides :mod:`evals.harness.critic_yield` already scores; a draft in
@@ -550,7 +549,7 @@ def attribute_case(
                 )
             )
             continue
-        batch = (proposed or {}).get(lane)
+        batch = proposed.get(lane)
         offered = next(
             (
                 (read_verb, place, offers)
@@ -619,7 +618,7 @@ def attribute_case(
         case=case.id,
         losses=tuple(losses),
         assertion_backed=_backing(score, produced),
-        proposals_read=proposed is not None,
+        proposed_nothing=not proposed,
     )
 
 
@@ -660,9 +659,8 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
                     relations_must_find[loss.place_relation] += loss.must_find
     return {
         "cases": len(rows),
-        # How many cases could decide ``fan-in``. A zero there over cases that
-        # archived no proposals is not a measurement of the fan-in.
-        "proposals_read": sum(row.proposals_read for row in rows),
+        # How many cases had no lane proposal, and so no ``fan-in`` row.
+        "proposed_nothing": sum(row.proposed_nothing for row in rows),
         "losses": sum(totals.values()),
         # The ``fan-in`` rows by what the fan-in did: a proposal it removed, or
         # a draft it narrowed off the reference's place. Two different fixes.

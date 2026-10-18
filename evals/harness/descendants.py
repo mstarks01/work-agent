@@ -49,7 +49,7 @@ from analysis_service.graph import (
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex, SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
-from evals.harness.bundle import case_file, finished_file, stride_threats
+from evals.harness.bundle import finished_file, stride_threats
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
@@ -178,7 +178,7 @@ def replay_artifact(
     cases: Sequence[GoldenCase],
     injected: Mapping[str, Mapping[str, Sequence[Mapping[str, Any]]]] = {},
 ) -> list[Replayed]:
-    """Every case of a sweep that archived its proposals, replayed.
+    """Every finished case of a sweep, replayed from its archived proposals.
 
     Each injected case is one of ``cases``, and each injected lane one of the
     package's, so a misspelled key is refused rather than injecting nothing.
@@ -196,12 +196,9 @@ def replay_artifact(
         report_path = finished_file(artifact, case.id, "report")
         if report_path is None:
             continue
-        proposals_path = case_file(artifact.path, case.id, "proposals")
-        if not proposals_path.is_file():
-            raise EvalRunError(
-                f"{proposals_path} is missing; the sweep kept no lane proposals,"
-                " so its fan-in cannot be run again"
-            )
+        proposals_path = finished_file(artifact, case.id, "proposals")
+        # A finished case: finished_file returns the path or raises.
+        assert proposals_path is not None
         report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
         proposals = json.loads(proposals_path.read_text(encoding="utf-8"))
         rows.append(

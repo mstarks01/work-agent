@@ -22,6 +22,7 @@ from evals.harness.provenance import REPO_ROOT
 from tests import test_evals_run_grounds as grounds
 from tests.eval_factories import write_emission_sweep
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixture)
+    finished,
     record_requests,
     recorded,
 )
@@ -29,11 +30,6 @@ from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
 PACKAGE_LOADER = MarkdownLoader(REPO_ROOT / "frameworks" / "stride")
 PROMPT_LOADER = MarkdownLoader(REPO_ROOT / "prompts")
-
-
-def finished(out, case_id):
-    """The artifact of a sweep whose one case finished."""
-    return write_emission_sweep(out, "analysis", [case_id])
 
 
 def failed(out, case_id):
