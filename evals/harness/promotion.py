@@ -69,7 +69,7 @@ from analysis_service.sources import text_digest
 from evals.harness import falsify
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports, case_file
-from evals.harness.modes import AssertionResult
+from evals.harness.modes import AssertionResult, EvalRunError
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.replay import replay_assertions, signed_reference
 
@@ -627,8 +627,9 @@ def pooled_recall(paths: Sequence[Path]) -> float:
     cases = [case for case in load_corpus(CORPUS) if case.id in RECALL_CASES]
     found = required = 0
     for path in paths:
-        held = [case for case in cases if case.id in load_artifact(path).cases]
-        for case_id, result in assertions_from_reports(path, held).items():
+        artifact = load_artifact(path)
+        held = [case for case in cases if case.id in artifact.cases]
+        for case_id, result in assertions_from_reports(artifact, held).items():
             case = next(case for case in held if case.id == case_id)
             reference = signed_reference(CORPUS, case)
             if reference is None:
@@ -847,7 +848,7 @@ def command_gates(args: argparse.Namespace) -> int:
         return 1
     try:
         readings = decide(artifact, report, spread=spread, recall=args.recall)
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, EvalRunError) as error:
         print(f"cannot read the recall repeats: {error}", file=sys.stderr)
         return 1
     print(render(readings), end="")

@@ -1408,6 +1408,31 @@ class TestTheDraftSurvivesTheProcess:
         assert came_back["missing"] == ["nobody rotates the key"]
         assert came_back["notes"] == "counted 18"
 
+    def test_a_draft_mark_under_an_alias_comes_back_under_its_finding(self, tree):
+        """The page draws a mark by the current key, so the route sends that key."""
+        client = browser(session_for(tree, "ada"))
+        client.post("/api/own-list", json={"case": OTHER, "items": OTHER_LIST})
+        target = next(
+            target
+            for target in sittings.prepare(
+                tree / "evals" / "corpus" / OTHER
+            ).mark_targets
+            if target.aliases
+        )
+        client.post(
+            "/api/draft",
+            json={
+                "case": OTHER,
+                "marks": {target.aliases[0]: "agree"},
+                "missing": [],
+                "notes": "",
+            },
+        )
+
+        came_back = client.get(f"/api/part-one?case={OTHER}").json()
+
+        assert came_back["marks"] == {target.fingerprint: "agree"}
+
     def test_the_gate_stays_open_across_the_restart(self, tree):
         """The gate asks whether the case has an own list, and the draft is
         where that answer now lives — so a restart re-arms nothing."""

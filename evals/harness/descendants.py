@@ -49,7 +49,7 @@ from analysis_service.graph import (
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex, SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
-from evals.harness.bundle import case_file, finished_report, stride_threats
+from evals.harness.bundle import case_file, finished_file, stride_threats
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
@@ -193,7 +193,7 @@ def replay_artifact(
             )
     rows = []
     for case in cases:
-        report_path = finished_report(artifact, case.id)
+        report_path = finished_file(artifact, case.id, "report")
         if report_path is None:
             continue
         proposals_path = case_file(artifact.path, case.id, "proposals")

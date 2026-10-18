@@ -53,6 +53,7 @@ from evals.harness.modes import (
 )
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
+from tests.eval_factories import write_emission_sweep
 from tests.factories import emitted
 from tests.test_evals_run_grounds import CASE_DIR, DEAD, TEST_TIER_ENV, sweep
 
@@ -435,6 +436,8 @@ def test_a_refused_catalog_keeps_its_count_through_the_archive(case, tmp_path):
     out = tmp_path / "artifact.json"
     write_assertions(str(out), "assertions", {case.id: result})
 
-    (read,) = heads_from_reports(out, [case]).values()
+    artifact = write_emission_sweep(out, "assertions", [case.id])
+
+    (read,) = heads_from_reports(artifact, [case]).values()
 
     assert score_assertions(case, read).rejected == MAX_SUBJECTS + 1

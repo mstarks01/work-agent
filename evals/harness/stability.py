@@ -56,7 +56,7 @@ from typing import Any
 from analysis_service.claims import FrameworkName
 from analysis_service.system_model import ModelIndex, SystemModel
 from evals.harness.artifact import EvalArtifact, load_artifact
-from evals.harness.bundle import case_file, reports_dir
+from evals.harness.bundle import finished_file, reports_dir
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import endpoint_form
 from evals.harness.provenance import ProvenanceError
@@ -343,7 +343,9 @@ def _content(
     claim matched each reference, and its claims carry a severity. A
     catalog-identified package records matched identifiers alone, so there is
     nothing here to read for it. ``None`` where the bundle is absent, which is
-    the shape of a sweep copied without its reports.
+    the shape of a sweep copied without its reports. Within a bundle,
+    :func:`~evals.harness.bundle.finished_file` reads each scored case's
+    report, so a lost report is refused by name.
     """
     directory = reports_dir(artifact.path)
     if not directory.is_dir():
@@ -356,9 +358,9 @@ def _content(
     try:
         for score in artifact.block("scores"):
             scope: Scope = (scored, str(score["case"]))
-            path = case_file(artifact.path, scope[1], "report")
-            if not path.is_file():
-                return None
+            path = finished_file(artifact, scope[1], "report")
+            if path is None:
+                continue
             raw = json.loads(path.read_text(encoding="utf-8"))
             flows = ModelIndex.of(
                 SystemModel.model_validate(raw["system_model"])

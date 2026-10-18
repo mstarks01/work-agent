@@ -87,6 +87,10 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the statuses a resumed job ends in without a report, so every status"
         " that runs or ends in one is absent by construction"
     ),
+    ("evals.harness.bundle", "KEPT_WHEN_FAILED"): (
+        "the case files a failed case may carry, which a report and the files"
+        " written beside a report are not"
+    ),
     ("evals.harness.calibration", "SCORED_LABELS"): (
         "the labels carrying an answer an identity rule can be graded against;"
         " a disposition states why a pair is unscorable and stays out of the"

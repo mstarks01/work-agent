@@ -343,11 +343,24 @@ function restore(text) {
   }
   for (const [id, a] of Object.entries(held.cases || {})) {
     if (!BY_ID[id]) continue;
-    // A mark for a target the case no longer has names no finding, which the
-    // merge refuses (check_marks), so it is not carried.
-    const targets = new Set(BY_ID[id].targets.map(t => t.fingerprint));
-    const marks = Object.fromEntries(
-      Object.entries(a.marks || {}).filter(([key]) => targets.has(key)));
+    // A key is read through the aliases the server sent, as the merge reads
+    // it (current_marks). A key that names no finding is not carried, because
+    // the merge refuses it (check_marks). Two keys of one finding that
+    // disagree carry neither, so the reader marks that finding again.
+    const current = new Map();
+    for (const t of BY_ID[id].targets) {
+      current.set(t.fingerprint, t.fingerprint);
+      for (const alias of t.aliases) current.set(alias, t.fingerprint);
+    }
+    const marks = {};
+    const disputed = new Set();
+    for (const [key, mark] of Object.entries(a.marks || {})) {
+      const finding = current.get(key);
+      if (finding === undefined) continue;
+      if (finding in marks && marks[finding] !== mark) disputed.add(finding);
+      marks[finding] = mark;
+    }
+    for (const finding of disputed) delete marks[finding];
     answers[id] = {own_list: a.own_list || [], marks,
                    missing: a.missing || [], notes: a.notes || "",
                    opened_digests: a.opened_digests || BY_ID[id].digests};

@@ -43,7 +43,7 @@ from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
-from evals.harness.bundle import case_file, finished_report
+from evals.harness.bundle import case_file, finished_file
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 
@@ -157,7 +157,7 @@ def replay_artifact(
     """Every framework block of every finished case, assembled again."""
     rows = []
     for case in cases:
-        report_path = finished_report(artifact, case.id)
+        report_path = finished_file(artifact, case.id, "report")
         if report_path is None:
             continue
         drafts_path = case_file(artifact.path, case.id, "drafts")
