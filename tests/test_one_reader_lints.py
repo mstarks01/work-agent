@@ -240,10 +240,39 @@ SPELLING_READERS: dict[Site, str] = {
     ("src/analysis_service/claims.py", "spellings"): (
         "it is the reader that ``kind`` reads"
     ),
-    ("src/analysis_service/claims.py", "names_an_element"): (
-        "it asks whether a reference names an element, which a question kind does too"
+}
+
+#: The fields of :class:`~analysis_service.claims.UnknownRef` that spell a
+#: kind of fact.
+SPELLING_FIELDS = frozenset(
+    {"element_id", "attribute", "subject", "assertion", "question", "capability"}
+)
+
+#: Each function that tests two spelling fields in one test, and why the test
+#: does not decide a kind.
+FIELD_PAIR_READERS: dict[Site, str] = {
+    ("src/analysis_service/critic.py", "_unresolved_unknown_ref_issues"): (
+        "it runs after the one-spelling check and the ``kind`` route, and asks"
+        " whether the entry states any text at all"
     ),
 }
+
+
+def _spelling_field(operand: ast.expr) -> str | None:
+    """The spelling field ``operand`` tests, through ``not`` and ``strip``."""
+    match operand:
+        case ast.UnaryOp(op=ast.Not(), operand=inner):
+            return _spelling_field(inner)
+        case ast.Call(func=ast.Attribute(attr="strip", value=inner), args=[]):
+            return _spelling_field(inner)
+        case ast.Attribute(attr=attr) if attr in SPELLING_FIELDS:
+            return attr
+    return None
+
+
+def _tests_two_spelling_fields(node: ast.AST) -> bool:
+    fields = {_spelling_field(operand) for operand in _tested(node)} - {None}
+    return len(fields) > 1
 
 
 def _tests_a_spelling(node: ast.AST) -> bool:
@@ -257,6 +286,18 @@ def _tests_a_spelling(node: ast.AST) -> bool:
 def test_the_kind_of_an_open_fact_has_one_reader():
     """Only ``UnknownRef.kind`` routes on which spelling a reference uses."""
     assert set(_sites(_tests_a_spelling)) == SPELLING_READERS.keys()
+
+
+def test_the_kind_of_an_open_fact_is_not_read_from_two_fields():
+    """No test of two spelling fields decides a kind beside ``UnknownRef.kind``.
+
+    The fields ``element_id``, ``attribute``, ``subject`` and ``assertion``
+    have namesakes on other models, so a test of one of them alone is not a
+    second reader. A test of two of them at once is how a kind is decided, as
+    in ``names_an_element``, which asks ``kind``.
+    """
+    readers = set(_sites(_tests_two_spelling_fields)) - FIELD_PAIR_READERS.keys()
+    assert readers == set()
 
 
 def test_the_place_of_a_pydantic_error_has_one_reader():
@@ -312,6 +353,7 @@ def _reads_loc(node: ast.AST) -> bool:
 
 def test_each_declared_site_still_reads_the_rule_itself():
     assert SPELLING_READERS.keys() <= set(_sites(_tests_a_spelling))
+    assert FIELD_PAIR_READERS.keys() <= set(_sites(_tests_two_spelling_fields))
     assert LOC_READERS.keys() <= set(_sites(_reads_loc))
     assert CONFIG_DEFAULT_READERS.keys() <= set(_sites(_reads_a_config_default))
     assert ID_DERIVERS.keys() <= set(_sites(_derives_an_id))

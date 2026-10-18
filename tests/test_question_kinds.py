@@ -307,8 +307,9 @@ _ONE_KIND: dict[str, dict[str, str]] = {
 def test_every_surface_names_the_kind_that_fact_kind_reads(first, second):
     """A reference with two spellings names one kind, and every surface asks it.
 
-    ``fact_kind`` decides the kind, so the label, the group and the re-ask
-    sentence each equal those of the sound reference of that kind alone.
+    ``fact_kind`` decides the kind, so the label, the group, the re-ask
+    sentence and ``names_an_element`` each equal those of the sound reference
+    of that kind alone.
     """
     from analysis_service.claims import name_unknown
     from analysis_service.fact_answers import fact_kind
@@ -322,6 +323,7 @@ def test_every_surface_names_the_kind_that_fact_kind_reads(first, second):
     assert label_of(ref, names) == label_of(sound, names)
     assert group_of(ref) == group_of(sound)
     assert name_unknown(ref) == name_unknown(sound)
+    assert ref.names_an_element == sound.names_an_element
 
 
 #: A reference with two spellings: a closed attribute and a question kind. Its
