@@ -108,9 +108,8 @@ const workspace = (() => {
       if (data.questions) showQuestions(data.questions);
       else if (data.status === "running") {
         show("progress-panel");
-        processing(data.completed_steps);
+        processing(data.completed_steps, data.pauses);
         el("status").hidden = false;
-        el("status-text").textContent = "The analysis is running. This page updates automatically.";
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
       } else if (served && new URLSearchParams(location.search).get("view") !== "reports") {
         location.replace("/report/" + encodeURIComponent(data.run));
@@ -138,11 +137,27 @@ const workspace = (() => {
       if (ticket === generation) metadata(data);
     } catch (error) { message(error.message); }
   };
-  const processing = (steps) => {
-    if (steps) el("ticks").replaceChildren(...steps.map((step) => node("li", step)));
-    const any = el("ticks").children.length > 0;
-    el("ticks").hidden = !any;
-    el("processing-empty").hidden = any;
+  // Node events name completed steps. Show the next stage in plain language.
+  // Runs can take different paths, so the bar stays indeterminate.
+  const stageAfter = (step, pauses) => {
+    if (!step) return pauses ? "Building system model…" : "Preparing analysis…";
+    if (step === "extract" || step === "repair") return "Checking system model…";
+    if (step === "validate" || step === "revalidate" || step === "capabilities"
+        || step === "stated" || step === "assert" || step === "read") {
+      return pauses ? "Generating questions…" : "Preparing analysis checks…";
+    }
+    if (step === "catalog" || step === "pause") return "Finishing questions…";
+    if (step === "prepare") return "Running analysis checks…";
+    if (step === "assemble") return "Finishing report…";
+    if (/^(analyze|join|merge|critic|router|recritic|rereview|critic_failed)_/.test(step)) {
+      return "Reviewing findings…";
+    }
+    return "Continuing analysis…";
+  };
+  const processing = (steps, pauses, initialStage) => {
+    const latest = steps?.at(-1);
+    el("status-text").textContent = latest ? stageAfter(latest, pauses)
+      : initialStage || stageAfter(null, pauses);
   };
   const progress = (data, filled, total) => {
     const done = data.early_stop != null;

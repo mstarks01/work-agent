@@ -266,9 +266,13 @@ class HeldRunner(web.PausingRunner):
 
     def __init__(self) -> None:
         super().__init__(catalog=False)
+        self.step = threading.Event()
         self.release = threading.Event()
 
     async def run(self, job, on_node):
+        while not self.step.is_set():
+            await asyncio.sleep(0.05)
+        await on_node("extract")
         while not self.release.is_set():
             await asyncio.sleep(0.05)
         return await super().run(job, on_node)
@@ -293,8 +297,21 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         )
         tab = opened.locator("#questions-nav")
         assert opened.is_visible("#progress-panel")
+        assert opened.locator("#analysis-progress").count() == 1
+        assert opened.locator("#analysis-progress").get_attribute("value") is None
+        assert opened.locator("#status-text").inner_text() == "Building system model…"
+        assert (
+            opened.locator("#progress-panel")
+            .locator("h2, details, .spinner, #ticks")
+            .count()
+            == 0
+        )
         assert tab.is_enabled()
 
+        runner.step.set()
+        opened.wait_for_function(
+            "() => document.querySelector('#status-text').textContent === 'Checking system model…'"
+        )
         opened.click("#description-nav")
         assert not opened.is_visible("#progress-panel")
         tab.click()

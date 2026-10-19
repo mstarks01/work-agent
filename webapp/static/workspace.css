@@ -600,27 +600,27 @@ summary:hover {
   max-width:700px;
   margin:40px auto
 }
-#status {
-  color:var(--accent)
+#analysis-progress {
+  display:block;
+  width:100%;
+  height:12px;
+  accent-color:var(--accent)
 }
-#ticks {
-  font-size:13px;
-  color:var(--muted);
-  overflow-wrap:anywhere
+#analysis-progress::-webkit-progress-bar {
+  background:var(--soft);
+  border-radius:6px
 }
-.spinner {
-  display:inline-block;
-  width:14px;
-  height:14px;
-  border:2px solid var(--line);
-  border-right-color:var(--accent);
-  border-radius:50%;
-  animation:spin 1s linear infinite
+#analysis-progress::-webkit-progress-value {
+  background:var(--accent);
+  border-radius:6px
 }
-@keyframes spin {
-  to {
-    transform:rotate(360deg)
-  }
+#analysis-progress::-moz-progress-bar {
+  background:var(--accent);
+  border-radius:6px
+}
+#status-text {
+  margin:12px 0 0;
+  color:var(--text)
 }
 #analysis-search {
   max-width:360px
@@ -823,9 +823,6 @@ code {
 @media(prefers-reduced-motion:reduce) {
   button,.button {
     transition:none
-  }
-  .spinner {
-    animation:none
   }
 }
 .ask-option {
