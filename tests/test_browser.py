@@ -878,12 +878,11 @@ def test_an_unticked_framework_shows_its_options_disabled(page):
 
 def test_question_progress_and_entry_guidance(page):
     assert page.locator('input[name="framework"]:checked').count() == 0
-    assert (
-        page.locator("#description-panel summary")
-        .filter(has_text="How questions work")
-        .count()
-        == 1
-    )
+    help = page.locator(".ask-with-help .question-help")
+    assert help.locator("summary").text_content().strip() == "How questions work"
+    assert not help.locator(".question-help-content").is_visible()
+    help.locator("summary").click()
+    assert help.locator(".question-help-content").is_visible()
     assert page.get_by_label("Ask me questions to make the report better.").is_checked()
     pause(page)
     assert page.locator("#answer-progress-bar").get_attribute("value") == "0"
