@@ -34,6 +34,7 @@ from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
 from analysis_service.links import NONE_OF_THESE
+from analysis_service.open_facts import group_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from tests import test_open_facts, test_questions, test_webapp
 from tests.factories import (
@@ -1734,6 +1735,40 @@ const each = group.children.find(c => c.className === "each-one");
 const rowsOf = () => each.children.filter(c => c.tag === "p");
 calls.push({ shared: shared.length });
 """
+
+
+@pytest.mark.parametrize(
+    ("form", "choices", "names"),
+    [
+        ("control", [], ["", ": type it, or pick a common one"]),
+        ("choice", ["TLS"], ["", ": exceptions or detail (optional)"]),
+        ("text", [], [""]),
+    ],
+)
+def test_a_shared_answer_is_asked_as_a_question_of_every_part(form, choices, names):
+    """The box's heading asks the shared question of every part it lists,
+    and it names each shared control (#1842)."""
+    first, second = valid_model().data_flows[:2]
+    _, heading = group_of(
+        UnknownRef(element_id=first.id, attribute="encryption_in_transit")
+    )
+    facts = [_control_row(flow, form) for flow in (first, second)]
+    for fact in facts:
+        fact |= {
+            "group_heading": heading,
+            "choices": [{"id": choice, "name": ""} for choice in choices],
+        }
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+const title = group.children.find(c => c.tag === "summary");
+calls.push({ heading: title.children[0].textContent,
+  names: walk(shared[0].children[0]).filter(c => c["aria-label"]).map(c => c["aria-label"]) });
+"""
+    )
+    seen = _run_form_script(steps)["calls"]
+    assert heading == "Is each connection encrypted? If so, how?"
+    assert seen[2] == {"heading": heading, "names": [heading + name for name in names]}
 
 
 def test_one_shared_answer_fills_every_row_but_an_exception():

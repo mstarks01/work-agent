@@ -939,6 +939,10 @@
     }
     const shared = inputFor(q, null, () =>
       applyShared(box, (row) => row.set({ value: shared.read() })));
+    // The box's heading asks the question for every part it lists, so it
+    // names each control; a second control adds what it takes.
+    shared.controls.forEach((control, at) => control.setAttribute("aria-label",
+      at ? `${q.group_heading}: ${control.placeholder}` : q.group_heading));
     line.append(...shared.nodes);
     return line;
   };

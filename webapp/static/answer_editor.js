@@ -59,7 +59,8 @@ let suggestLists = 0;
 // `prefill` is an earlier answer to start from, or null; `changed` runs on
 // every edit.
 //
-// `nodes` follow the label. `read` is the answer's value, or "" for none;
+// `nodes` follow the label, and `controls` are the selects and text inputs
+// among them, in order. `read` is the answer's value, or "" for none;
 // `set` writes a value into the input; `answer` is the answer as the service
 // takes it, or null; `known` is whether it says more than "I don't know".
 const answerEditor = (q, { choices, prefill, reopen, changed = () => {} }) => {
@@ -69,6 +70,7 @@ const answerEditor = (q, { choices, prefill, reopen, changed = () => {} }) => {
   let read = () => input.value.trim();
   let set;
   let nodes;
+  let controls;
   // A closed answer takes a detail beside it; free text needs none.
   let detail = null;
   if (choices.length) {
@@ -81,6 +83,7 @@ const answerEditor = (q, { choices, prefill, reopen, changed = () => {} }) => {
     detail = answerDetail((prefill && prefill.detail) || "");
     detail.addEventListener("input", changed);
     nodes = [input, " ", detail];
+    controls = [input, detail];
   } else if (q.form === "control") {
     // A control: say there is none, say you do not know, or name the
     // mechanism. The suggestions are a start; the text is the answer.
@@ -115,6 +118,7 @@ const answerEditor = (q, { choices, prefill, reopen, changed = () => {} }) => {
     };
     read = () => (state.value === "mechanism" ? input.value.trim() : state.value);
     nodes = [state, " ", input, list];
+    controls = [state, input];
   } else {
     input = document.createElement("input");
     input.type = "text";
@@ -135,6 +139,7 @@ const answerEditor = (q, { choices, prefill, reopen, changed = () => {} }) => {
       box.checked = input.disabled = next === DONT_KNOW;
     };
     nodes = dontKnowOffered ? [input, " ", dontKnow] : [input];
+    controls = [input];
   }
   set(value);
   input.dataset.key = JSON.stringify(q.key);
@@ -142,6 +147,7 @@ const answerEditor = (q, { choices, prefill, reopen, changed = () => {} }) => {
   return {
     input,
     nodes,
+    controls,
     read,
     set,
     readDetail,
