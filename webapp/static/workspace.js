@@ -35,7 +35,7 @@ const workspace = (() => {
     el("ask").disabled = true;
     current = data;
     el("analysis-header").hidden = false;
-    el("entry-heading").hidden = true;
+    el("new-analysis-title").hidden = true;
     el("analysis-title").textContent = data.name;
     el("breadcrumb-title").textContent = data.name;
     el("analysis-state").textContent = labels[data.status] || data.status;
