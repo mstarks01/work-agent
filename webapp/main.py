@@ -1193,7 +1193,6 @@ def create_app(
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 workspace_style=_WORKSPACE_STYLE,
-                tiers=_tier_lines(current.tiers),
                 frameworks=_framework_fields(current.frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
@@ -1842,24 +1841,6 @@ async def _stream(
         yield _frame("failed", {"message": record.error or "The analysis failed."})
 
 
-def _tier_lines(tiers: ModelTierConfig | None) -> str:
-    """One compact read-only line per tier — config-time selection, and only that.
-
-    Not credential status (the page rendering at all already proves that check
-    passed), and not sampling (config a first-run reader has no basis to judge).
-    The *served* build that actually answered is per-response provenance, which
-    the report itself carries and the viewer already renders; this does not
-    duplicate it.
-    """
-    if tiers is None:
-        return ""
-    return "\n".join(
-        f'<div class="tier"><b>{escape(tier)}</b> → '
-        f"{escape(selection.vendor)} / {escape(selection.model)}</div>"
-        for tier, selection in tiers.tiers.items()
-    )
-
-
 def diagnostic_page(state: Startup, env: Mapping[str, str]) -> RenderedPage:
     """The fail-closed page that replaces the form when config is unusable.
 
@@ -2003,9 +1984,7 @@ _WORKSPACE_STYLE = (Path(__file__).parent / "static" / "workspace.css").read_tex
 #: whose answers a new one can carry (ADR 0079), and shows the list only where
 #: there is one.
 _QUESTIONS_FIELD = """<p class="ask-option"><label><input type="checkbox" id="ask" name="ask" checked>
-    Ask me questions to make the report better.</label></p>
-<div id="answers-from-field" hidden><label class="field-label" for="answers-from">Reuse answers from</label>
-    <select id="answers-from"><option value="">No earlier analysis</option></select></div>"""
+    Ask me questions to make the report better.</label></p>"""
 
 _DIAGNOSTIC_PAGE = (
     """<!doctype html>

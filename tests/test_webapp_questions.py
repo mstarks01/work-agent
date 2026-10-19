@@ -1006,8 +1006,8 @@ def test_an_early_row_carries_its_element_s_source_words(tiers):
     )
 
 
-def test_the_form_page_says_why_and_quotes_the_description():
-    """Each early row shows its first reason and its element's words (#1289, B1)."""
+def test_the_form_page_keeps_why_and_the_description_in_help():
+    """The prompt stays concise, with its reason and source words in help."""
     long = "x" * 250
     rows = [
         _text_row(["", "", "", "who?", "", ""], "who?")
@@ -1023,19 +1023,21 @@ streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questi
   early_questions: {json.dumps(rows)}, 
   answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
-  if (typeof c === "object") {{ if (c.className === "hint") out.push(c); walk(c, out); }}
-  return out; }};
-calls.push(walk(ids.questions).map(h => ({{ text: h.textContent, title: h.title }})));
+  if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
+calls.push(walk(ids.questions).filter(n => n.className === "question-context").map(h => ({{
+  trigger: h.children[0].textContent,
+  name: h.children[0]["aria-label"],
+  lines: h.children[1].children.map(p => p.textContent),
+}})));
 """
-    hints = _run_form_script(steps)["calls"][-1]
-    (row,) = [h for h in hints if h["text"].startswith("Why:")]
-    assert row["text"] == (
-        "Why: Can an attacker reach it? \u00b7 Used by the asvs and stride analyses"
-        " \u00b7 Your description of this part, for reference: \u201c"
-        + "x" * 200
-        + "\u2026\u201d"
-    )
-    assert row["title"] == long
+    (help,) = _run_form_script(steps)["calls"][-1]
+    assert help["trigger"] == "?"
+    assert help["name"] == "Why this question?"
+    assert help["lines"] == [
+        "Why: Can an attacker reach it?",
+        "Used by the asvs and stride analyses",
+        f"Your description of this part, for reference: \u201c{long}\u201d",
+    ]
 
 
 def test_the_report_names_the_findings_a_question_settles():
@@ -1684,10 +1686,10 @@ calls.push({ analysing: !ids.status.hidden, text: ids["status-text"].textContent
     building, paused, analysing = (c for c in seen if "url" not in c)
 
     assert building["building"]
-    assert building["text"] == "Building system model…"
+    assert building["text"] == "Reading your description and identifying the parts of your system…"
     assert paused == {"paused": True}
     assert analysing["analysing"]
-    assert analysing["text"] == "Running analysis checks…"
+    assert analysing["text"] == "Using your answers to continue the analysis…"
 
 
 def _control_row(flow, form="control"):
@@ -1995,8 +1997,7 @@ def test_the_report_page_offers_one_optional_follow_up():
     }
     steps = "calls.push(box.all('summary').map(node => node.textContent));"
     [lines] = _run_answer_block(payloads, steps)["calls"]
-    assert lines[0].startswith("Optional follow-up: 1 question(s).")
-    assert "After that, the report is final." in lines[0]
+    assert lines[0] == "Optional follow-up: 1 question"
 
 
 def test_a_pause_with_nothing_to_ask_starts_the_analysis_at_once():
@@ -2116,10 +2117,11 @@ streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
   answered_early: [], answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
-calls.push(walk(ids.questions).map(n => n.textContent).find(t => t.startsWith("Why:")));
+calls.push(walk(ids.questions).filter(n => n.className === "question-context-content")
+  .flatMap(n => n.children.map(p => p.textContent)));
 """
     said = _run_form_script(steps)["calls"][-1]
-    assert "Decides what the asvs analysis covers" in said
+    assert any("Decides what the asvs analysis covers" in line for line in said)
 
 
 def test_no_to_the_rest_answers_only_the_blank_capability_questions():
@@ -2929,8 +2931,7 @@ await followUp().listeners.click();
 """
     summaries, sent = _run_answer_block(payloads, steps)["calls"]
 
-    assert summaries[0].startswith("Optional follow-up: 0 question(s)")
-    assert "2 earlier answer(s)" in summaries[0]
+    assert summaries[0] == "Optional follow-up: review earlier answers"
     assert sent["url"] == "/answer/r1"
     assert sent["body"] == {
         "links": [],

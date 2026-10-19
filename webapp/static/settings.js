@@ -11,6 +11,7 @@ let SETTINGS = JSON.parse(document.getElementById("settings").textContent);
 // a reset. `removals` holds the unknown lines to remove.
 const changes = new Map();
 const removals = new Set();
+let saving = false;
 
 function h(tag, attrs = {}, ...children) {
   const element = document.createElement(tag);
@@ -244,16 +245,27 @@ function panel() {
   list.replaceChildren();
   for (const [key, value] of changes) {
     const row = rowOf(key);
-    if (!visible(row)) continue;
-    let before = shown(row.value);
-    let after = value === null ? [shown(row.shipped), " (shipped)"] : [shown(value)];
-    if (row.secret) {
-      before = row.key_saved ? "a saved key" : "no key";
-      after = value === null ? "no key" : "a new key";
+    const before = row.secret ? (row.key_saved ? "a saved key" : "no key") : shown(row.value);
+    const after = row.secret ? (value === null ? "no key" : "a new key")
+      : value === null ? [shown(row.shipped), " (shipped)"] : [shown(value)];
+    const item = h("li", { "data-key": key }, h("b", {}, row.label), ": ", before, " → ", after);
+    if (!visible(row)) {
+      item.append(h("small", { class: "hint pending-note" },
+        "This setting is inactive. Its edit stays pending and is not included in this save."));
+      const discardEdit = h("button", { type: "button", class: "quiet discard-edit",
+        "aria-label": `Discard edit for ${row.label}` }, "Discard this edit");
+      discardEdit.disabled = saving;
+      discardEdit.addEventListener("click", () => {
+        changes.delete(key);
+        fill(currentFilter());
+        panel();
+      });
+      item.append(discardEdit);
     }
-    list.append(h("li", { "data-key": key }, h("b", {}, row.label), ": ", before, " → ", after));
+    list.append(item);
   }
-  if (changes.size) {
+  const saveable = [...changes.keys()].filter((key) => visible(rowOf(key))).length + removals.size;
+  if (saveable) {
     for (const row of deletedKeys()) {
       list.append(
         h("li", { "data-key": row.key, class: "warning" }, `No tier uses ${row.vendor} after this save, so the save deletes the saved ${row.label}.`),
@@ -262,9 +274,9 @@ function panel() {
   }
   for (const key of removals) list.append(h("li", { "data-key": key }, "Remove the line ", h("code", {}, key)));
   const count = changes.size + removals.size;
-  document.getElementById("changes-empty").hidden = count > 0;
-  document.getElementById("save-changes").disabled = count === 0;
-  document.getElementById("discard-changes").disabled = count === 0;
+  document.getElementById("changes-panel").hidden = count === 0;
+  document.getElementById("save-changes").disabled = saving || saveable === 0;
+  document.getElementById("discard-changes").disabled = saving || count === 0;
 }
 
 function showErrors(errors) {
@@ -280,47 +292,68 @@ function showSaved(restart) {
   const box = document.getElementById("save-status");
   const labels = restart.map((key) => rowOf(key)?.label ?? key);
   box.replaceChildren(
-    "Saved. The next analysis uses the new settings, and an analysis that runs now finishes on the old ones.",
+    changes.size || removals.size
+      ? "Saved the active settings. Edits to inactive settings are still pending. The next analysis uses the new settings, and an analysis that runs now finishes on the old ones."
+      : "Saved. The next analysis uses the new settings, and an analysis that runs now finishes on the old ones.",
     labels.length ? h("div", {}, "Restart the app to apply the job storage change: ", labels.join(", "), ".") : null,
   );
   box.hidden = false;
 }
 
 async function save() {
+  if (saving) return;
+  const sentChanges = new Map([...changes].filter(([key]) => visible(rowOf(key))));
+  const sentRemovals = new Set(removals);
+  if (!sentChanges.size && !sentRemovals.size) return;
+  saving = true;
+  const layout = document.querySelector(".settings-layout");
+  const unknown = document.getElementById("unknown-lines");
+  layout.inert = true;
+  unknown.inert = true;
+  layout.setAttribute("aria-busy", "true");
   const button = document.getElementById("save-changes");
-  button.disabled = true;
+  button.textContent = "Saving…";
+  panel();
   document.getElementById("save-errors").hidden = true;
   document.getElementById("save-status").hidden = true;
-  let response;
   try {
-    response = await fetch("/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        revision: SETTINGS.revision,
-        changes: Object.fromEntries([...changes].filter(([key]) => visible(rowOf(key)))),
-        remove: [...removals],
-      }),
-    });
-  } catch {
-    showErrors([{ message: "The app did not answer. Check that it runs, then try again." }]);
+    let response;
+    try {
+      response = await fetch("/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          revision: SETTINGS.revision,
+          changes: Object.fromEntries(sentChanges),
+          remove: [...sentRemovals],
+        }),
+      });
+    } catch {
+      showErrors([{ message: "The app did not answer. Check that it runs, then try again." }]);
+      return;
+    }
+    const payload = await response.json().catch(() => ({}));
+    if (response.ok) {
+      SETTINGS = payload.settings;
+      for (const key of sentChanges.keys()) changes.delete(key);
+      for (const key of sentRemovals) removals.delete(key);
+      render();
+      showSaved(payload.restart);
+      return;
+    }
+    showErrors(payload.errors ?? [{ message: payload.message ?? `The save failed with status ${response.status}.` }]);
+  } finally {
+    saving = false;
+    layout.inert = false;
+    unknown.inert = false;
+    layout.removeAttribute("aria-busy");
+    button.textContent = "Check and save";
     panel();
-    return;
   }
-  const payload = await response.json().catch(() => ({}));
-  if (response.ok) {
-    SETTINGS = payload.settings;
-    changes.clear();
-    removals.clear();
-    render();
-    showSaved(payload.restart);
-    return;
-  }
-  showErrors(payload.errors ?? [{ message: payload.message ?? `The save failed with status ${response.status}.` }]);
-  panel();
 }
 
 function discard() {
+  if (saving) return;
   changes.clear();
   removals.clear();
   document.getElementById("save-errors").hidden = true;

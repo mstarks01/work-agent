@@ -4,6 +4,8 @@ const workspace = (() => {
   const panels = ["description-panel", "progress-panel", "asked", "reports-panel", "library-panel"];
   let current = null;
   let generation = 0;
+  let progressRun = null;
+  let completedSteps = [];
   // A running analysis shows its progress under the tab of what it produces
   // next: Questions where it will stop to ask, Reports where it runs to a report.
   const progressTab = () => current?.pauses ? "questions-nav" : "reports-nav";
@@ -32,6 +34,9 @@ const workspace = (() => {
     el("frameworks").disabled = true;
     el("go").hidden = true;
     el("load").hidden = true;
+    el("upload").hidden = true;
+    el("transcript-note").hidden = true;
+    el("transcript-file").disabled = true;
     el("ask").disabled = true;
     current = data;
     el("analysis-header").hidden = false;
@@ -108,7 +113,7 @@ const workspace = (() => {
       if (data.questions) showQuestions(data.questions);
       else if (data.status === "running") {
         show("progress-panel");
-        processing(data.completed_steps, data.pauses);
+        processing(data.completed_steps, data.pauses, undefined, data.run);
         el("status").hidden = false;
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
       } else if (served && new URLSearchParams(location.search).get("view") !== "reports") {
@@ -137,33 +142,59 @@ const workspace = (() => {
       if (ticket === generation) metadata(data);
     } catch (error) { message(error.message); }
   };
-  // Node events name completed steps. Show the next stage in plain language.
-  // Runs can take different paths, so the bar stays indeterminate.
+  // Each quarter marks a completed stage, not a share of elapsed time.
+  const completedStage = (step, pauses) => {
+    if (step === "extract") return 1;
+    if (["validate", "repair", "revalidate", "capabilities", "stated", "read", "assert"].includes(step)) return 2;
+    if (pauses && step === "catalog") return 3;
+    if (pauses && step === "pause") return 4;
+    if (!pauses && step === "prepare") return 2;
+    if (!pauses && (step.startsWith("join_") || step.startsWith("merge_")
+        || step.startsWith("critic_") || step.startsWith("critic_failed_")
+        || step.startsWith("router_") || step.startsWith("recritic_")
+        || step.startsWith("rereview_"))) return 3;
+    if (!pauses && step === "assemble") return 4;
+    return 0;
+  };
   const stageAfter = (step, pauses) => {
-    if (!step) return pauses ? "Building system model…" : "Preparing analysis…";
-    if (step === "extract" || step === "repair") return "Checking system model…";
-    if (step === "validate" || step === "revalidate" || step === "capabilities"
-        || step === "stated" || step === "assert" || step === "read") {
-      return pauses ? "Generating questions…" : "Preparing analysis checks…";
+    if (!step) return pauses ? "Reading your description and identifying the parts of your system…"
+      : "Preparing the analysis…";
+    if (step === "extract" || step === "repair") return "Checking the system map for gaps or conflicting details…";
+    if (step === "validate" || step === "revalidate") return "Noting the security measures you’ve already described…";
+    if (step === "capabilities" || step === "stated" || step === "read") {
+      return "Identifying details that would make the analysis more precise…";
     }
-    if (step === "catalog" || step === "pause") return "Finishing questions…";
-    if (step === "prepare") return "Running analysis checks…";
-    if (step === "assemble") return "Finishing report…";
-    if (/^(analyze|join|merge|critic|router|recritic|rereview|critic_failed)_/.test(step)) {
-      return "Reviewing findings…";
+    if (step === "assert") return "Choosing the relevant checks for your system…";
+    if (step === "catalog" || step === "pause") return "Generating questions…";
+    if (step === "prepare" || step.startsWith("analyze_")) {
+      return "Examining your system against the selected frameworks…";
     }
-    return "Continuing analysis…";
+    if (step.startsWith("join_") || step.startsWith("merge_") || step.startsWith("critic_")
+        || step.startsWith("critic_failed_")
+        || step.startsWith("router_") || step.startsWith("recritic_")
+        || step.startsWith("rereview_")) {
+      return "Bringing the results together and checking the findings…";
+    }
+    if (step === "assemble") return "Putting your report together…";
+    return "Continuing the analysis…";
   };
-  const processing = (steps, pauses, initialStage) => {
-    const latest = steps?.at(-1);
-    el("status-text").textContent = latest ? stageAfter(latest, pauses)
-      : initialStage || stageAfter(null, pauses);
-  };
-  const progress = (data, filled, total) => {
-    const done = data.early_stop != null;
-    el("answer-progress-bar").max = total || 1;
-    el("answer-progress-bar").value = total ? filled : done ? 1 : 0;
-    el("answer-progress-label").textContent = done ? "No more recommended questions" : `${filled} of ${total} answers filled in`;
+  const processing = (steps, pauses, initialStage, runId) => {
+    if (runId && progressRun !== runId) {
+      progressRun = runId;
+      completedSteps = [];
+      el("analysis-progress").value = 0;
+    }
+    if (steps?.length === 1 && !completedSteps.includes(steps[0])) {
+      completedSteps.push(steps[0]);
+    } else if (steps?.length > completedSteps.length) {
+      completedSteps = steps;
+    }
+    const latest = completedSteps.at(-1);
+    const progress = el("analysis-progress");
+    progress.value = Math.max(progress.value, ...completedSteps.map((step) => completedStage(step, pauses)));
+    progress.setAttribute("aria-valuetext", `${progress.value} of 4 stages complete`);
+    const status = latest ? stageAfter(latest, pauses) : initialStage || stageAfter(null, pauses);
+    el("status-text").textContent = `${progress.value} of 4 stages complete · ${status}`;
   };
   const grouped = () => {
     show("asked");
@@ -226,5 +257,5 @@ const workspace = (() => {
       }
     }).catch(() => message("Recent analyses are unavailable. You can still start a new analysis."));
   });
-  return {show, track, grouped, progress, processing};
+  return {show, track, grouped, processing};
 })();

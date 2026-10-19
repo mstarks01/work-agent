@@ -182,10 +182,10 @@ def run_to_completion(client, text: str = "A web app talks to a database.") -> s
     return run_id
 
 
-def test_the_form_page_shows_the_resolved_tiers_read_only(client, tiers):
-    page = client.get("/").text
-    for tier, selection in tiers.tiers.items():
-        assert f"<b>{tier}</b> → {selection.vendor} / {selection.model}" in page
+def test_the_form_page_omits_run_configuration():
+    page = (PROJECT_ROOT / "webapp/workspace.html").read_text()
+    assert "Run configuration" not in page
+    assert 'class="configuration"' not in page
 
 
 def test_the_transcript_input_carries_the_deployment_s_byte_limit(client):
@@ -197,10 +197,8 @@ def test_the_transcript_input_carries_the_deployment_s_byte_limit(client):
 def test_no_form_control_can_influence_which_model_runs(client, tiers):
     """The picker chooses what is analysed; nothing chooses what analyses it.
 
-    Model identity stays config-only (A01, LLM10). The page prints the resolved
-    tier, vendor and model, so this cannot assert those strings are absent —
-    it asserts that no *control* carries one, which is the property that would
-    actually be lost if a model field were ever added.
+    Model identity stays config-only (A01, LLM10), so no form control can
+    carry a tier, vendor or model name.
     """
     controls = re.findall(r"<(?:input|select|textarea)\b[^>]*>", client.get("/").text)
     named = {tier for tier in tiers.tiers}

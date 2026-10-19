@@ -253,6 +253,12 @@ def test_a_new_analysis_reuses_the_answers_of_an_earlier_one(page):
     choose(page, control, "yes")
     page.goto("/")
     page.wait_for_selector("#answers-from-field", state="visible")
+    ask_row = page.locator(".ask-with-help").bounding_box()
+    reuse_row = page.locator("#answers-from-field").bounding_box()
+    help = page.locator(".question-help summary").bounding_box()
+    assert ask_row and reuse_row and help
+    assert reuse_row["y"] >= ask_row["y"] + ask_row["height"]
+    assert ask_row["y"] <= help["y"] < ask_row["y"] + ask_row["height"]
     earlier = page.locator("#answers-from option").nth(1).get_attribute("value")
     page.select_option("#answers-from", earlier)
     pause(page)
@@ -298,8 +304,12 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         tab = opened.locator("#questions-nav")
         assert opened.is_visible("#progress-panel")
         assert opened.locator("#analysis-progress").count() == 1
-        assert opened.locator("#analysis-progress").get_attribute("value") is None
-        assert opened.locator("#status-text").inner_text() == "Building system model…"
+        assert opened.locator("#analysis-progress").get_attribute("value") == "0"
+        assert opened.locator("#analysis-progress").get_attribute("max") == "4"
+        assert opened.locator("#status-text").inner_text() == "0 of 4 stages complete · Reading your description and identifying the parts of your system…"
+        assert opened.is_hidden("#upload")
+        assert opened.locator("#transcript-file").is_disabled()
+        assert opened.locator(".configuration").count() == 0
         assert (
             opened.locator("#progress-panel")
             .locator("h2, details, .spinner, #ticks")
@@ -310,8 +320,9 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
 
         runner.step.set()
         opened.wait_for_function(
-            "() => document.querySelector('#status-text').textContent === 'Checking system model…'"
+            "() => document.querySelector('#status-text').textContent === '1 of 4 stages complete · Checking the system map for gaps or conflicting details…'"
         )
+        assert opened.locator("#analysis-progress").get_attribute("value") == "1"
         opened.click("#description-nav")
         assert not opened.is_visible("#progress-panel")
         tab.click()
@@ -637,6 +648,7 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
     for url in serve(create_app(env=env_in(tmp_path, ANALYSIS_MAX_SOURCES="5"))):
         page, errors = opened(browser, url + "/settings")
         page.wait_for_selector("#settings-rows tr[data-key]")
+        assert page.is_hidden("#changes-panel")
         review = page.locator('tr[data-key="tiers.review.model"]').inner_text()
         sources = page.locator('tr[data-key="resilience.max_sources"]').inner_text()
         location, key = (
@@ -893,7 +905,7 @@ def test_an_unticked_framework_shows_its_options_disabled(page):
     assert page.input_value('select[data-option="level"]') == "3", "kept on re-tick"
 
 
-def test_question_progress_and_entry_guidance(page):
+def test_question_guidance_without_a_misleading_progress_count(page):
     assert page.locator('input[name="framework"]:checked').count() == 0
     help = page.locator(".ask-with-help .question-help")
     assert help.locator("summary").text_content().strip() == "How questions work"
@@ -904,11 +916,13 @@ def test_question_progress_and_entry_guidance(page):
     assert not help.locator(".question-help-content").is_visible()
     assert page.get_by_label("Ask me questions to make the report better.").is_checked()
     pause(page)
-    assert page.locator("#answer-progress-bar").get_attribute("value") == "0"
+    note = "Questions are dynamically generated. Your answers may generate more or answer several at once."
+    assert page.locator(".question-note > .hint").inner_text() == note
+    assert page.locator("#answer-progress-bar").count() == 0
     control = page.locator('#questions select:has(option[value="yes"])').first
     control.select_option("yes")
-    assert float(page.locator("#answer-progress-bar").get_attribute("value")) >= 1
-    assert "Is the connection Web App → Orders DB encrypted?" in page.inner_text(
+    assert page.locator(".question-note > .hint").inner_text() == note
+    assert "Is the connection initiated by Web App to Orders DB encrypted?" in page.inner_text(
         "#questions"
     )
 

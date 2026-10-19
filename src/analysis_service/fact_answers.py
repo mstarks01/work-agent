@@ -317,7 +317,7 @@ def fact_label(key: UnknownKey, model: SystemModel) -> str:
     A refusal names a fact by this rather than by its six-part key, which
     means nothing on a page.
     """
-    return label_of(key_ref(key), element_names(model))
+    return label_of(key_ref(key), element_names(model), model)
 
 
 def fact_line(fact: FactAnswer) -> str:

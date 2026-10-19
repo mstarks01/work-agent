@@ -166,7 +166,7 @@
         fail((await started.json()).message);
         return;
       }
-      follow((await started.json()).run, "Building system model…", Boolean(ask && ask.checked));
+      follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean(ask && ask.checked));
     } catch {
       fail("The connection was interrupted. Check Analyses before starting again.");
     }
@@ -201,8 +201,6 @@
   // option is saved at once. 400 ms is the initial target #1632 sets; no
   // measurement of typing chose it.
   const AUTOSAVE_DELAY = 400;
-  // How much of an element's source words a row shows; the rest is its title.
-  const EXCERPT = 200;
   const keyOf = (key) => JSON.stringify(key);
   // A row's key as the page's maps hold it: a link question's key is a
   // string, every other question's the JSON of its key tuple.
@@ -283,9 +281,7 @@
     }
     return parts.length ? parts.join("; ") : null;
   };
-  // Why a question is asked, which analysis it serves, what each answer
-  // does to the list, and the words of the description its element was read
-  // from. The words are what the service read, not an answer to the question.
+  // Keep supporting context next to the prompt, without taking up a row.
   const context = (q) => {
     const parts = [];
     if ((q.reasons || []).length) parts.push(`Why: ${q.reasons[0]}`);
@@ -293,16 +289,33 @@
     if (use) parts.push(use);
     const effect = effectOf(q);
     if (effect) parts.push(effect);
-    if (q.excerpt) {
-      const cut = q.excerpt.length > EXCERPT ? `${q.excerpt.slice(0, EXCERPT)}…` : q.excerpt;
-      parts.push(`Your description of this part, for reference: “${cut}”`);
-    }
+    if (q.excerpt) parts.push(`Your description of this part, for reference: “${q.excerpt}”`);
     if (!parts.length) return null;
-    const hint = document.createElement("div");
-    hint.className = "hint";
-    hint.textContent = parts.join(" · ");
-    hint.title = q.excerpt || "";
-    return hint;
+    const help = document.createElement("details");
+    help.className = "question-context";
+    const trigger = document.createElement("summary");
+    trigger.textContent = "?";
+    trigger.setAttribute("aria-label", "Why this question?");
+    trigger.title = "Why this question?";
+    const content = document.createElement("div");
+    content.className = "question-context-content";
+    for (const part of parts) {
+      const line = document.createElement("p");
+      line.textContent = part;
+      content.append(line);
+    }
+    help.append(trigger, content);
+    return help;
+  };
+  const questionTitle = (q, text) => {
+    const title = document.createElement("div");
+    title.className = "question-title";
+    const label = document.createElement("b");
+    label.textContent = text;
+    title.append(label);
+    const about = context(q);
+    if (about) title.append(about);
+    return title;
   };
   const button = (text, onClick, className = "quiet") => {
     const control = document.createElement("button");
@@ -587,7 +600,7 @@
     if (saving) setStatus("saving");
     else showState();
     if (changed) scheduleSave(typed ? AUTOSAVE_DELAY : 0);
-    updateQuestionProgress();
+    updateQuestionActions();
   };
   // Skip one listed question for now, with any part answer it holds. A skip
   // is not an answer: the fact stays open, and "Answer it" opens it again.
@@ -659,9 +672,7 @@
   // service takes it, or null; `set` writes an answer into the editor.
   const drawFact = (row, prefill) => {
     const q = row.q;
-    const label = document.createElement("b");
-    label.textContent = q.label;
-    label.title = (q.reasons || []).join(" ");
+    const title = questionTitle(q, q.label);
     const { input, nodes, set, answer, readDetail } = inputFor(q, prefill, (event) =>
       onEdit(row, event),
     );
@@ -671,23 +682,27 @@
     row.set = (next) => set(next.value);
     row.compact = false;
     const skip = skipControl(row);
-    const about = context(q);
-    row.node.replaceChildren(...(row.tick ? [row.tick, " "] : []), label, " ", ...nodes, " ", skip);
-    if (about) row.node.append(about);
+    const fields = document.createElement("div");
+    fields.className = "answer-fields";
+    fields.append(" ", ...nodes, " ", skip);
+    row.node.dataset.layout = q.choices?.length ? "split" : "stack";
+    row.node.replaceChildren(...(row.tick ? [row.tick] : []), title, fields);
   };
   // A saved answer, compact and in place, with "Change".
   const drawCompact = (row, answer) => {
     const q = row.q;
-    const label = document.createElement("b");
-    label.textContent = q.label;
+    const title = questionTitle(q, q.label);
     const shown = document.createElement("span");
     shown.textContent = ` — ${answerText(answer)}`;
     row.compact = true;
     row.read = () => null;
-    row.node.replaceChildren(label, shown, " ", button("Change", () => {
+    const fields = document.createElement("div");
+    fields.className = "answer-fields";
+    fields.append(shown, " ", button("Change", () => {
       drawFact(row, answer);
       if (row.input && typeof row.input.focus === "function") row.input.focus();
     }));
+    row.node.replaceChildren(title, fields);
   };
   // A link row: which element a principal is. A skipped link places nothing.
   const linkSelect = (q, prefill) => {
@@ -703,10 +718,10 @@
   };
   const drawLink = (row, prefill) => {
     const q = row.q;
-    const label = document.createElement("label");
     const name = document.createElement("b");
     name.textContent = q.principal;
     const select = linkSelect(q, prefill);
+    select.setAttribute("aria-label", `Matching part of your system for ${q.principal}`);
     select.addEventListener("change", (event) => onEdit(row, event));
     row.input = select;
     row.read = () =>
@@ -715,13 +730,16 @@
       select.value = next.element;
     };
     row.compact = false;
-    label.append(name, ` — places ${q.rows} stated fact(s) `, select);
-    row.node.replaceChildren(label, " ", skipControl(row));
+    const fields = document.createElement("div");
+    fields.className = "answer-fields";
+    fields.append(" ", select, " ", skipControl(row));
+    row.node.dataset.layout = "split";
+    row.node.replaceChildren(name, fields);
     // The element whose name matches, offered and never chosen for the
     // person: the page sends only what a person picks.
     const match = !prefill && q.options.find((option) => option.id === q.suggested);
     if (match) {
-      row.node.append(" ", button(`Use ${match.name || match.id}`, (event) => {
+      fields.append(" ", button(`Use ${match.name || match.id}`, (event) => {
         select.value = match.id;
         onEdit(row, event);
       }));
@@ -734,7 +752,11 @@
     shown.textContent = ` — ${answer.element === "none" ? "none of these" : answer.element}`;
     row.compact = true;
     row.read = () => null;
-    row.node.replaceChildren(name, shown, " ", button("Change", () => drawLink(row, answer.element)));
+    const fields = document.createElement("div");
+    fields.className = "answer-fields";
+    fields.append(shown, " ", button("Change", () => drawLink(row, answer.element)));
+    row.node.dataset.layout = "split";
+    row.node.replaceChildren(name, fields);
   };
   // A question with facets is a table: a column per facet, a row per
   // element, and a first row that sets the whole column where two or more
@@ -761,11 +783,7 @@
     const q = row.q;
     const grid = row.grid;
     const name = document.createElement("td");
-    const who = document.createElement("b");
-    who.textContent = q.element;
-    name.append(who);
-    const about = context(q);
-    if (about) name.append(about);
+    name.append(questionTitle(q, q.element));
     const selects = q.facets.map((facet, column) => {
       const select = facetSelect("(leave unanswered)", (prefill && prefill.facets && prefill.facets[facet.id]) || "", true);
       select.dataset.key = keyOf(q.key);
@@ -805,9 +823,7 @@
   };
   const drawCompactFacets = (row, answer) => {
     const name = document.createElement("td");
-    const who = document.createElement("b");
-    who.textContent = row.q.element;
-    name.append(who);
+    name.append(questionTitle(row.q, row.q.element));
     const shown = document.createElement("td");
     shown.textContent = answerText(answer);
     const change = document.createElement("td");
@@ -842,7 +858,13 @@
     const heading = document.createElement("span");
     heading.className = "group-heading";
     heading.textContent = box.heading;
-    box.title.replaceChildren(heading);
+    if (box.group === "links") {
+      const guidance = document.createElement("small");
+      guidance.textContent = "Choose the matching part for each name, or “None of these” if there’s no match.";
+      box.title.replaceChildren(heading, guidance);
+    } else {
+      box.title.replaceChildren(heading);
+    }
   };
   // A box whose rows ask one attribute or kind of two or more elements asks
   // it once (ADR 0081): one answer for every element it lists, sent as each
@@ -924,7 +946,7 @@
     tick.title = "Take the answer under \"Same for all\"";
     tick.className = "share-answer";
     row.tick = tick;
-    if (!row.compact) row.node.replaceChildren(tick, " ", ...[...row.node.children]);
+    if (!row.compact) row.node.replaceChildren(tick, ...[...row.node.children]);
   };
   // Put a new row after `prev`, the listed row before it in the service's
   // order, or first where there is none. A row joins `prev`'s box where the
@@ -984,7 +1006,7 @@
   // is; everything else follows the service. Rows are matched by key and
   // never moved: a new row is inserted where the service's order puts it.
   let pass = 0;
-  let updateQuestionProgress = () => {};
+  let updateQuestionActions = () => {};
   // True while a skip, a start or an amendment runs. The skip and start
   // buttons stay disabled until it ends.
   let answerBusy = false;
@@ -998,7 +1020,7 @@
     const held = answersOf(data);
     const listed = [
       ...data.link_questions.map((q) => ({
-        q: { ...q, group: "links", group_heading: "Which element is each of these?" },
+        q: { ...q, group: "links", group_heading: "Which part of your system does each name refer to?" },
         kind: "link",
       })),
       ...data.early_questions.map((q) => ({ q, kind: "fact" })),
@@ -1070,7 +1092,7 @@
     drawTail(data);
     drawBoxes(data);
     announce(before, data);
-    updateQuestionProgress();
+    updateQuestionActions();
     if (typeof workspace !== "undefined") workspace.grouped(data);
   };
   // What changed in the list since the last payload, in one short line the
@@ -1233,7 +1255,7 @@
       }
       answerProblem.hidden = true;
       asked.hidden = true;
-      follow(body.run, "Building system model…", true);
+      follow(body.run, "Reading your description and identifying the parts of your system…", true);
     }), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
     tail.append(fix);
@@ -1364,36 +1386,9 @@
     row.listed && !row.compact && !row.node.hidden && row.kind === "fact"
     && row.q.kind === "capability" && !row.read() && !row.detail()
     && (row.q.choices || []).some((choice) => choice.id === "no"));
-  // What the page says about progress: filled answers among the listed rows,
-  // the listed choices, and the start button's weight.
-  updateQuestionProgress = () => {
+  // Keep bulk-answer and start actions in sync with the changing question set.
+  updateQuestionActions = () => {
     if (!view) return;
-    const listed = [...rows.values()].filter((row) => row.listed);
-    // A shared box is one question: its parts count once, and a part is
-    // filled where every row it lists has it (ADR 0081).
-    const parts = (row) => {
-      const answer = row.read ? row.read() : null;
-      if (!answer) return new Set();
-      return new Set(answer.facets ? Object.keys(answer.facets) : ["value"]);
-    };
-    let visible = 0;
-    let filled = 0;
-    const counted = new Set();
-    for (const row of listed) {
-      const box = row.box && row.box.shared ? row.box : null;
-      if (!box) {
-        visible += row.q.decisions || 1;
-        filled += parts(row).size;
-        continue;
-      }
-      if (counted.has(box)) continue;
-      counted.add(box);
-      const members = box.rows.filter((member) => member.listed);
-      const ids = row.q.form === "facets" ? row.q.facets.map((facet) => facet.id) : ["value"];
-      visible += ids.length;
-      const each = members.map(parts);
-      filled += ids.filter((id) => each.every((held) => held.has(id))).length;
-    }
     const left = view.early_stop == null;
     const blank = blankCapabilities().length;
     noRestButton.hidden = !blank;
@@ -1403,7 +1398,6 @@
       + ` left blank (${blank})`;
     skipButton.disabled = answerBusy || !left;
     startButton.className = left ? "" : "primary";
-    if (typeof workspace !== "undefined") workspace.progress(view, filled, visible);
   };
 
   // A refused answer is shown beside the list, and every answer stays as it
@@ -1456,7 +1450,7 @@
         const payload = await snapshot.json();
         if (snapshot.ok && payload.run !== pausedRun) {
           asked.hidden = true;
-          follow(payload.run, "Running analysis checks…", false);
+          follow(payload.run, "Using your answers to continue the analysis…", false);
           return;
         }
         refuse("The connection was interrupted. Reload this analysis to check whether it started.");
@@ -1468,7 +1462,7 @@
       }
       answerProblem.hidden = true;
       asked.hidden = true;
-      follow((await resumed.json()).run, "Running analysis checks…", false);
+      follow((await resumed.json()).run, "Using your answers to continue the analysis…", false);
     } finally {
       starting = false;
       startButton.disabled = false;
@@ -1485,7 +1479,7 @@
     finally {
       answerBusy = false;
       controls.forEach((control) => { control.disabled = false; });
-      updateQuestionProgress();
+      updateQuestionActions();
     }
   };
   startButton.addEventListener("click", () => answerAction(startAnalysis));
@@ -1512,16 +1506,16 @@
     await flush();
   }));
 
-  asked.addEventListener("input", () => updateQuestionProgress());
-  asked.addEventListener("change", () => updateQuestionProgress());
-  asked.addEventListener("click", () => updateQuestionProgress());
+  asked.addEventListener("input", () => updateQuestionActions());
+  asked.addEventListener("change", () => updateQuestionActions());
+  asked.addEventListener("click", () => updateQuestionActions());
 
   // Follow one run's progress to its end: a report, questions, or a failure.
   const follow = (runId, initialStage, pauses) => {
     go.disabled = true;
     if (typeof workspace !== "undefined") workspace.track(runId);
     working(initialStage);
-    if (typeof workspace !== "undefined") workspace.processing([], pauses, initialStage);
+    if (typeof workspace !== "undefined") workspace.processing([], pauses, initialStage, runId);
     const stream = new EventSource("/events/" + encodeURIComponent(runId));
     stream.addEventListener("error", () => {
       stream.close();
@@ -1534,7 +1528,7 @@
     });
     stream.addEventListener("node", (event) => {
       if (typeof workspace !== "undefined") {
-        workspace.processing([JSON.parse(event.data).node], pauses);
+        workspace.processing([JSON.parse(event.data).node], pauses, undefined, runId);
       }
     });
     stream.addEventListener("done", (event) => {
@@ -1565,5 +1559,5 @@
   // it, because the report page shows one finished report and nothing else.
   const followed = new URLSearchParams(location.search).get("follow");
   if (followed) {
-    follow(followed, "Running analysis checks…", false);
+    follow(followed, "Using your answers to continue the analysis…", false);
   }

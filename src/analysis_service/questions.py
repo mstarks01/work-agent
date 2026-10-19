@@ -385,7 +385,7 @@ def fact_questions(
                 key=key,
                 kind=fact_kind(key),
                 basis=basis,
-                label=label_of(needs.refs[key], names),
+                label=label_of(needs.refs[key], names, model),
                 cited_by=cited_by,
                 covered_so_far=sum(
                     1 for facts in waiting.values() if facts <= answered

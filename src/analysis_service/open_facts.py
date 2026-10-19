@@ -33,7 +33,7 @@ from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.evidence import evidence_catalog, prepared_view
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.system_model import ZONE_ATTRIBUTE, SystemModel
+from analysis_service.system_model import ZONE_ATTRIBUTE, DataFlow, SystemModel
 
 NEEDS_INFO = "needs-info"
 
@@ -118,7 +118,9 @@ _ATTRIBUTE_QUESTIONS = {
 }
 
 
-def label_of(ref: UnknownRef, names: Mapping[str, str]) -> str:
+def label_of(
+    ref: UnknownRef, names: Mapping[str, str], model: SystemModel | None = None
+) -> str:
     """What a reader sees for one open fact: the question it asks.
 
     Every surface words a fact through this, so the form page, the report page,
@@ -126,6 +128,26 @@ def label_of(ref: UnknownRef, names: Mapping[str, str]) -> str:
     :attr:`~analysis_service.claims.UnknownRef.kind`.
     """
     where = names.get(ref.element_id, ref.element_id)
+    flow = model.get(ref.element_id) if model is not None else None
+    if isinstance(flow, DataFlow):
+        source = names.get(flow.source, flow.source)
+        destination = names.get(flow.destination, flow.destination)
+        where = f"the connection initiated by {source} to {destination}"
+        if ref.kind == "attribute":
+            match ref.attribute:
+                case "authentication":
+                    return (
+                        f"When {source} initiates a connection to {destination}, "
+                        "what authentication, if any, is used?"
+                    )
+                case "protocol":
+                    return f"What protocol does {source} use to connect to {destination}?"
+                case "encryption_in_transit":
+                    return f"Is {where} encrypted?"
+                case "data_description":
+                    return f"What data passes over {where}?"
+                case "operations":
+                    return f"What does {source} do when it connects to {destination}?"
     match ref.kind:
         case "capability":
             capability = CAPABILITIES.get(ref.capability)
@@ -178,7 +200,7 @@ def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, 
         refs = claim.waits_on()
         needs[claim.id] = {ref.key for ref in refs}
         for ref in refs:
-            labels.setdefault(ref.key, label_of(ref, names))
+            labels.setdefault(ref.key, label_of(ref, names, model))
     cited: dict[UnknownKey, list[str]] = defaultdict(list)
     for claim_id, keys in needs.items():
         for key in keys:

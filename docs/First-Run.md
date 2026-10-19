@@ -379,23 +379,21 @@ The app can ask you questions before the analysis, and after the report.
   a first row that sets a whole column at once. Each cell takes yes, no, not
   applicable or "I don't know". The most
   likely needed questions come first and are open; the rest are one click
-  away. Hover over a part's name to see why a rule asks about it. Where your
+  away. Open the question-mark help beside a prompt to see why it is asked. Where your
   install builds an assertion catalog (the default), it also
   asks which element each group of people or accounts is, such as "shopper
   accounts", so that facts about the group reach the model. Rows you leave
   blank stay open.
 
-  The page lists the recommended questions at once, the most useful first,
-  and under each yes/no question says what each answer would settle. Where one question asks about several
+  The page lists the recommended questions at once, the most useful first.
+  The help beside each prompt explains what its answers may change. Where one question asks about several
   parts of your system, the page asks it once and lists the parts it applies
   to; one answer is saved for each of them. Where a part differs, open
-  **Answer each one separately** and change that part, or untick it. Under each question, a line says why it is
-  asked and quotes the words of your description that the part was read
-  from. A line at the top says
-  what the list holds; your answers can add questions as well as remove
+  **Answer each one separately** and change that part, or untick it. The help also quotes the words of your description that the part was read
+  from. A line at the top explains that your answers can add questions as well as remove
   them, and the page says when they do. Each answer is saved as you give
   it: a chosen option at once, typed text a moment after you stop. The line
-  under the progress bar says **Not saved** when a save fails, and **Save
+  near the question guidance says **Not saved** when a save fails, and **Save
   now** sends again what a lost connection left unsaved. If you leave the page
   before an answer is saved, the browser asks you to confirm. The app runs
   no model, and shows the list again with your answers in. A new question
@@ -441,8 +439,8 @@ The app can ask you questions before the analysis, and after the report.
   answer**, change it or choose "I don't know", and click **Save the
   corrections**. The report marks each finding that rests on a corrected
   answer. The analysis does not run again. Where your install builds an assertion catalog, the
-  follow-up also lists the group questions under **Which element is each of
-  these?**. Where a part of your system has the same name as the person or
+  follow-up also lists the group questions under **Which part of your system
+  does each name refer to?**. Where a part of your system has the same name as the person or
   team, the question offers **Use** with that name; nothing is chosen until
   you click it. Under **Earlier answers**, the follow-up lists the answers this
   report read. Click **Change** beside one to give a new answer, and the
