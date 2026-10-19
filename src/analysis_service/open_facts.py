@@ -141,7 +141,9 @@ def label_of(
                         "what authentication, if any, is used?"
                     )
                 case "protocol":
-                    return f"What protocol does {source} use to connect to {destination}?"
+                    return (
+                        f"What protocol does {source} use to connect to {destination}?"
+                    )
                 case "encryption_in_transit":
                     return f"Is {where} encrypted?"
                 case "data_description":

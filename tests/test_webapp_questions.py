@@ -1686,7 +1686,10 @@ calls.push({ analysing: !ids.status.hidden, text: ids["status-text"].textContent
     building, paused, analysing = (c for c in seen if "url" not in c)
 
     assert building["building"]
-    assert building["text"] == "Reading your description and identifying the parts of your system…"
+    assert (
+        building["text"]
+        == "Reading your description and identifying the parts of your system…"
+    )
     assert paused == {"paused": True}
     assert analysing["analysing"]
     assert analysing["text"] == "Using your answers to continue the analysis…"

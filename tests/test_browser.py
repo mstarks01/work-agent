@@ -306,7 +306,10 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         assert opened.locator("#analysis-progress").count() == 1
         assert opened.locator("#analysis-progress").get_attribute("value") == "0"
         assert opened.locator("#analysis-progress").get_attribute("max") == "4"
-        assert opened.locator("#status-text").inner_text() == "0 of 4 stages complete · Reading your description and identifying the parts of your system…"
+        assert (
+            opened.locator("#status-text").inner_text()
+            == "0 of 4 stages complete · Reading your description and identifying the parts of your system…"
+        )
         assert opened.is_hidden("#upload")
         assert opened.locator("#transcript-file").is_disabled()
         assert opened.locator(".configuration").count() == 0
@@ -922,8 +925,9 @@ def test_question_guidance_without_a_misleading_progress_count(page):
     control = page.locator('#questions select:has(option[value="yes"])').first
     control.select_option("yes")
     assert page.locator(".question-note > .hint").inner_text() == note
-    assert "Is the connection initiated by Web App to Orders DB encrypted?" in page.inner_text(
-        "#questions"
+    assert (
+        "Is the connection initiated by Web App to Orders DB encrypted?"
+        in page.inner_text("#questions")
     )
 
 
