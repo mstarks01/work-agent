@@ -1415,7 +1415,8 @@ def test_the_page_posts_the_selection_it_built_from_the_checkboxes():
     """
     javascript = form_javascript()
 
-    assert "frameworks: selection()" in javascript
+    assert "const frameworks = selection()" in javascript
+    assert "frameworks," in javascript
     assert 'querySelectorAll("input[name=framework]")' in javascript
 
 
@@ -1567,6 +1568,7 @@ PAGE_SCRIPTS = {
     "webapp/sitting.py": "sitting.js",
     "webapp/review.py": ("review_queue.js", "review_finding.js"),
     "webapp/main.py": (
+        "sidebar.js",
         "workspace.js",
         "answer_editor.js",
         "first_run.js",

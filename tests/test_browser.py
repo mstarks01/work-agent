@@ -993,7 +993,7 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     assert page.locator("#sysname").is_visible()
     page.get_by_role("link", name="All reports", exact=True).click()
     page.wait_for_selector("#report-list a")
-    assert page.locator("#report-list a").inner_text().startswith("Your system")
+    assert page.locator("#report-list a").inner_text().startswith("Test analysis")
     assert "Generated " in page.locator("#report-list a").inner_text()
 
 
