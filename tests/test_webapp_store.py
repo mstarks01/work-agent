@@ -103,17 +103,6 @@ def payload(page: str, block: str) -> dict:
     return json.loads(match.group(1))
 
 
-def assert_store_is_named(tiers, caplog, restart: str) -> None:
-    """The startup log and each of the page's three hints carry one note."""
-    with caplog.at_level(logging.INFO, logger="webapp"):
-        client = app(tiers)
-    with client:
-        page = client.get("/").text
-    [note] = [line for line in caplog.messages if "restart" in line]
-    assert restart in note
-    assert page.count(note) == 3
-
-
 class TestTheSettings:
     def test_with_no_store_setting_a_restart_loses_every_run(self, tiers):
         with app(tiers) as client:
@@ -121,27 +110,21 @@ class TestTheSettings:
         with app(tiers) as client:
             assert client.get("/workspace/runs").json() == []
 
-    def test_the_log_and_the_page_say_a_restart_clears_a_memory_store(
-        self, tiers, caplog
-    ):
-        assert_store_is_named(tiers, caplog, "a restart clears them")
+    def test_the_memory_store_page_omits_storage_policy_notes(self, tiers):
+        with app(tiers) as client:
+            assert "This app keeps your runs" not in client.get("/").text
 
-    def test_the_log_and_the_page_say_a_restart_keeps_a_sql_store(
-        self, tiers, caplog, durable
-    ):
-        assert_store_is_named(tiers, caplog, "a restart keeps them")
+    def test_the_sql_store_page_omits_storage_policy_notes(self, tiers, durable):
+        with app(tiers) as client:
+            assert "This app keeps your runs" not in client.get("/").text
 
-    def test_the_page_says_a_restart_clears_a_memory_store_another_class_wraps(
-        self, tiers
-    ):
-        """The store states whether it is durable, so a class the note does not
-        know never reads as durable."""
+    def test_a_wrapped_memory_store_page_omits_storage_policy_notes(self, tiers):
         store = ChangesTheOldestOnAdmission(InMemoryJobStore())
         workspace = Workspace(store=store)
         client = TestClient(
             create_app(startup_for(tiers), workspace), base_url=LOOPBACK
         )
-        assert "a restart clears them" in client.get("/").text
+        assert "This app keeps your runs" not in client.get("/").text
 
     @pytest.mark.parametrize(
         ("setting", "value", "message"),

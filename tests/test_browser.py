@@ -120,6 +120,8 @@ def choose(page, locator, value: str) -> None:
 
 def pause(page) -> None:
     """Submit a description that asks questions, and wait for the list."""
+    if not page.locator("#analysis-name").input_value():
+        page.fill("#analysis-name", "Test analysis")
     page.fill("#description", "A web app talks to a database.")
     page.check("#ask")
     if not page.locator('input[name="framework"]:checked').count():
@@ -127,6 +129,36 @@ def pause(page) -> None:
             framework.check()
     page.click("#go")
     page.wait_for_selector("#asked", state="visible")
+
+
+def test_entry_validates_its_name_framework_and_description_limit(page):
+    assert page.locator("#analysis-name").get_attribute("required") is not None
+    before = int(page.locator("#description").get_attribute("data-max-bytes"))
+    assert f"{before:,} characters remaining" in page.inner_text(
+        "#description-remaining"
+    )
+    page.fill("#analysis-name", "Test analysis")
+    page.fill("#description", "A")
+    assert f"{before - 1:,} characters remaining" in page.inner_text(
+        "#description-remaining"
+    )
+    page.click("#go")
+    assert page.inner_text("#problem") == "Please select a framework."
+
+
+def test_sidebar_collapses_and_stays_collapsed_on_settings(page):
+    page.click("#sidebar-toggle")
+    assert "sidebar-collapsed" in page.locator(".workspace").get_attribute("class")
+    assert (
+        page.locator("#sidebar-toggle").get_attribute("aria-label") == "Expand sidebar"
+    )
+    page.goto("/settings")
+    assert "sidebar-collapsed" in page.locator(".workspace").get_attribute("class")
+    page.click("#sidebar-toggle")
+    assert (
+        page.locator("#sidebar-toggle").get_attribute("aria-label")
+        == "Collapse sidebar"
+    )
 
 
 def test_clearing_a_control_sends_no_answer_for_it(page):
@@ -292,6 +324,7 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         context = browser.new_context(base_url=base)
         opened = context.new_page()
         opened.goto("/")
+        opened.fill("#analysis-name", "Test analysis")
         opened.fill("#description", "A web app talks to a database.")
         opened.check("#ask")
         for framework in opened.locator('input[name="framework"]').all():
@@ -635,6 +668,16 @@ def test_workspace_reopens_grouped_questions_and_renders_names_as_text(page):
     assert page.is_visible("#reports-panel")
     page.click("#library-nav")
     page.wait_for_selector("#analysis-list a")
+    assert page.locator("#analysis-list th").all_inner_texts() == [
+        "Name",
+        "Date",
+        "Status",
+    ]
+    assert page.locator("#analysis-list time").first.get_attribute("datetime")
+    page.locator('[data-sort="name"]').click()
+    assert page.locator("#sort-name").get_attribute("aria-sort") == "ascending"
+    page.locator('[data-sort="name"]').click()
+    assert page.locator("#sort-name").get_attribute("aria-sort") == "descending"
     assert page.locator("#analysis-list img").count() == 0
     page.locator("#analysis-list a").click()
     page.wait_for_selector("#asked", state="visible")
@@ -684,13 +727,19 @@ def test_the_settings_page_saves_resets_and_refuses_a_stale_tab(browser, tmp_pat
     for url in serve(create_app(env=env_in(tmp_path))):
         page, errors = opened(browser, url + "/settings")
         other, other_errors = opened(browser, url + "/settings")
-        page.locator(f"{timeout} input").fill(" 5000")
-        listed = page.locator("#changes-list").inner_text()
+        page.locator(f"{timeout} input").fill("")
+        page.locator("#settings-search").click()
+        assert page.locator(f"{timeout} input").get_attribute("aria-invalid") == "true"
+        assert (
+            "Enter a whole number"
+            in page.locator(f"{timeout} .field-error").inner_text()
+        )
         page.click("#save-changes")
         page.wait_for_selector("#save-errors", state="visible")
         refused = page.locator("#save-errors").inner_text()
 
         page.locator(f"{timeout} input").fill("5000")
+        listed = page.locator("#changes-list").inner_text()
         page.click("#save-changes")
         page.wait_for_selector("#save-status", state="visible")
         status = page.locator("#save-status").inner_text()
@@ -710,7 +759,7 @@ def test_the_settings_page_saves_resets_and_refuses_a_stale_tab(browser, tmp_pat
         other.close()
     assert errors == other_errors == [], f"the settings page raised: {errors}"
     assert "Timeout ms" in listed and "5000" in listed
-    assert "whitespace" in refused and "5000" not in refused
+    assert "Timeout ms: Enter a whole number." in refused
     assert "next analysis uses the new settings" in status
     assert "this page" in changed and "Shipped:" in changed
     assert "ANALYSIS_TIMEOUT_MS=5000" in written
@@ -860,6 +909,7 @@ def test_an_uploaded_transcript_alone_starts_an_analysis(page):
     upload("call.txt", "Ana: the web app talks to a database. — Ben: yes.".encode())
     page.wait_for_selector("#transcript-note", state="visible")
     assert page.inner_text("#transcript-name") == "call.txt"
+    page.fill("#analysis-name", "Transcript analysis")
     with page.expect_request("**/analyze") as posted:
         page.click("#go")
     assert posted.value.post_data_json["sources"] == [
@@ -943,7 +993,7 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     assert page.locator("#sysname").is_visible()
     page.get_by_role("link", name="All reports", exact=True).click()
     page.wait_for_selector("#report-list a")
-    assert page.locator("#report-list a").inner_text().startswith("Your system")
+    assert page.locator("#report-list a").inner_text().startswith("Test analysis")
     assert "Generated " in page.locator("#report-list a").inner_text()
 
 

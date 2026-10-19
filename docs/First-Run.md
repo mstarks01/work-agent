@@ -318,14 +318,15 @@ instead of the analysis form. The page links to the
 
 ## 4. Run the included example
 
-1. Click **Load example**. This loads
+1. Enter an analysis name and click **Load example**. This loads
    [`examples/orders.md`](../examples/orders.md).
 2. Select at least one framework.
 3. For ASVS, select level 1, 2, or 3.
 4. Click **Prepare analysis**.
 
-The selected frameworks affect both the answer and the cost. STRIDE runs six
-lane analyzers. ASVS runs 17. Each framework also runs its own reviewer, and a
+The analysis name is required in the app. The selected frameworks affect both
+the answer and the cost. STRIDE runs six lane analyzers. ASVS runs 17. Each
+framework also runs its own reviewer, and a
 malformed review may cause one additional review call. Extraction is shared
 when both frameworks are selected.
 
@@ -352,8 +353,9 @@ Start with these parts of the result:
   the provider returned, and which execution fingerprint each call produced.
   These values support auditing; they do not establish that a finding is right.
 
-To analyze a recorded conversation, click **Upload transcript** and choose the
-transcript as a plain UTF-8 text file. The page refuses a file that is larger
+To analyze a recorded conversation, click the **+** button below the
+description field and choose the transcript as a plain UTF-8 text file. The page
+refuses a file that is larger
 than one analysis can carry, is not UTF-8, or holds control characters. The
 service reads the transcript as a conversation, beside the description where
 you type one. **Remove** takes the transcript off the form.

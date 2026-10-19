@@ -1012,8 +1012,6 @@
 
     if (LINK_QUESTIONS.length) {
       box.append(el("h2", null, "Which part of your system does each name refer to?"));
-      box.append(el("div", "meta",
-        "Choose the matching part for each name, or “None of these” if there’s no match."));
       LINK_QUESTIONS.forEach(q => {
         const row = el("p");
         const select = el("select");

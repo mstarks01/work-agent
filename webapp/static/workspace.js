@@ -41,8 +41,8 @@ const workspace = (() => {
     current = data;
     el("analysis-header").hidden = false;
     el("new-analysis-title").hidden = true;
+    el("description-remaining").hidden = true;
     el("analysis-title").textContent = data.name;
-    el("breadcrumb-title").textContent = data.name;
     el("analysis-state").textContent = labels[data.status] || data.status;
     el("analysis-frameworks").textContent = data.frameworks.join(" · ");
     el("questions-nav").disabled = !(data.status === "awaiting-answers" || (data.status === "running" && data.pauses));
@@ -68,23 +68,54 @@ const workspace = (() => {
     ++generation;
     show("library-panel");
     el("analysis-header").hidden = true;
-    el("breadcrumb-title").textContent = "Analyses";
     history.replaceState(null, "", "/?view=analyses");
     try {
       const response = await fetch("/workspace/runs");
       if (!response.ok) throw new Error("Could not load analyses. Try again.");
       const data = await response.json();
+      let sortBy = "date";
+      let descending = true;
       const render = () => {
-        el("analysis-list").replaceChildren();
+        el("analysis-rows").replaceChildren();
         const found = data.filter((run) => run.name.toLocaleLowerCase().includes(el("analysis-search").value.toLocaleLowerCase()));
-        found.forEach((run) => {
-          const link = node("a", "", "analysis-row");
-          link.href = "/?run=" + encodeURIComponent(run.run);
-          link.append(node("strong", run.name), node("span", labels[run.status], "badge"));
-          el("analysis-list").append(link);
+        found.sort((left, right) => {
+          const order = sortBy === "name"
+            ? left.name.localeCompare(right.name, undefined, { sensitivity: "base", numeric: true })
+            : new Date(left.created_at) - new Date(right.created_at);
+          return (descending ? -order : order) || left.name.localeCompare(right.name);
         });
-        if (!found.length) el("analysis-list").append(node("p", data.length ? "No analyses match your search." : "Start with a system description. Your analyses will appear here.", "muted"));
+        found.forEach((run) => {
+          const link = node("a", run.name);
+          link.href = "/?run=" + encodeURIComponent(run.run);
+          const created = node("time", new Date(run.created_at).toLocaleDateString(undefined, {dateStyle: "medium"}));
+          created.dateTime = run.created_at;
+          const row = node("tr", "");
+          const nameCell = node("td", "");
+          const dateCell = node("td", "");
+          const statusCell = node("td", "");
+          nameCell.append(link);
+          dateCell.append(created);
+          statusCell.append(node("span", labels[run.status] || run.status, "badge"));
+          row.append(nameCell, dateCell, statusCell);
+          el("analysis-rows").append(row);
+        });
+        el("analysis-list").hidden = !found.length;
+        el("analysis-empty").hidden = Boolean(found.length);
+        el("analysis-empty").textContent = data.length
+          ? "No analyses match your search."
+          : "Start with a system description. Your analyses will appear here.";
+        for (const key of ["name", "date"]) {
+          el("sort-" + key).setAttribute("aria-sort", sortBy === key ? (descending ? "descending" : "ascending") : "none");
+        }
       };
+      el("library-panel").querySelectorAll("[data-sort]").forEach((button) => {
+        button.onclick = () => {
+          const key = button.dataset.sort;
+          descending = sortBy === key ? !descending : key === "date";
+          sortBy = key;
+          render();
+        };
+      });
       el("analysis-search").oninput = render;
       render();
     } catch (error) { message(error.message); }

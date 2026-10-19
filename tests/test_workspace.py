@@ -47,6 +47,7 @@ def test_reopen_keeps_questions_revision_and_related_report(tiers):
         assert "no-store" in listing.headers["cache-control"]
         assert "Private system description" not in listing.text
         assert listing.json()[0]["name"] == BREAKOUT
+        assert listing.json()[0]["created_at"]
         detail = client.get(f"/workspace/runs/{run}").json()
         assert detail["questions"] == paused
         assert detail["description"] == "Private system description"

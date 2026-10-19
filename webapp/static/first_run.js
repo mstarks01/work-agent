@@ -52,6 +52,7 @@
       const response = await fetch("/example");
       if (!response.ok) throw new Error();
       box.value = await response.text();
+      updateDescriptionRemaining();
     } catch {
       fail("Could not load the example. Try again.");
     }
@@ -67,13 +68,28 @@
   const transcriptFile = document.getElementById("transcript-file");
   const transcriptNote = document.getElementById("transcript-note");
   const maxTranscriptBytes = Number(transcriptFile.dataset.maxBytes);
+  const maxDescriptionBytes = Number(box.dataset.maxBytes);
+  const remainingNote = document.getElementById("description-remaining");
   const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/;
   let transcript = null;
+  const updateDescriptionRemaining = () => {
+    const used = new TextEncoder().encode(box.value).length
+      + new TextEncoder().encode(transcript || "").length;
+    const remaining = maxDescriptionBytes - used;
+    remainingNote.textContent = remaining < 0
+      ? "Description and transcript are too long. Shorten them to continue."
+      : `Up to ${remaining.toLocaleString()} characters remaining`;
+    remainingNote.classList.toggle("field-error", remaining < 0);
+    return remaining;
+  };
+  box.addEventListener("input", updateDescriptionRemaining);
+  updateDescriptionRemaining();
   const holdTranscript = (text, name) => {
     transcript = text;
     document.getElementById("transcript-name").textContent = name;
     transcriptNote.hidden = text === null;
     box.required = text === null;
+    updateDescriptionRemaining();
   };
   document.getElementById("upload").addEventListener("click", () => transcriptFile.click());
   document.getElementById("transcript-remove").addEventListener(
@@ -150,14 +166,30 @@
     problem.hidden = true;
     go.disabled = true;
 
+    const name = document.getElementById("analysis-name").value.trim();
+    if (!name) {
+      fail("Enter an analysis name.");
+      document.getElementById("analysis-name").focus();
+      return;
+    }
+    const frameworks = selection();
+    if (!frameworks.length) {
+      fail("Please select a framework.");
+      return;
+    }
+    if (updateDescriptionRemaining() < 0) {
+      fail("Description and transcript are too long. Shorten them to continue.");
+      return;
+    }
+
     try {
       const started = await fetch("/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sources: sources(),
-          name: document.getElementById("analysis-name")?.value.trim() || "Your system",
-          frameworks: selection(),
+          name,
+          frameworks,
           questions: Boolean(ask && ask.checked),
           answers_from: document.getElementById("answers-from")?.value || undefined,
         }),
@@ -844,6 +876,9 @@
     node.className = "question-group";
     node.open = true;
     const title = document.createElement("summary");
+    const applies = document.createElement("small");
+    applies.className = "group-applies";
+    applies.hidden = true;
     const top = document.createElement("div");
     const each = document.createElement("details");
     each.className = "each-one";
@@ -852,19 +887,13 @@
     eachTitle.hidden = true;
     each.append(eachTitle);
     node.append(title, top, each);
-    return { node, title, top, each, eachTitle, group: q.group, heading: q.group_heading, rows: [], grid: null, shared: null };
+    return { node, title, applies, top, each, eachTitle, group: q.group, heading: q.group_heading, rows: [], grid: null, shared: null };
   };
   const titleBox = (box) => {
     const heading = document.createElement("span");
     heading.className = "group-heading";
     heading.textContent = box.heading;
-    if (box.group === "links") {
-      const guidance = document.createElement("small");
-      guidance.textContent = "Choose the matching part for each name, or “None of these” if there’s no match.";
-      box.title.replaceChildren(heading, guidance);
-    } else {
-      box.title.replaceChildren(heading);
-    }
+    box.title.replaceChildren(heading, box.applies);
   };
   // A box whose rows ask one attribute or kind of two or more elements asks
   // it once (ADR 0081): one answer for every element it lists, sent as each
@@ -893,14 +922,18 @@
   const sharedControl = (box, q) => {
     const line = document.createElement("p");
     if (q.form === "facets") {
+      line.className = "shared-facets";
       for (const facet of q.facets) {
         const label = document.createElement("label");
+        label.className = "shared-facet";
         const select = facetSelect("(leave unanswered)", "", true);
         select.dataset.facet = facet.id;
         select.addEventListener("change", () =>
           applyShared(box, (row) => row.setFacet && row.setFacet(facet.id, select.value)));
-        label.append(facet.question, " ", select);
-        line.append(label, " ");
+        const prompt = document.createElement("span");
+        prompt.textContent = facet.question;
+        label.append(prompt, select);
+        line.append(label);
       }
       return line;
     }
@@ -914,6 +947,7 @@
     const one = members.length >= 2
       && members.every((row) => shareable(row.q, members[0].q));
     box.eachTitle.hidden = !one;
+    box.applies.hidden = !one;
     box.eachTitle.textContent = `Answer each one separately (${members.length})`;
     if (!one) {
       box.top.className = "";
@@ -926,15 +960,13 @@
       box.shared = sharedControl(box, members[0].q);
       box.each.open = false;
     }
-    const names = document.createElement("p");
-    names.className = "hint";
-    names.textContent = "Applies to: " + members.map((row) => row.q.element).join(", ");
+    box.applies.textContent = "Applies to: " + members.map((row) => row.q.element).join(", ");
     const hint = document.createElement("p");
     hint.className = "hint";
     hint.textContent = "One answer covers every part listed. Where one differs,"
       + " open \"Answer each one separately\" and change it there.";
     box.top.className = "shared-controls";
-    box.top.replaceChildren(box.shared, names, hint);
+    box.top.replaceChildren(box.shared, hint);
     for (const row of members) if (row.q.form !== "facets") addTick(row);
   };
   // Ticked rows take the shared answer; an unticked row is an exception.

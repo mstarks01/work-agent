@@ -18,8 +18,9 @@
   .tag.outside { border-color:var(--accent); color:var(--accent); }
   .not-set { color:var(--muted); font-style:italic; }
   .settings-layout { display:grid; grid-template-columns:minmax(0,1fr) 18rem; gap:24px; align-items:start; }
-  .settings-layout:has(> .changes-panel[hidden]) { grid-template-columns:minmax(0,1fr); }
-  .changes-panel { border:1px solid var(--line); border-radius:8px; padding:12px; position:sticky; top:16px; }
+  .settings-layout:has(> .changes-column[hidden]) { grid-template-columns:minmax(0,1fr); }
+  .changes-column { position:sticky; top:16px; }
+  .changes-panel { border:1px solid var(--line); border-radius:8px; padding:12px; }
   .changes-panel h2 { font-size:15px; margin:0 0 8px; }
   .changes-panel ul { padding-left:18px; margin:0 0 12px; font-size:13px; }
   .changes-panel li + li { margin-top:8px; }
@@ -27,26 +28,26 @@
   .changes-panel .discard-edit { margin-top:4px; padding:2px 0; }
   .changes-panel .actions { display:flex; gap:8px; flex-wrap:wrap; }
   .choices { border:0; padding:0; margin:0; display:flex; gap:12px; flex-wrap:wrap; }
-  table.settings input[type=text], table.settings select { width:100%; max-width:22rem; }
+  table.settings input[type=text], table.settings input[type=number], table.settings select { width:100%; max-width:22rem; }
+  table.settings input[aria-invalid=true] { border-color:var(--error); background:var(--error-bg); }
+  .field-error { display:block; margin-top:4px; color:var(--error); }
+  .changes-column .problem { margin-top:12px; }
   .saved { border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin-bottom:16px; }
-  @media (max-width: 800px) { .settings-layout { grid-template-columns:minmax(0,1fr); } .changes-panel { position:static; } }
+  @media (max-width: 800px) { .settings-layout { grid-template-columns:minmax(0,1fr); } .changes-column { position:static; } }
 </style>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
 <div class="workspace">
   <aside class="sidebar">
-    <a class="brand" href="/" aria-label="Work Agent home"><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg>Work Agent</a>
-    <nav aria-label="Workspace"><a class="new-analysis" href="/">New analysis</a><a href="/?view=analyses">Analyses</a><a href="/settings" aria-current="page">Settings</a></nav>
-    <div class="workspace-identity"><span class="avatar" aria-hidden="true">ME</span><span>Personal workspace<small>Only you · this computer</small></span></div>
+    <div class="sidebar-head"><a class="brand" href="/" aria-label="Work Agent home"><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 3 9 5-9 5-9-5 9-5M3 16l9 5 9-5"/></svg><span class="brand-label">Work Agent</span></a><button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Collapse sidebar" aria-controls="sidebar-navigation" aria-expanded="true" title="Collapse sidebar"><svg class="collapse-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M15.41 7.41 14 6 8 12l6 6 1.41-1.41L10.83 12l4.58-4.59Z"/></svg><svg class="expand-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12l-4.58 4.59Z"/></svg></button></div>
+    <nav id="sidebar-navigation" aria-label="Workspace"><a class="new-analysis" href="/">New analysis</a><a href="/?view=analyses">Analyses</a><a href="/settings" aria-current="page">Settings</a></nav>
   </aside>
   <div class="workspace-body">
-    <header class="breadcrumb">Personal workspace <span aria-hidden="true">/</span> <span>Settings</span></header>
     <main id="main">
       <h1>Settings</h1>
       <div id="engine-error" class="problem" role="alert" hidden></div>
       <div id="unknown-lines" class="problem" role="alert" hidden></div>
-      <div id="save-errors" class="problem" role="alert" hidden></div>
       <div id="save-status" class="saved" role="status" hidden></div>
       <label class="field-label" for="settings-search">Find a setting</label>
       <div class="settings-layout">
@@ -60,14 +61,17 @@
           </div>
           <p class="hint">A save writes <code id="settings-file"></code>, and each key to its own file beside it, and applies at once, except a job storage setting, which takes effect after a restart. A hand edit of the file applies after a restart.</p>
         </div>
-        <aside id="changes-panel" class="changes-panel" aria-labelledby="changes-heading" hidden>
-          <h2 id="changes-heading">Unsaved changes</h2>
-          <ul id="changes-list"></ul>
-          <div class="actions">
-            <button type="button" id="save-changes" class="primary" disabled>Check and save</button>
-            <button type="button" id="discard-changes" disabled>Discard</button>
-          </div>
-        </aside>
+        <div id="changes-column" class="changes-column" hidden>
+          <aside id="changes-panel" class="changes-panel" aria-labelledby="changes-heading">
+            <h2 id="changes-heading">Unsaved changes</h2>
+            <ul id="changes-list"></ul>
+            <div class="actions">
+              <button type="button" id="save-changes" class="primary" disabled>Check and save</button>
+              <button type="button" id="discard-changes" disabled>Discard</button>
+            </div>
+          </aside>
+          <div id="save-errors" class="problem" role="alert" hidden></div>
+        </div>
       </div>
       <div id="model-lists"></div>
     </main>

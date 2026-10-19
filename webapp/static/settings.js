@@ -11,6 +11,7 @@ let SETTINGS = JSON.parse(document.getElementById("settings").textContent);
 // a reset. `removals` holds the unknown lines to remove.
 const changes = new Map();
 const removals = new Set();
+const invalidNumbers = new Map();
 let saving = false;
 
 function h(tag, attrs = {}, ...children) {
@@ -68,6 +69,7 @@ function suggests(row) {
 function change(row, value) {
   if (value === (row.value ?? "")) changes.delete(row.key);
   else changes.set(row.key, value);
+  document.getElementById("save-errors").hidden = true;
   panel();
 }
 
@@ -78,6 +80,44 @@ function textControl(row) {
   const input = h("input", attrs);
   input.addEventListener("input", () => change(row, input.value));
   return input;
+}
+
+function numberError(row, value) {
+  if (row.numeric === "integer") {
+    return /^-?\d+$/.test(value) && Number.isSafeInteger(Number(value))
+      ? null : "Enter a whole number.";
+  }
+  return value !== "" && Number.isFinite(Number(value)) ? null : "Enter a number.";
+}
+
+function markNumber(row, input, note) {
+  const error = numberError(row, input.value);
+  if (error) invalidNumbers.set(row.key, error);
+  else invalidNumbers.delete(row.key);
+  input.setAttribute("aria-invalid", String(Boolean(error)));
+  note.textContent = error || "";
+  note.hidden = !error;
+  return error;
+}
+
+function numberControl(row) {
+  const attrs = {
+    type: "number", "aria-label": row.label, value: pending(row) ?? "",
+    inputmode: row.numeric === "integer" ? "numeric" : "decimal",
+    step: row.numeric === "integer" ? "1" : "any",
+  };
+  if (row.example) attrs.placeholder = `e.g. ${row.example}`;
+  const input = h("input", attrs);
+  const note = h("small", { class: "field-error", id: `error-${row.key.replaceAll(".", "-")}` });
+  note.hidden = true;
+  input.setAttribute("aria-describedby", note.id);
+  input.addEventListener("input", () => {
+    change(row, input.value);
+    if (invalidNumbers.has(row.key)) markNumber(row, input, note);
+  });
+  input.addEventListener("blur", () => markNumber(row, input, note));
+  if (invalidNumbers.has(row.key)) markNumber(row, input, note);
+  return h("div", {}, input, note);
 }
 
 function choiceControl(row) {
@@ -129,6 +169,7 @@ function keyControl(row) {
 function control(row) {
   if (row.multiple) return multipleControl(row);
   if (row.options) return choiceControl(row);
+  if (row.numeric) return numberControl(row);
   return textControl(row);
 }
 
@@ -274,7 +315,7 @@ function panel() {
   }
   for (const key of removals) list.append(h("li", { "data-key": key }, "Remove the line ", h("code", {}, key)));
   const count = changes.size + removals.size;
-  document.getElementById("changes-panel").hidden = count === 0;
+  document.getElementById("changes-column").hidden = count === 0;
   document.getElementById("save-changes").disabled = saving || saveable === 0;
   document.getElementById("discard-changes").disabled = saving || count === 0;
 }
@@ -305,6 +346,25 @@ async function save() {
   const sentChanges = new Map([...changes].filter(([key]) => visible(rowOf(key))));
   const sentRemovals = new Set(removals);
   if (!sentChanges.size && !sentRemovals.size) return;
+  const numericErrors = [];
+  for (const [key, value] of sentChanges) {
+    const row = rowOf(key);
+    if (!row.numeric || value === null) continue;
+    const input = [...document.querySelectorAll("#settings-rows tr[data-key] input[type=number]")]
+      .find((item) => item.closest("tr").dataset.key === key);
+    const note = input && document.getElementById(`error-${key.replaceAll(".", "-")}`);
+    const error = input && note ? markNumber(row, input, note) : numberError(row, value);
+    if (error) {
+      invalidNumbers.set(key, error);
+      numericErrors.push({ message: `${row.label}: ${error}` });
+    }
+  }
+  if (numericErrors.length) {
+    document.getElementById("settings-search").value = "";
+    fill("");
+    showErrors(numericErrors);
+    return;
+  }
   saving = true;
   const layout = document.querySelector(".settings-layout");
   const unknown = document.getElementById("unknown-lines");
@@ -337,6 +397,7 @@ async function save() {
       SETTINGS = payload.settings;
       for (const key of sentChanges.keys()) changes.delete(key);
       for (const key of sentRemovals) removals.delete(key);
+      invalidNumbers.clear();
       render();
       showSaved(payload.restart);
       return;
@@ -356,6 +417,7 @@ function discard() {
   if (saving) return;
   changes.clear();
   removals.clear();
+  invalidNumbers.clear();
   document.getElementById("save-errors").hidden = true;
   render();
 }
