@@ -883,6 +883,8 @@ def test_question_progress_and_entry_guidance(page):
     assert not help.locator(".question-help-content").is_visible()
     help.locator("summary").click()
     assert help.locator(".question-help-content").is_visible()
+    help.locator("summary").click()
+    assert not help.locator(".question-help-content").is_visible()
     assert page.get_by_label("Ask me questions to make the report better.").is_checked()
     pause(page)
     assert page.locator("#answer-progress-bar").get_attribute("value") == "0"
