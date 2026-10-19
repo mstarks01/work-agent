@@ -337,7 +337,8 @@ class TestTheFirstRunApp:
         page = client.get("/")
 
         assert page.status_code == 200
-        assert OTHER_MODEL in page.text
+        assert "Run configuration" not in page.text
+        assert OTHER_MODEL in client.get("/settings").text
 
     def test_it_carries_what_settings_env_names(self, tmp_path):
         write_settings(tmp_path, hand_written(ANALYSIS_FRAMEWORKS_CARRIED="stride"))

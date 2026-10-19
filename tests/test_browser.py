@@ -920,11 +920,11 @@ def test_question_guidance_without_a_misleading_progress_count(page):
     assert page.get_by_label("Ask me questions to make the report better.").is_checked()
     pause(page)
     note = "Questions are dynamically generated. Your answers may generate more or answer several at once."
-    assert page.locator(".question-note > .hint").inner_text() == note
+    assert page.locator(".question-note > p:first-child").inner_text() == note
     assert page.locator("#answer-progress-bar").count() == 0
     control = page.locator('#questions select:has(option[value="yes"])').first
     control.select_option("yes")
-    assert page.locator(".question-note > .hint").inner_text() == note
+    assert page.locator(".question-note > p:first-child").inner_text() == note
     assert (
         "Is the connection initiated by Web App to Orders DB encrypted?"
         in page.inner_text("#questions")

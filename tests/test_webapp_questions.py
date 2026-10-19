@@ -1807,7 +1807,8 @@ streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questi
   early_questions: {json.dumps(facts)} }}) }});
 const groups = ids.questions.querySelectorAll("details").filter(g => g.className === "question-group");
 const rowsOf = g => g.children.find(c => c.className === "each-one").children.filter(r => r.tag === "p");
-const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
+const child = (r, tag) => {{ for (const c of r.children) {{ if (typeof c !== "object") continue;
+  if (c.tag === tag) return c; const nested = child(c, tag); if (nested) return nested; }} }};
 calls.push({{ groups: groups.map(g => ({{
   title: g.children[0].children.map(n => n.textContent).join(""),
   rows: rowsOf(g).map(r => child(r, "b").textContent),
