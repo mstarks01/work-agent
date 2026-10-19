@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import parse_qs, urlsplit
 
+from analysis_service import resilience
 from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.config_files import (
     SETTINGS_FILE,
@@ -196,7 +197,13 @@ def _controls() -> dict[str, dict[str, Any]]:
             if setting.variable in CLOSED_SETTINGS
         },
     }
+    numeric = {
+        f"resilience.{field}": {"numeric": "integer" if parser is int else "decimal"}
+        for field, (_, parser) in resilience.ENV_OVERRIDES.items()
+    }
+    numeric["store.retention_days"] = {"numeric": "integer"}
     return {
+        **numeric,
         **{
             key: {"options": list(options)}
             for key, options in choices.items()

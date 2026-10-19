@@ -42,6 +42,12 @@ from webapp.settings_page import EXAMPLES, IAM_SETUP, SETTINGS
 from webapp.settings_view import _CONTROLS
 
 
+def test_numeric_controls_follow_the_loader_parsers():
+    assert _CONTROLS["resilience.attempts"]["numeric"] == "integer"
+    assert _CONTROLS["resilience.retry_budget_ratio"]["numeric"] == "decimal"
+    assert _CONTROLS["store.retention_days"]["numeric"] == "integer"
+
+
 class TestSecretVars:
     def test_it_names_each_secret_that_a_loader_reads(self):
         vendor_secrets = {

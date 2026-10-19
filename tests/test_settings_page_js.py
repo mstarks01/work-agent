@@ -40,7 +40,7 @@ const settings = { revision: "one", rows, modes: { anthropic: ["api_key"], opena
   models: {}, iam: [], unknown: [], settings_file: "settings.env", error: null };
 const ids = Object.fromEntries([
   "settings", "settings-rows", "model-lists", "settings-search", "changes-list",
-  "changes-panel", "save-changes", "discard-changes", "save-errors", "save-status",
+  "changes-panel", "changes-column", "save-changes", "discard-changes", "save-errors", "save-status",
   "engine-error", "unknown-lines", "settings-file",
 ].map((id) => [id, new Node(id)]));
 ids.settings.textContent = JSON.stringify(settings);
@@ -61,10 +61,10 @@ globalThis.fetch = (_url, request) => {
 const scriptText = fs.readFileSync(process.argv[1], "utf8");
 eval(scriptText + `
 (async () => {
-  assert.strictEqual(document.getElementById("changes-panel").hidden, true);
+  assert.strictEqual(document.getElementById("changes-column").hidden, true);
   change(rowOf("credentials.anthropic.api_key"), "private-key");
   change(rowOf("tiers.base.vendor"), "openai");
-  assert.strictEqual(document.getElementById("changes-panel").hidden, false);
+  assert.strictEqual(document.getElementById("changes-column").hidden, false);
   const item = document.getElementById("changes-list").children.find(
     (entry) => entry["data-key"] === "credentials.anthropic.api_key");
   const text = (entry) => entry.textContent + entry.children.map(text).join("");
@@ -84,11 +84,11 @@ eval(scriptText + `
   assert.strictEqual(layout.inert, false);
   assert.strictEqual(changes.has("tiers.base.vendor"), false);
   assert.strictEqual(changes.get("credentials.anthropic.api_key"), "private-key");
-  assert.strictEqual(document.getElementById("changes-panel").hidden, false);
+  assert.strictEqual(document.getElementById("changes-column").hidden, false);
   assert.strictEqual(document.getElementById("save-changes").disabled, true);
   assert.strictEqual(document.getElementById("discard-changes").disabled, false);
   discard();
-  assert.strictEqual(document.getElementById("changes-panel").hidden, true);
+  assert.strictEqual(document.getElementById("changes-column").hidden, true);
 })().catch((error) => { console.error(error); process.exitCode = 1; });
 `);
 """

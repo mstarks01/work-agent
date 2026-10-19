@@ -305,21 +305,6 @@ _SETTINGS_GRANTS = Grants(script=True, style=True, connect=True)
 OPERATOR = Identity.local(DEFAULT_CALLER)
 
 
-def store_note(store: JobStore) -> str:
-    """The sentence that tells a user whether a restart keeps their runs.
-
-    The startup line and the form page both show it, so the two cannot
-    disagree about the store. It reads :attr:`JobStore.durable`, which each
-    store states.
-    """
-    if not store.durable:
-        return (
-            "This app keeps your runs in memory, so a restart clears them."
-            " To keep them, set a sql store as docs/Web-App.md states."
-        )
-    return "This app keeps your runs in a durable store, so a restart keeps them."
-
-
 class WorkspaceFull(Exception):
     """Every job the workspace holds waits for answers, so none can make room."""
 
@@ -524,6 +509,9 @@ class Workspace:
         return {
             "run": record.id,
             "name": _name_of(record),
+            "created_at": min(
+                (item.created_at for item in related), default=record.created_at
+            ).isoformat(),
             "status": _page_status(record),
             # Whether the run stops for answers, so the page shows its
             # progress under the Questions tab rather than Reports.
@@ -1130,7 +1118,7 @@ def create_app(
     backend settings, and an unusable setting raises, also where the
     Deployment then fails to build. Where ``ANALYSIS_JOB_STORE`` is unset,
     the store is ``memory``, so a first run needs no setting. The app logs
-    :func:`store_note` for the store it built. At startup, before the app
+    the store class it built. At startup, before the app
     takes a request, the app always runs
     :func:`~analysis_service.store_backends.store_lifespan` over the store, as
     the service does.
@@ -1148,7 +1136,7 @@ def create_app(
         startup = Startup(settings=None, frameworks=(), tiers=None, error=exc)
     if workspace is None:
         store = build_store(with_store_defaults(env))
-        logger.info(store_note(store))
+        logger.info("job store: %s", type(store).__name__)
         workspace = Workspace(store=store)
     state = build(env) if startup is None else startup
     cell = Cell(state.current(workspace.store))
@@ -1189,7 +1177,12 @@ def create_app(
                 _FORM_GRANTS,
                 script="\n".join(
                     client_script(name)
-                    for name in ("workspace.js", "answer_editor.js", "first_run.js")
+                    for name in (
+                        "sidebar.js",
+                        "workspace.js",
+                        "answer_editor.js",
+                        "first_run.js",
+                    )
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 workspace_style=_WORKSPACE_STYLE,
@@ -1197,7 +1190,6 @@ def create_app(
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 source_limit=str(current.answers.limits.max_total_bytes),
-                store_note=escape(store_note(workspace.store)),
             )
         )
 
@@ -1210,7 +1202,9 @@ def create_app(
             render(
                 _SETTINGS_PAGE,
                 _SETTINGS_GRANTS,
-                script=client_script("settings.js"),
+                script="\n".join(
+                    client_script(name) for name in ("sidebar.js", "settings.js")
+                ),
                 settings=script_json(settings_view(process_env, error)),
                 workspace_style=_WORKSPACE_STYLE,
             )
@@ -1374,6 +1368,8 @@ def create_app(
             body = await request.json()
             sources = [Source.model_validate(source) for source in body["sources"]]
             refuse_answers_source(sources)
+            if body["frameworks"] == []:
+                return _message(400, "Please select a framework.")
             selection = _selection(current.frameworks, body["frameworks"])
             ask_questions = body.get("questions") is True
             answers_from = body.get("answers_from")

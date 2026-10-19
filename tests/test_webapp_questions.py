@@ -529,7 +529,8 @@ _FORM_HARNESS = r"""
 const calls = [], streams = [];
 class Node {
   constructor(tag) { this.tag = tag; this.children = []; this.dataset = {}; this.parentNode = null;
-    this.hidden = false; this.value = ""; this.textContent = ""; this.listeners = {}; }
+    this.hidden = false; this.value = ""; this.textContent = ""; this.listeners = {};
+    this.classList = { toggle() {} }; }
   adopt(kid) { if (typeof kid === "object") { if (kid.parentNode) kid.parentNode.children = kid.parentNode.children.filter((c) => c !== kid); kid.parentNode = this; } }
   append(...kids) { for (const k of kids) { this.adopt(k); this.children.push(k); } }
   replaceChildren(...kids) { this.children = []; this.append(...kids); }
@@ -555,17 +556,23 @@ for (const id of ["analyze","description","ticks","problem","go","load","ask",
                   "asked","questions","list","earlier","save","continue","status",
                   "status-text","answer-problem","skip","no-rest","no-rest-hint","skipped","more",
                   "answer_limits","save-status","changes","upload","transcript-file",
-                  "transcript-note","transcript-name","transcript-remove"])
+                  "transcript-note","transcript-name","transcript-remove","analysis-name",
+                  "description-remaining"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
 ids["transcript-file"].dataset.maxBytes = "64";
 ids["transcript-file"].files = [];
+ids.description.dataset.maxBytes = "1000000";
+ids["analysis-name"].value = "Test analysis";
 ids.ask.checked = true;
 ids.answer_limits.textContent = LIMITS;
+const framework = new Node("input");
+framework.value = "stride";
+framework.checked = true;
 globalThis.document = {
   getElementById: (id) => ids[id] || null,
   createElement: (tag) => new Node(tag),
-  querySelectorAll: () => [],
+  querySelectorAll: (selector) => selector === "input[name=framework]" ? [framework] : [],
   activeElement: null,
 };
 globalThis.location = { href: "", search: SEARCH };
@@ -1737,7 +1744,9 @@ def test_one_shared_answer_fills_every_row_but_an_exception():
     steps = (
         _SHARED_STEPS.replace("FACTS", json.dumps(facts))
         + """
-calls.push({ closed: !each.open, applies: shared[0].children[1].textContent });
+const heading = group.children.find(c => c.tag === "summary");
+calls.push({ closed: !each.open,
+  applies: heading.children.find(c => c.className === "group-applies").textContent });
 child(rowsOf()[1], "input").checked = false;
 const state = child(shared[0].children[0], "select");
 state.value = "none"; state.listeners.change();
@@ -1810,7 +1819,7 @@ const rowsOf = g => g.children.find(c => c.className === "each-one").children.fi
 const child = (r, tag) => {{ for (const c of r.children) {{ if (typeof c !== "object") continue;
   if (c.tag === tag) return c; const nested = child(c, tag); if (nested) return nested; }} }};
 calls.push({{ groups: groups.map(g => ({{
-  title: g.children[0].children.map(n => n.textContent).join(""),
+  title: g.children[0].children.find(n => n.className === "group-heading").textContent,
   rows: rowsOf(g).map(r => child(r, "b").textContent),
   open: g.open }})) }});
 child(rowsOf(groups[0])[0], "select").value = "no";

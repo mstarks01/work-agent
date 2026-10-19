@@ -303,8 +303,7 @@ does, with one difference: where `ANALYSIS_JOB_STORE` is unset, the app uses
 `memory`. So the first run needs no setting, and a restart loses every run.
 The service's table states each setting and its values. An unusable setting
 stops the startup, and the app does not fall back to `memory`. At startup, the
-app logs one line that tells whether a restart keeps your runs, and the form
-page shows the same line.
+app logs the store class it built.
 
 To keep your runs in SQLite and a directory, install the `sql` extra, make the
 directory, run the migration step once, then start the app:
@@ -413,7 +412,8 @@ progress stream alone. An analysis that the app cannot read, because another
 schema version stored it or a stored value is one the app no longer lists,
 stays in the list. A run whose stored value the app no longer lists shows as
 **Cannot be read**. Its pages return `409` and ask you to submit it again. Names are limited to 200 characters on one line. Search filters
-the held analyses by name.
+the held analyses by name. The list shows each analysis's name, creation date,
+and status, and can be sorted by name or date.
 
 The bound of 20 runs still applies. With the `memory` store, a restart clears
 everything; with a `sql` store, the analyses stay
