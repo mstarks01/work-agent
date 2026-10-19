@@ -463,7 +463,7 @@ def _question(
     return EarlyQuestion(
         key=key,
         kind=fact_kind(key),
-        label=label_of(ref, names),
+        label=label_of(ref, names, model),
         reasons=reasons,
         frameworks=frameworks,
         choices=answer_choices(key, model, catalog),

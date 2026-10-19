@@ -71,7 +71,7 @@ def conditions(
             refs = {ref.key: ref for ref in cites}
             wanted = needs_of(cites)
             found[f"{block.framework}/{claim.id}"] = [
-                (key, label_of(ref, names), status(key, wanted[key]))
+                (key, label_of(ref, names, model), status(key, wanted[key]))
                 for key, ref in refs.items()
             ]
     return found

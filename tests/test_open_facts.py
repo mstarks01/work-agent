@@ -12,7 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.open_facts import open_facts, open_facts_by_framework
+from analysis_service.open_facts import (
+    element_names,
+    label_of,
+    open_facts,
+    open_facts_by_framework,
+)
 from analysis_service.report import Report
 
 REPORTS = sorted(
@@ -79,8 +84,27 @@ def test_a_flow_reads_as_its_two_endpoints(report):
             element_id = fact.key[0]
             if element_id in flows:
                 flow = flows[element_id]
-                assert f"{names[flow.source]} → {names[flow.destination]}" in fact.label
+                source = names[flow.source]
+                destination = names[flow.destination]
+                assert source in fact.label and destination in fact.label
+                assert fact.label.index(source) < fact.label.index(destination)
+                assert "→" not in fact.label
                 assert fact.label.endswith("?"), "a fact reads as the question it asks"
+
+
+def test_a_flow_authentication_question_names_the_initiator():
+    from analysis_service.claims import UnknownRef
+    from tests.factories import valid_model
+
+    model = valid_model()
+    flow = model.data_flows[0]
+    names = element_names(model)
+    assert label_of(
+        UnknownRef(element_id=flow.id, attribute="authentication"), names, model
+    ) == (
+        f"When {names[flow.source]} initiates a connection to "
+        f"{names[flow.destination]}, what authentication, if any, is used?"
+    )
 
 
 def test_the_page_payload_is_json_per_framework(report):

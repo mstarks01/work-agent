@@ -18,9 +18,13 @@
   .tag.outside { border-color:var(--accent); color:var(--accent); }
   .not-set { color:var(--muted); font-style:italic; }
   .settings-layout { display:grid; grid-template-columns:minmax(0,1fr) 18rem; gap:24px; align-items:start; }
+  .settings-layout:has(> .changes-panel[hidden]) { grid-template-columns:minmax(0,1fr); }
   .changes-panel { border:1px solid var(--line); border-radius:8px; padding:12px; position:sticky; top:16px; }
   .changes-panel h2 { font-size:15px; margin:0 0 8px; }
   .changes-panel ul { padding-left:18px; margin:0 0 12px; font-size:13px; }
+  .changes-panel li + li { margin-top:8px; }
+  .changes-panel .pending-note { display:block; margin-top:4px; }
+  .changes-panel .discard-edit { margin-top:4px; padding:2px 0; }
   .changes-panel .actions { display:flex; gap:8px; flex-wrap:wrap; }
   .choices { border:0; padding:0; margin:0; display:flex; gap:12px; flex-wrap:wrap; }
   table.settings input[type=text], table.settings select { width:100%; max-width:22rem; }
@@ -44,9 +48,9 @@
       <div id="unknown-lines" class="problem" role="alert" hidden></div>
       <div id="save-errors" class="problem" role="alert" hidden></div>
       <div id="save-status" class="saved" role="status" hidden></div>
+      <label class="field-label" for="settings-search">Find a setting</label>
       <div class="settings-layout">
         <div>
-          <label class="field-label" for="settings-search">Find a setting</label>
           <input type="search" id="settings-search" class="settings-search" placeholder="Name of a setting">
           <div class="table-wrap">
             <table class="settings">
@@ -56,9 +60,8 @@
           </div>
           <p class="hint">A save writes <code id="settings-file"></code>, and each key to its own file beside it, and applies at once, except a job storage setting, which takes effect after a restart. A hand edit of the file applies after a restart.</p>
         </div>
-        <aside class="changes-panel" aria-labelledby="changes-heading">
+        <aside id="changes-panel" class="changes-panel" aria-labelledby="changes-heading" hidden>
           <h2 id="changes-heading">Unsaved changes</h2>
-          <p id="changes-empty" class="hint">No changes.</p>
           <ul id="changes-list"></ul>
           <div class="actions">
             <button type="button" id="save-changes" class="primary" disabled>Check and save</button>

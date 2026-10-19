@@ -968,12 +968,14 @@
     // without it, and answering runs the analysis once more.
     const box = el("details", "followup");
     const waiting = new Set(FACT_QUESTIONS.flatMap(q => q.findings)).size;
-    box.append(el("summary", null,
-      `Optional follow-up: ${FACT_QUESTIONS.length + LINK_QUESTIONS.length} question(s)` +
-      (waiting ? ` about facts that ${waiting} conditional finding(s) wait on` : "") +
-      (earlierCount ? `, and ${earlierCount} earlier answer(s) you can change` : "") +
-      ". Answer what you can, and the analysis runs once more, which takes a " +
-      "few minutes. After that, the report is final."));
+    const questionCount = FACT_QUESTIONS.length + LINK_QUESTIONS.length;
+    box.append(el("summary", null, questionCount
+      ? `Optional follow-up: ${questionCount} ${questionCount === 1 ? "question" : "questions"}`
+      : "Optional follow-up: review earlier answers"));
+    box.append(el("p", "meta",
+      (waiting ? `${waiting} conditional ${waiting === 1 ? "finding waits" : "findings wait"} on these answers. ` : "") +
+      (earlierCount ? `You can also change ${earlierCount} earlier ${earlierCount === 1 ? "answer" : "answers"}. ` : "") +
+      "Answer what you can. The analysis runs once more, which takes a few minutes. After that, the report is final."));
     $("links").append(box);
     const linkSelects = [];
     // One reader per fact question: `read` is its answer as the service takes
@@ -1009,10 +1011,9 @@
     };
 
     if (LINK_QUESTIONS.length) {
-      box.append(el("h2", null, "Which element is each of these?"));
+      box.append(el("h2", null, "Which part of your system does each name refer to?"));
       box.append(el("div", "meta",
-        "The sources state facts about these principals but never say which element " +
-        "of the model each one is, so no rule can place the facts."));
+        "Choose the matching part for each name, or “None of these” if there’s no match."));
       LINK_QUESTIONS.forEach(q => {
         const row = el("p");
         const select = el("select");
@@ -1020,8 +1021,8 @@
         select.append(option("(leave unanswered)", ""));
         linkOptions(select, q.options);
         select.value = DRAFT_LINKS.get(q.principal) || "";
-        row.append(el("b", null, q.principal),
-          ` \u2014 an answer places ${q.rows} stated fact(s) `, select);
+        select.setAttribute("aria-label", `Matching part of your system for ${q.principal}`);
+        row.append(el("b", null, q.principal), " ", select);
         box.append(row);
         linkSelects.push(select);
       });

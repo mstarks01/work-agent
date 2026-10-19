@@ -205,9 +205,15 @@ small {
   color:var(--accent)
 }
 .sidebar nav>.new-analysis {
-  background:var(--canvas);
-  border:1px solid var(--line);
+  background:var(--accent);
+  border:1px solid transparent;
+  color:var(--on-accent);
   margin-bottom:12px
+}
+.sidebar nav>.new-analysis:hover {
+  background:var(--accent);
+  color:var(--on-accent);
+  filter:brightness(.93)
 }
 .recent>p {
   font-size:12px;
@@ -294,6 +300,16 @@ main {
 .description-help {
   margin-top:6px
 }
+#answers-from-field {
+  margin-top:16px;
+  max-width:22rem
+}
+#answers-from-field .field-label {
+  margin:0 0 8px
+}
+#answers-from-field select {
+  width:100%
+}
 .description-help p,.entry-actions p,.start-actions p {
   margin:0
 }
@@ -364,14 +380,6 @@ summary {
 }
 summary:hover {
   color:var(--accent)
-}
-.configuration {
-  margin-top:28px
-}
-.tier {
-  font-size:13px;
-  margin-top:12px;
-  overflow-wrap:anywhere
 }
 .heading-row h1 {
   overflow-wrap:anywhere;
@@ -448,7 +456,7 @@ summary:hover {
   color:var(--text);
   margin-top:20px
 }
-#list>details,#questions .amend {
+#list>details {
   margin:0 0 24px;
   border-bottom:1px solid var(--line);
   padding-bottom:24px;
@@ -753,9 +761,7 @@ code {
     padding:8px
   }
   .sidebar nav>.new-analysis {
-    margin:0;
-    border:0;
-    background:none
+    margin:0
   }
   .recent,.workspace-identity {
     display:none
@@ -859,7 +865,7 @@ a.analysis-row:hover {
   border-radius: 10px;
   padding: 0;
   margin-bottom: 24px;
-  overflow: clip;
+  overflow: visible;
 }
 #questions > details > summary {
   background: var(--sidebar);
@@ -872,6 +878,59 @@ a.analysis-row:hover {
 }
 #questions > details > summary + div + p { border-top: 0; }
 #questions > details > p > b { font-size: 15px; font-weight: 500; }
+.question-title {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  position:relative;
+  min-width:0
+}
+.question-title>b {
+  font-size:15px;
+  font-weight:500;
+  overflow-wrap:anywhere
+}
+.question-context { flex:none; }
+.question-context summary {
+  display:grid;
+  place-items:center;
+  width:32px;
+  height:32px;
+  list-style:none;
+  border:1px solid var(--line);
+  border-radius:50%;
+  color:var(--muted);
+  font-size:16px;
+  font-weight:600;
+  line-height:1;
+  cursor:pointer
+}
+.question-context summary::-webkit-details-marker { display:none; }
+.question-context summary:hover,.question-context[open] summary {
+  color:var(--accent);
+  background:var(--soft)
+}
+.question-context summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.question-title:has(.question-context[open]) { z-index:3; }
+.question-context-content {
+  position:absolute;
+  z-index:3;
+  top:calc(100% + 8px);
+  left:0;
+  width:min(340px,calc(100vw - 36px));
+  max-height:min(70vh,360px);
+  overflow:auto;
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--canvas);
+  box-shadow:0 8px 24px rgba(0,0,0,.12);
+  font-size:13px;
+  line-height:1.55;
+  font-weight:400
+}
+.question-context-content p { margin:0; color:var(--text); overflow-wrap:anywhere; }
+.question-context-content p+p { margin-top:8px; }
 #questions > details > p:has(.share-answer) {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
@@ -889,10 +948,8 @@ a.analysis-row:hover {
 #questions > details > table tr:last-child td { border-bottom: 0; }
 .answer-actions { border-top: 0; padding-top: 0; }
 .entry-actions { justify-content: flex-end; }
-.answer-progress { margin-bottom: 28px; max-width: 780px; }
-.answer-progress label { display:block; font-size:14px; font-weight:600; margin-bottom:8px; }
-.answer-progress progress { display:block; width:100%; height:8px; accent-color:var(--accent); }
-.answer-progress .hint { margin:8px 0 0; }
+.question-note { margin-bottom: 28px; max-width: 780px; }
+.question-note > .hint { margin: 0; }
 .analysis-row time { color:var(--muted); font-size:13px; }
 @media(max-width:580px) {
   #questions > details > summary { padding:16px; }
@@ -930,6 +987,7 @@ a.analysis-row:hover {
   overflow-x:auto;
   display:block
 }
+#list table:has(.question-context[open]) { overflow:visible; }
 @media (max-width:480px) {
   #list>details>p {
     padding:12px 0
@@ -959,6 +1017,8 @@ a.analysis-row:hover {
   font-size:14px;
   margin-bottom:8px
 }
+#list .each-one>p>.question-title { margin-bottom:8px; }
+#list .each-one>p>.question-title>b { font-size:14px; font-weight:600; }
 #list .each-one>p:has(.share-answer) {
   display:grid;
   grid-template-columns:20px minmax(0,1fr);
@@ -970,6 +1030,38 @@ a.analysis-row:hover {
   grid-column:1;
   grid-row:1;
   margin:3px 0 0
+}
+#list .each-one>p.question>.answer-fields {
+  min-width:0
+}
+#list .each-one>p.question>.answer-fields>select {
+  width:100%
+}
+#list .each-one>p.question>.answer-fields>.skip {
+  display:block;
+  margin:8px 0 0
+}
+#list .each-one>p.question[data-layout=stack]>.answer-fields {
+  max-width:38rem
+}
+@media (min-width:761px) {
+  #list .each-one>p.question[data-layout=split]:not(:has(>input.share-answer)) {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(14rem,20rem);
+    column-gap:20px;
+    align-items:start
+  }
+  #list .each-one>p.question[data-layout=split]>.question-title {
+    grid-column:1;
+    margin-bottom:0
+  }
+  #list .each-one>p.question[data-layout=split]>.answer-fields {
+    grid-column:2
+  }
+  #list .each-one>p.question[data-layout=split]>.hint,
+  #list .each-one>p.question[data-layout=split]>.conflict {
+    grid-column:1 / -1
+  }
 }
 #questions .shared-controls label {
   display:block;
