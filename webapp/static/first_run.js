@@ -1,13 +1,11 @@
   const form = document.getElementById("analyze");
   const box = document.getElementById("description");
-  const ticks = document.getElementById("ticks");
   const problem = document.getElementById("problem");
   const go = document.getElementById("go");
   const status = document.getElementById("status");
   const statusText = document.getElementById("status-text");
 
-  // What the service is doing now, beside a spinner, from the moment a run
-  // starts until it stops for answers, ends, or fails.
+  // Show the current stage from the moment a run starts until it stops.
   const working = (message) => {
     if (typeof workspace !== "undefined") workspace.show("progress-panel");
     statusText.textContent = message;
@@ -127,7 +125,6 @@
   const fail = (...content) => {
     problem.replaceChildren(...content);
     problem.hidden = false;
-    ticks.hidden = true;
     idle();
     go.disabled = false;
   };
@@ -151,7 +148,6 @@
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     problem.hidden = true;
-    ticks.replaceChildren();
     go.disabled = true;
 
     try {
@@ -170,14 +166,7 @@
         fail((await started.json()).message);
         return;
       }
-      follow(
-        (await started.json()).run,
-        ask && ask.checked
-          ? "Reading your description and building the system model. The service"
-            + " stops for your answers before the threat analysis starts."
-          : "Reading your description and running the threat analysis. This takes"
-            + " a few minutes.",
-      );
+      follow((await started.json()).run, "Building system model…", Boolean(ask && ask.checked));
     } catch {
       fail("The connection was interrupted. Check Analyses before starting again.");
     }
@@ -1244,8 +1233,7 @@
       }
       answerProblem.hidden = true;
       asked.hidden = true;
-      follow(body.run, "Reading your description again with your amendment. The"
-        + " service stops for your answers again before the threat analysis starts.");
+      follow(body.run, "Building system model…", true);
     }), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
     tail.append(fix);
@@ -1468,7 +1456,7 @@
         const payload = await snapshot.json();
         if (snapshot.ok && payload.run !== pausedRun) {
           asked.hidden = true;
-          follow(payload.run, "Running the threat analysis with your answers. This takes a few minutes.");
+          follow(payload.run, "Running analysis checks…", false);
           return;
         }
         refuse("The connection was interrupted. Reload this analysis to check whether it started.");
@@ -1480,10 +1468,7 @@
       }
       answerProblem.hidden = true;
       asked.hidden = true;
-      follow(
-        (await resumed.json()).run,
-        "Running the threat analysis with your answers. This takes a few minutes.",
-      );
+      follow((await resumed.json()).run, "Running analysis checks…", false);
     } finally {
       starting = false;
       startButton.disabled = false;
@@ -1532,13 +1517,11 @@
   asked.addEventListener("click", () => updateQuestionProgress());
 
   // Follow one run's progress to its end: a report, questions, or a failure.
-  const follow = (runId, message) => {
+  const follow = (runId, initialStage, pauses) => {
     go.disabled = true;
     if (typeof workspace !== "undefined") workspace.track(runId);
-    working(message);
-    ticks.replaceChildren();
-    ticks.hidden = false;
-    if (typeof workspace !== "undefined") workspace.processing();
+    working(initialStage);
+    if (typeof workspace !== "undefined") workspace.processing([], pauses, initialStage);
     const stream = new EventSource("/events/" + encodeURIComponent(runId));
     stream.addEventListener("error", () => {
       stream.close();
@@ -1546,15 +1529,13 @@
     });
     stream.addEventListener("questions", (event) => {
       stream.close();
-      ticks.hidden = true;
       idle();
       showQuestions(JSON.parse(event.data));
     });
     stream.addEventListener("node", (event) => {
-      const item = document.createElement("li");
-      item.textContent = JSON.parse(event.data).node;
-      ticks.append(item);
-      if (typeof workspace !== "undefined") workspace.processing();
+      if (typeof workspace !== "undefined") {
+        workspace.processing([JSON.parse(event.data).node], pauses);
+      }
     });
     stream.addEventListener("done", (event) => {
       stream.close();
@@ -1584,5 +1565,5 @@
   // it, because the report page shows one finished report and nothing else.
   const followed = new URLSearchParams(location.search).get("follow");
   if (followed) {
-    follow(followed, "Running the analysis again with your answers. This takes a few minutes.");
+    follow(followed, "Running analysis checks…", false);
   }

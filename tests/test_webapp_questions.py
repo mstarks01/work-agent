@@ -1670,7 +1670,7 @@ def test_typing_a_mechanism_chooses_it(send):
 
 
 def test_the_form_script_shows_what_the_service_is_doing():
-    """A spinner and a sentence from Analyze until the pause, and again after."""
+    """The current stage appears from Analyze until the pause, and again after."""
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 calls.push({ building: !ids.status.hidden, text: ids["status-text"].textContent });
@@ -1684,11 +1684,10 @@ calls.push({ analysing: !ids.status.hidden, text: ids["status-text"].textContent
     building, paused, analysing = (c for c in seen if "url" not in c)
 
     assert building["building"]
-    assert "building the system model" in building["text"]
-    assert "stops for your answers" in building["text"]
+    assert building["text"] == "Building system model…"
     assert paused == {"paused": True}
     assert analysing["analysing"]
-    assert "threat analysis with your answers" in analysing["text"]
+    assert analysing["text"] == "Running analysis checks…"
 
 
 def _control_row(flow, form="control"):
