@@ -306,9 +306,16 @@ class TestTheGroups:
             assert "{" not in heading
             assert heading.endswith("?")
 
-    def test_an_attribute_groups_by_its_name(self):
+    def test_an_attribute_groups_by_its_name_and_asks_of_each_part(self):
         ref = UnknownRef(element_id=STORE, attribute="encryption_at_rest")
-        assert group_of(ref) == ("encryption_at_rest", "Encryption at rest")
+        assert group_of(ref) == (
+            "encryption_at_rest",
+            "Is the data in each store encrypted? If so, how?",
+        )
+
+    def test_an_attribute_with_no_worded_question_asks_of_each_part(self):
+        ref = UnknownRef(element_id=STORE, attribute="trust_zone")
+        assert group_of(ref) == ("trust_zone", "What is the trust zone for each part?")
 
     def test_each_question_carries_its_group_and_its_element(self):
         (question,) = early_questions(

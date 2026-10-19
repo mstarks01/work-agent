@@ -109,13 +109,28 @@ def reference_labels(
     return labels
 
 
-#: The question an attribute asks where the plain form reads badly. Each of
-#: these attributes belongs to one element type: a flow is in transit and a
-#: store is at rest.
+#: The question an attribute asks where the plain form reads badly: of one
+#: element, and of each element its group lists. Each of these attributes
+#: belongs to one element type: a flow is in transit and a store is at rest.
 _ATTRIBUTE_QUESTIONS = {
-    "encryption_in_transit": "Is the connection {element} encrypted?",
-    "encryption_at_rest": "Is data stored in {element} encrypted?",
+    "encryption_in_transit": (
+        "Is the connection {element} encrypted?",
+        "Is each connection encrypted? If so, how?",
+    ),
+    "encryption_at_rest": (
+        "Is data stored in {element} encrypted?",
+        "Is the data in each store encrypted? If so, how?",
+    ),
 }
+
+
+def _attribute_questions(attribute: str) -> tuple[str, str]:
+    """The question an attribute asks of one element, and of each one listed."""
+    name = attribute.replace("_", " ")
+    return _ATTRIBUTE_QUESTIONS.get(
+        attribute,
+        (f"What is the {name} for {{element}}?", f"What is the {name} for each part?"),
+    )
 
 
 def label_of(
@@ -160,11 +175,7 @@ def label_of(
         case "assertion":
             return ref.assertion
         case "attribute":
-            attribute = ref.attribute.replace("_", " ")
-            template = _ATTRIBUTE_QUESTIONS.get(
-                ref.attribute, f"What is the {attribute} for {{element}}?"
-            )
-            return template.format(element=where)
+            return _attribute_questions(ref.attribute)[0].format(element=where)
         case "subject":
             return ref.subject
 
@@ -174,9 +185,10 @@ def group_of(ref: UnknownRef) -> tuple[str, str]:
 
     One group for each question kind and each attribute, so a page asks each
     once and lists the elements under it. Every capability question is about
-    the whole application, so they share one group. The heading is the kind's question
-    with its element made a pronoun, or the attribute's name. The kind is read
-    through :attr:`~analysis_service.claims.UnknownRef.kind`.
+    the whole application, so they share one group. The heading is the
+    question the group asks, with no element named: the kind's question with
+    its element made a pronoun, or the attribute's question of each element.
+    The kind is read through :attr:`~analysis_service.claims.UnknownRef.kind`.
     """
     match ref.kind:
         case "capability":
@@ -186,7 +198,7 @@ def group_of(ref: UnknownRef) -> tuple[str, str]:
             heading = template.replace("{element}'s", "its").replace("{element}", "it")
             return ref.question, heading
         case "attribute":
-            return ref.attribute, ref.attribute.replace("_", " ").capitalize()
+            return ref.attribute, _attribute_questions(ref.attribute)[1]
     label = label_of(ref, {})
     return label, label
 
