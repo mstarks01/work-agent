@@ -300,7 +300,12 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         assert opened.locator("#analysis-progress").count() == 1
         assert opened.locator("#analysis-progress").get_attribute("value") is None
         assert opened.locator("#status-text").inner_text() == "Building system model…"
-        assert opened.locator("#progress-panel").locator("h2, details, .spinner, #ticks").count() == 0
+        assert (
+            opened.locator("#progress-panel")
+            .locator("h2, details, .spinner, #ticks")
+            .count()
+            == 0
+        )
         assert tab.is_enabled()
 
         runner.step.set()
