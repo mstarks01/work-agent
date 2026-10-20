@@ -188,6 +188,7 @@ from analysis_service.fact_answers import (
     fact_label,
     merged_facts,
 )
+from analysis_service.fixes import fixes_by_framework
 from analysis_service.frameworks import PACKAGES, package_for
 from analysis_service.job_answers import (
     DraftSaved,
@@ -880,6 +881,13 @@ def render_report(
         units=script_json(unit_rows(report)),
         open_facts=script_json(
             open_facts_by_framework(report.analyses, report.system_model)
+        ),
+        fixes=script_json(
+            fixes_by_framework(
+                report.analyses,
+                report.system_model,
+                report.assertions.catalog if report.assertions else None,
+            )
         ),
         fact_questions=script_json(asked["fact_questions"]),
         question_fallback=script_json(question_fallback(report.analyses).to_json()),
