@@ -91,10 +91,13 @@ from analysis_service.skills import estimate_tokens
 from analysis_service.sources import Source, render_sources
 from analysis_service.system_model import (
     ELEMENT_ID,
+    ENDPOINT_PREFIXES,
     FLOW_ID_VERSION,
     FlowIdError,
     flow_id_version,
     mentioned_ids,
+    normalize_name,
+    parse_flow_id,
 )
 from analysis_service.token_caps import (
     COMPOSED_ANALYZE_CAP,
@@ -975,7 +978,7 @@ EXTRACTION_FAILURE_RULES: dict[str, tuple[str, str]] = {
     ),
     "id-mismatch": ("IDs are recomputed from the names you give", EXTRACT_PROMPT_NAME),
     "empty-slug": (
-        "A `name` needs at least one Latin letter or digit",
+        "A `name` needs at least one ASCII letter a-z or digit 0-9",
         EXTRACT_PROMPT_NAME,
     ),
     "invalid-reference": (
@@ -1038,6 +1041,17 @@ def test_the_prompt_carries_the_rule_that_prevents_each_failure(code, rule):
         f"{prompt}.md carries no rule against {code!r}. A model that trips it "
         f"kills the job and spends its one repair pass."
     )
+
+
+@pytest.mark.parametrize("name", ["é", "１"])
+def test_the_empty_slug_rule_names_only_ascii(name):
+    """The ``empty-slug`` phrase says ASCII, so the slug keeps nothing else.
+
+    A non-ASCII letter or digit makes no slug. A rule that folds one to ASCII
+    makes the phrase false, and this fails until the phrase follows it.
+    """
+    with pytest.raises(ValueError):
+        normalize_name(name)
 
 
 def _computed_view_keys() -> frozenset[str]:
@@ -1240,24 +1254,58 @@ def test_the_prompt_states_the_flow_id_shape_the_service_writes():
     )
 
 
-@pytest.mark.parametrize("name", PROMPT_BODY_NAMES + PROMPT_DELTA_NAMES)
-def test_every_flow_id_a_prompt_shows_is_one_the_service_writes(name):
+#: Every text a model reads that can show a flow ID: the prompt bodies and
+#: deltas, and each package's skills, notes, cases and output contracts.
+_FLOW_SHOWING_TEXTS = {
+    **{f"prompts/{name}.md": name for name in PROMPT_BODY_NAMES + PROMPT_DELTA_NAMES},
+    **{
+        path.relative_to(REPO_ROOT).as_posix(): path
+        for path in sorted(FRAMEWORKS_DIR.rglob("*.md"))
+    },
+}
+
+
+@pytest.mark.parametrize("shown_in", sorted(_FLOW_SHOWING_TEXTS))
+def test_every_flow_id_a_prompt_shows_is_one_the_service_writes(shown_in):
     """A worked example is read harder than a pattern, so it is held harder.
 
     Only complete IDs: a span carrying a placeholder is the pattern above, and
-    a bare ``flow:`` prefix in prose names no ID at all.
+    a bare ``flow:`` prefix in prose names no ID at all. An attribute ref such
+    as ``flow:...>label:authentication`` shows the flow ID before its last
+    colon. Each endpoint is an element the gate admits as one.
     """
-    shown = [
-        found
-        for found in re.findall(r"flow:[A-Za-z0-9:>_-]+", loader.load(name))
+    source = _FLOW_SHOWING_TEXTS[shown_in]
+    text = loader.load(source) if isinstance(source, str) else source.read_text()
+    shown = {
+        _flow_id_of(found)
+        for found in re.findall(r"flow:[A-Za-z0-9:>_-]+", text)
         if found.count(":") > 1
-    ]
+    }
     wrong = {one: flow_id_version(one) for one in shown if _version_or_none(one)}
 
     assert all(version == FLOW_ID_VERSION for version in wrong.values()), (
-        f"prompts/{name}.md shows {sorted(k for k, v in wrong.items() if v != FLOW_ID_VERSION)},"
+        f"{shown_in} shows {sorted(k for k, v in wrong.items() if v != FLOW_ID_VERSION)},"
         f" which is not version {FLOW_ID_VERSION}. A model copies the example."
     )
+    illegal = sorted(
+        one
+        for one in wrong
+        if not {
+            end.split(":", 1)[0]
+            for end in (parse_flow_id(one).source, parse_flow_id(one).destination)
+        }
+        <= ENDPOINT_PREFIXES
+    )
+    assert not illegal, (
+        f"{shown_in} shows {illegal}, whose endpoint is not one of"
+        f" {sorted(ENDPOINT_PREFIXES)}. The gate refuses that flow."
+    )
+
+
+def _flow_id_of(found: str) -> str:
+    """The flow ID in one match, without an attribute ref's ``:<attribute>``."""
+    label = found.rsplit(">", 1)[-1]
+    return found.removesuffix(label) + label.split(":", 1)[0]
 
 
 def _version_or_none(flow_id: str) -> int | None:

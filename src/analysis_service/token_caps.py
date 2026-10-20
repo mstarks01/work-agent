@@ -123,7 +123,7 @@ TOKEN_CAPS: dict[str, int] = {
     # HTTPS" as a protocol only and left the encryption open on nine flows of
     # the example, where luna and the blessed references record it.
     #
-    # It says that a `name` needs a Latin letter or digit (ADR 0096). A name
+    # It says that a `name` needs an ASCII letter or digit (ADR 0096). A name
     # with neither has no ID, and the gate refuses it as `empty-slug` and
     # spends the repair pass; the rule tells the model how to name such a thing.
     "prompts/extract": 4700,

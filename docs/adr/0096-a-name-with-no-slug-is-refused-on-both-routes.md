@@ -13,7 +13,7 @@
 ## Context
 
 An **Element ID** is the type prefix and the slug of the element's name.
-`normalize_name` makes the slug. It raises on a name with no Latin letter or
+`normalize_name` makes the slug. It raises on a name with no ASCII letter a-z or
 digit after it folds the case, for example `数据库` or `!!!`. Such a name has
 no derived ID.
 

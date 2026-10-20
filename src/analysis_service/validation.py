@@ -166,8 +166,8 @@ def validate(
                 ValidationIssue(
                     code="empty-slug",
                     message=f"element {element.id!r} has the name"
-                    f" {element.name!r}, which has no letter or digit for its ID;"
-                    " write the name in Latin letters or digits",
+                    f" {element.name!r}, which has no ASCII letter a-z or digit"
+                    " 0-9 for its ID; write the name with one",
                     element_id=element.id,
                     field="name",
                 )
