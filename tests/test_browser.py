@@ -341,6 +341,12 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
             opened.locator("#status-text").inner_text()
             == "0 of 4 stages complete · Reading your description and identifying the parts of your system…"
         )
+        elapsed = opened.locator("#status-elapsed")
+        assert elapsed.inner_text().startswith("Still working on this step · 0:0")
+        assert elapsed.get_attribute("role") is None
+        opened.wait_for_function(
+            "() => !document.querySelector('#status-elapsed').textContent.includes('· 0:00.')"
+        )
         assert opened.is_hidden("#upload")
         assert opened.locator("#transcript-file").is_disabled()
         assert opened.locator(".configuration").count() == 0
@@ -357,6 +363,7 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
             "() => document.querySelector('#status-text').textContent === '1 of 4 stages complete · Checking the system map for gaps or conflicting details…'"
         )
         assert opened.locator("#analysis-progress").get_attribute("value") == "1"
+        assert elapsed.inner_text().startswith("Still working on this step · 0:0")
         opened.click("#description-nav")
         assert not opened.is_visible("#progress-panel")
         tab.click()

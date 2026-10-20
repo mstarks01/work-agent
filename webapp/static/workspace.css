@@ -626,10 +626,24 @@ summary:hover {
   display:block;
   width:100%;
   height:12px;
-  accent-color:var(--accent)
+  accent-color:var(--accent);
+  appearance:none;
+  border:0;
+  border-radius:6px;
+  /* A light band moves along the track while a step runs. */
+  background:linear-gradient(90deg, var(--soft) 40%, color-mix(in srgb, var(--accent) 35%, var(--soft)) 50%, var(--soft) 60%) 0 0 / 250% 100%;
+  animation:progress-sweep 1.8s linear infinite
+}
+@keyframes progress-sweep {
+  from {
+    background-position:100% 0
+  }
+  to {
+    background-position:0 0
+  }
 }
 #analysis-progress::-webkit-progress-bar {
-  background:var(--soft);
+  background:transparent;
   border-radius:6px
 }
 #analysis-progress::-webkit-progress-value {
@@ -899,6 +913,9 @@ code {
 @media(prefers-reduced-motion:reduce) {
   button,.button {
     transition:none
+  }
+  #analysis-progress {
+    animation:none
   }
 }
 .ask-option {
