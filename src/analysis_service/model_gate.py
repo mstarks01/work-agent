@@ -49,6 +49,17 @@ class ModelGateError(ConfigError):
     """A tier's ``(vendor, model, sampling)`` combination cannot be requested."""
 
 
+class NoThinkingLevel(ModelGateError):
+    """A tier sets a thinking level on a model that takes none.
+
+    ``tier`` names the tier, so a caller can point at the setting.
+    """
+
+    def __init__(self, tier: str, message: str) -> None:
+        super().__init__(message)
+        self.tier = tier
+
+
 #: Every ``LITELLM_LOCAL_*`` switch litellm defines, set together rather than
 #: chosen between. Each one turns off a remote config fetch. One of them guards
 #: the Anthropic beta headers, which litellm fetches at request time from its
@@ -287,6 +298,36 @@ def tool_models(name: VendorName) -> tuple[str, ...]:
             continue
         names.add(model)
     return tuple(sorted(names))
+
+
+def takes_thinking(vendor: Vendor, model: str) -> bool:
+    """Whether the pinned library sends a thinking level to this model.
+
+    **The one reader of the question.** The build refuses a level on a model
+    that takes none, and the Settings page offers the levels only where this
+    says yes. It asks the parameter check that the build runs, with
+    ``reasoning_effort`` alone. That check reads the parameter and not its
+    value, so it cannot tell which of the levels a model takes.
+    """
+    try:
+        _litellm.utils.get_optional_params(
+            model=model,
+            custom_llm_provider=vendor.litellm_provider,
+            reasoning_effort="medium",
+        )
+    except _litellm.exceptions.UnsupportedParamsError:
+        return False
+    return True
+
+
+@cache
+def no_thinking_models(name: VendorName) -> tuple[str, ...]:
+    """The models that :func:`tool_models` suggests for the vendor ``name``
+    and that take no thinking level."""
+    vendor = vendor_for(name)
+    return tuple(
+        model for model in tool_models(name) if not takes_thinking(vendor, model)
+    )
 
 
 #: Each :data:`~analysis_service.vendors.SchemaRule`, as the function that
