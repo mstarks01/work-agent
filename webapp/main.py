@@ -549,15 +549,14 @@ class Current:
     the running store, the job deadline, and what the pages show of it.
 
     ``answers`` holds the runner, the bounds and the certification gate.
-    ``frameworks`` and ``tiers`` are the page view: what the picker offers
-    and allow-lists, and the tier lines. The Deployment stays in memory
-    through ``answers.runner_for`` while a request or a job holds it.
+    ``frameworks`` is what the picker offers and allow-lists. The Deployment
+    stays in memory through ``answers.runner_for`` while a request or a job
+    holds it.
     """
 
     answers: JobAnswers
     deadline_seconds: float
     frameworks: tuple[FrameworkName, ...]
-    tiers: ModelTierConfig | None
 
 
 class CellEmpty(Exception):
@@ -670,7 +669,6 @@ class Startup:
             ),
             deadline_seconds=settings.deadline_seconds,
             frameworks=self.frameworks,
-            tiers=self.tiers,
         )
 
 
@@ -684,8 +682,8 @@ def build_startup(env: Mapping[str, str]) -> Startup:
     tier's ``(vendor, model, sampling)`` through LiteLLM's own check. So a
     *config* failure leaves no tiers to report, while a *credential* failure
     can still name the vendor the config selected — which is the case a first
-    run overwhelmingly hits. One read either way: the tiers the page prints are
-    the tiers the runner was built from, not a second load of the same file.
+    run overwhelmingly hits. One read either way: the tiers the diagnostic page
+    reads are the tiers the runner was built from, not a second load of the same file.
 
     **Building the runner is the credential check, because binding the tier
     adapters is what resolves the credentials.** Binding does not depend on
@@ -1954,27 +1952,9 @@ _STYLE = """
   h2 { font-size: 1.05rem; margin-top: 1.75rem; }
   h3 { font-size: .9rem; font-family: ui-monospace, monospace; margin-bottom: .3rem; }
   .sub { opacity: .7; margin-top: 0; }
-  .tier { font-family: ui-monospace, monospace; font-size: .85rem; opacity: .8; }
-  textarea { width: 100%; min-height: 15rem; font: 13px/1.5 ui-monospace, monospace;
-             padding: .75rem; box-sizing: border-box; }
-  button { font: inherit; padding: .5rem 1rem; margin-right: .5rem; }
   .problem { border-left: 3px solid #c00; padding: .5rem .75rem; margin: 1rem 0; }
-  #ticks { font-family: ui-monospace, monospace; font-size: .85rem; }
-  #ticks li { opacity: .55; }
   .not { color: #c00; font-weight: 600; }
   .set { opacity: .6; }
-  .pick { margin: .15rem 0; }
-  .pick b { font-family: ui-monospace, monospace; font-weight: 600; }
-  .opts { margin-left: .75rem; font-size: .85rem; opacity: .8; }
-  .opts[hidden] { display: none; }
-  .spinner { display: inline-block; width: .9em; height: .9em; border-radius: 50%;
-             border: 2px solid currentColor; border-right-color: transparent;
-             vertical-align: -.1em; animation: spin .8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
-  .hint { font-size: .85rem; opacity: .7; }
-  /* A facet table can be wider than a phone: it scrolls in its own box. */
-  table { display: block; max-width: 100%; overflow-x: auto; }
 """
 
 _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-8")

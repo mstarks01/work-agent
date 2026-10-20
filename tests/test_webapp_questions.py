@@ -553,7 +553,7 @@ class Node {
   querySelector() { return new Node("div"); }
 }
 const ids = {};
-for (const id of ["analyze","description","ticks","problem","go","load","ask",
+for (const id of ["analyze","description","problem","go","load","ask",
                   "asked","questions","list","earlier","save","continue","status",
                   "status-text","answer-problem","skip","no-rest","no-rest-hint","skipped","more",
                   "answer_limits","save-status","changes","upload","transcript-file",
