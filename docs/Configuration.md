@@ -112,6 +112,12 @@ version and an optional `:<variant>` tail such as `:thinking`. The bare
 `claude-opus-5` is refused there, and so is the hyphenated
 `anthropic/claude-opus-4-7`; the error names the right spelling.
 
+**A `:batch` variant is refused on every vendor.** OpenRouter serves a name
+such as `openai/gpt-6-luna-pro:batch` only through its batch API, and the
+service calls the chat completions endpoint. Remove the variant and name the
+model, for example `openai/gpt-6-luna-pro`. The Settings page does not suggest
+these names.
+
 OpenRouter may serve one slug from more than one upstream provider, so two runs
 of one configuration can reach two backends. That does not stop an analysis. A
 **Baseline** reads the upstream the record names for every node on the route

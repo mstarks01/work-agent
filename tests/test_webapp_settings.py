@@ -348,6 +348,11 @@ class TestModelSuggestions:
             assert info["mode"] == "chat"
             assert info["supports_function_calling"]
 
+    def test_no_suggestion_names_a_variant_only_the_batch_api_serves(self):
+        names = [name for vendor in VENDOR_NAMES for name in tool_models(vendor)]
+
+        assert not [name for name in names if name.lower().endswith(":batch")]
+
     def test_a_model_outside_the_map_serves_without_a_refusal(self, tmp_path):
         settings = hand_written(ANALYSIS_MODEL_REVIEW_MODEL="claude-sonnet-5-5")
         client = client_for(tmp_path, settings)
