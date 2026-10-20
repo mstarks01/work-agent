@@ -1861,8 +1861,8 @@ def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
         in script.split("function unitTable")[1].split("function renderBlock")[0]
     ), "the requirement row reads the ruling as Excluded by review"
     assert "dismissed.forEach" in script, "the dismissed list is the rest"
-    assert '"Excluded by review"]] : []' in script, (
-        "the tile exists only where units do"
+    assert '[ruledOutClaims.length, "excluded by review"]' in script, (
+        "the summary counts the rulings, which exist only where units do"
     )
 
 

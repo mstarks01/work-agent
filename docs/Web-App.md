@@ -124,12 +124,20 @@ catalog and the pause. A run toward a report counts the extraction, the
 preparation, the review of the findings and the report assembly. The status line
 names the next stage in plain words, and the page shows no graph node name.
 
-**The report** — one block per framework you selected, a summary, the extracted
-DFD, and the served-build provenance for every LLM node. STRIDE contributes
-threat cards; ASVS contributes requirement rulings. Each card carries its
-**grounds** under the analysis: the quotes, unknown attributes and boundary
-crossings the agent raised it on, with a quote the service could not find in its
-source marked as such rather than hidden.
+**The report** — one block per framework you selected. Each block starts with a
+summary and a table of its findings. The summary counts the confirmed findings
+by severity and the findings that wait on an answer. The table gives each
+finding's severity, status, affected components and first next step, and its
+title links to the finding's card. STRIDE contributes threat cards; ASVS
+contributes requirement rulings. Each card carries its **grounds** behind
+**Why it matters, and the evidence**: the quotes, unknown attributes and
+boundary crossings the agent raised it on, with a quote the service could not
+find in its source marked as such rather than hidden.
+
+**How this report was made** — a link under the report's title opens a second
+view of the same page at `?view=provenance`. It holds the service's disclaimer
+with the assertion counts, the extracted DFD with its boundary crossings and
+assumptions, and the served-build provenance for every LLM node.
 
 ## When the configuration is wrong
 

@@ -64,8 +64,9 @@ globalThis.location = { pathname: "/report/r1", href: "" };
 """
 
 
-def run_report_page(html: str) -> dict[str, str]:
-    """The text of each part of the page, once its script has run over ``html``."""
+def run_report_page(html: str, search: str = "") -> dict[str, str]:
+    """The text of each part of the page, once its script has run over ``html``
+    at the query ``search``. ``hidden`` lists the parts the script hid."""
     node = shutil.which("node")
     if node is None:
         pytest.skip("no node on PATH to run the report page")
@@ -79,9 +80,11 @@ def run_report_page(html: str) -> dict[str, str]:
     (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
     program = (
         _SHIM.replace("PAYLOADS", json.dumps(payloads))
+        + f"location.search = {json.dumps(search)};\n"
         + script
-        + "\nconsole.log(JSON.stringify(Object.fromEntries("
-        "Object.entries(ids).map(([id, n]) => [id, n.textContent]))));"
+        + "\nconsole.log(JSON.stringify({...Object.fromEntries("
+        "Object.entries(ids).map(([id, n]) => [id, n.textContent])),"
+        " hidden: Object.keys(ids).filter(id => ids[id].hidden).join(' ')}));"
     )
     done = subprocess.run(
         [node, "-"],
@@ -122,46 +125,82 @@ def waits_line(parts):
 
 
 @pytest.mark.parametrize(
-    ("answered", "shown", "why", "summary"),
+    ("answered", "shown", "why"),
     [
-        ([], [], "not asked yet", "1 on a fact nobody was asked"),
-        (
-            [],
-            [ASKED.key],
-            "shown before the analysis and left blank",
-            "1 on a fact left blank",
-        ),
+        ([], [], "not asked yet"),
+        ([], [ASKED.key], "shown before the analysis and left blank"),
         (
             [FactAnswer(key=ASKED.key, value="unknown")],
             [],
             'nobody knew: an answer said "I don\'t know"',
-            "1 wait on a fact nobody knew",
         ),
         (
             [FactAnswer(key=ASKED.key, value="TLS 1.3")],
             [],
             "you answered it, and the analysis still did not find it settled",
-            "1 on a fact you answered",
         ),
     ],
     ids=["open", "unanswered", "unknown", "answered"],
 )
-def test_a_conditional_finding_says_why_each_fact_is_still_open(
-    answered, shown, why, summary
-):
+def test_a_conditional_finding_says_why_each_fact_is_still_open(answered, shown, why):
     """The banner named an element and an attribute and nothing more (#1289, PR 4)."""
     parts = run_report_page(page(answered=answered, shown=shown))
     assert waits_line(parts) == why
     assert "neither confirmed nor cleared" in parts["analyses"]
-    assert "What remains open: 1 finding(s) are conditional." in parts["analyses"]
-    assert summary in parts["analyses"]
 
 
 def test_a_skipped_fact_is_told_apart_from_a_blank_one():
     """Only the submitter's own skip reads as skipped (#1542 F4)."""
     parts = run_report_page(page(shown=[ASKED.key], skipped=[ASKED.key]))
     assert waits_line(parts) == "skipped before the analysis"
-    assert "1 on a fact skipped before the analysis" in parts["analyses"]
+
+
+def two_findings():
+    """A report of one confirmed finding and one that waits on ``ASKED``."""
+    waiting = asking_threat(ASKED).model_copy(
+        update={"id": "S-02", "title": "Cookies cross the network in clear"}
+    )
+    report = sample_report([sample_threat(), waiting])
+    return render_report(report, report_state(report)).html
+
+
+def test_the_summary_counts_the_confirmed_and_the_waiting_findings():
+    """One summary per block, in place of the tiles and the severity bar."""
+    text = run_report_page(two_findings())["analyses"]
+    assert "1 confirmed finding (1 high)." in text
+    assert "1 finding needs an answer to 1 open question. Answer the questions" in text
+    assert "Actionable claims" not in text
+
+
+def test_the_findings_table_lists_each_finding_with_its_first_step():
+    """A row per finding, before the cards: the confirmed one first, with its
+    first mitigation, and the waiting one with the question it waits on."""
+    text = run_report_page(two_findings())["analyses"]
+    head = "SeverityFindingStatusAffectedFirst next step"
+    assert head in text
+    table = text[text.index(head) : text.index("AI-generated STRIDE")]
+    confirmed = table.index("Session cookie theft enables account takeover S-01")
+    waiting = table.index("Cookies cross the network in clear S-02")
+    assert confirmed < waiting
+    assert "\u2713 Confirmed" in table
+    assert "Set HttpOnly and Secure on cookies" in table
+    assert "Answer: Is the connection" in table
+
+
+def test_the_findings_view_hides_how_the_report_was_made():
+    parts = run_report_page(two_findings())
+    assert parts["hidden"].split() == ["provenance-view"]
+    assert parts["jobmeta"].endswith("How this report was made")
+
+
+def test_the_provenance_view_holds_the_model_and_the_pipeline():
+    """The service disclaimer, the element count, the System Model and the
+    pipeline move to ?view=provenance, which hides the findings."""
+    parts = run_report_page(two_findings(), search="?view=provenance")
+    assert parts["hidden"].split() == ["report-view"]
+    assert parts["jobmeta"].endswith("Back to the findings")
+    assert parts["disclaimer"].startswith("AI-generated security analysis.")
+    assert "elements in the model" in parts["scope"]
 
 
 def test_the_next_step_follows_whether_the_report_is_final():
@@ -204,18 +243,17 @@ def test_an_owner_s_answer_is_marked_as_unchecked():
 
 
 def test_every_reason_a_fact_is_open_has_a_line_on_the_page():
-    """The page's WHY_OPEN and OPEN_SUMMARY tables and FactStatus are one set."""
+    """The page's WHY_OPEN table and FactStatus are one set."""
     from typing import get_args
 
     from analysis_service.report_conditions import FactStatus
     from tests.test_webapp import viewer_javascript
 
-    for name in ("WHY_OPEN", "OPEN_SUMMARY"):
-        table = re.search(
-            rf"const {name} = \{{(.*?)\n  \}};", viewer_javascript(), re.DOTALL
-        )
-        keys = set(re.findall(r"^\s*(\w+):", table.group(1), re.MULTILINE))
-        assert keys == set(get_args(FactStatus)), name
+    table = re.search(
+        r"const WHY_OPEN = \{(.*?)\n  \};", viewer_javascript(), re.DOTALL
+    )
+    keys = set(re.findall(r"^\s*(\w+):", table.group(1), re.MULTILINE))
+    assert keys == set(get_args(FactStatus))
 
 
 @pytest.mark.parametrize("step", [None, "evidence", "reasoning", "lane", "duplicate"])
@@ -380,13 +418,15 @@ console.log(JSON.stringify({ shown: out.shown.join(""), hidden: out.hidden.join(
 
 
 def test_a_finding_shows_its_summary_and_hides_its_provenance():
-    """#561's default view: why it matters, what is missing, what it touches
-    and what to do next. The grounds and the critic's reason sit behind the
+    """#561's default view: what is missing, what it touches and what to do
+    next. Why it matters, the grounds and the critic's reason sit behind the
     toggle, and nothing is dropped."""
     shown, hidden = _split_by_provenance(page())
 
-    for part in ("Why it matters", "Missing information", "Affected", "Next step"):
+    for part in ("Missing information", "Affected", "Next step"):
         assert part in shown, part
+    assert "Why it matters" in hidden
+    assert "Why it matters" not in shown
     assert "The critic's reason" in hidden
     assert "The sources do not state this." in hidden
     assert "The sources do not state this." not in shown
@@ -521,11 +561,12 @@ def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
     assert _page_table_keys(table) == set(values)
 
 
-def test_the_severity_bar_reads_the_service_s_order():
+def test_the_page_reads_the_service_s_severity_order():
     """The page orders severity by ``SEVERITY_ORDER`` as the server sends it.
 
     The page holds no order of its own, so a level the service adds lands in
-    the bar. ``SEV`` labels each level, and the table test holds its keys.
+    the summary and the findings table. ``SEV`` labels each level, and the
+    table test holds its keys.
     """
     from analysis_service.critic import SEVERITY_ORDER
     from tests.test_webapp import viewer_javascript

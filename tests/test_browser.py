@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import socket
 import threading
 import time
@@ -204,8 +205,28 @@ def test_a_submitter_who_skips_every_question_reaches_a_report_that_says_what_is
     page.click("#continue")
     page.wait_for_url("**/report/**")
     report = page.inner_text("body")
-    assert "What remains open" in report
-    assert "neither confirmed nor cleared" in report
+    assert re.search(r"\d+ findings? needs? an answer", report)
+    assert "? Needs info" in report
+
+
+def test_a_report_links_each_finding_and_shows_how_it_was_made_apart(page):
+    """A table row's title opens its card, inside a closed group too, and the
+    System Model and the pipeline sit on their own view."""
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    assert not page.locator("#elements").is_visible()
+    row = page.locator("table.findings tr", has_text="Needs info").first
+    row.locator("a").click()
+    card = page.locator(row.locator("a").get_attribute("href"))
+    card.wait_for(state="visible")
+    page.get_by_role("link", name="How this report was made").click()
+    page.wait_for_url("**?view=provenance")
+    assert page.locator("#elements").is_visible()
+    assert page.locator("#nodes").is_visible()
+    assert not page.locator("#analyses").is_visible()
+    page.get_by_role("link", name="Back to the findings").click()
+    page.locator("table.findings").wait_for()
 
 
 def test_a_phone_sized_submitter_answers_skips_corrects_and_starts(browser, served):

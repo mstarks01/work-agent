@@ -335,10 +335,16 @@ when both frameworks are selected.
 
 Start with these parts of the result:
 
-- **System model:** verify that the actors, components, stores, flows, and trust
-  zones match the source. Every later result depends on this extraction.
-- **Grounds:** check whether each finding rests on relevant source text or a
-  real fact derived from the model. A ground that quotes one of your answers,
+- **Summary and findings table:** each framework's block starts with the
+  count of confirmed findings by severity, the count of findings that wait on
+  an answer, and one row for each finding. Click a finding's title to open its
+  card.
+- **System model:** on **How this report was made**, verify that the actors,
+  components, stores, flows, and trust zones match the source. Every later
+  result depends on this extraction.
+- **Grounds:** open **Why it matters, and the evidence** on a card, and check
+  whether each finding rests on relevant source text or a real fact derived
+  from the model. A ground that quotes one of your answers,
   or rests on an attribute you answered, says "your answer; the service did
   not check it": it is your statement, not evidence from the description.
 - **Verdict:** `confirmed`, `needs-info`, or `rejected`. For ASVS, `confirmed`
@@ -347,12 +353,12 @@ Start with these parts of the result:
   neither confirmed nor cleared. Its card lists each fact it waits on and why
   that fact is still open: nobody knew, you answered only part of it, you
   skipped it before the analysis, you answered it and the analysis still did
-  not find it settled, or nobody was asked. **What remains open**, above the findings, counts them. An "I
-  don't know" never reads as a missing control.
+  not find it settled, or nobody was asked. An "I don't know" never reads as a
+  missing control.
 - **Marks:** look for repaired quotes, dropped claims, unresolved evidence, or
   unresolved references. These show where one proposal was degraded or removed
   without discarding the entire analysis.
-- **Provenance:** see which model route was requested, which model identifier
+- **Provenance:** on **How this report was made**, see which model route was requested, which model identifier
   the provider returned, and which execution fingerprint each call produced.
   These values support auditing; they do not establish that a finding is right.
 

@@ -89,15 +89,6 @@
     answered: "you answered it, and the analysis still did not find it settled",
     open: "not asked yet",
   };
-  // The same reasons, as the "What remains open" summary counts them.
-  const OPEN_SUMMARY = {
-    unknown: (n) => `${n} wait on a fact nobody knew`,
-    partial: (n) => `${n} on a fact you answered in part`,
-    skipped: (n) => `${n} on a fact skipped before the analysis`,
-    unanswered: (n) => `${n} on a fact left blank before the analysis`,
-    answered: (n) => `${n} on a fact you answered that the analysis did not find settled`,
-    open: (n) => `${n} on a fact nobody was asked`,
-  };
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -366,13 +357,22 @@
   // both, so the tab reads the run rather than the template.
   document.title = R.input.system_name + " — report";
   const fmt = (t) => new Date(t).toISOString().replace("T"," ").replace(".000Z"," UTC");
+  // The page shows the findings, or at ?view=provenance how the report was
+  // made. Each view links to the other.
+  const PROVENANCE_VIEW =
+    new URLSearchParams(location.search).get("view") === "provenance";
+  $("report-view").hidden = PROVENANCE_VIEW;
+  $("provenance-view").hidden = !PROVENANCE_VIEW;
+  const otherView = el("a", null, PROVENANCE_VIEW
+    ? "Back to the findings"
+    : "How this report was made");
+  otherView.href = location.pathname + (PROVENANCE_VIEW ? "" : "?view=provenance");
   $("jobmeta").append(
-    `Generated ${fmt(R.job.completed_at)}`
+    `Generated ${fmt(R.job.completed_at)} · `, otherView
   );
-  // The envelope's disclaimer says what the *service* is. Each block carries
-  // its own, saying what that framework's claims assert — a different sentence
-  // the moment a report carries a framework that rules on requirement
-  // applicability rather than on attacks.
+  // The envelope's disclaimer says what the *service* is and how many of its
+  // facts anybody checked. Each block carries its own, saying what that
+  // framework's claims assert, beside the findings.
   $("disclaimer").textContent = R.disclaimer;
 
   // "in the model", never "analysed". `elements_analyzed` is the embedded
@@ -469,6 +469,7 @@
   // here; its claims render, correctly, in the neutral shape.
   function claimCard(marks, t, rejected) {
     const card = el("div", "card" + (rejected ? " rejected" : ""));
+    card.id = cardId(t);
     const head = el("div","card-head");
     head.append(proseEl("h3", null, t.title), el("span","tid", t.id));
     card.append(head);
@@ -510,16 +511,10 @@
 
     card.append(proseEl("div","desc", t.description));
 
-    // The default view answers what a reader triages on (#561): why it
-    // matters, what is missing, what it touches and what to do next. The
+    // The default view answers what a reader triages on (#561): what is
+    // missing, what it touches and what to do next. Why it matters, the
     // evidence behind it, and every warning about a citation that did not
-    // resolve, sits under one toggle further down, so nothing is removed.
-    if (t.severity) {
-      const why = el("div","field");
-      why.append(lbl("Why it matters"), el("br"), prose(t.severity.justification));
-      card.append(why);
-    }
-
+    // resolve, sit under one toggle further down, so nothing is removed.
     // The facts a needs-info finding waits on, each by the label the server
     // gives it and why it is still open. The critic's own sentence restates
     // them, so it moves under the toggle rather than repeating above it.
@@ -563,11 +558,17 @@
     }
     if (next.children.length > 1) card.append(next);
 
-    // Everything behind the default view: the critic's reason, the grounds
-    // with who justified what, and each citation the service dropped. A
-    // `details` element, so the browser does the toggling, keyboard included.
+    // Everything behind the default view: why it matters, the critic's
+    // reason, the grounds with who justified what, and each citation the
+    // service dropped. A `details` element, so the browser does the toggling,
+    // keyboard included.
     const prov = el("details","prov");
-    prov.append(el("summary", null, "Show technical provenance"));
+    prov.append(el("summary", null, "Why it matters, and the evidence"));
+    if (t.severity) {
+      const why = el("div","field");
+      why.append(lbl("Why it matters"), el("br"), prose(t.severity.justification));
+      prov.append(why);
+    }
     if (waits.length && t.verdict.reason) {
       const reason = el("div","field");
       reason.append(lbl("The critic's reason"), el("br"), prose(t.verdict.reason));
@@ -600,6 +601,104 @@
     }
     card.append(prov);
     return card;
+  }
+
+  // A card's anchor, for the findings table to link to.
+  const cardId = (t) => `finding-${t.framework}-${t.id}`;
+  // Whether the report asks the questions its conditional findings wait on.
+  const ASKS = FACT_QUESTIONS.length > 0 && !FINAL && !RESUMED_BY;
+  const FLOW_IDS = new Set(R.system_model.data_flows.map(f => f.id));
+
+  // What a block found, before any detail: the confirmed findings by
+  // severity, the findings that wait on an answer, and each other count that
+  // is not zero.
+  function summaryOf(block, openFacts, others) {
+    const box = el("div", "summary");
+    const confirmed = block.claims.filter(c => c.verdict.status === "confirmed").length;
+    const waiting = block.claims.filter(c => c.verdict.status === "needs-info").length;
+    const first = el("p");
+    first.append(el("b", null, `${confirmed} confirmed ${confirmed === 1 ? "finding" : "findings"}`));
+    const bySeverity = block.summary.by_severity_confirmed;
+    if (bySeverity && confirmed) {
+      const levels = SEV_ORDER.filter(l => bySeverity[l])
+        .map(l => `${bySeverity[l]} ${SEV[l][0].toLowerCase()}`);
+      first.append(` (${levels.join(", ")})`);
+    }
+    first.append(".");
+    box.append(first);
+    if (waiting) {
+      const line = el("p");
+      line.append(el("b", null,
+        `${waiting} ${waiting === 1 ? "finding needs" : "findings need"} an answer`));
+      line.append(openFacts
+        ? ` to ${openFacts} open ${openFacts === 1 ? "question" : "questions"}.`
+        : ".");
+      if (ASKS) {
+        const go = el("a", null, "Answer the questions");
+        go.href = "#followup";
+        go.addEventListener("click", () => { $("followup").open = true; });
+        line.append(" ", go);
+      }
+      box.append(line);
+    }
+    const rest = others.filter(([n]) => n).map(([n, what]) => `${n} ${what}`);
+    if (rest.length) box.append(el("p", "meta", `Also: ${rest.join(", ")}.`));
+    return box;
+  }
+
+  // Open every `details` around a card, so a link to it lands on it.
+  const openTo = (node) => {
+    for (let d = node.closest("details"); d; d = d.parentElement && d.parentElement.closest("details")) {
+      d.open = true;
+    }
+  };
+
+  // One row per finding: its severity, title, status, the components it
+  // touches and the first thing to do. The title links to the card below.
+  function findingsTable(block) {
+    const claims = [...block.claims];
+    if (!claims.length) return null;
+    const graded = claims.every(c => c.severity);
+    const STATUS_RANK = ["confirmed", "needs-info"];
+    claims.sort((a, b) =>
+      (graded ? SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level) : 0)
+      || STATUS_RANK.indexOf(a.verdict.status) - STATUS_RANK.indexOf(b.verdict.status));
+    const table = el("table", "findings");
+    const head = el("tr");
+    if (graded) head.append(el("th", null, "Severity"));
+    head.append(el("th", null, "Finding"), el("th", null, "Status"),
+      el("th", "aff", "Affected"), el("th", null, "First next step"));
+    const thead = el("thead");
+    thead.append(head);
+    const body = el("tbody");
+    claims.forEach(t => {
+      const row = el("tr");
+      if (graded) {
+        const sev = el("td", "sev");
+        const swatch = el("span", "swatch");
+        swatch.style.background = svar(t.severity.level);
+        sev.append(swatch, SEV[t.severity.level][0]);
+        row.append(sev);
+      }
+      const link = el("a");
+      link.href = `#${cardId(t)}`;
+      link.append(prose(t.title));
+      link.addEventListener("click", () => openTo($(cardId(t))));
+      const [label, glyph] = VERDICT[t.verdict.status];
+      // The components a finding touches; a flow only where it names nothing else.
+      const elements = t.affected_element_ids.filter(id => !FLOW_IDS.has(id));
+      const affected = el("td", "aff");
+      (elements.length ? elements : t.affected_element_ids)
+        .forEach((id, i) => affected.append(...(i ? [", "] : []), ref(id)));
+      const waits = CONDITIONS[`${t.framework}/${t.id}`] || [];
+      const step = waits.length ? `Answer: ${waits[0].label}`
+        : t.mitigations && t.mitigations.length ? prose(t.mitigations[0].summary) : "—";
+      row.append(cell(link, " ", el("span", "tid", t.id)), el("td", "status", `${glyph} ${label}`),
+        affected, cell(step));
+      body.append(row);
+    });
+    table.append(thead, body);
+    return table;
   }
 
   // One framework's whole section: its heading, its disclaimer, its own counts,
@@ -685,31 +784,23 @@
     const marks = marksOf(block);
     const section = el("section", "analysis");
     section.append(el("h2", null, `${block.framework} \u00b7 v${block.framework_version}`));
-    section.append(el("div", "disclaimer-block", block.disclaimer));
-
-    const tiles = el("div", "tiles");
-    // The deferred count rides beside the claim counts rather than only inside
-    // the scope summary: a requirement this job cannot settle is work the
-    // submitter can act on, and a total that omits it reads as less to do
-    // than there is (#659).
+    // A requirement this job cannot settle is work the submitter can act on,
+    // so the summary counts it beside the findings (#659).
     const deferredCount =
       block.scope.filter(e => e.state === "needs-other-evidence").length;
     // Split out of the rejected count on the page: a requirement ruled out
     // is an answer, and a draft dismissed for arguing badly is not.
     const ruledOutClaims = block.rejected_claims.filter(c => rulesOut(block, c));
     const dismissed = block.rejected_claims.filter(c => !rulesOut(block, c));
-    [
-      [block.summary.claim_count, "Actionable claims"],
-      [block.summary.needs_info_count, "Needs info"],
-      ...(answersInUnits(block) ? [[ruledOutClaims.length, "Excluded by review"]] : []),
-      [dismissed.length, "Rejected"],
-      [deferredCount, "Needs other evidence"],
-    ].forEach(([n, k]) => {
-      const t = el("div","tile");
-      t.append(el("div","n",String(n)), el("div","k",k));
-      tiles.append(t);
-    });
-    section.append(tiles);
+    const facts = OPEN_FACTS[block.framework] || [];
+    section.append(summaryOf(block, facts.length, [
+      [ruledOutClaims.length, "excluded by review"],
+      [dismissed.length, "rejected"],
+      [deferredCount, "need other evidence"],
+    ]));
+    const table = findingsTable(block);
+    if (table) section.append(table);
+    section.append(el("div", "disclaimer-block", block.disclaimer));
 
     // What this framework considered and raised nothing about, grouped. The
     // entries are not listed one by one: a framework answering in its own units
@@ -818,41 +909,6 @@
       section.append(note);
     }
 
-    // The severity mix, only for a framework that grades harm. One that does
-    // not declares no `by_severity`, and an empty bar would read as "nothing
-    // was severe" rather than "severity is not this method's question".
-    const by = block.summary.by_severity;
-    if (by) {
-      const present = SEV_ORDER.filter(l => by[l]);
-      if (present.length) {
-        const wrap = el("div", "mixwrap");
-        const mix = el("div", "mix");
-        const legend = el("div", "mixlegend");
-        present.forEach(l => {
-          const s = el("span");
-          s.style.flex = by[l];
-          s.style.background = svar(l);
-          mix.append(s);
-        });
-        // Each band says how many of its claims are confirmed. The rubric
-        // rates a claim resting on an unstated control as if the control were
-        // absent, so a conditional claim reaches the top band on a fact nobody
-        // stated — and "3 critical" alone reads as three settled findings.
-        const confirmed = block.summary.by_severity_confirmed || {};
-        present.forEach(l => {
-          const item = el("div");
-          const swatch = el("span", "swatch");
-          swatch.style.background = svar(l);
-          const open = by[l] - (confirmed[l] || 0);
-          const split = open ? ` (${confirmed[l] || 0} confirmed, ${open} to answer)` : "";
-          item.append(swatch, `${SEV[l][0]} \u00b7 ${by[l]}${split}`);
-          legend.append(item);
-        });
-        wrap.append(mix, legend);
-        section.append(wrap);
-      }
-    }
-
     // Severity order where the framework grades, and the block's own order
     // otherwise — which is the package's declared lane order, and is the only
     // ranking a framework that grades nothing has.
@@ -860,7 +916,6 @@
     // settle the most findings on its own, rather than in the list below: a
     // report of many conditional findings asks the same few questions many
     // times, and grouped they read as the questions they are.
-    const facts = OPEN_FACTS[block.framework] || [];
     const grouped = new Set(facts.flatMap(f => f.placed));
     const byClaimId = {};
     block.claims.forEach(c => { byClaimId[c.id] = c; });
@@ -925,22 +980,6 @@
   }
   // In the job's own selection order, which the envelope has already checked
   // against `job.frameworks`.
-  // What stays open, before any finding: a conditional finding is neither
-  // confirmed nor cleared, and the counts say why each is still open.
-  const conditional = Object.values(CONDITIONS);
-  if (conditional.length) {
-    const tally = Object.fromEntries(Object.keys(WHY_OPEN).map(status => [status, 0]));
-    conditional.forEach(waits => {
-      new Set(waits.map(w => w.status)).forEach(status => { tally[status] += 1; });
-    });
-    const parts = Object.entries(OPEN_SUMMARY)
-      .filter(([status]) => tally[status])
-      .map(([status, line]) => line(tally[status]));
-    $("analyses").append(el("div", "meta",
-      `What remains open: ${conditional.length} finding(s) are conditional. Each is ` +
-      "neither confirmed nor cleared until the facts it waits on are confirmed. " +
-      `Of them, ${parts.join("; ")}.`));
-  }
   R.analyses.forEach(renderBlock);
 
   // What the report asks: which element each principal is (link questions),
@@ -967,6 +1006,7 @@
     // The follow-up is optional and starts closed: the report is complete
     // without it, and answering runs the analysis once more.
     const box = el("details", "followup");
+    box.id = "followup";
     const waiting = new Set(FACT_QUESTIONS.flatMap(q => q.findings)).size;
     const questionCount = FACT_QUESTIONS.length + LINK_QUESTIONS.length;
     box.append(el("summary", null, questionCount
