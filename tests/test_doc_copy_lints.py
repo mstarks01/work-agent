@@ -14,11 +14,12 @@ reworded guide then fails the check, and does not pass with nothing read.
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import tomllib
 from pathlib import Path
-from typing import get_args
+from typing import Literal, get_args, get_origin
 
 import pytest
 from fastapi.routing import APIRoute
@@ -585,11 +586,14 @@ def test_the_outcome_list_is_every_terminal_status(path, bullet):
 
 
 #: The count words a record section may use for the fields its package adds.
-_FIELD_COUNTS = {"One": 1, "Two": 2, "Three": 3, "Four": 4}
+_FIELD_COUNTS = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5, "Six": 6}
 
 
 @pytest.mark.parametrize("framework", sorted(SCHEMAS))
 def test_each_record_block_is_every_field_its_package_adds(framework):
+    """The block names each field the package's record adds, the section
+    counts them in one "N fields, and nothing else" sentence, and each
+    ``Literal[...]`` the block copies holds the members of the model's own."""
     record = SCHEMAS[framework].ruled_record
     text = section(DOCS / "Report-Schema.md", f"### {framework.upper()}'s own record")
     block = re.search(
@@ -598,11 +602,19 @@ def test_each_record_block_is_every_field_its_package_adds(framework):
         re.DOTALL | re.MULTILINE,
     )
     added = set(record.model_fields) - set(RuledClaim.model_fields)
+    counts = re.findall(r"\b(\w+) fields?, and nothing else", text)
 
     assert block
     assert set(re.findall(r"^    ([a-z_]+):", block[1], re.MULTILINE)) == added
-    for word in re.findall(r"\b(\w+) fields?, and nothing else", text):
-        assert _FIELD_COUNTS[word] == len(added)
+    assert len(counts) == 1, "the section states its field count once"
+    assert counts[0] in _FIELD_COUNTS, f"no count word {counts[0]!r} in the lint"
+    assert _FIELD_COUNTS[counts[0]] == len(added)
+    for name, members in re.findall(
+        r"^    ([a-z_]+): Literal\[(.*?)\]", block[1], re.MULTILINE
+    ):
+        annotation = record.model_fields[name].annotation
+        assert get_origin(annotation) is Literal, f"{name} is not a Literal"
+        assert ast.literal_eval(f"({members},)") == get_args(annotation), name
 
 
 # Model tiers: the loader's version and node keys.

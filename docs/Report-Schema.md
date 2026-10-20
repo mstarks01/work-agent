@@ -164,7 +164,7 @@ class Threat(RuledClaim):
     recommendation: RecommendationReading | None  # {sound, note}
 ```
 
-`recommendation` is the critic's reading of the threat's `mitigations`, or
+Five fields, and nothing else. `recommendation` is the critic's reading of the threat's `mitigations`, or
 `null` where the critic made none.
 
 Category letters: `S` spoofing, `T` tampering, `R` repudiation,
@@ -188,11 +188,13 @@ rather than reading a third map that could disagree with these two.
 ```python
 class RequirementRuling(RuledClaim):
     chapter: AsvsChapter  # encoding-and-sanitization | authentication | ...
-    direction: Literal["", "gap", "question", "excluded"]
+    direction: Literal["", "gap", "question", "excluded"] = ""
 ```
 
 Two fields, and nothing else. `direction` is the lane's statement of what the
-claim is: a gap, a question or an exclusion. **ASVS grades nothing**: no
+claim is: a gap, a question or an exclusion. The service copies it from the
+lane's proposal, which must state one, so `""` appears only on a claim read
+back from a report that does not carry the field. **ASVS grades nothing**: no
 severity, no confidence and no mitigation, so the package carries no
 `severity_rubric.md` and the block's `summary` adds `by_chapter` alone. A claim's `id` is the standard's own
 version-safe reference — `v5.0.0-1.2.5` — composed by the service from the lane's
