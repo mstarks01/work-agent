@@ -13,6 +13,7 @@ import pytest
 
 from evals.harness.submit import run_command
 from tests.source_tree import REPO_ROOT
+from tests.test_workflow_lints import FILTERED_WORKFLOWS, _filter_paths
 
 SCRIPT = REPO_ROOT / ".github" / "scripts" / "five_class_read.py"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "five-class.yml"
@@ -66,15 +67,38 @@ def test_the_code_paths_are_the_guides():
         ".githooks/check-attribution",
         ".github/workflows/ci.yml",
         ".github/scripts/five_class_read.py",
+        "config/model_tiers.toml",
+        "domains/http-api.md",
+        "evals/verify_corpus.py",
+        "evals/critic_review/score.py",
+        "pyproject.toml",
     ],
 )
 def test_a_code_path_needs_the_read(path):
     assert check.changes_code(["docs/Web-App.md", path])
 
 
+@pytest.mark.parametrize("workflow", FILTERED_WORKFLOWS, ids=lambda path: path.name)
+def test_every_path_that_changes_the_analysis_is_a_code_path(workflow):
+    swept = [
+        entry.replace("**", "module.py")
+        for entry in _filter_paths(workflow)
+        if not entry.startswith("!")
+    ]
+    assert swept
+    assert [path for path in swept if not check.changes_code([path])] == []
+
+
 @pytest.mark.parametrize(
     "path",
-    ["docs/agents/code-review.md", "AGENTS.md", "GLOSSARY.md", "evals/corpus/x.json"],
+    [
+        "docs/agents/code-review.md",
+        "AGENTS.md",
+        "GLOSSARY.md",
+        "evals/corpus/x.json",
+        "evals/README.md",
+        "docs/research/probe.py",
+    ],
 )
 def test_a_path_that_holds_no_code_needs_no_read(path):
     assert not check.changes_code([path])
@@ -111,6 +135,36 @@ def test_a_subheading_inside_the_section_keeps_the_section_open():
 def test_a_name_wrapped_over_two_lines_counts():
     body = FULL_SECTION.replace("A bound predicted, not", "A bound predicted,\r\nnot")
     assert check.missing(body) == []
+
+
+@pytest.mark.parametrize(
+    "hide",
+    [
+        lambda text: f"<!--\n{text}\n-->",
+        lambda text: f"```\n{text}\n```",
+        lambda text: f"~~~markdown\n{text}\n~~~",
+    ],
+    ids=["comment", "backtick-fence", "tilde-fence"],
+)
+def test_a_section_that_does_not_render_does_not_count(hide):
+    assert check.missing(f"Intro.\n\n{hide(FULL_SECTION)}") == [check.HEADING]
+
+
+def test_a_class_inside_a_comment_does_not_count():
+    body = FULL_SECTION.replace(LAST, f"<!-- {LAST} -->")
+    assert check.missing(body) == [check.CLASSES[-1]]
+
+
+def test_an_empty_entry_is_named():
+    body = FULL_SECTION.replace(
+        f"**{check.CLASSES[1]}**: none.", f"**{check.CLASSES[1]}**:"
+    )
+    assert check.missing(body) == [f"text after {check.CLASSES[1]}"]
+
+
+def test_the_names_on_one_line_are_not_a_read():
+    body = f"{check.HEADING}\n\n" + ", ".join(check.CLASSES) + ": none."
+    assert check.missing(body) == [f"text after {name}" for name in check.CLASSES[:-1]]
 
 
 def _commit(repo: Path, path: str) -> str:
@@ -157,6 +211,15 @@ def test_a_code_change_with_no_section_is_refused(repo):
     head = _commit(repo, "src/module.py")
     assert _run(repo, base, head, "A body with no section.") == 1
     assert _run(repo, base, head, FULL_SECTION) == 0
+
+
+def test_a_code_file_moved_out_of_a_code_path_needs_the_read(repo):
+    _commit(repo, "src/module.py")
+    base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
+    (repo / "scripts").mkdir()
+    run_command(["git", "mv", "src/module.py", "scripts/module.py"], repo)
+    head = _commit(repo, "docs/guide.md")
+    assert _run(repo, base, head, "") == 1
 
 
 def test_a_docs_change_needs_no_section(repo):

@@ -39,12 +39,25 @@ the end of this guide.
 
 Write the result in the pull request body, under the heading
 `## Five-class read`, with one entry for each class by its name in the table
-below. CI requires the section on each pull request that changes a code path:
-`src/`, `webapp/`, `evals/harness/`, `prompts/`, `frameworks/`, `tests/`,
-`.githooks/`, `.github/workflows/` or `.github/scripts/`. The check
-`Five-class read` (`.github/workflows/five-class.yml`) runs again when the body
-is edited. `.github/scripts/five_class_read.py` holds the class names, and
-`tests/test_five_class_read.py` holds them to the table below.
+below. Give each class its own entry with text after the name. CI requires the
+section on each pull request that changes a code path:
+`src/*`, `webapp/*`, `evals/harness/*`, `evals/*.py`, `prompts/*`,
+`frameworks/*`, `domains/*`, `config/*`, `tests/*`, `.githooks/*`,
+`.github/workflows/*`, `.github/scripts/*` or `pyproject.toml`. An asterisk
+also matches a slash, and a rename counts as a change to its old and its new
+path.
+The check `Five-class read` (`.github/workflows/five-class.yml`) runs again
+when the body is edited. It does not read an HTML comment or a fenced code
+block. `.github/scripts/five_class_read.py` holds the class names and the code
+paths. `tests/test_five_class_read.py` holds the names to the table below, and
+holds each path that a live workflow sweeps to the code paths.
+
+The check has a limit. GitHub runs the copy of `five-class.yml` that the pull
+request carries. The workflow runs the base branch's copy of the script, but a
+pull request that edits the workflow can remove that step or the whole check.
+So the check does not guard a pull request that changes
+`.github/workflows/five-class.yml`. The reviewer of such a pull request reads
+the workflow diff.
 
 ## The five defect classes
 
