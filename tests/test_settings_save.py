@@ -231,6 +231,24 @@ class TestASaveThatPasses:
         assert "extreme" not in refused.text
         assert "THINKING" not in settings_text(tmp_path)
 
+    def test_a_level_on_a_model_that_takes_none_is_refused_on_its_row(self, tmp_path):
+        client, _ = app_on(tmp_path, hand_written())
+
+        refused = save(
+            client,
+            {
+                "tiers.strong.vendor": "openai",
+                "tiers.strong.model": "gpt-4o-2024-08-06",
+                "sampling.strong.thinking": "high",
+            },
+        )
+
+        assert refused.status_code == 422, refused.text
+        [error] = refused.json()["errors"]
+        assert error["key"] == "sampling.strong.thinking"
+        assert "gpt-4o" not in error["message"]
+        assert "drop_params" not in error["message"]
+
 
 class TestAReset:
     def test_it_removes_the_line_and_the_page_shows_the_shipped_value(self, tmp_path):

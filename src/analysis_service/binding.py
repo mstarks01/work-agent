@@ -91,9 +91,11 @@ from analysis_service.ladder import RUNG_KWARGS, Ladder, Rung, rungs_for
 from analysis_service.model_gate import (
     SCHEMA_RULES,
     ModelGateError,
+    NoThinkingLevel,
     assert_kwarg_supported,
     check_supported,
     output_ceiling,
+    takes_thinking,
 )
 from analysis_service.model_tiers import (
     TIER_NAMES,
@@ -458,6 +460,14 @@ def build_tier_adapters(
             tier,
             "config/sampling.toml",
         )
+        if tier_sampling.thinking is not None and not takes_thinking(
+            vendor, selection.model
+        ):
+            raise NoThinkingLevel(
+                tier,
+                f"{source}: the model takes no thinking level; leave"
+                f" {env_var_for(tier, 'thinking')} unset",
+            )
         check_supported(
             vendor, selection.model, tier_sampling.gate_params(), source=source
         )

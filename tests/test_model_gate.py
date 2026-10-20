@@ -29,6 +29,7 @@ from analysis_service.model_gate import (
     emulates_structured_output,
     native_structured_output,
     output_ceiling,
+    takes_thinking,
 )
 from analysis_service.vendors import VENDORS, vendor_for
 
@@ -194,6 +195,40 @@ class TestReasoningReachesEveryVendor:
         # gate cannot catch it and no per-(vendor, model) data exists to, so
         # the config surface offers no "off" value.
         gate("vertex", GEMINI, temperature=0.0, reasoning_effort="none")
+
+
+class TestTakesThinking:
+    """The one reader of whether a model takes a thinking level at all."""
+
+    @pytest.mark.parametrize(
+        ("vendor", "model"),
+        [
+            ("anthropic", ANTHROPIC_CLAUDE),
+            ("vertex", GEMINI),
+            ("openai", "gpt-5.6-terra"),
+        ],
+    )
+    def test_a_reasoning_model_takes_one(self, vendor, model):
+        assert takes_thinking(vendor_for(vendor), model)
+
+    @pytest.mark.parametrize(
+        ("vendor", "model"),
+        [("openai", "gpt-4o"), ("openrouter", "openai/gpt-4o-2024-08-06")],
+    )
+    def test_a_model_that_refuses_the_parameter_takes_none(self, vendor, model):
+        assert not takes_thinking(vendor_for(vendor), model)
+
+    @pytest.mark.parametrize("model", ["gpt-4o", "gpt-5.6-terra"])
+    def test_it_agrees_with_the_build_check(self, model):
+        """The page offers the levels by this answer and the build refuses by
+        the parameter check, so the two must give one answer."""
+        vendor = vendor_for("openai")
+        try:
+            check_supported(vendor, model, {"reasoning_effort": "low"}, source="t")
+            refused = False
+        except ModelGateError:
+            refused = True
+        assert takes_thinking(vendor, model) is not refused
 
 
 class TestKwargAssertion:

@@ -121,7 +121,7 @@ def test_the_page_runs_whole():
 
 def waits_line(parts):
     """The banner's line for the one fact the finding waits on."""
-    (line,) = re.findall(r"encrypted\? — ([^.]*?)(?=Until)", parts["analyses"])
+    (line,) = re.findall(r"encrypted\? — ([^.]*?)(?=Affected)", parts["analyses"])
     return line
 
 
@@ -186,6 +186,48 @@ def test_the_findings_table_lists_each_finding_with_its_first_step():
     assert "\u2713 Confirmed" in table
     assert "Set HttpOnly and Secure on cookies" in table
     assert "Answer: Is the connection" in table
+
+
+def test_findings_that_rest_on_one_missing_control_share_a_group(monkeypatch):
+    """Two confirmed findings that cite one stated-absent control sit under one
+    group, named for the control to add, and the table still lists both."""
+    from analysis_service.claims import Ground
+    from tests import factories
+
+    model = valid_model()
+    flow = model.data_flows[1].model_copy(update={"encryption_in_transit": "none"})
+    stated = model.model_copy(update={"data_flows": [model.data_flows[0], flow]})
+    monkeypatch.setattr(factories, "valid_model", lambda: stated)
+    missing = Ground(
+        kind="absent-attribute", element_id=flow.id, attribute="encryption_in_transit"
+    )
+    threats = [
+        sample_threat(
+            "T-01", "tampering", title="Orders change in transit", grounds=[missing]
+        ),
+        sample_threat(
+            "I-01",
+            "information-disclosure",
+            title="Orders leak in transit",
+            grounds=[missing],
+        ),
+    ]
+    report = sample_report(threats)
+    text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
+    assert (
+        "Add encryption in transit to the connection from Web App to Orders DB"
+        " \u2014 2 findings rest on this missing control"
+    ) in text
+    assert text.count("Orders change in transit") == 2
+
+
+def test_the_conditional_section_says_its_guidance_once():
+    """The cards under a question carry no copy of the section's guidance."""
+    text = run_report_page(page())["analyses"]
+    assert text.count("neither confirmed nor cleared") == 1
+    assert text.count("Confirm each fact with the people who run the component") == 1
+    assert "Questions that would settle the conditional findings" in text
+    assert "an answer alone covers 1 Answer" in text
 
 
 def test_the_findings_view_hides_how_the_report_was_made():

@@ -99,6 +99,7 @@ on:
       - "!src/analysis_service/aws_identity.py"
       - "!src/analysis_service/conformance.py"
       - "!src/analysis_service/engine.py"
+      - "!src/analysis_service/fixes.py"
       - "!src/analysis_service/job_answers.py"
       - "!src/analysis_service/objects.py"
       - "!src/analysis_service/report_changes.py"

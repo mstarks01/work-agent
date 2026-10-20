@@ -18,6 +18,9 @@
   // ordered server-side. Each finding is placed under one fact; the page only
   // renders what it is handed.
   const OPEN_FACTS = JSON.parse(document.getElementById("open_facts").textContent);
+  // The missing controls two or more confirmed findings rest on, grouped and
+  // ordered server-side. Each finding is placed under one control.
+  const FIXES = JSON.parse(document.getElementById("fixes").textContent);
   // The principals no element stands for yet, ranked server-side by how many
   // stated facts an answer would place. The page only renders what it is handed.
   const LINK_QUESTIONS = JSON.parse(document.getElementById("link_questions").textContent);
@@ -97,6 +100,14 @@
     return n;
   };
   const code = (text) => el("code", null, text);
+  // A follow-up question's anchor, for its open fact to link to. One map, so
+  // the link and the question it reaches get the same ID.
+  const QUESTION_IDS = new Map();
+  const questionId = (key) => {
+    const name = JSON.stringify(key);
+    if (!QUESTION_IDS.has(name)) QUESTION_IDS.set(name, `question-${QUESTION_IDS.size + 1}`);
+    return QUESTION_IDS.get(name);
+  };
   const option = (label, value) => Object.assign(el("option", null, label), { value });
   // A link question's choices: each element it may be, then "None of these".
   const linkOptions = (select, ids) => {
@@ -525,8 +536,7 @@
       u.append(el("b", null, "Needs info."), " Missing information:");
       const list = el("ul");
       waits.forEach(w => list.append(el("li", null, `${w.label} — ${WHY_OPEN[w.status] || w.status}`)));
-      u.append(list, el("div", null,
-        "Until these are confirmed, this finding is neither confirmed nor cleared."));
+      u.append(list);
       card.append(u);
     }
 
@@ -541,15 +551,10 @@
       card.append(why);
     }
 
-    // What to do next: settle the open facts, then the mitigations, or the
-    // statement that none was proposed.
+    // What to do next: the mitigations, or the statement that none was
+    // proposed. How to settle an open fact is said once, above its group.
     const next = el("div","field");
     next.append(el("div","lbl","Next step"));
-    if (waits.length) {
-      next.append(el("div", null, FINAL
-        ? "Confirm the missing information with the people who run the component, then correct an answer below or submit the description again."
-        : "Confirm the missing information with the people who run the component, and answer the questions in the follow-up below."));
-    }
     if (t.mitigations && t.mitigations.length) {
       const list = el("ul","mits"); t.mitigations.forEach(m => list.append(proseEl("li", null, m.summary)));
       next.append(list);
@@ -606,6 +611,11 @@
 
   // A card's anchor, for the findings table to link to.
   const cardId = (t) => `finding-${t.framework}-${t.id}`;
+  const ASKED = new Set(FACT_QUESTIONS.map(q => JSON.stringify(q.key)));
+  // Severity order where every claim is graded, and the given order otherwise.
+  const bySeverity = (list) => list.every(c => c.severity)
+    ? [...list].sort((a, b) => SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level))
+    : list;
   // Whether the report asks the questions its conditional findings wait on.
   const ASKS = FACT_QUESTIONS.length > 0 && !FINAL && !RESUMED_BY;
   const FLOW_IDS = new Set(R.system_model.data_flows.map(f => f.id));
@@ -914,36 +924,63 @@
     // otherwise — which is the package's declared lane order, and is the only
     // ranking a framework that grades nothing has.
     // A conditional finding is shown once, under the open fact that would
-    // settle the most findings on its own, rather than in the list below: a
-    // report of many conditional findings asks the same few questions many
-    // times, and grouped they read as the questions they are.
+    // settle the most findings on its own, and a confirmed finding that rests
+    // on a missing control two findings share is shown once, under that
+    // control. The rest follow in the list.
     const grouped = new Set(facts.flatMap(f => f.placed));
+    const fixes = FIXES[block.framework] || [];
+    const fixed = new Set(fixes.flatMap(f => f.placed));
     const byClaimId = {};
     block.claims.forEach(c => { byClaimId[c.id] = c; });
-    const claims = block.claims.filter(c => !grouped.has(c.id));
-    if (claims.every(c => c.severity)) {
-      claims.sort((a,b) => SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level));
-    }
+    const claims = bySeverity(block.claims.filter(c => !grouped.has(c.id) && !fixed.has(c.id)));
     section.append(el("h3", null, "Claims"));
-    if (claims.length) {
-      claims.forEach(t => section.append(claimCard(marks, t, false)));
-    } else {
+    if (fixes.length) {
+      section.append(el("div", "meta",
+        "Each group is one control that the description states is missing, and each " +
+        "finding in it rests on that control. Each finding is shown once, under the " +
+        "control that the most findings rest on."));
+      fixes.forEach(f => {
+        const box = el("details", "openfact");
+        const head = el("summary");
+        const elsewhere = f.rests.length - f.placed.length;
+        head.append(el("b", null, f.label),
+          ` \u2014 ${f.rests.length} findings rest on this missing control` +
+          (elsewhere ? `; ${elsewhere} of them shown under another control` : ""));
+        box.append(head);
+        bySeverity(f.placed.map(id => byClaimId[id]))
+          .forEach(t => box.append(claimCard(marks, t, false)));
+        section.append(box);
+      });
+    }
+    claims.forEach(t => section.append(claimCard(marks, t, false)));
+    if (!claims.length && !fixed.size) {
       // Said rather than left blank. A framework that examined the system and
       // raised nothing is a result; an empty heading reads as a rendering fault.
       section.append(el("div", "meta", grouped.size
-        ? "Every claim here is conditional; they are grouped below by what would settle them."
+        ? "Every claim here is conditional; they are grouped below by the question that would settle them."
         : "No claims were raised under this framework."));
     }
     if (grouped.size) {
-      section.append(el("h3", null, "Conditional \u2014 grouped by the open fact that would settle them"));
+      section.append(el("h3", null, "Questions that would settle the conditional findings"));
       section.append(el("div", "meta",
-        `${grouped.size} finding(s) wait on ${facts.length} open fact(s). ` +
-        "Each finding is shown once, under the fact that alone covers the most findings."));
+        `${grouped.size} conditional finding(s) wait on ${facts.length} question(s). ` +
+        "A conditional finding is neither confirmed nor cleared until the facts it " +
+        "waits on are confirmed. Each finding is shown once, under the question " +
+        "that alone covers the most findings. " +
+        (FINAL
+          ? "Confirm each fact with the people who run the component, then correct an answer below or submit the description again."
+          : "Confirm each fact with the people who run the component, and answer the questions in the follow-up below.")));
       facts.filter(f => f.placed.length).forEach(f => {
         const box = el("details", "openfact");
         const head = el("summary");
         head.append(el("b", null, f.label),
           ` \u2014 ${f.cited_by.length} finding(s) wait on this; an answer alone covers ${f.settles.length}`);
+        if (ASKS && ASKED.has(JSON.stringify(f.key))) {
+          const go = el("a", null, "Answer");
+          go.href = `#${questionId(f.key)}`;
+          go.addEventListener("click", () => openTo($(questionId(f.key))));
+          head.append(" ", go);
+        }
         box.append(head);
         f.placed.forEach(id => box.append(claimCard(marks, byClaimId[id], false)));
         section.append(box);
@@ -1141,6 +1178,7 @@
       ordered.forEach((q, index) => {
         const into = !q.findings.length ? unwaited : index < SHOWN ? box : more;
         const row = el("p");
+        row.id = questionId(q.key);
         const editor = editorFor(q, startFrom(RETAINED.get(JSON.stringify(q.key)), q.key), recount, false);
         factAnswers.push({
           read: editor.read,
