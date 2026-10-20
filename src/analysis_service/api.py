@@ -74,7 +74,7 @@ from analysis_service.auth import (
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.deployment import Deployment, FrameworkNotCarried
-from analysis_service.errors import ConfigError, error_place, refusal_text
+from analysis_service.errors import ConfigError, refusal_text, shown_errors
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
@@ -287,11 +287,6 @@ class FrameworkRequest(BaseModel):
 #: shipped one is ten — because it is not that limit: it is the point past
 #: which validating the body costs more than reading it.
 MAX_SOURCES_PER_BODY = 100
-
-#: How many complaints a 422 carries. A body that is wrong in ten thousand
-#: places is wrong; a caller needs to see that and the first few, not all of
-#: them. Rendering every one made the refusal amplify the request 43 times.
-MAX_RENDERED_ERRORS = 20
 
 
 class JobSubmission(BaseModel):
@@ -863,22 +858,10 @@ def create_app(
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(request: Request, exc: RequestValidationError):
-        found = exc.errors()
         errors = [
-            {
-                "loc": error_place(error),
-                "msg": error["msg"],
-            }
-            for error in found[:MAX_RENDERED_ERRORS]
+            {"loc": place, "msg": message}
+            for place, message in shown_errors(exc.errors())
         ]
-        if len(found) > MAX_RENDERED_ERRORS:
-            errors.append(
-                {
-                    "loc": "",
-                    "msg": f"and {len(found) - MAX_RENDERED_ERRORS} more problems"
-                    " not shown",
-                }
-            )
         return _problem_response(422, "request body is invalid", errors=errors)
 
     @app.exception_handler(Exception)

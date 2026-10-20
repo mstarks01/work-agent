@@ -49,6 +49,7 @@ CODE_PATHS = (
     ".github/workflows/*",
     ".github/scripts/*",
     "pyproject.toml",
+    "uv.lock",
 )
 
 #: An HTML comment, closed or open to the end of the body. GitHub does not

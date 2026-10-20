@@ -12,8 +12,10 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from pydantic import BaseModel, ValidationError
 
 from analysis_service.claims import UnknownRef
+from analysis_service.errors import MAX_RENDERED_ERRORS, refusal_text
 from analysis_service.jobs import JobRecord
 from analysis_service.question_kinds import QUESTION_KINDS
 from tests import test_webapp
@@ -349,3 +351,19 @@ def test_a_package_refusal_names_a_saved_mark_by_its_position(tmp_path):
     assert response.status_code == 409, response.text
     assert "echomarker" not in response.text.lower(), response.text
     assert f"marks[{len(marks) - 1}]" in response.json()["detail"]
+
+
+def test_a_refusal_names_the_first_problems_and_says_how_many_more():
+    """The web app and /v1 cap a refusal through one reader, so a body with
+    many errors gets the same count of places on both."""
+
+    class Many(BaseModel):
+        values: list[int]
+
+    with pytest.raises(ValidationError) as refused:
+        Many.model_validate({"values": ["x"] * (MAX_RENDERED_ERRORS + 5)})
+
+    text = refusal_text(refused.value)
+
+    assert text.count("values.") == MAX_RENDERED_ERRORS
+    assert text.endswith("and 5 more problems not shown")
