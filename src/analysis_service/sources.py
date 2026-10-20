@@ -183,8 +183,8 @@ class Source(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: SourceKind
-    label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
-    text: str = Field(min_length=1)
+    label: str = Field(max_length=MAX_LABEL_CHARS)
+    text: str
 
     @field_validator("label")
     @classmethod

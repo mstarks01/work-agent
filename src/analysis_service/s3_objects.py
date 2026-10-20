@@ -49,7 +49,10 @@ from botocore.exceptions import BotoCoreError, ClientError
 from analysis_service.aws_identity import platform_session
 from analysis_service.objects import (
     OBJECT_ADDRESSING_VAR,
+    OBJECT_BUCKET_VAR,
     OBJECT_CREDENTIALS_VAR,
+    OBJECT_ENDPOINT_VAR,
+    OBJECT_REGION_VAR,
     OBJECT_STORES,
     S3_KEY_FILES,
     Addressing,
@@ -135,7 +138,7 @@ def _endpoint(env: Mapping[str, str]) -> str | None:
     region. Only ``https://`` with a host and an optional port passes, so an
     object never crosses the network without TLS, and no message repeats the
     value, which can hold a password."""
-    value = env.get("ANALYSIS_OBJECT_ENDPOINT", "").strip()
+    value = env.get(OBJECT_ENDPOINT_VAR, "").strip()
     if not value:
         return None
     try:
@@ -209,8 +212,8 @@ class S3ObjectStore:
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> S3ObjectStore:
         _refuse_stray_settings(env)
-        bucket = _required(env, "ANALYSIS_OBJECT_BUCKET", _BUCKET)
-        region = _required(env, "ANALYSIS_OBJECT_REGION", REGION)
+        bucket = _required(env, OBJECT_BUCKET_VAR, _BUCKET)
+        region = _required(env, OBJECT_REGION_VAR, REGION)
         addressing = closed_setting(
             env.get(OBJECT_ADDRESSING_VAR, "").strip() or "virtual",
             OBJECT_ADDRESSING_VAR,

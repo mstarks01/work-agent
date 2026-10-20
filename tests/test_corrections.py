@@ -126,6 +126,13 @@ class TestTheRoute:
         )
         assert response.status_code == 422, response.text
 
+    def test_an_empty_correction_is_refused_by_the_correction_rule(self):
+        client, store = make_client()
+        job = finished(store)
+        response = correct(client, job)
+        assert response.status_code == 400, response.text
+        assert response.json()["detail"] == "a correction changes at least one answer"
+
     def test_a_report_that_is_not_final_refuses_it(self):
         client, store = make_client()
         job = finished(store, final=False)

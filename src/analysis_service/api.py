@@ -313,11 +313,14 @@ class JobSubmission(BaseModel):
     the loop with well under one request a second.
 
     ``frameworks`` is **required and non-empty**, with no default anywhere on
-    the path. A submission that names none is refused rather than analysed under
-    whatever this install happens to carry: a default set would make one body
-    mean different things on two installs, and the caller would read no sign of
-    it. Which names are acceptable is again the deployment's, so an unknown or
-    uncarried name is refused by the route rather than by this schema.
+    the path. The schema requires the field, and
+    :func:`~analysis_service.selection.resolve_names` refuses an empty list, so
+    the web app and this route give one sentence. A submission that names none
+    is refused rather than analysed under whatever this install happens to
+    carry: a default set would make one body mean different things on two
+    installs, and the caller would read no sign of it. Which names are
+    acceptable is again the deployment's, so an unknown or uncarried name is
+    refused by the route rather than by this schema.
 
     The list is ordered, and the order is kept: it is the order the report's
     analysis blocks carry.
@@ -334,7 +337,7 @@ class JobSubmission(BaseModel):
     # request exceeds it, and the schema refuses an over-long list before the
     # route's per-name work runs. The bound tracks the registry, so a new
     # package raises it with no edit here.
-    frameworks: list[FrameworkRequest] = Field(min_length=1, max_length=len(PACKAGES))
+    frameworks: list[FrameworkRequest] = Field(max_length=len(PACKAGES))
     #: Read by :func:`~analysis_service.sources.clean_system_name`, the same
     #: rule the in-process engine and the web app apply, so the entry points
     #: accept and refuse the same names. It reaches the report a consumer
@@ -404,7 +407,7 @@ class AmendmentSubmission(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    text: str = Field(min_length=1)
+    text: str
     revision: Revision
 
 
@@ -414,7 +417,7 @@ class CorrectionsSubmission(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    facts: list[FactAnswer] = Field(min_length=1, max_length=MAX_FACT_ANSWERS)
+    facts: list[FactAnswer] = Field(max_length=MAX_FACT_ANSWERS)
     #: The revision the questions were read with (ADR 0090).
     revision: Revision
 

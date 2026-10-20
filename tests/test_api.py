@@ -1262,6 +1262,14 @@ class TestFrameworksListIsBounded:
         assert response.status_code == 422
         assert "repeats stride" in response.json()["detail"]
 
+    def test_an_empty_selection_is_refused_by_the_selection_rule(self):
+        client, _ = make_client()
+        response = client.post(
+            "/v1/jobs", json=submission(frameworks=[]), headers=auth()
+        )
+        assert response.status_code == 422
+        assert "a job must select at least one framework" in response.json()["detail"]
+
     def test_a_frameworks_list_longer_than_the_registry_is_refused(self):
         client, _ = make_client()
         over_long = [{"name": "stride"}, {"name": "asvs"}, {"name": "stride"}]
