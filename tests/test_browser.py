@@ -737,6 +737,8 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
         page, errors = opened(browser, url + "/settings")
         page.wait_for_selector("#settings-rows tr[data-key]")
         assert page.is_hidden("#changes-panel")
+        current = page.locator('#sidebar-navigation a[aria-current="page"]')
+        assert current.inner_text() == "Settings"
         review = page.locator('tr[data-key="tiers.review.model"]').inner_text()
         sources = page.locator('tr[data-key="resilience.max_sources"]').inner_text()
         location, key = (
