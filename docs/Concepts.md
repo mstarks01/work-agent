@@ -86,14 +86,16 @@ whether a security claim follows and must ground that claim separately.
 A **ground** is the evidence a claim rests on. Code, not a model, constructs the
 final ground objects from references selected by a lane analyzer.
 
-Grounds can represent:
+A ground has one of these kinds:
 
-- a quote from a labeled source;
-- an attribute the source left unknown;
-- an attribute the source explicitly said was absent;
-- a trust-boundary crossing derived from the model;
-- the absence of a named element from the model; or
-- an assertion row, when the assertion pass runs (see below).
+- `quote`: a quote from a labeled source;
+- `unknown-attribute`: an attribute the source left unknown;
+- `absent-attribute`: an attribute the source explicitly said was absent;
+- `derived-fact`: a trust-boundary crossing derived from the model;
+- `absent-element`: the absence of a named element from the model;
+- `assertion`: an assertion row that the sources settle (see below); or
+- `unknown-assertion`: an assertion row that the sources left open, because
+  its value is unknown or another row disputes it.
 
 Every carried claim has at least one ground. Quotes are checked against the
 source text. If a close source span can be found, code repairs the quote and
@@ -130,7 +132,8 @@ What code does with a row:
   says why.
 - **Each row states its basis.** `stated` means the source says it in words.
   `inferred` means the pass concluded it from what the source says, and the row
-  gives the reasoning.
+  gives the reasoning. `derived` means a rule in code wrote the value, and the
+  row gives the reasoning. A model cannot propose a `derived` row.
 
 No person has checked a row when the report is built, so every row starts
 `unchecked`. A reviewer can mark it `supported`, `unsupported` or `unresolved`.
@@ -216,13 +219,17 @@ certify the input.
 
 ## Outcomes
 
-An analysis has three terminal outcomes:
+An analysis job ends in one of these terminal statuses:
 
 - **Completed:** a full report is available.
 - **Rejected:** extraction and its one repair attempt could not produce a valid
   system model. Structured issues tell the submitter what failed.
 - **Failed:** caller input, a provider, a deadline, or an internal check failed.
   No partial report is returned.
+- **Awaiting answers:** the run stopped before the analysis to ask the
+  submitter questions. The job holds its valid system model and, where the
+  assertion pass ran, its assertion catalog. An answer starts a resumed job
+  from them. Only a job submitted with questions turned on ends here.
 
 A completed multi-framework report includes one block per selected framework,
 even when a framework's precondition skips its analyzers. The block then records

@@ -540,8 +540,9 @@ own words, such as an exception to a "yes". It follows the answer on its line
 of the answers source, and no code reads a fact out of it. Each fact question
 also carries `history`, what became of it at the pause: `skipped` (you skipped
 it), `unanswered` (it was shown and left blank), `partial` (some facets were
-answered), `unknown` (the answer was "I don't know"), or `open` (it was never
-shown).
+answered), `unknown` (the answer was "I don't know"), `answered` (the answer
+gave a known value to each facet that the finding needs), or `open` (it was
+never shown).
 A follow-up must add information: a new or moved link, or an answer whose
 known content changes. Where every answer is `unknown` or repeats an earlier
 answer, it is refused with `400`, no job starts, and the follow-up is still

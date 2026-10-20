@@ -15,7 +15,8 @@ uv sync
 
 ## 2. Select models and provide credentials
 
-Work Agent uses two model tiers:
+The service has three model tiers: `base`, `strong` and `review`. The shipped
+node map binds nodes to two of them, so a first run uses these two:
 
 | Tier | Used for |
 | --- | --- |
@@ -23,8 +24,10 @@ Work Agent uses two model tiers:
 | `strong` | Framework analyzers, framework review, and one review retry if needed. |
 
 The shipped [`config/model_tiers.toml`](../config/model_tiers.toml) deliberately
-selects neither tier. Choose a vendor and model for both. The following pairs
-are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODELS`:
+selects neither tier. Choose a vendor and model for both. No node uses
+`review` until you move a critic onto it, so a first run needs no `review`
+selection. The following pairs are the reference pairs declared in
+`analysis_service.conformance.REFERENCE_MODELS`:
 
 <!-- every-vendor -->
 

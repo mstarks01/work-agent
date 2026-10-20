@@ -26,17 +26,26 @@ from pydantic import TypeAdapter
 
 from analysis_service import resilience
 from analysis_service.answer_state import EARLY_RULES, POLICY_VERSION
+from analysis_service.assertions import Basis
 from analysis_service.auth import (
     ALLOWED_ALGORITHMS,
     DEFAULT_ALGORITHMS,
     AuthConfigError,
     build_verifier,
 )
-from analysis_service.claims import GroundKind, Spelling, UnknownKey
+from analysis_service.claims import GroundKind, RuledClaim, Spelling, UnknownKey
 from analysis_service.deployment import ConfigPaths
-from analysis_service.fact_answers import FactAnswer, fact_kind
+from analysis_service.fact_answers import FactAnswer, FactStatus, fact_kind
+from analysis_service.frameworks import SCHEMAS
+from analysis_service.jobs import TERMINAL_STATUSES
+from analysis_service.ladder import Rung
 from analysis_service.links import MAX_LINK_ANSWERS
-from analysis_service.model_tiers import LLM_NODES, SUPPORTED_VERSION, TIER_NAMES
+from analysis_service.model_tiers import (
+    LLM_NODES,
+    SUPPORTED_VERSION,
+    TIER_NAMES,
+    tiers_in_use,
+)
 from analysis_service.resilience import ResilienceConfig, load_resilience
 from analysis_service.sampling import (
     OFFERED_PARAMS,
@@ -44,7 +53,11 @@ from analysis_service.sampling import (
     env_var_for,
     load_sampling,
 )
-from analysis_service.sources import MAX_LABEL_CHARS, MAX_SYSTEM_NAME_CHARS
+from analysis_service.sources import (
+    MAX_LABEL_CHARS,
+    MAX_SYSTEM_NAME_CHARS,
+    SourceKind,
+)
 from analysis_service.validation import MAX_ELEMENTS
 from analysis_service.vendors import VENDORS, CredentialMode
 from tests.test_api import make_client
@@ -53,6 +66,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS = REPO_ROOT / "docs"
 CONFIGURATION = DOCS / "Configuration.md"
 HTTP_API = DOCS / "HTTP-API.md"
+CONCEPTS = DOCS / "Concepts.md"
 
 #: The guides a reader copies a TOML example from. ``docs/adr/``,
 #: ``docs/research/`` and ``docs/history/`` record a past state, so an old
@@ -517,6 +531,80 @@ def test_the_fact_kind_list_is_every_spelling():
     assert set(backticked(bullet[1])) == set(get_args(Spelling))
 
 
+def test_the_history_list_is_every_fact_status():
+    text = flat(HTTP_API.read_text(encoding="utf-8"))
+    sentence = re.search(
+        r"carries `history`, what became of it at the pause: (.*?)\. ", text
+    )
+
+    assert sentence
+    assert set(backticked(sentence[1])) == set(get_args(FactStatus))
+
+
+def test_the_source_kind_vocabulary_is_every_source_kind():
+    text = flat((REPO_ROOT / "GLOSSARY.md").read_text(encoding="utf-8"))
+    sentence = re.search(r"`kind` is a closed vocabulary of (.*?)\. ", text)
+
+    assert sentence
+    assert set(backticked(sentence[1])) == set(get_args(SourceKind))
+
+
+def test_the_concepts_ground_list_is_every_ground_kind():
+    bullets = re.findall(
+        r"^- `([a-z-]+)`: ", section(CONCEPTS, "## Ground"), re.MULTILINE
+    )
+
+    assert sorted(bullets) == sorted(get_args(GroundKind))
+
+
+def test_the_concepts_basis_bullet_is_every_basis():
+    bullet = re.search(
+        r"^- \*\*Each row states its basis\.\*\* (.*?)\n(?:\n|- )",
+        section(CONCEPTS, "## Assertion"),
+        re.DOTALL | re.MULTILINE,
+    )
+
+    assert bullet
+    assert set(backticked(bullet[1])) == set(get_args(Basis))
+
+
+@pytest.mark.parametrize(
+    ("path", "bullet"),
+    [
+        (CONCEPTS, r"^- \*\*([A-Za-z ]+):\*\*"),
+        (DOCS / "Architecture.md", r"^- \*\*([a-z-]+)\*\*"),
+    ],
+    ids=["concepts", "architecture"],
+)
+def test_the_outcome_list_is_every_terminal_status(path, bullet):
+    names = re.findall(bullet, section(path, "## Outcomes"), re.MULTILINE)
+
+    assert sorted(name.lower().replace(" ", "-") for name in names) == sorted(
+        TERMINAL_STATUSES
+    )
+
+
+#: The count words a record section may use for the fields its package adds.
+_FIELD_COUNTS = {"One": 1, "Two": 2, "Three": 3, "Four": 4}
+
+
+@pytest.mark.parametrize("framework", sorted(SCHEMAS))
+def test_each_record_block_is_every_field_its_package_adds(framework):
+    record = SCHEMAS[framework].ruled_record
+    text = section(DOCS / "Report-Schema.md", f"### {framework.upper()}'s own record")
+    block = re.search(
+        rf"^class {record.__name__}\(RuledClaim\):\n(.*?)^```",
+        text,
+        re.DOTALL | re.MULTILINE,
+    )
+    added = set(record.model_fields) - set(RuledClaim.model_fields)
+
+    assert block
+    assert set(re.findall(r"^    ([a-z_]+):", block[1], re.MULTILINE)) == added
+    for word in re.findall(r"\b(\w+) fields?, and nothing else", text):
+        assert _FIELD_COUNTS[word] == len(added)
+
+
 # Model tiers: the loader's version and node keys.
 
 
@@ -542,6 +630,27 @@ def test_the_nodes_example_is_every_node_key():
     (block,) = _TOML_FENCE.findall(text)
 
     assert set(tomllib.loads(block)["nodes"]) == set(LLM_NODES)
+
+
+def test_the_first_run_tiers_are_the_tier_names_and_the_shipped_tiers():
+    """The guide names every tier, and its table names the tiers the shipped
+    node map binds."""
+    text = section(DOCS / "First-Run.md", "## 2. Select models and provide credentials")
+    named = re.search(r"model tiers: (.*?)\. ", flat(text))
+    nodes = tomllib.loads(SHIPPED_PATHS.model_tiers.read_text(encoding="utf-8"))
+    rows = table(text, "Tier", "Used for")
+
+    assert named
+    assert backticked(named[1]) == list(TIER_NAMES)
+    assert {backticked(row[0])[0] for row in rows} == tiers_in_use(nodes["nodes"])
+
+
+def test_the_rung_table_is_every_rung():
+    rows = table(
+        CONFIGURATION.read_text(encoding="utf-8"), "Rung", "How the schema travels"
+    )
+
+    assert [backticked(row[0])[0] for row in rows] == list(get_args(Rung))
 
 
 # The readers' own teeth.

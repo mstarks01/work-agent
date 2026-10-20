@@ -587,6 +587,7 @@ ladder of formats, best first (ADR 0058):
 | `forced_tool` | As the parameters of one tool, `submit_answer`, and the request forces the call. The service reads the call's arguments as the node's answer. |
 | `offered_tool` | The same tool, offered without force, so the model chooses to call it. |
 | `prompt` | Stated in the request text, after an instruction to answer with JSON only. The service removes one fence around the whole answer. |
+| `unconstrained` | Not sent. A tier that sets `constrain_output = false` has this rung alone, and the model answers without a schema. |
 
 Below `native`, the model usually follows the schema, but nothing makes it.
 
