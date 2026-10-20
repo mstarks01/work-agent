@@ -1314,11 +1314,6 @@ class UpstreamNamingLlm(ScriptedLlm):
             yield response
 
 
-#: The tier keys the *base* tier serves. Spelled as tier node names rather than
-#: graph node names because that is what the resolver is handed, and because the
-#: two are not the same thing: six lane agents share one ``analyze/<F>``.
-_BASE_TIER_NODES = frozenset({"extract", "repair", "assert", "capabilities"})
-
 #: What the capability reader says where a test scripts nothing: no capability.
 EMPTY_CAPABILITIES = '{"capabilities": []}'
 
@@ -1366,17 +1361,17 @@ def scripted_pipeline(
     per-tier is also what keeps ``seen`` a record of one node's prompts.
     """
     minted: list[ScriptedLlm] = []
+    tiers = repo_tiers()
 
     def resolve(tier_node: str) -> BaseLlm:
         model = llm_class(
-            model=BASE_MODEL if tier_node in _BASE_TIER_NODES else STRONG_MODEL,
+            model=BASE_MODEL if tiers.nodes[tier_node] == "base" else STRONG_MODEL,
             reply=EMPTY_CLAIMS,
             seen=[],
         )
         minted.append(model)
         return model
 
-    tiers = repo_tiers()
     sampling = sampling or load_sampling(
         PROJECT_ROOT / "config" / "sampling.toml", env={}
     )

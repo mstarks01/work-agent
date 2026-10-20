@@ -13,6 +13,7 @@ import logging
 import re
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from typing import get_args
 
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
@@ -26,6 +27,7 @@ from analysis_service.jobs import (
     NON_LOCKING_STATUSES,
     RECORD_FIELDS,
     RESTART_FAILURE_MESSAGE,
+    TERMINAL_STATUSES,
     Admission,
     Checkpoint,
     InMemoryJobStore,
@@ -1158,7 +1160,9 @@ def unreadable(
     return record.id
 
 
-IN_FLIGHT: tuple[JobStatus, ...] = ("queued", "running")
+IN_FLIGHT: tuple[JobStatus, ...] = tuple(
+    status for status in get_args(JobStatus) if status not in TERMINAL_STATUSES
+)
 
 
 class TestAnUnreadableJobHasEnded:

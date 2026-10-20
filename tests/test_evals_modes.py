@@ -37,8 +37,8 @@ from analysis_service.claims import (
 from analysis_service.evidence import evidence_catalog
 from analysis_service.frameworks import package_for
 from analysis_service.frameworks.stride.record import (
-    CATEGORY_LETTERS,
     STRIDE_CATEGORIES,
+    _threat_id,
 )
 from analysis_service.graph import (
     ENTRY_ASSERT_ONLY,
@@ -170,7 +170,7 @@ def scripted_ruling(case, category) -> dict:
     refs = reaching_refs(case, reference.affected_element_ids)
     conditional = any(ref.startswith("unknown:") for ref in refs)
     return {
-        "id": f"{CATEGORY_LETTERS[category]}-01",
+        "id": _threat_id(category, 1),
         "confidence": "low" if conditional else "high",
         "verdict": {},
     }

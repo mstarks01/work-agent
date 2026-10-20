@@ -20,6 +20,7 @@ import pytest
 
 from analysis_service.vendors import (
     _CATCH_ALL,
+    _CLAUDE_MODERN,
     _CLAUDE_RULE,
     CREDENTIAL_MODE_NOTES,
     MODEL_NAME,
@@ -501,16 +502,19 @@ class TestWhichVariablesAreSecret:
         assert bedrock.all_secret_env_vars() == tuple(dict.fromkeys(secret))
 
 
-#: The bare spelling's minor version, which OpenRouter writes with a dot. Used
-#: only to restate a bare identifier in that vendor's spelling, so the
-#: portability property can be asserted against the rule rather than against a
-#: second list of identifiers.
-_MODERN_MINOR = re.compile(r"^(claude-[a-z]+-\d+)-(\d{1,2})$")
+#: The bare modern spelling, read with the code's own pattern. Used only to
+#: restate a bare identifier in OpenRouter's spelling, so the portability
+#: property can be asserted against the rule rather than against a second list
+#: of identifiers.
+_MODERN = re.compile(rf"claude-{_CLAUDE_MODERN}")
 
 
 def _dotted_minor(model: str) -> str:
     """``claude-sonnet-4-6`` in OpenRouter's spelling; anything else unchanged."""
-    return _MODERN_MINOR.sub(r"\1.\2", model)
+    match = _MODERN.fullmatch(model)
+    if match is None or match["minor"] is None:
+        return model
+    return f"claude-{match['name']}-{match['major']}.{match['minor']}"
 
 
 def _bare(model: str) -> str:
