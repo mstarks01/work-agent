@@ -27,11 +27,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # The base branch's copy of the script, so a pull request that edits the
-      # script does not pass its own check. A base that holds no copy runs the
-      # pull request's copy. The body reaches the script through the
-      # environment, never through the command line, because a pull request
-      # author writes it.
+      # The base branch's copy of the script, so a pull request that edits
+      # only the script does not pass its own check. A base that holds no copy
+      # runs the pull request's copy. LIMIT: GitHub runs the pull request's
+      # copy of this workflow file, so a pull request that edits this file can
+      # remove this step and pass. The check does not guard such a pull
+      # request; its reviewer reads the workflow diff. The body reaches the
+      # script through the environment, never through the command line,
+      # because a pull request author writes it.
       - name: Pull request body
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

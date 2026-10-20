@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Iterable
+from fnmatch import fnmatchcase
 
 HEADING = "## Five-class read"
 
@@ -28,30 +29,66 @@ CLASSES = (
     "A fact with no reader",
 )
 
-#: The paths that hold code. ``tests/`` is one: the lints and gates live there,
-#: and a test can pass on broken code (#1824). A change to any other path, such
-#: as a doc or a ledger row, needs no five-class read.
+#: The paths that hold code or model content, as ``fnmatch`` patterns, where
+#: ``*`` also matches ``/``. ``tests/`` is one: the lints and gates live there,
+#: and a test can pass on broken code (#1824). ``config/`` and ``domains/`` are
+#: read by the analysis, and each path that a live workflow sweeps must be one
+#: (``tests/test_five_class_read.py`` holds them together). A change to any
+#: other path, such as a doc or a ledger row, needs no five-class read.
 CODE_PATHS = (
-    "src/",
-    "webapp/",
-    "evals/harness/",
-    "prompts/",
-    "frameworks/",
-    "tests/",
-    ".githooks/",
-    ".github/workflows/",
-    ".github/scripts/",
+    "src/*",
+    "webapp/*",
+    "evals/harness/*",
+    "evals/*.py",
+    "prompts/*",
+    "frameworks/*",
+    "domains/*",
+    "config/*",
+    "tests/*",
+    ".githooks/*",
+    ".github/workflows/*",
+    ".github/scripts/*",
+    "pyproject.toml",
 )
+
+#: An HTML comment, closed or open to the end of the body. GitHub does not
+#: render it.
+_COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.DOTALL)
+
+#: A line that opens or closes a fenced code block.
+_FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")
+
+#: A list marker at the end of an entry, which belongs to the next entry.
+_NEXT_MARKER = re.compile(r"(?:\d+[.)]|[-+])\s*$")
 
 
 def changes_code(paths: Iterable[str]) -> bool:
-    """Whether a path in ``paths`` sits under one of :data:`CODE_PATHS`."""
-    return any(path.startswith(CODE_PATHS) for path in paths)
+    """Whether a path in ``paths`` matches one of :data:`CODE_PATHS`."""
+    return any(fnmatchcase(path, pattern) for path in paths for pattern in CODE_PATHS)
+
+
+def rendered(body: str) -> list[str]:
+    """The lines of ``body`` that GitHub renders as prose: no HTML comment and no
+    fenced code block."""
+    lines = []
+    fence = None
+    for line in _COMMENT.sub("", body.replace("\r\n", "\n")).split("\n"):
+        opener = _FENCE.match(line)
+        if fence is None and opener:
+            fence = opener.group(1)
+        elif fence is not None:
+            closer = line.strip()
+            if closer.startswith(fence) and not closer.strip(fence[0]):
+                fence = None
+        else:
+            lines.append(line)
+    return lines
 
 
 def section(body: str) -> str | None:
-    """The text under :data:`HEADING` up to the next heading of its level, or None."""
-    lines = body.replace("\r\n", "\n").split("\n")
+    """The rendered text under :data:`HEADING` up to the next heading of its
+    level, or None."""
+    lines = rendered(body)
     starts = [index for index, line in enumerate(lines) if line.rstrip() == HEADING]
     if not starts:
         return None
@@ -64,18 +101,36 @@ def section(body: str) -> str | None:
 
 
 def missing(body: str) -> list[str]:
-    """What the body lacks: the heading, or each class its section does not name."""
+    """What the body lacks: the heading, each class its section does not name,
+    and each class with no text between its name and the next entry."""
     text = section(body)
     if text is None:
         return [HEADING]
     folded = " ".join(text.replace("*", "").casefold().split())
-    return [name for name in CLASSES if name.casefold() not in folded]
+    found = sorted(
+        (folded.find(name.casefold()), name)
+        for name in CLASSES
+        if name.casefold() in folded
+    )
+    ends = [start for start, _ in found[1:]] + [len(folded)]
+    empty = {
+        name
+        for (start, name), end in zip(found, ends)
+        if not re.search(r"\w", _NEXT_MARKER.sub("", folded[start + len(name) : end]))
+    }
+    named = {name for _, name in found}
+    return [
+        name if name not in named else f"text after {name}"
+        for name in CLASSES
+        if name not in named or name in empty
+    ]
 
 
 def changed_paths(base: str, head: str) -> list[str]:
-    """Each path the pull request changes, from the merge base of the two commits."""
+    """Each path the pull request changes, from the merge base of the two
+    commits. A rename lists both its old and its new path."""
     listed = subprocess.run(
-        ["git", "diff", "--name-only", "-z", f"{base}...{head}"],
+        ["git", "diff", "--name-only", "--no-renames", "-z", f"{base}...{head}"],
         capture_output=True,
         text=True,
         check=True,
