@@ -128,18 +128,18 @@
   .dropped ul { margin: 4px 0 0; padding-left: 18px; }
   .dropped code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-  /* stat tiles */
-  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
-  .tile .n { font-size: 1.9rem; font-weight: 650; letter-spacing: -0.02em; }
-  .tile .k { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
-  @media (max-width: 620px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  /* A block's summary: what is confirmed, and what waits on an answer. */
+  .summary { margin: 0 0 16px; font-size: 0.95rem; }
+  .summary p { margin: 0 0 4px; }
 
-  /* severity mix bar */
-  .mix { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--surface-2); gap: 2px; }
-  .mix span { display: block; }
-  .mixlegend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 0.82rem; color: var(--ink-2); }
-  .mixlegend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 6px; vertical-align: middle; }
+  /* One row per finding, before the cards. Its title links to its card. */
+  .findings { margin-bottom: 24px; }
+  .findings a { color: var(--ink); }
+  .findings .sev { white-space: nowrap; }
+  .findings .sev .swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block;
+    margin-right: 6px; }
+  @media (min-width: 621px) { .findings .status { white-space: nowrap; } }
+  @media (max-width: 620px) { .findings .aff { display: none; } }
 
   /* threat cards */
   .card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--muted);
@@ -224,7 +224,6 @@
      under a strict nonce CSP with no 'unsafe-inline', which blocks inline
      style attributes; a class costs nothing and a generated one-off colour
      goes through element.style.* instead, which CSP does not govern. */
-  .mixwrap { margin-top: 18px; }
   .belowtable { margin-top: 12px; }
   .workspace-return {display:flex;gap:24px;align-items:center;padding:18px 28px;border-bottom:1px solid var(--hairline);font:14px/1.5 system-ui,sans-serif}
   .workspace-return a {color:var(--ink);text-decoration:none}
@@ -244,31 +243,33 @@
       </div>
       <button class="toggle" id="themebtn" type="button">Toggle theme</button>
     </div>
-    <div class="disclaimer"><span class="dot"></span><span id="disclaimer"></span></div>
+    <div id="report-view">
+      <!-- One section per framework the job selected, built in JS: the count
+           and the names are the report's, not this file's. -->
+      <div id="analyses"></div>
 
-    <!-- A fact about the shared model rather than about any analysis, so it is
-         stated once here instead of being copied into each block: N copies
-         would be N chances to disagree about one number. -->
-    <div class="meta" id="scope"></div>
+      <!-- Which element each principal is, asked of the submitter. Built in JS
+           from the link_questions payload; empty and hidden when none is asked. -->
+      <div id="links"></div>
+    </div>
 
-    <!-- One section per framework the job selected, built in JS: the count and
-         the names are the report's, not this file's. Everything outside it
-         describes the one shared System Model, which every framework analysed. -->
-    <div id="analyses"></div>
+    <!-- How this report was made: the service's disclaimer, the System Model
+         every framework analysed, and the pipeline. Shown in place of the
+         findings at ?view=provenance. -->
+    <div id="provenance-view" hidden>
+      <div class="disclaimer"><span class="dot"></span><span id="disclaimer"></span></div>
+      <div class="meta" id="scope"></div>
 
-    <!-- Which element each principal is, asked of the submitter. Built in JS
-         from the link_questions payload; empty and hidden when none is asked. -->
-    <div id="links"></div>
+      <h2>System model (extracted DFD)</h2>
+      <table id="elements"><thead><tr>
+        <th>Type</th><th>ID</th><th>Name</th><th>Trust zone</th><th>Key attributes</th>
+      </tr></thead><tbody></tbody></table>
+      <div id="crossings" class="belowtable"></div>
+      <div id="assumptions" class="belowtable"></div>
 
-    <h2>System model (extracted DFD)</h2>
-    <table id="elements"><thead><tr>
-      <th>Type</th><th>ID</th><th>Name</th><th>Trust zone</th><th>Key attributes</th>
-    </tr></thead><tbody></tbody></table>
-    <div id="crossings" class="belowtable"></div>
-    <div id="assumptions" class="belowtable"></div>
-
-    <h2>Pipeline</h2>
-    <div class="nodes" id="nodes"></div>
+      <h2>Pipeline</h2>
+      <div class="nodes" id="nodes"></div>
+    </div>
   </div>
 </div>
 
