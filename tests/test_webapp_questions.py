@@ -36,6 +36,7 @@ from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineComplete
 from analysis_service.links import NONE_OF_THESE
 from analysis_service.open_facts import group_of
 from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.selection import SelectionError, resolve_names
 from tests import test_open_facts, test_questions, test_webapp
 from tests.factories import (
     asking_threat,
@@ -678,6 +679,37 @@ await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
     ]
     assert first["answers_from"] == "job-earlier"
     assert "answers_from" not in second
+
+
+@pytest.mark.parametrize("ticked", [False, True])
+def test_the_form_gate_refuses_the_selection_the_server_rule_refuses(ticked):
+    """The page's empty-selection gate and ``resolve_names`` make one decision.
+
+    The page refuses before it posts, with its own sentence; the server rule
+    refuses the names the page would post. Each selection the page can make
+    is held to both.
+    """
+    steps = f"""
+framework.checked = {json.dumps(ticked)};
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+if (!ids.problem.hidden) calls.push({{ url: "problem", body: ids.problem.children.join("") }});
+"""
+    calls = _run_form_script(steps)["calls"]
+    sent = [call["body"]["frameworks"] for call in calls if call["url"] == "/analyze"]
+    problems = [call["body"] for call in calls if call["url"] == "problem"]
+    names = ["stride"] if ticked else []
+    try:
+        resolve_names(PACKAGES, names)
+    except SelectionError:
+        server_refuses = True
+    else:
+        server_refuses = False
+
+    assert (not sent) == server_refuses
+    if server_refuses:
+        assert problems == ["Please select a framework."]
+    else:
+        assert [entry["name"] for entry in sent[0]] == names
 
 
 # Picks a stand-in file of ``bytes`` in the transcript input. A read of its
