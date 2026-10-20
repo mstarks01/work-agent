@@ -771,8 +771,11 @@
     // and never chosen for the person: the page sends only what a person picks.
     const match = !prefill && q.options.find((option) => option.id === q.suggested);
     if (match) {
+      // The arrow gives up the focus: a row that holds it stays open, and
+      // this answer is complete, so the row closes once it saves.
       const use = button("→", (event) => {
         select.value = match.id;
+        use.blur();
         onEdit(row, event);
       }, "use-match");
       use.title = `Use ${match.name || match.id}`;
@@ -894,7 +897,7 @@
     node.append(title);
     if (q.group === "links") {
       const help = document.createElement("p");
-      help.className = "hint";
+      help.className = "hint group-help";
       help.textContent =
         "Your description says things about these users, teams and accounts, such as " +
         "whether they sign in with MFA. The analysis can use those facts only after you " +

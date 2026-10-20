@@ -504,11 +504,11 @@ summary:hover {
   overflow:visible
 }
 #list>details>summary {
-  font-size:20px;
+  font-size:17px;
   line-height:1.35;
   color:var(--text);
   font-weight:600;
-  padding:20px 24px 16px;
+  padding:16px 24px 13px;
   letter-spacing:-.015em
 }
 #earlier>p,#skipped>p,#more>p {
@@ -1026,9 +1026,10 @@ a.analysis-row:hover {
 .question-note > .hint { margin: 0; }
 .analysis-row time { color:var(--muted); font-size:13px; }
 @media(max-width:580px) {
-  #list>details>summary { padding:17px 16px; }
+  #list>details>summary { padding:14px 16px; }
   #list>details>summary small { margin-left:25px; }
   #questions .shared-controls { margin:0 16px; }
+  #list>details>.group-help { margin:0 16px 14px; }
 }
 
 .save-line {
@@ -1071,6 +1072,9 @@ a.analysis-row:hover {
 
 /* A box that asks its question once (ADR 0081): the shared answer on top, the
    elements under "Answer each one separately". */
+#list>details>.group-help {
+  margin:0 24px 14px
+}
 #list .each-one {
   margin:0 24px;
   padding:16px 0 18px;
