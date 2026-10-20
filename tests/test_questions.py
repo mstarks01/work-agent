@@ -53,6 +53,7 @@ from analysis_service.links import (
 )
 from analysis_service.open_facts import open_attribute
 from analysis_service.pipeline import AdkPipelineRunner
+from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import _by_band, fact_questions
 from analysis_service.report import Report
 from analysis_service.report_conditions import conditions
@@ -1045,9 +1046,9 @@ def test_the_card_and_the_follow_up_name_the_same_facts(path):
         assert named == {key for key, _, _ in rows} & asked, finding
 
 
-CAPACITY_FACETS = ("rate", "size", "concurrency", "quota")
-RATE_ONLY = {"rate": "yes"}
-MIXED = {"rate": "yes"} | dict.fromkeys(CAPACITY_FACETS[1:], "unknown")
+CAPACITY_FACETS = tuple(facet.id for facet in QUESTION_KINDS["capacity-limits"].facets)
+RATE_ONLY = {CAPACITY_FACETS[0]: "yes"}
+MIXED = RATE_ONLY | dict.fromkeys(CAPACITY_FACETS[1:], "unknown")
 ALL_UNKNOWN = dict.fromkeys(CAPACITY_FACETS, "unknown")
 ALL_KNOWN = dict.fromkeys(CAPACITY_FACETS, "yes")
 

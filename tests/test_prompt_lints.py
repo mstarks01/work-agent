@@ -88,6 +88,7 @@ from analysis_service.prompts import (
     lane_exemplars_doc,
 )
 from analysis_service.skills import estimate_tokens
+from analysis_service.sources import Source, render_sources
 from analysis_service.system_model import (
     ELEMENT_ID,
     FLOW_ID_VERSION,
@@ -101,7 +102,7 @@ from analysis_service.token_caps import (
     TOKEN_CAPS,
     prompt_key,
 )
-from evals.harness.exemplar_verbs import proposal_type
+from evals.harness.exemplar_verbs import _JSON_BLOCK, proposal_type
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -132,13 +133,25 @@ EXEMPLAR_LANES = [
 ]
 
 
-JSON_BLOCK_RE = re.compile(r"^```json\n(.*?)^```", re.MULTILINE | re.DOTALL)
-# The exemplar system's rendered source: a fence, the `label:` line, the `----`
-# rule, then the text — the shape ``render_sources`` produces for a real job.
-SOURCE_BLOCK_RE = re.compile(
-    r"^(?P<fence>`{3,})\nlabel: (?P<label>.+)\n----\n(?P<text>.*?)^(?P=fence)$",
-    re.MULTILINE | re.DOTALL,
-)
+def _source_block_re():
+    """The block ``render_sources`` produces for a real job, as a pattern.
+
+    The layout comes from one probe render, so the pattern reads the label
+    line and the rule exactly as the code writes them.
+    """
+    probe = render_sources([Source(kind="description", label="LABEL", text="TEXT")])
+    # The marker line, a blank line, the fence line, then the fenced body.
+    body = probe.split("\n", 3)[3]
+    label_lead, _, rest = body.partition("LABEL")
+    rule, _, _ = rest.partition("TEXT")
+    return re.compile(
+        rf"^(?P<fence>`{{3,}})\n{re.escape(label_lead)}(?P<label>.+)"
+        rf"{re.escape(rule)}(?P<text>.*?)^(?P=fence)$",
+        re.MULTILINE | re.DOTALL,
+    )
+
+
+SOURCE_BLOCK_RE = _source_block_re()
 # Element and flow IDs as the prompts write them: `type:normalized-name`.
 # The shipped grammar, not a second spelling of it: a flow ID's parts are
 # separated by `FLOW_DELIMITER`, and a lint that kept its own character class
@@ -157,7 +170,7 @@ EXEMPLAR_SYSTEM_RE = re.compile(
 
 
 def json_blocks(text):
-    return JSON_BLOCK_RE.findall(text)
+    return _JSON_BLOCK.findall(text)
 
 
 def exemplar_sections(framework, lane):

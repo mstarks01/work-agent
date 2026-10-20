@@ -28,6 +28,7 @@ from analysis_service.frameworks.stride.record import (
     DraftThreat,
     StrideCategory,
     Threat,
+    _threat_id,
 )
 from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.sampling import TierSampling
@@ -234,16 +235,6 @@ def write_finished_sweep(out: Path, run: Any, **blocks: Any) -> Path:
     return write_sweep_document(out, document)
 
 
-CATEGORY_LETTERS = {
-    "spoofing": "S",
-    "tampering": "T",
-    "repudiation": "R",
-    "information-disclosure": "I",
-    "denial-of-service": "D",
-    "elevation-of-privilege": "E",
-}
-
-
 class ScriptedMatcher:
     """Answers from recorded data, and counts what it was asked.
 
@@ -301,7 +292,7 @@ def draft_threat(
     one would be graded by nothing.
     """
     return DraftThreat(
-        id=f"{CATEGORY_LETTERS[category]}-{sequence:02d}",
+        id=_threat_id(category, sequence),
         framework="stride",
         framework_version=STRIDE_VERSION,
         category=category,
