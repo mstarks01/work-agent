@@ -183,8 +183,10 @@ class DraftRequirementRuling(Claim):
     """One draft ASVS ruling: a claim plus the chapter it was reached in.
 
     Everything a lane agent's proposal establishes and nothing the critic rules
-    on. The chapter is the one field this framework adds, and the graph stamps it
-    from the lane it is resolving rather than from anything an agent said.
+    on. The chapter and the direction are the two fields this framework adds.
+    The graph stamps the chapter from the lane it is resolving rather than from
+    anything an agent said, and the service copies the direction from the
+    proposal.
 
     **Built by the service, never emitted by an agent**, on the same route
     STRIDE's drafts take: an agent answers in :class:`RequirementProposal`, and

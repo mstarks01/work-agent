@@ -43,9 +43,9 @@ below. Give each class its own entry with text after the name. CI requires the
 section on each pull request that changes a code path:
 `src/*`, `webapp/*`, `evals/harness/*`, `evals/*.py`, `prompts/*`,
 `frameworks/*`, `domains/*`, `config/*`, `tests/*`, `.githooks/*`,
-`.github/workflows/*`, `.github/scripts/*` or `pyproject.toml`. An asterisk
-also matches a slash, and a rename counts as a change to its old and its new
-path.
+`.github/workflows/*`, `.github/scripts/*`, `pyproject.toml` or `uv.lock`. An
+asterisk also matches a slash, and a rename counts as a change to its old and
+its new path.
 The check `Five-class read` (`.github/workflows/five-class.yml`) runs again
 when the body is edited. It does not read an HTML comment or a fenced code
 block. `.github/scripts/five_class_read.py` holds the class names and the code

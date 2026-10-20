@@ -16,7 +16,6 @@ from fastapi.testclient import TestClient
 from analysis_service.api import (
     _BODY_SLACK,
     _REFUSALS,
-    MAX_RENDERED_ERRORS,
     BodyLimitMiddleware,
     create_app,
 )
@@ -25,7 +24,7 @@ from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.engine import DEFAULT_CALLER
-from analysis_service.errors import ConfigError
+from analysis_service.errors import MAX_RENDERED_ERRORS, ConfigError
 from analysis_service.jobs import (
     JOB_ID_PATTERN,
     RESTART_FAILURE_MESSAGE,

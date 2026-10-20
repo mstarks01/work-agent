@@ -25,7 +25,7 @@ pydantic's coercion path are unaffected.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from pydantic import ValidationError
@@ -50,15 +50,34 @@ def error_place(error: Mapping[str, Any]) -> str:
     return ".".join(str(part) for part in loc)
 
 
+#: How many complaints a refusal carries. A body that is wrong in ten thousand
+#: places is wrong; a caller needs to see that and the first few, not all of
+#: them. Rendering every one made the refusal amplify the request 43 times.
+MAX_RENDERED_ERRORS = 20
+
+
+def shown_errors(errors: Sequence[Mapping[str, Any]]) -> list[tuple[str, str]]:
+    """The place and message of each error a refusal names: the first
+    :data:`MAX_RENDERED_ERRORS`, then one entry with no place that counts the
+    rest."""
+    shown = [
+        (error_place(error), error["msg"]) for error in errors[:MAX_RENDERED_ERRORS]
+    ]
+    if len(errors) > MAX_RENDERED_ERRORS:
+        hidden = len(errors) - MAX_RENDERED_ERRORS
+        shown.append(("", f"and {hidden} more problems not shown"))
+    return shown
+
+
 def refusal_text(exc: ValueError) -> str:
     """What a refusal says for ``exc``.
 
     A :class:`~pydantic.ValidationError` prints each input it refused, so it
-    is read as each place and rule instead.
+    is read as each place and rule instead, through :func:`shown_errors`.
     """
     if isinstance(exc, ValidationError):
         return "; ".join(
-            f"{error_place(error)}: {error['msg']}"
-            for error in exc.errors(include_input=False)
+            f"{place}: {message}" if place else message
+            for place, message in shown_errors(exc.errors(include_input=False))
         )
     return str(exc)
