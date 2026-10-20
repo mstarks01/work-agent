@@ -396,7 +396,8 @@ that keep that from being the only thing standing between the two.
 
 Use **New analysis** to enter a name and a system description. The framework
 picker is generated from installed packages, including their declared options.
-Frameworks start unselected; questions are enabled by default. Read **How questions work** on the description page before preparing an analysis. The group index jumps to a group without
+Frameworks start unselected; questions are enabled by default. Read **How questions work** on the description page before preparing an analysis. Each question group starts collapsed. Click its heading,
+or its link in the group index, to open it. The group index jumps to a group without
 changing its answers or the engine's question order. Shared answers, row
 exceptions, earlier answers, skipped questions and follow-up rules use the
 existing answer service.

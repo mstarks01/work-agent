@@ -874,7 +874,6 @@
   const newBox = (q) => {
     const node = document.createElement("details");
     node.className = "question-group";
-    node.open = true;
     const title = document.createElement("summary");
     const applies = document.createElement("small");
     applies.className = "group-applies";
