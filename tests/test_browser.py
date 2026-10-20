@@ -1085,6 +1085,19 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     assert "Generated " in page.locator("#report-list a").inner_text()
 
 
+def test_a_question_s_answer_link_opens_its_follow_up_row(page):
+    """The Answer link on an open question opens the closed follow-up and
+    lands on that question's row."""
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    link = page.locator("details.openfact summary a", has_text="Answer").first
+    target = link.get_attribute("href")
+    link.click()
+    page.locator(target).wait_for(state="visible")
+    assert page.locator("#followup").get_attribute("open") is not None
+
+
 def test_a_report_sits_in_the_workspace_with_its_analysis_tabs(page):
     """The report shows the workspace sidebar, and its Description tab opens
     the analysis at its description without a return to the report."""

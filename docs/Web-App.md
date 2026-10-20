@@ -128,7 +128,11 @@ names the next stage in plain words, and the page shows no graph node name.
 summary and a table of its findings. The summary counts the confirmed findings
 by severity and the findings that wait on an answer. The table gives each
 finding's severity, status, affected components and first next step, and its
-title links to the finding's card. STRIDE contributes threat cards; ASVS
+title links to the finding's card. Under **Claims**, confirmed findings that
+rest on one control the description states is missing share a group, named for
+the control to add. Under **Questions that would settle the conditional
+findings**, each open question shows once, with the findings that wait on it
+and an **Answer** link to its row in the follow-up. STRIDE contributes threat cards; ASVS
 contributes requirement rulings. Each card carries its **grounds** behind
 **Why it matters, and the evidence**: the quotes, unknown attributes and
 boundary crossings the agent raised it on, with a quote the service could not

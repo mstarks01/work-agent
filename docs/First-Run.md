@@ -339,6 +339,9 @@ Start with these parts of the result:
   count of confirmed findings by severity, the count of findings that wait on
   an answer, and one row for each finding. Click a finding's title to open its
   card.
+- **Groups:** confirmed findings that rest on one missing control share a
+  group, so one change answers them. Conditional findings sit under the
+  question that would settle them; click **Answer** to go to that question.
 - **System model:** on **How this report was made**, verify that the actors,
   components, stores, flows, and trust zones match the source. Every later
   result depends on this extraction.
