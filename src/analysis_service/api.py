@@ -356,8 +356,8 @@ class JobSubmission(BaseModel):
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
     #: Stop after the assertion pass, publish the questions, and wait for a
     #: person to answer them. Off by default, so an autonomous caller's job
-    #: never waits (#1252).
-    questions: bool = False
+    #: never waits (#1252). Strict, as ``save`` is: ``"yes"`` asks nothing.
+    questions: bool = Field(default=False, strict=True)
     #: An earlier job of the caller's whose answers this job carries, and
     #: whose questions take each one they still ask (ADR 0079). It needs
     #: ``questions``: a job that does not pause never reads what it carries.

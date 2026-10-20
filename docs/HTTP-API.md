@@ -243,7 +243,8 @@ plural, or `null`. It is a suggestion only: nothing is placed until you answer.
 The most rows come first.
 
 **Ask before the analysis runs.** Submit with `"questions": true` beside the
-sources. The job stops after extraction, and after the assertion pass where
+sources. The value must be a JSON boolean: the service refuses `"yes"`, `1` or
+`"on"` with `422`. The job stops after extraction, and after the assertion pass where
 the deployment runs one. It ends in `awaiting-answers` and waits. Its
 questions come from what it has read so far. Answer them with the route below,
 or send `{"links": []}` to continue without answers; either starts the
@@ -628,7 +629,8 @@ when a deployment changes vendor. Shape is checked before size:
 | `422` | A source is malformed: unknown `kind`, missing or over-long `label`, empty `text`, an unknown field. |
 | `422` | A `label` carries a control, bidi or zero-width character. A label is a citation key rendered as chrome beside the text it names, so a character that renders as something other than what it is can misrepresent the report. Rejected rather than stripped: a label is bounded but never rewritten, so repairing one would cite something you did not submit. Line breaks are refused for the same reason. |
 | `400` | `sources` is present but empty. |
-| `400` | A source has `kind` `answers`. The service composes that source from `links`. |
+| `400` | A source has `kind` `answers` and the label `Answers to link questions`. The service composes that source from `links`. |
+| `422` | A source has `kind` `answers` with any other label, or another `kind` with the label `Answers to link questions`. Only the answers source carries that label. |
 | `400` | `links` is not empty and this deployment builds no assertion catalog. |
 | `400` | Two `links` entries answer the same principal. Refused rather than resolved by order, because the service cannot know which answer you meant. |
 | `422` | A `links` entry names an `element` that is not an entity, process or store ID, or `none`; or there are more than 50 entries. |

@@ -85,6 +85,12 @@ one the HTTP route and the engine read, so the three entry points agree. A submi
 leaves out an option its framework needs is refused before any model runs, with a
 message naming the field.
 
+The app reads each field of a submission by the rule `POST /v1/jobs` reads it
+with, and refuses a body that `POST /v1/jobs` refuses. The refusal names the
+field and the rule, such as a blank description or a label with a line break,
+and never repeats the value. Each JSON route of the app refuses a field that
+it does not read, as each `/v1` route does.
+
 A paused run keeps the frameworks it selected. When the settings no longer
 carry one of them, a continue of that run is refused with a message that names
 the framework. You can still save answers on it, and the run continues when the

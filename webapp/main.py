@@ -116,7 +116,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -126,7 +126,7 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
-from pydantic import Field, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from analysis_service import (
@@ -156,7 +156,14 @@ from analysis_service.answer_state import (
     SourcesOverLimit,
     StaleRevision,
 )
-from analysis_service.api import JOB_REFUSAL_STATUS
+from analysis_service.api import (
+    JOB_REFUSAL_STATUS,
+    AmendmentSubmission,
+    AnswersSubmission,
+    CorrectionsSubmission,
+    FrameworkRequest,
+    JobSubmission,
+)
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
 from analysis_service.claims import UnknownKey
@@ -170,6 +177,7 @@ from analysis_service.config_files import (
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
 from analysis_service.engine import DEFAULT_CALLER
+from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     MAX_HELD_FACTS,
@@ -218,7 +226,7 @@ from analysis_service.principals import Identity
 from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
-from analysis_service.selection import SelectionError, resolve_selection
+from analysis_service.selection import resolve_selection
 from analysis_service.settings_variables import deployment_env, merged_env
 from analysis_service.sources import (
     ANSWERS_LABEL,
@@ -603,6 +611,57 @@ _NAME_REFUSED = (
     f"Use an analysis name of at most {MAX_SYSTEM_NAME_CHARS} characters, on one"
     " line, with no control or formatting characters."
 )
+
+
+def _as_v1(field: str) -> Any:
+    """The field ``POST /v1/jobs`` declares, its bounds and strictness with it.
+
+    Typed ``Any`` as :func:`pydantic.Field` is, so a model can take it as a
+    default.
+    """
+    return JobSubmission.model_fields[field]
+
+
+class _Submission(BaseModel):
+    """The body of ``POST /analyze``, and the one statement of the keys it takes.
+
+    Each field that ``POST /v1/jobs`` also takes is the field
+    :class:`~analysis_service.api.JobSubmission` declares, so the two entry
+    points refuse the same values with the same sentence. ``name`` is the
+    form's ``system_name``; the route reads it with
+    :func:`~analysis_service.sources.clean_system_name`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sources: list[Source] = _as_v1("sources")
+    frameworks: list[FrameworkRequest] = _as_v1("frameworks")
+    questions: bool = _as_v1("questions")
+    answers_from: str | None = _as_v1("answers_from")
+    name: str | None = None
+
+
+class _UnknownKey(Exception):
+    """A body carries a key its route does not read."""
+
+
+def _body_of(raw: object, model: type[BaseModel]) -> dict[str, object]:
+    """``raw`` as a JSON object that holds only the keys ``model`` declares.
+
+    Each route names the model of its body, and the /v1 models refuse any
+    other key (``extra="forbid"``), so both entry points refuse the same
+    bodies. The refusal names the keys the route takes, never the one sent.
+    Raises ``TypeError`` for a body that is not an object.
+    """
+    if not isinstance(raw, dict):
+        raise TypeError
+    if not raw.keys() <= model.model_fields.keys():
+        raise _UnknownKey(
+            "This request takes only these fields: "
+            + ", ".join(model.model_fields)
+            + "."
+        )
+    return raw
 
 
 def _name_of(record: Envelope) -> str:
@@ -1373,32 +1432,31 @@ def create_app(
         answers = current.answers
 
         try:
-            body = await request.json()
-            sources = [Source.model_validate(source) for source in body["sources"]]
-            refuse_answers_source(sources)
-            selection = _selection(current.frameworks, body["frameworks"])
-            ask_questions = body.get("questions") is True
-            answers_from = body.get("answers_from")
-            if answers_from is not None and not isinstance(answers_from, str):
-                raise TypeError
-            name = body.get("name")
-            if not isinstance(name, str | None):
-                return _message(400, _NAME_REFUSED)
-            try:
-                name = clean_system_name(name)
-            except ValueError:
-                return _message(400, _NAME_REFUSED)
-        except SelectionError as exc:
-            # Names the framework and the field it wanted, or the name the
-            # install does not carry, and nothing about this deployment. Safe
-            # to show, and the only way a submitter learns what to change.
+            body = _body_of(await request.json(), _Submission)
+        except _UnknownKey as exc:
             return _message(400, str(exc))
-        except (ValidationError, ValueError, KeyError, TypeError):
+        except (ValueError, TypeError):
             return _message(
                 400,
                 "Expected a JSON body with a 'sources' list and a 'frameworks'"
                 " list naming frameworks this install carries.",
             )
+        try:
+            submission = _Submission.model_validate(body)
+            sources = submission.sources
+            refuse_answers_source(sources)
+            selection = _selection(current.frameworks, submission.frameworks)
+        except ValueError as exc:
+            # The sentence /v1 answers with: each field and rule a schema
+            # refusal names, the framework or option a selection refusal
+            # names, and never a value the submitter sent.
+            return _message(400, refusal_text(exc))
+        try:
+            name = clean_system_name(submission.name)
+        except ValueError:
+            return _message(400, _NAME_REFUSED)
+        ask_questions = submission.questions
+        answers_from = submission.answers_from
         breach = answers.limits.breach(sources)
         if breach is not None:
             return _message(400, breach.message)
@@ -1444,6 +1502,7 @@ def create_app(
             body = None  # refused below, as every other malformed body is
         questions = _questions_of(workspace, answers, run_id)
         try:
+            body = _body_of(body, AnswersSubmission)
             raw = body["links"]
             raw_facts = body.get("facts", [])
             if (
@@ -1471,7 +1530,7 @@ def create_app(
             revision = body.get("revision")
             if revision is not None:
                 revision = _revision(revision)
-        except InvalidFactAnswer as exc:
+        except (InvalidFactAnswer, _UnknownKey) as exc:
             return _message(400, str(exc))
         except (ValidationError, ValueError, KeyError, TypeError):
             return _message(
@@ -1517,11 +1576,13 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            body = await request.json()
+            body = _body_of(await request.json(), AmendmentSubmission)
             text = body["text"]
             revision = _revision(body["revision"])
             if not isinstance(text, str):
                 raise TypeError
+        except _UnknownKey as exc:
+            return _message(400, str(exc))
         except (ValueError, KeyError, TypeError):
             return _message(400, "Expected a JSON body with a 'text' and a 'revision'.")
         owner_id = await workspace.owner_id(answers, run_id)
@@ -1591,13 +1652,17 @@ def create_app(
         answers = current.answers
         questions = _questions_of(workspace, answers, run_id)
         try:
-            body = await request.json()
+            body = _body_of(await request.json(), CorrectionsSubmission)
             raw = body["facts"]
-            if not isinstance(raw, list) or len(raw) > MAX_FACT_ANSWERS:
+            if not isinstance(raw, list):
                 raise TypeError
+            if len(raw) > MAX_FACT_ANSWERS:
+                return _message(
+                    400, f"One request takes at most {MAX_FACT_ANSWERS} corrections."
+                )
             facts = [await _fact_answer(fact, questions) for fact in raw]
             revision = _revision(body["revision"])
-        except InvalidFactAnswer as exc:
+        except (InvalidFactAnswer, _UnknownKey) as exc:
             return _message(400, str(exc))
         except (ValidationError, ValueError, KeyError, TypeError):
             return _message(
@@ -1626,7 +1691,7 @@ def _revision(value: object) -> int:
 
 
 def _selection(
-    carried: Sequence[FrameworkName], requested: object
+    carried: Sequence[FrameworkName], requested: Sequence[FrameworkRequest]
 ) -> list[FrameworkSelection]:
     """One submission's selection: checked by the shared reader, in carried order.
 
@@ -1639,19 +1704,11 @@ def _selection(
     route refuses it: collapsing it would answer a submission with a selection
     nobody made.
 
-    Raises ``TypeError`` for a body whose ``frameworks`` is not a list,
-    ``ValidationError`` for an entry that is not a
-    :class:`~analysis_service.report.FrameworkSelection`, and
-    :class:`~analysis_service.selection.SelectionError` — a ``ValueError`` — for
-    a selection the install cannot run. The route answers all three as one 400.
+    Raises :class:`~analysis_service.selection.SelectionError` for a
+    selection the install cannot run.
     """
-    if not isinstance(requested, list):
-        raise TypeError("'frameworks' must be a list of framework selections")
     picked = {
-        selection.name: selection
-        for selection in resolve_selection(
-            carried, [FrameworkSelection.model_validate(entry) for entry in requested]
-        )
+        selection.name: selection for selection in resolve_selection(carried, requested)
     }
     return [picked[name] for name in carried if name in picked]
 
