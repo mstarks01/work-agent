@@ -1442,13 +1442,17 @@ async def event_frames(
     records them.
 
     **The one reader of "when does a job's stream end".** It ends when the job
-    reaches a terminal status, when the store holds no such job, or when
-    ``gone`` says the client left. A job that emits nothing sends nothing, so
+    reaches a terminal status, when the store holds no such job, when the
+    store cannot read the job (ADR 0095), or when ``gone`` says the client
+    left. A job that emits nothing sends nothing, so
     a send to a client that left never fails: ``gone`` is how such a stream
     ends and gives its slot back.
     """
     while True:
-        progress = await store.events_after(job_id, seen)
+        try:
+            progress = await store.events_after(job_id, seen)
+        except UnreadableSchema:
+            return
         if progress is None:
             return
         status, events = progress

@@ -87,3 +87,26 @@ def refuse_unread(
         raise StoreConfigError(
             f"{backend} takes no {', '.join(stray)}; unset {pronoun}"
         )
+
+
+def holds_password(value: str) -> bool:
+    """Whether ``value`` holds a password, in the user part of a URL or as a
+    query key that names one.
+
+    **The one rule of a password in a URL.** It parses as SQLAlchemy parses
+    the database URL. A value that names a scheme and does not parse holds
+    one, so a reader fails closed, and so does every such value where the
+    ``sql`` extra is not installed. A value that names no scheme is not a URL.
+    """
+    try:
+        from sqlalchemy.engine import make_url
+        from sqlalchemy.exc import ArgumentError
+    except ModuleNotFoundError:
+        return "://" in value
+    try:
+        url = make_url(value)
+    except (ArgumentError, ValueError):
+        return "://" in value
+    return url.password is not None or any(
+        "password" in key.lower() for key in url.query
+    )

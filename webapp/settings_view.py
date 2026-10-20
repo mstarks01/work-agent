@@ -31,7 +31,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import parse_qs, urlsplit
 
 from analysis_service import resilience
 from analysis_service.claims import FRAMEWORK_NAMES
@@ -73,6 +72,7 @@ from analysis_service.store_settings import (
     DATABASE_URL_VAR,
     DATABASE_VARIABLES,
     StoreConfigError,
+    holds_password,
 )
 from analysis_service.vendors import VENDOR_NAMES, VENDORS
 from webapp.settings_page import EXAMPLES, IAM_SETUP, SETTINGS, Setting
@@ -298,17 +298,9 @@ def _override_form(value: object) -> str:
 
 
 def _withheld(value: str) -> str | None:
-    """``value``, or ``None`` where it holds a URL password, in the user part
-    or as a query key, which the page never shows. A value that does not parse
-    as a URL is withheld too."""
-    try:
-        parts = urlsplit(value)
-        password = parts.password
-    except ValueError:
-        return None
-    query = parse_qs(parts.query, keep_blank_values=True)
-    in_query = any("password" in key.lower() for key in query)
-    return None if password is not None or in_query else value
+    """``value``, or ``None`` where :func:`holds_password` finds a password,
+    which the page never shows."""
+    return None if holds_password(value) else value
 
 
 def _key_saved(path: str | None) -> bool:

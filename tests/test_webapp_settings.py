@@ -239,6 +239,14 @@ class TestSecrets:
             "postgresql+asyncpg://user:PASSWORD@db/jobs",
             "postgresql+asyncpg://user@db/jobs?password=PASSWORD",
             "postgresql+asyncpg://user:PASSWORD@[::1/jobs",
+            "postgresql+asyncpg://user:PASS/WORD@db/jobs",
+            "postgresql+asyncpg://user:PASS?WORD@db/jobs",
+            "postgresql+asyncpg://user:PASS#WORD@db/jobs",
+            "postgresql+asyncpg://user:PASS@WORD@db/jobs",
+            "postgresql+asyncpg://user:PASS%40WORD@db/jobs",
+            "postgresql+asyncpg://user@db/jobs?Password=PASSWORD",
+            "postgresql+asyncpg://user:PASSWORD@db:port/jobs",
+            "not a scheme://user:PASSWORD@db/jobs",
         ],
     )
     def test_a_url_password_is_withheld(self, tmp_path, url):
@@ -251,6 +259,17 @@ class TestSecrets:
         assert "PASSWORD" not in response.text
         row = {r["key"]: r for r in page_data(response)["rows"]}["store.database_url"]
         assert row["value"] is None
+
+    def test_a_url_with_no_password_is_shown(self, tmp_path):
+        url = "postgresql+asyncpg://user@db/jobs?ssl=require"
+        client = memory_client(
+            tmp_path, ANALYSIS_JOB_STORE="sql", ANALYSIS_DATABASE_URL=url
+        )
+
+        response = client.get("/settings")
+
+        row = {r["key"]: r for r in page_data(response)["rows"]}["store.database_url"]
+        assert row["value"] == url
 
 
 class TestWhatTheSelectionShows:
