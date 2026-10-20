@@ -131,11 +131,23 @@ class TestThePageModule:
         assert unnamed == ["tiers.review_independence"]
         assert SETTINGS["tiers.review_independence"].mark == "shows"
 
-    def test_sampling_and_review_independence_are_shown_only(self):
+    def test_each_tier_thinking_level_changes_with_a_note(self):
+        for tier in TIER_NAMES:
+            setting = SETTINGS[f"sampling.{tier}.thinking"]
+            assert setting.mark == "changes", tier
+            assert "uncertified" in setting.note, tier
+
+    def test_the_other_sampling_and_review_independence_are_shown_only(self):
         sampling_keys = {key for key in SETTINGS if key.startswith("sampling.")}
         assert len(sampling_keys) == len(sampling.env_variables())
-        for key in {*sampling_keys, "tiers.review_independence"}:
+        thinking = {f"sampling.{tier}.thinking" for tier in TIER_NAMES}
+        for key in {*sampling_keys - thinking, "tiers.review_independence"}:
             assert SETTINGS[key].mark == "shows", key
+
+    def test_a_note_comes_only_with_a_row_the_page_changes(self):
+        for key, setting in SETTINGS.items():
+            if setting.note:
+                assert setting.mark == "changes", key
 
     def test_the_config_paths_and_the_blessed_fingerprints_are_excluded(self):
         excluded = {

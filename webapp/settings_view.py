@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from analysis_service import resilience
 from analysis_service.claims import FRAMEWORK_NAMES
@@ -57,6 +57,7 @@ from analysis_service.model_tiers import (
     upstreams_env_var_for,
 )
 from analysis_service.objects import OBJECT_STORES, object_store_name
+from analysis_service.sampling import ReasoningEffort
 from analysis_service.settings_variables import deployment_variables, secret_vars
 from analysis_service.store_backends import (
     CLOSED_SETTINGS,
@@ -138,6 +139,7 @@ def settings_view(
             "label": setting.label,
             "mark": setting.mark,
             "reason": setting.reason,
+            "note": setting.note,
             "restart": var in restart,
             "example": EXAMPLES.get(key),
             **_CONTROLS.get(key, {}),
@@ -177,6 +179,10 @@ def _controls() -> dict[str, dict[str, Any]]:
     flag = ("true", "false")
     choices: dict[str, tuple[str, ...]] = {
         **{f"tiers.{tier}.vendor": VENDOR_NAMES for tier in TIER_NAMES},
+        **{
+            f"sampling.{tier}.thinking": get_args(ReasoningEffort)
+            for tier in TIER_NAMES
+        },
         **{
             f"credentials.{vendor}.mode": tuple(VENDORS[vendor].credential_modes)
             for vendor in VENDOR_NAMES

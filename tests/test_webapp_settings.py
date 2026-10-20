@@ -97,6 +97,13 @@ class TestTheRows:
         always = {key for key, s in SETTINGS.items() if s.mark != "excluded"} - follows
         assert always <= rows.keys()
 
+    def test_a_thinking_row_offers_each_level_and_carries_its_note(self, tmp_path):
+        row = rows_of(client_for(tmp_path, hand_written()))["sampling.strong.thinking"]
+
+        assert row["mark"] == "changes"
+        assert row["options"] == ["low", "medium", "high"]
+        assert row["note"] == SETTINGS["sampling.strong.thinking"].note
+
     def test_a_shown_only_entry_carries_its_reason(self, tmp_path):
         row = rows_of(client_for(tmp_path, hand_written()))["tiers.review_independence"]
 

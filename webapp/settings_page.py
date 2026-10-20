@@ -61,6 +61,9 @@ class Setting:
     #: :data:`~analysis_service.deployment.CONFIG_PATHS` that names the file,
     #: and the path of keys in it. ``None`` where no file holds one.
     file_key: tuple[deployment.ConfigPathName, tuple[str, ...]] | None = None
+    #: What a change costs, for a setting that the page changes. Empty for
+    #: each other setting.
+    note: str = ""
 
 
 @dataclass(frozen=True)
@@ -197,22 +200,39 @@ def _credential_settings() -> list[tuple[str, Setting]]:
     return entries
 
 
+#: The sampling field that the page changes. Each other one it only shows.
+_CHANGED_SAMPLING = "thinking"
+
+
 def _sampling_settings() -> list[tuple[str, Setting]]:
-    return [
-        (
-            f"sampling.{tier}.{param}",
-            Setting(
-                sampling.env_var_for(tier, param),
-                "Sampling",
-                f"{tier.capitalize()} {param.replace('_', ' ')}",
-                "shows",
-                _UNCERTIFIED,
-                ("sampling", ("tiers", tier, param)),
-            ),
-        )
-        for tier in TIER_NAMES
-        for param in sampling.OFFERED_PARAMS
-    ]
+    """Each tier's sampling fields. The page changes the thinking level and
+    shows the others: a change to either kind makes each run uncertified, and
+    the thinking level decides whether a job finishes and what it finds."""
+    entries = []
+    for tier in TIER_NAMES:
+        for param in sampling.OFFERED_PARAMS:
+            variable = sampling.env_var_for(tier, param)
+            label = f"{tier.capitalize()} {param.replace('_', ' ')}"
+            file_key: tuple[deployment.ConfigPathName, tuple[str, ...]] = (
+                "sampling",
+                ("tiers", tier, param),
+            )
+            if param == _CHANGED_SAMPLING:
+                setting = Setting(
+                    variable,
+                    "Sampling",
+                    label,
+                    "changes",
+                    "",
+                    file_key,
+                    note=_UNCERTIFIED,
+                )
+            else:
+                setting = Setting(
+                    variable, "Sampling", label, "shows", _UNCERTIFIED, file_key
+                )
+            entries.append((f"sampling.{tier}.{param}", setting))
+    return entries
 
 
 def _deployment_settings() -> list[tuple[str, Setting]]:

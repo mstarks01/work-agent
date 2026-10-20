@@ -443,6 +443,18 @@ class TestConstrainOutput:
         with pytest.raises(SamplingConfigError, match="is not one of"):
             load_sampling(config_path(config_toml()), env=env)
 
+    @pytest.mark.parametrize(
+        "param",
+        ["temperature", "seed", "constrain_output", "thinking", "structured_output"],
+    )
+    def test_a_refused_override_never_repeats_its_value(self, config_path, param):
+        """The Settings page sends a thinking level to this loader, and its
+        refusal reaches the page."""
+        env = {env_var_for("base", param): "zzsecretzz"}
+        with pytest.raises(SamplingConfigError) as refused:
+            load_sampling(config_path(config_toml()), env=env)
+        assert "zzsecretzz" not in str(refused.value)
+
 
 class TestAPenaltyIsFinite:
     """The sweep of finding 3's class, over the file a contributor writes.
