@@ -118,8 +118,16 @@ def choose(page, locator, value: str) -> None:
     saved(page)
 
 
-def pause(page) -> None:
-    """Submit a description that asks questions, and wait for the list."""
+def open_groups(page) -> None:
+    """Open each shown question group, as a submitter clicks its heading."""
+    for summary in page.query_selector_all(".question-group:not([open]) > summary"):
+        if summary.is_visible():
+            summary.click()
+
+
+def pause(page, opened: bool = True) -> None:
+    """Submit a description that asks questions, wait for the list, and open
+    its groups unless ``opened`` is false."""
     if not page.locator("#analysis-name").input_value():
         page.fill("#analysis-name", "Test analysis")
     page.fill("#description", "A web app talks to a database.")
@@ -129,6 +137,8 @@ def pause(page) -> None:
             framework.check()
     page.click("#go")
     page.wait_for_selector("#asked", state="visible")
+    if opened:
+        open_groups(page)
 
 
 def test_entry_validates_its_name_framework_and_description_limit(page):
@@ -269,6 +279,7 @@ def test_a_reload_shows_the_saved_answers(page):
     choose(page, control, "yes")
     page.reload()
     page.wait_for_selector("#asked", state="visible")
+    open_groups(page)
     page.click("#earlier summary")
     assert "yes" in page.inner_text("#earlier")
 
@@ -443,6 +454,7 @@ def test_two_tabs_do_not_write_over_each_other_in_silence(browser, served):
     second.on("pageerror", lambda error: errors.append(str(error)))
     second.goto(first.url)
     second.wait_for_selector("#asked", state="visible")
+    open_groups(second)
     # A plain row's select: the first yes/no select in a STRIDE list can be a
     # facet cell, whose row is a table row.
     control = '#list p select:has(option[value="yes"])'
@@ -467,7 +479,8 @@ def test_a_first_report_offers_no_way_to_reopen_a_known_answer(page):
     the page offered it (#1289, F2)."""
     first_report(page)
     followup = page.locator("details.followup")
-    followup.locator("summary").click()
+    followup.locator("summary").first.click()
+    open_groups(page)
     earlier = followup.locator("p", has=page.locator("button", has_text="Change"))
     for index in range(earlier.count()):
         earlier.nth(index).locator("button").click()
@@ -491,7 +504,8 @@ def final_report(page) -> str:
     first_report(page)
     first = page.url
     followup = page.locator("details.followup")
-    followup.locator("summary").click()
+    followup.locator("summary").first.click()
+    open_groups(page)
     row = followup.locator("p", has=page.locator("button", has_text="Change")).first
     row.locator("button").click()
     row.locator("select").select_option("yes")
@@ -521,7 +535,8 @@ def test_a_first_report_sends_a_changed_answer_and_reaches_the_final_report(page
 def test_a_final_report_saves_a_correction(page):
     final_report(page)
     corrections = page.locator("details.followup", has_text="Correct an answer")
-    corrections.locator("summary").click()
+    corrections.locator("summary").first.click()
+    open_groups(page)
     row = corrections.locator("p", has=page.locator("button", has_text="Change")).first
     row.locator("button").click()
     row.locator("select").select_option("unknown")
@@ -1049,9 +1064,12 @@ def _tab_to(page, reached: str, limit: int = 400) -> None:
 
 
 def test_a_keyboard_answers_skips_and_starts_with_no_pointer(page):
-    """Tab reaches each control, an arrow key answers, and Enter skips and
-    starts (#1632)."""
-    pause(page)
+    """Enter opens a group, Tab reaches each control, an arrow key answers,
+    and Enter skips and starts (#1632)."""
+    pause(page, opened=False)
+    _tab_to(page, "active.matches('.question-group > summary')")
+    page.keyboard.press("Enter")
+    assert page.evaluate("document.activeElement.parentElement.open")
     _tab_to(
         page,
         "active.tagName === 'SELECT' && [...active.options].some((o) => o.value === 'yes')",
@@ -1060,7 +1078,15 @@ def test_a_keyboard_answers_skips_and_starts_with_no_pointer(page):
         page.keyboard.press("ArrowDown")
     assert answered.value.ok, answered.value.text()
     saved(page)
-    _tab_to(page, "active.textContent === 'Skip for now'")
+    # The answered group can hold no other question; Enter opens the next one.
+    _tab_to(
+        page,
+        "active.textContent === 'Skip for now'"
+        " || active.matches('.question-group:not([open]) > summary')",
+    )
+    if page.evaluate("document.activeElement.tagName === 'SUMMARY'"):
+        page.keyboard.press("Enter")
+        _tab_to(page, "active.textContent === 'Skip for now'")
     with page.expect_response(_post_to_answer) as skipped:
         page.keyboard.press("Enter")
     assert skipped.value.request.post_data_json["skip"], "the skip names a question"

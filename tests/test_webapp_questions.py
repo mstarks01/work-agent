@@ -1888,7 +1888,7 @@ const child = (r, tag) => {{ for (const c of r.children) {{ if (typeof c !== "ob
 calls.push({{ groups: groups.map(g => ({{
   title: g.children[0].children.find(n => n.className === "group-heading").textContent,
   rows: rowsOf(g).map(r => child(r, "b").textContent),
-  open: g.open }})) }});
+  open: Boolean(g.open) }})) }});
 child(rowsOf(groups[0])[0], "select").value = "no";
 child(rowsOf(groups[2])[0], "select").value = "yes";
 await ids.continue.listeners.click(); await settle();
@@ -1900,17 +1900,17 @@ await ids.continue.listeners.click(); await settle();
         {
             "title": "stored-copy-integrity heading?",
             "rows": [store.name, flow.name],
-            "open": True,
+            "open": False,
         },
         {
             "title": "audit-evidence heading?",
             "rows": [flow.name, store.name],
-            "open": True,
+            "open": False,
         },
         {
             "title": "stored-copy-integrity heading?",
             "rows": [process.name],
-            "open": True,
+            "open": False,
         },
     ]
     sent = next(c for c in seen if c.get("url") == "/answer/r1")
