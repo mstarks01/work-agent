@@ -585,6 +585,23 @@ class TestPinnedFormRule:
     def test_a_word_that_merely_begins_with_a_marker_passes(self, name, model):
         assert vendor_for(name).validate_model(model, source="t") == model
 
+    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    @pytest.mark.parametrize(
+        "model", ["openai/gpt-6-luna-pro:batch", "google/gemini-3.8-flash:BATCH"]
+    )
+    def test_a_variant_only_the_batch_api_serves_is_refused_on_every_vendor(
+        self, name, model
+    ):
+        with pytest.raises(ValueError, match="only the batch API serves") as refused:
+            vendor_for(name).validate_model(model, source="t")
+        assert model not in str(refused.value)
+
+    @pytest.mark.parametrize(
+        "model", ["anthropic/claude-3.7-sonnet:thinking", "z-ai/glm-4.6:exacto"]
+    )
+    def test_a_variant_the_chat_endpoint_serves_passes(self, model):
+        assert vendor_for("openrouter").validate_model(model, source="t") == model
+
     def test_an_alias_and_a_pre_ga_build_read_differently(self):
         """Two messages, because they name two different next actions."""
         vendor = vendor_for("vertex")

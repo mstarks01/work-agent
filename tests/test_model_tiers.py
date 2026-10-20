@@ -319,6 +319,13 @@ class TestEnvOverrides:
                 env={model_var: "gemini-2.5-pro-preview-06-05"},
             )
 
+    def test_env_batch_variant_rejected(self, config_path):
+        _, model_var = env_vars_for("strong")
+        with pytest.raises(ModelConfigError, match="batch API"):
+            load_model_tiers(
+                config_path(config_toml()), env={model_var: "gemini-2.5-pro:batch"}
+            )
+
     def test_env_set_but_empty_rejected(self, config_path):
         _, model_var = env_vars_for("base")
         with pytest.raises(ModelConfigError, match="set but empty"):

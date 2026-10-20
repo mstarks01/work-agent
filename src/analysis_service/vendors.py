@@ -418,6 +418,18 @@ _FLOATING_WORDS: dict[str, str] = {
     "experimental": _PRE_GA,
 }
 
+#: Every variant that selects an endpoint rather than a build, against the
+#: endpoint that serves it. The variant is the text after an identifier's last
+#: ``:``, matched without case. The service calls the chat completions endpoint
+#: on every vendor, so a variant that only another endpoint serves passes every
+#: check at load and then fails each request after a job starts: OpenRouter
+#: answers ``openai/gpt-6-luna-pro:batch`` on the chat endpoint with a 404. One
+#: table, one reader (:meth:`Vendor.validate_model`), and every vendor row reads
+#: it, because the endpoint is the service's and not the vendor's.
+_ENDPOINT_VARIANTS: dict[str, str] = {
+    "batch": "the batch API",
+}
+
 #: Every spelling of a **cloud resource** this service refuses, and what each
 #: one names. Refused for every vendor, on two properties rather than on whose
 #: syntax it is. A resource identifier hides which model answers behind it, so a
@@ -1187,6 +1199,14 @@ class Vendor:
         if word is not None:
             reason = _FLOATING_WORDS[word].format(word=word)
             raise ValueError(f"{source}: {reason}; use the pinned model identifier")
+        _, colon, variant = model.rpartition(":")
+        variant = variant.lower()
+        if colon and variant in _ENDPOINT_VARIANTS:
+            raise ValueError(
+                f"{source}: names a variant that only"
+                f" {_ENDPOINT_VARIANTS[variant]} serves, and this service calls the"
+                f" chat completions endpoint; remove the ':{variant}' variant"
+            )
         rule = self._rule_for(model)
         if rule.pinned is not None and rule.pinned.fullmatch(model) is None:
             raise ValueError(f"{source}: is not pinned — {rule.hint}")
