@@ -8,17 +8,23 @@ it. Fail-closed behaviour gets its own tempdir cases.
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from analysis_service.claims import derive_severity_level
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.report import InputRef
+from analysis_service.resilience import MAX_SOURCE_BYTES_VAR
+from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel, normalize_element_ids
 from evals import verify_corpus
 from evals.harness.identity import endpoint_form
 from evals.harness.reference import (
     MAX_CORPUS_SOURCE_BYTES,
+    CaseMetadata,
     CorpusError,
     ReferenceThreat,
     flows_by_case,
@@ -408,3 +414,59 @@ def test_a_case_without_rulings_reads_its_claims_alone(tmp_path):
 def test_a_ruling_that_no_longer_fits_its_claim_fails_closed(tmp_path, edit, message):
     with pytest.raises(CorpusError, match=message):
         load_case(_ruled_case(tmp_path, edit))
+
+
+def test_a_repeated_source_label_is_refused_at_load(tmp_path):
+    """The loader refuses the sources the service refuses: one rule, one reader."""
+    case_dir = tmp_path / "16-library-lending-interview"
+    shutil.copytree(CORPUS_DIR / case_dir.name, case_dir)
+    meta = json.loads((case_dir / "case.json").read_text())
+    meta["sources"][1]["label"] = meta["sources"][0]["label"]
+    (case_dir / "case.json").write_text(json.dumps(meta))
+
+    with pytest.raises(CorpusError, match="source labels must be unique"):
+        load_case(case_dir)
+
+
+def test_the_deployment_byte_limit_applies_at_load(tmp_path, monkeypatch):
+    """The loader reads the limits the service reads, overrides included."""
+    case_dir = _copy_case(CORPUS_DIR / "01-payments-checkout", tmp_path)
+    monkeypatch.setenv(MAX_SOURCE_BYTES_VAR, "10")
+
+    with pytest.raises(CorpusError, match="over the 10 byte limit"):
+        load_case(case_dir)
+
+
+@pytest.mark.parametrize(
+    "title",
+    ["Payments", "  Payments  ", "Payments\n", "   ", "Pay\u202ements", "x" * 500],
+)
+def test_the_case_title_and_the_report_name_agree(title):
+    """The case title and a report's system name answer one rule alike.
+
+    Tested against each other, so a title the loader accepts is a name the
+    report accepts, and a title that would fail the report fails at load.
+    """
+    meta = json.loads((CORPUS_DIR / "01-payments-checkout" / "case.json").read_text())
+    source = Source(kind="description", label="System description", text="x")
+
+    def accepts(build) -> bool:
+        try:
+            build()
+        except ValidationError:
+            return False
+        return True
+
+    assert accepts(lambda: CaseMetadata.model_validate({**meta, "title": title})) == (
+        accepts(lambda: InputRef.of(system_name=title, sources=[source]))
+    )
+
+
+def test_a_padded_title_is_refused_at_load(tmp_path):
+    case_dir = _copy_case(CORPUS_DIR / "01-payments-checkout", tmp_path)
+    meta = json.loads((case_dir / "case.json").read_text())
+    meta["title"] = "  Payments  "
+    (case_dir / "case.json").write_text(json.dumps(meta))
+
+    with pytest.raises(CorpusError, match="title"):
+        load_case(case_dir)

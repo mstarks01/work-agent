@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -64,11 +65,18 @@ from analysis_service.claims import (
     SeverityLevel,
     derive_severity_level,
 )
+from analysis_service.deployment import ConfigPaths
 from analysis_service.frameworks.asvs.record import AsvsChapter
 from analysis_service.frameworks.stride.record import LANES_OF_VERB, StrideCategory
 from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.parsing import signer
-from analysis_service.sources import MAX_LABEL_CHARS, Source, SourceKind
+from analysis_service.resilience import load_resilience
+from analysis_service.sources import (
+    MAX_LABEL_CHARS,
+    Source,
+    SourceKind,
+    clean_system_name,
+)
 from analysis_service.system_model import DataFlow, SystemModel
 from analysis_service.validation import parse_and_validate
 from evals.harness.verbs import check_verb
@@ -634,6 +642,22 @@ class CaseMetadata(BaseModel):
     aliases: list[ElementAlias] = Field(default_factory=list)
     notes: str = ""
 
+    @field_validator("title")
+    @classmethod
+    def _title_is_a_clean_system_name(cls, value: str) -> str:
+        """Refuse a title the report would refuse as its system name.
+
+        A run puts the title in the report's ``system_name``, which accepts
+        only a value that ``clean_system_name`` returns unchanged. The same
+        test here refuses such a title at load, before any model call.
+        """
+        if clean_system_name(value) != value:
+            raise ValueError(
+                "is not the name clean_system_name writes; trim it and remove"
+                " any line break or formatting character"
+            )
+        return value
+
 
 @dataclass(frozen=True)
 class GoldenCase:
@@ -978,6 +1002,12 @@ def _load_sources(case_dir: Path, meta: CaseMetadata) -> tuple[Source, ...]:
                 text=resolved.read_text(encoding="utf-8"),
             )
         )
+    limits = load_resilience(
+        ConfigPaths.from_env(os.environ).resilience
+    ).source_limits()
+    breach = limits.breach(sources)
+    if breach is not None:
+        raise CorpusError(f"{case_dir.name}: {breach.message}")
     return tuple(sources)
 
 
