@@ -850,8 +850,10 @@ def render_report(
     the same Question Set the answer route admits against.
 
     The template is a self-contained renderer for the report schema — no build
-    step, no framework, its own inline CSS and JS. This fills its one payload
-    placeholder and its per-response CSP nonce, and serves the result.
+    step, no framework, its own inline CSS and JS. It sits in the workspace
+    layout, so it carries the workspace styles and the sidebar script too. This
+    fills its payload placeholders and its per-response CSP nonce, and serves
+    the result.
 
     **The escape is the contract.** The report carries the submitter's own
     prose, so a description containing ``</script>`` would close the JSON block
@@ -868,9 +870,11 @@ def render_report(
     return render(
         VIEWER.read_text(encoding="utf-8"),
         _REPORT_GRANTS,
-        script=client_script("answer_editor.js")
-        + "\n"
-        + client_script("report_view.js"),
+        script="\n".join(
+            client_script(name)
+            for name in ("sidebar.js", "answer_editor.js", "report_view.js")
+        ),
+        workspace_style=_WORKSPACE_STYLE,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
         units=script_json(unit_rows(report)),

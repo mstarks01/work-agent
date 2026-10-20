@@ -347,6 +347,11 @@ bound. Each delete writes one log line with the cause `workspace`.
 dependencies. The app reads it, substitutes your run's JSON into its
 `<script type="application/json" id="report">` block, and serves the result.
 
+The page sits in the workspace layout: it carries the workspace styles, the
+sidebar, and the **Description** and **Reports** tabs of the report's analysis.
+**Description** opens the analysis at its description, and **Reports** opens
+the list of its reports.
+
 It holds no report of its own, so opening it from disk shows nothing. It is a
 template belonging to this app, not a sample to look at.
 

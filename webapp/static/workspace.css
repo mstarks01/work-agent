@@ -439,7 +439,7 @@ summary:hover {
   margin:24px 0 30px;
   flex-wrap:wrap
 }
-.section-nav button {
+.section-nav button,.section-nav a {
   padding:0 0 12px;
   background:none;
   border:0;
@@ -448,7 +448,10 @@ summary:hover {
   color:var(--muted);
   font-size:14px
 }
-.section-nav button[aria-current=page] {
+.section-nav a {
+  text-decoration:none
+}
+.section-nav button[aria-current=page],.section-nav a[aria-current=page] {
   border-bottom-color:var(--accent);
   color:var(--text);
   font-weight:600

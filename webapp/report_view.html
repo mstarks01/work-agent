@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Report</title>
-<style nonce="__CSP_NONCE__">
+<style nonce="__CSP_NONCE__"><!--workspace_style-->
   /* Palette roles (dataviz reference instance). Status hues are fixed, never themed. */
   .viz-root {
     color-scheme: light;
@@ -225,16 +225,33 @@
      style attributes; a class costs nothing and a generated one-off colour
      goes through element.style.* instead, which CSP does not govern. */
   .belowtable { margin-top: 12px; }
-  .workspace-return {display:flex;gap:24px;align-items:center;padding:18px 28px;border-bottom:1px solid var(--hairline);font:14px/1.5 system-ui,sans-serif}
-  .workspace-return a {color:var(--ink);text-decoration:none}
-  .workspace-return a:hover {text-decoration:underline}
-  .workspace-return a:focus-visible {outline:2px solid currentColor;outline-offset:4px}
-  @media(max-width:580px){.workspace-return{padding:16px;flex-wrap:wrap;gap:16px}}
+
+  /* The report sits in the workspace layout, whose styles above set rules for
+     bare elements. These put back what the report's own rules expect.
+     `:where` keeps each at the weight of a bare element rule, so the
+     report's own class rules still win. */
+  main.report-main { max-width: none; padding: 0; }
+  main.report-main > .viz-root { min-height: 100dvh; }
+  :where(.viz-root) table { display: table; }
+  :where(.viz-root) th, :where(.viz-root) td { min-width: 0; }
+  :where(.viz-root) summary { font-size: inherit; color: inherit; }
+  :where(.viz-root) details { margin: 0; }
+  .viz-root .section-nav { margin: 20px 0 8px; }
+  /* The theme toggle reaches the sidebar too. */
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="workspace">
+  <aside class="sidebar">
+    <div class="sidebar-head"><a class="brand" href="/" aria-label="Work Agent home"><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 3 9 5-9 5-9-5 9-5M3 16l9 5 9-5"/></svg><span class="brand-label">Work Agent</span></a><button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Collapse sidebar" aria-controls="sidebar-navigation" aria-expanded="true" title="Collapse sidebar"><svg class="collapse-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M15.41 7.41 14 6 8 12l6 6 1.41-1.41L10.83 12l4.58-4.59Z"/></svg><svg class="expand-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12l-4.58 4.59Z"/></svg></button></div>
+    <nav id="sidebar-navigation" aria-label="Workspace"><a class="new-analysis" href="/">New analysis</a><a href="/?view=analyses">Analyses</a><a href="/settings">Settings</a></nav>
+  </aside>
+  <div class="workspace-body">
+  <main id="main" class="report-main">
 <div class="viz-root">
-  <nav class="workspace-return" aria-label="Workspace"><a href="/">Work Agent</a><a href="/?view=analyses">Analyses</a><a id="analysis-reports" hidden>All reports</a><span>Report</span></nav>
   <div class="wrap">
     <div class="topbar">
       <div>
@@ -243,6 +260,8 @@
       </div>
       <button class="toggle" id="themebtn" type="button">Toggle theme</button>
     </div>
+    <!-- The tabs of the report's analysis, as the workspace shows them. -->
+    <nav class="section-nav" id="analysis-tabs" aria-label="Analysis" hidden><a id="description-tab">Description</a><a id="reports-tab" aria-current="page">Reports</a></nav>
     <div id="report-view">
       <!-- One section per framework the job selected, built in JS: the count
            and the names are the report's, not this file's. -->
@@ -270,6 +289,9 @@
       <h2>Pipeline</h2>
       <div class="nodes" id="nodes"></div>
     </div>
+  </div>
+</div>
+  </main>
   </div>
 </div>
 
