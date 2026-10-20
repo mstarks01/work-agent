@@ -129,6 +129,13 @@ class TestTheRoute:
         )
         assert missing.status_code == 422
 
+    def test_an_empty_amendment_is_refused_by_the_source_rule(self):
+        client, store = _client()
+        job = waiting(store)
+        response = _amend(client, job, text="")
+        assert response.status_code == 400, response.text
+        assert "text must not be blank" in response.json()["detail"]
+
     def test_only_a_waiting_job_takes_an_amendment(self):
         from tests.test_questions import TestTheRoutes
 
