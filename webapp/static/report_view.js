@@ -1011,7 +1011,8 @@
     };
 
     if (LINK_QUESTIONS.length) {
-      box.append(el("h2", null, "Which part of your system does each name refer to?"));
+      box.append(el("h2", null, "Match each user, team or account to a part of your system"));
+      box.append(el("div", "meta", "Your description says things about these users, teams and accounts, such as whether they sign in with MFA. The analysis can use those facts only after you match each one to a part of your system. Choose \"None of these\" if no part matches."));
       LINK_QUESTIONS.forEach(q => {
         const row = el("p");
         const select = el("select");
