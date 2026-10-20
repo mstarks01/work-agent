@@ -56,6 +56,7 @@ globalThis.document = {
   createElement: (tag) => new Node(tag),
   createTextNode: (t) => String(t),
   createDocumentFragment: () => new Node("#fragment"),
+  querySelector: () => new Node("query"),
   querySelectorAll: () => [],
   body: new Node("body"),
 };

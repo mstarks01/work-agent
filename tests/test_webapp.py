@@ -1662,7 +1662,7 @@ PAGE_SCRIPTS = {
         "settings.js",
     ),
     "webapp/offline_sitting.py": "offline_sitting.js",
-    "webapp/report_view.html": ("answer_editor.js", "report_view.js"),
+    "webapp/report_view.html": ("sidebar.js", "answer_editor.js", "report_view.js"),
 }
 
 #: A ``<script>`` block a page template is allowed to fill itself. Each one

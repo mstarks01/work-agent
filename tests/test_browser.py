@@ -1033,10 +1033,27 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     page.goto(analysis_url)
     page.wait_for_url(report_url)
     assert page.locator("#sysname").is_visible()
-    page.get_by_role("link", name="All reports", exact=True).click()
+    page.get_by_role("link", name="Reports", exact=True).click()
     page.wait_for_selector("#report-list a")
     assert page.locator("#report-list a").inner_text().startswith("Test analysis")
     assert "Generated " in page.locator("#report-list a").inner_text()
+
+
+def test_a_report_sits_in_the_workspace_with_its_analysis_tabs(page):
+    """The report shows the workspace sidebar, and its Description tab opens
+    the analysis at its description without a return to the report."""
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    assert page.locator(".sidebar").is_visible()
+    assert page.locator("#reports-tab").get_attribute("aria-current") == "page"
+    page.click("#sidebar-toggle")
+    assert page.locator(".workspace.sidebar-collapsed").count() == 1
+    page.click("#description-tab")
+    page.wait_for_url("**view=description")
+    page.locator("#description-panel").wait_for(state="visible")
+    assert page.input_value("#description")
+    assert "/report/" not in page.url
 
 
 def test_reopening_an_analysis_whose_report_is_withheld_stays_on_it(page, monkeypatch):

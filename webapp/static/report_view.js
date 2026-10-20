@@ -344,12 +344,13 @@
   };
   const svar = (lvl) => `var(${SEV[lvl][1]})`;
 
-  // The served report can return to its analysis's named report history.
+  // The served report links to its analysis's description and report list.
   const reportRoute = location.pathname?.match(/^\/report\/([A-Za-z0-9_-]+)$/);
   if (reportRoute) {
-    const historyLink = $("analysis-reports");
-    historyLink.href = "/?run=" + encodeURIComponent(reportRoute[1]) + "&view=reports";
-    historyLink.hidden = false;
+    const analysis = "/?run=" + encodeURIComponent(reportRoute[1]);
+    $("description-tab").href = analysis + "&view=description";
+    $("reports-tab").href = analysis + "&view=reports";
+    $("analysis-tabs").hidden = false;
   }
   // header
   $("sysname").textContent = R.input.system_name;

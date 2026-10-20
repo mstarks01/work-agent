@@ -130,8 +130,9 @@ const workspace = (() => {
       const data = await fetchRun(id);
       if (ticket !== generation) return;
       metadata(data);
-      const reportView = new URLSearchParams(location.search).get("view") === "reports";
-      history.replaceState(null, "", "/?run=" + encodeURIComponent(data.run) + (reportView ? "&view=reports" : ""));
+      // A report's tabs open its analysis at its description or its report list.
+      const view = ["description", "reports"].find((name) => name === new URLSearchParams(location.search).get("view"));
+      history.replaceState(null, "", "/?run=" + encodeURIComponent(data.run) + (view ? "&view=" + view : ""));
       el("description").value = data.description;
       el("analysis-name").value = data.name;
       for (const checkbox of boxes) {
@@ -150,7 +151,9 @@ const workspace = (() => {
         el("status").hidden = false;
         processing(data.completed_steps, data.pauses, undefined, data.run);
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
-      } else if (served && new URLSearchParams(location.search).get("view") !== "reports") {
+      } else if (view === "description") {
+        show("description-panel");
+      } else if (served && !view) {
         location.replace("/report/" + encodeURIComponent(data.run));
       } else {
         show("reports-panel");
