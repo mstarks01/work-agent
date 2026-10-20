@@ -591,6 +591,13 @@ class Cell:
 
 DEFAULT_NAME = "Your system"
 
+#: The form page's note for a store that a restart clears. A durable store
+#: shows no note.
+_MEMORY_STORE_NOTE = (
+    "This app keeps your runs in memory, so a restart clears them."
+    " To keep them, set a sql store as docs/Web-App.md states."
+)
+
 #: The page's statement of :func:`~analysis_service.sources.clean_system_name`.
 #: A fixed sentence, so a refusal never echoes the name it refused.
 _NAME_REFUSED = (
@@ -1190,6 +1197,9 @@ def create_app(
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 source_limit=str(current.answers.limits.max_total_bytes),
+                store_note=""
+                if workspace.store.durable
+                else escape(_MEMORY_STORE_NOTE),
             )
         )
 
@@ -1368,8 +1378,6 @@ def create_app(
             body = await request.json()
             sources = [Source.model_validate(source) for source in body["sources"]]
             refuse_answers_source(sources)
-            if body["frameworks"] == []:
-                return _message(400, "Please select a framework.")
             selection = _selection(current.frameworks, body["frameworks"])
             ask_questions = body.get("questions") is True
             answers_from = body.get("answers_from")
@@ -1976,9 +1984,7 @@ _WORKSPACE_STYLE = (Path(__file__).parent / "static" / "workspace.css").read_tex
 )
 
 #: The question toggle. Every install can pause: one with no catalog asks its
-#: early questions and no link question. The page lists the earlier analyses
-#: whose answers a new one can carry (ADR 0079), and shows the list only where
-#: there is one.
+#: early questions and no link question.
 _QUESTIONS_FIELD = """<p class="ask-option"><label><input type="checkbox" id="ask" name="ask" checked>
     Ask me questions to make the report better.</label></p>"""
 

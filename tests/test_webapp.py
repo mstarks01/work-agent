@@ -520,6 +520,16 @@ def test_a_submission_this_install_cannot_serve_is_refused(client, frameworks):
     assert refused.status_code == 400, refused.text
 
 
+def test_an_empty_selection_is_refused_by_the_selection_rule(client):
+    body = posted("A web app talks to a database.")
+    body["frameworks"] = []
+
+    refused = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+
+    assert refused.status_code == 400
+    assert "a job must select at least one framework" in refused.text
+
+
 def test_a_submission_missing_a_required_option_is_refused_by_name(client):
     """The package's own options model refuses it, and says which field.
 

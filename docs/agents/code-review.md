@@ -216,8 +216,7 @@ rule and names each site; every site but the one reader fails it. Put it in
 `tests/test_one_reader_lints.py`, or in the lint file that holds that kind of
 rule. Show that it fails on a deliberate second reader, then revert that.
 
-Without the lint, the next reader of the rule surfaces one pull request at a
-time: the case-file rule took six (#1807, #1825, #1830, #1831, #1833, #1834).
+Without the lint, each new reader of the rule needs a pull request of its own.
 Where no AST pattern can find the rule, say so in the pull request body and
 name the test that holds the readers against each other.
 

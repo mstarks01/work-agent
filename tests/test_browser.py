@@ -134,12 +134,10 @@ def pause(page) -> None:
 def test_entry_validates_its_name_framework_and_description_limit(page):
     assert page.locator("#analysis-name").get_attribute("required") is not None
     before = int(page.locator("#description").get_attribute("data-max-bytes"))
-    assert f"{before:,} characters remaining" in page.inner_text(
-        "#description-remaining"
-    )
+    assert f"{before:,} bytes remaining" in page.inner_text("#description-remaining")
     page.fill("#analysis-name", "Test analysis")
     page.fill("#description", "A")
-    assert f"{before - 1:,} characters remaining" in page.inner_text(
+    assert f"{before - 1:,} bytes remaining" in page.inner_text(
         "#description-remaining"
     )
     page.click("#go")

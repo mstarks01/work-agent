@@ -19,6 +19,8 @@ from typing import Literal, get_args
 
 from analysis_service.jobs import InMemoryJobStore, JobStore
 from analysis_service.objects import (
+    OBJECT_ADDRESSING_VAR,
+    OBJECT_CREDENTIALS_VAR,
     OBJECT_STORE_VAR,
     OBJECT_STORES,
     Addressing,
@@ -107,8 +109,8 @@ JOB_STORES: dict[JobStoreName, JobStoreBackend] = {
 CLOSED_SETTINGS: dict[str, tuple[str, ...]] = {
     JOB_STORE_VAR: tuple(JOB_STORES),
     OBJECT_STORE_VAR: tuple(OBJECT_STORES),
-    "ANALYSIS_OBJECT_ADDRESSING": get_args(Addressing),
-    "ANALYSIS_OBJECT_CREDENTIALS": tuple(mode.value for mode in CredentialMode),
+    OBJECT_ADDRESSING_VAR: get_args(Addressing),
+    OBJECT_CREDENTIALS_VAR: tuple(mode.value for mode in CredentialMode),
     DATABASE_CREDENTIALS_VAR: get_args(DatabaseCredentialMode),
     DATABASE_IAM_VAR: get_args(DatabaseIamName),
 }

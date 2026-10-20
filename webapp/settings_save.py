@@ -241,7 +241,7 @@ def unused_keys(tiers: ModelTierConfig | None) -> frozenset[str]:
         var
         for name, vendor in VENDORS.items()
         if name not in used
-        for var in vendor.all_env_vars(secret_only=True)
+        for var in vendor.all_secret_env_vars()
     )
 
 

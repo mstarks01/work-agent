@@ -324,10 +324,10 @@ instead of the analysis form. The page links to the
 3. For ASVS, select level 1, 2, or 3.
 4. Click **Prepare analysis**.
 
-The analysis name is required in the app. The selected frameworks affect both
-the answer and the cost. STRIDE runs six lane analyzers. ASVS runs 17. Each
-framework also runs its own reviewer, and a
-malformed review may cause one additional review call. Extraction is shared
+The form asks for an analysis name before it submits. The selected frameworks
+affect both the answer and the cost. STRIDE runs six lane analyzers. ASVS runs
+17. Each framework also runs its own reviewer, and a malformed review may cause
+one additional review call. Extraction is shared
 when both frameworks are selected.
 
 Start with these parts of the result:

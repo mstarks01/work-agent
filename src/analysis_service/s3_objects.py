@@ -47,7 +47,13 @@ from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from analysis_service.aws_identity import platform_session
-from analysis_service.objects import OBJECT_STORES, S3_KEY_FILES, Addressing
+from analysis_service.objects import (
+    OBJECT_ADDRESSING_VAR,
+    OBJECT_CREDENTIALS_VAR,
+    OBJECT_STORES,
+    S3_KEY_FILES,
+    Addressing,
+)
 from analysis_service.store_settings import (
     StoreConfigError,
     closed_setting,
@@ -119,8 +125,8 @@ def _refuse_stray_settings(env: Mapping[str, str]) -> None:
 
 
 def _session(env: Mapping[str, str]) -> boto3.Session:
-    value = env.get("ANALYSIS_OBJECT_CREDENTIALS", "")
-    mode = closed_setting(value, "ANALYSIS_OBJECT_CREDENTIALS", CREDENTIALS)
+    value = env.get(OBJECT_CREDENTIALS_VAR, "")
+    mode = closed_setting(value, OBJECT_CREDENTIALS_VAR, CREDENTIALS)
     return CREDENTIALS[mode](env)
 
 
@@ -206,8 +212,8 @@ class S3ObjectStore:
         bucket = _required(env, "ANALYSIS_OBJECT_BUCKET", _BUCKET)
         region = _required(env, "ANALYSIS_OBJECT_REGION", REGION)
         addressing = closed_setting(
-            env.get("ANALYSIS_OBJECT_ADDRESSING", "").strip() or "virtual",
-            "ANALYSIS_OBJECT_ADDRESSING",
+            env.get(OBJECT_ADDRESSING_VAR, "").strip() or "virtual",
+            OBJECT_ADDRESSING_VAR,
             dict.fromkeys(get_args(Addressing)),
         )
         client = _session(env).client(

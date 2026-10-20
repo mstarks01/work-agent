@@ -39,7 +39,7 @@ def _selected_tiers(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(var, value)
     # A key the developer's shell exports would make every build refuse it.
     for vendor in VENDORS.values():
-        for var in vendor.all_env_vars(secret_only=True):
+        for var in vendor.all_secret_env_vars():
             monkeypatch.delenv(refused_var(var), raising=False)
 
 
