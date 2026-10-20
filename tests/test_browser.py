@@ -809,6 +809,52 @@ def test_the_settings_page_saves_resets_and_refuses_a_stale_tab(browser, tmp_pat
     assert "Reload the page" in stale
 
 
+def test_a_thinking_row_follows_its_tier_model_and_resets_to_the_default(
+    browser, tmp_path
+):
+    """The base tier's model takes no level, the strong tier's model takes one,
+    "The model's own level" removes a saved level, and a model typed on the
+    page that takes none hides the levels before any save."""
+    from tests.test_settings_env import env_in, hand_written, write_settings
+    from webapp.main import create_app
+
+    write_settings(tmp_path, hand_written())
+    base = 'tr[data-key="sampling.base.thinking"]'
+    strong = 'tr[data-key="sampling.strong.thinking"]'
+    for url in serve(create_app(env=env_in(tmp_path))):
+        page, errors = opened(browser, url + "/settings")
+        page.wait_for_selector(strong)
+        base_text = page.locator(base).inner_text()
+        base_selects = page.locator(f"{base} select").count()
+        offered = page.locator(f"{strong} select option").all_inner_texts()
+
+        page.select_option(f"{strong} select", "high")
+        page.click("#save-changes")
+        page.wait_for_selector("#save-status", state="visible")
+        written = (tmp_path / "settings.env").read_text()
+
+        page.select_option(f"{strong} select", "")
+        page.click("#save-changes")
+        page.wait_for_selector(f"{strong} >> text=default")
+        removed = (tmp_path / "settings.env").read_text()
+
+        page.select_option('tr[data-key="tiers.strong.vendor"] select', "openai")
+        model = page.locator('tr[data-key="tiers.strong.model"] input')
+        model.fill("gpt-4o-2024-08-06")
+        model.press("Tab")
+        typed = page.locator(strong).inner_text()
+        typed_selects = page.locator(f"{strong} select").count()
+        page.close()
+    assert errors == [], f"the settings page raised: {errors}"
+    assert "This model takes no thinking level." in base_text
+    assert base_selects == 0
+    assert offered == ["The model's own level", "low", "medium", "high"]
+    assert "ANALYSIS_SAMPLING_STRONG_THINKING=high" in written
+    assert "THINKING" not in removed
+    assert "This model takes no thinking level." in typed
+    assert typed_selects == 0
+
+
 def test_the_settings_page_saves_a_key_with_the_vendor_that_needs_it(browser, tmp_path):
     from tests.test_settings_env import env_in, hand_written, write_settings
     from webapp.main import create_app

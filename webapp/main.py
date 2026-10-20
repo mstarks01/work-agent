@@ -220,6 +220,7 @@ from analysis_service.links import (
     components,
     refuse_answers_source,
 )
+from analysis_service.model_gate import NoThinkingLevel
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import open_facts_by_framework, reference_labels
 from analysis_service.principals import Identity
@@ -1113,22 +1114,33 @@ async def _cell_empty(request: Request, exc: CellEmpty) -> Response:
 
 def check_saved(
     env: Mapping[str, str], build: Callable[[Mapping[str, str]], Startup]
-) -> tuple[Startup, list[str]]:
+) -> tuple[Startup, list[Refusal]]:
     """The check of the mapping that a save gives: the Startup that ``build``
-    makes from it, and the message of each loader that refuses it.
+    makes from it, and a refusal for each loader that refuses it. A thinking
+    level on a model that takes none is refused on its own row.
 
     ``build`` builds the test Deployment and its runner, and the store check
     runs :func:`~analysis_service.store_backends.build_store` and the
     retention rule. No step calls a provider.
     """
     startup = build(env)
-    messages = [] if startup.error is None else [str(startup.error)]
+    found = [] if startup.error is None else [_refusal_of(startup.error)]
     try:
         build_store(with_store_defaults(env))
         retention_days(env)
     except (StoreConfigError, ImportError) as exc:
-        messages.append(str(exc))
-    return startup, messages
+        found.append(Refusal(None, str(exc)))
+    return startup, found
+
+
+def _refusal_of(error: ConfigError) -> Refusal:
+    """The refusal of a build error, on the row that it names where one does."""
+    key = (
+        f"sampling.{error.tier}.thinking"
+        if isinstance(error, NoThinkingLevel)
+        else None
+    )
+    return Refusal(key, str(error))
 
 
 def _refused_save(found: Sequence[Refusal]) -> JSONResponse:
@@ -1333,11 +1345,9 @@ def create_app(
                 saved_env = merged_env(
                     process_env, saved_lines(lines, save, written), path
                 )
-                built, messages = await asyncio.to_thread(check_saved, saved_env, build)
-                if messages:
-                    return _refused_save(
-                        [Refusal(None, message) for message in messages]
-                    )
+                built, found = await asyncio.to_thread(check_saved, saved_env, build)
+                if found:
+                    return _refused_save(found)
                 # A hand edit while the check ran is not written over.
                 if read_settings(path).revision != revision:
                     return _message(409, _RELOAD_MESSAGE)

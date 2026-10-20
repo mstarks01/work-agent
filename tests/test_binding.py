@@ -15,7 +15,7 @@ import pytest
 
 from analysis_service.binding import NodeBinding, build_tier_adapters
 from analysis_service.graph import tier_node_by_graph_node
-from analysis_service.model_gate import ModelGateError
+from analysis_service.model_gate import ModelGateError, NoThinkingLevel
 from analysis_service.model_tiers import ModelConfigError, load_model_tiers
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
@@ -172,3 +172,43 @@ class TestReasoningTemperatureFloor:
 
     def test_a_non_reasoning_openai_model_is_untouched(self, tmp_path):
         assert self._binding("gpt-4o", DIVERGENT.replace("1.0", "0.0"), tmp_path)
+
+
+class TestAThinkingLevelOnAModelThatTakesNone:
+    """A level on such a model fails the build with a message of this service's
+    own, which names the variable and not the model, and gives no library advice."""
+
+    def _binding(self, model: str):
+        tiers = load_model_tiers(
+            PROJECT_ROOT / "config" / "model_tiers.toml",
+            env={
+                "ANALYSIS_MODEL_BASE_VENDOR": "openai",
+                "ANALYSIS_MODEL_BASE_MODEL": model,
+                "ANALYSIS_MODEL_STRONG_VENDOR": "openai",
+                "ANALYSIS_MODEL_STRONG_MODEL": model,
+                "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
+                "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+            },
+        )
+        return build_tier_adapters(
+            tiers,
+            load_sampling(
+                PROJECT_ROOT / "config" / "sampling.toml",
+                env={"ANALYSIS_SAMPLING_STRONG_THINKING": "high"},
+            ),
+            load_resilience(PROJECT_ROOT / "config" / "resilience.toml"),
+            env=secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "sk-test-not-a-real-key"),
+        )
+
+    def test_the_build_refuses_it_and_names_the_tier_and_the_variable(self):
+        with pytest.raises(NoThinkingLevel) as refused:
+            self._binding("gpt-4o")
+
+        message = str(refused.value)
+        assert refused.value.tier == "strong"
+        assert "ANALYSIS_SAMPLING_STRONG_THINKING" in message
+        assert "gpt-4o" not in message
+        assert "drop_params" not in message
+
+    def test_a_model_that_takes_one_builds(self):
+        assert self._binding("gpt-5.6-terra")

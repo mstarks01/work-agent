@@ -67,7 +67,9 @@ function suggests(row) {
 }
 
 function change(row, value) {
-  if (value === (row.value ?? "")) changes.delete(row.key);
+  // A removal where this page saved no line removes nothing.
+  const unchanged = value === null ? row.source !== "page" : value === (row.value ?? "");
+  if (unchanged) changes.delete(row.key);
   else changes.set(row.key, value);
   document.getElementById("save-errors").hidden = true;
   panel();
@@ -79,6 +81,9 @@ function textControl(row) {
   if (suggests(row)) attrs.list = `models-${suggests(row)}`;
   const input = h("input", attrs);
   input.addEventListener("input", () => change(row, input.value));
+  // A model decides what its tier's thinking row offers, so a finished edit
+  // draws the table again.
+  if (suggests(row)) input.addEventListener("change", () => fill(currentFilter()));
   return input;
 }
 
@@ -124,17 +129,60 @@ function choiceControl(row) {
   const now = pending(row);
   const options = row.options.includes(now) || now == null ? row.options : [now, ...row.options];
   const select = h("select", { "aria-label": row.label });
-  if (now == null) select.append(h("option", { value: "", disabled: "", selected: "" }, "Not set"));
+  if (row.unset) {
+    const attrs = { value: "" };
+    if (now == null) attrs.selected = "";
+    select.append(h("option", attrs, row.unset));
+  } else if (now == null) {
+    select.append(h("option", { value: "", disabled: "", selected: "" }, "Not set"));
+  }
   for (const option of options) {
     const attrs = { value: option };
     if (option === now) attrs.selected = "";
     select.append(h("option", attrs, option));
   }
   select.addEventListener("change", () => {
-    change(row, select.value);
+    change(row, row.unset && select.value === "" ? null : select.value);
     fill(currentFilter());
   });
   return select;
+}
+
+// The vendor and the model of the tier whose thinking row this is, with the
+// unsaved changes applied, or null for another row.
+function thinkingModel(row) {
+  const tier = /^sampling\.([^.]+)\.thinking$/.exec(row.key);
+  if (!tier) return null;
+  const vendor = rowOf(`tiers.${tier[1]}.vendor`);
+  const model = rowOf(`tiers.${tier[1]}.model`);
+  return vendor && model ? { vendor: pending(vendor), model: pending(model) } : null;
+}
+
+// Whether a suggested model takes no thinking level; the server's
+// `model_gate.takes_thinking` decides each listed model.
+function takesNoLevel(row) {
+  const chosen = thinkingModel(row);
+  if (!chosen || !chosen.vendor || !Object.hasOwn(SETTINGS.no_thinking, chosen.vendor)) return false;
+  return SETTINGS.no_thinking[chosen.vendor].includes(chosen.model);
+}
+
+function noLevelControl(row) {
+  const said = hint("This model takes no thinking level.");
+  if (pending(row) == null) return said;
+  const remove = h("button", { type: "button", class: "reset" }, "Remove the level");
+  remove.addEventListener("click", () => {
+    change(row, null);
+    fill(currentFilter());
+  });
+  return [said, remove];
+}
+
+// A model that the list does not hold: the save checks whether it takes a level.
+function thinkingNote(row) {
+  const chosen = thinkingModel(row);
+  if (!chosen || !chosen.vendor || !chosen.model) return null;
+  const known = Object.hasOwn(SETTINGS.models, chosen.vendor) ? SETTINGS.models[chosen.vendor] : [];
+  return known.includes(chosen.model) ? null : hint("The save checks whether this model takes a thinking level.");
 }
 
 // A list of names separated by commas, in the order of the options.
@@ -167,6 +215,7 @@ function keyControl(row) {
 }
 
 function control(row) {
+  if (takesNoLevel(row)) return noLevelControl(row);
   if (row.multiple) return multipleControl(row);
   if (row.options) return choiceControl(row);
   if (row.numeric) return numberControl(row);
@@ -210,6 +259,7 @@ function notes(row) {
     row.source === "page" ? hint("Shipped: ", row.shipped == null ? "none shipped" : h("code", {}, row.shipped)) : null,
     resetButton(row),
     modelNote(row),
+    thinkingNote(row),
     row.restart ? hint("Takes effect after a restart.") : null,
     row.mark === "shows" ? hint(`Shown only. ${row.reason}`) : null,
     row.note ? hint(row.note) : null,

@@ -104,6 +104,20 @@ class TestTheRows:
         assert row["options"] == ["low", "medium", "high"]
         assert row["note"] == SETTINGS["sampling.strong.thinking"].note
 
+    def test_a_thinking_row_offers_the_model_default(self, tmp_path):
+        row = rows_of(client_for(tmp_path, hand_written()))["sampling.base.thinking"]
+
+        assert row["unset"] == "The model's own level"
+
+    def test_the_data_lists_each_suggested_model_that_takes_no_level(self, tmp_path):
+        data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
+
+        assert set(data["no_thinking"]) == set(VENDOR_NAMES)
+        assert "gpt-4o-2024-08-06" in data["no_thinking"]["openai"]
+        assert "gpt-5.6-terra" not in data["no_thinking"]["openai"]
+        for vendor, names in data["no_thinking"].items():
+            assert set(names) <= set(data["models"][vendor]), vendor
+
     def test_a_shown_only_entry_carries_its_reason(self, tmp_path):
         row = rows_of(client_for(tmp_path, hand_written()))["tiers.review_independence"]
 

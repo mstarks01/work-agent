@@ -49,7 +49,7 @@ from analysis_service.deployment import (
     config_path,
 )
 from analysis_service.errors import ConfigError
-from analysis_service.model_gate import tool_models
+from analysis_service.model_gate import no_thinking_models, tool_models
 from analysis_service.model_tiers import (
     TIER_NAMES,
     charges_env_var_for,
@@ -169,6 +169,9 @@ def settings_view(
             if (setup := IAM_SETUP[vendor]) is not None
         ],
         "models": {vendor: list(tool_models(vendor)) for vendor in VENDOR_NAMES},
+        "no_thinking": {
+            vendor: list(no_thinking_models(vendor)) for vendor in VENDOR_NAMES
+        },
     }
 
 
@@ -179,10 +182,6 @@ def _controls() -> dict[str, dict[str, Any]]:
     flag = ("true", "false")
     choices: dict[str, tuple[str, ...]] = {
         **{f"tiers.{tier}.vendor": VENDOR_NAMES for tier in TIER_NAMES},
-        **{
-            f"sampling.{tier}.thinking": get_args(ReasoningEffort)
-            for tier in TIER_NAMES
-        },
         **{
             f"credentials.{vendor}.mode": tuple(VENDORS[vendor].credential_modes)
             for vendor in VENDOR_NAMES
@@ -216,6 +215,13 @@ def _controls() -> dict[str, dict[str, Any]]:
             if options
         },
         "frameworks.carried": {"options": list(FRAMEWORK_NAMES), "multiple": True},
+        **{
+            f"sampling.{tier}.thinking": {
+                "options": list(get_args(ReasoningEffort)),
+                "unset": "The model's own level",
+            }
+            for tier in TIER_NAMES
+        },
     }
 
 

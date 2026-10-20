@@ -211,10 +211,18 @@ the vendor of each tier and that vendor's credential mode, with the unsaved
 changes applied, so one save sets a tier and its key. A vendor in the `iam`
 mode shows a short note and its setup command. The job storage rows follow the
 selected job store, object store and database, and each one takes effect only
-after a restart. The thinking row of each tier offers `low`, `medium` and
-`high`, and a reset returns the tier to its model's own preset. The row says
-that a change makes each run uncertified until a sweep measures it. The other
-sampling rows and review independence show "Shown only" and the reason.
+after a restart. The thinking row of each tier follows the tier's model, with
+the unsaved changes applied. For a model that takes a thinking level, it offers
+"The model's own level", `low`, `medium` and `high`; the first choice removes a
+saved level. For a listed model that takes none, it says so and offers to remove
+a saved level. For a model that the list does not hold, it offers the levels and
+says that the save checks the model. The row says that a change makes each run
+uncertified until a sweep measures it. The other sampling rows and review
+independence show "Shown only" and the reason.
+
+The page can tell whether a model takes a thinking level, but not which levels
+it takes: the pinned litellm checks the parameter and not its value. A save of a
+level on a model that takes none is refused on the tier's thinking row.
 
 A key never shows. A key row says "A key is saved. The page never shows it." or
 "No key is saved.", and the page never opens the key file. A value that holds a
