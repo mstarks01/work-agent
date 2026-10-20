@@ -1964,3 +1964,14 @@ def test_the_operator_is_a_local_principal_that_the_first_run_creates(tiers):
     assert principal.issuer == LOCAL_ISSUER
     assert asyncio.run(workspace.store.get(run_id)).owner_id == principal.owner_id
     assert [run["run"] for run in client.get("/workspace/runs").json()] == [run_id]
+
+
+@pytest.mark.parametrize(
+    "name", ["workspace.html", "settings.html", "report_view.html"]
+)
+def test_every_workspace_page_takes_the_one_sidebar(name):
+    """Each page fills the shared sidebar and carries no copy of its own, so
+    the copies cannot drift apart."""
+    template = (PROJECT_ROOT / "webapp" / name).read_text(encoding="utf-8")
+    assert "<!--sidebar-->" in template
+    assert 'id="sidebar-navigation"' not in template

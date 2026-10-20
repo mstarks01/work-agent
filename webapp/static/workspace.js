@@ -162,7 +162,11 @@ const workspace = (() => {
       }
     } catch (error) { message(error.message); }
   };
-  el("library-nav").addEventListener("click", library);
+  // The link opens the list in place; library() writes the same URL.
+  el("library-nav").addEventListener("click", (event) => {
+    event.preventDefault();
+    library();
+  });
   el("description-nav").addEventListener("click", () => show("description-panel"));
   el("questions-nav").addEventListener("click", () => show(running() ? "progress-panel" : "asked"));
   el("reports-nav").addEventListener("click", () => {

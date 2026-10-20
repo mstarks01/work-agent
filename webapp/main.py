@@ -875,6 +875,7 @@ def render_report(
             for name in ("sidebar.js", "answer_editor.js", "report_view.js")
         ),
         workspace_style=_WORKSPACE_STYLE,
+        sidebar=_SIDEBAR,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
         units=script_json(unit_rows(report)),
@@ -1254,6 +1255,7 @@ def create_app(
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 workspace_style=_WORKSPACE_STYLE,
+                sidebar=_SIDEBAR,
                 frameworks=_framework_fields(current.frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
@@ -1278,6 +1280,7 @@ def create_app(
                 ),
                 settings=script_json(settings_view(process_env, error)),
                 workspace_style=_WORKSPACE_STYLE,
+                sidebar=_SIDEBAR,
             )
         )
 
@@ -2023,6 +2026,9 @@ _SETTINGS_PAGE = (Path(__file__).parent / "settings.html").read_text(encoding="u
 _WORKSPACE_STYLE = (Path(__file__).parent / "static" / "workspace.css").read_text(
     encoding="utf-8"
 )
+#: The sidebar of every workspace page: the form, Settings and the report.
+#: Static markup, so it takes no escape.
+_SIDEBAR = (Path(__file__).parent / "sidebar.html").read_text(encoding="utf-8")
 
 #: The question toggle. Every install can pause: one with no catalog asks its
 #: early questions and no link question.
