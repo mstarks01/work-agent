@@ -948,6 +948,83 @@ def test_the_settings_page_shows_each_source():
     assert _table_keys("settings.js", "sources") == set(get_args(Source))
 
 
+def _graph_node_names() -> set[str]:
+    """Every node name of each graph a job runs: the extracting graph with
+    both passes, and the paused head with and without the catalog pass. A
+    resumed graph is a part of the extracting graph."""
+    from analysis_service import graph
+    from analysis_service.binding import NodeBinding
+    from analysis_service.frameworks import SCHEMAS
+    from analysis_service.markdown_loader import MarkdownLoader
+    from analysis_service.sampling import load_sampling
+    from tests.factories import repo_package_loaders, repo_tiers
+
+    frameworks = tuple(sorted(SCHEMAS))
+    tiers = repo_tiers()
+    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
+    binding = NodeBinding.from_configs(
+        tiers, sampling, lambda node: tiers.resolve_model(node).route
+    )
+    shapes: list[tuple[graph.Entry, bool, bool]] = [
+        (graph.ENTRY_EXTRACT, True, True),
+        (graph.ENTRY_HEAD_ONLY, True, False),
+        (graph.ENTRY_HEAD_ONLY, False, False),
+    ]
+    names: set[str] = set()
+    for entry, assertions, capability_reader in shapes:
+        built = graph.build_pipeline(
+            prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
+            domain_loader=MarkdownLoader(PROJECT_ROOT / "domains"),
+            package_loaders=repo_package_loaders(frameworks),
+            binding=binding,
+            frameworks=frameworks,
+            entry=entry,
+            assertions=assertions,
+            capability_reader=capability_reader,
+        ).workflow.graph
+        assert built is not None
+        names |= {node.name for node in built.nodes}
+    return names
+
+
+#: The nodes each stage function leaves to its fallback, by decision.
+#: ``reject`` ends a run as ``rejected``, and the page shows a run's progress
+#: only while it is ``running``. A lane agent completes no stage alone: the
+#: third stage completes at its framework's join.
+_UNSTAGED = {"completedStage": ("reject", "analyze_"), "stageAfter": ("reject",)}
+
+
+@pytest.mark.parametrize("function", sorted(_UNSTAGED))
+def test_the_workspace_maps_each_graph_node_to_a_stage(function):
+    """``workspace.js`` maps each node a job's graph runs to a stage, and names
+    no node that the graph lacks. A node the function lacks falls through to
+    no stage and a generic status line."""
+    from google.adk.workflow import START
+
+    body = re.search(
+        rf"const {function} = \(step, pauses\) => \{{(.*?)\n  \}};",
+        page_javascript("workspace.js"),
+        re.DOTALL,
+    )
+    assert body is not None, f"workspace.js holds no {function} function"
+    names = set(re.findall(r'step === "(\w+)"', body[1]))
+    for listed in re.findall(r"\[([^\]]*)\]\.includes\(step\)", body[1]):
+        names |= set(re.findall(r'"(\w+)"', listed))
+    prefixes = tuple(re.findall(r'step\.startsWith\("(\w+)"\)', body[1]))
+    nodes = _graph_node_names() - {START.name}
+
+    assert names, f"{function} names no node"
+    assert names <= nodes, f"{function} names no graph node {sorted(names - nodes)}"
+    for prefix in prefixes:
+        assert any(node.startswith(prefix) for node in nodes), prefix
+    unmapped = {
+        node
+        for node in nodes - names
+        if not node.startswith(prefixes) and not node.startswith(_UNSTAGED[function])
+    }
+    assert not unmapped, f"{function} maps no stage for {sorted(unmapped)}"
+
+
 @pytest.mark.parametrize("sink", HTML_STRING_SINKS)
 def test_the_viewer_has_no_html_string_sink(sink):
     """Decision 1, as a lint: there is no sink left to forget to escape."""
