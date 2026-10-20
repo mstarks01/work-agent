@@ -82,7 +82,7 @@ from pydantic import (
     model_validator,
 )
 
-from analysis_service.config_files import read_toml
+from analysis_service.config_files import read_toml, validation_problems
 from analysis_service.errors import ConfigError
 from analysis_service.model_tiers import TIER_NAMES, TierName
 from analysis_service.parsing import is_version
@@ -361,17 +361,17 @@ def _parse_env_value(var: str, param: str, value: str) -> float | int | bool | s
         try:
             return float(value)
         except ValueError:
-            raise SamplingConfigError(f"{var}: {value!r} is not a number") from None
+            raise SamplingConfigError(f"{var}: is not a number") from None
     if param in ("seed", "max_output_tokens"):
         try:
             return int(value)
         except ValueError:
-            raise SamplingConfigError(f"{var}: {value!r} is not an integer") from None
+            raise SamplingConfigError(f"{var}: is not an integer") from None
     if param == "constrain_output":
         parsed = _BOOL_LITERALS.get(value.lower())
         if parsed is None:
             expected = ", ".join(sorted(_BOOL_LITERALS))
-            raise SamplingConfigError(f"{var}: {value!r} is not one of {expected}")
+            raise SamplingConfigError(f"{var}: is not one of {expected}")
         return parsed
     # thinking and structured_output: left as the raw string for _RawTier's
     # Literal to accept or reject.
@@ -444,7 +444,7 @@ def load_sampling(
     try:
         parsed = _RawSampling(**raw)
     except ValidationError as exc:
-        raise SamplingConfigError(f"{path}: {exc}") from exc
+        raise SamplingConfigError(f"{path}: {validation_problems(exc)}") from exc
 
     resolved = {
         tier: TierSampling(**raw_tier.model_dump())
@@ -453,4 +453,4 @@ def load_sampling(
     try:
         return SamplingConfig(version=parsed.version, tiers=resolved)
     except ValidationError as exc:
-        raise SamplingConfigError(f"{path}: {exc}") from exc
+        raise SamplingConfigError(f"{path}: {validation_problems(exc)}") from exc

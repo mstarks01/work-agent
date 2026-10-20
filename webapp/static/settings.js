@@ -212,6 +212,7 @@ function notes(row) {
     modelNote(row),
     row.restart ? hint("Takes effect after a restart.") : null,
     row.mark === "shows" ? hint(`Shown only. ${row.reason}`) : null,
+    row.note ? hint(row.note) : null,
     row.source === "process" ? hint("Unset the variable to change this here.") : null,
   ];
 }

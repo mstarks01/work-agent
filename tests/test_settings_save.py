@@ -207,6 +207,30 @@ class TestASaveThatPasses:
         assert lines == ["settings saved: tiers.base.model, resilience.timeout_ms"]
         assert OTHER_MODEL not in caplog.text
 
+    def test_a_thinking_level_writes_its_variable_and_a_reset_removes_it(
+        self, tmp_path
+    ):
+        client, builds = app_on(tmp_path, hand_written())
+
+        saved = save(client, {"sampling.strong.thinking": "medium"})
+
+        assert saved.status_code == 200, saved.text
+        assert "ANALYSIS_SAMPLING_STRONG_THINKING=medium" in settings_text(tmp_path)
+        assert rows_of(client)["sampling.strong.thinking"]["value"] == "medium"
+        assert len(builds.models) == 2
+        reset = save(client, {"sampling.strong.thinking": None})
+        assert reset.status_code == 200, reset.text
+        assert "THINKING" not in settings_text(tmp_path)
+
+    def test_a_thinking_level_outside_the_set_is_refused(self, tmp_path):
+        client, _ = app_on(tmp_path, hand_written())
+
+        refused = save(client, {"sampling.base.thinking": "extreme"})
+
+        assert refused.status_code == 422, refused.text
+        assert "extreme" not in refused.text
+        assert "THINKING" not in settings_text(tmp_path)
+
 
 class TestAReset:
     def test_it_removes_the_line_and_the_page_shows_the_shipped_value(self, tmp_path):
