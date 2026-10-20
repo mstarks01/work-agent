@@ -947,7 +947,6 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
         *sorted((PROJECT_ROOT / "docs" / "agents").glob("*.md")),
     )
     TIERS_TEMPLATE: ClassVar[Path] = PROJECT_ROOT / "config" / "model_tiers.toml"
-    WEB_APP: ClassVar[Path] = PROJECT_ROOT / "docs" / "Web-App.md"
     ISSUE_TRACKER: ClassVar[Path] = (
         PROJECT_ROOT / "docs" / "agents" / "issue-tracker.md"
     )
@@ -1060,24 +1059,6 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
             assert model in REFERENCE_MODELS[vendor], (
                 f"{doc} shows tiers.{name} as {vendor}/{model}, which is not"
                 f" a model the matrix profiles for {vendor}"
-            )
-
-    def test_the_web_app_example_selects_a_profiled_pair(self):
-        """``docs/Web-App.md`` shows what the page prints for "whichever pair
-        you selected in step 2 of First-Run", so its example has to be a pair
-        First-Run offers. A stale example here reads as a working selection."""
-        shown = re.findall(
-            r"^(base|strong)\s+→\s+(\S+)\s*/\s*(\S+)$",
-            self.WEB_APP.read_text(encoding="utf-8"),
-            re.MULTILINE,
-        )
-
-        assert shown, "docs/Web-App.md shows no tier lines to check"
-        for tier, vendor, model in shown:
-            index = 0 if tier == "base" else 1
-            assert REFERENCE_MODELS[vendor][index] == model, (
-                f"Web-App.md shows {tier} as {vendor}/{model}, which is not"
-                f" that vendor's profiled {tier} model"
             )
 
 

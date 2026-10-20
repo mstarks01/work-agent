@@ -92,16 +92,13 @@ settings carry the framework again.
 
 ## What it shows you
 
-**The models it is about to use**, one line per tier — whichever pair you
-selected in step 2 of [First-Run](First-Run.md), since nothing is selected by
-default:
+**No model on the form.** The form shows no model, no credential status and no
+sampling parameter. The models are the pair you selected in step 2 of
+[First-Run](First-Run.md), since nothing is selected by default. The form
+appears only after the credential check passes. The report carries the
+**served** model build that answered each node.
 
-```
-base   → openai / gpt-4o-2024-08-06
-strong → vertex / gemini-2.5-pro
-```
-
-Read-only. **No input to an analysis can influence which model runs** — not a
+**No input to an analysis can influence which model runs** — not a
 form field, not a query parameter, not a header. The framework picker is not an
 exception to this: it chooses what the app analyses, never what analyses it.
 Model selection lives in
@@ -111,22 +108,15 @@ app has no authentication, so its save accepts only a request from the app's own
 page on loopback: the same `Host` and `Sec-Fetch-Site` checks as each other
 writing route.
 
-It does not show credential status — the page appearing at all proves the
-credential check passed — and it does not show sampling parameters. The
-**served** model build that actually answered each node is different information,
-and the report itself carries it.
-
-**Progress, per node.** A STRIDE run takes around 40 seconds, and each further
-framework adds its own lane nodes to that. The page streams **every** graph node
-as it finishes — the model calls and the deterministic ones between them
-(`validate`, `prepare`, `merge`, `router`, `assemble`) alike — rather than
-showing you a blank tab. Node names appear exactly as the graph emits them, which
-is why STRIDE's denial-of-service agent reads `analyze_stride_denial_of_service`
-rather than the `analyze/stride` that
-[`config/model_tiers.toml`](../config/model_tiers.toml) keys on. Two things
-differ. A graph node exists per framework *and* lane, while the tier config
-keys one node per framework, because a framework's lanes all run the same
-judgement on the same tier. And a graph node name must be a Python identifier.
+**Progress, in four stages.** A STRIDE run takes around 40 seconds, and each
+further framework adds its own lane nodes to that. The page shows a progress bar
+of four stages and one status line, for example
+`1 of 4 stages complete · Checking the system map for gaps or conflicting details…`.
+The bar counts completed stages, not elapsed time. A run that stops for your
+answers counts the extraction, the checks of the system model, the question
+catalog and the pause. A run toward a report counts the extraction, the
+preparation, the review of the findings and the report assembly. The status line
+names the next stage in plain words, and the page shows no graph node name.
 
 **The report** — one block per framework you selected, a summary, the extracted
 DFD, and the served-build provenance for every LLM node. STRIDE contributes
@@ -446,10 +436,8 @@ analysis creates that principal; before it, the app lists no runs.
 
 ### Question progress and reports
 
-The progress bar counts filled answers in the recommended list, including individual
-parts of multi-part questions. The number of recommended questions can rise as well
-as fall when an answer lists a part or removes a question, and the page says so. It
-is not a fixed percentage or an estimate of elapsed time.
+The number of recommended questions can rise as well as fall when an answer
+lists a part or removes a question, and the page says so.
 
 Each answer is saved as it is given, one request at a time for the run, with
 the revision the page read. A chosen option is sent at once; typed text waits
@@ -475,9 +463,10 @@ and the `memory` store loses them when the app stops.
 When no recommended question remains, **Start the analysis** becomes the primary
 action. Skipped questions remain open facts, not negative answers.
 
-Reopening a running analysis shows completed processing steps from its session
-snapshot, without consuming its live progress stream. Until the first step
-finishes, the page explains that it is waiting. A completed analysis opens its
+Reopening a running analysis shows its progress bar and status line from its
+session snapshot, without consuming its live progress stream. Before the first
+stage completes, the line reads `0 of 4 stages complete` and names the current
+stage. A completed analysis opens its
 report directly. Report entries use the analysis name and generation timestamp;
 the report header labels its generation time in UTC.
 
