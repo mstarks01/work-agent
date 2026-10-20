@@ -27,6 +27,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.assertions import ABSENT, Assertion, AssertionCatalog, Subject
 from tests import test_webapp_questions as web
 
 tiers = web.tiers
@@ -1168,3 +1169,53 @@ def test_a_report_names_each_open_fact_by_its_label(browser, waiting_asvs):
     assert errors == [], f"the page raised: {errors}"
     assert row == labels
     assert listed == labels
+
+
+#: Principals named as the held model's elements are, so each link row offers
+#: its element with the arrow.
+_MATCHED = ("customer", "orders db", "web app")
+
+
+@pytest.fixture
+def matched(tiers, monkeypatch):
+    """The first-run app over a paused job that asks one link question for
+    each of :data:`_MATCHED`, served on a free local port."""
+    subjects = [
+        Subject(id=f"principal:{name.replace(' ', '-')}", type="principal", label=name)
+        for name in _MATCHED
+    ]
+    entries = [
+        Assertion(
+            subject=subject.id,
+            predicate="mfa-requirement",
+            value=ABSENT,
+            basis="inferred",
+            origin="assertion-pass",
+            explanation="the description names one factor",
+        )
+        for subject in subjects
+    ]
+    record = web.HELD.assertions.model_copy(
+        update={"catalog": AssertionCatalog(subjects=subjects, entries=entries)}
+    )
+    monkeypatch.setattr(web, "HELD", web.HELD.model_copy(update={"assertions": record}))
+    yield from serve(web.app_for(tiers, web.PausingRunner(catalog=True)))
+
+
+def test_each_arrow_answers_and_closes_its_own_row(browser, matched):
+    """A click on a row's arrow chooses its element, and the row closes to its
+    answer, the last row too, with no click on another row."""
+    context = browser.new_context(base_url=matched)
+    page = context.new_page()
+    page.goto("/")
+    pause(page)
+    for name in sorted(_MATCHED):
+        row = page.locator(
+            "p.question", has=page.locator(f'select[data-principal="{name}"]')
+        )
+        with page.expect_response(_post_to_answer):
+            row.locator(".use-match").click()
+        closed = page.locator("p.question", has_text=f"{name} — ")
+        closed.locator("button", has_text="Change").wait_for()
+    assert page.locator(".use-match").count() == 0
+    context.close()

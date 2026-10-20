@@ -541,6 +541,7 @@ class Node {
   remove() { if (this.parentNode) { this.parentNode.children = this.parentNode.children.filter((c) => c !== this); this.parentNode = null; } }
   contains(node) { return node === this || this.children.some((c) => typeof c === "object" && c.contains(node)); }
   focus() { document.activeElement = this; }
+  blur() { if (document.activeElement === this) document.activeElement = null; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
   dispatchEvent(event) { const fn = this.listeners[event.type]; if (fn) fn(event); return true; }
   setAttribute(name, value) { this[name] = value; }
