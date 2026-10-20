@@ -370,12 +370,16 @@ sweep and an `analysis` sweep beside its `end-to-end` sweep.
 
 ## Outcomes
 
-The graph reaches one of three states, surfaced identically by both entry
+The graph reaches one of these states, surfaced identically by both entry
 points:
 
 - **completed** — a `Report`.
 - **rejected** — the input failed the validity gate; carries the
   `ValidationIssue`s.
+- **awaiting-answers** — the head of the graph stopped before the analysis to
+  ask questions; carries the valid model and, where the assertion pass ran,
+  the assertion catalog. Only a run that asks questions ends here, and an
+  answer starts a resumed job from that state.
 - **failed** (raises) — an internal error. No partial report is ever produced:
   an empty Tampering section means "looked, found nothing", never "the Tampering
   agent errored".
