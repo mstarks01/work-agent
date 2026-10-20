@@ -528,3 +528,36 @@ def test_an_element_id_has_one_deriver():
     """Only ``derive_element_id`` derives the ID an element's name implies."""
     derivers = set(_sites(_derives_an_id)) - ID_DERIVERS.keys()
     assert derivers == {("src/analysis_service/system_model.py", "derive_element_id")}
+
+
+#: Each function that reads a password field, or tests a key for the word
+#: ``password``, for another rule than whether a URL holds a password.
+NOT_THE_PASSWORD_RULE: dict[Site, str] = {
+    ("src/analysis_service/s3_objects.py", "_endpoint"): (
+        "the object endpoint refuses any user part, a password among them,"
+        " and a path, a query or a fragment"
+    ),
+    ("src/analysis_service/sql_store.py", "_postgres"): (
+        "it calls the password row of the database credentials, which reads"
+        " the password file"
+    ),
+}
+
+
+def _reads_a_password(node: ast.AST) -> bool:
+    return _is_attribute(node, "password") or (
+        isinstance(node, ast.Compare)
+        and isinstance(node.left, ast.Constant)
+        and node.left.value == "password"
+    )
+
+
+def test_a_url_password_has_one_reader():
+    """Only ``holds_password`` decides whether a URL holds a password, so the
+    Settings page never shows a URL that the startup refuses as one."""
+    readers = set(_sites(_reads_a_password)) - NOT_THE_PASSWORD_RULE.keys()
+    assert readers == {("src/analysis_service/store_settings.py", "holds_password")}
+
+
+def test_each_declared_site_still_reads_a_password():
+    assert NOT_THE_PASSWORD_RULE.keys() <= set(_sites(_reads_a_password))

@@ -136,6 +136,7 @@ from analysis_service.store_settings import (
     DatabaseIamName,
     StoreConfigError,
     closed_setting,
+    holds_password,
     refuse_unread,
 )
 from analysis_service.vendors import (
@@ -317,6 +318,7 @@ _ADAPTERS: dict[str, TypeAdapter[Any]] = {
 }
 _SOURCES: TypeAdapter[list[Source]] = TypeAdapter(list[Source])
 _STATUS: TypeAdapter[JobStatus] = TypeAdapter(JobStatus)
+_EVENTS: TypeAdapter[list[JobEvent]] = TypeAdapter(list[JobEvent])
 
 
 def _json(name: str, value: object) -> str:
@@ -453,6 +455,19 @@ def _part_of(row: Row[Any], parse: Callable[[], Any]) -> Any:
     except ValidationError as error:
         _unparsed(row.id, error)
         raise UnreadableSchema(row.schema_version) from None
+
+
+def _stored_events(row: Row[Any], texts: Sequence[str]) -> list[JobEvent]:
+    """The events that the event rows ``texts`` of the job ``row`` hold.
+    Raises :class:`UnreadableSchema` where one does not parse (ADR 0095),
+    and the error never holds the text."""
+    return _part_of(
+        row,
+        lambda: _EVENTS.validate_python(
+            [_loads(text, index) for index, text in enumerate(texts)],
+            context=STORED,
+        ),
+    )
 
 
 def _event_rows(job_id: str, events: Sequence[JobEvent]) -> list[dict[str, Any]]:
@@ -832,7 +847,7 @@ def database_url(env: Mapping[str, str]) -> URL:
         # SQLAlchemy raises a bare ValueError for a host or a port that does
         # not parse, and its message repeats a part of the URL.
         raise StoreConfigError(f"{DATABASE_URL_VAR} is not a database URL") from None
-    if url.password is not None or any("password" in key.lower() for key in url.query):
+    if holds_password(value):
         raise StoreConfigError(
             f"{DATABASE_URL_VAR} holds a password; remove it from the URL"
         )
@@ -1329,19 +1344,26 @@ class SqlJobStore:
     async def events_after(
         self, job_id: str, seen: int
     ) -> tuple[JobStatus, list[JobEvent]] | None:
-        """The job's status and the events past ``seen``, and nothing else."""
+        """The job's status and the events past ``seen``, and nothing else.
+        Raises :class:`UnreadableSchema` where the status or an event does
+        not parse (ADR 0095)."""
         async with self._transaction() as connection:
-            status = await connection.scalar(
-                select(jobs.c.status).where(jobs.c.id == job_id)
+            found = await connection.execute(
+                select(jobs.c.id, jobs.c.status, jobs.c.schema_version).where(
+                    jobs.c.id == job_id
+                )
             )
-            if status is None:
+            row = found.one_or_none()
+            if row is None:
                 return None
             texts = await connection.scalars(
                 select(job_events.c.event)
                 .where(job_events.c.job_id == job_id, job_events.c.seq > seen)
                 .order_by(job_events.c.seq)
             )
-            return status, [JobEvent.model_validate_json(text) for text in texts]
+            events = texts.all()
+        status = _part_of(row, lambda: _STATUS.validate_python(row.status))
+        return status, _stored_events(row, events)
 
     async def save(self, record: JobRecord) -> None:
         """Write the record back, and the events it gained.
@@ -1353,9 +1375,12 @@ class SqlJobStore:
         """
         async with self._transaction() as connection:
             found = await connection.execute(
-                select(jobs.c.id, jobs.c.owner_id, jobs.c.report_sha256).where(
-                    jobs.c.id == record.id
-                )
+                select(
+                    jobs.c.id,
+                    jobs.c.owner_id,
+                    jobs.c.schema_version,
+                    jobs.c.report_sha256,
+                ).where(jobs.c.id == record.id)
             )
             row = found.one_or_none()
             texts = await connection.scalars(
@@ -1363,10 +1388,10 @@ class SqlJobStore:
                 .where(job_events.c.job_id == record.id)
                 .order_by(job_events.c.seq)
             )
-            held = [JobEvent.model_validate_json(text) for text in texts]
+            events = texts.all()
         if row is None:
             raise ValueError(f"job {record.id!r} does not exist")
-        check_save(record, row.report_sha256, held)
+        check_save(record, row.report_sha256, _stored_events(row, events))
         values = _job_row(record)
         if record.report is not None and not _names(row, "report.json"):
             data = stored_report(record.report)

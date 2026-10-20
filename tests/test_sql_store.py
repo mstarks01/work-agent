@@ -41,6 +41,7 @@ from analysis_service.jobs import (
     Resumption,
     UnreadableRecord,
     UnreadableSchema,
+    event_frames,
     execute_job,
     parent_of,
     readable,
@@ -52,10 +53,11 @@ from analysis_service.sql_store import (
     METADATA,
     CorruptObject,
     SqlJobStore,
+    database_url,
     engine_for,
 )
 from analysis_service.store_backends import JOB_STORES, build_store
-from analysis_service.store_settings import StoreConfigError
+from analysis_service.store_settings import StoreConfigError, holds_password
 from analysis_service.validation import ValidationIssue
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
@@ -77,6 +79,7 @@ from tests.test_api import (
 from tests.test_job_store import DeletingReads, follow_up, new_record
 from tests.test_resume import LINK
 from tests.test_webapp_questions import PausingRunner
+from webapp.settings_view import _withheld
 
 #: A fact key the store keeps without reading it.
 KEY = ("df-1", "encryption_in_transit", "", "", "", "")
@@ -212,6 +215,26 @@ class TestTheStartupRefusals:
         with pytest.raises(StoreConfigError, match=message) as refused:
             start(env)
         assert "hunter2" not in str(refused.value)
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "postgresql+asyncpg://user:PASS/WORD@db/jobs",
+            "postgresql+asyncpg://user:PASS?WORD@db/jobs",
+            "postgresql+asyncpg://user:PASS#WORD@db/jobs",
+            "postgresql+asyncpg://user:PASS%40WORD@db/jobs",
+            "postgresql+asyncpg://user@db/jobs?Password=PASSWORD",
+            "postgresql+asyncpg://user:PASSWORD@[::1/jobs",
+            "not a scheme://user:PASSWORD@db/jobs",
+        ],
+    )
+    def test_the_settings_page_withholds_each_url_the_startup_refuses(self, url):
+        """The startup and the Settings page read one rule of a password."""
+        with pytest.raises(StoreConfigError) as refused:
+            database_url({"ANALYSIS_DATABASE_URL": url})
+        assert "PASS" not in str(refused.value)
+        assert holds_password(url)
+        assert _withheld(url) is None
 
     def test_a_schema_that_is_not_at_the_latest_revision(self, env, tmp_path):
         env["ANALYSIS_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
@@ -668,6 +691,10 @@ def store_unlisted(database: str, job_id: str, case: str) -> None:
         assert connection.execute(statement, (value, job_id)).rowcount == 1
 
 
+#: Each value of :data:`UNLISTED` that an event row holds.
+UNLISTED_EVENTS = [case for case in UNLISTED if "job_events" in UNLISTED[case][0]]
+
+
 #: Each value of :data:`UNLISTED` on a job that its stored status puts in
 #: flight. A removed status is itself the stored status.
 UNREADABLE_IN_FLIGHT = [
@@ -843,6 +870,37 @@ class TestAStoredValueThisServiceDoesNotList:
         with TestClient(app_over(store)) as client:
             questions = client.get(f"/v1/jobs/{record.id}/questions", headers=auth())
         assert questions.status_code == 409, questions.text
+
+    @pytest.mark.parametrize("case", UNLISTED_EVENTS)
+    def test_events_after_raises_unreadable_and_never_repeats_the_text(self, env, case):
+        store = build_store(env)
+        job = in_flight(store, "running")
+        store_unlisted(database_of(env), job, case)
+        with pytest.raises(UnreadableSchema) as raised:
+            asyncio.run(store.events_after(job, 0))
+        assert UNLISTED[case][1] not in str(raised.value)
+
+    @pytest.mark.parametrize("case", UNLISTED_EVENTS)
+    def test_a_save_over_an_unreadable_event_raises_unreadable(self, env, case):
+        store = build_store(env)
+        job = in_flight(store, "running")
+        record = asyncio.run(store.owned(job, "alice"))
+        store_unlisted(database_of(env), job, case)
+        with pytest.raises(UnreadableSchema):
+            asyncio.run(store.save(record))
+
+    @pytest.mark.parametrize("case", UNLISTED_EVENTS)
+    def test_the_event_stream_of_an_unreadable_job_ends(self, env, case):
+        """A stream open on a job whose event row stops parsing ends, as the
+        stream of a job that the store no longer holds ends."""
+        store = build_store(env)
+        job = in_flight(store, "running")
+        store_unlisted(database_of(env), job, case)
+
+        async def frames() -> list[str]:
+            return [frame async for frame in event_frames(store, job)]
+
+        assert asyncio.run(frames()) == []
 
     def test_the_restart_scan_leaves_an_unreadable_job_as_stored(self, env, caplog):
         store = build_store(env)

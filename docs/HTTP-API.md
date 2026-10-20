@@ -675,7 +675,8 @@ next one. See [ADR 0007](adr/0007-per-caller-concurrency-ceiling.md).
 
 A token may hold at most 8 streams from `GET /v1/jobs/{id}/events` open at
 once, over all its jobs. A stream stays open until its job reaches a terminal
-state or you close it, so a ninth stream gets `429`. Close a stream, or wait for
+state, the service cannot read the job, or you close it, so a ninth stream
+gets `429`. Close a stream, or wait for
 its job to end, and open the next one.
 
 ### How much you may consume over time
