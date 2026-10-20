@@ -309,6 +309,28 @@ main {
 .description-help {
   margin-top:6px
 }
+/* The description box holds its own tools, below the text. */
+.composer {
+  border:1px solid var(--line);
+  border-radius:7px;
+  background:var(--canvas)
+}
+.composer:focus-within {
+  outline:2px solid var(--accent);
+  outline-offset:3px
+}
+.composer textarea {
+  display:block;
+  border:0;
+  background:transparent
+}
+.composer textarea:focus-visible {
+  outline:none
+}
+.composer-tools {
+  display:flex;
+  padding:0 6px 6px
+}
 .upload-icon {
   width:42px;
   padding:8px;
@@ -1103,6 +1125,24 @@ a.analysis-row:hover {
 #list .each-one>p.question>.answer-fields>.skip {
   display:block;
   margin:8px 0 0
+}
+/* A link row with a matching element: the arrow sits left of its select. */
+#list .each-one>p.question>.answer-fields:has(>.use-match) {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px
+}
+#list .each-one>p.question>.answer-fields:has(>.use-match)>select {
+  flex:1;
+  width:auto;
+  min-width:0
+}
+#list .each-one>p.question>.answer-fields:has(>.use-match)>.skip {
+  flex-basis:100%;
+  margin:2px 0 0
+}
+#list .use-match {
+  padding:0 10px
 }
 #list .each-one>p.question[data-layout=stack]>.answer-fields {
   max-width:38rem

@@ -741,8 +741,11 @@
     const select = document.createElement("select");
     select.dataset.principal = q.principal;
     select.append(optionOf("(leave unanswered)", ""));
-    for (const option of q.options) {
-      select.append(optionOf(option.name ? `${option.name} (${option.id})` : option.id, option.id));
+    // The element whose name matches comes first, marked, and is not chosen.
+    const match = q.options.filter((option) => option.id === q.suggested);
+    for (const option of [...match, ...q.options.filter((option) => option.id !== q.suggested)]) {
+      const text = option.name ? `${option.name} (${option.id})` : option.id;
+      select.append(optionOf(option.id === q.suggested ? `${text} (same name)` : text, option.id));
     }
     select.append(optionOf("None of these", "none"));
     select.value = prefill || "";
@@ -764,18 +767,21 @@
     row.compact = false;
     const fields = document.createElement("div");
     fields.className = "answer-fields";
+    // The element whose name matches, offered as an arrow beside the select
+    // and never chosen for the person: the page sends only what a person picks.
+    const match = !prefill && q.options.find((option) => option.id === q.suggested);
+    if (match) {
+      const use = button("→", (event) => {
+        select.value = match.id;
+        onEdit(row, event);
+      }, "use-match");
+      use.title = `Use ${match.name || match.id}`;
+      use.setAttribute("aria-label", use.title);
+      fields.append(use);
+    }
     fields.append(" ", select, " ", skipControl(row));
     row.node.dataset.layout = "split";
     row.node.replaceChildren(name, fields);
-    // The element whose name matches, offered and never chosen for the
-    // person: the page sends only what a person picks.
-    const match = !prefill && q.options.find((option) => option.id === q.suggested);
-    if (match) {
-      fields.append(" ", button(`Use ${match.name || match.id}`, (event) => {
-        select.value = match.id;
-        onEdit(row, event);
-      }));
-    }
   };
   const drawCompactLink = (row, answer) => {
     const name = document.createElement("b");
@@ -885,7 +891,17 @@
     const eachTitle = document.createElement("summary");
     eachTitle.hidden = true;
     each.append(eachTitle);
-    node.append(title, top, each);
+    node.append(title);
+    if (q.group === "links") {
+      const help = document.createElement("p");
+      help.className = "hint";
+      help.textContent =
+        "Your description says things about these users, teams and accounts, such as " +
+        "whether they sign in with MFA. The analysis can use those facts only after you " +
+        "match each one to a part of your system. Choose \"None of these\" if no part matches.";
+      node.append(help);
+    }
+    node.append(top, each);
     return { node, title, applies, top, each, eachTitle, group: q.group, heading: q.group_heading, rows: [], grid: null, shared: null };
   };
   const titleBox = (box) => {
@@ -1055,7 +1071,7 @@
     const held = answersOf(data);
     const listed = [
       ...data.link_questions.map((q) => ({
-        q: { ...q, group: "links", group_heading: "Which part of your system does each name refer to?" },
+        q: { ...q, group: "links", group_heading: "Match each user, team or account to a part of your system" },
         kind: "link",
       })),
       ...data.early_questions.map((q) => ({ q, kind: "fact" })),

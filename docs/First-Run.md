@@ -356,8 +356,8 @@ Start with these parts of the result:
   the provider returned, and which execution fingerprint each call produced.
   These values support auditing; they do not establish that a finding is right.
 
-To analyze a recorded conversation, click the **+** button below the
-description field and choose the transcript as a plain UTF-8 text file. The page
+To analyze a recorded conversation, click the **+** button in the
+bottom-left corner of the description field and choose the transcript as a plain UTF-8 text file. The page
 refuses a file that is larger
 than one analysis can carry, is not UTF-8, or holds control characters. The
 service reads the transcript as a conversation, beside the description where
@@ -444,10 +444,11 @@ The app can ask you questions before the analysis, and after the report.
   answer**, change it or choose "I don't know", and click **Save the
   corrections**. The report marks each finding that rests on a corrected
   answer. The analysis does not run again. Where your install builds an assertion catalog, the
-  follow-up also lists the group questions under **Which part of your system
-  does each name refer to?**. Where a part of your system has the same name as the person or
-  team, the question offers **Use** with that name; nothing is chosen until
-  you click it. Under **Earlier answers**, the follow-up lists the answers this
+  follow-up also lists the group questions under **Match each user, team
+  or account to a part of your system**. Where a part of your system has the same name as the user, team
+  or account, the question lists that part first, marked "(same name)", and shows an
+  arrow button beside the list. Click the arrow to choose that part; nothing is
+  chosen until you do. Under **Earlier answers**, the follow-up lists the answers this
   report read. Click **Change** beside one to give a new answer, and the
   follow-up reads it. A known answer cannot change back to "I don't know"
   there, and a known part of a question with parts cannot either. Where you

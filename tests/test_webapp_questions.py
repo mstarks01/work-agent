@@ -2341,7 +2341,13 @@ _LINK = {
 
 
 def _suggested(click: bool) -> list:
-    link = _LINK | {"suggested": "entity:shopper"}
+    link = _LINK | {
+        "options": [
+            {"id": "process:api", "name": "API"},
+            {"id": "entity:shopper", "name": "Shopper"},
+        ],
+        "suggested": "entity:shopper",
+    }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
 streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
@@ -2349,8 +2355,9 @@ streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
   answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
   if (typeof c === "object") {{ out.push(c); walk(c, out); }} return out; }};
-const use = walk(ids.questions).find((n) => n.tag === "button" && n.textContent === "Use Shopper");
-calls.push({{ offered: Boolean(use) }});
+const use = walk(ids.questions).find((n) => n.tag === "button" && n.title === "Use Shopper");
+const select = walk(ids.questions).find((n) => n.tag === "select");
+calls.push({{ offered: Boolean(use), first: select.children[1].textContent }});
 if ({json.dumps(click)}) {{ await use.listeners.click({{ type: "click" }}); await settle(); }}
 await ids.continue.listeners.click(); await settle();
 """
@@ -2358,10 +2365,13 @@ await ids.continue.listeners.click(); await settle();
 
 
 def test_a_suggested_element_is_offered_and_sent_only_when_chosen():
-    """The service names the element whose name matches; the page offers it
-    as one click, and sends nothing a person did not pick."""
+    """The service names the element whose name matches; the page lists it
+    first, offers it as one click, and sends nothing a person did not pick."""
     untouched = _suggested(click=False)
-    assert {"offered": True} in untouched
+    assert {
+        "offered": True,
+        "first": "Shopper (entity:shopper) (same name)",
+    } in untouched
     assert all(not call.get("body", {}).get("links") for call in untouched)
 
     chosen = _suggested(click=True)
