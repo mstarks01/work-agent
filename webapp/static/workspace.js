@@ -6,6 +6,9 @@ const workspace = (() => {
   let generation = 0;
   let progressRun = null;
   let completedSteps = [];
+  let stepStatus = null;
+  let stepStarted = 0;
+  let elapsedTimer = null;
   // A running analysis shows its progress under the tab of what it produces
   // next: Questions where it will stop to ask, Reports where it runs to a report.
   const progressTab = () => current?.pauses ? "questions-nav" : "reports-nav";
@@ -144,8 +147,8 @@ const workspace = (() => {
       if (data.questions) showQuestions(data.questions);
       else if (data.status === "running") {
         show("progress-panel");
-        processing(data.completed_steps, data.pauses, undefined, data.run);
         el("status").hidden = false;
+        processing(data.completed_steps, data.pauses, undefined, data.run);
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
       } else if (served && new URLSearchParams(location.search).get("view") !== "reports") {
         location.replace("/report/" + encodeURIComponent(data.run));
@@ -209,10 +212,23 @@ const workspace = (() => {
     if (step === "assemble") return "Putting your report together…";
     return "Continuing the analysis…";
   };
+  // A one-second count shows that a long step still runs. It sits outside
+  // the status region, so a screen reader hears only a change of step.
+  const elapsed = () => {
+    if (el("status").hidden) {
+      clearInterval(elapsedTimer);
+      elapsedTimer = null;
+      return;
+    }
+    const seconds = Math.floor((Date.now() - stepStarted) / 1000);
+    const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    el("status-elapsed").textContent = `Still working on this step · ${clock}. Some steps take a few minutes.`;
+  };
   const processing = (steps, pauses, initialStage, runId) => {
     if (runId && progressRun !== runId) {
       progressRun = runId;
       completedSteps = [];
+      stepStatus = null;
       el("analysis-progress").value = 0;
     }
     if (steps?.length === 1 && !completedSteps.includes(steps[0])) {
@@ -226,6 +242,12 @@ const workspace = (() => {
     progress.setAttribute("aria-valuetext", `${progress.value} of 4 stages complete`);
     const status = latest ? stageAfter(latest, pauses) : initialStage || stageAfter(null, pauses);
     el("status-text").textContent = `${progress.value} of 4 stages complete · ${status}`;
+    if (status !== stepStatus) {
+      stepStatus = status;
+      stepStarted = Date.now();
+    }
+    elapsedTimer ??= setInterval(elapsed, 1000);
+    elapsed();
   };
   const grouped = () => {
     show("asked");
