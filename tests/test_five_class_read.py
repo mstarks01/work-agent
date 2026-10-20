@@ -42,6 +42,18 @@ def test_the_class_names_are_the_guides():
     assert list(check.CLASSES) == _guide_classes()
 
 
+def _guide_code_paths() -> list[str]:
+    """Each code path that the pre-merge section of ``docs/agents/code-review.md``
+    lists, in order."""
+    text = REVIEW_GUIDE.read_text(encoding="utf-8")
+    paragraph = text.partition("changes a code path:")[2].partition("The check")[0]
+    return re.findall(r"`([^`]+)`", paragraph)
+
+
+def test_the_code_paths_are_the_guides():
+    assert list(check.CODE_PATHS) == _guide_code_paths()
+
+
 @pytest.mark.parametrize(
     "path",
     [

@@ -315,6 +315,9 @@ ObjectStoreName = Literal["filesystem", "s3"]
 
 #: The setting that selects a row of :data:`OBJECT_STORES`.
 OBJECT_STORE_VAR = "ANALYSIS_OBJECT_STORE"
+#: The s3 settings that the Settings page offers as a closed choice.
+OBJECT_ADDRESSING_VAR = "ANALYSIS_OBJECT_ADDRESSING"
+OBJECT_CREDENTIALS_VAR = "ANALYSIS_OBJECT_CREDENTIALS"
 
 #: Each ``ANALYSIS_OBJECT_STORE`` value, and how to build its store from the
 #: environment. The table answers for every name of :data:`ObjectStoreName`.
@@ -330,8 +333,8 @@ OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
             "ANALYSIS_OBJECT_BUCKET",
             "ANALYSIS_OBJECT_REGION",
             "ANALYSIS_OBJECT_ENDPOINT",
-            "ANALYSIS_OBJECT_ADDRESSING",
-            "ANALYSIS_OBJECT_CREDENTIALS",
+            OBJECT_ADDRESSING_VAR,
+            OBJECT_CREDENTIALS_VAR,
             *S3_KEY_FILES.values(),
         ),
     ),

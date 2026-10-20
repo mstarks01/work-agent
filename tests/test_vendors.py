@@ -498,7 +498,7 @@ class TestWhichVariablesAreSecret:
 
         assert len(required) > len(set(required))
         assert bedrock.all_env_vars() == tuple(dict.fromkeys(required))
-        assert bedrock.all_env_vars(secret_only=True) == tuple(dict.fromkeys(secret))
+        assert bedrock.all_secret_env_vars() == tuple(dict.fromkeys(secret))
 
 
 #: The bare spelling's minor version, which OpenRouter writes with a dot. Used

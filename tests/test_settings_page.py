@@ -30,10 +30,15 @@ from analysis_service.resilience import load_resilience
 from analysis_service.sampling import SamplingConfigError
 from analysis_service.settings_variables import deployment_variables, secret_vars
 from analysis_service.sql_store import DATABASE_CREDENTIALS, DATABASES
-from analysis_service.store_backends import build_store, retention_days
+from analysis_service.store_backends import (
+    RETENTION_DAYS_VAR,
+    build_store,
+    retention_days,
+)
 from analysis_service.store_settings import (
     DATABASE_PASSWORD_FILE_VAR,
     DATABASE_VARIABLES,
+    StoreConfigError,
 )
 from analysis_service.vendors import REGION, VENDORS, CredentialMode, vendor_for
 from tests.factories import PROJECT_ROOT, TEST_TIER_ENV, declared_env, secret_env
@@ -45,15 +50,20 @@ from webapp.settings_view import _CONTROLS
 def test_numeric_controls_follow_the_loader_parsers():
     assert _CONTROLS["resilience.attempts"]["numeric"] == "integer"
     assert _CONTROLS["resilience.retry_budget_ratio"]["numeric"] == "decimal"
+
+
+def test_the_retention_control_takes_whole_days_as_the_loader_does():
+    assert SETTINGS["store.retention_days"].variable == RETENTION_DAYS_VAR
     assert _CONTROLS["store.retention_days"]["numeric"] == "integer"
+    assert retention_days({RETENTION_DAYS_VAR: "7"}) == 7
+    with pytest.raises(StoreConfigError):
+        retention_days({RETENTION_DAYS_VAR: "1.5"})
 
 
 class TestSecretVars:
     def test_it_names_each_secret_that_a_loader_reads(self):
         vendor_secrets = {
-            var
-            for vendor in VENDORS.values()
-            for var in vendor.all_env_vars(secret_only=True)
+            var for vendor in VENDORS.values() for var in vendor.all_secret_env_vars()
         }
         assert vendor_secrets
         assert secret_vars() == {

@@ -78,7 +78,7 @@
     const remaining = maxDescriptionBytes - used;
     remainingNote.textContent = remaining < 0
       ? "Description and transcript are too long. Shorten them to continue."
-      : `Up to ${remaining.toLocaleString()} characters remaining`;
+      : `Up to ${remaining.toLocaleString()} bytes remaining`;
     remainingNote.classList.toggle("field-error", remaining < 0);
     return remaining;
   };

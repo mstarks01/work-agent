@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import re
 import stat
 import subprocess
 import sys
@@ -43,7 +42,8 @@ from tests.test_webapp_questions import PausingRunner, shown_list, start
 from tests.test_webapp_settings import page_data, rows_of
 from webapp import main, settings_save
 from webapp.main import Startup, build_startup, create_app
-from webapp.settings_save import MAX_SAVE_BYTES
+from webapp.settings_save import _KEY_FILE_NAME as KEY_FILE
+from webapp.settings_save import MAX_SAVE_BYTES, new_key_file
 
 BASE_MODEL = TEST_TIER_ENV["ANALYSIS_MODEL_BASE_MODEL"]
 
@@ -483,8 +483,6 @@ class TestAStoreChange:
 KEY = "sk-saved-from-the-page-never-shown"
 ANTHROPIC_KEY = "credentials.anthropic.api_key"
 OLD_KEY = "sk-ant-an-older-key"
-#: The name form of a key file that a save writes.
-KEY_FILE = re.compile(r"(?P<stem>[a-z0-9_]+)\.[0-9a-f]{16}")
 
 
 def key_on_disk(tmp_path, name: str = "anthropic_api_key.0123456789abcdef") -> str:
@@ -512,6 +510,12 @@ def stems(tmp_path) -> list[str]:
         f"{match['stem']}.*" if (match := KEY_FILE.fullmatch(p.name)) else p.name
         for p in tmp_path.iterdir()
     )
+
+
+def test_the_key_file_rule_reads_each_name_that_new_key_file_writes(tmp_path):
+    path = new_key_file(tmp_path, "ANALYSIS_ANTHROPIC_API_KEY_FILE")
+
+    assert KEY_FILE.fullmatch(path.name)["stem"] == "anthropic_api_key"
 
 
 def failing(path, values):

@@ -110,21 +110,21 @@ class TestTheSettings:
         with app(tiers) as client:
             assert client.get("/workspace/runs").json() == []
 
-    def test_the_memory_store_page_omits_storage_policy_notes(self, tiers):
+    def test_the_memory_store_page_says_a_restart_clears_the_runs(self, tiers):
+        with app(tiers) as client:
+            assert "a restart clears them" in client.get("/").text
+
+    def test_the_sql_store_page_has_no_store_note(self, tiers, durable):
         with app(tiers) as client:
             assert "This app keeps your runs" not in client.get("/").text
 
-    def test_the_sql_store_page_omits_storage_policy_notes(self, tiers, durable):
-        with app(tiers) as client:
-            assert "This app keeps your runs" not in client.get("/").text
-
-    def test_a_wrapped_memory_store_page_omits_storage_policy_notes(self, tiers):
+    def test_a_wrapped_memory_store_page_says_a_restart_clears_the_runs(self, tiers):
         store = ChangesTheOldestOnAdmission(InMemoryJobStore())
         workspace = Workspace(store=store)
         client = TestClient(
             create_app(startup_for(tiers), workspace), base_url=LOOPBACK
         )
-        assert "This app keeps your runs" not in client.get("/").text
+        assert "a restart clears them" in client.get("/").text
 
     @pytest.mark.parametrize(
         ("setting", "value", "message"),

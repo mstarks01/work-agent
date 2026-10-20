@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
@@ -1270,11 +1270,19 @@ class Vendor:
         """
         return tuple(entry.var for entry in self._source_for(mode).env if entry.secret)
 
-    def all_env_vars(self, *, secret_only: bool = False) -> tuple[str, ...]:
-        """The variables of every mode this vendor allows, once each, in mode
-        order: those of :meth:`required_env_vars`, or with ``secret_only``
-        those of :meth:`secret_env_vars`."""
-        read = self.secret_env_vars if secret_only else self.required_env_vars
+    def all_env_vars(self) -> tuple[str, ...]:
+        """The :meth:`required_env_vars` of every mode this vendor allows,
+        once each, in mode order."""
+        return self._each_mode(self.required_env_vars)
+
+    def all_secret_env_vars(self) -> tuple[str, ...]:
+        """The :meth:`secret_env_vars` of every mode this vendor allows, once
+        each, in mode order."""
+        return self._each_mode(self.secret_env_vars)
+
+    def _each_mode(
+        self, read: Callable[[CredentialMode], tuple[str, ...]]
+    ) -> tuple[str, ...]:
         return tuple(
             dict.fromkeys(var for mode in self.credential_modes for var in read(mode))
         )
