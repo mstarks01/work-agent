@@ -7,18 +7,23 @@ named by its endpoints — are the ones the critic actually writes.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from pathlib import Path
 
 import pytest
 
 from analysis_service.open_facts import (
+    ASSET_WORDS,
     element_names,
     label_of,
     open_facts,
     open_facts_by_framework,
+    reference_labels,
 )
 from analysis_service.report import Report
+from analysis_service.system_model import CORE_ASSET_TAGS
+from tests.factories import valid_model
 
 REPORTS = sorted(
     Path(__file__)
@@ -162,3 +167,47 @@ def test_a_card_and_the_open_facts_name_the_same_facts(path):
         for claim in _needs_info(block):
             card = cards[f"{block.framework}/{claim.id}"]
             assert {key for key, _, _ in card} == cited.get(claim.id, set()), claim.id
+
+
+def test_every_asset_tag_has_its_words():
+    assert set(ASSET_WORDS) == CORE_ASSET_TAGS
+
+
+def test_an_attribute_a_model_names_reads_as_words():
+    model = valid_model()
+    flow = model.data_flows[0]
+    labels = reference_labels(model)
+    assert labels["encryption_in_transit"] == "encryption in transit"
+    assert labels["pii"] == "personal data"
+    name = element_names(model)[flow.id]
+    assert labels[f"{flow.id}.authentication"] == f"{name}: authentication"
+    assert (
+        labels[f"authentication: {flow.authentication}"]
+        == f"authentication: {flow.authentication}"
+    )
+
+
+#: The backtick spans in the archived claims that have no label: free words,
+#: and a slug written without its element type.
+UNLABELLED = {
+    "audit",
+    "audit log",
+    "main",
+    "unknown",
+    "dispatch-requests",
+    "live-job-status",
+}
+
+
+def test_every_other_backtick_span_in_the_archive_has_a_label():
+    span = re.compile(r"`([^`\n]+)`")
+    unlabelled = set()
+    for path in REPORTS:
+        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        catalog = report.assertions.catalog if report.assertions else None
+        labels = reference_labels(report.system_model, catalog)
+        for block in report.analyses:
+            for claim in block.claims:
+                spans = span.findall(claim.model_dump_json())
+                unlabelled |= {text for text in spans if text not in labels}
+    assert unlabelled == UNLABELLED

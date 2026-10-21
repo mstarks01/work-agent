@@ -33,12 +33,34 @@ from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.evidence import evidence_catalog, prepared_view
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.system_model import ZONE_ATTRIBUTE, DataFlow, SystemModel
+from analysis_service.system_model import (
+    ZONE_ATTRIBUTE,
+    DataFlow,
+    SystemModel,
+    assumable_attribute_names,
+    attribute_names,
+)
 
 NEEDS_INFO = "needs-info"
 
 #: The one group every capability question is shown in.
 CAPABILITY_GROUP = "capabilities"
+
+#: What a reader sees for each asset tag in
+#: :data:`~analysis_service.system_model.CORE_ASSET_TAGS`.
+ASSET_WORDS = {
+    "credentials": "credentials",
+    "pii": "personal data",
+    "financial": "financial data",
+    "health": "health data",
+    "secrets": "secrets",
+    "business-critical-data": "business-critical data",
+}
+
+
+def attribute_words(attribute: str) -> str:
+    """An attribute or a control as a reader sees it: words, not a field name."""
+    return attribute.replace("_", " ").replace("-", " ")
 
 
 @dataclass(frozen=True)
@@ -87,7 +109,8 @@ _GROUND_STATE = {"unknown-attribute": "unstated", "absent-attribute": "stated ab
 def reference_labels(
     model: SystemModel, assertions: AssertionCatalog | None = None
 ) -> Mapping[str, str]:
-    """A display label for each element ID and each evidence reference.
+    """A display label for each element ID, each evidence reference, and each
+    other name a model writes in backticks.
 
     The references are the keys of
     :func:`~analysis_service.evidence.evidence_catalog`, the one writer of
@@ -95,13 +118,26 @@ def reference_labels(
     parses one. An attribute reads as ``element: attribute, state`` and a
     crossing as ``flow crosses a trust boundary``. An assertion row has no
     short label and keeps its reference.
+
+    A model also writes an attribute, an asset tag, ``element.attribute`` and
+    ``attribute: value`` in backticks. Each of these gets its words too, for
+    each element and value in the model, so the page parses none of them.
     """
     names = element_names(model)
     labels = dict(names)
+    labels.update(ASSET_WORDS)
+    labels.update({name: attribute_words(name) for name in assumable_attribute_names()})
+    for element in model.elements():
+        for name in attribute_names(element):
+            words = attribute_words(name)
+            labels[f"{element.id}.{name}"] = f"{names[element.id]}: {words}"
+            labels[f"{name}: {getattr(element, name)}"] = (
+                f"{words}: {getattr(element, name)}"
+            )
     for ref, ground in evidence_catalog(model, assertions).items():
         if ground.kind in _GROUND_STATE:
             where = names.get(ground.element_id, ground.element_id)
-            attribute = ground.attribute.replace("_", " ")
+            attribute = attribute_words(ground.attribute)
             labels[ref] = f"{where}: {attribute}, {_GROUND_STATE[ground.kind]}"
         elif ground.flow_id:
             where = names.get(ground.flow_id, ground.flow_id)
@@ -126,7 +162,7 @@ _ATTRIBUTE_QUESTIONS = {
 
 def _attribute_questions(attribute: str) -> tuple[str, str]:
     """The question an attribute asks of one element, and of each one listed."""
-    name = attribute.replace("_", " ")
+    name = attribute_words(attribute)
     return _ATTRIBUTE_QUESTIONS.get(
         attribute,
         (f"What is the {name} for {{element}}?", f"What is the {name} for each part?"),

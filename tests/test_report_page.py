@@ -358,9 +358,8 @@ def test_the_page_names_the_attribute_ground_kinds_the_claims_name():
 def test_a_description_names_an_element_by_its_name():
     """A finding never shows `flow:entity:customer>process:web-app>login` (#561).
 
-    An element ID in backticks reads as the element's name, and a flow as its
-    two endpoints. A span that names no element, such as an attribute, stays
-    as it was written.
+    An element ID in backticks reads as the element's name, a flow as its two
+    endpoints, and an attribute as words.
     """
     from tests.factories import sample_threat
 
@@ -375,10 +374,11 @@ def test_a_description_names_an_element_by_its_name():
 
     endpoints = f"{by_id[flow.source]} → {by_id[flow.destination]}"
     assert (
-        f"{by_id[flow.source]} sends {endpoints} with encryption_in_transit unknown."
+        f"{by_id[flow.source]} sends {endpoints} with encryption in transit unknown."
         in text
     )
     assert flow.id not in text
+    assert "encryption_in_transit" not in text
 
 
 def test_a_description_names_an_evidence_reference_by_its_label():
