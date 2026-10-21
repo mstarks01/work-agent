@@ -1157,6 +1157,47 @@ def test_a_printed_report_is_the_complete_export(page):
     assert not page.locator("#export-questions").is_visible()
 
 
+def test_a_finding_s_question_saves_reloads_and_updates_the_report(page):
+    """Finding, question, Save draft, reload, Update report: the draft runs
+    nothing, a reload shows it, and the update starts the follow-up (#1884)."""
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    page.locator(
+        "details.finding-group > summary", has_text="Conditional findings"
+    ).click()
+    finding = page.locator("details.finding-group details.finding").first
+    finding.locator("> summary").click()
+    finding.locator(".field ul a").first.click()
+    page.wait_for_url("**?view=questions")
+    focused = page.evaluate_handle("document.activeElement")
+    key = focused.evaluate("n => n.dataset.key")
+    tag = focused.evaluate("n => n.tagName")
+    if tag == "SELECT":
+        value = focused.evaluate(
+            "n => [...n.options].map(o => o.value).find(v => v && v !== 'unknown')"
+        )
+        focused.as_element().select_option(value)
+    else:
+        value = "mutual TLS"
+        focused.as_element().fill(value)
+        focused.as_element().dispatch_event("input")
+    assert "Unsaved changes" in page.inner_text("#question-actions")
+    with page.expect_request("**/answer/*") as saved:
+        page.get_by_role("button", name="Save draft").click()
+    assert saved.value.post_data_json["save"] is True
+    page.wait_for_selector("text=Saved draft: 1 answer", state="attached")
+    page.reload()
+    escaped = key.replace(chr(34), chr(92) + chr(34))
+    restored = page.locator(f':is(input, select)[data-key="{escaped}"]').first
+    assert restored.input_value() == value
+    first = page.url.split("?")[0]
+    with page.expect_request("**/answer/*") as sent:
+        page.get_by_role("button", name="Update report").click()
+    assert "save" not in sent.value.post_data_json
+    page.wait_for_url(lambda url: "/report/" in url and url.split("?")[0] != first)
+
+
 def test_the_export_preview_restores_what_the_reader_had_open(page):
     """Preview complete export opens every section and record, and Close
     preview returns to the section and the disclosures the reader had."""
