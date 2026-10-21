@@ -626,9 +626,10 @@ and a refusal on the last rung, still fails the call.
 
 **Every rung below `native` relies on the schema re-ask.** An answer that fails
 its schema goes back to the same model once, with the validation errors. A
-second failure still fails the node. How often the lower rungs need the
-re-ask, and whether report quality matches the native rung, is not measured yet
-(#1413). The `prompt` rung is the weakest. It sends the format the
+second failure still fails the node. On `claude-haiku-4-5` with no thinking,
+a finished forced-tool run matched the native rung's report quality, and the
+critic needed the re-ask more often (`QA-2026-10-21-02`, #1413). The offered
+tool is not measured. The `prompt` rung is the weakest. It sends the format the
 `constrain_output = false` measurement below found fenced and incomplete, but
 it states the schema in the prompt, strips a fence and relies on the re-ask.
 
