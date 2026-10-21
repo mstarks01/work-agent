@@ -369,6 +369,9 @@ class Predicate:
     """
 
     meaning: str
+    #: The question a page asks where the value is open, with ``{subject}``
+    #: where the subject's label goes.
+    question: str
     subjects: frozenset[SubjectType]
     value: ValueKind
     terms: frozenset[str] = frozenset()
@@ -423,6 +426,7 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
     {
         "authentication-mechanism": Predicate(
             meaning="how the initiator of this interaction proves who it is",
+            question="How does the initiator of {subject} prove who it is?",
             subjects=frozenset({"interaction", "component"}),
             value="text",
             multiplicity="many",
@@ -430,6 +434,8 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         ),
         "credential-presented": Predicate(
             meaning="what the initiator presents: a cookie, a token, a key",
+            question="What does the initiator of {subject} present to prove who it"
+            " is, such as a cookie, a token or a key?",
             subjects=frozenset({"interaction", "principal"}),
             value="reference",
             refers_to=frozenset({"credential"}),
@@ -438,12 +444,14 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         ),
         "mfa-requirement": Predicate(
             meaning="whether a second factor is required to authenticate",
+            question="Does {subject} require a second factor to authenticate?",
             subjects=frozenset({"interaction", "principal"}),
             value="term",
             terms=frozenset({"required"}),
         ),
         "authorization-grant": Predicate(
             meaning="what this principal may do, to which resource",
+            question="What may {subject} do, and to which resource?",
             subjects=frozenset({"principal"}),
             value="text",
             requires=("resource", "operation"),
@@ -451,23 +459,27 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         ),
         "credential-sharing": Predicate(
             meaning="how many principals hold this credential",
+            question="How many principals hold {subject}?",
             subjects=frozenset({"credential"}),
             value="term",
             terms=frozenset({"per-principal", "shared"}),
         ),
         "credential-rotation": Predicate(
             meaning="whether this credential is replaced after it is issued",
+            question="Is {subject} replaced after it is issued?",
             subjects=frozenset({"credential"}),
             value="term",
             terms=frozenset({"rotated", "not-rotated"}),
         ),
         "credential-custody": Predicate(
             meaning="where this credential is kept",
+            question="Where is {subject} kept?",
             subjects=frozenset({"credential"}),
             value="text",
         ),
         "credential-expiry": Predicate(
             meaning="whether this credential stops working on its own",
+            question="Does {subject} stop working on its own?",
             subjects=frozenset({"credential"}),
             value="term",
             terms=frozenset({"expires", "does-not-expire"}),
@@ -480,23 +492,27 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         # control being present (#1054).
         "credential-lifetime": Predicate(
             meaning="how long this credential works before it expires",
+            question="How long does {subject} work before it expires?",
             subjects=frozenset({"credential"}),
             value="text",
         ),
         "credential-revocation": Predicate(
             meaning="whether this credential can be withdrawn before it expires",
+            question="Can {subject} be withdrawn before it expires?",
             subjects=frozenset({"credential"}),
             value="term",
             terms=frozenset({"revocable"}),
         ),
         "transport-encryption": Predicate(
             meaning="what protects this interaction's data on the wire",
+            question="What protects the data of {subject} on the wire?",
             subjects=frozenset({"interaction"}),
             value="text",
             projects_into="encryption_in_transit",
         ),
         "storage-encryption": Predicate(
             meaning="what protects this component's data at rest",
+            question="What protects the data in {subject} at rest?",
             subjects=frozenset({"component"}),
             value="text",
             projects_into="encryption_at_rest",
@@ -509,6 +525,7 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         "data-classification": Predicate(
             meaning="which sensitivity tier this component's data is in,"
             " never a list of what it holds",
+            question="Which sensitivity tier is the data in {subject} in?",
             subjects=frozenset({"component"}),
             value="term",
             terms=frozenset({"public", "internal", "confidential"}),
@@ -516,6 +533,7 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         ),
         "signature-verification": Predicate(
             meaning="whether the receiver checks who signed the artifact it took",
+            question="Does the receiver of {subject} check who signed it?",
             subjects=frozenset({"artifact", "interaction"}),
             value="term",
             terms=frozenset({"verified"}),
@@ -530,18 +548,22 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         # neither other predicate could carry (#1053).
         "origin-verification": Predicate(
             meaning="whether the receiver checks who supplied what it took",
+            question="Does the receiver of {subject} check who supplied it?",
             subjects=frozenset({"interaction"}),
             value="term",
             terms=frozenset({"verified"}),
         ),
         "destination-verification": Predicate(
             meaning="whether the sender checks it is sending to the right place",
+            question="Does the sender of {subject} check that it sends to the right"
+            " place?",
             subjects=frozenset({"interaction"}),
             value="term",
             terms=frozenset({"verified"}),
         ),
         "internet-exposure": Predicate(
             meaning="whether this component can be reached from the internet",
+            question="Can {subject} be reached from the internet?",
             subjects=frozenset({"component"}),
             value="term",
             terms=frozenset({"internet-facing", "internal"}),
@@ -551,6 +573,7 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             meaning="which zone a sentence about where this component runs"
             " puts it in; its own name, what reaches it and what it talks to"
             " or sits on place it nowhere",
+            question="Which zone does {subject} run in?",
             subjects=frozenset({"component"}),
             value="reference",
             refers_to=frozenset({"zone"}),
@@ -558,6 +581,7 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         ),
         "administrative-authority": Predicate(
             meaning="which component this principal administers",
+            question="Which component does {subject} administer?",
             subjects=frozenset({"principal"}),
             value="reference",
             refers_to=frozenset({"component"}),
@@ -565,6 +589,7 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         ),
         "tenant-ownership": Predicate(
             meaning="which party controls this component",
+            question="Which party controls {subject}?",
             subjects=frozenset({"component", "zone"}),
             value="reference",
             refers_to=frozenset({"principal"}),
@@ -577,6 +602,9 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             meaning="whom this component's records name as the one who acted:"
             " the principal who asked, or only the component that passed the"
             " request on",
+            question="Whom do the records of {subject} name as the one who acted:"
+            " the principal who asked, or only the component that passed the"
+            " request on?",
             subjects=frozenset({"component"}),
             value="term",
             terms=frozenset({"principal", "intermediary"}),
@@ -588,6 +616,8 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         "content-validation": Predicate(
             meaning="whether the receiver checks the contents of what it takes,"
             " beyond its format or schema",
+            question="Does the receiver of {subject} check its contents, beyond"
+            " their format or schema?",
             subjects=frozenset({"interaction"}),
             value="term",
             terms=frozenset({"validated"}),
@@ -601,6 +631,7 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         "represented-by": Predicate(
             meaning="which element of the model stands for this principal,"
             " where the sources say the two are the same thing",
+            question="Which element of the model stands for {subject}?",
             subjects=frozenset({"principal"}),
             value="reference",
             refers_to=frozenset({"component"}),

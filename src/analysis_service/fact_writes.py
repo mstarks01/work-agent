@@ -164,7 +164,9 @@ def check_fact_answers(
             # Every other kind's key is checked above; a subject is the caller's
             # own text until the job is found to ask it.
             named = (
-                "" if kind == "subject" else f' to "{fact_label(answer.key, model)}"'
+                ""
+                if kind == "subject"
+                else f' to "{fact_label(answer.key, model, catalog)}"'
             )
             raise ValueError(
                 f"facts[{at}]: an answer may hold {limit} characters; shorten the"
@@ -177,7 +179,7 @@ def check_fact_answers(
         choices = answer_choices(answer.key, model, catalog)
         if choices and answer.value not in choices:
             raise ValueError(
-                f'facts[{at}]: the answer to "{fact_label(answer.key, model)}" is'
+                f'facts[{at}]: the answer to "{fact_label(answer.key, model, catalog)}" is'
                 f" not one of {', '.join(choices)}"
             )
     _check_attribute_values(answers, model)

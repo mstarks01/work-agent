@@ -311,13 +311,15 @@ def fact_kind(key: UnknownKey) -> FactKind:
     return key_ref(key).kind
 
 
-def fact_label(key: UnknownKey, model: SystemModel) -> str:
+def fact_label(
+    key: UnknownKey, model: SystemModel, catalog: AssertionCatalog | None = None
+) -> str:
     """What a person reads for one fact: the label its question shows.
 
     A refusal names a fact by this rather than by its six-part key, which
-    means nothing on a page.
+    means nothing on a page. ``catalog`` words an assertion.
     """
-    return label_of(key_ref(key), element_names(model), model)
+    return label_of(key_ref(key), element_names(model), model, catalog)
 
 
 def fact_line(fact: FactAnswer) -> str:

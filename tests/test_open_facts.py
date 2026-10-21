@@ -237,3 +237,67 @@ def test_a_gap_names_each_element_by_its_open_fact_key():
     (element, *_) = gap.to_json()["elements"]
     ref = UnknownRef(element_id=element["id"], attribute=gap.attribute)
     assert element["key"] == list(ref.key)
+
+
+def _grant_catalog():
+    from analysis_service.assertions import (
+        Assertion,
+        AssertionCatalog,
+        Qualifier,
+        Subject,
+    )
+
+    subject = Subject(
+        id="principal:support-administrators",
+        type="principal",
+        label="Support administrators",
+    )
+    row = Assertion(
+        subject=subject.id,
+        predicate="authorization-grant",
+        value="refund orders",
+        scope=[
+            Qualifier(kind="resource", value="orders"),
+            Qualifier(kind="operation", value="refund"),
+        ],
+        basis="inferred",
+        origin="assertion-pass",
+        explanation="the description says they refund orders",
+    )
+    return AssertionCatalog(subjects=[subject], entries=[row]), row
+
+
+def test_an_assertion_question_reads_as_its_predicate_question_never_its_reference():
+    from analysis_service.assertions import UNKNOWN, assertion_id
+
+    catalog, row = _grant_catalog()
+    expected = (
+        "What may Support administrators do, and to which resource?"
+        " (resource: orders; operation: refund)"
+    )
+    for identity in (
+        assertion_id(row),
+        assertion_id(row.model_copy(update={"value": UNKNOWN})),
+    ):
+        label = label_of(UnknownRef(assertion=identity), {}, None, catalog)
+        assert label == expected
+        assert "assertion:" not in label
+
+
+def test_an_assertion_the_catalog_does_not_hold_has_no_reference_in_its_label():
+    from analysis_service.open_facts import UNWORDED_ASSERTION
+
+    catalog, _ = _grant_catalog()
+    identity = "assertion:authorization-grant~principal:customers~any~unknown"
+    assert label_of(UnknownRef(assertion=identity), {}, None, catalog) == (
+        UNWORDED_ASSERTION
+    )
+    assert label_of(UnknownRef(assertion=identity), {}) == UNWORDED_ASSERTION
+
+
+def test_every_predicate_asks_a_question_about_its_subject():
+    from analysis_service.assertions import REGISTRY
+
+    for name, predicate in REGISTRY.items():
+        assert predicate.question.count("{subject}") == 1, name
+        assert predicate.question.endswith("?"), name

@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.claims import FrameworkAnalysis, UnknownKey
 from analysis_service.fact_answers import (
     FactAnswer,
@@ -38,6 +39,7 @@ def conditions(
     answered: Sequence[FactAnswer],
     shown: Sequence[UnknownKey],
     skipped: Sequence[SkipKey] = (),
+    catalog: AssertionCatalog | None = None,
 ) -> dict[str, list[tuple[UnknownKey, str, FactStatus]]]:
     """Each conditional finding's open facts, as ``framework/claim``: key, label and status.
 
@@ -53,7 +55,7 @@ def conditions(
     The card shows the facts the finding waits on
     (:meth:`~analysis_service.claims.RuledClaim.waits_on`), which the
     follow-up's counts and order read too. A ground the critic dismissed is
-    not one (ADR 0094).
+    not one (ADR 0094). ``catalog`` words an assertion.
     """
     names = element_names(model)
     said = {answer.key: answer for answer in answered}
@@ -71,7 +73,7 @@ def conditions(
             refs = {ref.key: ref for ref in cites}
             wanted = needs_of(cites)
             found[f"{block.framework}/{claim.id}"] = [
-                (key, label_of(ref, names, model), status(key, wanted[key]))
+                (key, label_of(ref, names, model, catalog), status(key, wanted[key]))
                 for key, ref in refs.items()
             ]
     return found

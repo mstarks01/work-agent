@@ -886,7 +886,11 @@ def render_report(
         report=script_json(report.model_dump(mode="json")),
         units=script_json(unit_rows(report)),
         open_facts=script_json(
-            open_facts_by_framework(report.analyses, report.system_model)
+            open_facts_by_framework(
+                report.analyses,
+                report.system_model,
+                report.assertions.catalog if report.assertions else None,
+            )
         ),
         fixes=script_json(
             fixes_by_framework(
@@ -959,7 +963,12 @@ def _provenance_payload(
         "conditions": {
             finding: [{"label": label, "status": status} for _, label, status in rows]
             for finding, rows in conditions(
-                report.analyses, report.system_model, answered, shown, skipped
+                report.analyses,
+                report.system_model,
+                answered,
+                shown,
+                skipped,
+                report.assertions.catalog if report.assertions else None,
             ).items()
         },
     }
@@ -977,7 +986,7 @@ def _answer_rows(
     return [
         {
             "key": list(answer.key),
-            "label": fact_label(answer.key, model),
+            "label": fact_label(answer.key, model, catalog),
             "form": answer_form(answer.key, model, catalog),
             "choices": list(answer_choices(answer.key, model, catalog)),
             "facets": facets_json(answer_facets(answer.key)),
@@ -1873,7 +1882,7 @@ async def _fact_answer(
             if asked is not None:
                 known = asked.asked | {q.key for q, _ in asked.answered_early}
                 if parts in known:
-                    label = fact_label(parts, asked.model)
+                    label = fact_label(parts, asked.model, asked.catalog)
         lead = "An answer" if label is None else f'The answer to "{label}"'
         raise InvalidFactAnswer(f"{lead} was refused: {reason}") from None
 
