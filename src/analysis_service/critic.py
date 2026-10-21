@@ -459,8 +459,13 @@ def complete_rulings(
     rejection with the table's reason, whatever the critic ruled. That is the
     one rejection this service writes rather than reads.
 
-    A rejection passes through untouched, and so does a ruling that names no
-    drafted ID: the reconciliation check owns that.
+    An ``immaterial_unknowns`` entry that names no unknown ground of the draft
+    is removed. It dismisses nothing, and left in place it reads as though it
+    answered a question. A near-miss spelling of a cited fact therefore leaves
+    that fact open, and the ruling reads ``needs-info`` on it.
+
+    A rejection passes through untouched apart from that removal, and so does
+    a ruling that names no drafted ID: the reconciliation check owns that.
     """
     by_id = {draft.id: draft.unknown_grounds() for draft in drafts}
     misfiled = {
@@ -468,6 +473,7 @@ def complete_rulings(
     }
     completed = []
     for ruling in rulings:
+        ruling = _without_stray_dismissals(ruling, by_id.get(ruling.id, []))
         if ruling.id in misfiled:
             # A lane error is a table lookup, so the ruling is the table's
             # whatever the critic said (#442). The reason names the lanes the
@@ -517,45 +523,14 @@ def _named(refs: Iterable[UnknownRef]) -> str:
     return ", ".join(name_unknown(ref) for ref in refs)
 
 
-def _dismissal_off_grounds_issues(
-    drafts: Sequence[Claim], rulings: Iterable[Ruling]
-) -> list[UnreconciledRuling]:
-    """Every ``immaterial_unknowns`` entry naming a pair the draft never cites.
-
-    ``related_unknowns`` is checked against the model, in
-    :func:`_unresolved_unknown_ref_issues`, because a question nobody can
-    answer is worse than no question. This is the same rule on the other
-    field, against the other source of truth: a dismissal is a statement about
-    **this draft's own grounds**, so a pair that is not one of them dismisses
-    nothing.
-
-    It matters because the dismissal is what buys a ``confirmed``. A critic
-    that names a near-miss spelling — the right element and a neighbouring
-    attribute — leaves the real pair outstanding, and :func:`complete_rulings`
-    turns that into a ``needs-info`` on it. The entry itself is still wrong,
-    and it looks to a reader as though it answered a question, so the re-ask
-    is told.
-    """
-    by_id = {draft.id: {ref.key for ref in draft.unknown_grounds()} for draft in drafts}
-    issues = []
-    for ruling in rulings:
-        cited = by_id.get(ruling.id, set())
-        stray = [
-            ref for ref in ruling.verdict.immaterial_unknowns if ref.key not in cited
-        ]
-        if not stray:
-            continue
-        issues.append(
-            UnreconciledRuling.of(
-                claim_id=ruling.id,
-                kind="dismissal-off-grounds",
-                message=f"claim {ruling.id!r} names"
-                f" {_named(stray)} in immaterial_unknowns, which its own"
-                " grounds do not cite as never stated: dismiss only the facts"
-                " the draft carries",
-            )
-        )
-    return issues
+def _without_stray_dismissals(ruling: Ruling, cited: Iterable[UnknownRef]) -> Ruling:
+    """``ruling`` with only the dismissals that name one of ``cited``."""
+    keys = {ref.key for ref in cited}
+    kept = [ref for ref in ruling.verdict.immaterial_unknowns if ref.key in keys]
+    if len(kept) == len(ruling.verdict.immaterial_unknowns):
+        return ruling
+    verdict = ruling.verdict.model_copy(update={"immaterial_unknowns": kept})
+    return ruling.model_copy(update={"verdict": verdict})
 
 
 def endpoint_targets(
@@ -767,10 +742,8 @@ def review_issues(
     drafted_ids = {draft.id for draft in drafts}
     ruled_ids = {ruling.id for ruling in rulings}
     dropped = sorted(drafted_ids - ruled_ids)
-    per_ruling = (
-        _dismissal_off_grounds_issues(drafts, rulings)
-        + _verdict_shape_issues(rulings)
-        + _unresolved_unknown_ref_issues(rulings, system_model)
+    per_ruling = _verdict_shape_issues(rulings) + _unresolved_unknown_ref_issues(
+        rulings, system_model
     )
     problems = [
         UnreconciledRuling.of(
