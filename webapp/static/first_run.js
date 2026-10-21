@@ -237,13 +237,6 @@
   // A row's key as the page's maps hold it: a link question's key is a
   // string, every other question's the JSON of its key tuple.
   const rowKey = (row) => (row.kind === "link" ? row.q.key : keyOf(row.q.key));
-  // Draw a row's open editor, with `prefill` as its saved answer or null.
-  const drawOpen = (row, prefill) => {
-    if (row.kind === "link") drawLink(row, prefill ? prefill.element : "");
-    else if (row.q.form === "facets") drawFacetRow(row, prefill);
-    else drawFact(row, prefill);
-    row.saved = prefill;
-  };
   // Two answers are one answer when the fields the submitter gives agree. The
   // service serves every field, with its defaults and with the value it
   // writes from a facets answer; the page builds only the fields given.
@@ -313,8 +306,9 @@
     }
     return parts.length ? parts.join("; ") : null;
   };
-  // Keep supporting context next to the prompt, without taking up a row.
-  const context = (q) => {
+  // The lines under a question's "?": why it is asked, what it serves, what
+  // each answer does, and the submitter's own words about the part.
+  const contextOf = (q) => {
     const parts = [];
     if ((q.reasons || []).length) parts.push(`Why: ${q.reasons[0]}`);
     const use = serves(q);
@@ -322,40 +316,7 @@
     const effect = effectOf(q);
     if (effect) parts.push(effect);
     if (q.excerpt) parts.push(`Your description of this part, for reference: “${q.excerpt}”`);
-    if (!parts.length) return null;
-    const help = document.createElement("details");
-    help.className = "question-context";
-    const trigger = document.createElement("summary");
-    trigger.textContent = "?";
-    trigger.setAttribute("aria-label", "Why this question?");
-    trigger.title = "Why this question?";
-    const content = document.createElement("div");
-    content.className = "question-context-content";
-    for (const part of parts) {
-      const line = document.createElement("p");
-      line.textContent = part;
-      content.append(line);
-    }
-    help.append(trigger, content);
-    return help;
-  };
-  const questionTitle = (q, text) => {
-    const title = document.createElement("div");
-    title.className = "question-title";
-    const label = document.createElement("b");
-    label.textContent = text;
-    title.append(label);
-    const about = context(q);
-    if (about) title.append(about);
-    return title;
-  };
-  const button = (text, onClick, className = "quiet") => {
-    const control = document.createElement("button");
-    control.type = "button";
-    control.className = className;
-    control.textContent = text;
-    control.addEventListener("click", onClick);
-    return control;
+    return parts;
   };
 
   // ---- Saving -------------------------------------------------------------
@@ -622,10 +583,6 @@
     return true;
   };
   const onEdit = (row, event) => {
-    if (!sharing && row.box && row.box.shared) {
-      row.exception = true;
-      if (row.tick) row.tick.checked = false;
-    }
     const typed = Boolean(event && event.type === "input");
     const changed = registerEdit(row);
     if (row.conflict) clearConflict(row);
@@ -699,359 +656,21 @@
     row.conflict = true;
   };
 
-  // ---- Rows ---------------------------------------------------------------
-  // A fact row: label, context, editor, skip. `read` is the answer as the
-  // service takes it, or null; `set` writes an answer into the editor.
-  const drawFact = (row, prefill) => {
-    const q = row.q;
-    const title = questionTitle(q, q.label);
-    const { input, nodes, set, answer, readDetail } = inputFor(q, prefill, (event) =>
-      onEdit(row, event),
-    );
-    row.input = input;
-    row.read = answer;
-    row.detail = readDetail;
-    row.set = (next) => set(next.value);
-    row.compact = false;
-    const skip = skipControl(row);
-    const fields = document.createElement("div");
-    fields.className = "answer-fields";
-    fields.append(" ", ...nodes, " ", skip);
-    row.node.dataset.layout = q.choices?.length ? "split" : "stack";
-    row.node.replaceChildren(...(row.tick ? [row.tick] : []), title, fields);
-  };
-  // A saved answer, compact and in place, with "Change".
-  const drawCompact = (row, answer) => {
-    const q = row.q;
-    const title = questionTitle(q, q.label);
-    const shown = document.createElement("span");
-    shown.textContent = ` — ${answerText(answer)}`;
-    row.compact = true;
-    row.read = () => null;
-    const fields = document.createElement("div");
-    fields.className = "answer-fields";
-    fields.append(shown, " ", button("Change", () => {
-      drawFact(row, answer);
-      if (row.input && typeof row.input.focus === "function") row.input.focus();
-    }));
-    row.node.replaceChildren(title, fields);
-  };
-  // A link row: which element a principal is. A skipped link places nothing.
-  const linkSelect = (q, prefill) => {
-    const select = document.createElement("select");
-    select.dataset.principal = q.principal;
-    select.append(optionOf("(leave unanswered)", ""));
-    // The element whose name matches comes first, marked, and is not chosen.
-    const match = q.options.filter((option) => option.id === q.suggested);
-    for (const option of [...match, ...q.options.filter((option) => option.id !== q.suggested)]) {
-      const text = option.name ? `${option.name} (${option.id})` : option.id;
-      select.append(optionOf(option.id === q.suggested ? `${text} (same name)` : text, option.id));
-    }
-    select.append(optionOf("None of these", "none"));
-    select.value = prefill || "";
-    return select;
-  };
-  const drawLink = (row, prefill) => {
-    const q = row.q;
-    const name = document.createElement("b");
-    name.textContent = q.principal;
-    const select = linkSelect(q, prefill);
-    select.setAttribute("aria-label", `Matching part of your system for ${q.principal}`);
-    select.addEventListener("change", (event) => onEdit(row, event));
-    row.input = select;
-    row.read = () =>
-      select.value ? { principal: q.principal, element: select.value } : null;
-    row.set = (next) => {
-      select.value = next.element;
-    };
-    row.compact = false;
-    const fields = document.createElement("div");
-    fields.className = "answer-fields";
-    // The element whose name matches, offered as an arrow beside the select
-    // and never chosen for the person: the page sends only what a person picks.
-    const match = !prefill && q.options.find((option) => option.id === q.suggested);
-    if (match) {
-      // The arrow gives up the focus: a row that holds it stays open, and
-      // this answer is complete, so the row closes once it saves.
-      const use = button("→", (event) => {
-        select.value = match.id;
-        use.blur();
-        onEdit(row, event);
-      }, "use-match");
-      use.title = `Use ${match.name || match.id}`;
-      use.setAttribute("aria-label", use.title);
-      fields.append(use);
-    }
-    fields.append(" ", select, " ", skipControl(row));
-    row.node.dataset.layout = "split";
-    row.node.replaceChildren(name, fields);
-  };
-  const drawCompactLink = (row, answer) => {
-    const name = document.createElement("b");
-    name.textContent = row.q.principal;
-    const shown = document.createElement("span");
-    shown.textContent = ` — ${answer.element === "none" ? "none of these" : answer.element}`;
-    row.compact = true;
-    row.read = () => null;
-    const fields = document.createElement("div");
-    fields.className = "answer-fields";
-    fields.append(shown, " ", button("Change", () => drawLink(row, answer.element)));
-    row.node.dataset.layout = "split";
-    row.node.replaceChildren(name, fields);
-  };
-  // A question with facets is a table: a column per facet, a row per
-  // element, and a first row that sets the whole column where two or more
-  // rows share it.
-  const facetTable = (q) => {
-    const table = document.createElement("table");
-    const head = document.createElement("tr");
-    const corner = document.createElement("th");
-    corner.textContent = "Part of your system";
-    head.append(corner);
-    const columns = q.facets.map((facet) => {
-      const cell = document.createElement("th");
-      cell.textContent = facet.question;
-      head.append(cell);
-      return [];
-    });
-    const detailHead = document.createElement("th");
-    detailHead.textContent = "Exceptions or detail (optional)";
-    head.append(detailHead);
-    table.append(head);
-    return { table, columns, count: 0 };
-  };
-  const drawFacetRow = (row, prefill) => {
-    const q = row.q;
-    const grid = row.grid;
-    const name = document.createElement("td");
-    name.append(questionTitle(q, q.element));
-    const selects = q.facets.map((facet, column) => {
-      const select = facetSelect("(leave unanswered)", (prefill && prefill.facets && prefill.facets[facet.id]) || "", true);
-      select.dataset.key = keyOf(q.key);
-      select.dataset.facet = facet.id;
-      select.addEventListener("change", (event) => onEdit(row, event));
-      grid.columns[column].push(select);
-      const cell = document.createElement("td");
-      cell.append(select);
-      return cell;
-    });
-    const detail = answerDetail((prefill && prefill.detail) || "");
-    detail.addEventListener("input", (event) => onEdit(row, event));
-    const detailCell = document.createElement("td");
-    detailCell.append(detail, " ", skipControl(row));
-    const inputs = selects.map((cell) => cell.children[0]);
-    row.read = () => {
-      const given = {};
-      for (const select of inputs) {
-        if (select.value) given[select.dataset.facet] = select.value;
-      }
-      return Object.keys(given).length
-        ? withDetail({ key: q.key, facets: given }, detail.value.trim())
-        : null;
-    };
-    // Whether a facet is still blank, which a skip sets aside.
-    row.open = () => inputs.some((select) => !select.value);
-    row.setFacet = (id, value) => {
-      for (const select of inputs) if (select.dataset.facet === id) select.value = value;
-    };
-    row.set = (next) => {
-      for (const select of inputs) select.value = (next.facets || {})[select.dataset.facet] || "";
-      detail.value = next.detail || "";
-    };
-    row.input = inputs[0];
-    row.compact = false;
-    row.node.replaceChildren(name, ...selects, detailCell);
-  };
-  const drawCompactFacets = (row, answer) => {
-    const name = document.createElement("td");
-    name.append(questionTitle(row.q, row.q.element));
-    const shown = document.createElement("td");
-    shown.textContent = answerText(answer);
-    const change = document.createElement("td");
-    change.append(button("Change", () => drawFacetRow(row, answer)));
-    row.compact = true;
-    row.read = () => null;
-    row.node.replaceChildren(name, shown, change);
-  };
-
-  // ---- Boxes --------------------------------------------------------------
-  // The list is a sequence of boxes, one for each run of rows that share a
-  // group, in the service's order. The service lists each question kind's
-  // rows together (ADR 0080), so a kind takes one box. A capability keeps
-  // its place in its framework's turn, so the application's box can come
-  // back later in the list, and then it opens a new box.
-  const newBox = (q) => {
-    const node = document.createElement("details");
-    node.className = "question-group";
-    const title = document.createElement("summary");
-    const applies = document.createElement("small");
-    applies.className = "group-applies";
-    applies.hidden = true;
-    const top = document.createElement("div");
-    const each = document.createElement("details");
-    each.className = "each-one";
-    each.open = true;
-    const eachTitle = document.createElement("summary");
-    eachTitle.hidden = true;
-    each.append(eachTitle);
-    node.append(title);
-    if (q.group === "links") {
-      const help = document.createElement("p");
-      help.className = "hint group-help";
-      help.textContent =
-        "Your description says things about these users, teams and accounts, such as " +
-        "whether they sign in with MFA. The analysis can use those facts only after you " +
-        "match each one to a part of your system. Choose \"None of these\" if no part matches.";
-      node.append(help);
-    }
-    node.append(top, each);
-    return { node, title, applies, top, each, eachTitle, group: q.group, heading: q.group_heading, rows: [], grid: null, shared: null };
-  };
-  const titleBox = (box) => {
-    const heading = document.createElement("span");
-    heading.className = "group-heading";
-    heading.textContent = box.heading;
-    box.title.replaceChildren(heading, box.applies);
-  };
-  // A box whose rows ask one attribute or kind of two or more elements asks
-  // it once (ADR 0081): one answer for every element it lists, sent as each
-  // element's own answer. The rows stay under "Answer each one separately",
-  // and a row edited there is an exception the shared answer leaves alone. A
-  // capability asks about the whole application, so it never shares.
-  const shareable = (a, b) =>
-    a.key[0] && b.key[0] && a.key[1] === b.key[1] && a.key[4] === b.key[4]
-    && a.form === b.form
-    && JSON.stringify(a.choices) === JSON.stringify(b.choices);
-  // Set while the shared answer writes rows, so those edits are not exceptions.
-  let sharing = false;
-  const applyShared = (box, write) => {
-    sharing = true;
-    try {
-      for (const row of box.rows) {
-        if (row.kind !== "fact" || row.compact || row.exception) continue;
-        if (row.tick && !row.tick.checked) continue;
-        write(row);
-        onEdit(row);
-      }
-    } finally {
-      sharing = false;
-    }
-  };
-  const sharedControl = (box, q) => {
-    const line = document.createElement("p");
-    if (q.form === "facets") {
-      line.className = "shared-facets";
-      for (const facet of q.facets) {
-        const label = document.createElement("label");
-        label.className = "shared-facet";
-        const select = facetSelect("(leave unanswered)", "", true);
-        select.dataset.facet = facet.id;
-        select.addEventListener("change", () =>
-          applyShared(box, (row) => row.setFacet && row.setFacet(facet.id, select.value)));
-        const prompt = document.createElement("span");
-        prompt.textContent = facet.question;
-        label.append(prompt, select);
-        line.append(label);
-      }
-      return line;
-    }
-    const shared = inputFor(q, null, () =>
-      applyShared(box, (row) => row.set({ value: shared.read() })));
-    // The box's heading asks the question for every part it lists, so it
-    // names each control; a second control adds what it takes.
-    shared.controls.forEach((control, at) => control.setAttribute("aria-label",
-      at ? `${q.group_heading}: ${control.placeholder}` : q.group_heading));
-    line.append(...shared.nodes);
-    return line;
-  };
-  const ensureShared = (box) => {
-    const members = box.rows.filter((row) => row.kind === "fact");
-    const one = members.length >= 2
-      && members.every((row) => shareable(row.q, members[0].q));
-    box.eachTitle.hidden = !one;
-    box.applies.hidden = !one;
-    box.eachTitle.textContent = `Answer each one separately (${members.length})`;
-    if (!one) {
-      box.top.className = "";
-      box.top.replaceChildren();
-      box.shared = null;
-      box.each.open = true;
-      return;
-    }
-    if (!box.shared) {
-      box.shared = sharedControl(box, members[0].q);
-      box.each.open = false;
-    }
-    box.applies.textContent = "Applies to: " + members.map((row) => row.q.element).join(", ");
-    const hint = document.createElement("p");
-    hint.className = "hint";
-    hint.textContent = "One answer covers every part listed. Where one differs,"
-      + " open \"Answer each one separately\" and change it there.";
-    box.top.className = "shared-controls";
-    box.top.replaceChildren(box.shared, hint);
-    for (const row of members) if (row.q.form !== "facets") addTick(row);
-  };
-  // Ticked rows take the shared answer; an unticked row is an exception.
-  const addTick = (row) => {
-    if (row.tick) return;
-    const tick = document.createElement("input");
-    tick.type = "checkbox";
-    tick.checked = true;
-    tick.title = "Take the answer under \"Same for all\"";
-    tick.className = "share-answer";
-    row.tick = tick;
-    if (!row.compact) row.node.replaceChildren(tick, ...[...row.node.children]);
-  };
-  // Put a new row after `prev`, the listed row before it in the service's
-  // order, or first where there is none. A row joins `prev`'s box where the
-  // groups match, and a facet row joins its table; otherwise a new box opens
-  // right after `prev`'s box.
-  const insertAfter = (parent, node, after) => {
-    const children = [...parent.children];
-    const at = after ? children.indexOf(after) : -1;
-    const next = children[at + 1] || null;
-    parent.insertBefore(node, next);
-  };
-  const place = (row, before) => {
-    // A row opened from a box beside the list has no place in it.
-    const prev = before && before.box ? before : null;
-    let box = prev && prev.box.group === row.q.group ? prev.box : null;
-    if (!box) {
-      box = newBox(row.q);
-      insertAfter(list, box.node, prev ? prev.box.node : null);
-    }
-    row.box = box;
-    const at = prev && prev.box === box ? box.rows.indexOf(prev) : -1;
-    box.rows.splice(at + 1, 0, row);
-    if (row.q.form === "facets" && row.kind === "fact") {
-      if (!box.grid) {
-        box.grid = facetTable(row.q);
-        box.each.append(box.grid.table);
-      }
-      row.grid = box.grid;
-      row.node = document.createElement("tr");
-      row.node.dataset.key = keyOf(row.q.key);
-      const after = prev && prev.grid === box.grid ? prev.node : [...box.grid.table.children][0];
-      insertAfter(box.grid.table, row.node, after);
-      box.grid.count += 1;
-    } else {
-      insertAfter(box.each, row.node, prev && prev.box === box ? prev.node : box.eachTitle);
-    }
-    titleBox(box);
-    ensureShared(box);
-  };
+  // ---- Rows and boxes ------------------------------------------------------
+  // Drawn by questionList, as every page that asks open facts draws them. A
+  // job waiting at its pause takes "I don't know" over a known answer, so
+  // every input offers it. Each row offers "Skip for now".
+  const { place, removeRow: unplace, drawOpen, drawSaved, drawAlone, button } = questionList({
+    list,
+    onEdit,
+    inputFor,
+    reopen: true,
+    contextOf,
+    extras: (row) => [skipControl(row)],
+  });
   const removeRow = (row) => {
-    const box = row.box;
     rows.delete(rowKey(row));
-    row.node.remove();
-    if (!box) return;
-    box.rows = box.rows.filter((other) => other !== row);
-    if (row.grid) row.grid.count -= 1;
-    if (!box.rows.length) box.node.remove();
-    else {
-      titleBox(box);
-      ensureShared(box);
-    }
+    unplace(row);
   };
 
   // ---- Reconcile ----------------------------------------------------------
@@ -1130,9 +749,7 @@
       if (held.has(key)) {
         // Answered: compact, in place, still editable.
         const answer = held.get(key);
-        if (row.kind === "link") drawCompactLink(row, answer);
-        else if (row.q.form === "facets") drawCompactFacets(row, answer);
-        else drawCompact(row, answer);
+        drawSaved(row, answer);
         continue;
       }
       removeRow(row);
@@ -1343,14 +960,7 @@
         kept.hidden = true;
         const entry = { q, kind, node: row, saved: before || null, listed: false, lazyBox: box };
         rows.set(key, entry);
-        if (kind === "link") drawLink(entry, before ? before.element : "");
-        else if (q.form === "facets") {
-          entry.grid = facetTable(q);
-          entry.node = document.createElement("tr");
-          entry.grid.table.append(entry.node);
-          row.append(entry.grid.table);
-          drawFacetRow(entry, before);
-        } else drawFact(entry, before);
+        drawAlone(entry, row, before || null);
         if (entry.input && typeof entry.input.focus === "function") entry.input.focus();
       });
       row.append(" ", open);

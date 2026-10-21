@@ -1284,6 +1284,7 @@ def create_app(
                         "sidebar.js",
                         "workspace.js",
                         "answer_editor.js",
+                        "question_list.js",
                         "first_run.js",
                     )
                 ),
