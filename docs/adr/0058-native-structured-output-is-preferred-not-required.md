@@ -99,10 +99,12 @@ a failure, and so does a refusal on the last rung.
 
 ## Consequences
 
-**Quality equality is a claim, not a result.** The safeguards are built and
-verified offline. A paired run on one model, native against tool on the same
-cases, decides whether `auto` stays the default. Until it runs, every statement
-about the tool path says that its quality effect is unmeasured.
+**`auto` stays the default.** A paired run measured the forced tool against
+native on one model: `claude-haiku-4-5` with no thinking, case 01, STRIDE
+(`QA-2026-10-21-02`). A finished tool run scored inside the native spread. The
+tool path failed more jobs, on causes that #1880 and #1882 then fixed or
+reduced, and the maintainer ruled on #1413 that `auto` stays. The offered tool,
+which a thinking model takes, is not measured.
 
 **The runtime matcher rests on documentation.** Bedrock does not document the
 error for an unsupported model, and no rule was confirmed by a live call. A
