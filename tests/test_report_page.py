@@ -59,6 +59,7 @@ globalThis.document = {
     ? Object.assign(new Node("script"), { children: [payloads[id]] })
     : (ids[id] = ids[id] || new Node(id)),
   createElement: (tag) => new Node(tag),
+  createElementNS: (namespace, tag) => new Node(tag),
   createTextNode: (t) => String(t),
   createDocumentFragment: () => new Node("#fragment"),
   querySelector: () => new Node("query"),
@@ -705,3 +706,21 @@ def test_the_export_lists_each_question_with_its_findings_and_a_link():
     assert "Is the connection initiated by Web App to Orders DB encrypted?" in printed
     assert "New question from this analysis" in printed
     assert "Used by: S-01" in printed
+
+
+def test_the_page_carries_the_zones_the_service_assumed():
+    """The diagram reads which zones were inferred from the model's one reader."""
+    report = sample_report([sample_threat()])
+    (assumed,) = re.findall(
+        r'id="assumed_zones"[^>]*>(.*?)</script>',
+        render_report(report, report_state(report)).html,
+    )
+    assert json.loads(assumed) == sorted(report.system_model.assumed_zone_elements())
+
+
+def test_about_draws_the_system_model():
+    parts = run_report_page(two_findings(), "?view=about")
+    drawn = parts["model-diagram"]
+    for element in valid_model().elements():
+        assert element.name in drawn, element.id
+    assert "A dashed box is a trust zone." in drawn

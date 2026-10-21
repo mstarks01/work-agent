@@ -341,9 +341,9 @@ Start with these parts of the result:
 - **Shared actions:** where confirmed findings rest on one missing control, a
   line names the one action that addresses them all. A conditional finding
   lists the facts it needs; click one to go to its question.
-- **System model:** under **About the analysis**, verify that the actors,
-  components, stores, flows, and trust zones match the source. Every later
-  result depends on this extraction.
+- **System model:** under **About the analysis**, use the diagram and the
+  table to verify that the actors, components, stores, flows, and trust zones
+  match the source. Every later result depends on this extraction.
 - **Grounds:** open **Evidence and justification** on a finding, and check
   whether each finding rests on relevant source text or a real fact derived
   from the model. A ground that quotes one of your answers,
