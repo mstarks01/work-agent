@@ -14,10 +14,8 @@
   // both handed to it. Same escape, same discipline — every string below is
   // still untrusted and still goes in as text.
   const UNITS = JSON.parse(document.getElementById("units").textContent);
-  // The open facts each framework's conditional findings rest on, grouped and
-  // ordered server-side. Each finding is placed under one fact; the page only
-  // renders what it is handed.
-  const OPEN_FACTS = JSON.parse(document.getElementById("open_facts").textContent);
+  // The run whose answers started this one, or null.
+  const PARENT_RUN = JSON.parse(document.getElementById("parent_run").textContent);
   // The missing controls two or more confirmed findings rest on, grouped and
   // ordered server-side. Each finding is placed under one control.
   const FIXES = JSON.parse(document.getElementById("fixes").textContent);
@@ -100,79 +98,6 @@
     return n;
   };
   const code = (text) => el("code", null, text);
-  // A follow-up question's anchor, for its open fact to link to. One map, so
-  // the link and the question it reaches get the same ID.
-  const QUESTION_IDS = new Map();
-  const questionId = (key) => {
-    const name = JSON.stringify(key);
-    if (!QUESTION_IDS.has(name)) QUESTION_IDS.set(name, `question-${QUESTION_IDS.size + 1}`);
-    return QUESTION_IDS.get(name);
-  };
-  const option = (label, value) => Object.assign(el("option", null, label), { value });
-  // A link question's choices: each element it may be, then "None of these".
-  const linkOptions = (select, ids) => {
-    ids.forEach(id => select.append(option(NAMES[id] ? `${NAMES[id]} (${id})` : id, id)));
-    select.append(option("None of these", "none"));
-  };
-  // One answer's editor, as the follow-up and a correction both show it,
-  // built by answerEditor. `nodes` follow the label; `read` is the answer as
-  // the service takes it, or null; `known` is whether it says more than "I
-  // don't know". `prefill` is an answer to start from, and `changed` runs on
-  // every edit. With `reopen` false, a known value offers no "I don't know"
-  // (offersDontKnow), as the follow-up takes it.
-  const editorFor = (q, prefill, changed, reopen) => {
-    if (q.form === "facets") {
-      // One list per facet. Only a facet answered otherwise than `prefill`
-      // is sent: the service keeps the earlier answer to a facet left out,
-      // so a facet answered before offers no blank.
-      const list = el("ul");
-      const selects = q.facets.map(facet => {
-        const before = (prefill && prefill.facets && prefill.facets[facet.id]) || "";
-        const select = facetSelect(before ? null : "(leave unanswered)", before, reopen);
-        select.dataset.key = JSON.stringify(q.key);
-        select.dataset.facet = facet.id;
-        select.dataset.before = before;
-        select.addEventListener("change", changed);
-        const item = el("li", null, `${facet.question} `);
-        item.append(select);
-        list.append(item);
-        return select;
-      });
-      const given = () => Object.fromEntries(selects
-        .filter(s => s.value && s.value !== s.dataset.before)
-        .map(s => [s.dataset.facet, s.value]));
-      // A detail is sent where it changed from the answer it starts from.
-      const detailBefore = (prefill && prefill.detail) || "";
-      const detail = answerDetail(detailBefore);
-      detail.addEventListener("input", changed);
-      // A changed detail alone sends the facets it starts from, which the
-      // service keeps as they are.
-      const kept = () => Object.fromEntries(selects
-        .filter(s => s.value).map(s => [s.dataset.facet, s.value]));
-      const read = () => {
-        const facets = Object.keys(given()).length ? given()
-          : detail.value.trim() !== detailBefore ? kept() : {};
-        if (!Object.keys(facets).length) return null;
-        return withDetail({ key: q.key, facets }, detail.value.trim());
-      };
-      return {
-        nodes: [list, detail],
-        read,
-        // The critic names the kind, not a facet, so a finding waiting on it
-        // is covered only once every facet says more than "I don't know".
-        // A facet kept from `prefill` counts, as the service merges it.
-        known: () => selects.every(s => s.value && s.value !== DONT_KNOW),
-        // A finding that needs only some facets is covered once those are
-        // known (ADR 0073); `facets` lists them, or is empty for every facet.
-        knownFor: (facets) => selects
-          .filter(s => !facets.length || facets.includes(s.dataset.facet))
-          .every(s => s.value && s.value !== DONT_KNOW),
-      };
-    }
-    const choices = q.choices.map(id => ({ id, name: NAMES[id] }));
-    const editor = answerEditor(q, { choices, prefill, reopen, changed });
-    return { nodes: editor.nodes, read: editor.answer, known: editor.known };
-  };
   // A model writes an identifier the way the prompt hands it over: in
   // backticks. A span that is an element's ID or an evidence reference shows
   // its label, and the identifier stays on hover, so a description reads
@@ -323,7 +248,7 @@
     // framework does not have -- an ASVS requirement number the standard does
     // not publish. Unlike every mark above, these do NOT key to a surviving
     // claim: the claim is gone, which is why they render as a block-level note
-    // rather than on a card. The title is the only trace of what was lost.
+    // rather than on a finding. The title is the only trace of what was lost.
     const unknown = (block.unknown_claim_identities || []);
     // Claims the service dropped because every ground they cited was lost --
     // a quote the source does not contain, or a reference the catalog does
@@ -334,7 +259,7 @@
     // the bounded re-ask. These key to a claim that may or may not be in the
     // block -- a dropped draft is ruled on the second pass and a ruling on an
     // invented ID never had a claim -- so they render as a block-level note
-    // rather than on a card, grouped by kind.
+    // rather than on a finding, grouped by kind.
     const unreconciled = (block.unreconciled_rulings || []);
     return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless, unreconciled };
   }
@@ -364,27 +289,14 @@
     $("analysis-tabs").hidden = false;
   }
   // header
-  $("sysname").textContent = R.input.system_name;
+  $("sysname").textContent = `${R.input.system_name} security report`;
   // The static title names no system and no framework. The report names
   // both, so the tab reads the run rather than the template.
   document.title = R.input.system_name + " — report";
   const fmt = (t) => new Date(t).toISOString().replace("T"," ").replace(".000Z"," UTC");
-  // The page shows the findings, or at ?view=provenance how the report was
-  // made. Each view links to the other.
-  const PROVENANCE_VIEW =
-    new URLSearchParams(location.search).get("view") === "provenance";
-  $("report-view").hidden = PROVENANCE_VIEW;
-  $("provenance-view").hidden = !PROVENANCE_VIEW;
-  const otherView = el("a", null, PROVENANCE_VIEW
-    ? "Back to the findings"
-    : "How this report was made");
-  otherView.href = location.pathname + (PROVENANCE_VIEW ? "" : "?view=provenance");
-  $("jobmeta").append(
-    `Generated ${fmt(R.job.completed_at)} · `, otherView
-  );
   // The envelope's disclaimer says what the *service* is and how many of its
   // facts anybody checked. Each block carries its own, saying what that
-  // framework's claims assert, beside the findings.
+  // framework's claims assert.
   $("disclaimer").textContent = R.disclaimer;
 
   // "in the model", never "analysed". `elements_analyzed` is the embedded
@@ -396,6 +308,28 @@
   $("scope").textContent =
     `${R.elements_analyzed} elements in the model, under ${frameworks}`;
 
+  // ---- Sections -----------------------------------------------------------
+  // The page has three sections: the report, its questions, and how it was
+  // made. The report is the one a reader lands on, and ?view= names another,
+  // so a reload stays where the reader was.
+  const SECTIONS = ["report", "questions", "about"];
+  const showSection = (name) => {
+    SECTIONS.forEach(each => {
+      $(`${each}-view`).hidden = each !== name;
+      if (each === name) $(`${each}-tab`).setAttribute("aria-current", "page");
+      else $(`${each}-tab`).removeAttribute("aria-current");
+    });
+    const query = name === "report" ? "" : `?view=${name}`;
+    if (location.search !== query) history.replaceState(null, "", location.pathname + query);
+  };
+  SECTIONS.forEach(name => {
+    $(`${name}-tab`).href = location.pathname + (name === "report" ? "" : `?view=${name}`);
+    $(`${name}-tab`).addEventListener("click", (event) => {
+      event.preventDefault();
+      showSection(name);
+    });
+  });
+  $("back-to-report").addEventListener("click", () => showSection("report"));
   // One grounds entry. Every string here is model-authored or lifted verbatim
   // out of the submitter's own prose, so it goes in as text and never as markup.
   //
@@ -468,115 +402,148 @@
     return block;
   }
 
-  // One claim card, built from the neutral shape and *widened* by whatever the
-  // framework's own record carries.
+  // ---- Findings -----------------------------------------------------------
+  // A finding is one row that opens in place. The closed row shows its
+  // severity, its title, its next action and its ID. The open row holds
+  // everything the report says about it, so concision comes from the closed
+  // row and nothing is removed.
   //
-  // This is the fallback the report's design promises: a consumer that does not
-  // know a framework reads an ID, the (framework, version) pair, a title, a
-  // description, the elements and the grounds — and this page is that consumer
-  // for every framework but the ones whose extras it happens to recognise. So
-  // each extra is rendered behind a presence test rather than assumed: a claim
-  // with no severity gets no severity chip and no coloured border, not a card
-  // that throws reading `undefined.level`. Adding a framework needs no edit
-  // here; its claims render, correctly, in the neutral shape.
-  function claimCard(marks, t, rejected) {
-    const card = el("div", "card" + (rejected ? " rejected" : ""));
-    card.id = cardId(t);
-    const head = el("div","card-head");
-    head.append(proseEl("h3", null, t.title), el("span","tid", t.id));
-    card.append(head);
+  // Built from the neutral shape and *widened* by whatever the framework's
+  // own record carries: a consumer that does not know a framework reads an
+  // ID, a title, a description, the elements and the grounds. So each extra
+  // renders behind a presence test rather than being assumed: a claim with no
+  // severity gets no severity, not a row that throws reading
+  // `undefined.level`. Adding a framework needs no edit here.
+
+  // A finding's anchor, for a link from a question or a gap to reach.
+  const findingId = (t) => `finding-${t.framework}-${t.id}`;
+  const findingKey = (t) => `${t.framework}/${t.id}`;
+  // Each finding by `framework/claim`, for the questions to name.
+  const FINDINGS = new Map(R.analyses.flatMap(block =>
+    [...block.claims, ...block.rejected_claims].map(c => [`${block.framework}/${c.id}`, c])));
+  // The heading over a finding's two recommendations, by its verdict: a
+  // conditional finding's are not actions yet, and a dismissed one's are not
+  // actions at all.
+  const RECOMMENDATIONS = {
+    "confirmed": "Recommended actions",
+    "needs-info": "Potential mitigations · if confirmed",
+    "rejected": "Original proposed mitigations · not active actions",
+  };
+  // The first thing a reader can do about a finding, for its closed row.
+  const nextAction = (t) => {
+    const waits = CONDITIONS[findingKey(t)] || [];
+    if (t.verdict.status === "needs-info" && waits.length) {
+      return `Information needed: ${waits[0].label}`;
+    }
+    if (t.verdict.status === "rejected") return "Dismissed";
+    return t.mitigations && t.mitigations.length ? prose(t.mitigations[0].summary) : "";
+  };
+
+  function findingBody(marks, t) {
+    const body = el("div", "finding-body");
+    // A follow-up's finding says how it moved since the report the answers
+    // came from.
+    const moved = CHANGED.get(findingKey(t));
+    if (moved && moved.change === "new") {
+      body.append(el("div", "meta", "New since the earlier report."));
+    } else if (moved && moved.change === "changed") {
+      body.append(el("div", "meta", `Was ${VERDICT[moved.before][0]} in the earlier report.`));
+    }
     // A final report's owner changed an answer this finding rests on, after
     // the analysis ran; the analysis did not run again (ADR 0054).
-    const moved = CHANGED.get(`${t.framework}/${t.id}`);
-    if (moved && moved.change === "new") {
-      card.append(el("div", "meta", "New since the earlier report."));
-    } else if (moved && moved.change === "changed") {
-      card.append(el("div", "meta", `Was ${VERDICT[moved.before][0]} in the earlier report.`));
-    }
-    if (CORRECTED.has(`${t.framework}/${t.id}`)) {
-      card.append(el("div", "unknown",
+    if (CORRECTED.has(findingKey(t))) {
+      body.append(el("div", "unknown",
         "Corrected after this report: an answer this finding rests on was " +
         "changed after the analysis ran. The analysis did not run again."));
     }
-    // The lane, where the framework stamps one.
-    const lane = laneOf(t.framework, t);
-    if (lane) card.append(el("div","cat", lane));
 
-    const badges = el("div","badges");
+    // The lane, the confidence and the verdict, on one line.
+    const facts = el("div", "badges");
+    const lane = laneOf(t.framework, t);
+    if (lane) facts.append(el("span", "cat", lane));
     if (t.severity) {
-      card.style.borderLeftColor = svar(t.severity.level);
-      const sev = el("span","chip");
-      const sevSwatch = el("span","swatch");
-      sevSwatch.style.background = svar(t.severity.level);
-      sev.append(sevSwatch, SEV[t.severity.level][0]);
-      // A property assignment, not an attribute: there is no markup context to
-      // escape out of, which is why no quote handling is needed anywhere here.
-      sev.title = `likelihood ${t.severity.likelihood} \u00d7 impact ${t.severity.impact} \u2192 ${t.severity.level}`;
-      badges.append(sev);
+      const sev = el("span", "chip");
+      const swatch = el("span", "swatch");
+      swatch.style.background = svar(t.severity.level);
+      sev.append(swatch, SEV[t.severity.level][0]);
+      // A property assignment, not an attribute: there is no markup context
+      // to escape out of.
+      sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact} → ${t.severity.level}`;
+      facts.append(sev);
     }
     const [vlabel, vglyph] = VERDICT[t.verdict.status];
-    badges.append(el("span","chip verdict", `${vglyph} ${vlabel}`));
-    if (t.confidence) {
-      badges.append(el("span","chip confidence", `confidence: ${t.confidence}`));
-    }
-    card.append(badges);
+    facts.append(el("span", "chip verdict", `${vglyph} ${vlabel}`));
+    if (t.confidence) facts.append(el("span", "chip confidence", `confidence: ${t.confidence}`));
+    body.append(facts);
 
-    card.append(proseEl("div","desc", t.description));
-
-    // The default view answers what a reader triages on (#561): what is
-    // missing, what it touches and what to do next. Why it matters, the
-    // evidence behind it, and every warning about a citation that did not
-    // resolve, sit under one toggle further down, so nothing is removed.
-    // The facts a needs-info finding waits on, each by the label the server
-    // gives it and why it is still open. The critic's own sentence restates
-    // them, so it moves under the toggle rather than repeating above it.
-    const waits = CONDITIONS[`${t.framework}/${t.id}`] || [];
+    // The facts a conditional finding waits on, each by its question and
+    // what became of it, each linked to its editor where the report asks it.
+    const waits = CONDITIONS[findingKey(t)] || [];
     if (waits.length) {
-      const u = el("div","unknown");
-      u.append(el("b", null, "Needs info."), " Missing information:");
+      const needed = el("div", "field");
+      needed.append(el("div", "lbl", "Information needed"));
       const list = el("ul");
-      waits.forEach(w => list.append(el("li", null, `${w.label} — ${WHY_OPEN[w.status] || w.status}`)));
-      u.append(list);
-      card.append(u);
+      waits.forEach(w => {
+        const item = el("li");
+        const asked = ASKS && QUESTION_ROWS.has(JSON.stringify(w.key));
+        if (asked) {
+          const go = el("a", null, w.label);
+          go.href = `?view=questions`;
+          go.addEventListener("click", (event) => {
+            event.preventDefault();
+            goToQuestion(w.key);
+          });
+          item.append(go);
+        } else {
+          item.append(w.label);
+        }
+        item.append(el("span", "meta", ` — ${WHY_OPEN[w.status] || w.status}`));
+        list.append(item);
+      });
+      needed.append(list);
+      body.append(needed);
     }
-
-    const refs = el("div","field refs");
-    refs.append(lbl("Affected"), el("br"));
-    t.affected_element_ids.forEach(r => refs.append(ref(r)));
-    card.append(refs);
 
     if (t.verdict.status === "rejected") {
-      const why = el("div","field");
-      why.append(lbl("Reason dismissed"), el("br"), prose(t.verdict.reason));
-      card.append(why);
+      const why = el("div", "field why-dismissed");
+      why.append(el("div", "lbl", "Why dismissed"), proseEl("p", null, t.verdict.reason));
+      body.append(why);
     }
 
-    // What to do next: the mitigations, or the statement that none was
-    // proposed. How to settle an open fact is said once, above its group.
-    const next = el("div","field");
-    next.append(el("div","lbl","Next step"));
+    // The whole description the agent wrote, not a second summary of it.
+    const story = el("details", "prov");
+    story.append(el("summary", null, "Full attack narrative"), proseEl("div", "desc", t.description));
+    body.append(story);
+
+    const refs = el("div", "field refs");
+    refs.append(el("div", "lbl", "Affected components and flows"));
+    t.affected_element_ids.forEach(r => refs.append(ref(r)));
+    body.append(refs);
+
+    const next = el("div", "field");
+    next.append(el("div", "lbl", RECOMMENDATIONS[t.verdict.status]));
     if (t.mitigations && t.mitigations.length) {
-      const list = el("ul","mits"); t.mitigations.forEach(m => list.append(proseEl("li", null, m.summary)));
+      const list = el("ul", "mits");
+      t.mitigations.forEach(m => list.append(proseEl("li", null, m.summary)));
       next.append(list);
     } else if (marks.unmitigated.has(t.id)) {
       next.append(el("div", "caveat",
         "⚠ No mitigation proposed, and this finding does not rest on an unknown that would explain why."));
     }
-    if (next.children.length > 1) card.append(next);
+    if (next.children.length > 1) body.append(next);
 
-    // Everything behind the default view: why it matters, the critic's
-    // reason, the grounds with who justified what, and each citation the
-    // service dropped. A `details` element, so the browser does the toggling,
-    // keyboard included.
-    const prov = el("details","prov");
-    prov.append(el("summary", null, "Why it matters, and the evidence"));
+    // Why it matters, the critic's reason, the grounds with who justified
+    // what, and each citation the service dropped. A `details` element, so
+    // the browser does the toggling, keyboard included.
+    const prov = el("details", "prov");
+    prov.append(el("summary", null, "Evidence and justification"));
     if (t.severity) {
-      const why = el("div","field");
+      const why = el("div", "field");
       why.append(lbl("Why it matters"), el("br"), prose(t.severity.justification));
       prov.append(why);
     }
-    if (waits.length && t.verdict.reason) {
-      const reason = el("div","field");
+    if (t.verdict.status !== "rejected" && t.verdict.reason) {
+      const reason = el("div", "field");
       reason.append(lbl("The critic's reason"), el("br"), prose(t.verdict.reason));
       prov.append(reason);
     }
@@ -605,117 +572,59 @@
       composed.forEach((r, i) => { if (i) note.append(", "); note.append(code(r)); });
       prov.append(note);
     }
-    card.append(prov);
-    return card;
+    body.append(prov);
+    return body;
   }
 
-  // A card's anchor, for the findings table to link to.
-  const cardId = (t) => `finding-${t.framework}-${t.id}`;
-  const ASKED = new Set(FACT_QUESTIONS.map(q => JSON.stringify(q.key)));
-  // Severity order where every claim is graded, and the given order otherwise.
+  function findingRow(marks, t) {
+    const row = el("details", "finding" + (t.verdict.status === "rejected" ? " rejected" : ""));
+    row.id = findingId(t);
+    const head = el("summary");
+    const sev = el("span", "finding-sev");
+    if (t.severity) {
+      const swatch = el("span", "swatch");
+      swatch.style.background = svar(t.severity.level);
+      sev.append(swatch, SEV[t.severity.level][0]);
+    }
+    const what = el("span", "finding-what");
+    what.append(proseEl("span", "finding-title", t.title));
+    const next = nextAction(t);
+    if (next) {
+      const line = el("span", "finding-next");
+      line.append(next);
+      what.append(line);
+    }
+    head.append(sev, what, el("span", "tid", t.id), el("span", "finding-open"));
+    row.append(head, findingBody(marks, t));
+    return row;
+  }
+
+  // Severity order where every claim is graded, and the given order otherwise
+  // — the package's declared lane order, the only ranking a framework that
+  // grades nothing has.
   const bySeverity = (list) => list.every(c => c.severity)
     ? [...list].sort((a, b) => SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level))
     : list;
-  // Whether the report asks the questions its conditional findings wait on.
-  const ASKS = FACT_QUESTIONS.length > 0 && !FINAL && !RESUMED_BY;
-  const FLOW_IDS = new Set(R.system_model.data_flows.map(f => f.id));
-
-  // What a block found, before any detail: the confirmed findings by
-  // severity, the findings that wait on an answer, and each other count that
-  // is not zero.
-  function summaryOf(block, openFacts, others) {
-    const box = el("div", "summary");
-    const confirmed = block.claims.filter(c => c.verdict.status === "confirmed").length;
-    const waiting = block.claims.filter(c => c.verdict.status === "needs-info").length;
-    const first = el("p");
-    first.append(el("b", null, `${confirmed} confirmed ${confirmed === 1 ? "finding" : "findings"}`));
-    const bySeverity = block.summary.by_severity_confirmed;
-    if (bySeverity && confirmed) {
-      const levels = SEV_ORDER.filter(l => bySeverity[l])
-        .map(l => `${bySeverity[l]} ${SEV[l][0].toLowerCase()}`);
-      first.append(` (${levels.join(", ")})`);
-    }
-    first.append(".");
-    box.append(first);
-    if (waiting) {
-      const line = el("p");
-      line.append(el("b", null,
-        `${waiting} ${waiting === 1 ? "finding needs" : "findings need"} an answer`));
-      line.append(openFacts
-        ? ` to ${openFacts} open ${openFacts === 1 ? "question" : "questions"}.`
-        : ".");
-      if (ASKS) {
-        const go = el("a", null, "Answer the questions");
-        go.href = "#followup";
-        go.addEventListener("click", () => { $("followup").open = true; });
-        line.append(" ", go);
-      }
-      box.append(line);
-    }
-    const rest = others.filter(([n]) => n).map(([n, what]) => `${n} ${what}`);
-    if (rest.length) box.append(el("p", "meta", `Also: ${rest.join(", ")}.`));
-    return box;
-  }
-
-  // Open every `details` around a card, so a link to it lands on it.
+  // Open every `details` around a node, and the node itself, so a link to it
+  // lands on it.
   const openTo = (node) => {
+    if (node.tagName === "DETAILS") node.open = true;
     for (let d = node.closest("details"); d; d = d.parentElement && d.parentElement.closest("details")) {
       d.open = true;
     }
   };
+  // A link from a question to a finding: the report, with the finding open
+  // and focused.
+  const goToFinding = (key) => {
+    const t = FINDINGS.get(key);
+    const row = t && $(findingId(t));
+    if (!row) return;
+    showSection("report");
+    openTo(row);
+    row.scrollIntoView({ block: "start" });
+    row.querySelector("summary").focus();
+  };
 
-  // One row per finding: its severity, title, status, the components it
-  // touches and the first thing to do. The title links to the card below.
-  function findingsTable(block) {
-    const claims = [...block.claims];
-    if (!claims.length) return null;
-    const graded = claims.every(c => c.severity);
-    const STATUS_RANK = ["confirmed", "needs-info"];
-    claims.sort((a, b) =>
-      (graded ? SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level) : 0)
-      || STATUS_RANK.indexOf(a.verdict.status) - STATUS_RANK.indexOf(b.verdict.status));
-    const table = el("table", "findings");
-    const head = el("tr");
-    if (graded) head.append(el("th", null, "Severity"));
-    head.append(el("th", null, "Finding"), el("th", null, "Status"),
-      el("th", "aff", "Affected"), el("th", null, "First next step"));
-    const thead = el("thead");
-    thead.append(head);
-    const body = el("tbody");
-    claims.forEach(t => {
-      const row = el("tr");
-      if (graded) {
-        const sev = el("td", "sev");
-        const swatch = el("span", "swatch");
-        swatch.style.background = svar(t.severity.level);
-        sev.append(swatch, SEV[t.severity.level][0]);
-        row.append(sev);
-      }
-      const link = el("a");
-      link.href = `#${cardId(t)}`;
-      link.append(prose(t.title));
-      link.addEventListener("click", () => openTo($(cardId(t))));
-      const [label, glyph] = VERDICT[t.verdict.status];
-      // The components a finding touches; a flow only where it names nothing else.
-      const elements = t.affected_element_ids.filter(id => !FLOW_IDS.has(id));
-      const affected = el("td", "aff");
-      (elements.length ? elements : t.affected_element_ids)
-        .forEach((id, i) => affected.append(...(i ? [", "] : []), ref(id)));
-      const waits = CONDITIONS[`${t.framework}/${t.id}`] || [];
-      const step = waits.length ? `Answer: ${waits[0].label}`
-        : t.mitigations && t.mitigations.length ? prose(t.mitigations[0].summary) : "—";
-      row.append(cell(link, " ", el("span", "tid", t.id)), el("td", "status", `${glyph} ${label}`),
-        affected, cell(step));
-      body.append(row);
-    });
-    table.append(thead, body);
-    return table;
-  }
-
-  // One framework's whole section: its heading, its disclaimer, its own counts,
-  // and its two claim arrays. Nothing here reaches back into the envelope
-  // except for the element count, which is a fact about the one shared model
-  // and so is stated once at the top rather than N times.
   // One row per unit the framework answers for: what the standard asks, what
   // this run concluded, and why. The grouped counts above answer "how much";
   // this answers "which, and on what grounds", which no count can (#659).
@@ -791,214 +700,600 @@
     return wrap;
   }
 
+  // ---- The report -----------------------------------------------------------
+  // What a block found, in words: the confirmed findings by severity, then
+  // how many are conditional and how many were dismissed. A report is
+  // complete for what it was told, so the summary says that no question
+  // needs an answer.
+  function summaryOf(block, conditional, dismissed) {
+    const box = el("div", "summary");
+    const confirmed = block.claims.filter(c => c.verdict.status === "confirmed").length;
+    const first = el("p");
+    let lead = `${confirmed} confirmed ${confirmed === 1 ? "finding" : "findings"}`;
+    const graded = block.summary.by_severity_confirmed;
+    if (graded && confirmed) {
+      lead += ": " + SEV_ORDER.filter(l => graded[l])
+        .map(l => `${graded[l]} ${SEV[l][0].toLowerCase()}`).join(", ");
+    }
+    first.append(el("b", null, `${lead}.`));
+    box.append(first);
+    const rest = [];
+    if (conditional) {
+      rest.push(`${counted(conditional, "additional finding is", "additional findings are")} conditional on missing information.`);
+    }
+    if (dismissed) {
+      rest.push(conditional
+        ? `${dismissed} ${dismissed === 1 ? "was" : "were"} dismissed.`
+        : `${counted(dismissed, "finding was", "findings were")} dismissed.`);
+    }
+    if (conditional) rest.push("You can use this report without answering any questions.");
+    if (rest.length) box.append(el("p", null, rest.join(" ")));
+    return box;
+  }
+
+  // A collapsed section of finding rows, with its count in its title.
+  const findingGroup = (title, rows) => {
+    const box = el("details", "finding-group");
+    box.append(el("summary", null, `${title} · ${rows.length}`), ...rows);
+    return box;
+  };
+
+  // One framework's whole section: its summary, the actions two findings
+  // share, its confirmed findings, then its conditional and its dismissed
+  // findings, each closed, and the units it answered for. Its disclaimer,
+  // its scope counts and its diagnostics are about how the analysis ran, so
+  // they sit under About the analysis.
   function renderBlock(block) {
     const marks = marksOf(block);
     const section = el("section", "analysis");
-    section.append(el("h2", null, `${block.framework} \u00b7 v${block.framework_version}`));
-    // A requirement this job cannot settle is work the submitter can act on,
-    // so the summary counts it beside the findings (#659).
-    const deferredCount =
-      block.scope.filter(e => e.state === "needs-other-evidence").length;
-    // Split out of the rejected count on the page: a requirement ruled out
-    // is an answer, and a draft dismissed for arguing badly is not.
-    const ruledOutClaims = block.rejected_claims.filter(c => rulesOut(block, c));
-    const dismissed = block.rejected_claims.filter(c => !rulesOut(block, c));
-    const facts = OPEN_FACTS[block.framework] || [];
-    section.append(summaryOf(block, facts.length, [
-      [ruledOutClaims.length, "excluded by review"],
-      [dismissed.length, "rejected"],
-      [deferredCount, "need other evidence"],
-    ]));
-    const table = findingsTable(block);
-    if (table) section.append(table);
-    section.append(el("div", "disclaimer-block", block.disclaimer));
-
-    // What this framework considered and raised nothing about, grouped. The
-    // entries are not listed one by one: a framework answering in its own units
-    // lists every one of them — ASVS lists 70 requirements at level 1 and 345 at
-    // level 3 — and a page printing all of them would bury the findings under
-    // the things that were fine. The payload still carries every unit, which is
-    // the rule; this is how a person reads it.
-    //
-    // Grouped by state, and the deferred group again by the evidence that would
-    // settle it, because those two say different things. "Ruled out" is a
-    // finished answer. "Needs source code" is a live one a reader can act on by
-    // supplying a different kind of input, and it is worth naming what kind.
-    if (block.scope.length) {
-      const byState = {};
-      block.scope.forEach(e => { (byState[e.state] = byState[e.state] || []).push(e); });
-      const wrap = el("div", "meta");
-      wrap.append(el("div", null,
-        `${block.scope.length} units with no claim raised`));
-
-      const ruledOut = (byState["not-applicable"] || []).length;
-      if (ruledOut) {
-        wrap.append(el("div", null, `\u00a0\u00a0${ruledOut} ruled out — does not apply`));
-      }
-      if (ruledOutClaims.length) {
-        wrap.append(el("div", null,
-          `\u00a0\u00a0${ruledOutClaims.length} ruled out by review — does not apply; each on its own row below`));
-      }
-      const undecided = (byState["undecidable"] || []).length;
-      if (undecided) {
-        wrap.append(el("div", null,
-          `\u00a0\u00a0${undecided} undecidable — the input never says whether this framework applies`));
-      }
-      const notRaised = (byState["not-raised"] || []).length;
-      if (notRaised) {
-        wrap.append(el("div", null,
-          `\u00a0\u00a0${notRaised} not raised — no lane filed a claim; not a verdict that they apply`));
-      }
-      const deferred = byState["needs-other-evidence"] || [];
-      if (deferred.length) {
-        const byNeed = {};
-        deferred.forEach(e => { byNeed[e.needs] = (byNeed[e.needs] || 0) + 1; });
-        wrap.append(el("div", null,
-          `\u00a0\u00a0${deferred.length} could not be evaluated from this input:`));
-        Object.keys(byNeed).sort().forEach(need => {
-          wrap.append(el("div", null, `\u00a0\u00a0\u00a0\u00a0${byNeed[need]} need ${need}`));
-        });
-      }
-      section.append(wrap);
+    if (R.analyses.length > 1) {
+      section.append(el("h2", null, `${block.framework} · v${block.framework_version}`));
     }
+    // A requirement ruled out by review is an answer about the requirement,
+    // and sits on its unit's row; a draft dismissed for arguing badly is not.
+    const dismissed = bySeverity(block.rejected_claims.filter(c => !rulesOut(block, c)));
+    const confirmed = bySeverity(block.claims.filter(c => c.verdict.status === "confirmed"));
+    const conditional = bySeverity(block.claims.filter(c => c.verdict.status === "needs-info"));
+    section.append(summaryOf(block, conditional.length, dismissed.length));
 
+    // One missing control that two or more confirmed findings rest on is one
+    // action for all of them. Each finding stays its own row.
+    (FIXES[block.framework] || []).forEach(f => {
+      const line = el("p", "shared-action");
+      line.append(`One shared action addresses ${f.rests.length} findings: `, el("b", null, f.label), ". ");
+      f.rests.forEach((id, i) => {
+        const link = el("a", "tid", id);
+        link.href = `#finding-${block.framework}-${id}`;
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+          goToFinding(`${block.framework}/${id}`);
+        });
+        line.append(...(i ? [" · "] : []), link);
+      });
+      section.append(line);
+    });
+
+    if (confirmed.length) {
+      section.append(el("h3", null, "Confirmed findings"));
+      const list = el("div", "findings");
+      confirmed.forEach(t => list.append(findingRow(marks, t)));
+      section.append(list);
+    } else {
+      // Said rather than left blank: a framework that examined the system and
+      // confirmed nothing is a result.
+      section.append(el("p", "meta", "No finding is confirmed under this framework."));
+    }
+    if (conditional.length) {
+      section.append(findingGroup("Conditional findings", conditional.map(t => findingRow(marks, t))));
+    }
+    if (dismissed.length) {
+      section.append(findingGroup("Dismissed findings", dismissed.map(t => findingRow(marks, t))));
+    }
     const units = unitTable(block);
     if (units) section.append(units);
-
-    // What the service dropped for naming something this framework does not
-    // have. There is no card to hang these on, so they are listed here: a
-    // reader who is told "23 requirements considered" deserves to know that a
-    // 24th ruling was discarded for citing a requirement that does not exist.
-    if (marks.unknown.length) {
-      const note = el("div", "dropped");
-      note.append(el("b", null,
-        `${counted(marks.unknown.length, "ruling", "rulings")} dropped for naming an unpublished identifier`));
-      const list = el("ul");
-      marks.unknown.forEach(m => {
-        const item = el("li");
-        item.append(code(m.claim_id), " \u2014 ", prose(m.title));
-        list.append(item);
-      });
-      note.append(list);
-      section.append(note);
-    }
-    if (marks.groundless.length) {
-      const note = el("div", "dropped");
-      note.append(el("b", null,
-        `${counted(marks.groundless.length, "finding", "findings")} dropped for a fault in one entry`));
-      const list = el("ul");
-      marks.groundless.forEach(m => {
-        const item = el("li");
-        item.append(code(m.claim_id), " \u2014 ", prose(m.title),
-          " (", prose(m.reason), ")");
-        list.append(item);
-      });
-      note.append(list);
-      section.append(note);
-    }
-    // A repaired run and a clean one read alike without this. The count per
-    // kind is what a reader acts on -- one dropped draft is a slip, and forty
-    // needs-info verdicts hung on attributes the model does not have is a
-    // prompt that needs work -- so the kinds are grouped rather than listed
-    // one sentence at a time.
-    if (marks.unreconciled.length) {
-      const note = el("div", "dropped");
-      note.append(el("b", null,
-        `${counted(marks.unreconciled.length, "problem", "problems")} the review's first pass left for its re-ask`));
-      const byKind = new Map();
-      marks.unreconciled.forEach(m => {
-        if (!byKind.has(m.kind)) byKind.set(m.kind, []);
-        byKind.get(m.kind).push(m.claim_id);
-      });
-      const list = el("ul");
-      byKind.forEach((ids, kind) => {
-        const item = el("li");
-        item.append(code(kind), ` \u2014 ${ids.length}: `, prose(ids.join(", ")));
-        list.append(item);
-      });
-      note.append(list);
-      section.append(note);
-    }
-
-    // Severity order where the framework grades, and the block's own order
-    // otherwise — which is the package's declared lane order, and is the only
-    // ranking a framework that grades nothing has.
-    // A conditional finding is shown once, under the open fact that would
-    // settle the most findings on its own, and a confirmed finding that rests
-    // on a missing control two findings share is shown once, under that
-    // control. The rest follow in the list.
-    const grouped = new Set(facts.flatMap(f => f.placed));
-    const fixes = FIXES[block.framework] || [];
-    const fixed = new Set(fixes.flatMap(f => f.placed));
-    const byClaimId = {};
-    block.claims.forEach(c => { byClaimId[c.id] = c; });
-    const claims = bySeverity(block.claims.filter(c => !grouped.has(c.id) && !fixed.has(c.id)));
-    section.append(el("h3", null, "Claims"));
-    if (fixes.length) {
-      section.append(el("div", "meta",
-        "Each group is one control that the description states is missing, and each " +
-        "finding in it rests on that control. Each finding is shown once, under the " +
-        "control that the most findings rest on."));
-      fixes.forEach(f => {
-        const box = el("details", "openfact");
-        const head = el("summary");
-        const elsewhere = f.rests.length - f.placed.length;
-        head.append(el("b", null, f.label),
-          ` \u2014 ${f.rests.length} findings rest on this missing control` +
-          (elsewhere ? `; ${elsewhere} of them shown under another control` : ""));
-        box.append(head);
-        bySeverity(f.placed.map(id => byClaimId[id]))
-          .forEach(t => box.append(claimCard(marks, t, false)));
-        section.append(box);
-      });
-    }
-    claims.forEach(t => section.append(claimCard(marks, t, false)));
-    if (!claims.length && !fixed.size) {
-      // Said rather than left blank. A framework that examined the system and
-      // raised nothing is a result; an empty heading reads as a rendering fault.
-      section.append(el("div", "meta", grouped.size
-        ? "Every claim here is conditional; they are grouped below by the question that would settle them."
-        : "No claims were raised under this framework."));
-    }
-    if (grouped.size) {
-      section.append(el("h3", null, "Questions that would settle the conditional findings"));
-      section.append(el("div", "meta",
-        `${counted(grouped.size, "conditional finding waits", "conditional findings wait")} on ${counted(facts.length, "question", "questions")}. ` +
-        "A conditional finding is neither confirmed nor cleared until the facts it " +
-        "waits on are confirmed. Each finding is shown once, under the question " +
-        "that alone covers the most findings. " +
-        (FINAL
-          ? "Confirm each fact with the people who run the component, then correct an answer below or submit the description again."
-          : "Confirm each fact with the people who run the component, and answer the questions in the follow-up below.")));
-      facts.filter(f => f.placed.length).forEach(f => {
-        const box = el("details", "openfact");
-        const head = el("summary");
-        head.append(el("b", null, f.label),
-          ` \u2014 ${counted(f.cited_by.length, "finding waits", "findings wait")} on this; an answer alone covers ${f.settles.length}`);
-        if (ASKS && ASKED.has(JSON.stringify(f.key))) {
-          const go = el("a", null, "Answer");
-          go.href = `#${questionId(f.key)}`;
-          go.addEventListener("click", () => openTo($(questionId(f.key))));
-          head.append(" ", go);
-        }
-        box.append(head);
-        f.placed.forEach(id => box.append(claimCard(marks, byClaimId[id], false)));
-        section.append(box);
-      });
-    }
-    // Only where there are any. Every block carries this heading otherwise, and
-    // on a report with two frameworks that is two empty sections a reader has
-    // to scroll past to reach the model.
-    if (dismissed.length) {
-      section.append(el("h3", null, "Rejected \u2014 considered and dismissed"));
-      dismissed.forEach(t => section.append(claimCard(marks, t, true)));
-    }
     $("analyses").append(section);
+    frameworkNotes(block, marks);
+  }
+
+  // ---- Questions --------------------------------------------------------------
+  // What the report asks: which element each principal is (link questions),
+  // and the open facts its conditional findings rest on (fact questions), in
+  // the question list the early questions use. Answers go to /answer/{run}:
+  // a save keeps a draft and runs nothing, and an update starts the report's
+  // one follow-up (ADR 0070). Code writes every answer, so no model reads
+  // one. Every label is untrusted and lands as text.
+  //
+  // A final report asks nothing. Its answers can be corrected (ADR 0054) in
+  // the same list, and a correction runs nothing.
+
+  // Whether the report asks the questions its conditional findings wait on.
+  const ASKS = !FINAL && !RESUMED_BY
+    && (FACT_QUESTIONS.length + LINK_QUESTIONS.length + EARLIER_FACTS.length + EARLIER_LINKS.length) > 0;
+  // Every question row the page draws, by its key as a string: a link
+  // question's key is its principal, and a fact question's the JSON of its
+  // key. One map, so a finding's link and the question it reaches agree.
+  const QUESTION_ROWS = new Map();
+  const rowKey = (row) => (row.kind === "link" ? row.q.principal : JSON.stringify(row.q.key));
+  // Two answers are one answer when the fields the submitter gives agree.
+  const sameAnswer = (a, b) => {
+    if (!a || !b) return !a && !b;
+    if ("principal" in a) return a.principal === b.principal && a.element === b.element;
+    if ((a.detail || "") !== (b.detail || "")) return false;
+    if (!a.facets && !b.facets) return a.value === b.value;
+    if (!a.facets || !b.facets) return false;
+    const given = Object.entries(a.facets);
+    return given.length === Object.keys(b.facets).length
+      && given.every(([facet, value]) => b.facets[facet] === value);
+  };
+  // What became of a question before this report, in the words its row shows.
+  const HISTORY = {
+    open: "New question from this analysis",
+    unanswered: "Earlier answer: left blank",
+    skipped: "Earlier answer: skipped",
+    partial: "Earlier answer: answered in part",
+    unknown: "Earlier answer: I don't know",
+    answered: "Earlier answer: given, and the analysis did not find it settled",
+  };
+  const questionTotal = FACT_QUESTIONS.length + LINK_QUESTIONS.length;
+  $("questions-tab").textContent = questionTotal ? `Questions (${questionTotal})` : "Questions";
+
+  // A question's findings as links, each its ID with its title on hover.
+  const usedBy = (findings) => {
+    const line = el("div", "meta used-by");
+    line.append("Used by: ");
+    findings.forEach((key, i) => {
+      const t = FINDINGS.get(key);
+      const link = el("a", null, t ? t.id : key);
+      link.href = t ? `#${findingId(t)}` : "#";
+      if (t) link.title = t.title;
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        goToFinding(key);
+      });
+      line.append(...(i ? [" · "] : []), link);
+    });
+    return line;
+  };
+  // The lines under a question's "?": what the answer informs, and that the
+  // analysis decides again.
+  const whyAsked = (q) => {
+    const parts = [];
+    const findings = q.findings || [];
+    if (findings.length) {
+      const titles = findings.map(f => (FINDINGS.get(f) || { title: f }).title);
+      parts.push(`Your answer informs ${counted(findings.length, "finding", "findings")}: ${titles.join("; ")}.`);
+      parts.push("A finding can need other facts too. The analysis decides again whether each one is settled.");
+    } else if (q.findings) {
+      parts.push("No conditional finding waits on this fact. The next analysis reads the answer.");
+    }
+    if (q.band) parts.push(`The most important finding it informs is ${q.band}.`);
+    if (q.basis === "critic") {
+      parts.push("The reviewer raised this question. It can change when the analysis runs again.");
+    }
+    return parts;
+  };
+  // The answers a row starts from: the draft's, over a kept answer's.
+  const startOf = (row) => (row.kind === "link"
+    ? (DRAFT_LINKS.has(row.q.principal) ? { principal: row.q.principal, element: DRAFT_LINKS.get(row.q.principal) } : null)
+    : startFrom(RETAINED.get(JSON.stringify(row.q.key)), row.q.key));
+
+  // Select one group of the list: its box shows, open, and every other box
+  // hides. The index marks it.
+  const selectGroup = (box) => {
+    [...$("list").children].forEach(node => { node.hidden = node !== box; });
+    box.open = true;
+    $("question-index").querySelectorAll("a").forEach(link => {
+      if (link.box === box) link.setAttribute("aria-current", "true");
+      else link.removeAttribute("aria-current");
+    });
+  };
+  const indexGroups = () => {
+    $("question-index").replaceChildren();
+    [...$("list").children].forEach((box, index) => {
+      box.id = `question-group-${index}`;
+      const link = el("a", null, box.querySelector(".group-heading").textContent);
+      const count = box.querySelectorAll(".question, tr[data-key]").length;
+      link.append(el("small", null, counted(count, "question", "questions")));
+      link.href = `#${box.id}`;
+      link.box = box;
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        selectGroup(box);
+        box.querySelector("summary").focus();
+      });
+      $("question-index").append(link);
+    });
+  };
+  // A link from a finding to a question: the question's group, open, with
+  // the focus on its first input.
+  const goToQuestion = (key) => {
+    const row = QUESTION_ROWS.get(JSON.stringify(key));
+    if (!row) return;
+    showSection("questions");
+    selectGroup(row.box.node);
+    openTo(row.node);
+    row.node.scrollIntoView({ block: "center" });
+    if (row.input && typeof row.input.focus === "function") row.input.focus();
+  };
+
+  // A list over `entries`, each `{ q, kind, saved }`, drawn into the layout.
+  // `reopen` is whether a known answer may go back to "I don't know".
+  const drawList = (entries, { reopen, onEdit, notes }) => {
+    const list = questionList({
+      list: $("list"),
+      onEdit,
+      reopen,
+      inputFor: (q, prefill, changed) => answerEditor(q, {
+        choices: q.choices.map(id => ({ id, name: NAMES[id] })),
+        prefill,
+        reopen,
+        changed,
+      }),
+      contextOf: whyAsked,
+      notes,
+    });
+    let prev = null;
+    entries.forEach(({ q, kind, saved, compact }) => {
+      const row = { q, kind, node: el("p", "question"), saved: null };
+      row.node.dataset.key = rowKey(row);
+      QUESTION_ROWS.set(rowKey(row), row);
+      list.place(row, prev);
+      if (compact) list.drawSaved(row, saved);
+      else list.drawOpen(row, saved);
+      row.start = saved;
+      prev = row;
+    });
+    $("question-layout").hidden = false;
+    indexGroups();
+    if ($("list").children.length) selectGroup($("list").children[0]);
+  };
+  // A link question as a row of the list: its options with their names.
+  const linkQuestion = (q) => ({
+    ...q,
+    options: q.options.map(id => ({ id, name: NAMES[id] })),
+    group: "links",
+    group_heading: "Match each user, team or account to a part of your system",
+  });
+  // An answer this report read, as a row the list draws compact. The answers
+  // share one group, after the questions.
+  const EARLIER_GROUP = { group: "earlier", group_heading: "Answers this report read" };
+  const earlierFact = (a) => ({ ...a, ...EARLIER_GROUP, element: a.label });
+
+  // The action area: what the answers on the page are, and the two buttons.
+  const status = el("p", "save-line");
+  status.setAttribute("role", "status");
+  const problem = el("p", "problem");
+  problem.hidden = true;
+  const button = (text, primary) => {
+    const control = el("button", primary ? "primary" : null, text);
+    control.type = "button";
+    return control;
+  };
+  // What a row sends: its answer where it differs from the one it started
+  // from. A facets answer sends only the facets answered otherwise: the
+  // service keeps the earlier answer to a facet left out. A changed detail
+  // alone sends the facets it starts from, which the service keeps as they
+  // are.
+  const sendable = (row) => {
+    const answer = row.read ? row.read() : null;
+    if (!answer || sameAnswer(answer, row.start)) return null;
+    if (!answer.facets || !row.start || !row.start.facets) return answer;
+    const before = row.start.facets;
+    const given = Object.fromEntries(Object.entries(answer.facets)
+      .filter(([facet, value]) => value !== before[facet]));
+    if (Object.keys(given).length) return withDetail({ key: answer.key, facets: given }, answer.detail || "");
+    return (answer.detail || "") !== (row.start.detail || "") ? answer : null;
+  };
+  // Every row whose answer would be sent, with what it sends.
+  const changes = () => [...QUESTION_ROWS.values()]
+    .map(row => ({ row, answer: sendable(row) }))
+    .filter(({ answer }) => answer);
+
+  if (RESUMED_BY) {
+    // The follow-up has run, or runs now: the page offers no second one.
+    const note = el("p", "meta",
+      "Your answers to this report started its follow-up, so this report asks " +
+      "no more questions. When the follow-up finishes, its report is ");
+    const link = el("a", null, "here");
+    link.href = `/report/${encodeURIComponent(RESUMED_BY)}`;
+    note.append(link, ".");
+    $("questions-state").append(note);
+    $("questions-lead").textContent = "This report's one follow-up has started.";
+  } else if (FINAL) {
+    $("questions-title").textContent = "Correct an answer";
+    $("questions-lead").textContent = "This report is final: its one follow-up has run, " +
+      "so it asks no more questions. If an answer was wrong or a guess, change it, or " +
+      "choose \"I don't know\". A correction is kept beside this report and marks the " +
+      "findings that rest on it. Saving corrections does not run the analysis again, " +
+      "and does not change the verdicts in this report.";
+    const answers = CORRECTIONS.answers || [];
+    if (!answers.length) {
+      $("questions-state").append(el("p", "meta", "This report read no answers to correct."));
+    } else {
+      const save = button("Save corrections", true);
+      const showState = () => {
+        const n = changes().length;
+        status.textContent = n ? `${counted(n, "correction", "corrections")} not saved yet` : "No new corrections";
+      };
+      drawList(answers.map(a => ({ q: earlierFact(a), kind: "fact", saved: a.answer, compact: true })), {
+        reopen: true,
+        onEdit: showState,
+        notes: (row) => {
+          const a = answers.find(each => JSON.stringify(each.key) === JSON.stringify(row.q.key));
+          return a && a.corrected ? [el("div", "meta", "Corrected after this report")] : [];
+        },
+      });
+      let saving = false;
+      save.addEventListener("click", async () => {
+        if (saving) return;
+        const facts = changes().map(({ answer }) => answer);
+        if (!facts.length) {
+          status.textContent = "No new corrections to save.";
+          return;
+        }
+        saving = save.disabled = true;
+        status.textContent = "Saving…";
+        try {
+          const saved = await fetch("/correct/" + encodeURIComponent(location.pathname.split("/").pop()), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ facts, revision: CORRECTIONS.revision }),
+          });
+          const body = await saved.json();
+          if (!saved.ok) throw new Error(body.message);
+          location.href = location.pathname + "?view=questions";
+        } catch (error) {
+          problem.textContent = error.message || "The connection was interrupted. Your corrections are still on this page.";
+          problem.hidden = false;
+          status.textContent = "Not saved";
+          saving = save.disabled = false;
+        }
+      });
+      showState();
+      $("question-actions").append(status, el("p", "hint",
+        "Saving corrections runs nothing."), save, problem);
+    }
+  } else if (!ASKS) {
+    $("questions-lead").textContent = "This report asks no questions.";
+  } else {
+    $("questions-lead").textContent = "Answer what you know. You can save and come back.";
+    const entries = [
+      ...LINK_QUESTIONS.map(q => ({ q: linkQuestion(q), kind: "link" })),
+      ...FACT_QUESTIONS.map(q => ({ q, kind: "fact" })),
+      ...EARLIER_LINKS.map(a => ({
+        q: { ...linkQuestion(a), ...EARLIER_GROUP },
+        kind: "link",
+        saved: DRAFT_LINKS.has(a.principal)
+          ? { principal: a.principal, element: DRAFT_LINKS.get(a.principal) }
+          : { principal: a.principal, element: a.answer.element },
+        compact: !DRAFT_LINKS.has(a.principal),
+      })),
+      ...EARLIER_FACTS.map(a => ({
+        q: earlierFact(a),
+        kind: "fact",
+        saved: startFrom(a.answer, a.key),
+        compact: !DRAFT_FACTS.has(JSON.stringify(a.key)),
+      })),
+    ].map(entry => ({ ...entry, saved: entry.saved || startOf(entry) }));
+
+    const save = button("Save draft", false);
+    const update = button("Update report", true);
+    let revision = EARLIER.revision || 0;
+    let busy = false;
+    const showState = (text) => {
+      if (text) {
+        status.textContent = text;
+        return;
+      }
+      const n = changes().length;
+      const drafted = DRAFT_FACTS.size + DRAFT_LINKS.size;
+      status.textContent = n
+        ? `${n} of ${counted(questionTotal, "question", "questions")} edited · Unsaved changes`
+        : drafted
+          ? `Saved draft: ${counted(drafted, "answer", "answers")}. Nothing runs until you choose Update report.`
+          : "No new answers";
+    };
+    // How far the answers reach, before Update report is pressed (#561). A
+    // finding is covered once every question that names it has an answer
+    // other than "I don't know", in any order, so the count follows the
+    // answers given and not the rank. A finding that needs only some facets
+    // of a question is covered once those are known (FactQuestion.needs).
+    const coverage = el("p", "meta");
+    const reach = el("p", "meta");
+    const waitsOn = new Map();
+    FACT_QUESTIONS.forEach((q, index) => q.findings.forEach(finding => {
+      if (!waitsOn.has(finding)) waitsOn.set(finding, []);
+      waitsOn.get(finding).push(index);
+    }));
+    const factRow = index => QUESTION_ROWS.get(JSON.stringify(FACT_QUESTIONS[index].key));
+    const needOf = (index, finding) => (FACT_QUESTIONS[index].needs || {})[finding] || [];
+    const knownFor = (index, facets) => {
+      const row = factRow(index);
+      return row.knownFor ? row.knownFor(facets) : row.known();
+    };
+    // Each finding's lane, read from the field its package stamps, so the
+    // scope line can say how many lanes the answers reach.
+    const laneOfFinding = new Map(R.analyses.flatMap(block => block.claims.map(c =>
+      [`${block.framework}/${c.id}`, laneOf(block.framework, c) || block.framework])));
+    const recount = () => {
+      if (!waitsOn.size) return;
+      const covered = [...waitsOn]
+        .filter(([finding, asked]) => asked.every(index => knownFor(index, needOf(index, finding))))
+        .length;
+      coverage.textContent =
+        `Your answers cover every question for ${covered} of the ${waitsOn.size} findings ` +
+        "that wait on one. The analysis decides again whether they are settled.";
+      const given = FACT_QUESTIONS.filter((q, index) => knownFor(index, [])).length;
+      const reached = [...waitsOn]
+        .filter(([, asked]) => asked.some(index => knownFor(index, []))).map(([f]) => f);
+      const lanes = new Set(reached.map(f => laneOfFinding.get(f)).filter(Boolean));
+      reach.textContent = given
+        ? `${counted(given, "answer reaches", "answers reach")} ${counted(reached.length, "finding", "findings")} in ${counted(lanes.size, "lane", "lanes")}. ` +
+          "Code records each answer, and no model interprets it before the analysis. " +
+          "The follow-up then runs the whole analysis once, and its report is final."
+        : "No answer given yet.";
+    };
+    drawList(entries, {
+      reopen: false,
+      onEdit: () => {
+        showState();
+        recount();
+      },
+      notes: (row) => {
+        const lines = [];
+        if (row.q.history) lines.push(el("div", "meta question-history", HISTORY[row.q.history] || row.q.history));
+        if ((row.q.findings || []).length) lines.push(usedBy(row.q.findings));
+        return lines;
+      },
+    });
+
+    // The run id is this page's own path: /report/{run}.
+    const run = location.pathname.split("/").pop();
+    const post = async (body) => {
+      let response;
+      let reply;
+      try {
+        response = await fetch("/answer/" + encodeURIComponent(run), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        reply = await response.json();
+      } catch {
+        throw new Error("The connection was interrupted. Your answers are still on this page;"
+          + " reload it to check what was saved, or try again.");
+      }
+      if (!response.ok) throw new Error(reply.message);
+      return reply;
+    };
+    const entered = () => {
+      const edited = changes();
+      return {
+        edited,
+        links: edited.filter(({ row }) => row.kind === "link").map(({ answer }) => answer),
+        facts: edited.filter(({ row }) => row.kind !== "link").map(({ answer }) => answer),
+      };
+    };
+    // Save the answers in as many requests as the limits need, each naming
+    // the revision the last one returned. A row then starts from what it saved.
+    const saveInParts = async ({ edited, links, facts }) => {
+      const parts = Math.max(Math.ceil(facts.length / ANSWER_LIMITS.facts),
+        Math.ceil(links.length / ANSWER_LIMITS.links), 1);
+      for (let part = 0; part < parts; part += 1) {
+        const reply = await post({
+          links: links.slice(part * ANSWER_LIMITS.links, (part + 1) * ANSWER_LIMITS.links),
+          facts: facts.slice(part * ANSWER_LIMITS.facts, (part + 1) * ANSWER_LIMITS.facts),
+          save: true,
+          revision,
+        });
+        revision = reply.revision;
+      }
+      edited.forEach(({ row, answer }) => {
+        row.start = row.read();
+        if (row.kind === "link") DRAFT_LINKS.set(answer.principal, answer.element);
+        else DRAFT_FACTS.set(JSON.stringify(answer.key), answer);
+      });
+    };
+    const setBusy = (on) => {
+      busy = on;
+      save.disabled = update.disabled = on;
+    };
+    save.addEventListener("click", async () => {
+      if (busy) return;
+      const answers = entered();
+      if (!answers.edited.length) {
+        showState("No new answers to save.");
+        return;
+      }
+      setBusy(true);
+      problem.hidden = true;
+      showState("Saving…");
+      try {
+        await saveInParts(answers);
+        showState();
+      } catch (error) {
+        problem.textContent = error.message;
+        problem.hidden = false;
+        showState("Not saved");
+      } finally {
+        setBusy(false);
+      }
+    });
+    update.addEventListener("click", async () => {
+      if (busy) return;
+      setBusy(true);
+      problem.hidden = true;
+      showState("Starting the follow-up…");
+      try {
+        let answers = entered();
+        if (answers.links.length > ANSWER_LIMITS.links || answers.facts.length > ANSWER_LIMITS.facts) {
+          // More than one request carries: save them all first, then run on
+          // the draft.
+          await saveInParts(answers);
+          answers = { links: [], facts: [] };
+        }
+        const reply = await post({ links: answers.links, facts: answers.facts, revision });
+        // The form page follows a run's progress and opens its report.
+        location.href = "/?follow=" + encodeURIComponent(reply.run);
+      } catch (error) {
+        problem.textContent = error.message;
+        problem.hidden = false;
+        showState();
+        setBusy(false);
+      }
+    });
+    // Leaving with answers that are not saved asks first.
+    window.addEventListener("beforeunload", (event) => {
+      if (busy || !changes().length) return;
+      event.preventDefault();
+      event.returnValue = "";
+    });
+    showState();
+    recount();
+    $("question-actions").append(status, coverage, reach,
+      el("p", "hint", "Update report uses this report's one follow-up: the analysis runs " +
+        "once more with your answers, and its report is final. A fact you do not know " +
+        "stays open. This report stays available."),
+      save, " ", update, problem);
+  }
+
+  // The invitation under the report: optional, and only where the report
+  // asks something or can be corrected.
+  if (ASKS) {
+    const invite = el("div", "invite");
+    const lead = el("p");
+    lead.append(el("b", null, "Have more information?"));
+    invite.append(lead,
+      el("p", "meta", "Answer a question once, and use it for every finding that depends on it."));
+    const add = el("button", "quiet", "Add information");
+    add.type = "button";
+    add.addEventListener("click", () => {
+      showSection("questions");
+      $("question-index").querySelector("a")?.focus();
+    });
+    invite.append(add);
+    $("invite").append(invite);
+  } else if (RESUMED_BY) {
+    const note = el("p", "meta", "This report's follow-up has started. Its report is ");
+    const link = el("a", null, "here");
+    link.href = `/report/${encodeURIComponent(RESUMED_BY)}`;
+    note.append(link, ".");
+    $("invite").append(note);
+  } else if (FINAL && (CORRECTIONS.answers || []).length) {
+    const note = el("p", "meta", "This report is final. You can still ");
+    const link = el("a", null, "correct an answer");
+    link.href = "?view=questions";
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      showSection("questions");
+    });
+    note.append(link, "; a correction runs nothing.");
+    $("invite").append(note);
   }
 
   // What the answers did, before any finding: how the follow-up's findings
   // moved since the report the answers came from. A finding the follow-up no
-  // longer raises has no card, so it is listed here by title.
+  // longer raises has no row, so it is listed here by title.
   if (CHANGES.length) {
     const tally = new Map();
     CHANGES.forEach(c => {
@@ -1020,379 +1315,146 @@
   // against `job.frameworks`.
   R.analyses.forEach(renderBlock);
 
-  // What the report asks: which element each principal is (link questions),
-  // and the open facts its conditional findings rest on (fact questions).
-  // Answers go to /answer/{run}, which starts a run from this report's model
-  // and catalog; code writes every answer, so no model reads one. Every label
-  // is untrusted and lands as text.
-  if (FINAL) {
-    $("links").append(el("div", "meta",
-      "This report is final. Its one follow-up has run, so it asks no more " +
-      "questions. The facts still open are listed under the conditional findings."));
-  }
-  if (RESUMED_BY) {
-    const note = el("div", "meta",
-      "Your answers to this report started its follow-up, so this report asks " +
-      "no more questions. When the follow-up finishes, its report is ");
-    const link = el("a", null, "here");
-    link.href = `/report/${encodeURIComponent(RESUMED_BY)}`;
-    note.append(link, ".");
-    $("links").append(note);
-  }
-  const earlierCount = EARLIER_FACTS.length + EARLIER_LINKS.length;
-  if (LINK_QUESTIONS.length || FACT_QUESTIONS.length || earlierCount) {
-    // The follow-up is optional and starts closed: the report is complete
-    // without it, and answering runs the analysis once more.
-    const box = el("details", "followup");
-    box.id = "followup";
-    const waiting = new Set(FACT_QUESTIONS.flatMap(q => q.findings)).size;
-    const questionCount = FACT_QUESTIONS.length + LINK_QUESTIONS.length;
-    box.append(el("summary", null, questionCount
-      ? `Optional follow-up: ${questionCount} ${questionCount === 1 ? "question" : "questions"}`
-      : "Optional follow-up: review earlier answers"));
-    box.append(el("p", "meta",
-      (waiting ? `${waiting} conditional ${waiting === 1 ? "finding waits" : "findings wait"} on these answers. ` : "") +
-      (earlierCount ? `You can also change ${earlierCount} earlier ${earlierCount === 1 ? "answer" : "answers"}. ` : "") +
-      "Answer what you can. The analysis runs once more, which takes a few minutes. After that, the report is final."));
-    $("links").append(box);
-    const linkSelects = [];
-    // One reader per fact question: `read` is its answer as the service takes
-    // it, or null; `known` is whether that answer says more than "I don't know".
-    const factAnswers = [];
-    // Why a question is here: what became of it before the analysis
-    // (fact_status), new from the analysis, or raised by the reviewer. The
-    // list puts the most important findings' questions first, so the
-    // reviewer's questions sit among the others and each one says so.
-    const BEFORE = {
-      skipped: " (you skipped this before the analysis)",
-      unanswered: " (shown before the analysis and left blank)",
-      partial: " (you answered part of this before the analysis)",
-    };
-    const why = q => BEFORE[q.history]
-      ? BEFORE[q.history]
-      : q.basis === "evidence"
-        ? " (new from the analysis)"
-        : " (raised by the reviewer; it can change when the analysis runs again)";
-    // The findings that wait on a question, by title, so the owner sees what
-    // an answer can settle.
-    const titles = {};
-    (R.analyses || []).forEach(b => b.claims.forEach(c => {
-      titles[`${b.framework}/${c.id}`] = c.title;
-    }));
-    const waitingOn = q => {
-      if (!q.findings.length) return "";
-      const named = q.findings.slice(0, 3).map(f => titles[f] || f);
-      const rest = q.findings.length - named.length;
-      return el("div", "meta",
-        `Waiting on it: ${named.join("; ")}` + (rest ? `; and ${rest} more` : "") +
-        (q.band ? `. The most important is ${q.band}.` : ""));
-    };
+  // ---- About the analysis -----------------------------------------------------
+  // How this report was made: its identifiers, its times and the versions
+  // that ran, each by a readable label with its whole value. A value the
+  // report does not carry is left out, never made up.
+  const facts = [
+    ["Report ID", code(R.job.id)],
+    ["Follow-up of", PARENT_RUN && Object.assign(el("a", null, PARENT_RUN), {
+      href: `/report/${encodeURIComponent(PARENT_RUN)}` })],
+    ["Follow-up run", RESUMED_BY && Object.assign(el("a", null, RESUMED_BY), {
+      href: `/report/${encodeURIComponent(RESUMED_BY)}` })],
+    ["Started", fmt(R.job.created_at)],
+    ["Generated", fmt(R.job.completed_at)],
+    ["Frameworks", R.analyses.map(b => `${b.framework} ${b.framework_version}`).join(", ")],
+    ["Sources", R.input.sources.map(s => s.label).join(", ")],
+    ["Report schema", R.schema_version],
+    ["Critic re-asks", String(R.job.revise_rounds)],
+    ["Instruction digest", R.analysis_context && code(R.analysis_context.instruction_sha256)],
+    ["Domain packs", R.analysis_context && R.analysis_context.domain_packs.join(", ")],
+    ["Execution identity version", R.execution && String(R.execution.identity_version)],
+    ["Review independence", R.execution && R.execution.review_independence],
+    ["Builds", R.execution && Object.keys(R.execution.build).length
+      && Object.entries(R.execution.build).map(([name, version]) => `${name} ${version}`).join(", ")],
+  ];
+  facts.filter(([, value]) => value).forEach(([label, value]) => {
+    const term = el("dt", null, label);
+    const detail = el("dd");
+    detail.append(value);
+    $("report-facts").append(term, detail);
+  });
 
-    if (LINK_QUESTIONS.length) {
-      box.append(el("h2", null, "Match each user, team or account to a part of your system"));
-      box.append(el("div", "meta", "Your description says things about these users, teams and accounts, such as whether they sign in with MFA. The analysis can use those facts only after you match each one to a part of your system. Choose \"None of these\" if no part matches."));
-      LINK_QUESTIONS.forEach(q => {
-        const row = el("p");
-        const select = el("select");
-        select.dataset.principal = q.principal;
-        select.append(option("(leave unanswered)", ""));
-        linkOptions(select, q.options);
-        select.value = DRAFT_LINKS.get(q.principal) || "";
-        select.setAttribute("aria-label", `Matching part of your system for ${q.principal}`);
-        row.append(el("b", null, q.principal), " ", select);
-        box.append(row);
-        linkSelects.push(select);
-      });
+  // One framework's notes on how its analysis ran: its disclaimer, the units
+  // it raised nothing about, and what the service dropped or repaired.
+  function frameworkNotes(block, marks) {
+    const notes = el("section", "analysis");
+    notes.append(el("h3", null, `${block.framework} · v${block.framework_version}`));
+    notes.append(el("div", "disclaimer-block", block.disclaimer));
+    // What this framework considered and raised nothing about, grouped by
+    // state, and the deferred group again by the evidence that would settle
+    // it. A framework answering in its own units lists every one of them, so
+    // the counts stand for the list, which the report holds unit by unit.
+    if (block.scope.length) {
+      const byState = {};
+      block.scope.forEach(e => { (byState[e.state] = byState[e.state] || []).push(e); });
+      const ruledOutClaims = block.rejected_claims.filter(c => rulesOut(block, c));
+      const lines = [`${block.scope.length} units with no claim raised`];
+      const count = (state) => (byState[state] || []).length;
+      if (count("not-applicable")) lines.push(`${count("not-applicable")} ruled out — does not apply`);
+      if (ruledOutClaims.length) {
+        lines.push(`${ruledOutClaims.length} ruled out by review — does not apply; each on its own row in the report`);
+      }
+      if (count("undecidable")) {
+        lines.push(`${count("undecidable")} undecidable — the input never says whether this framework applies`);
+      }
+      if (count("not-raised")) {
+        lines.push(`${count("not-raised")} not raised — no lane filed a claim; not a verdict that they apply`);
+      }
+      const deferred = byState["needs-other-evidence"] || [];
+      if (deferred.length) {
+        lines.push(`${deferred.length} could not be evaluated from this input`);
+        const byNeed = {};
+        deferred.forEach(e => { byNeed[e.needs] = (byNeed[e.needs] || 0) + 1; });
+        Object.keys(byNeed).sort().forEach(need => lines.push(`  ${byNeed[need]} need ${need}`));
+      }
+      const list = el("ul", "meta");
+      lines.forEach(line => list.append(el("li", null, line)));
+      notes.append(list);
     }
-
-    if (FACT_QUESTIONS.length) {
-      box.append(el("h2", null, "What would settle the conditional findings?"));
-      box.append(el("div", "meta",
-        "Each question is a fact the conditional findings wait on, the most useful " +
-        "first. Beside each is how many findings have every question answered once it " +
-        "and every question above it is answered. A question with parts asks only " +
-        "the parts listed, which may not be every fact a finding needs. Answer as far down as you like; " +
-        "the line under the questions counts the findings your answers cover. The " +
-        "analysis decides again whether each answer settles its finding. Choose " +
-        "\"I don't know\" where nobody knows: the fact stays open."));
-      if (FALLBACK.typed + FALLBACK.free_text) {
-        box.append(el("div", "meta",
-          `The reviewer asked ${counted(FALLBACK.typed, "open fact", "open facts")} from the fixed list of ` +
-          `questions and ${FALLBACK.free_text} in its own words.`));
-      }
-      // A question no conditional finding waits on cannot move this report:
-      // it follows the others, in a closed section of its own.
-      const material = FACT_QUESTIONS.filter(q => q.findings.length);
-      const aside = FACT_QUESTIONS.filter(q => !q.findings.length);
-      const ordered = [...material, ...aside];
-      // The first few in full; the rest one click away rather than a wall.
-      const SHOWN = 10;
-      const more = el("details", "openfact");
-      more.append(el("summary", null, `More questions (${material.length - SHOWN})`));
-      const unwaited = el("details", "openfact");
-      unwaited.append(el("summary", null,
-        `Questions no conditional finding waits on (${aside.length})`));
-      unwaited.append(el("div", "meta",
-        "Only a confirmed finding, a rejected draft, a finding that waits on a " +
-        "fact answered \"I don't know\", or evidence the reviewer ruled does not " +
-        "matter to its finding cites these facts. An answer cannot move a " +
-        "conditional finding in this report; the next analysis reads it."));
-      // The facts only the critic named come after the ones the findings' own
-      // evidence rests on, and they can change when the analysis runs again,
-      // so they are headed apart.
-      // A finding is covered once every question that names it has an answer,
-      // in any order, so the count follows the answers given, not the rank.
-      const waitsOn = new Map();
-      ordered.forEach((q, index) => q.findings.forEach(finding => {
-        if (!waitsOn.has(finding)) waitsOn.set(finding, []);
-        waitsOn.get(finding).push(index);
-      }));
-      // The facets a finding needs of a question it waits on only in part,
-      // as the service read them off its references (FactQuestion.needs).
-      const needOf = (index, finding) => (ordered[index].needs || {})[finding] || [];
-      // Each finding's lane, read from the field its package stamps, so the
-      // scope line can say how many lanes the answers reach.
-      const laneOfFinding = new Map(R.analyses.flatMap(block => block.claims.map(c =>
-        [`${block.framework}/${c.id}`, laneOf(block.framework, c) || block.framework])));
-      const tally = el("div", "meta");
-      const scope = el("div", "meta");
-      function recount() {
-        const known = index => factAnswers[index].known();
-        const coveredFor = finding => index => factAnswers[index].knownFor(needOf(index, finding));
-        const covered = [...waitsOn].filter(([finding, asked]) => asked.every(coveredFor(finding))).length;
-        tally.textContent =
-          `Your answers cover every question for ${covered} of the ${waitsOn.size} findings ` +
-          "that wait on one. The analysis decides again whether they are settled.";
-        // What pressing the button does, before it is pressed (#561): how far
-        // the answers reach, and what runs. A follow-up runs the whole
-        // analysis once (ADR 0044), and code records every answer (ADR 0046).
-        const given = factAnswers.filter(answer => answer.known()).length;
-        const reached = [...waitsOn].filter(([, asked]) => asked.some(known)).map(([f]) => f);
-        const lanes = new Set(reached.map(f => laneOfFinding.get(f)).filter(Boolean));
-        scope.textContent = given
-          ? `${counted(given, "answer reaches", "answers reach")} ${counted(reached.length, "finding", "findings")} in ${counted(lanes.size, "lane", "lanes")}. ` +
-            "Code records each answer, and no model interprets it before the analysis. " +
-            "The follow-up then runs the whole analysis once, and its report is final."
-          : "No answer given yet.";
-      }
-      ordered.forEach((q, index) => {
-        const into = !q.findings.length ? unwaited : index < SHOWN ? box : more;
-        const row = el("p");
-        row.id = questionId(q.key);
-        const editor = editorFor(q, startFrom(RETAINED.get(JSON.stringify(q.key)), q.key), recount, false);
-        factAnswers.push({
-          read: editor.read,
-          known: editor.known,
-          knownFor: editor.knownFor || editor.known,
-        });
-        const lead = [el("b", null, q.label), why(q),
-          ` \u2014 ${counted(q.cited_by, "finding waits", "findings wait")} on it; answering down to here covers ${q.covered_so_far}`];
-        if (q.form === "facets") row.append(...lead, waitingOn(q), ...editor.nodes);
-        else row.append(...lead, " ", ...editor.nodes, waitingOn(q));
-        into.append(row);
+    // What the service dropped for naming something this framework does not
+    // have. There is no finding to hang these on, so they are listed here.
+    if (marks.unknown.length) {
+      const note = el("div", "dropped");
+      note.append(el("b", null,
+        `${counted(marks.unknown.length, "ruling", "rulings")} dropped for naming an unpublished identifier`));
+      const list = el("ul");
+      marks.unknown.forEach(m => {
+        const item = el("li");
+        item.append(code(m.claim_id), " — ", prose(m.title));
+        list.append(item);
       });
-      if (material.length > SHOWN) box.append(more);
-      if (aside.length) box.append(unwaited);
-      box.append(tally, scope);
-      recount();
+      note.append(list);
+      notes.append(note);
     }
-
-    // The answers this report read. A row sends a new answer only once its
-    // "Change" button opens it, so the follow-up reads only what changed.
-    const earlierFacts = [];
-    if (earlierCount) {
-      box.append(el("h2", null, "Earlier answers"), el("div", "meta",
-        "This report read these answers. If one is wrong, or you now know what was " +
-        "\"I don't know\", change it, and the follow-up reads the new answer. A " +
-        "known answer, or a known part of one, cannot change back to " +
-        "\"I don't know\" here."));
-      // A row whose answer the draft changed opens at once, with the draft's
-      // answer in it.
-      const changer = (row, shown, open, drafted) => {
-        const change = el("button", null, "Change");
-        change.type = "button";
-        const opened = () => {
-          change.hidden = true;
-          shown.replaceChildren(" \u2014 ", ...open());
-        };
-        change.addEventListener("click", opened);
-        row.append(shown, " ", change);
-        if (drafted) opened();
-      };
-      EARLIER_LINKS.forEach(a => {
-        const row = el("p");
-        const element = a.answer.element;
-        row.append(el("b", null, a.principal));
-        changer(row, el("span", null, ` \u2014 ${element === "none"
-          ? "none of these" : NAMES[element] || element}`), () => {
-          const select = el("select");
-          select.dataset.principal = a.principal;
-          linkOptions(select, a.options);
-          select.value = DRAFT_LINKS.get(a.principal) || element;
-          linkSelects.push(select);
-          return [select];
-        }, DRAFT_LINKS.has(a.principal));
-        box.append(row);
+    if (marks.groundless.length) {
+      const note = el("div", "dropped");
+      note.append(el("b", null,
+        `${counted(marks.groundless.length, "finding", "findings")} dropped for a fault in one entry`));
+      const list = el("ul");
+      marks.groundless.forEach(m => {
+        const item = el("li");
+        item.append(code(m.claim_id), " — ", prose(m.title), " (", prose(m.reason), ")");
+        list.append(item);
       });
-      EARLIER_FACTS.forEach(a => {
-        const row = el("p");
-        row.append(el("b", null, a.label));
-        changer(row, el("span", null, ` \u2014 ${answerText(a.answer)}`), () => {
-          const editor = editorFor(a, startFrom(a.answer, a.key), () => {}, false);
-          earlierFacts.push(editor.read);
-          return editor.nodes;
-        }, DRAFT_FACTS.has(JSON.stringify(a.key)));
-        box.append(row);
-      });
+      note.append(list);
+      notes.append(note);
     }
-
-    // Saving keeps the answers as a draft and runs nothing; only the run
-    // button spends the follow-up (ADR 0070). Every answer entered stays on
-    // the page whatever a request returns.
-    const keep = el("button", null, "Save progress");
-    const again = el("button", null, "Run the follow-up with these answers");
-    const note = el("div", "meta");
-    const savedNote = el("div", "meta");
-    let revision = EARLIER.revision || 0;
-    const showSaved = () => {
-      const count = DRAFT_FACTS.size + DRAFT_LINKS.size;
-      savedNote.textContent = count
-        ? `Saved and not yet run: ${counted(count, "answer", "answers")}. The follow-up reads them when it runs.`
-        : "";
-    };
-    // The run id is this page's own path: /report/{run}.
-    const run = location.pathname.split("/").pop();
-    const post = async (body) => {
-      let response;
-      let reply;
-      try {
-        response = await fetch("/answer/" + encodeURIComponent(run), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        reply = await response.json();
-      } catch {
-        throw new Error("The connection was interrupted. Your answers are still on this page;"
-          + " reload it to check what was saved, or try again.");
-      }
-      if (!response.ok) throw new Error(reply.message);
-      return reply;
-    };
-    const entered = () => ({
-      links: linkSelects
-        .filter(s => s.value)
-        .map(s => ({ principal: s.dataset.principal, element: s.value })),
-      facts: [...factAnswers.map(answer => answer.read()),
-        ...earlierFacts.map(read => read())].filter(Boolean),
-    });
-    // Save the answers in as many requests as the limits need, each naming
-    // the revision the last one returned.
-    const saveInParts = async ({ links, facts }) => {
-      const parts = Math.max(Math.ceil(facts.length / ANSWER_LIMITS.facts),
-        Math.ceil(links.length / ANSWER_LIMITS.links), 1);
-      for (let part = 0; part < parts; part += 1) {
-        const reply = await post({
-          links: links.slice(part * ANSWER_LIMITS.links, (part + 1) * ANSWER_LIMITS.links),
-          facts: facts.slice(part * ANSWER_LIMITS.facts, (part + 1) * ANSWER_LIMITS.facts),
-          save: true,
-          revision,
-        });
-        revision = reply.revision;
-      }
-      links.forEach(a => DRAFT_LINKS.set(a.principal, a.element));
-      facts.forEach(a => DRAFT_FACTS.set(JSON.stringify(a.key), a));
-      showSaved();
-    };
-    const busy = (on) => { keep.disabled = again.disabled = on; };
-    keep.addEventListener("click", async () => {
-      const answers = entered();
-      if (!answers.links.length && !answers.facts.length) {
-        note.textContent = "No answer to save yet.";
-        return;
-      }
-      busy(true);
-      try {
-        await saveInParts(answers);
-        note.textContent = "Saved. Nothing runs until you choose to run the follow-up.";
-      } catch (error) {
-        note.textContent = error.message;
-      } finally {
-        busy(false);
-      }
-    });
-    again.addEventListener("click", async () => {
-      busy(true);
-      try {
-        let answers = entered();
-        if (answers.links.length > ANSWER_LIMITS.links || answers.facts.length > ANSWER_LIMITS.facts) {
-          // More than one request carries: save them all first, then run on
-          // the draft.
-          await saveInParts(answers);
-          answers = { links: [], facts: [] };
-        }
-        const reply = await post({ ...answers, revision });
-        // The form page follows a run's progress; this page shows one report.
-        location.href = "/?follow=" + encodeURIComponent(reply.run);
-      } catch (error) {
-        note.textContent = error.message;
-        busy(false);
-      }
-    });
-    const actions = el("p");
-    actions.append(keep, " ", again);
-    showSaved();
-    box.append(actions, savedNote, note);
+    // A repaired run and a clean one read alike without this. The count per
+    // kind is what a reader acts on, so the kinds are grouped.
+    if (marks.unreconciled.length) {
+      const note = el("div", "dropped");
+      note.append(el("b", null,
+        `${counted(marks.unreconciled.length, "problem", "problems")} the review's first pass left for its re-ask`));
+      const byKind = new Map();
+      marks.unreconciled.forEach(m => {
+        if (!byKind.has(m.kind)) byKind.set(m.kind, []);
+        byKind.get(m.kind).push(m.claim_id);
+      });
+      const list = el("ul");
+      byKind.forEach((ids, kind) => {
+        const item = el("li");
+        item.append(code(kind), ` — ${ids.length}: `, prose(ids.join(", ")));
+        list.append(item);
+      });
+      note.append(list);
+      notes.append(note);
+    }
+    $("framework-notes").append(notes);
   }
 
-  // A final report's answers can be corrected (ADR 0054): a changed value, or
-  // "I don't know" where an answer was a guess. A correction is kept beside
-  // the report and marks the findings that rest on it; nothing runs again.
-  if (FINAL && (CORRECTIONS.answers || []).length) {
-    const box = el("details", "followup");
-    box.append(el("summary", null, `Correct an answer (${CORRECTIONS.answers.length})`),
-      el("div", "meta",
-        "If an answer was wrong or a guess, change it, or choose \"I don't know\". " +
-        "The correction is kept beside this report and marks the findings that rest " +
-        "on it. The analysis does not run again."));
-    const edits = [];
-    CORRECTIONS.answers.forEach(a => {
-      const row = el("p");
-      const shown = el("span", null,
-        ` \u2014 ${answerText(a.answer)}` + (a.corrected ? " (corrected after this report)" : ""));
-      const change = el("button", null, "Change");
-      change.type = "button";
-      change.addEventListener("click", () => {
-        change.hidden = true;
-        const editor = editorFor(a, a.answer, () => {}, true);
-        shown.replaceChildren(" \u2014 ", ...editor.nodes);
-        edits.push(editor.read);
-      });
-      row.append(el("b", null, a.label), shown, " ", change);
-      box.append(row);
+  // Each question by its Q number and label, with the reference the service
+  // keys it by. The reference stays here, out of the question list.
+  if (FACT_QUESTIONS.length) {
+    const table = el("table");
+    const head = el("tr");
+    head.append(el("th", null, "Q"), el("th", null, "Question"), el("th", null, "Reference"));
+    table.append(head);
+    FACT_QUESTIONS.forEach((q, index) => {
+      const row = el("tr");
+      row.append(cell(`Q${index + 1}`), cell(q.label), cell(code(q.key.filter(Boolean).join(" · "))));
+      table.append(row);
     });
-    const save = el("button", null, "Save the corrections");
-    const note = el("div", "meta");
-    save.addEventListener("click", async () => {
-      const facts = edits.map(read => read()).filter(Boolean);
-      // The run id is this page's own path: /report/{run}.
-      const run = location.pathname.split("/").pop();
-      const saved = await fetch("/correct/" + encodeURIComponent(run), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ facts, revision: CORRECTIONS.revision }),
-      });
-      const body = await saved.json();
-      if (!saved.ok) {
-        note.textContent = body.message;
-        return;
-      }
-      location.href = location.pathname;
-    });
-    const actions = el("p");
-    actions.append(save);
-    box.append(actions, note);
-    $("links").append(box);
+    $("question-refs").append(table);
+    // How the reviewer named the open facts: from the fixed list of question
+    // kinds, or in its own words.
+    if (FALLBACK.typed + FALLBACK.free_text) {
+      $("question-refs").append(el("div", "meta",
+        `The reviewer asked ${counted(FALLBACK.typed, "open fact", "open facts")} from the fixed list of ` +
+        `questions and ${FALLBACK.free_text} in its own words.`));
+    }
+  } else {
+    $("question-refs").append(el("div", "meta", "This report asks no questions."));
   }
 
   // system model table. Each entry returns the cell's children rather than a
@@ -1447,7 +1509,7 @@
   });
 
   // What the model leaves unstated, on the most elements first. An element
-  // whose fact this report asks links to its question in the follow-up.
+  // whose fact this report asks links to its question.
   const GAPS = JSON.parse($("gaps").textContent);
   GAPS.forEach(g => {
     const words = NAMES[g.attribute] || g.attribute;
@@ -1458,9 +1520,13 @@
     g.elements.forEach((e, i) => {
       if (i) row.append(", ");
       row.append(ref(e.id));
-      if (ASKS && ASKED.has(JSON.stringify(e.key))) {
+      if (QUESTION_ROWS.has(JSON.stringify(e.key)) && ASKS) {
         const answer = el("a", null, "Answer");
-        answer.href = `${location.pathname}#${questionId(e.key)}`;
+        answer.href = "?view=questions";
+        answer.addEventListener("click", (event) => {
+          event.preventDefault();
+          goToQuestion(e.key);
+        });
         row.append(" (", answer, ")");
       }
     });
@@ -1476,9 +1542,12 @@
       el("span", "m", n.model ? n.model : "code"), ` · ${n.duration_ms} ms`
     );
     if (n.execution_fingerprint) {
-      const fp = el("code", "m", `fp ${n.execution_fingerprint.slice(0, 12)}…`);
-      fp.title = `execution-identity fingerprint: sha256 of the requested route, the served build, the resolved tier sampling, the instruction digest and the build versions\n${n.execution_fingerprint}`;
-      row.append(" · ", fp);
+      // The whole value, to copy: sha256 of the requested route, the served
+      // build, the resolved tier sampling, the instruction digest and the
+      // build versions.
+      const fp = el("code", "m fingerprint", n.execution_fingerprint);
+      fp.title = "execution-identity fingerprint";
+      row.append(" · fingerprint ", fp);
     }
     $("nodes").append(row);
   });
@@ -1494,18 +1563,23 @@
     $("nodes").append(row);
   });
 
-  // A print shows every card, so the closed groups open for it and close
-  // again after. Each card's evidence stays closed.
+  // A print holds the report: every finding opens for it, and each closes
+  // again after.
   let closedForPrint = [];
   window.addEventListener("beforeprint", () => {
-    closedForPrint = [...document.querySelectorAll("details.openfact:not([open])")];
+    closedForPrint = [...document.querySelectorAll("#report-view details:not([open])")];
     closedForPrint.forEach(d => { d.open = true; });
   });
   window.addEventListener("afterprint", () => closedForPrint.forEach(d => { d.open = false; }));
 
-  // A link from the other view lands on its target, opened.
+  // The section ?view= names, and a link from elsewhere lands on its target,
+  // opened.
+  const view = new URLSearchParams(location.search).get("view");
+  showSection(SECTIONS.includes(view) ? view : "report");
   const landed = location.hash && document.getElementById(location.hash.slice(1));
   if (landed) {
+    const holder = SECTIONS.find(name => $(`${name}-view`).contains(landed));
+    if (holder) showSection(holder);
     openTo(landed);
     landed.scrollIntoView();
   }

@@ -14,8 +14,10 @@
 //
 // A row is the page's own object: `{ q, kind, node }`, `kind` "fact" or
 // "link". Drawing sets `row.read`, the answer as the service takes it or
-// null, `row.set`, `row.input` and `row.compact`. Every label is untrusted
-// and lands as text.
+// null, `row.set`, `row.input` and `row.compact`. A fact row also sets
+// `row.known`, whether its answer says more than "I don't know", and a facets
+// row `row.knownFor(facets)`, whether the facets named are. Every label is
+// untrusted and lands as text.
 const questionList = ({
   list,
   onEdit,
@@ -83,11 +85,12 @@ const questionList = ({
   const drawFact = (row, prefill) => {
     const q = row.q;
     const title = questionTitle(q, q.label);
-    const { input, nodes, set, answer, readDetail } = inputFor(q, prefill, (event) =>
+    const { input, nodes, set, answer, readDetail, known } = inputFor(q, prefill, (event) =>
       edited(row, event),
     );
     row.input = input;
     row.read = answer;
+    row.known = known;
     row.detail = readDetail;
     row.set = (next) => set(next.value);
     row.compact = false;
@@ -229,6 +232,14 @@ const questionList = ({
         ? withDetail({ key: q.key, facets: given }, detail.value.trim())
         : null;
     };
+    // The critic names the kind, not a facet, so a finding waiting on it is
+    // covered only once every facet says more than "I don't know". A finding
+    // that needs only some facets is covered once those are known (ADR 0073);
+    // `facets` lists them, or is empty for every facet.
+    row.knownFor = (facets) => inputs
+      .filter((select) => !facets.length || facets.includes(select.dataset.facet))
+      .every((select) => select.value && select.value !== DONT_KNOW);
+    row.known = () => row.knownFor([]);
     // Whether a facet is still blank, which a skip sets aside.
     row.open = () => inputs.some((select) => !select.value);
     row.setFacet = (id, value) => {

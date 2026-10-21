@@ -225,7 +225,6 @@ from analysis_service.model_gate import NoThinkingLevel
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import (
     gaps,
-    open_facts_by_framework,
     reference_labels,
 )
 from analysis_service.principals import Identity
@@ -842,12 +841,16 @@ def unit_rows(report: Report) -> dict[str, list[dict[str, str]]]:
 
 
 def render_report(
-    report: Report, state: AnswerState, previous: Report | None = None
+    report: Report,
+    state: AnswerState,
+    previous: Report | None = None,
+    parent: str | None = None,
 ) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
     ``previous`` is the report a follow-up's answers came from. The page then
-    shows how each finding moved since it.
+    shows how each finding moved since it. ``parent`` is the ID of the run
+    whose answers started this one, or ``None``.
 
     ``state`` is the run's :class:`~analysis_service.answer_state.AnswerState`:
     its answers, whether a follow-up wrote its report, what the pause showed,
@@ -878,20 +881,18 @@ def render_report(
         _REPORT_GRANTS,
         script="\n".join(
             client_script(name)
-            for name in ("sidebar.js", "answer_editor.js", "report_view.js")
+            for name in (
+                "sidebar.js",
+                "answer_editor.js",
+                "question_list.js",
+                "report_view.js",
+            )
         ),
         workspace_style=_WORKSPACE_STYLE,
         sidebar=_SIDEBAR,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
         units=script_json(unit_rows(report)),
-        open_facts=script_json(
-            open_facts_by_framework(
-                report.analyses,
-                report.system_model,
-                report.assertions.catalog if report.assertions else None,
-            )
-        ),
         fixes=script_json(
             fixes_by_framework(
                 report.analyses,
@@ -904,6 +905,7 @@ def render_report(
         link_questions=script_json(asked["link_questions"]),
         final=script_json(asked["final"]),
         resumed_by=script_json(asked["resumed_by"]),
+        parent_run=script_json(parent),
         corrections=script_json(
             _corrections_payload(
                 report, state.answers.facts, state.corrections, state.revision
@@ -961,7 +963,10 @@ def _provenance_payload(
             if answer.kind == "attribute" and answer.known
         ],
         "conditions": {
-            finding: [{"label": label, "status": status} for _, label, status in rows]
+            finding: [
+                {"key": list(key), "label": label, "status": status}
+                for key, label, status in rows
+            ]
             for finding, rows in conditions(
                 report.analyses,
                 report.system_model,
@@ -1680,7 +1685,14 @@ def create_app(
         previous = None
         if parent is not None and served(answers, parent):
             previous = await workspace.store.report(parent.id, owner_id)
-        return response(render_report(report, answerable.state(), previous))
+        return response(
+            render_report(
+                report,
+                answerable.state(),
+                previous,
+                None if resumption is None else resumption.parent_id,
+            )
+        )
 
     @app.post("/correct/{run_id}")
     async def correct(run_id: str, request: Request) -> Response:

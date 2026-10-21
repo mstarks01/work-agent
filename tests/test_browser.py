@@ -204,29 +204,40 @@ def test_a_submitter_who_skips_every_question_reaches_a_report_that_says_what_is
     assert "primary" in page.get_attribute("#continue", "class")
     page.click("#continue")
     page.wait_for_url("**/report/**")
-    report = page.inner_text("body")
-    assert re.search(r"\d+ findings? needs? an answer", report)
-    assert "? Needs info" in report
+    report = page.inner_text("#report-view")
+    assert re.search(r"\d+ additional findings? (is|are) conditional", report)
+    assert "You can use this report without answering any questions." in report
+    assert "Conditional findings ·" in report
 
 
-def test_a_report_links_each_finding_and_shows_how_it_was_made_apart(page):
-    """A table row's title opens its card, inside a closed group too, and the
-    System Model and the pipeline sit on their own view."""
+def test_a_report_moves_between_its_three_sections(page):
+    """The report opens on its findings. A conditional finding's question link
+    opens Questions on its row, and About the analysis holds the System Model
+    and the pipeline (#1884)."""
     pause(page)
     page.click("#continue")
     page.wait_for_url("**/report/**")
+    assert page.locator("#analyses").is_visible()
     assert not page.locator("#elements").is_visible()
-    row = page.locator("table.findings tr", has_text="Needs info").first
-    row.locator("a").click()
-    card = page.locator(row.locator("a").get_attribute("href"))
-    card.wait_for(state="visible")
-    page.get_by_role("link", name="How this report was made").click()
-    page.wait_for_url("**?view=provenance")
+    assert not page.locator("#question-actions").is_visible()
+    page.locator(
+        "details.finding-group > summary", has_text="Conditional findings"
+    ).click()
+    finding = page.locator("details.finding-group details.finding").first
+    finding.locator("> summary").click()
+    finding.locator(".field ul a").first.click()
+    page.wait_for_url("**?view=questions")
+    assert page.locator("#question-actions").is_visible()
+    assert page.evaluate(
+        "document.getElementById('list').contains(document.activeElement)"
+    )
+    page.get_by_role("link", name="About the analysis").click()
+    page.wait_for_url("**?view=about")
     assert page.locator("#elements").is_visible()
     assert page.locator("#nodes").is_visible()
     assert not page.locator("#analyses").is_visible()
-    page.get_by_role("link", name="Back to the findings").click()
-    page.locator("table.findings").wait_for()
+    page.get_by_role("link", name="Report", exact=True).click()
+    page.locator("#analyses").wait_for()
 
 
 def test_a_phone_sized_submitter_answers_skips_corrects_and_starts(browser, served):
@@ -507,16 +518,21 @@ def test_a_first_report_offers_no_way_to_reopen_a_known_answer(page):
     """The follow-up refuses "I don't know" for a known earlier answer, and
     the page offered it (#1289, F2)."""
     first_report(page)
-    followup = page.locator("details.followup")
-    followup.locator("summary").first.click()
-    open_groups(page)
-    earlier = followup.locator("p", has=page.locator("button", has_text="Change"))
+    earlier = earlier_answers(page)
     for index in range(earlier.count()):
-        earlier.nth(index).locator("button").click()
+        earlier.nth(index).locator("button", has_text="Change").click()
     offered = earlier.locator("option").evaluate_all("o => o.map(n => n.value)")
     assert "no" in offered
     assert "unknown" not in offered
     assert earlier.locator("label", has_text="I don't know").count() == 0
+
+
+def earlier_answers(page):
+    """The rows of the answers the report read, in the Questions section."""
+    page.get_by_role("link", name=re.compile("^Questions")).click()
+    page.locator("#question-index a", has_text="Answers this report read").click()
+    group = page.locator(".question-group", has_text="Answers this report read")
+    return group.locator("p.question")
 
 
 def first_report(page) -> None:
@@ -532,11 +548,8 @@ def final_report(page) -> str:
     follow-up. Returns the final report's path."""
     first_report(page)
     first = page.url
-    followup = page.locator("details.followup")
-    followup.locator("summary").first.click()
-    open_groups(page)
-    row = followup.locator("p", has=page.locator("button", has_text="Change")).first
-    row.locator("button").click()
+    row = earlier_answers(page).first
+    row.locator("button", has_text="Change").click()
     row.locator("select").select_option("yes")
     snapshots = []
     page.on(
@@ -546,33 +559,33 @@ def final_report(page) -> str:
         ),
     )
     with page.expect_request("**/answer/*") as sent:
-        page.click("text=Run the follow-up with these answers")
+        page.get_by_role("button", name="Update report").click()
     assert any(
         fact.get("value") == "yes" for fact in sent.value.post_data_json["facts"]
     )
-    page.wait_for_url(lambda url: "/report/" in url and url != first)
+    page.wait_for_url(
+        lambda url: "/report/" in url and url.split("?")[0] != first.split("?")[0]
+    )
     assert len(snapshots) == 1, "Live progress must not also start reopening the run"
     return page.url
 
 
 def test_a_first_report_sends_a_changed_answer_and_reaches_the_final_report(page):
     final_report(page)
-    assert page.locator("summary", has_text="Correct an answer").count() == 1
-    assert page.locator("text=Run the follow-up with these answers").count() == 0
+    page.get_by_role("link", name=re.compile("^Questions")).click()
+    assert page.locator("#questions-title").inner_text() == "Correct an answer"
+    assert page.get_by_role("button", name="Update report").count() == 0
 
 
 def test_a_final_report_saves_a_correction(page):
     final_report(page)
-    corrections = page.locator("details.followup", has_text="Correct an answer")
-    corrections.locator("summary").first.click()
-    open_groups(page)
-    row = corrections.locator("p", has=page.locator("button", has_text="Change")).first
-    row.locator("button").click()
+    row = earlier_answers(page).first
+    row.locator("button", has_text="Change").click()
     row.locator("select").select_option("unknown")
     with page.expect_request("**/correct/*") as sent:
-        page.click("text=Save the corrections")
+        page.click("text=Save corrections")
     assert sent.value.post_data_json["facts"][0]["value"] == "unknown"
-    page.wait_for_selector("text=(corrected after this report)", state="attached")
+    page.wait_for_selector("text=Corrected after this report", state="attached")
 
 
 def opened(browser, url: str):
@@ -1077,7 +1090,8 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     page.click("#continue")
     page.wait_for_url("**/report/**")
     report_url = page.url
-    assert "Generated " in page.inner_text("#jobmeta")
+    page.get_by_role("link", name="About the analysis").click()
+    assert "Generated" in page.inner_text("#report-facts")
     page.goto(analysis_url)
     page.wait_for_url(report_url)
     assert page.locator("#sysname").is_visible()
@@ -1087,30 +1101,40 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     assert "Generated " in page.locator("#report-list a").inner_text()
 
 
-def test_a_question_s_answer_link_opens_its_follow_up_row(page):
-    """The Answer link on an open question opens the closed follow-up and
-    lands on that question's row."""
+def test_a_question_s_finding_link_opens_its_report_row(page):
+    """A Used by link on a question opens the report on that finding, inside
+    its closed section, and focuses it (#1884)."""
     pause(page)
     page.click("#continue")
     page.wait_for_url("**/report/**")
-    link = page.locator("details.openfact summary a", has_text="Answer").first
+    page.get_by_role("link", name=re.compile("^Questions")).click()
+    link = page.locator(".used-by a").first
     target = link.get_attribute("href")
     link.click()
     page.locator(target).wait_for(state="visible")
-    assert page.locator("#followup").get_attribute("open") is not None
+    assert page.locator(target).get_attribute("open") is not None
+    assert page.evaluate(
+        f"document.querySelector({json.dumps(target)}).contains(document.activeElement)"
+    )
 
 
 def test_a_printed_report_holds_only_the_findings(page):
-    """A print hides the navigation, the controls and the follow-up, prints in
-    the light palette, and opens each closed group so every card prints."""
+    """A print hides the navigation, the controls and the questions, prints in
+    the light palette, and opens each closed section so every finding prints."""
     pause(page)
     page.click("#continue")
     page.wait_for_url("**/report/**")
     page.click("#themebtn")
-    group = page.locator("details.openfact").first
+    group = page.locator("details.finding-group").first
     assert group.get_attribute("open") is None
     page.emulate_media(media="print")
-    for hidden in (".sidebar", "#themebtn", "#analysis-tabs", "#links"):
+    for hidden in (
+        ".sidebar",
+        "#themebtn",
+        "#analysis-tabs",
+        "#report-tabs",
+        "#invite",
+    ):
         assert not page.locator(hidden).is_visible(), hidden
     assert (
         page.locator(".viz-root").evaluate(
@@ -1124,19 +1148,20 @@ def test_a_printed_report_holds_only_the_findings(page):
     assert group.get_attribute("open") is None
 
 
-def test_a_gap_s_answer_link_opens_its_question_on_the_findings_view(page):
-    """An Answer link in the model's gaps leads to the findings view, opens the
-    follow-up, and lands on the question's row."""
+def test_a_gap_s_answer_link_opens_its_question(page):
+    """An Answer link in the model's gaps opens Questions on the question's
+    group, with the focus on its input."""
     pause(page)
     page.click("#continue")
     page.wait_for_url("**/report/**")
-    page.goto(page.url + "?view=provenance")
-    link = page.locator("#model-gaps a", has_text="Answer").first
-    target = link.get_attribute("href").split("#")[1]
-    link.click()
-    page.locator(f"#{target}").wait_for(state="visible")
-    assert page.locator("#followup").get_attribute("open") is not None
-    assert page.locator("#report-view").is_visible()
+    page.goto(page.url + "?view=about")
+    page.locator("#model-gaps a", has_text="Answer").first.click()
+    page.wait_for_url("**?view=questions")
+    assert page.locator("#questions-view").is_visible()
+    assert not page.locator("#about-view").is_visible()
+    assert page.evaluate(
+        "document.getElementById('list').contains(document.activeElement)"
+    )
 
 
 def test_a_report_sits_in_the_workspace_with_its_analysis_tabs(page):
@@ -1300,7 +1325,7 @@ def test_a_report_names_each_open_fact_by_its_label(browser, waiting_asvs):
     unit = page.locator("details.unit", has_text="Still to answer")
     unit.locator("summary").click()
     row = unit.locator("div.lbl:text-is('Still to answer') + p").all_inner_texts()
-    card = page.locator(".unknown", has_text=labels[0]).locator("li")
+    card = page.locator(".finding .field", has_text=labels[0]).first.locator("li")
     listed = [text.split(" — ")[0] for text in card.all_text_contents()]
     context.close()
 

@@ -124,36 +124,54 @@ catalog and the pause. A run toward a report counts the extraction, the
 preparation, the review of the findings and the report assembly. The status line
 names the next stage in plain words, and the page shows no graph node name.
 
-**The report** — one block per framework you selected. Each block starts with a
-summary and a table of its findings. The summary counts the confirmed findings
-by severity and the findings that wait on an answer. The table gives each
-finding's severity, status, affected components and first next step, and its
-title links to the finding's card. Under **Claims**, confirmed findings that
-rest on one control the description states is missing share a group, named for
-the control to add. Under **Questions that would settle the conditional
-findings**, each open question shows once, with the findings that wait on it
-and an **Answer** link to its row in the follow-up. STRIDE contributes threat cards; ASVS
-contributes requirement rulings. Each card carries its **grounds** behind
-**Why it matters, and the evidence**: the quotes, unknown attributes and
-boundary crossings the agent raised it on, with a quote the service could not
-find in its source marked as such rather than hidden.
-A name that an agent writes, such as an element ID, an attribute or an asset
-tag, shows as words. The name itself shows when you hover over the words.
+**The report** has three sections under its title: **Report**, **Questions**
+and **About the analysis**. The page opens on **Report**, and `?view=questions`
+or `?view=about` opens the other two.
 
-**How this report was made** — a link under the report's title opens a second
-view of the same page at `?view=provenance`. It holds the service's disclaimer
-with the assertion counts, the extracted DFD with its boundary crossings and
-assumptions, and the served-build provenance for every LLM node.
+**Report** holds one block per framework you selected. Each block starts with a
+summary: the confirmed findings by severity, how many findings are conditional
+on missing information, and how many the review dismissed. The report is
+complete for what you told it, and the summary says that you can use it without
+answering a question. Where two or more confirmed findings rest on one control
+that the description states is missing, a line names that one shared action and
+the findings it addresses. Each finding is one row: its severity, its title, its
+next action and its ID. Click a row to open it. The open row gives the lane, the
+confidence and the verdict, the facts a conditional finding needs, the reason a
+dismissed finding was dismissed, the full attack narrative, the affected
+components and flows, and the two recommendations. The heading over the
+recommendations follows the verdict: **Recommended actions**, **Potential
+mitigations · if confirmed**, or **Original proposed mitigations · not active
+actions**. **Evidence and justification** holds the grounds: the quotes,
+unknown attributes and boundary crossings the agent raised the finding on, with
+a quote the service could not find in its source marked as such. The confirmed
+findings show open; the conditional and the dismissed findings each sit in a
+closed section. A name that an agent writes, such as an element ID, an
+attribute or an asset tag, shows as words. The name itself shows when you hover
+over the words.
 
-**Gaps in the system model**, at the top of that view, lists each attribute
-that the description leaves unstated, with the elements it is unstated on. The
+**Questions** asks the facts that the conditional findings need, in the same
+list as the questions before the analysis: a group for each kind of question,
+an index of the groups, typed answers, and one shared answer where a question
+asks about several parts. Each question says what became of it before, names
+the findings that use it, and explains under its **?** what the answer informs.
+A link from a finding opens its question, and a link from a question opens its
+finding. **Save draft** keeps the answers and runs nothing. **Update report**
+starts the report's one follow-up. A final report shows its answers here to
+correct instead, and a correction runs nothing.
+
+**About the analysis** holds the report's identifiers and times, the versions
+that ran, the service's disclaimer, each framework's notes and diagnostics, the
+reference of each question, the extracted DFD with its boundary crossings and
+assumptions, and the served-build provenance and fingerprint of every LLM node.
+
+**Gaps in the system model**, in About the analysis, lists each attribute that
+the description leaves unstated, with the elements it is unstated on. The
 attribute on the most elements comes first. Where the report asks about an
-element, an **Answer** link opens that question in the follow-up.
+element, an **Answer** link opens that question.
 
-**A printed report** holds only the findings. The print leaves out the sidebar,
-the tabs, the theme button and the follow-up questions, and it always uses the
-light colours. Each group of findings opens for the print, so every card
-prints. The evidence under each card stays closed.
+**A printed report** holds the report section only. The print leaves out the
+sidebar, the tabs, the theme button and the questions, and it always uses the
+light colours. Each closed section and finding opens for the print.
 
 ## When the configuration is wrong
 

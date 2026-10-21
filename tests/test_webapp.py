@@ -1386,24 +1386,6 @@ def test_a_submitted_nonce_placeholder_is_not_substituted():
     assert nonce not in payload.group(1)
 
 
-def test_the_page_carries_the_open_facts_its_findings_rest_on():
-    """The grouping is computed server-side and handed over, like the units."""
-    from analysis_service.open_facts import open_facts_by_framework
-    from tests.factories import sample_report
-
-    report = sample_report()
-    rendered = render_report(report, report_state(report))
-    payload = re.search(
-        r'<script type="application/json" id="open_facts"[^>]*>(.*?)</script>',
-        rendered.html,
-        re.DOTALL,
-    )
-
-    assert json.loads(payload.group(1)) == json.loads(
-        json.dumps(open_facts_by_framework(report.analyses, report.system_model))
-    )
-
-
 def test_the_page_carries_the_link_questions_its_catalog_raises():
     """The questions are computed server-side and handed over, like the units."""
     from analysis_service.links import link_questions
@@ -1861,9 +1843,11 @@ def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
         "REVIEW_EXCLUDED"
         in script.split("function unitTable")[1].split("function renderBlock")[0]
     ), "the requirement row reads the ruling as Excluded by review"
-    assert "dismissed.forEach" in script, "the dismissed list is the rest"
-    assert '[ruledOutClaims.length, "excluded by review"]' in script, (
-        "the summary counts the rulings, which exist only where units do"
+    assert "block.rejected_claims.filter(c => !rulesOut(block, c))" in script, (
+        "the dismissed list is the rest"
+    )
+    assert "ruled out by review" in script.split("function frameworkNotes")[1], (
+        "the analysis notes count the rulings, which exist only where units do"
     )
 
 

@@ -1,7 +1,7 @@
 """The whole report page, run under ``node`` against a page the service rendered.
 
 Where the other harnesses cut one block out of the script, this one runs all
-of it, so the claim cards, their grounds and the page's summaries are checked
+of it, so the finding rows, their grounds and the page's summaries are checked
 as a person would read them (#1289, PR 4).
 """
 
@@ -28,7 +28,7 @@ from webapp.main import render_report
 _SHIM = r"""
 class Node {
   constructor(tag) { this.tag = tag; this.children = []; this.dataset = {};
-    this.style = {}; this.listeners = {}; this.attributes = {};
+    this.style = {}; this.listeners = {}; this.attributes = {}; this.value = "";
     this.classList = { add() {}, remove() {}, toggle() { return true; }, contains() { return false; } }; }
   append(...kids) { this.children.push(...kids); }
   prepend(...kids) { this.children.unshift(...kids); }
@@ -42,6 +42,11 @@ class Node {
   addEventListener(name, fn) { this.listeners[name] = fn; }
   setAttribute(name, value) { this.attributes[name] = value; }
   getAttribute(name) { return this.attributes[name]; }
+  removeAttribute(name) { delete this.attributes[name]; }
+  get tagName() { return String(this.tag).toUpperCase(); }
+  contains() { return false; }
+  scrollIntoView() {}
+  focus() {}
   querySelector() { return this._query || (this._query = new Node("query")); }
   querySelectorAll() { return []; }
   closest() { return new Node("closest"); }
@@ -62,8 +67,33 @@ globalThis.document = {
 };
 globalThis.window = globalThis;
 globalThis.addEventListener = () => {};
-globalThis.location = { pathname: "/report/r1", href: "" };
+globalThis.location = { pathname: "/report/r1", href: "", search: "" };
+globalThis.history = { replaceState() {} };
 """
+
+
+def payloads_of(html: str) -> dict[str, str]:
+    """Each JSON block a rendered page carries, by its ID, as served."""
+    return dict(
+        re.findall(
+            r'<script type="application/json" id="([^"]+)"[^>]*>(.*?)</script>',
+            html,
+            re.DOTALL,
+        )
+    )
+
+
+def page_script() -> str:
+    """The report page's whole client script, as a rendered page carries it."""
+    report = sample_report()
+    html = render_report(report, report_state(report)).html
+    (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
+    return script
+
+
+def shim(payloads: dict[str, str]) -> str:
+    """The stand-in DOM, serving ``payloads`` as the page's JSON blocks."""
+    return _SHIM.replace("PAYLOADS", json.dumps(payloads))
 
 
 def run_report_page(html: str, search: str = "") -> dict[str, str]:
@@ -72,16 +102,9 @@ def run_report_page(html: str, search: str = "") -> dict[str, str]:
     node = shutil.which("node")
     if node is None:
         pytest.skip("no node on PATH to run the report page")
-    payloads = dict(
-        re.findall(
-            r'<script type="application/json" id="([^"]+)"[^>]*>(.*?)</script>',
-            html,
-            re.DOTALL,
-        )
-    )
     (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
     program = (
-        _SHIM.replace("PAYLOADS", json.dumps(payloads))
+        shim(payloads_of(html))
         + f"location.search = {json.dumps(search)};\n"
         + script
         + "\nconsole.log(JSON.stringify({...Object.fromEntries("
@@ -117,12 +140,15 @@ def page(answered=(), shown=(), final=False, skipped=()):
 
 def test_the_page_runs_whole():
     parts = run_report_page(page())
-    assert "Needs info." in parts["analyses"]
+    assert "? Needs info" in parts["analyses"]
+    assert "Information needed" in parts["analyses"]
 
 
 def waits_line(parts):
     """The banner's line for the one fact the finding waits on."""
-    (line,) = re.findall(r"encrypted\? — ([^.]*?)(?=Affected)", parts["analyses"])
+    (line,) = re.findall(
+        r"encrypted\? — (.*?)(?=Full attack narrative)", parts["analyses"]
+    )
     return line
 
 
@@ -148,7 +174,6 @@ def test_a_conditional_finding_says_why_each_fact_is_still_open(answered, shown,
     """The banner named an element and an attribute and nothing more (#1289, PR 4)."""
     parts = run_report_page(page(answered=answered, shown=shown))
     assert waits_line(parts) == why
-    assert "neither confirmed nor cleared" in parts["analyses"]
 
 
 def test_a_skipped_fact_is_told_apart_from_a_blank_one():
@@ -167,31 +192,31 @@ def two_findings():
 
 
 def test_the_summary_counts_the_confirmed_and_the_waiting_findings():
-    """One summary per block, in place of the tiles and the severity bar."""
+    """One summary per block, in words, that needs no answer to be complete."""
     text = run_report_page(two_findings())["analyses"]
-    assert "1 confirmed finding (1 high)." in text
-    assert "1 finding needs an answer to 1 open question. Answer the questions" in text
-    assert "Actionable claims" not in text
+    assert "1 confirmed finding: 1 high." in text
+    assert "1 additional finding is conditional on missing information." in text
+    assert "You can use this report without answering any questions." in text
 
 
-def test_the_findings_table_lists_each_finding_with_its_first_step():
-    """A row per finding, before the cards: the confirmed one first, with its
-    first mitigation, and the waiting one with the question it waits on."""
+def test_each_finding_is_a_row_with_its_next_action():
+    """A row per finding: the confirmed one first, with its first mitigation,
+    and the conditional one in its closed section, with the question it
+    waits on (#1884)."""
     text = run_report_page(two_findings())["analyses"]
-    head = "SeverityFindingStatusAffectedFirst next step"
-    assert head in text
-    table = text[text.index(head) : text.index("AI-generated STRIDE")]
-    confirmed = table.index("Session cookie theft enables account takeover S-01")
-    waiting = table.index("Cookies cross the network in clear S-02")
-    assert confirmed < waiting
-    assert "\u2713 Confirmed" in table
-    assert "Set HttpOnly and Secure on cookies" in table
-    assert "Answer: Is the connection" in table
+    confirmed = text.index(
+        "HighSession cookie theft enables account takeoverSet HttpOnly and Secure on cookiesS-01"
+    )
+    waiting = text.index(
+        "Conditional findings · 1HighCookies cross the network in clear"
+        "Information needed: Is the connection"
+    )
+    assert text.index("Confirmed findings") < confirmed < waiting
 
 
 def test_findings_that_rest_on_one_missing_control_share_a_group(monkeypatch):
-    """Two confirmed findings that cite one stated-absent control sit under one
-    group, named for the control to add, and the table still lists both."""
+    """Two confirmed findings that cite one stated-absent control name one
+    shared action, and each finding stays its own row."""
     from analysis_service.claims import Ground
     from tests import factories
 
@@ -216,42 +241,59 @@ def test_findings_that_rest_on_one_missing_control_share_a_group(monkeypatch):
     report = sample_report(threats)
     text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
     assert (
-        "Add encryption in transit to the connection from Web App to Orders DB"
-        " \u2014 2 findings rest on this missing control"
+        "One shared action addresses 2 findings: Add encryption in transit to"
+        " the connection from Web App to Orders DB. T-01 · I-01"
     ) in text
-    assert text.count("Orders change in transit") == 2
+    assert text.count("Orders change in transit") == 1
 
 
-def test_the_conditional_section_says_its_guidance_once():
-    """The cards under a question carry no copy of the section's guidance."""
-    text = run_report_page(page())["analyses"]
-    assert text.count("neither confirmed nor cleared") == 1
-    assert text.count("Confirm each fact with the people who run the component") == 1
-    assert "Questions that would settle the conditional findings" in text
-    assert "an answer alone covers 1 Answer" in text
+def test_conditional_and_dismissed_findings_each_keep_their_own_row():
+    """Each record stays individually reachable in its closed section (#1884)."""
+    from analysis_service.claims import Verdict
+
+    rejected = sample_threat(
+        "I-01",
+        "information-disclosure",
+        title="Admin traffic is readable",
+        verdict=Verdict(status="rejected", reason="The source states HTTPS."),
+    )
+    report = sample_report([asking_threat(ASKED)], [rejected])
+    text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
+    assert "Conditional findings · 1" in text
+    assert "Dismissed findings · 1HighAdmin traffic is readableDismissedI-01" in text
+    assert "Why dismissedThe source states HTTPS." in text
+    assert "Original proposed mitigations · not active actions" in text
 
 
-def test_the_findings_view_hides_how_the_report_was_made():
+def test_the_report_is_the_section_a_reader_lands_on():
     parts = run_report_page(two_findings())
-    assert parts["hidden"].split() == ["provenance-view"]
-    assert parts["jobmeta"].endswith("How this report was made")
+    assert parts["hidden"].split() == ["questions-view", "about-view"]
 
 
-def test_the_provenance_view_holds_the_model_and_the_pipeline():
-    """The service disclaimer, the element count, the System Model and the
-    pipeline move to ?view=provenance, which hides the findings."""
-    parts = run_report_page(two_findings(), search="?view=provenance")
-    assert parts["hidden"].split() == ["report-view"]
-    assert parts["jobmeta"].endswith("Back to the findings")
+def test_about_holds_the_identifiers_the_model_and_the_pipeline():
+    """The disclaimer, the identifiers, the element count, the System Model and
+    the pipeline sit under About the analysis, which hides the report."""
+    parts = run_report_page(two_findings(), search="?view=about")
+    assert parts["hidden"].split() == ["report-view", "questions-view"]
     assert parts["disclaimer"].startswith("AI-generated security analysis.")
     assert "elements in the model" in parts["scope"]
+    assert "Report IDjob-" in parts["report-facts"]
+    assert "Generated" in parts["report-facts"]
 
 
-def test_the_next_step_follows_whether_the_report_is_final():
-    follow_up = run_report_page(page())["analyses"]
-    final = run_report_page(page(final=True))["analyses"]
-    assert "answer the questions in the follow-up below" in follow_up
-    assert "correct an answer below or submit the description again" in final
+def test_the_questions_follow_whether_the_report_is_final():
+    follow_up = run_report_page(page())
+    final = run_report_page(page(final=True))
+    assert "Have more information?" in follow_up["invite"]
+    assert (
+        follow_up["questions-lead"]
+        == "Answer what you know. You can save and come back."
+    )
+    assert final["questions-title"] == "Correct an answer"
+    assert (
+        "Saving corrections does not run the analysis again" in final["questions-lead"]
+    )
+    assert final.get("invite", "") == ""
 
 
 def test_a_corrected_finding_is_marked_on_its_card():
@@ -463,12 +505,17 @@ console.log(JSON.stringify({ shown: out.shown.join(""), hidden: out.hidden.join(
 
 def test_a_finding_shows_its_summary_and_hides_its_provenance():
     """#561's default view: what is missing, what it touches and what to do
-    next. Why it matters, the grounds and the critic's reason sit behind the
-    toggle, and nothing is dropped."""
+    next. The narrative, why it matters, the grounds and the critic's reason
+    sit behind toggles, and nothing is dropped."""
     shown, hidden = _split_by_provenance(page())
 
-    for part in ("Missing information", "Affected", "Next step"):
+    for part in (
+        "Information needed",
+        "Affected components and flows",
+        "Potential mitigations",
+    ):
         assert part in shown, part
+    assert "Stolen session cookies let an attacker" in hidden
     assert "Why it matters" in hidden
     assert "Why it matters" not in shown
     assert "The critic's reason" in hidden
@@ -586,6 +633,8 @@ def _scope_states():
         ("VERDICT_STATE", "analysis_service.claims:VerdictStatus"),
         ("SCOPE_STATE", None),
         ("CHANGE_LINE", "analysis_service.report_changes:Change"),
+        ("RECOMMENDATIONS", "analysis_service.claims:VerdictStatus"),
+        ("HISTORY", "analysis_service.report_conditions:FactStatus"),
     ],
 )
 def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
@@ -609,7 +658,7 @@ def test_the_page_reads_the_service_s_severity_order():
     """The page orders severity by ``SEVERITY_ORDER`` as the server sends it.
 
     The page holds no order of its own, so a level the service adds lands in
-    the summary and the findings table. ``SEV`` labels each level, and the
+    the summary and the finding rows. ``SEV`` labels each level, and the
     table test holds its keys.
     """
     from analysis_service.critic import SEVERITY_ORDER
@@ -626,10 +675,10 @@ def test_the_page_reads_the_service_s_severity_order():
     )
 
 
-def test_the_provenance_view_lists_the_model_s_gaps_with_their_questions():
+def test_about_lists_the_model_s_gaps_with_their_questions():
     """Each unstated attribute shows once, with its elements, and an element
     the report asks about links to its question."""
-    parts = run_report_page(page(), "?view=provenance")
+    parts = run_report_page(page(), "?view=about")
     gaps = parts["model-gaps"]
     assert "Encryption in transit is not stated for 1 element: " in gaps
     assert "(Answer)" in gaps
@@ -637,6 +686,9 @@ def test_the_provenance_view_lists_the_model_s_gaps_with_their_questions():
 
 
 def test_a_count_of_one_reads_in_the_singular():
-    text = run_report_page(page())["analyses"]
-    assert "1 conditional finding waits on 1 question." in text
-    assert "1 finding waits on this" in text
+    parts = run_report_page(page())
+    assert (
+        "1 additional finding is conditional on missing information."
+        in parts["analyses"]
+    )
+    assert parts["questions-tab"] == "Questions (1)"

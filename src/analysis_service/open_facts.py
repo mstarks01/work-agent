@@ -1,36 +1,28 @@
-"""The open facts a framework's conditional findings rest on, grouped for a reader.
+"""How a reader sees an open fact: the question it asks, and the group it is in.
 
 A ``needs-info`` verdict names what has to be answered in ``related_unknowns``.
-One open fact often holds up several findings, and one finding often waits on
-several facts, so a report that lists the findings one by one asks the same
-question many times and hides which answer would settle the most. This groups
-them the other way round: each open fact once, with the findings that cite it.
+Every surface that shows such a fact words it here, so the early list, the
+report, ``/v1`` and a refusal ask it alike: :func:`label_of` for the question,
+:func:`group_of` for the group a page lists it in. This module also names the
+elements and references a report writes (:func:`reference_labels`), lists the
+attributes the model leaves unstated (:func:`gaps`), and decides which
+attribute may be asked (:func:`open_attribute`).
 
-**Deterministic, and derived from the report alone.** No model is asked. The
-grouping reads what each finding waits on
-(:meth:`~analysis_service.claims.RuledClaim.waits_on`) through
-:attr:`~analysis_service.claims.UnknownRef.key`, the one reader of "are these two
-references the same", and labels an element through the report's own System
-Model. Nothing here is stored on the report: it is computed wherever a reader
-needs it, so it cannot drift from the verdicts it summarises.
-
-**Each finding is placed once.** A finding that waits on several facts is shown
-under the one that settles the most findings on its own, and the others it
-needs are still listed on its card. The order is by that same count, then by
-how many findings cite the fact, then by label, so two reads of one report
-agree.
+**Deterministic, and derived from the report alone.** No model is asked, and
+nothing here is stored on the report: it is computed wherever a reader needs
+it, so it cannot drift from the verdicts it describes.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from analysis_service.analysis import control_state
 from analysis_service.assertions import REGISTRY, AssertionCatalog, identity_parts
 from analysis_service.capabilities import CAPABILITIES
-from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
+from analysis_service.claims import UnknownRef
 from analysis_service.evidence import evidence_catalog, prepared_view
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.system_model import (
@@ -40,8 +32,6 @@ from analysis_service.system_model import (
     assumable_attribute_names,
     attribute_names,
 )
-
-NEEDS_INFO = "needs-info"
 
 #: The one group every capability question is shown in.
 CAPABILITY_GROUP = "capabilities"
@@ -65,31 +55,6 @@ ASSET_WORDS = {
 def attribute_words(attribute: str) -> str:
     """An attribute or a control as a reader sees it: words, not a field name."""
     return attribute.replace("_", " ").replace("-", " ")
-
-
-@dataclass(frozen=True)
-class OpenFact:
-    """One open fact, and the conditional findings that wait on it."""
-
-    #: :attr:`UnknownRef.key`, as a list so it serialises as JSON.
-    key: UnknownKey
-    #: What a reader sees: an element's name and the attribute, or the subject.
-    label: str
-    #: Every needs-info finding that cites this fact.
-    cited_by: tuple[str, ...]
-    #: The findings an answer to this fact alone would settle.
-    settles: tuple[str, ...]
-    #: The findings shown under this fact; each finding is placed once.
-    placed: tuple[str, ...]
-
-    def to_json(self) -> dict[str, object]:
-        return {
-            "key": list(self.key),
-            "label": self.label,
-            "cited_by": list(self.cited_by),
-            "settles": list(self.settles),
-            "placed": list(self.placed),
-        }
 
 
 def element_names(model: SystemModel) -> Mapping[str, str]:
@@ -263,10 +228,16 @@ def group_of(ref: UnknownRef) -> tuple[str, str]:
     question the group asks, with no element named: the kind's question with
     its element made a pronoun, or the attribute's question of each element.
     The kind is read through :attr:`~analysis_service.claims.UnknownRef.kind`.
+    An assertion and a free-text subject each ask their own question, so every
+    assertion shares one group, and every subject shares another.
     """
     match ref.kind:
         case "capability":
             return CAPABILITY_GROUP, "About the application"
+        case "assertion":
+            return "assertions", "What the description leaves open"
+        case "subject":
+            return "subjects", "Other questions"
         case "question" if ref.question in QUESTION_KINDS:
             template = QUESTION_KINDS[ref.question].template
             heading = template.replace("{element}'s", "its").replace("{element}", "it")
@@ -316,62 +287,6 @@ def gaps(model: SystemModel) -> tuple[Gap, ...]:
         unstated, key=lambda attribute: (-len(unstated[attribute]), attribute)
     )
     return tuple(Gap(attribute, tuple(unstated[attribute])) for attribute in order)
-
-
-def open_facts(
-    block: FrameworkAnalysis,
-    model: SystemModel,
-    catalog: AssertionCatalog | None = None,
-) -> tuple[OpenFact, ...]:
-    """Every open fact this block's needs-info findings rest on, best first."""
-    names = element_names(model)
-    needs: dict[str, set[UnknownKey]] = {}
-    labels: dict[UnknownKey, str] = {}
-    for claim in block.claims:
-        if claim.verdict.status != NEEDS_INFO:
-            continue
-        refs = claim.waits_on()
-        needs[claim.id] = {ref.key for ref in refs}
-        for ref in refs:
-            labels.setdefault(ref.key, label_of(ref, names, model, catalog))
-    cited: dict[UnknownKey, list[str]] = defaultdict(list)
-    for claim_id, keys in needs.items():
-        for key in keys:
-            cited[key].append(claim_id)
-    settles = {
-        key: tuple(claim_id for claim_id in ids if needs[claim_id] == {key})
-        for key, ids in cited.items()
-    }
-    order = sorted(
-        cited, key=lambda key: (-len(settles[key]), -len(cited[key]), labels[key])
-    )
-    rank = {key: position for position, key in enumerate(order)}
-    placed: dict[UnknownKey, list[str]] = defaultdict(list)
-    for claim_id, keys in needs.items():
-        if keys:
-            placed[min(keys, key=rank.__getitem__)].append(claim_id)
-    return tuple(
-        OpenFact(
-            key=key,
-            label=labels[key],
-            cited_by=tuple(cited[key]),
-            settles=settles[key],
-            placed=tuple(placed[key]),
-        )
-        for key in order
-    )
-
-
-def open_facts_by_framework(
-    analyses: Sequence[FrameworkAnalysis],
-    model: SystemModel,
-    catalog: AssertionCatalog | None = None,
-) -> dict[str, list[dict[str, object]]]:
-    """:func:`open_facts` for each block, as the JSON a page is handed."""
-    return {
-        block.framework: [fact.to_json() for fact in open_facts(block, model, catalog)]
-        for block in analyses
-    }
 
 
 def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
