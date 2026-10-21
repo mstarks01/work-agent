@@ -145,6 +145,11 @@ view of the same page at `?view=provenance`. It holds the service's disclaimer
 with the assertion counts, the extracted DFD with its boundary crossings and
 assumptions, and the served-build provenance for every LLM node.
 
+**Gaps in the system model**, at the top of that view, lists each attribute
+that the description leaves unstated, with the elements it is unstated on. The
+attribute on the most elements comes first. Where the report asks about an
+element, an **Answer** link opens that question in the follow-up.
+
 **A printed report** holds only the findings. The print leaves out the sidebar,
 the tabs, the theme button and the follow-up questions, and it always uses the
 light colours. Each group of findings opens for the print, so every card

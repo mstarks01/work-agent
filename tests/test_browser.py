@@ -1124,6 +1124,21 @@ def test_a_printed_report_holds_only_the_findings(page):
     assert group.get_attribute("open") is None
 
 
+def test_a_gap_s_answer_link_opens_its_question_on_the_findings_view(page):
+    """An Answer link in the model's gaps leads to the findings view, opens the
+    follow-up, and lands on the question's row."""
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    page.goto(page.url + "?view=provenance")
+    link = page.locator("#model-gaps a", has_text="Answer").first
+    target = link.get_attribute("href").split("#")[1]
+    link.click()
+    page.locator(f"#{target}").wait_for(state="visible")
+    assert page.locator("#followup").get_attribute("open") is not None
+    assert page.locator("#report-view").is_visible()
+
+
 def test_a_report_sits_in_the_workspace_with_its_analysis_tabs(page):
     """The report shows the workspace sidebar, and its Description tab opens
     the analysis at its description without a return to the report."""

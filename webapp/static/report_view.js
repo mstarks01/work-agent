@@ -1446,6 +1446,28 @@
     $("assumptions").append(d);
   });
 
+  // What the model leaves unstated, on the most elements first. An element
+  // whose fact this report asks links to its question in the follow-up.
+  const GAPS = JSON.parse($("gaps").textContent);
+  GAPS.forEach(g => {
+    const words = NAMES[g.attribute] || g.attribute;
+    const count = g.elements.length;
+    const row = el("div", "gap");
+    row.append(el("b", null, words[0].toUpperCase() + words.slice(1)),
+      ` is not stated for ${count} ${count === 1 ? "element" : "elements"}: `);
+    g.elements.forEach((e, i) => {
+      if (i) row.append(", ");
+      row.append(ref(e.id));
+      if (ASKS && ASKED.has(JSON.stringify(e.key))) {
+        const answer = el("a", null, "Answer");
+        answer.href = `${location.pathname}#${questionId(e.key)}`;
+        row.append(" (", answer, ")");
+      }
+    });
+    $("model-gaps").append(row);
+  });
+  if (!GAPS.length) $("model-gaps").append(el("div", "meta", "The system model states every attribute."));
+
   // pipeline
   R.nodes.forEach(n => {
     const row = el("div","node");
@@ -1480,6 +1502,13 @@
     closedForPrint.forEach(d => { d.open = true; });
   });
   window.addEventListener("afterprint", () => closedForPrint.forEach(d => { d.open = false; }));
+
+  // A link from the other view lands on its target, opened.
+  const landed = location.hash && document.getElementById(location.hash.slice(1));
+  if (landed) {
+    openTo(landed);
+    landed.scrollIntoView();
+  }
 
   // theme toggle
   $("themebtn").addEventListener("click", () => {

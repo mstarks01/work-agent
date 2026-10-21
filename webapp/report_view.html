@@ -216,6 +216,7 @@
   td .unk { color: var(--sev-high); font-weight: 600; }
   .crossing { font-size: 0.85rem; color: var(--ink-2); padding: 6px 0; }
   .assume { font-size: 0.85rem; color: var(--ink-2); }
+  .gap { font-size: 0.88rem; padding: 4px 0; }
 
   .nodes { display: flex; flex-wrap: wrap; gap: 8px; }
   .node { font-size: 0.76rem; color: var(--ink-2); background: var(--surface); border: 1px solid var(--border);
@@ -290,6 +291,11 @@
       <div class="disclaimer"><span class="dot"></span><span id="disclaimer"></span></div>
       <div class="meta" id="scope"></div>
 
+      <!-- What the System Model leaves unstated, built in JS from the gaps
+           payload. -->
+      <h2>Gaps in the system model</h2>
+      <div id="model-gaps"></div>
+
       <h2>System model (extracted DFD)</h2>
       <table id="elements"><thead><tr>
         <th>Type</th><th>ID</th><th>Name</th><th>Trust zone</th><th>Key attributes</th>
@@ -346,6 +352,9 @@
      Source, the attributes the owner answered, and why each conditional
      finding's facts are still open. -->
 <script type="application/json" id="provenance" nonce="__CSP_NONCE__"><!--provenance--></script>
+<!-- Each attribute the System Model leaves unstated, and where, from
+     analysis_service.open_facts.gaps. Escaped the same way. -->
+<script type="application/json" id="gaps" nonce="__CSP_NONCE__"><!--gaps--></script>
 <!-- A display label for each element ID and evidence reference, from
      analysis_service.open_facts.reference_labels. Escaped the same way. -->
 <script type="application/json" id="names" nonce="__CSP_NONCE__"><!--names--></script>
