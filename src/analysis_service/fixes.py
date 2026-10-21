@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from analysis_service.assertions import ABSENT, AssertionCatalog, assertion_id
 from analysis_service.claims import Claim, FrameworkAnalysis
 from analysis_service.critic import row_controls
-from analysis_service.open_facts import element_names
+from analysis_service.open_facts import attribute_words, element_names
 from analysis_service.system_model import DataFlow, SystemModel
 
 CONFIRMED = "confirmed"
@@ -94,8 +94,7 @@ def label_of(key: ControlKey, names: Mapping[str, str], model: SystemModel) -> s
         source = names.get(element.source, element.source)
         destination = names.get(element.destination, element.destination)
         where = f"the connection from {source} to {destination}"
-    what = control.replace("_", " ").replace("-", " ")
-    return f"Add {what} to {where}"
+    return f"Add {attribute_words(control)} to {where}"
 
 
 def fixes(

@@ -444,7 +444,7 @@
       return row;
     }
     if (ground.kind === "unknown-attribute" || ground.kind === "absent-attribute") {
-      body.append(ref(ground.element_id), " \u2192 ", code(ground.attribute));
+      body.append(ref(ground.element_id), " \u2192 ", ref(ground.attribute));
       if (ANSWERED_ATTRIBUTES.has(`${ground.element_id}>${ground.attribute}`)) {
         body.append(el("span", "cite", " (your answer; the service did not check it)"));
       }

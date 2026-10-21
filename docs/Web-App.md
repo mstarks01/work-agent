@@ -137,6 +137,8 @@ contributes requirement rulings. Each card carries its **grounds** behind
 **Why it matters, and the evidence**: the quotes, unknown attributes and
 boundary crossings the agent raised it on, with a quote the service could not
 find in its source marked as such rather than hidden.
+A name that an agent writes, such as an element ID, an attribute or an asset
+tag, shows as words. The name itself shows when you hover over the words.
 
 **How this report was made** — a link under the report's title opens a second
 view of the same page at `?view=provenance`. It holds the service's disclaimer
