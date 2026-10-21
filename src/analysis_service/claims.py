@@ -2010,8 +2010,8 @@ UNNAMED_CLAIM = "(unnamed)"
 #:   :data:`ARCHIVED_UNRECONCILED_KINDS`;
 #: * ``duplicate-on-unit`` — archived only: see
 #:   :data:`ARCHIVED_UNRECONCILED_KINDS`;
-#: * ``dismissal-off-grounds`` — a ruling names a pair in
-#:   ``immaterial_unknowns`` that the draft's own grounds do not cite;
+#: * ``dismissal-off-grounds`` — archived only: see
+#:   :data:`ARCHIVED_UNRECONCILED_KINDS`;
 #: * ``verdict-shape`` — a verdict's fields cannot make a coherent verdict;
 #: * ``unresolved-unknown`` — a ``needs-info`` names an element or attribute
 #:   the model does not hold, or names nothing at all;
@@ -2041,9 +2041,12 @@ UnreconciledKind = Literal[
 #: (#1202), so no ruling can take this kind. ``duplicate-on-unit`` is a draft
 #: naming a catalog unit that the critic rejected as a duplicate. The critic
 #: has no duplicate step and :class:`ProposedVerdict` admits no ``duplicate``,
-#: so no ruling can take this kind either.
+#: so no ruling can take this kind either. ``dismissal-off-grounds`` is a
+#: ruling naming a fact in ``immaterial_unknowns`` that the draft's grounds do
+#: not cite. :func:`~analysis_service.critic.complete_rulings` removes such an
+#: entry, so no review writes this kind.
 ARCHIVED_UNRECONCILED_KINDS: frozenset[UnreconciledKind] = frozenset(
-    {"confirmed-on-unknown", "duplicate-on-unit"}
+    {"confirmed-on-unknown", "dismissal-off-grounds", "duplicate-on-unit"}
 )
 
 
