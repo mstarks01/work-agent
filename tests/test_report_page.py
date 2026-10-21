@@ -490,7 +490,7 @@ def test_a_follow_up_says_how_each_finding_moved():
     text = run_report_page(html)["analyses"]
 
     assert (
-        "Since the report your answers came from, 2 finding(s): 1 Needs info"
+        "Since the report your answers came from, 2 findings: 1 Needs info"
         " → Confirmed; 1 no longer raised." in text
     )
     assert "Was Needs info in the earlier report." in text
@@ -634,3 +634,9 @@ def test_the_provenance_view_lists_the_model_s_gaps_with_their_questions():
     assert "Encryption in transit is not stated for 1 element: " in gaps
     assert "(Answer)" in gaps
     assert "Encryption at rest is not stated for 1 element: Orders DB" in gaps
+
+
+def test_a_count_of_one_reads_in_the_singular():
+    text = run_report_page(page())["analyses"]
+    assert "1 conditional finding waits on 1 question." in text
+    assert "1 finding waits on this" in text

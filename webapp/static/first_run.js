@@ -307,7 +307,7 @@
     const parts = [];
     for (const [answer, effect] of Object.entries(rank.answers)) {
       const said = [];
-      if (effect.settles) said.push(`may remove ${effect.settles} follow-up question(s)`);
+      if (effect.settles) said.push(`may remove ${counted(effect.settles, "follow-up question", "follow-up questions")}`);
       if (effect.unlocks) said.push(`lists ${effect.unlocks} more`);
       if (said.length) parts.push(`“${answer}” ${said.join(" and ")}`);
     }
@@ -1161,11 +1161,11 @@
       const moot = (data.early_unnecessary || []).filter((q) => was.has(keyOf(q.key))).length;
       const added = [...now].filter((key) => !was.has(key)).length;
       noted = [];
-      if (moot) noted.push(`${moot} question(s) are no longer needed`);
-      if (added) noted.push(`${added} relevant question(s) added`);
+      if (moot) noted.push(`${counted(moot, "question is", "questions are")} no longer needed`);
+      if (added) noted.push(`${counted(added, "relevant question", "relevant questions")} added`);
     }
     const parts = queued
-      ? [...noted, `${queued} of them show when you leave the answer you are typing`]
+      ? [...noted, `${queued} of them ${queued === 1 ? "shows" : "show"} when you leave the answer you are typing`]
       : noted;
     say(changesNote, parts.join(". ") + (parts.length ? "." : ""));
   };
@@ -1201,8 +1201,8 @@
       // The service's own stop reason decides the sentence (QuestionSet.stop).
       // No stop says every fact is settled, so the page lists what stays open.
       const stops = {
-        "budget-exhausted": `The question limit is reached, so ${(data.early_held_back || []).length}`
-          + " more question(s) are not in the list. ",
+        "budget-exhausted": `The question limit is reached, so ${counted((data.early_held_back || []).length,
+          "more question is", "more questions are")} not in the list. `,
         "below-floor": "No recommended question is left. ",
         "skipped": "You skipped every question that is left. ",
         "nothing-left": "No question is left to ask. ",
@@ -1215,19 +1215,19 @@
     const summary = data.early_summary;
     if (summary) {
       const open = [];
-      const count = (n, text) => { if (n) open.push(`${n} ${text}`); };
-      count(summary.skipped, "question(s) skipped for now");
-      count(summary.partial, "question(s) answered in part");
-      count(summary.unknown, "answer(s) of “I don't know”");
-      count(summary.held_back, "question(s) held back by the question limit");
-      count(summary.below_floor, "question(s) ranked below the threshold for the list");
+      const count = (n, one, many, text) => { if (n) open.push(`${counted(n, one, many)} ${text}`); };
+      count(summary.skipped, "question", "questions", "skipped for now");
+      count(summary.partial, "question", "questions", "answered in part");
+      count(summary.unknown, "answer", "answers", "of “I don't know”");
+      count(summary.held_back, "question", "questions", "held back by the question limit");
+      count(summary.below_floor, "question", "questions", "ranked below the threshold for the list");
       for (const [name, bands] of Object.entries(summary.applicability || {})) {
         for (const band of bands) {
           const unknown = band.states.unknown || 0;
           if (!unknown) continue;
           const total = Object.values(band.states).reduce((sum, n) => sum + n, 0);
           const where = band.band ? `${name}, ${band.band}` : name;
-          open.push(`${where}: whether ${unknown} of ${total} unit(s) apply is still unknown`
+          open.push(`${where}: whether ${unknown} of ${counted(total, "unit applies", "units apply")} is still unknown`
             + (band.unaskable ? `, and no open question can settle ${band.unaskable} of them` : ""));
         }
       }
@@ -1262,7 +1262,7 @@
     if (dropped.length) {
       const lead = document.createElement("p");
       lead.className = "hint";
-      lead.textContent = `${dropped.length} earlier answer(s) do not fit this`
+      lead.textContent = `${counted(dropped.length, "earlier answer does", "earlier answers do")} not fit this`
         + " system model, so they are not kept:";
       const items = document.createElement("ul");
       for (const line of dropped) {

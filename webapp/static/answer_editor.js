@@ -9,6 +9,9 @@ const ANSWER_LIMITS = JSON.parse(document.getElementById("answer_limits").textCo
 // The answer that says the submitter does not know. The service writes
 // nothing for it, so the fact stays open.
 const DONT_KNOW = "unknown";
+// A count with its noun, and its verb where one follows: "1 finding waits",
+// "2 findings wait". Every page that loads this file words a count with it.
+const counted = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 // A fact answer as one line of text.
 const answerText = (answer) => (answer.facets
   ? Object.entries(answer.facets).map(([facet, value]) => `${facet}: ${value}`).join("; ")
