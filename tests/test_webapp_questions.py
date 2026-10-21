@@ -605,7 +605,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         pytest.skip("no node on PATH to run the form page's script")
     script = "\n".join(
         (PROJECT_ROOT / "webapp" / "static" / name).read_text()
-        for name in ("answer_editor.js", "first_run.js")
+        for name in ("answer_editor.js", "question_list.js", "first_run.js")
     )
     program = (
         _FORM_HARNESS.replace("SEARCH", json.dumps(search)).replace(
@@ -851,7 +851,7 @@ def test_every_key_part_a_page_reads_is_the_part_it_means():
     means = {0: "element_id", 1: "attribute", 4: "question"}
     read = {
         int(index)
-        for name in ("first_run.js", "report_view.js")
+        for name in ("first_run.js", "question_list.js", "report_view.js")
         for index in re.findall(r"\bkey\[(\d)\]", test_webapp.page_javascript(name))
     }
 
