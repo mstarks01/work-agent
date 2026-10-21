@@ -1472,6 +1472,15 @@
     $("nodes").append(row);
   });
 
+  // A print shows every card, so the closed groups open for it and close
+  // again after. Each card's evidence stays closed.
+  let closedForPrint = [];
+  window.addEventListener("beforeprint", () => {
+    closedForPrint = [...document.querySelectorAll("details.openfact:not([open])")];
+    closedForPrint.forEach(d => { d.open = true; });
+  });
+  window.addEventListener("afterprint", () => closedForPrint.forEach(d => { d.open = false; }));
+
   // theme toggle
   $("themebtn").addEventListener("click", () => {
     const cur = document.documentElement.getAttribute("data-theme");
