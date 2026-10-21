@@ -1457,6 +1457,277 @@
     $("question-refs").append(el("div", "meta", "This report asks no questions."));
   }
 
+  // ---- The system model, drawn ------------------------------------------------
+  // A box per trust zone, the elements in their zone, and an arrow per flow,
+  // drawn as SVG nodes. The table below holds the same facts in words, so it
+  // stays the text a reader and a screen reader use.
+  //
+  // **Placement is stated, never inferred.** An element whose zone is not one
+  // of the model's trust boundaries is drawn outside every zone, under "Zone
+  // not stated", and an element whose zone the service inferred says "zone
+  // assumed" (SystemModel.assumed_zone_elements). Neither reads as a placement
+  // the input made. Whether a flow crosses a boundary is the service's
+  // reading too (boundary_crossings), never the page's.
+  const ASSUMED_ZONES = new Set(JSON.parse($("assumed_zones").textContent));
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const svg = (tag, attributes = {}, text = null) => {
+    const node = document.createElementNS(SVG_NS, tag);
+    Object.entries(attributes).forEach(([name, value]) => node.setAttribute(name, String(value)));
+    if (text != null) node.textContent = text;
+    return node;
+  };
+  // A label cut to `max` characters; the whole text is in the node's title.
+  const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+  // A name in at most two lines of about `width` characters.
+  const wrapped = (text, width) => {
+    const out = [""];
+    String(text).split(/\s+/).forEach(word => {
+      const last = out.length - 1;
+      if (!out[last] || `${out[last]} ${word}`.length <= width) out[last] = `${out[last]} ${word}`.trim();
+      else out.push(word);
+    });
+    return (out.length > 2 ? [out[0], out.slice(1).join(" ")] : out).map(line => clip(line, width));
+  };
+  const KIND_WORDS = {
+    "external-entity": "external entity",
+    "process": "process",
+    "data-store": "data store",
+  };
+  // The geometry, in viewBox units.
+  const DIAGRAM = { width: 600, pad: 16, inset: 16, columns: 3, nodeW: 136, nodeH: 56,
+    label: 28, rowGap: 44, bandGap: 32 };
+
+  function drawModel(model) {
+    const nodes = [
+      ...model.external_entities.map(e => ({ kind: "external-entity", e })),
+      ...model.processes.map(e => ({ kind: "process", e })),
+      ...model.data_stores.map(e => ({ kind: "data-store", e })),
+    ];
+    if (!nodes.length) return null;
+    const index = new Map(nodes.map((node, i) => [node.e.id, i]));
+    const flows = model.data_flows.filter(f => index.has(f.source) && index.has(f.destination));
+
+    // Each element's rank: the longest path to it along the flows, with each
+    // flow that closes a cycle left out, so the drawing reads in the flows'
+    // direction from the top down.
+    const next = nodes.map(() => []);
+    flows.forEach(f => next[index.get(f.source)].push(index.get(f.destination)));
+    const state = nodes.map(() => 0);
+    const closes = new Set();
+    const visit = (i) => {
+      state[i] = 1;
+      next[i].forEach(j => {
+        if (state[j] === 1) closes.add(`${i}>${j}`);
+        else if (!state[j]) visit(j);
+      });
+      state[i] = 2;
+    };
+    nodes.forEach((_, i) => { if (!state[i]) visit(i); });
+    const rank = nodes.map(() => 0);
+    nodes.forEach(() => next.forEach((targets, i) => targets.forEach(j => {
+      if (!closes.has(`${i}>${j}`) && rank[j] < rank[i] + 1) rank[j] = rank[i] + 1;
+    })));
+
+    // A band per zone that holds an element, in the order the flows reach
+    // them, and the elements with no stated zone last, in a band of their own.
+    const zones = model.trust_boundaries.map(b => ({ id: b.id, name: b.name, members: [] }));
+    const zoneOf = new Map(zones.map(zone => [zone.id, zone]));
+    const unplaced = { id: null, name: "Zone not stated", members: [] };
+    nodes.forEach((node, i) => (zoneOf.get(node.e.trust_zone) || unplaced).members.push(i));
+    const lead = zone => Math.min(...zone.members.map(i => rank[i]));
+    const bands = [...zones, unplaced].filter(zone => zone.members.length)
+      .sort((a, b) => (a.id === null) - (b.id === null) || lead(a) - lead(b));
+
+    const D = DIAGRAM;
+    const bandW = D.width - 2 * D.pad;
+    const gapX = (bandW - 2 * D.inset - D.columns * D.nodeW) / (D.columns - 1);
+    const place = new Map();
+    // Each element's neighbours along the flows, either way, so an element
+    // sits under the elements it talks to and fewer flows cross.
+    const neighbours = nodes.map(() => []);
+    flows.forEach(f => {
+      neighbours[index.get(f.source)].push(index.get(f.destination));
+      neighbours[index.get(f.destination)].push(index.get(f.source));
+    });
+    const across = i => {
+      const placed = neighbours[i].filter(j => place.has(j)).map(j => place.get(j).x);
+      return placed.length ? placed.reduce((sum, x) => sum + x, 0) / placed.length : Infinity;
+    };
+    let top = D.pad;
+    const drawnBands = bands.map(zone => {
+      const members = [...zone.members]
+        .sort((a, b) => across(a) - across(b) || rank[a] - rank[b] || a - b);
+      const rows = Math.ceil(members.length / D.columns);
+      members.forEach((i, at) => {
+        const row = Math.floor(at / D.columns);
+        const inRow = Math.min(D.columns, members.length - row * D.columns);
+        const rowW = inRow * D.nodeW + (inRow - 1) * gapX;
+        const left = D.pad + (bandW - rowW) / 2;
+        place.set(i, {
+          x: left + (at % D.columns) * (D.nodeW + gapX),
+          y: top + D.label + row * (D.nodeH + D.rowGap),
+        });
+      });
+      const height = D.label + rows * D.nodeH + (rows - 1) * D.rowGap + D.inset;
+      const band = { zone, members, top, height };
+      top += height + D.bandGap;
+      return band;
+    });
+    const height = top - D.bandGap + D.pad;
+
+    const root = svg("svg", {
+      viewBox: `0 0 ${D.width} ${height}`,
+      role: "img",
+      "aria-label": `Diagram of the system model: ${counted(nodes.length, "element", "elements")}, ` +
+        `${counted(flows.length, "flow", "flows")} and ${counted(zones.filter(z => z.members.length).length, "trust zone", "trust zones")}. ` +
+        "The table below lists the same elements.",
+    });
+    const defs = svg("defs");
+    const marker = svg("marker", { id: "model-arrow", viewBox: "0 0 10 10", refX: 9, refY: 5,
+      markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" });
+    marker.append(svg("path", { d: "M0,0 L10,5 L0,10 z", class: "arrowhead" }));
+    defs.append(marker);
+    root.append(defs);
+
+    drawnBands.forEach(band => {
+      const group = svg("g", { class: band.zone.id === null ? "zone unplaced" : "zone",
+        "data-zone": band.zone.id === null ? "" : band.zone.id });
+      group.append(
+        svg("rect", { x: D.pad, y: band.top, width: bandW, height: band.height, rx: 10, class: "zone-box" }),
+        svg("text", { x: D.pad + 12, y: band.top + 18, class: "zone-label" }, clip(band.zone.name, 60)),
+      );
+      root.append(group);
+    });
+
+    // Flows under the elements, and their labels over them. Two flows between
+    // one pair of elements bend apart, so neither hides the other.
+    const centre = i => ({ x: place.get(i).x + D.nodeW / 2, y: place.get(i).y + D.nodeH / 2 });
+    const edge = (c, toward) => {
+      const dx = toward.x - c.x;
+      const dy = toward.y - c.y;
+      const t = Math.min(dx ? (D.nodeW / 2) / Math.abs(dx) : Infinity, dy ? (D.nodeH / 2) / Math.abs(dy) : Infinity);
+      return { x: c.x + dx * t, y: c.y + dy * t };
+    };
+    const crossing = new Map(R.boundary_crossings.map(c => [c.flow_id, c.decided ? "crosses" : "undecided"]));
+    const pairs = new Map();
+    flows.forEach(f => {
+      const pair = [f.source, f.destination].sort().join("|");
+      pairs.set(pair, [...(pairs.get(pair) || []), f.id]);
+    });
+    const lines = svg("g", { class: "flows" });
+    const labels = svg("g", { class: "flow-labels" });
+    // Whether a point falls on an element other than the flow's two ends.
+    const boxes = [...place].map(([i, p]) => ({ i, x: p.x - 6, y: p.y - 6, w: D.nodeW + 12, h: D.nodeH + 12 }));
+    const onElement = (pt, ends) => boxes.some(b => !ends.includes(b.i)
+      && pt.x > b.x && pt.x < b.x + b.w && pt.y > b.y && pt.y < b.y + b.h);
+    const along = (p, c, q, t) => ({
+      x: (1 - t) * (1 - t) * p.x + 2 * (1 - t) * t * c.x + t * t * q.x,
+      y: (1 - t) * (1 - t) * p.y + 2 * (1 - t) * t * c.y + t * t * q.y,
+    });
+    const taken = [];
+    const overlaps = (r, others) => others.some(o =>
+      r.x < o.x + o.w && o.x < r.x + r.w && r.y < o.y + o.h && o.y < r.y + r.h);
+    flows.forEach(f => {
+      const from = index.get(f.source);
+      const to = index.get(f.destination);
+      const a = centre(from);
+      const b = centre(to);
+      const text = clip(f.name, 22);
+      const labelW = text.length * 6.4 + 8;
+      let d;
+      let spots;
+      if (from === to) {
+        // A flow from an element to itself: a loop on its right side.
+        const x = a.x + D.nodeW / 2;
+        d = `M${x},${a.y - 12} C${x + 44},${a.y - 30} ${x + 44},${a.y + 30} ${x},${a.y + 12}`;
+        spots = [{ x: x + 34, y: a.y }];
+      } else {
+        // The flow bends away from the other flow between the same two
+        // elements, and further until it passes over no other element.
+        const pair = pairs.get([f.source, f.destination].sort().join("|"));
+        const base = (pair.indexOf(f.id) - (pair.length - 1) / 2) * 56;
+        const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const curve = bend => {
+          const c = {
+            x: (a.x + b.x) / 2 - ((b.y - a.y) / length) * bend,
+            y: (a.y + b.y) / 2 + ((b.x - a.x) / length) * bend,
+          };
+          return { c, p: edge(a, c), q: edge(b, c) };
+        };
+        const clear = ({ p, c, q }) => [0.15, 0.3, 0.45, 0.6, 0.75, 0.9]
+          .every(t => !onElement(along(p, c, q, t), [from, to]));
+        const { p, c, q } = [0, 60, -60, 120, -120, 180, -180]
+          .map(extra => curve(base + extra)).find(clear) || curve(base);
+        d = `M${p.x},${p.y} Q${c.x},${c.y} ${q.x},${q.y}`;
+        // Where its label may sit: along the flow, then just beside it.
+        // A flow that runs across takes its label on the side it bends to.
+        const level = Math.abs(b.x - a.x) > Math.abs(b.y - a.y);
+        const down = c.y > (a.y + b.y) / 2;
+        const offsets = down ? [14, 32, 48, -12, -30, -46] : [-12, -30, -46, 14, 32, 48];
+        spots = [0.5, 0.35, 0.65, 0.25, 0.75].flatMap(t => {
+          const at = along(p, c, q, t);
+          return level
+            ? offsets.map(dy => ({ x: at.x, y: at.y + dy }))
+            : [at, { x: at.x, y: at.y - 14 }];
+        });
+      }
+      const box = (spot) => ({ x: spot.x - labelW / 2, y: spot.y - 9, w: labelW, h: 16 });
+      const inside = (r) => r.x >= 0 && r.y >= 0 && r.x + r.w <= D.width && r.y + r.h <= height;
+      const spot = spots.find(each => inside(box(each)) && !overlaps(box(each), [...boxes, ...taken]))
+        || spots.find(each => inside(box(each))) || spots[0];
+      taken.push(box(spot));
+      const path = svg("path", { d, class: `flow ${crossing.get(f.id) || ""}`.trim(),
+        "marker-end": "url(#model-arrow)", "data-flow": f.id });
+      path.append(svg("title", {}, `${f.name}: ${NAMES[f.id] || f.id}`));
+      lines.append(path);
+      const { x, y, w, h } = box(spot);
+      labels.append(
+        svg("rect", { x, y, width: w, height: h, rx: 3, class: "flow-label-box" }),
+        svg("text", { x: spot.x, y: spot.y + 3, class: "flow-label" }, text),
+      );
+    });
+    root.append(lines);
+
+    drawnBands.forEach(band => band.members.forEach(i => {
+      const { kind, e } = nodes[i];
+      const { x, y } = place.get(i);
+      const group = svg("g", { class: `element ${kind}`, "data-element": e.id,
+        "data-zone": band.zone.id === null ? "" : band.zone.id });
+      const assumed = ASSUMED_ZONES.has(e.id);
+      group.append(svg("title", {}, `${e.name} (${KIND_WORDS[kind]})${assumed ? ", zone assumed" : ""}`));
+      if (kind === "data-store") {
+        group.append(
+          svg("rect", { x, y, width: D.nodeW, height: D.nodeH, class: "element-fill" }),
+          svg("path", { d: `M${x},${y} H${x + D.nodeW} M${x},${y + D.nodeH} H${x + D.nodeW}`, class: "element-line" }),
+        );
+      } else {
+        group.append(svg("rect", { x, y, width: D.nodeW, height: D.nodeH,
+          rx: kind === "process" ? 18 : 2, class: "element-box" }));
+      }
+      const words = wrapped(e.name, 18);
+      const all = assumed ? [...words, "zone assumed"] : words;
+      const label = svg("text", { x: x + D.nodeW / 2, y: y + D.nodeH / 2 - (all.length - 1) * 7 + 4,
+        class: "element-label" });
+      all.forEach((line, at) => label.append(svg("tspan", {
+        x: x + D.nodeW / 2, dy: at ? 15 : 0, class: at >= words.length ? "assumed" : "",
+      }, line)));
+      group.append(label);
+      root.append(group);
+    }));
+    root.append(labels);
+    return root;
+  }
+  const diagram = drawModel(R.system_model);
+  if (diagram) {
+    const caption = el("figcaption", "meta",
+      "A dashed box is a trust zone. A rectangle is an external entity, a rounded " +
+      "box a process, and two lines a data store. A thick arrow crosses a trust " +
+      "boundary, and a dotted arrow may cross one, because a zone is not stated.");
+    $("model-diagram").append(diagram, caption);
+  } else {
+    $("model-diagram").hidden = true;
+  }
+
   // system model table. Each entry returns the cell's children rather than a
   // string of markup — `technology`, `protocol`, `authentication` and
   // `data_classification` are free-text copied out of submitted prose, and this

@@ -1496,3 +1496,130 @@ def test_each_arrow_answers_and_closes_its_own_row(browser, matched):
         closed.locator("button", has_text="Change").wait_for()
     assert page.locator(".use-match").count() == 0
     context.close()
+
+
+def _drawn(browser, report):
+    """A rendered report's About section in a browser, and its script errors."""
+    from tests.factories import report_state
+    from webapp.main import render_report
+
+    page = browser.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    html = render_report(report, report_state(report)).html
+    page.route(
+        "http://report.test/report/r1",
+        lambda route: route.fulfill(body=html, content_type="text/html"),
+    )
+    page.goto("http://report.test/report/r1")
+    page.click("#about-tab")
+    return page, errors
+
+
+#: Each drawn element's box and the box of the zone it is drawn in.
+_PLACED = """() => [...document.querySelectorAll('#model-diagram g.element')].map(g => {
+  const zone = g.dataset.zone;
+  const band = [...document.querySelectorAll('#model-diagram g.zone')]
+    .find(z => z.dataset.zone === zone).querySelector('rect').getBBox();
+  const box = g.querySelector('rect').getBBox();
+  return { id: g.dataset.element, zone, inside: box.y >= band.y
+    && box.y + box.height <= band.y + band.height, text: g.textContent };
+})"""
+
+
+def test_the_diagram_draws_each_element_in_its_zone_and_each_flow_once(browser):
+    """Every element once, inside the box of the zone the model states, and
+    every flow once, marked where it crosses a boundary (#1884)."""
+    from tests.factories import sample_report
+
+    report = sample_report()
+    model = report.system_model
+    page, errors = _drawn(browser, report)
+    placed = page.evaluate(_PLACED)
+    flows = page.evaluate(
+        "[...document.querySelectorAll('#model-diagram path.flow')]"
+        ".map(p => [p.dataset.flow, p.classList.contains('crosses')])"
+    )
+    page.close()
+
+    assert errors == []
+    zoned = {e.id: e.trust_zone for e in model.zoned_elements()}
+    assert sorted(p["id"] for p in placed) == sorted(zoned)
+    assert all(p["inside"] and p["zone"] == zoned[p["id"]] for p in placed)
+    crossing = {c.flow_id for c in report.boundary_crossings if c.decided}
+    assert sorted(flows) == sorted([f.id, f.id in crossing] for f in model.data_flows)
+
+
+def test_the_diagram_places_no_element_in_a_zone_the_model_does_not_state(browser):
+    """Placement is stated, never inferred: an element with no stated zone is
+    drawn outside every zone, and an inferred zone says so (#1884)."""
+    from analysis_service.system_model import Assumption
+    from tests.factories import sample_report
+
+    report = sample_report()
+    model = report.system_model
+    store, process = model.data_stores[0], model.processes[0]
+    model = model.model_copy(
+        update={
+            "data_stores": [store.model_copy(update={"trust_zone": "unknown"})],
+            "assumptions": [
+                *model.assumptions,
+                Assumption(
+                    assumption="placed by its role",
+                    element_id=process.id,
+                    attribute="trust_zone",
+                    basis="inferred from the role",
+                ),
+            ],
+        }
+    )
+    report = report.model_copy(
+        update={"system_model": model, "boundary_crossings": model.boundary_crossings()}
+    )
+    page, errors = _drawn(browser, report)
+    placed = {p["id"]: p for p in page.evaluate(_PLACED)}
+    unplaced = page.locator("#model-diagram g.zone.unplaced").text_content()
+    dotted = page.evaluate(
+        "[...document.querySelectorAll('#model-diagram path.flow.undecided')]"
+        ".map(p => p.dataset.flow)"
+    )
+    page.close()
+
+    assert errors == []
+    assert placed[store.id]["zone"] == "" and placed[store.id]["inside"]
+    assert unplaced == "Zone not stated"
+    assert "zone assumed" in placed[process.id]["text"]
+    assert sorted(dotted) == sorted(
+        c.flow_id for c in report.boundary_crossings if not c.decided
+    )
+
+
+def test_the_diagram_s_labels_cover_no_element_on_the_largest_archived_model(browser):
+    """The layout keeps each flow label off every element on the largest model
+    the archive holds."""
+    import glob
+
+    from analysis_service.report import Report
+
+    def size(path):
+        model = json.loads(Path(path).read_text())["system_model"]
+        return sum(len(model[k]) for k in ("processes", "data_stores", "data_flows"))
+
+    paths = glob.glob(
+        str(Path(__file__).parents[1] / "evals/baselines/*/*.reports/*.report.json")
+    )
+    report = Report.model_validate_json(Path(max(paths, key=size)).read_text())
+    page, errors = _drawn(browser, report)
+    covered = page.evaluate(
+        """() => {
+      const boxes = s => [...document.querySelectorAll(s)].map(n => n.getBBox());
+      const meet = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width
+        && a.y < b.y + b.height && b.y < a.y + a.height;
+      const labels = boxes('#model-diagram .flow-label-box');
+      return labels.filter(l => boxes('#model-diagram g.element rect').some(e => meet(l, e))).length;
+    }"""
+    )
+    page.close()
+
+    assert errors == []
+    assert covered == 0

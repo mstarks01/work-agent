@@ -80,6 +80,28 @@
   .analysis { border-top: 1px solid var(--border); margin-top: 8px; }
   #analyses > .analysis:first-child { border-top: 0; margin-top: 0; }
   .fingerprint { overflow-wrap: anywhere; }
+  /* The system model drawn. It scales to the column, and below its least
+     readable width it scrolls inside its own box rather than the page. */
+  .model-diagram { margin: 0 0 18px; overflow-x: auto; }
+  .model-diagram svg { display: block; width: 100%; min-width: 460px; height: auto; }
+  .model-diagram figcaption { margin-top: 6px; }
+  .model-diagram .zone-box { fill: var(--surface-2); stroke: var(--muted); stroke-dasharray: 6 4; }
+  .model-diagram .unplaced .zone-box { fill: none; stroke-dasharray: 2 4; }
+  .model-diagram .zone-label { fill: var(--ink-2); font-size: 12px; font-weight: 600; }
+  .model-diagram .element-box, .model-diagram .element-fill { fill: var(--surface); }
+  .model-diagram .element-box, .model-diagram .element-line { stroke: var(--ink-2); stroke-width: 1.4; fill-opacity: 1; }
+  .model-diagram .element-line { fill: none; }
+  .model-diagram .element-fill { stroke: none; }
+  .model-diagram .element-label { fill: var(--ink); font-size: 12.5px; text-anchor: middle; }
+  .model-diagram .element-label .assumed { fill: var(--muted); font-size: 11px; font-style: italic; }
+  .model-diagram .flow { fill: none; stroke: var(--muted); stroke-width: 1.3; }
+  .model-diagram .flow.crosses { stroke: var(--ink); stroke-width: 2.6; }
+  .model-diagram .flow.undecided { stroke: var(--ink-2); stroke-width: 1.6; stroke-dasharray: 2 3; }
+  .model-diagram .arrowhead { fill: var(--ink-2); }
+  .model-diagram .flow-label-box { fill: var(--plane); fill-opacity: 0.9; }
+  .model-diagram .flow-label { fill: var(--ink-2); font-size: 11px; text-anchor: middle; }
+  @media print { .model-diagram { overflow: visible; } .model-diagram svg { min-width: 0; } }
+
   /* About's tables wrap their cells rather than widen the page. */
   #about-view table { table-layout: fixed; }
   #about-view th, #about-view td { overflow-wrap: anywhere; }
@@ -385,6 +407,9 @@
       <div id="model-gaps"></div>
 
       <h2>System model (extracted DFD)</h2>
+      <!-- The model drawn: a box per trust zone, its elements, and the flows
+           between them. Built in JS; the table below holds the same facts. -->
+      <figure class="model-diagram" id="model-diagram"></figure>
       <table id="elements"><thead><tr>
         <th>Type</th><th>ID</th><th>Name</th><th>Trust zone</th><th>Key attributes</th>
       </tr></thead><tbody></tbody></table>
@@ -452,6 +477,10 @@
 <!-- Every severity level, most severe first, from
      analysis_service.critic.SEVERITY_ORDER. Escaped the same way. -->
 <script type="application/json" id="severity_order" nonce="__CSP_NONCE__"><!--severity_order--></script>
+
+<!-- Each element whose trust zone the service inferred rather than read, from
+     SystemModel.assumed_zone_elements. Escaped the same way. -->
+<script type="application/json" id="assumed_zones" nonce="__CSP_NONCE__"><!--assumed_zones--></script>
 
 <!-- The answer limits the service admits, from
      analysis_service.answer_state.ANSWER_LIMITS. Escaped the same way. -->

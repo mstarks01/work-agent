@@ -934,6 +934,7 @@ def render_report(
             else {}
         ),
         severity_order=script_json(list(SEVERITY_ORDER)),
+        assumed_zones=script_json(sorted(report.system_model.assumed_zone_elements())),
         lanes=script_json(
             {name: package.id_rule.lane_field for name, package in PACKAGES.items()}
         ),

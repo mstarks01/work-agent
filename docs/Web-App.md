@@ -164,6 +164,15 @@ that ran, the service's disclaimer, each framework's notes and diagnostics, the
 reference of each question, the extracted DFD with its boundary crossings and
 assumptions, and the served-build provenance and fingerprint of every LLM node.
 
+**The system model diagram**, above the DFD table, draws the model: a dashed
+box for each trust zone, the elements inside the zone the model states, and an
+arrow for each flow. A thick arrow crosses a trust boundary. A dotted arrow may
+cross one, because a zone is not stated. An element whose zone the model does
+not state is drawn outside every zone, under **Zone not stated**, and an
+element whose zone the service inferred says "zone assumed". Hover over an
+element or a flow to see its whole name. The table under the diagram lists the
+same elements in words.
+
 **Gaps in the system model**, in About the analysis, lists each attribute that
 the description leaves unstated, with the elements it is unstated on. The
 attribute on the most elements comes first. Where the report asks about an
