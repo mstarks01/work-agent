@@ -67,6 +67,7 @@ from analysis_service.report import TokenUsage
 from analysis_service.resilience import load_resilience
 from analysis_service.retry import (
     ATTEMPTS_METADATA_KEY,
+    RefusedCompletionError,
     TruncatedCompletionError,
     _clears_with_time,
     _is_transient,
@@ -363,6 +364,15 @@ class TestWhatTheRetryDriverReadsOffAResponse:
         body["choices"][0]["finish_reason"] = "length"
 
         with pytest.raises(TruncatedCompletionError):
+            responses_from("openai", _Provider(lambda: httpx.Response(200, json=body)))
+
+    def test_a_completion_stopped_at_the_filter_is_refused(self):
+        """The same path for litellm's ``finish_reason="content_filter"``,
+        which is Anthropic's ``stop_reason="refusal"``."""
+        body = completion_body("openai")
+        body["choices"][0]["finish_reason"] = "content_filter"
+
+        with pytest.raises(RefusedCompletionError):
             responses_from("openai", _Provider(lambda: httpx.Response(200, json=body)))
 
     def test_a_completion_that_ended_normally_is_not_refused(self):

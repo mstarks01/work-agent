@@ -81,7 +81,7 @@ from analysis_service.retry import (
     ProviderFailure,
     RetryPolicy,
     classify,
-    reject_truncated,
+    reject_unfinished,
     stamp_attempt,
 )
 
@@ -360,7 +360,7 @@ class InProcessExecutor:
 
     A sequence comes back rather than one result. A non-streaming call yields
     exactly one response today and this service never streams, but the
-    translator's own contract is a generator and the truncation check has
+    translator's own contract is a generator and the finish-reason check has
     always scanned all of it. Narrowing that here would be this module
     deciding something that is not its to decide.
     """
@@ -477,7 +477,7 @@ class ExecutedLlm(BaseLlm):
 
     A streaming call is refused rather than passed through. Every node in this
     graph binds an output schema and so never streams. A pass-through would
-    skip the retry loop, the truncation check and this seam all at once.
+    skip the retry loop, the finish-reason check and this seam all at once.
     """
 
     executor: ProviderExecutor
@@ -511,12 +511,12 @@ class ExecutedLlm(BaseLlm):
     ) -> tuple[list[GenerationResult], int]:
         """One answer to ``request``, with the attempts it took.
 
-        The truncation check runs here rather than inside the loop, so the loop
+        The finish-reason check runs here rather than inside the loop, so the loop
         keeps its one job — surviving transport failures — and a truncation is
         never mistaken for one of them.
         """
         results, attempt = await self._attempt_with_retries(request)
-        reject_truncated([result.into_response() for result in results], self.model)
+        reject_unfinished([result.into_response() for result in results], self.model)
         return list(results), attempt
 
     async def _attempt_with_retries(

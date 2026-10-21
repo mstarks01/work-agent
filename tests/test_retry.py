@@ -35,6 +35,7 @@ from analysis_service.provider import (
 from analysis_service.retry import (
     _RATE_LIMIT_CLEARS_WITH_TIME,
     _RETRY_AFTER_CEILING_SECONDS,
+    RefusedCompletionError,
     RetryBudget,
     RetryBudgetExhausted,
     RetryPolicy,
@@ -107,6 +108,11 @@ def response(text: str, finish_reason: str | None = None) -> LlmResponse:
 def truncated(text: str = "half a doc") -> LlmResponse:
     """What a provider that returns its partial output hands back at the cap."""
     return response(text, finish_reason="MAX_TOKENS")
+
+
+def refused(text: str = '{"threats":[{"id":') -> LlmResponse:
+    """What a provider hands back when its content filter stops a completion."""
+    return response(text, finish_reason="SAFETY")
 
 
 def texts(responses) -> list[str]:
@@ -796,10 +802,35 @@ class TestTruncationIsRefused:
             asyncio.run(_drain(adapter))
 
 
+class TestAFilterStopIsRefused:
+    """A safety refusal part-way through a document, refused before a validator.
+
+    Without this check the fragment reaches ``validate_schema``, the node
+    re-asks the same filter, and the run fails naming a column offset.
+    """
+
+    def test_a_filter_stop_fails_the_node_without_a_retry(self):
+        base = FakeExecutor(outcomes=[refused(), "ok"])
+        with pytest.raises(RefusedCompletionError):
+            drive(base, policy(attempts=3))
+        assert base.calls == 1
+
+    def test_it_is_not_transient(self):
+        assert not _is_transient(RefusedCompletionError("stopped at the filter"))
+
+    def test_the_message_names_the_model_and_the_finish_reason(self):
+        base = FakeExecutor(model="anthropic/claude-opus-5-5", outcomes=[refused()])
+        with pytest.raises(RefusedCompletionError) as excinfo:
+            drive(base, policy())
+        message = str(excinfo.value)
+        assert "anthropic/claude-opus-5-5" in message
+        assert "SAFETY" in message
+
+
 class TestTheFinishReasonContract:
     """The one assumption the fake cannot carry: what ADK actually puts there.
 
-    Every test above scripts the string ``reject_truncated`` matches on, which
+    Every test above scripts the string ``reject_unfinished`` matches on, which
     proves the check works and nothing about whether it will ever fire. These
     two probe the installed library instead — the same reason
     ``test_model_gate.py`` probes litellm rather than mirroring its behaviour.
@@ -811,6 +842,16 @@ class TestTheFinishReasonContract:
         from google.adk.models.lite_llm import _map_finish_reason
 
         assert _map_finish_reason("length") == "MAX_TOKENS"
+
+    def test_adk_maps_a_filter_stop_onto_the_string_we_match(self):
+        from google.adk.models.lite_llm import _map_finish_reason
+
+        assert _map_finish_reason("content_filter") == "SAFETY"
+
+    def test_litellm_maps_an_anthropic_refusal_onto_a_filter_stop(self):
+        from litellm.litellm_core_utils.core_helpers import map_finish_reason
+
+        assert map_finish_reason("refusal") == "content_filter"
 
     def test_a_normal_stop_maps_somewhere_else(self):
         from google.adk.models.lite_llm import _map_finish_reason
