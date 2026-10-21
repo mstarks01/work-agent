@@ -1112,9 +1112,12 @@ def test_a_printed_report_holds_only_the_findings(page):
     page.emulate_media(media="print")
     for hidden in (".sidebar", "#themebtn", "#analysis-tabs", "#links"):
         assert not page.locator(hidden).is_visible(), hidden
-    assert page.locator(".viz-root").evaluate(
-        "n => getComputedStyle(n).getPropertyValue('--ink').trim()"
-    ) == "#0b0b0b"
+    assert (
+        page.locator(".viz-root").evaluate(
+            "n => getComputedStyle(n).getPropertyValue('--ink').trim()"
+        )
+        == "#0b0b0b"
+    )
     page.evaluate("dispatchEvent(new Event('beforeprint'))")
     assert group.get_attribute("open") is not None
     page.evaluate("dispatchEvent(new Event('afterprint'))")
