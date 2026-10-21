@@ -169,9 +169,14 @@ the description leaves unstated, with the elements it is unstated on. The
 attribute on the most elements comes first. Where the report asks about an
 element, an **Answer** link opens that question.
 
-**A printed report** holds the report section only. The print leaves out the
-sidebar, the tabs, the theme button and the questions, and it always uses the
-light colours. Each closed section and finding opens for the print.
+**The complete export** — **Preview complete export**, above the findings,
+shows the whole report as one document: every finding open, each question with
+its history and the findings it informs, and About the analysis as an appendix.
+The export has no editor; it gives the report's address to answer the questions
+online. **Print or save as PDF** prints it, and **Close preview** returns the
+page to the section and the open rows you had. A print from the browser prints
+the same export. A print leaves out the sidebar, the tabs and the buttons, and
+it always uses the light colours.
 
 ## When the configuration is wrong
 

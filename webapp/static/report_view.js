@@ -1563,14 +1563,95 @@
     $("nodes").append(row);
   });
 
-  // A print holds the report: every finding opens for it, and each closes
-  // again after.
-  let closedForPrint = [];
-  window.addEventListener("beforeprint", () => {
-    closedForPrint = [...document.querySelectorAll("#report-view details:not([open])")];
-    closedForPrint.forEach(d => { d.open = true; });
+  // ---- The complete export ---------------------------------------------------
+  // The export is this page as one document: every section and finding open,
+  // each question with its findings and its history, and About the analysis
+  // as an appendix. It reads the same data, and it leaves out the editors: a
+  // link says where to answer the questions online. A print is the export.
+  const exportQuestions = $("export-questions");
+  exportQuestions.append(el("h2", "view-title", FINAL ? "Answers this report read" : "Questions"));
+  if (ASKS) {
+    const online = location.origin + location.pathname + "?view=questions";
+    const note = el("p", "meta", "To answer these questions, open this report online: ");
+    const link = el("a", null, online);
+    link.href = online;
+    note.append(link);
+    exportQuestions.append(note);
+  }
+  const exported = [
+    ...LINK_QUESTIONS.map(q => ({ group: "Match each user, team or account to a part of your system", label: q.principal })),
+    ...FACT_QUESTIONS.map(q => ({ group: q.group_heading, label: q.label, history: q.history, findings: q.findings })),
+    ...(FINAL ? (CORRECTIONS.answers || []) : EARLIER_FACTS).map(a => ({
+      group: "Answers this report read", label: a.label, answer: answerText(a.answer) })),
+  ];
+  const byGroup = new Map();
+  exported.forEach(q => {
+    if (!byGroup.has(q.group)) byGroup.set(q.group, []);
+    byGroup.get(q.group).push(q);
   });
-  window.addEventListener("afterprint", () => closedForPrint.forEach(d => { d.open = false; }));
+  byGroup.forEach((questions, group) => {
+    exportQuestions.append(el("h3", null, group));
+    questions.forEach(q => {
+      const item = el("div", "export-question");
+      item.append(el("b", null, q.label));
+      if (q.answer) item.append(el("div", "meta", `Answer: ${q.answer}`));
+      if (q.history) item.append(el("div", "meta", HISTORY[q.history] || q.history));
+      if ((q.findings || []).length) {
+        item.append(el("div", "meta", "Used by: " +
+          q.findings.map(f => (FINDINGS.get(f) || { id: f }).id).join(" \u00b7 ")));
+      }
+      exportQuestions.append(item);
+    });
+  });
+  if (!exported.length) exportQuestions.append(el("p", "meta", "This report asks no questions."));
+
+  // Entering the export opens what was closed and shows every section;
+  // leaving it closes those again and returns to the section the reader was
+  // in, so the reader's own view comes back as it was.
+  let beforeExport = null;
+  const enterExport = () => {
+    if (beforeExport) return;
+    beforeExport = {
+      section: SECTIONS.find(name => !$(`${name}-view`).hidden) || "report",
+      closed: [...document.querySelectorAll("details:not([open])")],
+    };
+    document.body.classList.add("exporting");
+    beforeExport.closed.forEach(d => { d.open = true; });
+    $("report-view").hidden = false;
+    $("questions-view").hidden = true;
+    exportQuestions.hidden = false;
+    $("about-view").hidden = false;
+    $("preview-bar").hidden = false;
+  };
+  const leaveExport = () => {
+    if (!beforeExport) return;
+    beforeExport.closed.forEach(d => { d.open = false; });
+    document.body.classList.remove("exporting");
+    exportQuestions.hidden = true;
+    $("preview-bar").hidden = true;
+    const { section } = beforeExport;
+    beforeExport = null;
+    showSection(section);
+  };
+  $("export-preview").addEventListener("click", () => {
+    enterExport();
+    $("export-close").focus();
+  });
+  $("export-close").addEventListener("click", () => {
+    leaveExport();
+    $("export-preview").focus();
+  });
+  $("export-print").addEventListener("click", () => window.print());
+  // A print outside the preview prints the export too, and leaves it after.
+  let printedExport = false;
+  window.addEventListener("beforeprint", () => {
+    printedExport = !beforeExport;
+    enterExport();
+  });
+  window.addEventListener("afterprint", () => {
+    if (printedExport) leaveExport();
+    printedExport = false;
+  });
 
   // The section ?view= names, and a link from elsewhere lands on its target,
   // opened.

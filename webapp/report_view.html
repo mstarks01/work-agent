@@ -80,6 +80,9 @@
   .analysis { border-top: 1px solid var(--border); margin-top: 8px; }
   #analyses > .analysis:first-child { border-top: 0; margin-top: 0; }
   .fingerprint { overflow-wrap: anywhere; }
+  /* About's tables wrap their cells rather than widen the page. */
+  #about-view table { table-layout: fixed; }
+  #about-view th, #about-view td { overflow-wrap: anywhere; }
   .meta { color: var(--ink-2); font-size: 0.85rem; }
   .meta code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .ref { text-decoration: underline dotted; cursor: help; }
@@ -184,6 +187,9 @@
   .question-actions { position: sticky; bottom: 0; background: var(--plane); padding: 12px 0;
     border-top: 1px solid var(--hairline); margin-top: 18px; }
   .question-actions .hint { margin: 4px 0 10px; }
+  /* On a narrow screen the area would cover the one group shown, so it
+     follows the group instead. */
+  @media (max-width: 720px) { .question-actions { position: static; } }
   .question-actions .problem { color: var(--sev-critical); }
   .used-by, .question-history { font-size: 0.8rem; margin: 2px 0 6px; }
 
@@ -286,10 +292,25 @@
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="dark"] { color-scheme: dark; }
 
-  /* A print holds the report: no navigation, no controls and no questions
-     to answer. */
+  /* The complete export: the report, its questions and About the analysis
+     in one document, with no tabs, no editors and no invitation. */
+  .export-bar { display: flex; justify-content: flex-end; margin: -10px 0 8px; }
+  .preview-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    padding: 10px 12px; margin-bottom: 18px; border: 1px solid var(--hairline);
+    border-radius: 8px; background: var(--surface); font-size: 0.9rem; }
+  .preview-bar span { flex: 1 1 auto; font-weight: 600; }
+  .exporting #report-tabs, .exporting #analysis-tabs, .exporting #invite,
+  .exporting .export-bar, .exporting .finding-open { display: none; }
+  .exporting #about-view, .exporting #export-questions { border-top: 1px solid var(--hairline);
+    margin-top: 32px; padding-top: 8px; }
+  .export-question { margin: 0 0 12px; break-inside: avoid; }
+  .export-question .meta { font-size: 0.82rem; }
+  #export-questions h3, #about-view h2, .finding-group > summary { break-after: avoid; }
+
+  /* A print is the complete export: no navigation and no controls. */
   @media print {
-    .skip-link, .sidebar, #themebtn, #analysis-tabs, #report-tabs, #invite { display: none; }
+    .skip-link, .sidebar, #themebtn, #analysis-tabs, #report-tabs, #invite,
+    #preview-bar, .export-bar { display: none; }
     .workspace { display: block; min-height: 0; }
     main.report-main > .viz-root { min-height: 0; padding: 0; background: none; }
     .finding { break-inside: avoid; }
@@ -318,9 +339,12 @@
     <!-- The report's own sections. The report is the one a reader lands on. -->
     <nav class="report-tabs" id="report-tabs" aria-label="Report sections"><a id="report-tab" aria-current="page">Report</a><a id="questions-tab">Questions</a><a id="about-tab">About the analysis</a></nav>
 
+    <!-- Shown while the complete export is previewed or printed. -->
+    <div class="preview-bar" id="preview-bar" hidden><span>Complete export preview</span> <button type="button" class="primary" id="export-print">Print or save as PDF</button> <button type="button" class="toggle" id="export-close">Close preview</button></div>
+
     <!-- One section per framework the job selected, built in JS: the count
          and the names are the report's, not this file's. -->
-    <div id="report-view"><div id="analyses"></div><div id="invite"></div></div>
+    <div id="report-view"><div class="export-bar"><button type="button" class="toggle" id="export-preview">Preview complete export</button></div><div id="analyses"></div><div id="invite"></div></div>
 
     <!-- The questions the conditional findings rest on, in the question list
          the early questions use, or a final report's answers to correct. -->
@@ -337,6 +361,10 @@
         </div>
       </div>
     </div>
+
+    <!-- The questions as the complete export prints them: no editor, and a
+         link to answer them online. -->
+    <div id="export-questions" hidden></div>
 
     <!-- How this report was made: its identifiers and versions, the service's
          disclaimer, each framework's notes, the System Model every framework

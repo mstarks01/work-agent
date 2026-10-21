@@ -1118,9 +1118,10 @@ def test_a_question_s_finding_link_opens_its_report_row(page):
     )
 
 
-def test_a_printed_report_holds_only_the_findings(page):
-    """A print hides the navigation, the controls and the questions, prints in
-    the light palette, and opens each closed section so every finding prints."""
+def test_a_printed_report_is_the_complete_export(page):
+    """A print holds every section, every finding open and every question,
+    with no navigation and no editor, in the light palette. After the print,
+    the page is as the reader left it (#1884)."""
     pause(page)
     page.click("#continue")
     page.wait_for_url("**/report/**")
@@ -1134,6 +1135,8 @@ def test_a_printed_report_holds_only_the_findings(page):
         "#analysis-tabs",
         "#report-tabs",
         "#invite",
+        "#preview-bar",
+        ".export-bar",
     ):
         assert not page.locator(hidden).is_visible(), hidden
     assert (
@@ -1144,8 +1147,119 @@ def test_a_printed_report_holds_only_the_findings(page):
     )
     page.evaluate("dispatchEvent(new Event('beforeprint'))")
     assert group.get_attribute("open") is not None
+    for shown in ("#export-questions", "#about-view", "#analyses"):
+        assert page.locator(shown).is_visible(), shown
+    assert not page.locator("#question-actions").is_visible()
+    assert "open this report online" in page.inner_text("#export-questions")
     page.evaluate("dispatchEvent(new Event('afterprint'))")
     assert group.get_attribute("open") is None
+    assert not page.locator("#about-view").is_visible()
+    assert not page.locator("#export-questions").is_visible()
+
+
+def test_a_finding_s_question_saves_reloads_and_updates_the_report(page):
+    """Finding, question, Save draft, reload, Update report: the draft runs
+    nothing, a reload shows it, and the update starts the follow-up (#1884)."""
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    page.locator(
+        "details.finding-group > summary", has_text="Conditional findings"
+    ).click()
+    finding = page.locator("details.finding-group details.finding").first
+    finding.locator("> summary").click()
+    finding.locator(".field ul a").first.click()
+    page.wait_for_url("**?view=questions")
+    focused = page.evaluate_handle("document.activeElement")
+    key = focused.evaluate("n => n.dataset.key")
+    tag = focused.evaluate("n => n.tagName")
+    if tag == "SELECT":
+        value = focused.evaluate(
+            "n => [...n.options].map(o => o.value).find(v => v && v !== 'unknown')"
+        )
+        focused.as_element().select_option(value)
+    else:
+        value = "mutual TLS"
+        focused.as_element().fill(value)
+        focused.as_element().dispatch_event("input")
+    assert "Unsaved changes" in page.inner_text("#question-actions")
+    with page.expect_request("**/answer/*") as saved:
+        page.get_by_role("button", name="Save draft").click()
+    assert saved.value.post_data_json["save"] is True
+    page.wait_for_selector("text=Saved draft: 1 answer", state="attached")
+    page.reload()
+    escaped = key.replace(chr(34), chr(92) + chr(34))
+    restored = page.locator(f':is(input, select)[data-key="{escaped}"]').first
+    assert restored.input_value() == value
+    first = page.url.split("?")[0]
+    with page.expect_request("**/answer/*") as sent:
+        page.get_by_role("button", name="Update report").click()
+    assert "save" not in sent.value.post_data_json
+    page.wait_for_url(lambda url: "/report/" in url and url.split("?")[0] != first)
+
+
+def test_the_export_preview_restores_what_the_reader_had_open(page):
+    """Preview complete export opens every section and record, and Close
+    preview returns to the section and the disclosures the reader had."""
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    page.locator(
+        "details.finding-group > summary", has_text="Conditional findings"
+    ).click()
+    opened = page.evaluate(
+        "[...document.querySelectorAll('details[open]')].map(d => d.id || d.className)"
+    )
+    page.click("#export-preview")
+    assert page.locator("#preview-bar").is_visible()
+    assert (
+        page.evaluate(
+            "document.querySelectorAll('#report-view details:not([open])').length"
+        )
+        == 0
+    )
+    assert page.locator("#about-view").is_visible()
+    page.click("#export-close")
+    assert (
+        page.evaluate(
+            "[...document.querySelectorAll('details[open]')].map(d => d.id || d.className)"
+        )
+        == opened
+    )
+    assert page.locator("#analyses").is_visible()
+    assert not page.locator("#about-view").is_visible()
+    assert page.evaluate("document.activeElement.id") == "export-preview"
+
+
+@pytest.mark.parametrize("width", [375, 320])
+def test_each_report_section_fits_a_phone_without_sideways_scroll(
+    browser, served, width
+):
+    """No section of the report is wider than a phone's screen (#1884)."""
+    page = browser.new_page(base_url=served, viewport={"width": width, "height": 800})
+    page.goto("/")
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    report = page.url.split("?")[0]
+    for view in ("", "?view=questions", "?view=about"):
+        page.goto(report + view)
+        assert page.evaluate("document.documentElement.scrollWidth") <= width, view
+    page.close()
+
+
+def test_the_report_follows_a_dark_appearance(browser, served):
+    """In a dark appearance the report's ink is light, and a print stays light."""
+    page = browser.new_page(base_url=served, color_scheme="dark")
+    page.goto("/")
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    ink = "n => getComputedStyle(n).getPropertyValue('--ink').trim()"
+    assert page.locator(".viz-root").evaluate(ink) == "#ffffff"
+    page.emulate_media(media="print")
+    assert page.locator(".viz-root").evaluate(ink) == "#0b0b0b"
+    page.close()
 
 
 def test_a_gap_s_answer_link_opens_its_question(page):

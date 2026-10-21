@@ -692,3 +692,16 @@ def test_a_count_of_one_reads_in_the_singular():
         in parts["analyses"]
     )
     assert parts["questions-tab"] == "Questions (1)"
+
+
+def test_the_export_lists_each_question_with_its_findings_and_a_link():
+    """The complete export prints each question, its history and the findings
+    it informs, with a link to answer online in place of an editor (#1884)."""
+    parts = run_report_page(page())
+    printed = parts["export-questions"]
+    assert printed.startswith(
+        "QuestionsTo answer these questions, open this report online: "
+    )
+    assert "Is the connection initiated by Web App to Orders DB encrypted?" in printed
+    assert "New question from this analysis" in printed
+    assert "Used by: S-01" in printed

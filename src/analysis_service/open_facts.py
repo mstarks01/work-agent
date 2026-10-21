@@ -20,7 +20,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from analysis_service.analysis import control_state
-from analysis_service.assertions import REGISTRY, AssertionCatalog, identity_parts
+from analysis_service.assertions import (
+    REGISTRY,
+    AssertionCatalog,
+    assertion_id,
+    identity_parts,
+)
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import UnknownRef
 from analysis_service.evidence import evidence_catalog, prepared_view
@@ -85,8 +90,9 @@ def reference_labels(
     :func:`~analysis_service.evidence.evidence_catalog`, the one writer of
     their spelling, so a page that looks a cited reference up here never
     parses one. An attribute reads as ``element: attribute, state`` and a
-    crossing as ``flow crosses a trust boundary``. An assertion row has no
-    short label and keeps its reference.
+    crossing as ``flow crosses a trust boundary``. An open assertion row reads
+    as the question it asks (:func:`assertion_label`), and a stated one as its
+    subject, the predicate's meaning and its value.
 
     A model also writes an attribute, an asset tag, ``element.attribute`` and
     ``attribute: value`` in backticks. Each of these gets its words too, for
@@ -111,7 +117,28 @@ def reference_labels(
         elif ground.flow_id:
             where = names.get(ground.flow_id, ground.flow_id)
             labels[ref] = f"{where} crosses a trust boundary"
+        elif ground.kind == "unknown-assertion":
+            labels[ref] = assertion_label(ref, names, assertions)
+        elif ground.kind == "assertion" and assertions is not None:
+            labels[ref] = _assertion_statement(ref, names, assertions)
     return labels
+
+
+def _assertion_statement(
+    identity: str, names: Mapping[str, str], catalog: AssertionCatalog
+) -> str:
+    """A stated assertion row as words: its subject, its meaning and its value.
+
+    A reference value names a subject, so it reads as that subject's label.
+    """
+    subjects = {subject.id: subject.label for subject in catalog.subjects}
+    row = next(entry for entry in catalog.entries if assertion_id(entry) == identity)
+    predicate = REGISTRY[row.predicate]
+    subject = subjects.get(row.subject) or names.get(row.subject, row.subject)
+    value = row.value
+    if predicate.value == "reference":
+        value = subjects.get(value) or names.get(value, value)
+    return f"{subject}: {predicate.meaning} \u2014 {value}"
 
 
 #: The question an attribute asks where the plain form reads badly: of one

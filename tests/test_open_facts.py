@@ -255,3 +255,21 @@ def test_assertions_share_one_group_and_subjects_share_another():
     assert group_of(UnknownRef(subject="one")) != group_of(
         UnknownRef(assertion="assertion:a~b~any~unknown")
     )
+
+
+def test_a_report_names_each_assertion_it_cites_in_words():
+    """An assertion ground showed its reference on the report (#1884): a stated
+    row reads as its subject, meaning and value, an open row as its question."""
+    from analysis_service.assertions import UNKNOWN, AssertionCatalog, assertion_id
+
+    catalog, row = _grant_catalog()
+    open_row = row.model_copy(update={"value": UNKNOWN, "reason": "not-stated"})
+    both = AssertionCatalog(subjects=catalog.subjects, entries=[row, open_row])
+    labels = reference_labels(valid_model(), both)
+    stated, asked = labels.get(assertion_id(row)), labels.get(assertion_id(open_row))
+    assert stated == (
+        "Support administrators: what this principal may do, to which resource"
+        " — refund orders"
+    )
+    assert asked is not None
+    assert asked.startswith("What may Support administrators do")
