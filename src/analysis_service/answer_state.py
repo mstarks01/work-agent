@@ -705,7 +705,7 @@ class QuestionSet:
         shown: dict[SkipKey, str] = {
             question.key: question.principal for question in self.links
         }
-        shown |= {key: fact_label(key, self.model) for key in presented}
+        shown |= {key: fact_label(key, self.model, self.catalog) for key in presented}
         for at, key in enumerate(skips):
             if key not in shown:
                 raise ValueError(

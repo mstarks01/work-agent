@@ -28,7 +28,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from analysis_service.analysis import control_state
-from analysis_service.assertions import AssertionCatalog
+from analysis_service.assertions import REGISTRY, AssertionCatalog, identity_parts
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import FrameworkAnalysis, UnknownKey, UnknownRef
 from analysis_service.evidence import evidence_catalog, prepared_view
@@ -45,6 +45,10 @@ NEEDS_INFO = "needs-info"
 
 #: The one group every capability question is shown in.
 CAPABILITY_GROUP = "capabilities"
+
+#: What a reader sees for an assertion the catalog does not hold, in place of
+#: its reference.
+UNWORDED_ASSERTION = "An open fact from the description that has no readable label"
 
 #: What a reader sees for each asset tag in
 #: :data:`~analysis_service.system_model.CORE_ASSET_TAGS`.
@@ -169,14 +173,48 @@ def _attribute_questions(attribute: str) -> tuple[str, str]:
     )
 
 
+def assertion_label(
+    identity: str, names: Mapping[str, str], catalog: AssertionCatalog | None
+) -> str:
+    """The question an assertion reference asks, worded from the catalog.
+
+    The label is the predicate's question about the subject's label, with the
+    scope after it. It reads only the predicate, the subject and the scope, so
+    each row that shares these three parts gives one label, whatever its value.
+    A reference the catalog does not hold gets :data:`UNWORDED_ASSERTION`,
+    never the reference itself.
+    """
+    if catalog is None:
+        return UNWORDED_ASSERTION
+    subjects = {subject.id: subject.label for subject in catalog.subjects}
+    for entry in catalog.entries:
+        if entry.predicate not in REGISTRY:
+            continue
+        parts = identity_parts(entry)
+        stem = f"assertion:{parts.predicate}~{parts.subject}~{parts.scope}~"
+        if not identity.startswith(stem):
+            continue
+        subject = subjects.get(entry.subject) or names.get(entry.subject, entry.subject)
+        question = REGISTRY[entry.predicate].question.format(subject=subject)
+        if not entry.scope:
+            return question
+        scope = "; ".join(f"{each.kind}: {each.value}" for each in entry.scope)
+        return f"{question} ({scope})"
+    return UNWORDED_ASSERTION
+
+
 def label_of(
-    ref: UnknownRef, names: Mapping[str, str], model: SystemModel | None = None
+    ref: UnknownRef,
+    names: Mapping[str, str],
+    model: SystemModel | None = None,
+    catalog: AssertionCatalog | None = None,
 ) -> str:
     """What a reader sees for one open fact: the question it asks.
 
     Every surface words a fact through this, so the form page, the report page,
     ``/v1`` and a refusal ask it alike. The kind is read through
-    :attr:`~analysis_service.claims.UnknownRef.kind`.
+    :attr:`~analysis_service.claims.UnknownRef.kind`. An assertion is worded
+    from ``catalog`` (:func:`assertion_label`).
     """
     where = names.get(ref.element_id, ref.element_id)
     flow = model.get(ref.element_id) if model is not None else None
@@ -209,7 +247,7 @@ def label_of(
             kind = QUESTION_KINDS.get(ref.question)
             return kind.template.format(element=where) if kind else ref.question
         case "assertion":
-            return ref.assertion
+            return assertion_label(ref.assertion, names, catalog)
         case "attribute":
             return _attribute_questions(ref.attribute)[0].format(element=where)
         case "subject":
@@ -280,7 +318,11 @@ def gaps(model: SystemModel) -> tuple[Gap, ...]:
     return tuple(Gap(attribute, tuple(unstated[attribute])) for attribute in order)
 
 
-def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, ...]:
+def open_facts(
+    block: FrameworkAnalysis,
+    model: SystemModel,
+    catalog: AssertionCatalog | None = None,
+) -> tuple[OpenFact, ...]:
     """Every open fact this block's needs-info findings rest on, best first."""
     names = element_names(model)
     needs: dict[str, set[UnknownKey]] = {}
@@ -291,7 +333,7 @@ def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, 
         refs = claim.waits_on()
         needs[claim.id] = {ref.key for ref in refs}
         for ref in refs:
-            labels.setdefault(ref.key, label_of(ref, names, model))
+            labels.setdefault(ref.key, label_of(ref, names, model, catalog))
     cited: dict[UnknownKey, list[str]] = defaultdict(list)
     for claim_id, keys in needs.items():
         for key in keys:
@@ -321,11 +363,13 @@ def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, 
 
 
 def open_facts_by_framework(
-    analyses: Sequence[FrameworkAnalysis], model: SystemModel
+    analyses: Sequence[FrameworkAnalysis],
+    model: SystemModel,
+    catalog: AssertionCatalog | None = None,
 ) -> dict[str, list[dict[str, object]]]:
     """:func:`open_facts` for each block, as the JSON a page is handed."""
     return {
-        block.framework: [fact.to_json() for fact in open_facts(block, model)]
+        block.framework: [fact.to_json() for fact in open_facts(block, model, catalog)]
         for block in analyses
     }
 
