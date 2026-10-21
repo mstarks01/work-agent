@@ -633,6 +633,8 @@ def _scope_states():
         ("VERDICT_STATE", "analysis_service.claims:VerdictStatus"),
         ("SCOPE_STATE", None),
         ("CHANGE_LINE", "analysis_service.report_changes:Change"),
+        ("RECOMMENDATIONS", "analysis_service.claims:VerdictStatus"),
+        ("HISTORY", "analysis_service.report_conditions:FactStatus"),
     ],
 )
 def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
