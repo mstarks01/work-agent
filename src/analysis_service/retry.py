@@ -53,10 +53,11 @@ once so that the same decision holds whether the call ran in this process or
 somewhere else.
 
 Retrying is not quite all this module supplies, and the exception is
-deliberate. :func:`reject_truncated` is the uniform refusal of a length-stopped
-completion, and it belongs beside the retry rule that must never retry one:
-the same request against the same cap truncates again. Nothing here can change
-an answer. It can refuse one the provider has already said is incomplete.
+deliberate. :func:`reject_unfinished` is the uniform refusal of a completion
+the provider stopped at the token cap or at its content filter, and it belongs
+beside the retry rule that must never retry one: the same request stops the
+same way again. Nothing here can change an answer. It can refuse one the
+provider has already said is incomplete.
 """
 
 from __future__ import annotations
@@ -115,6 +116,11 @@ _RETRY_AFTER_CEILING_SECONDS = 60.0
 # status code off the exception rather than naming a litellm class.
 _MAX_TOKENS_FINISH_REASON = "MAX_TOKENS"
 
+# ADK maps LiteLLM's ``finish_reason="content_filter"`` onto this member.
+# LiteLLM maps Anthropic's ``stop_reason="refusal"`` onto that, so a model's
+# safety refusal arrives here, with whatever text it wrote before it stopped.
+_SAFETY_FINISH_REASON = "SAFETY"
+
 # The remedy half of every truncation message, shared with
 # ``graph._TRUNCATION_HINT`` because a run can reach truncation from either
 # direction and both want the operator to turn the same knob. It lives in this
@@ -150,6 +156,15 @@ class TruncatedCompletionError(RuntimeError):
     request against the same cap truncates again, and the second ask is a
     paid-for identical answer. That is the rule the whole module already
     applies to a malformed request or a rejected credential.
+    """
+
+
+class RefusedCompletionError(RuntimeError):
+    """A completion the provider stopped at its content filter.
+
+    The text before the stop is a fragment, so a validator would report it as
+    malformed output and a re-ask would ask the same filter again. Not
+    retryable, for the reason :class:`TruncatedCompletionError` gives.
     """
 
 
@@ -273,8 +288,9 @@ def _is_transient(exc: BaseException) -> bool:
 
     An exception carrying no readable status code is not transient. A raised
     object from outside the provider library — this module's own
-    :class:`TruncatedCompletionError` among them — says nothing about transport,
-    and a missing number is not evidence of one.
+    :class:`TruncatedCompletionError` and :class:`RefusedCompletionError` among
+    them — says nothing about transport, and a missing number is not evidence
+    of one.
 
     A 429 is read one step further, because the code alone conflates a moment
     with a ceiling — see :data:`_RATE_LIMIT_CLEARS_WITH_TIME`.
@@ -423,7 +439,7 @@ class FailureKind(StrEnum):
 
     The members are #824's own list and nothing beyond it. A truncated
     completion is deliberately **not** one: the provider reported that call a
-    success, and :func:`reject_truncated` refuses it above the seam, so it
+    success, and :func:`reject_unfinished` refuses it above the seam, so it
     never arrives as a failure to name. A member nothing can produce reads as
     coverage.
     """
@@ -698,30 +714,40 @@ def stamp_attempt(responses: Sequence, attempt: int) -> Sequence:
     return responses
 
 
-def reject_truncated(responses: Sequence, model: str) -> None:
-    """Raise if the provider stopped any of ``responses`` at the token cap.
+def reject_unfinished(responses: Sequence, model: str) -> None:
+    """Raise if the provider stopped any of ``responses`` at the cap or the filter.
 
     Every response is checked rather than just the last: a non-streaming call
-    yields one today, but the collection is a sequence and a truncated part
-    anywhere in it is a truncated answer.
+    yields one today, but the collection is a sequence and an unfinished part
+    anywhere in it is an unfinished answer.
 
     ``finish_reason`` is read instead of ``error_code``, which ADK sets to the
     same value. The former is the provider's own word for what happened; the
     latter is ADK's overloading of an error channel for a response that carries
     no error, and it stops being set the day that overloading is reconsidered.
     """
-    truncated = any(
-        response.finish_reason == _MAX_TOKENS_FINISH_REASON for response in responses
-    )
-    if not truncated:
-        return
-    logger.error(
-        "%s: completion stopped at max_output_tokens with partial output;"
-        " failing the node rather than validating a fragment",
-        model,
-    )
-    raise TruncatedCompletionError(
-        f"{model} stopped at max_output_tokens with its output incomplete, so"
-        f" what it emitted is a fragment rather than an answer."
-        f" {TRUNCATION_REMEDY}"
-    )
+    reasons = [response.finish_reason for response in responses]
+    if _SAFETY_FINISH_REASON in reasons:
+        logger.error(
+            "%s: completion stopped at the provider's content filter;"
+            " failing the node rather than validating a fragment",
+            model,
+        )
+        raise RefusedCompletionError(
+            f"{model} refused the request: the provider stopped the completion"
+            f" at its content filter (finish reason {_SAFETY_FINISH_REASON}),"
+            f" so what it emitted is a fragment rather than an answer."
+            f" The same request stops the same way again; use another model"
+            f" for this node's tier."
+        )
+    if _MAX_TOKENS_FINISH_REASON in reasons:
+        logger.error(
+            "%s: completion stopped at max_output_tokens with partial output;"
+            " failing the node rather than validating a fragment",
+            model,
+        )
+        raise TruncatedCompletionError(
+            f"{model} stopped at max_output_tokens with its output incomplete, so"
+            f" what it emitted is a fragment rather than an answer."
+            f" {TRUNCATION_REMEDY}"
+        )

@@ -82,7 +82,7 @@ class ChargeModeMismatchError(ConfigError):
 
     It costs one node's tokens to find out, and the message names the key to
     change. That is the same trade
-    :func:`analysis_service.retry.reject_truncated` makes: fail the node rather
+    :func:`analysis_service.retry.reject_unfinished` makes: fail the node rather
     than keep what it produced.
 
     Not transient, so the retry driver gives up at once rather than paying for
