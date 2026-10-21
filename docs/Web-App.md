@@ -143,6 +143,11 @@ view of the same page at `?view=provenance`. It holds the service's disclaimer
 with the assertion counts, the extracted DFD with its boundary crossings and
 assumptions, and the served-build provenance for every LLM node.
 
+**A printed report** holds only the findings. The print leaves out the sidebar,
+the tabs, the theme button and the follow-up questions, and it always uses the
+light colours. Each group of findings opens for the print, so every card
+prints. The evidence under each card stays closed.
+
 ## When the configuration is wrong
 
 If the engine cannot be built — bad tier config, missing credentials, an

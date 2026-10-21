@@ -30,7 +30,8 @@
     --g-derived:    #1f8a86;
     --tint:         color-mix(in srgb, var(--surface) 88%, transparent);
   }
-  @media (prefers-color-scheme: dark) {
+  /* Screen only: a print is always light. */
+  @media screen and (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) .viz-root {
       color-scheme: dark;
       --plane:    #0d0d0d;
@@ -47,11 +48,13 @@
       --g-derived:#49b6b1;
     }
   }
-  :root[data-theme="dark"] .viz-root {
-    color-scheme: dark;
-    --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
-    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781; --border:rgba(255,255,255,0.10); --hairline:#2c2c2a;
-    --g-quote:#7ea6ee; --g-unknown:#ac8ce8; --g-absent:#d47fc6; --g-derived:#49b6b1;
+  @media screen {
+    :root[data-theme="dark"] .viz-root {
+      color-scheme: dark;
+      --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
+      --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781; --border:rgba(255,255,255,0.10); --hairline:#2c2c2a;
+      --g-quote:#7ea6ee; --g-unknown:#ac8ce8; --g-absent:#d47fc6; --g-derived:#49b6b1;
+    }
   }
 
   * { box-sizing: border-box; }
@@ -240,6 +243,15 @@
   /* The theme toggle reaches the sidebar too. */
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="dark"] { color-scheme: dark; }
+
+  /* A print holds the findings: no navigation, no controls and no questions
+     to answer. */
+  @media print {
+    .skip-link, .sidebar, #themebtn, #analysis-tabs, #links { display: none; }
+    .workspace { display: block; min-height: 0; }
+    main.report-main > .viz-root { min-height: 0; padding: 0; background: none; }
+    .card { break-inside: avoid; }
+  }
 </style>
 </head>
 <body>

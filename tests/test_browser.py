@@ -1100,6 +1100,30 @@ def test_a_question_s_answer_link_opens_its_follow_up_row(page):
     assert page.locator("#followup").get_attribute("open") is not None
 
 
+def test_a_printed_report_holds_only_the_findings(page):
+    """A print hides the navigation, the controls and the follow-up, prints in
+    the light palette, and opens each closed group so every card prints."""
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    page.click("#themebtn")
+    group = page.locator("details.openfact").first
+    assert group.get_attribute("open") is None
+    page.emulate_media(media="print")
+    for hidden in (".sidebar", "#themebtn", "#analysis-tabs", "#links"):
+        assert not page.locator(hidden).is_visible(), hidden
+    assert (
+        page.locator(".viz-root").evaluate(
+            "n => getComputedStyle(n).getPropertyValue('--ink').trim()"
+        )
+        == "#0b0b0b"
+    )
+    page.evaluate("dispatchEvent(new Event('beforeprint'))")
+    assert group.get_attribute("open") is not None
+    page.evaluate("dispatchEvent(new Event('afterprint'))")
+    assert group.get_attribute("open") is None
+
+
 def test_a_report_sits_in_the_workspace_with_its_analysis_tabs(page):
     """The report shows the workspace sidebar, and its Description tab opens
     the analysis at its description without a return to the report."""

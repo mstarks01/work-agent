@@ -61,6 +61,7 @@ globalThis.document = {
   body: new Node("body"),
 };
 globalThis.window = globalThis;
+globalThis.addEventListener = () => {};
 globalThis.location = { pathname: "/report/r1", href: "" };
 """
 
