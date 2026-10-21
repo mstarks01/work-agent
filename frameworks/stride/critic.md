@@ -22,9 +22,9 @@ Judge a draft's lane against the scope definitions in the digest below, which ar
 
 ## The judgements this framework's rulings carry
 
-Beyond a verdict, a STRIDE ruling carries a **confidence** rating. Run it, and the recommendation reading below, over the drafts that survived the two gating steps.
+Beyond a verdict, every STRIDE ruling carries a **confidence** rating, a rejected one included. Run the recommendation reading below over the drafts that survived the two gating steps.
 
-**Confidence.** Rate how firmly the surviving threat is grounded in stated model facts: **high** when every load-bearing claim is stated outright, **medium** when the chain is sound but an intermediate step is inferred from the model rather than stated, **low** when the threat rests largely on an `unknown`. Confidence is about grounding, not about severity or about how likely the attack is.
+**Confidence.** Rate how firmly the threat is grounded in stated model facts: **high** when every load-bearing claim is stated outright, **medium** when the chain is sound but an intermediate step is inferred from the model rather than stated, **low** when the threat rests largely on an `unknown`. Confidence is about grounding, not about severity or about how likely the attack is.
 
 Read the draft's `grounds` here, and read them for **relevance**: does the cited entry actually justify this threat? A quote that is word-for-word accurate and beside the point is the one defect no check can catch — the service matched each quote against its source and says on the draft which ones failed, so do not re-run that by eye. Entries that fail to support the threat may **lower** the rating you would otherwise give. Entries that support it well never **raise** one: a perfect quote cannot make a threat resting on an `unknown` any more certain, and letting it try turns this dial from grounding-in-model-facts into quality-of-citation.
 
