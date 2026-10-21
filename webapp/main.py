@@ -223,7 +223,11 @@ from analysis_service.links import (
 )
 from analysis_service.model_gate import NoThinkingLevel
 from analysis_service.model_tiers import ModelTierConfig
-from analysis_service.open_facts import open_facts_by_framework, reference_labels
+from analysis_service.open_facts import (
+    gaps,
+    open_facts_by_framework,
+    reference_labels,
+)
 from analysis_service.principals import Identity
 from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
@@ -927,6 +931,7 @@ def render_report(
         lanes=script_json(
             {name: package.id_rule.lane_field for name, package in PACKAGES.items()}
         ),
+        gaps=script_json([gap.to_json() for gap in gaps(report.system_model)]),
         names=script_json(
             reference_labels(
                 report.system_model,

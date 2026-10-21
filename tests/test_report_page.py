@@ -624,3 +624,13 @@ def test_the_page_reads_the_service_s_severity_order():
         r'const SEV_ORDER = JSON\.parse\(document\.getElementById\("severity_order"\)',
         viewer_javascript(),
     )
+
+
+def test_the_provenance_view_lists_the_model_s_gaps_with_their_questions():
+    """Each unstated attribute shows once, with its elements, and an element
+    the report asks about links to its question."""
+    parts = run_report_page(page(), "?view=provenance")
+    gaps = parts["model-gaps"]
+    assert "Encryption in transit is not stated for 1 element: " in gaps
+    assert "(Answer)" in gaps
+    assert "Encryption at rest is not stated for 1 element: Orders DB" in gaps

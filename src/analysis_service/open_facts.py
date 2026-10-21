@@ -239,6 +239,47 @@ def group_of(ref: UnknownRef) -> tuple[str, str]:
     return label, label
 
 
+@dataclass(frozen=True)
+class Gap:
+    """One attribute the System Model leaves unstated, and where."""
+
+    attribute: str
+    #: Each element the attribute is unstated on, in the model's order.
+    element_ids: tuple[str, ...]
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "attribute": self.attribute,
+            "elements": [
+                {
+                    "id": element_id,
+                    "key": list(
+                        UnknownRef(element_id=element_id, attribute=self.attribute).key
+                    ),
+                }
+                for element_id in self.element_ids
+            ],
+        }
+
+
+def gaps(model: SystemModel) -> tuple[Gap, ...]:
+    """Every attribute the model leaves unstated, on the most elements first.
+
+    Read from the ``unknown-attribute`` entries of
+    :func:`~analysis_service.evidence.evidence_catalog`, the one reader of
+    which attributes a model leaves open. Each element carries the key of its
+    open fact, so a page can link it to the question that asks it.
+    """
+    unstated: dict[str, list[str]] = defaultdict(list)
+    for ground in evidence_catalog(model).values():
+        if ground.kind == "unknown-attribute":
+            unstated[ground.attribute].append(ground.element_id)
+    order = sorted(
+        unstated, key=lambda attribute: (-len(unstated[attribute]), attribute)
+    )
+    return tuple(Gap(attribute, tuple(unstated[attribute])) for attribute in order)
+
+
 def open_facts(block: FrameworkAnalysis, model: SystemModel) -> tuple[OpenFact, ...]:
     """Every open fact this block's needs-info findings rest on, best first."""
     names = element_names(model)

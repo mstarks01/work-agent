@@ -13,9 +13,12 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.claims import UnknownRef
+from analysis_service.evidence import evidence_catalog
 from analysis_service.open_facts import (
     ASSET_WORDS,
     element_names,
+    gaps,
     label_of,
     open_facts,
     open_facts_by_framework,
@@ -211,3 +214,26 @@ def test_every_other_backtick_span_in_the_archive_has_a_label():
                 spans = span.findall(claim.model_dump_json())
                 unlabelled |= {text for text in spans if text not in labels}
     assert unlabelled == UNLABELLED
+
+
+def test_every_unstated_attribute_is_in_one_gap(report):
+    unstated = {
+        (ground.element_id, ground.attribute)
+        for ground in evidence_catalog(report.system_model).values()
+        if ground.kind == "unknown-attribute"
+    }
+    listed = [
+        (element_id, gap.attribute)
+        for gap in gaps(report.system_model)
+        for element_id in gap.element_ids
+    ]
+    assert sorted(listed) == sorted(unstated)
+    counts = [len(gap.element_ids) for gap in gaps(report.system_model)]
+    assert counts == sorted(counts, reverse=True)
+
+
+def test_a_gap_names_each_element_by_its_open_fact_key():
+    (gap, *_) = gaps(valid_model())
+    (element, *_) = gap.to_json()["elements"]
+    ref = UnknownRef(element_id=element["id"], attribute=gap.attribute)
+    assert element["key"] == list(ref.key)
