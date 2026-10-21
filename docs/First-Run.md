@@ -335,17 +335,16 @@ when both frameworks are selected.
 
 Start with these parts of the result:
 
-- **Summary and findings table:** each framework's block starts with the
-  count of confirmed findings by severity, the count of findings that wait on
-  an answer, and one row for each finding. Click a finding's title to open its
-  card.
-- **Groups:** confirmed findings that rest on one missing control share a
-  group, so one change answers them. Conditional findings sit under the
-  question that would settle them; click **Answer** to go to that question.
-- **System model:** on **How this report was made**, verify that the actors,
+- **Summary and findings:** each framework's block starts with the count of
+  confirmed findings by severity, the count of conditional findings and the
+  count of dismissed findings. Each finding is one row; click it to open it.
+- **Shared actions:** where confirmed findings rest on one missing control, a
+  line names the one action that addresses them all. A conditional finding
+  lists the facts it needs; click one to go to its question.
+- **System model:** under **About the analysis**, verify that the actors,
   components, stores, flows, and trust zones match the source. Every later
   result depends on this extraction.
-- **Grounds:** open **Why it matters, and the evidence** on a card, and check
+- **Grounds:** open **Evidence and justification** on a finding, and check
   whether each finding rests on relevant source text or a real fact derived
   from the model. A ground that quotes one of your answers,
   or rests on an attribute you answered, says "your answer; the service did
@@ -353,7 +352,7 @@ Start with these parts of the result:
 - **Verdict:** `confirmed`, `needs-info`, or `rejected`. For ASVS, `confirmed`
   means a requirement applies and the input does not show it satisfied; it is
   not a failed compliance test. A `needs-info` finding is conditional: it is
-  neither confirmed nor cleared. Its card lists each fact it waits on and why
+  neither confirmed nor cleared. It lists each fact it waits on and why
   that fact is still open: nobody knew, you answered only part of it, you
   skipped it before the analysis, you answered it and the analysis still did
   not find it settled, or nobody was asked. An "I don't know" never reads as a
@@ -361,7 +360,7 @@ Start with these parts of the result:
 - **Marks:** look for repaired quotes, dropped claims, unresolved evidence, or
   unresolved references. These show where one proposal was degraded or removed
   without discarding the entire analysis.
-- **Provenance:** on **How this report was made**, see which model route was requested, which model identifier
+- **Provenance:** under **About the analysis**, see which model route was requested, which model identifier
   the provider returned, and which execution fingerprint each call produced.
   These values support auditing; they do not establish that a finding is right.
 
@@ -439,49 +438,39 @@ The app can ask you questions before the analysis, and after the report.
   so, and you can still change an answer. Only **Start the analysis** starts
   it. The analysis then starts from what was already read, so nothing is read
   again, and it reads your answers.
-- **After the report: one optional follow-up.** The report may offer a
-  closed **Optional follow-up** section. It says how many questions it asks
-  and how many conditional findings wait on them, and each question names the
-  findings that wait on it. Questions that no
-  conditional finding waits on sit apart, in a closed section at the end:
-  an answer to one cannot change this report. You do not need it: the
-  report is complete without it. Open it, answer what you can, and click
-  **Run the follow-up with these answers**. The analysis runs once more, and
-  the app shows its progress and then its report. That report is final: it
-  asks no more questions, and it lists the facts still open under its
-  conditional findings. If an answer was wrong or a guess, open **Correct an
-  answer**, change it or choose "I don't know", and click **Save the
-  corrections**. The report marks each finding that rests on a corrected
-  answer. The analysis does not run again. Where your install builds an assertion catalog, the
-  follow-up also lists the group questions under **Match each user, team
-  or account to a part of your system**. Where a part of your system has the same name as the user, team
-  or account, the question lists that part first, marked "(same name)", and shows an
-  arrow button beside the list. Click the arrow to choose that part; nothing is
-  chosen until you do. Under **Earlier answers**, the follow-up lists the answers this
-  report read. Click **Change** beside one to give a new answer, and the
-  follow-up reads it. A known answer cannot change back to "I don't know"
-  there, and a known part of a question with parts cannot either. Where you
-  answered only some parts of such a question, the follow-up asks it again
-  and shows the parts you answered.
+- **After the report: one optional follow-up.** The report is complete
+  without it. Where the report asks something, a line under the findings
+  offers **Add information**, and the **Questions** tab shows how many
+  questions it asks. The questions use the same list as the questions before
+  the analysis: a group for each kind of question, an index of the groups on
+  the left, typed answers, and one shared answer where a question asks about
+  several parts. Each question says what became of it before the analysis: new
+  from this analysis, left blank, skipped, answered in part, or answered "I
+  don't know". **Used by** names the findings that use it; click an ID to open
+  that finding. The help under **?** says what the answer informs and that a
+  finding can need other facts too. Where your install builds an assertion
+  catalog, the list also asks which part of your system each user, team or
+  account is, under **Match each user, team or account to a part of your
+  system**. Where a part of your system has the same name, the question lists
+  that part first, marked "(same name)", and shows an arrow button; nothing is
+  chosen until you click it. **Answers this report read** lists your earlier
+  answers; **Change** gives a new one. A known answer cannot change back to "I
+  don't know" there, and a known part of a question with parts cannot either.
 
-- **The report's open facts.** Most findings are conditional: they rest on
-  facts your description never states, such as how a flow is protected. Under
-  **What would settle the conditional findings?** the report lists every such
-  fact, the most useful first, with how many findings have every question
-  answered once you answer down to it. A question marked "you skipped this
-  before the analysis" was shown at the pause and left blank. One marked "new
-  from the analysis" was never asked before, because the analysis found
-  something that depends on it. The reviewer's own questions come last,
-  because they can change when the analysis runs again. A question with parts asks only the
-  parts listed, which may not be every fact a finding needs. Choose "I don't know" where nobody knows: the
-  fact stays open. For a control such as authentication or encryption, first
-  choose "There is none", "I don't know" or "A mechanism". For a mechanism, the
-  text box suggests common ones as you type, and you can add what matters,
-  such as how often a key is rotated. The resumed run decides whether each answer
-  settles its finding. Answer as far as you like, by choosing a value or typing
-  one line, and run the follow-up. This works on every install, with or
-  without an assertion catalog. The list does not ask a fact you
-  already answered, "I don't know" included.
+  For a control such as authentication or encryption, first choose "There is
+  none", "I don't know" or "A mechanism". For a mechanism, the text box
+  suggests common ones as you type. Choose "I don't know" where nobody knows:
+  the fact stays open. Under the list, a line counts the findings whose
+  questions your answers cover. **Save draft** keeps your answers and runs
+  nothing; a reload shows them again. **Update report** starts the report's one
+  follow-up: the analysis runs once more with your answers, and the app shows
+  its progress and then its report. That report is final and asks no more
+  questions. The earlier report stays available. On a final report, the
+  **Questions** tab shows the answers it read. If one was wrong or a guess,
+  click **Change**, give the new answer or choose "I don't know", and click
+  **Save corrections**. The report marks each finding that rests on a
+  corrected answer. The analysis does not run again, and the verdicts do not
+  change. This works on every install, with or without an assertion catalog.
 
 Where your description names a protocol that is secure by its own definition, such as SFTP's encryption or WireGuard's peer authentication, the app records that property and does not ask about it. An answer settles its fact, even where your description said otherwise. A run
 that waits for your answers is kept in the app's job store, like every other

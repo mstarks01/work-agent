@@ -49,6 +49,7 @@ from analysis_service.fact_answers import (
 from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import (
     element_names,
+    group_of,
     label_of,
     open_attribute,
     prepared_model,
@@ -106,6 +107,12 @@ class FactQuestion:
     #: The longest answer it admits
     #: (:func:`~analysis_service.answer_forms.answer_limit`).
     max_length: int
+    #: The group a page shows it in, the group's heading, and the element's
+    #: name as its row in that group (:func:`~analysis_service.open_facts.group_of`),
+    #: as the early list shows them. A question about no element is its own row.
+    group: str
+    group_heading: str
+    element: str
     #: The label of the highest :class:`~analysis_service.frameworks.Band`
     #: among the findings that wait on it, or empty where none does or its
     #: package grades nothing.
@@ -137,6 +144,9 @@ class FactQuestion:
             "suggestions": list(self.suggestions),
             "facets": facets_json(self.facets),
             "max_length": self.max_length,
+            "group": self.group,
+            "group_heading": self.group_heading,
+            "element": self.element,
             "band": self.band,
             "findings": list(self.findings),
             "needs": {finding: list(need) for finding, need in self.needs.items()},
@@ -380,12 +390,15 @@ def fact_questions(
             1 for facts in waiting.values() if key in facts and not facts <= answered
         )
         answered.add(key)
+        ref = needs.refs[key]
+        label = label_of(ref, names, model, catalog)
+        group, heading = group_of(ref)
         asked.append(
             FactQuestion(
                 key=key,
                 kind=fact_kind(key),
                 basis=basis,
-                label=label_of(needs.refs[key], names, model, catalog),
+                label=label,
                 cited_by=cited_by,
                 covered_so_far=sum(
                     1 for facts in waiting.values() if facts <= answered
@@ -395,6 +408,9 @@ def fact_questions(
                 suggestions=answer_suggestions(key),
                 facets=answer_facets(key),
                 max_length=answer_limit(key, model),
+                group=group,
+                group_heading=heading,
+                element=names.get(ref.element_id, label) if ref.element_id else label,
                 findings=tuple(
                     sorted(
                         f"{framework}/{claim}"

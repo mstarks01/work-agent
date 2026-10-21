@@ -1320,3 +1320,16 @@ class TestTheMostImportantFindingsFirst:
         assert self.order(self.needs(forward, bands=bands)) == self.order(
             self.needs(backward, bands=dict(reversed(bands.items())))
         )
+
+
+def test_a_report_question_carries_the_group_the_early_list_shows_it_in(report):
+    """The report's questions group as the early list groups (#1884)."""
+    from analysis_service.fact_answers import key_ref
+    from analysis_service.open_facts import group_of
+
+    for question in ask(report):
+        assert (question.group, question.group_heading) == group_of(
+            key_ref(question.key)
+        )
+        assert question.element
+        assert "assertion:" not in question.label

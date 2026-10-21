@@ -59,9 +59,9 @@ point, not a measured maximum. The deployment's source limits bound the
 answers' text as well. The questions route publishes all four as
 `answer_limits`, and the report page reads them.
 
-**The report page saves in batches.** "Save progress" splits the answers into
+**The report page saves in batches.** "Save draft" splits the answers into
 requests within the limits, each naming the revision that the last one
-returned. "Run the follow-up" saves first where the answers pass one request,
+returned. "Update report" saves first where the answers pass one request,
 and then runs on the draft. Every answer stays on the page after a refusal,
 an interrupted connection or an unreadable reply, and the buttons come back.
 A saved draft fills its questions when the page opens.

@@ -930,86 +930,101 @@ class TestFactAnswers:
         assert re.search(r'id="question_fallback"[^>]*>\{"typed"', page)
 
 
-# The report page's answer block, run for real: the viewer's helper block
-# (which parses the page's payloads and defines ``el`` and ``$``), then the
-# answer block cut from the shipped script by its first and last lines. The
-# served script carries no comments, so neither marker is one.
+# The report page run whole under ``node``, with a stand-in DOM that holds
+# values, listeners and a recorded ``fetch``. A test names the payloads it is
+# about; every other block, and every field of a finding it leaves out, takes
+# a sample report's value, so the page draws its report as it is served.
+# ``box`` reaches the Questions section: the list, its actions and its state.
 _VIEWER_ANSWER_HARNESS = r"""
 const calls = [];
-class Node {
-  constructor(tag) { this.tag = tag; this.children = []; this.dataset = {};
-    this.value = ""; this.listeners = {}; this._text = ""; }
-  append(...kids) { for (const k of kids) this.children.push(k); }
-  replaceChildren(...kids) { this.children = [...kids]; }
-  set textContent(t) { this._text = t; }
-  get textContent() { return this._text; }
-  addEventListener(name, fn) { this.listeners[name] = fn; }
-  setAttribute(name, value) { this[name] = value; }
-  all(tag) { const out = [];
-    const walk = (n) => { for (const c of n.children) if (typeof c === "object") {
-      if (c.tag === tag) out.push(c); walk(c); } };
-    walk(this); return out; }
-}
-const payloads = PAYLOADS;
-const box = new Node("div");
-globalThis.document = {
-  getElementById: (id) => id === "links" ? box
-    : Object.assign(new Node("script"), { _text: JSON.stringify(payloads[id] ?? {}) }),
-  createElement: (tag) => new Node(tag),
-  createDocumentFragment: () => new Node("#fragment"),
-  createTextNode: (t) => Object.assign(new Node("#text"), { _text: t }),
+Node.prototype.all = function (tag) {
+  const out = [];
+  const walk = (n) => { for (const c of n.children) if (typeof c === "object") {
+    if (c.tag === tag) out.push(c); walk(c); } };
+  walk(this);
+  return out;
 };
-globalThis.location = { href: "", pathname: "/report/r1" };
 globalThis.fetch = async (url, init) => {
   calls.push({ url, body: JSON.parse(init.body) });
   return { ok: true, json: async () => ({ run: "r2" }) };
 };
-// The button that runs the follow-up, beside "Save progress".
-const followUp = () => box.all("button")
-  .find(b => b.textContent === "Run the follow-up with these answers");
+const box = { all: (tag) => ["list", "question-actions", "questions-state"]
+  .flatMap(id => document.getElementById(id).all(tag)) };
+// The button that starts the follow-up, beside "Save draft".
+const followUp = () => box.all("button").find(b => b.textContent === "Update report");
 """
 
-ANSWER_BLOCK_START = (
-    "  const earlierCount = EARLIER_FACTS.length + EARLIER_LINKS.length;\n"
-)
-ANSWER_BLOCK_END = "    box.append(actions, savedNote, note);\n  }\n"
+#: Every field of a finding the page reads, for a test that names only some.
+_CLAIM_DEFAULTS = {
+    "title": "A finding",
+    "description": "",
+    "affected_element_ids": [],
+    "grounds": [],
+    "mitigations": [],
+    "verdict": {"status": "needs-info", "reason": ""},
+}
 
 
-def _run_answer_block(
-    payloads: dict,
-    steps: str,
-    start_marker: str = ANSWER_BLOCK_START,
-    end_marker: str = ANSWER_BLOCK_END,
-) -> dict:
-    from tests.test_webapp import FIRST_VIEWER_CONSTANT, viewer_javascript
+def _report_payloads(payloads: dict) -> dict:
+    """``payloads`` over a sample report page's, each as the JSON text served."""
+    from tests import test_report_page
+    from tests.factories import report_state, sample_report
+    from webapp.main import render_report
+
+    sample = sample_report()
+    served = test_report_page.payloads_of(
+        render_report(sample, report_state(sample)).html
+    )
+    merged = {name: json.loads(text) for name, text in served.items()}
+    for name, value in payloads.items():
+        if name != "report":
+            merged[name] = value
+    report = {**merged["report"], **payloads.get("report", {})}
+    report.setdefault("analyses", [])
+    if "analyses" not in payloads.get("report", {}):
+        report["analyses"] = []
+    report["analyses"] = [
+        {
+            "framework_version": "1.0",
+            "disclaimer": "",
+            "scope": [],
+            "rejected_claims": [],
+            "summary": {},
+            **block,
+            "claims": [
+                {"framework": block["framework"], **_CLAIM_DEFAULTS, **claim}
+                for claim in block.get("claims", [])
+            ],
+        }
+        for block in report["analyses"]
+    ]
+    merged["report"] = report
+    return {name: json.dumps(value) for name, value in merged.items()}
+
+
+def _run_answer_block(payloads: dict, steps: str) -> dict:
+    """What the report page sends, and where it goes, once ``steps`` have run."""
+    from tests import test_report_page
 
     node = shutil.which("node")
     if node is None:
         pytest.skip("no node on PATH to run the report page's script")
-    # Every report carries `analyses`; a stub that states only the model
-    # stands for one with no findings.
-    if isinstance(payloads.get("report"), dict):
-        payloads["report"] = {"analyses": [], **payloads["report"]}
-    # The page reads each lane through the service's own table, as it is served.
-    payloads.setdefault(
-        "lanes", {name: pkg.id_rule.lane_field for name, pkg in PACKAGES.items()}
-    )
-    payloads.setdefault("answer_limits", dict(ANSWER_LIMITS))
-    javascript = viewer_javascript()
-    helpers = javascript.split(FIRST_VIEWER_CONSTANT)[0]
-    start = javascript.index(start_marker)
-    end = javascript.index(end_marker, start) + len(end_marker)
+    script = test_report_page.page_script()
     program = (
-        _VIEWER_ANSWER_HARNESS.replace("PAYLOADS", json.dumps(payloads))
-        + (PROJECT_ROOT / "webapp" / "static" / "answer_editor.js").read_text()
-        + helpers
-        + javascript[start:end]
+        test_report_page.shim(_report_payloads(payloads))
+        + _VIEWER_ANSWER_HARNESS
+        + script
         + "\n(async () => {\n"
         + steps
         + "\nconsole.log(JSON.stringify({calls, href: location.href}));\n})();"
     )
     done = subprocess.run(
-        [node, "-e", program], capture_output=True, text=True, timeout=30, check=False
+        [node, "-"],
+        input=program,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
     )
     assert done.returncode == 0, done.stderr
     return json.loads(done.stdout.strip().splitlines()[-1])
@@ -1082,7 +1097,8 @@ calls.push(walk(ids.questions).filter(n => n.className === "question-context").m
 
 
 def test_the_report_names_the_findings_a_question_settles():
-    """The report names which findings wait, not only a count (#1289, B1)."""
+    """The report names which findings wait, not only a count (#1289, B1): by
+    ID on the row, and by title under its "?" (#1884)."""
     payloads = {
         "report": {
             "system_model": valid_model().model_dump(mode="json"),
@@ -1099,15 +1115,19 @@ def test_the_report_names_the_findings_a_question_settles():
         ],
     }
     steps = """
-calls.push(box.all("div").map(d => d.textContent).filter(t => t.startsWith("Waiting")));
+calls.push(document.getElementById("list").all("p").map(d => d.textContent));
+calls.push(document.getElementById("list").all("div")
+  .filter(d => d.className === "meta used-by").map(d => d.textContent));
 """
-    (waiting,) = _run_answer_block(payloads, steps)["calls"]
-    assert waiting == ["Waiting on it: Build tampering. The most important is high."]
+    lines, used = _run_answer_block(payloads, steps)["calls"]
+    assert "Your answer informs 1 finding: Build tampering." in lines
+    assert "The most important finding it informs is high." in lines
+    assert used == ["Used by: T-01"]
 
 
-def test_a_question_no_finding_waits_on_is_set_apart():
-    """A follow-up listed questions that no conditional finding waits on among
-    the ones that settle findings (#1289, item 8)."""
+def test_a_question_no_finding_waits_on_says_so_and_is_sent():
+    """A question no conditional finding waits on says so under its "?",
+    names no finding, and its answer is sent with the others (#1289, item 8)."""
     payloads = {
         "report": {"system_model": valid_model().model_dump(mode="json")},
         "link_questions": [],
@@ -1117,21 +1137,19 @@ def test_a_question_no_finding_waits_on_is_set_apart():
         ],
     }
     steps = """
-const direct = (node, tag) => node.children.filter(c => typeof c === "object" && c.tag === tag);
-calls.push(box.all("details").map(d => ({
-  summary: direct(d, "summary")[0].textContent,
-  labels: direct(d, "p").flatMap(p => p.all("b").map(b => b.textContent)),
-})));
+calls.push(document.getElementById("list").all("p").map(d => d.textContent));
+calls.push(document.getElementById("list").all("div")
+  .filter(d => d.className === "meta used-by").map(d => d.textContent));
 const inputs = box.all("input").filter(i => i.type === "text");
 inputs.forEach(i => { i.value = "the release team"; });
 await followUp().listeners.click();
 """
-    sections, sent = _run_answer_block(payloads, steps)["calls"]
-    (followup,) = [s for s in sections if s["summary"].startswith("Optional follow-up")]
-    (apart,) = [s for s in sections if s["summary"].startswith("Questions no")]
-    assert followup["labels"] == ["who signs builds?"]
-    assert apart["summary"] == "Questions no conditional finding waits on (1)"
-    assert apart["labels"] == ["who rotates keys?"]
+    lines, used, sent = _run_answer_block(payloads, steps)["calls"]
+    assert (
+        "No conditional finding waits on this fact. The next analysis reads the answer."
+        in lines
+    )
+    assert used == ["Used by: stride/T-01"], "only the second names a finding"
     assert {fact["key"][3] for fact in sent["body"]["facts"]} == {
         "who rotates keys?",
         "who signs builds?",
@@ -1224,7 +1242,7 @@ for (const q of {json.dumps(answer)}) {{
   input.value = {json.dumps(value)} ?? (q.choices.length ? q.choices[0] : "an answer");
   (input.listeners.input || input.listeners.change)();
 }}
-calls.push(...box.all("div").map(d => d.textContent)
+calls.push(...document.getElementById("question-actions").all("p").map(d => d.textContent)
   .filter(t => t.startsWith({json.dumps(starts)})));
 """
     return _run_answer_block(payloads, steps)["calls"]
@@ -1344,7 +1362,8 @@ def test_the_report_page_says_how_many_facts_fell_back_to_free_text():
         "question_fallback": {"typed": 12, "free_text": 1, "rate": 0.0769},
     }
     steps = """
-calls.push(...box.all("div").map(d => d.textContent).filter(t => t.includes("fixed list")));
+calls.push(...document.getElementById("question-refs").all("div").map(d => d.textContent)
+  .filter(t => t.includes("fixed list")));
 """
     line = "The reviewer asked 12 open facts from the fixed list of questions"
     assert _run_answer_block(payloads, steps)["calls"] == [
@@ -1567,7 +1586,7 @@ def test_a_control_offers_its_suggestions_beside_the_text():
     steps = """
 const [list] = box.all("datalist");
 const [input] = box.all("input");
-calls.push({ list: list.id, points: input.list,
+calls.push({ list: list.id, points: input.attributes.list,
   values: list.children.map(o => o.value) });
 """
     (seen,) = _run_answer_block(payloads, steps)["calls"]
@@ -2037,7 +2056,7 @@ def test_the_report_page_counts_a_kind_only_when_every_facet_is_known():
         "fact_questions": [question],
     }
     steps = """
-const tally = () => box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your"))[0];
+const tally = () => document.getElementById("question-actions").all("p").map(d => d.textContent).filter(t => t.startsWith("Your"))[0];
 const [first, second] = box.all("select");
 second.value = "no";
 second.listeners.change();
@@ -2064,6 +2083,8 @@ await followUp().listeners.click();
 
 
 def test_the_report_page_offers_one_optional_follow_up():
+    """The questions are optional: a tab with their count, and an invitation
+    under the report (#1884)."""
     payloads = {
         "report": {"system_model": valid_model().model_dump(mode="json")},
         "link_questions": [
@@ -2076,9 +2097,13 @@ def test_the_report_page_offers_one_optional_follow_up():
         "fact_questions": [],
         "final": False,
     }
-    steps = "calls.push(box.all('summary').map(node => node.textContent));"
-    [lines] = _run_answer_block(payloads, steps)["calls"]
-    assert lines[0] == "Optional follow-up: 1 question"
+    steps = """
+calls.push(document.getElementById("questions-tab").textContent);
+calls.push(document.getElementById("invite").textContent);
+"""
+    tab, invite = _run_answer_block(payloads, steps)["calls"]
+    assert tab == "Questions (1)"
+    assert invite.startswith("Have more information?")
 
 
 def test_a_pause_with_nothing_to_ask_starts_the_analysis_at_once():
@@ -2562,20 +2587,21 @@ def test_a_follow_up_question_says_why_it_is_asked():
         "final": False,
     }
     steps = """
-calls.push(box.all("p").map(p => p.children.filter(c => typeof c === "string")
-  .join("")).filter(text => / waits? on it/.test(text)));
+const list = document.getElementById("list");
+calls.push(list.all("div").filter(d => d.className === "meta question-history")
+  .map(d => d.textContent));
+calls.push(list.all("p").map(d => d.textContent)
+  .filter(t => t.startsWith("The reviewer raised")).length);
 """
-    [lines] = _run_answer_block(payloads, steps)["calls"]
-    assert "(you skipped this before the analysis)" in lines[0]
-    assert "(new from the analysis)" in lines[1]
-    assert "skipped" not in lines[2] and "new from" not in lines[2]
-    assert "(raised by the reviewer;" in lines[2]
-    assert "(shown before the analysis and left blank)" in lines[3]
-    assert "(you answered part of this before the analysis)" in lines[4]
-
-
-CORRECTIONS_BLOCK_START = "  if (FINAL && (CORRECTIONS.answers || []).length) {"
-CORRECTIONS_BLOCK_END = '    $("links").append(box);\n  }\n'
+    lines, raised = _run_answer_block(payloads, steps)["calls"]
+    assert lines == [
+        "Earlier answer: skipped",
+        "New question from this analysis",
+        "New question from this analysis",
+        "Earlier answer: left blank",
+        "Earlier answer: answered in part",
+    ]
+    assert raised == 2, "the reviewer's two questions say it raised them"
 
 
 class TestCorrections:
@@ -2651,14 +2677,13 @@ class TestCorrections:
             "corrections": {"answers": [row], "findings": [], "revision": 3},
         }
         steps = """
-await box.all("button")[0].listeners.click();
+const pressed = (text) => box.all("button").find(b => b.textContent === text);
+await pressed("Change").listeners.click();
 const [state] = box.all("select");
 state.value = "unknown"; state.listeners.change();
-await box.all("button")[1].listeners.click();
+await pressed("Save corrections").listeners.click();
 """
-        seen = _run_answer_block(
-            payloads, steps, CORRECTIONS_BLOCK_START, CORRECTIONS_BLOCK_END
-        )
+        seen = _run_answer_block(payloads, steps)
         (sent,) = seen["calls"]
         assert sent["url"] == "/correct/r1"
         assert sent["body"] == {
@@ -2751,7 +2776,7 @@ def test_the_page_and_settles_agree_on_every_facet_answer():
     choices = ["", *FACET_ANSWERS, "unknown"]
     combos = list(itertools.product(choices, repeat=len(fact["facets"])))
     steps = f"""
-const tally = () => box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your"))[0];
+const tally = () => document.getElementById("question-actions").all("p").map(d => d.textContent).filter(t => t.startsWith("Your"))[0];
 const selects = box.all("select");
 for (const combo of {json.dumps(combos)}) {{
   combo.forEach((value, i) => {{ selects[i].value = value; selects[i].listeners.change(); }});
@@ -3022,7 +3047,7 @@ await followUp().listeners.click();
 """
     summaries, sent = _run_answer_block(payloads, steps)["calls"]
 
-    assert summaries[0] == "Optional follow-up: review earlier answers"
+    assert summaries[0] == "Answers this report read"
     assert sent["url"] == "/answer/r1"
     assert sent["body"] == {
         "links": [],
@@ -3098,6 +3123,12 @@ class TestCompoundAnswers:
     # Every choice each list offers, set in turn: the lists, the line that
     # counts coverage, and the body the follow-up button sends.
     STEPS = """
+// The service refuses each start, so the page stays on its answers and each
+// click sends once: a started follow-up takes no second click.
+globalThis.fetch = async (url, init) => {
+  calls.push({ url, body: JSON.parse(init.body) });
+  return { ok: false, json: async () => ({ message: "not started" }) };
+};
 const send = () => { const b = box.all("button"); return b[b.length - 1]; };
 if (OPEN) await box.all("button")[0].listeners.click();
 const selects = box.all("select");
@@ -3107,7 +3138,7 @@ const combos = offered.reduce((all, values) =>
   all.flatMap(c => values.map(v => [...c, v])), [[]]);
 for (const combo of combos) {
   combo.forEach((v, i) => { selects[i].value = v; selects[i].listeners.change(); });
-  const tally = box.all("div").map(d => d.textContent).filter(t => t.startsWith("Your"))[0];
+  const tally = document.getElementById("question-actions").all("p").map(d => d.textContent).filter(t => t.startsWith("Your"))[0];
   await send().listeners.click();
   calls.push({ combo, tally: tally || null });
 }
@@ -3227,7 +3258,7 @@ globalThis.fetch = async (url, init) => {
   return { ok: false, json: async () => ({ message: "refused here" }) };
 };
 await send.listeners.click();
-calls.push({ note: box.all("div").map(d => d.textContent).includes("refused here"),
+calls.push({ note: box.all("p").map(d => d.textContent).includes("refused here"),
   disabled: send.disabled, shown: box.all("select").map(s => s.value) });
 await send.listeners.click();
 """
@@ -3409,8 +3440,8 @@ class TestTheFollowUpSavesInBatches:
         steps = (
             _FILL_AND_SERVE
             + """
-await button("Save progress").listeners.click();
-calls.push({ said: text(box) });
+await button("Save draft").listeners.click();
+calls.push({ said: text(document.getElementById("question-actions")) });
 """
         )
         calls = _run_answer_block(_draft_payloads(5), steps)["calls"]
@@ -3421,13 +3452,13 @@ calls.push({ said: text(box) });
             (1, 2),
         ]
         assert all(c["body"]["save"] for c in saves)
-        assert "Saved and not yet run: 5 answers" in page["said"]
+        assert "Saved draft: 5 answers" in page["said"]
 
     def test_a_run_larger_than_one_request_saves_first_and_runs_on_the_draft(self):
         steps = (
             _FILL_AND_SERVE
             + """
-await button("Run the follow-up with these answers").listeners.click();
+await button("Update report").listeners.click();
 """
         )
         seen = _run_answer_block(_draft_payloads(3), steps)
@@ -3440,7 +3471,7 @@ await button("Run the follow-up with these answers").listeners.click();
         steps = (
             _FILL_AND_SERVE
             + """
-await button("Run the follow-up with these answers").listeners.click();
+await button("Update report").listeners.click();
 """
         )
         (run,) = _run_answer_block(_draft_payloads(2), steps)["calls"]
@@ -3457,9 +3488,7 @@ await button("Run the follow-up with these answers").listeners.click();
         ],
         ids=["interrupted", "unreadable"],
     )
-    @pytest.mark.parametrize(
-        "pressed", ["Save progress", "Run the follow-up with these answers"]
-    )
+    @pytest.mark.parametrize("pressed", ["Save draft", "Update report"])
     def test_a_failed_request_keeps_the_answers_and_the_buttons(self, failure, pressed):
         steps = (
             _FILL_AND_SERVE
@@ -3467,7 +3496,7 @@ await button("Run the follow-up with these answers").listeners.click();
             + f"""
 await button({json.dumps(pressed)}).listeners.click();
 calls.push({{
-  said: text(box),
+  said: text(document.getElementById("question-actions")),
   values: box.all("input").filter(i => i.type === "text").map(i => i.value),
   disabled: box.all("button").some(b => b.disabled),
 }});
@@ -3485,8 +3514,8 @@ calls.push({{
             _FILL_AND_SERVE
             + """
 globalThis.fetch = async () => ({ ok: false, json: async () => ({ message: "stale" }) });
-await button("Save progress").listeners.click();
-calls.push({ said: text(box) });
+await button("Save draft").listeners.click();
+calls.push({ said: text(document.getElementById("question-actions")) });
 """
         )
         [after] = _run_answer_block(_draft_payloads(2), steps)["calls"]
@@ -3499,14 +3528,14 @@ const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
 calls.push({
   values: box.all("input").filter(i => i.type === "text").map(i => i.value),
-  said: text(box),
+  said: text(document.getElementById("question-actions")),
 });
 """
         [page] = _run_answer_block(_draft_payloads(2, draft=draft, revision=3), steps)[
             "calls"
         ]
         assert page["values"] == ["", "from the draft"]
-        assert "Saved and not yet run: 1 answer" in page["said"]
+        assert "Saved draft: 1 answer." in page["said"]
 
 
 AMENDMENT = "A nightly batch loader also writes to the orders database."
@@ -3615,7 +3644,7 @@ const [actor] = box.all("select");
 actor.value = "yes"; actor.listeners.change();
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
-calls.push({ said: text(box) });
+calls.push({ said: text(document.getElementById("question-actions")) });
 """
 
     def test_a_finding_that_needs_one_facet_is_covered_by_it(self):

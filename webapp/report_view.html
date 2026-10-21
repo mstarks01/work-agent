@@ -71,15 +71,15 @@
   h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em;
        color: var(--muted); margin: 40px 0 14px; font-weight: 600; }
   /* Inside an analysis section: one step down from the framework's own heading,
-     so "Claims" reads as belonging to the framework named above it rather than
-     as a peer of it. With one framework selected the nesting is invisible;
-     with two it is the whole navigation. */
-  /* Direct children only: a claim card carries its own `h3` for the claim
-     title, and a descendant selector here would repaint every one of them in
-     the section-heading style. */
+     so "Confirmed findings" reads as belonging to the framework named above it
+     rather than as a peer of it. With one framework selected the nesting is
+     invisible; with two it is the whole navigation. Direct children only, so a
+     heading inside a finding keeps its own style. */
   .analysis > h3 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
        color: var(--muted); margin: 28px 0 12px; font-weight: 600; }
   .analysis { border-top: 1px solid var(--border); margin-top: 8px; }
+  #analyses > .analysis:first-child { border-top: 0; margin-top: 0; }
+  .fingerprint { overflow-wrap: anywhere; }
   .meta { color: var(--ink-2); font-size: 0.85rem; }
   .meta code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .ref { text-decoration: underline dotted; cursor: help; }
@@ -105,9 +105,6 @@
      is a note about what is missing, not a finding. */
   /* one row per unit the framework answered for */
   .units { margin: 20px 0 8px; }
-  .openfact { border: 1px solid var(--line, #ddd); border-radius: 6px; margin: 8px 0; }
-  .openfact > summary { cursor: pointer; padding: 8px 12px; }
-  .openfact > .card { margin: 8px 12px; }
   .units h3 { font-size: 0.95rem; margin: 0 0 8px; }
   .unit { border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
     margin-bottom: 6px; }
@@ -135,27 +132,71 @@
   .summary { margin: 0 0 16px; font-size: 0.95rem; }
   .summary p { margin: 0 0 4px; }
 
-  /* One row per finding, before the cards. Its title links to its card. */
-  .findings { margin-bottom: 24px; }
-  .findings a { color: var(--ink); }
-  .findings .sev { white-space: nowrap; }
-  .findings .sev .swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block;
-    margin-right: 6px; }
-  @media (min-width: 621px) { .findings .status { white-space: nowrap; } }
-  @media (max-width: 620px) { .findings .aff { display: none; } }
-
-  /* threat cards */
-  .card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--muted);
-    border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
-  .card.rejected { opacity: 0.9; border-left-color: var(--muted); background: var(--surface-2); }
-  .card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  .card h3 { font-size: 1.02rem; margin: 0; flex: 1 1 260px; }
   .tid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); font-size: 0.82rem; }
   .cat { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
   .desc { margin: 10px 0 12px; color: var(--ink-2); font-size: 0.92rem; }
+
+  /* The report's three sections, as tabs under the title. */
+  .report-tabs { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 18px 0 26px;
+    border-bottom: 1px solid var(--hairline); }
+  .report-tabs a { padding: 8px 0; color: var(--ink-2); text-decoration: none;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 0.95rem; }
+  .report-tabs a[aria-current] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .report-tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .view-title { font-size: 1.2rem; text-transform: none; letter-spacing: 0; color: var(--ink);
+    margin: 0 0 6px; }
+
+  /* A finding: a compact row that opens in place. The severity sits in a
+     narrow column, the title and the next action beside it, the ID last. */
+  .findings { border-top: 1px solid var(--hairline); }
+  .finding { border-bottom: 1px solid var(--hairline); }
+  .finding > summary { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto 18px;
+    gap: 4px 12px; align-items: baseline; padding: 10px 2px; cursor: pointer; list-style: none; }
+  .finding > summary::-webkit-details-marker { display: none; }
+  .finding > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .finding-sev { font-size: 0.85rem; white-space: nowrap; }
+  .finding-sev .swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .finding-what { min-width: 0; overflow-wrap: anywhere; }
+  .finding-title { display: block; font-weight: 600; font-size: 0.95rem; }
+  .finding-next { display: block; color: var(--ink-2); font-size: 0.85rem; margin-top: 2px; }
+  .finding-open::before { content: "+"; color: var(--muted); }
+  .finding[open] > summary .finding-open::before { content: "\2212"; }
+  .finding-body { padding: 0 2px 16px 82px; font-size: 0.9rem; }
+  .finding.rejected .finding-title { color: var(--ink-2); }
+  .why-dismissed p { margin: 4px 0 0; }
+  .finding-group { margin-top: 22px; }
+  .finding-group > summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+  .finding-group > .finding:first-of-type { border-top: 1px solid var(--hairline); }
+  .shared-action { font-size: 0.9rem; color: var(--ink-2); }
+  .shared-action a { margin: 0 2px; }
+  @media (max-width: 620px) {
+    .finding > summary { grid-template-columns: minmax(0, 1fr) auto 18px; }
+    .finding-sev { grid-column: 1 / -1; }
+    .finding-body { padding-left: 2px; }
+  }
+
+  /* The optional invitation under the report. */
+  .invite { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--hairline); }
+  .invite p { margin: 0 0 6px; }
+
+  /* The questions' save and update area, kept in reach while the list
+     scrolls. */
+  .question-actions { position: sticky; bottom: 0; background: var(--plane); padding: 12px 0;
+    border-top: 1px solid var(--hairline); margin-top: 18px; }
+  .question-actions .hint { margin: 4px 0 10px; }
+  .question-actions .problem { color: var(--sev-critical); }
+  .used-by, .question-history { font-size: 0.8rem; margin: 2px 0 6px; }
+
+  /* About the analysis: readable labels with each whole value. */
+  .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 18px;
+    font-size: 0.86rem; margin: 12px 0 20px; }
+  .facts dt { color: var(--muted); }
+  .facts dd { margin: 0; overflow-wrap: anywhere; }
+  .facts code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }
+  @media (max-width: 620px) { .facts { grid-template-columns: minmax(0, 1fr); } .facts dd { margin-bottom: 6px; } }
   /* An identifier inside model prose. Sized in `em` so it tracks whatever the
      surrounding block sets, from a card heading down to a mitigation. */
-  .card h3 code, .desc code, .field code, ul.mits code {
+  .finding-title code, .desc code, .field code, ul.mits code {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
 
   .badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
@@ -245,13 +286,13 @@
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="dark"] { color-scheme: dark; }
 
-  /* A print holds the findings: no navigation, no controls and no questions
+  /* A print holds the report: no navigation, no controls and no questions
      to answer. */
   @media print {
-    .skip-link, .sidebar, #themebtn, #analysis-tabs, #links { display: none; }
+    .skip-link, .sidebar, #themebtn, #analysis-tabs, #report-tabs, #invite { display: none; }
     .workspace { display: block; min-height: 0; }
     main.report-main > .viz-root { min-height: 0; padding: 0; background: none; }
-    .card { break-inside: avoid; }
+    .finding { break-inside: avoid; }
   }
 </style>
 </head>
@@ -268,28 +309,47 @@
     <div class="topbar">
       <div>
         <h1 id="sysname"></h1>
-        <div class="meta" id="jobmeta"></div>
+        <div class="meta">Security assessment</div>
       </div>
       <button class="toggle" id="themebtn" type="button">Toggle theme</button>
     </div>
     <!-- The tabs of the report's analysis, as the workspace shows them. -->
     <nav class="section-nav" id="analysis-tabs" aria-label="Analysis" hidden><a id="description-tab">Description</a><a id="reports-tab" aria-current="page">Reports</a></nav>
-    <div id="report-view">
-      <!-- One section per framework the job selected, built in JS: the count
-           and the names are the report's, not this file's. -->
-      <div id="analyses"></div>
+    <!-- The report's own sections. The report is the one a reader lands on. -->
+    <nav class="report-tabs" id="report-tabs" aria-label="Report sections"><a id="report-tab" aria-current="page">Report</a><a id="questions-tab">Questions</a><a id="about-tab">About the analysis</a></nav>
 
-      <!-- Which element each principal is, asked of the submitter. Built in JS
-           from the link_questions payload; empty and hidden when none is asked. -->
-      <div id="links"></div>
+    <!-- One section per framework the job selected, built in JS: the count
+         and the names are the report's, not this file's. -->
+    <div id="report-view"><div id="analyses"></div><div id="invite"></div></div>
+
+    <!-- The questions the conditional findings rest on, in the question list
+         the early questions use, or a final report's answers to correct. -->
+    <div id="questions-view" hidden>
+      <h2 class="view-title" id="questions-title">Refine the assessment</h2>
+      <p class="meta" id="questions-lead"></p>
+      <p><button type="button" class="toggle" id="back-to-report">Back to report</button></p>
+      <div id="questions-state"></div>
+      <div class="question-layout" id="question-layout" hidden>
+        <nav id="question-index" aria-label="Question groups"></nav>
+        <div class="question-body">
+          <div id="questions"><div id="list"></div></div>
+          <div class="question-actions" id="question-actions"></div>
+        </div>
+      </div>
     </div>
 
-    <!-- How this report was made: the service's disclaimer, the System Model
-         every framework analysed, and the pipeline. Shown in place of the
-         findings at ?view=provenance. -->
-    <div id="provenance-view" hidden>
+    <!-- How this report was made: its identifiers and versions, the service's
+         disclaimer, each framework's notes, the System Model every framework
+         analysed, and the pipeline. -->
+    <div id="about-view" hidden>
+      <h2 class="view-title">About the analysis</h2>
+      <dl class="facts" id="report-facts"></dl>
       <div class="disclaimer"><span class="dot"></span><span id="disclaimer"></span></div>
       <div class="meta" id="scope"></div>
+      <div id="framework-notes"></div>
+
+      <h2>Question references</h2>
+      <div id="question-refs"></div>
 
       <!-- What the System Model leaves unstated, built in JS from the gaps
            payload. -->
@@ -320,11 +380,6 @@
      webapp/main.py because the page knows no package. Escaped the same way. -->
 <script type="application/json" id="units" nonce="__CSP_NONCE__"><!--units--></script>
 
-<!-- The open facts each framework's conditional findings rest on, grouped by
-     analysis_service.open_facts, which decides the grouping and the order.
-     Escaped the same way. -->
-<script type="application/json" id="open_facts" nonce="__CSP_NONCE__"><!--open_facts--></script>
-
 <!-- The missing controls two or more confirmed findings rest on, grouped by
      analysis_service.fixes, which decides the grouping and the order.
      Escaped the same way. -->
@@ -342,6 +397,8 @@
 <script type="application/json" id="question_fallback" nonce="__CSP_NONCE__"><!--question_fallback--></script>
 <script type="application/json" id="final" nonce="__CSP_NONCE__"><!--final--></script>
 <script type="application/json" id="resumed_by" nonce="__CSP_NONCE__"><!--resumed_by--></script>
+<!-- The run whose answers started this one, or null. -->
+<script type="application/json" id="parent_run" nonce="__CSP_NONCE__"><!--parent_run--></script>
 <!-- A final report's answers, each in the form it is corrected in, the
      corrections kept beside the report, and the findings they reach. -->
 <script type="application/json" id="corrections" nonce="__CSP_NONCE__"><!--corrections--></script>
