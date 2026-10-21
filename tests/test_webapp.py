@@ -1975,3 +1975,15 @@ def test_every_workspace_page_takes_the_one_sidebar(name):
     template = (PROJECT_ROOT / "webapp" / name).read_text(encoding="utf-8")
     assert "<!--sidebar-->" in template
     assert 'id="sidebar-navigation"' not in template
+
+
+def test_no_page_words_a_count_with_a_bracketed_plural():
+    """A page words a count with ``counted``, never "finding(s)"."""
+    pages = [*(PROJECT_ROOT / "webapp" / "static").glob("*.js")]
+    pages += [*(PROJECT_ROOT / "webapp").glob("*.html")]
+    bracketed = {
+        page.name: found
+        for page in pages
+        if (found := re.findall(r"[a-z]\(s\)", page.read_text(encoding="utf-8")))
+    }
+    assert bracketed == {}

@@ -504,7 +504,7 @@ calls.push({{ same: who === whoAgain, value: whoAgain.value, focused: document.a
     end = seen[-1]
     assert end["same"] and end["value"] == "the platform tea" and end["focused"]
     assert end["order"] == [["Sign-in? \u2014 y"], ["Who runs it?"], ["OAuth? (leav"]]
-    assert end["note"] == "1 relevant question(s) added."
+    assert end["note"] == "1 relevant question added."
 
 
 def test_a_new_row_ranked_above_a_focused_editor_waits_until_the_focus_leaves():
@@ -534,12 +534,12 @@ calls.push({{ left: order(), note: ids.changes.textContent }});
     typing = next(c for c in seen if "typing" in c)
     assert typing["typing"] == [["Sign-in? \u2014 y"], ["Who runs it?"]]
     assert typing["note"] == (
-        "1 relevant question(s) added. 1 of them show when you leave the answer"
+        "1 relevant question added. 1 of them shows when you leave the answer"
         " you are typing."
     )
     left = seen[-1]
     assert left["left"] == [["OAuth? (leav"], ["Sign-in? \u2014 y"], ["Who runs it?"]]
-    assert left["note"] == "1 relevant question(s) added."
+    assert left["note"] == "1 relevant question added."
 
 
 def test_a_no_lists_the_parts_as_no_longer_needed_and_says_so():
@@ -584,7 +584,7 @@ await settle(); await settle();
 calls.push({{ note: ids.changes.textContent, drawn: selects().length }});
 """
     seen = run(first, steps)["calls"]
-    assert seen[-1] == {"note": "1 question(s) are no longer needed.", "drawn": 0}
+    assert seen[-1] == {"note": "1 question is no longer needed.", "drawn": 0}
 
 
 def test_skip_for_now_sends_one_skip_and_hides_the_row():

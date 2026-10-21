@@ -872,7 +872,7 @@
     if (marks.unknown.length) {
       const note = el("div", "dropped");
       note.append(el("b", null,
-        `${marks.unknown.length} ruling(s) dropped for naming an unpublished identifier`));
+        `${counted(marks.unknown.length, "ruling", "rulings")} dropped for naming an unpublished identifier`));
       const list = el("ul");
       marks.unknown.forEach(m => {
         const item = el("li");
@@ -885,7 +885,7 @@
     if (marks.groundless.length) {
       const note = el("div", "dropped");
       note.append(el("b", null,
-        `${marks.groundless.length} finding(s) dropped for a fault in one entry`));
+        `${counted(marks.groundless.length, "finding", "findings")} dropped for a fault in one entry`));
       const list = el("ul");
       marks.groundless.forEach(m => {
         const item = el("li");
@@ -904,7 +904,7 @@
     if (marks.unreconciled.length) {
       const note = el("div", "dropped");
       note.append(el("b", null,
-        `${marks.unreconciled.length} problem(s) the review's first pass left for its re-ask`));
+        `${counted(marks.unreconciled.length, "problem", "problems")} the review's first pass left for its re-ask`));
       const byKind = new Map();
       marks.unreconciled.forEach(m => {
         if (!byKind.has(m.kind)) byKind.set(m.kind, []);
@@ -963,7 +963,7 @@
     if (grouped.size) {
       section.append(el("h3", null, "Questions that would settle the conditional findings"));
       section.append(el("div", "meta",
-        `${grouped.size} conditional finding(s) wait on ${facts.length} question(s). ` +
+        `${counted(grouped.size, "conditional finding waits", "conditional findings wait")} on ${counted(facts.length, "question", "questions")}. ` +
         "A conditional finding is neither confirmed nor cleared until the facts it " +
         "waits on are confirmed. Each finding is shown once, under the question " +
         "that alone covers the most findings. " +
@@ -974,7 +974,7 @@
         const box = el("details", "openfact");
         const head = el("summary");
         head.append(el("b", null, f.label),
-          ` \u2014 ${f.cited_by.length} finding(s) wait on this; an answer alone covers ${f.settles.length}`);
+          ` \u2014 ${counted(f.cited_by.length, "finding waits", "findings wait")} on this; an answer alone covers ${f.settles.length}`);
         if (ASKS && ASKED.has(JSON.stringify(f.key))) {
           const go = el("a", null, "Answer");
           go.href = `#${questionId(f.key)}`;
@@ -1006,7 +1006,7 @@
       tally.set(line, (tally.get(line) || 0) + 1);
     });
     const box = el("div", "meta");
-    box.append(`Since the report your answers came from, ${CHANGES.length} finding(s): ` +
+    box.append(`Since the report your answers came from, ${counted(CHANGES.length, "finding", "findings")}: ` +
       [...tally].map(([line, n]) => `${n} ${line}`).join("; ") + ".");
     const gone = CHANGES.filter(c => c.change === "gone");
     if (gone.length) {
@@ -1117,7 +1117,7 @@
         "\"I don't know\" where nobody knows: the fact stays open."));
       if (FALLBACK.typed + FALLBACK.free_text) {
         box.append(el("div", "meta",
-          `The reviewer asked ${FALLBACK.typed} open fact(s) from the fixed list of ` +
+          `The reviewer asked ${counted(FALLBACK.typed, "open fact", "open facts")} from the fixed list of ` +
           `questions and ${FALLBACK.free_text} in its own words.`));
       }
       // A question no conditional finding waits on cannot move this report:
@@ -1170,7 +1170,7 @@
         const reached = [...waitsOn].filter(([, asked]) => asked.some(known)).map(([f]) => f);
         const lanes = new Set(reached.map(f => laneOfFinding.get(f)).filter(Boolean));
         scope.textContent = given
-          ? `${given} answer(s) reach ${reached.length} finding(s) in ${lanes.size} lane(s). ` +
+          ? `${counted(given, "answer reaches", "answers reach")} ${counted(reached.length, "finding", "findings")} in ${counted(lanes.size, "lane", "lanes")}. ` +
             "Code records each answer, and no model interprets it before the analysis. " +
             "The follow-up then runs the whole analysis once, and its report is final."
           : "No answer given yet.";
@@ -1186,7 +1186,7 @@
           knownFor: editor.knownFor || editor.known,
         });
         const lead = [el("b", null, q.label), why(q),
-          ` \u2014 ${q.cited_by} finding(s) wait on it; answering down to here covers ${q.covered_so_far}`];
+          ` \u2014 ${counted(q.cited_by, "finding waits", "findings wait")} on it; answering down to here covers ${q.covered_so_far}`];
         if (q.form === "facets") row.append(...lead, waitingOn(q), ...editor.nodes);
         else row.append(...lead, " ", ...editor.nodes, waitingOn(q));
         into.append(row);
@@ -1257,7 +1257,7 @@
     const showSaved = () => {
       const count = DRAFT_FACTS.size + DRAFT_LINKS.size;
       savedNote.textContent = count
-        ? `Saved and not yet run: ${count} answer(s). The follow-up reads them when it runs.`
+        ? `Saved and not yet run: ${counted(count, "answer", "answers")}. The follow-up reads them when it runs.`
         : "";
     };
     // The run id is this page's own path: /report/{run}.

@@ -184,11 +184,11 @@ function bar(into) {
   const publish = el("button", "go", "Open the pull request on GitHub");
   publish.disabled = !ready.length;
   publish.title = ready.length
-    ? ready.length + " case(s) ready to publish"
+    ? ready.length + (ready.length === 1 ? " case" : " cases") + " ready to publish"
     : "Mark every record in a case before you publish it";
   publish.onclick = publishToGitHub;
   if (window.crypto && window.crypto.subtle) b.appendChild(publish);
-  b.appendChild(el("span", "hint", done + " case(s) started, " + ready.length +
+  b.appendChild(el("span", "hint", done + (done === 1 ? " case" : " cases") + " started, " + ready.length +
     " ready to publish. Download to stop and load the same file to carry on — " +
     "nothing is sent from this page. On GitHub, an account without write access " +
     "presses Propose changes; an account with write access presses Commit changes " +

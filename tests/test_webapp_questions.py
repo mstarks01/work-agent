@@ -1320,10 +1320,10 @@ def test_the_follow_up_states_its_scope_before_it_runs():
         "No answer given yet."
     ]
     (line,) = tallies(questions, questions, analyses=analyses, starts="2 answer")
-    assert line.startswith("2 answer(s) reach 2 finding(s) in 2 lane(s).")
+    assert line.startswith("2 answers reach 2 findings in 2 lanes.")
     assert "runs the whole analysis once" in line
     (line,) = tallies(questions, questions[:1], analyses=analyses, starts="1 answer")
-    assert line.startswith("1 answer(s) reach 1 finding(s) in 1 lane(s).")
+    assert line.startswith("1 answer reaches 1 finding in 1 lane.")
 
 
 def test_the_report_page_says_how_many_facts_fell_back_to_free_text():
@@ -1346,7 +1346,7 @@ def test_the_report_page_says_how_many_facts_fell_back_to_free_text():
     steps = """
 calls.push(...box.all("div").map(d => d.textContent).filter(t => t.includes("fixed list")));
 """
-    line = "The reviewer asked 12 open fact(s) from the fixed list of questions"
+    line = "The reviewer asked 12 open facts from the fixed list of questions"
     assert _run_answer_block(payloads, steps)["calls"] == [
         f"{line} and 1 in its own words."
     ]
@@ -2100,7 +2100,7 @@ await settle();
 
 @pytest.mark.parametrize(
     ("withheld", "said"),
-    [(0, "No question is left to ask."), (3, "3 more question(s)")],
+    [(0, "No question is left to ask."), (3, "3 more questions")],
 )
 def test_the_last_save_waits_for_the_start_button(withheld, said):
     """A save that leaves nothing to ask waits for the start button (#1289, item 7)."""
@@ -2563,7 +2563,7 @@ def test_a_follow_up_question_says_why_it_is_asked():
     }
     steps = """
 calls.push(box.all("p").map(p => p.children.filter(c => typeof c === "string")
-  .join("")).filter(text => text.includes("wait on it")));
+  .join("")).filter(text => / waits? on it/.test(text)));
 """
     [lines] = _run_answer_block(payloads, steps)["calls"]
     assert "(you skipped this before the analysis)" in lines[0]
@@ -3356,10 +3356,10 @@ await ids.save.listeners.click(); await settle();
     assert ran["streams"] == ["/events/r1"], "an optional question keeps the page"
 
     assert "No recommended question is left." in page["said"]
-    assert "1 question(s) ranked below the threshold for the list" in page["said"]
-    assert "2 answer(s) of “I don't know”" in page["said"]
+    assert "1 question ranked below the threshold for the list" in page["said"]
+    assert "2 answers of “I don't know”" in page["said"]
     assert (
-        "asvs, level 1: whether 22 of 70 unit(s) apply is still unknown, and no"
+        "asvs, level 1: whether 22 of 70 units apply is still unknown, and no"
         " open question can settle 3 of them" in page["said"]
     )
     assert not page["hidden"] and "More questions (1," in page["more"]
@@ -3421,7 +3421,7 @@ calls.push({ said: text(box) });
             (1, 2),
         ]
         assert all(c["body"]["save"] for c in saves)
-        assert "Saved and not yet run: 5 answer(s)" in page["said"]
+        assert "Saved and not yet run: 5 answers" in page["said"]
 
     def test_a_run_larger_than_one_request_saves_first_and_runs_on_the_draft(self):
         steps = (
@@ -3506,7 +3506,7 @@ calls.push({
             "calls"
         ]
         assert page["values"] == ["", "from the draft"]
-        assert "Saved and not yet run: 1 answer(s)" in page["said"]
+        assert "Saved and not yet run: 1 answer" in page["said"]
 
 
 AMENDMENT = "A nightly batch loader also writes to the orders database."
@@ -3582,7 +3582,7 @@ const text = (n) => typeof n === "string" ? n
 calls.push({ said: text(ids.questions) });
 """
         said = _run_form_script(steps)["calls"][-1]["said"]
-        assert "2 earlier answer(s) do not fit this system model" in said
+        assert "2 earlier answers do not fit this system model" in said
         assert "Old DB: encryption at rest \u2014 AES" in said
         assert "batch loader \u2014 none of these" in said, "a link answer is listed"
 
