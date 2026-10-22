@@ -76,7 +76,14 @@ from analysis_service.store_settings import (
     holds_password,
 )
 from analysis_service.vendors import VENDOR_NAMES, VENDORS
-from webapp.settings_page import EXAMPLES, IAM_SETUP, SETTINGS, Setting
+from webapp.settings_page import (
+    CHANGED_SAMPLING,
+    EXAMPLES,
+    IAM_SETUP,
+    SETTINGS,
+    Setting,
+    sampling_key,
+)
 
 #: The value of each store setting that this app gives where no source sets
 #: it: a first run keeps its jobs in memory.
@@ -216,7 +223,7 @@ def _controls() -> dict[str, dict[str, Any]]:
         },
         "frameworks.carried": {"options": list(FRAMEWORK_NAMES), "multiple": True},
         **{
-            f"sampling.{tier}.thinking": {
+            sampling_key(tier, CHANGED_SAMPLING): {
                 "options": list(get_args(ReasoningEffort)),
                 "unset": "The model's own level",
             }

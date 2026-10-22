@@ -468,3 +468,22 @@ const questionList = ({
   };
   return { place, removeRow, drawOpen, drawSaved, drawAlone, button };
 };
+
+// Two rules both pages read, so neither keeps its own copy.
+// A row's key as a page's maps hold it: a link question's key is its own
+// `key`, every other question's the JSON of its key tuple. One reader, so a
+// finding's link and the question it reaches agree on every page.
+const rowKey = (row) => (row.kind === "link" ? row.q.key : JSON.stringify(row.q.key));
+// Two answers are one answer when the fields the submitter gives agree. The
+// service serves every field, with its defaults and with the value it
+// writes from a facets answer; a page builds only the fields given.
+const sameAnswer = (a, b) => {
+  if (!a || !b) return !a && !b;
+  if ("principal" in a) return a.principal === b.principal && a.element === b.element;
+  if ((a.detail || "") !== (b.detail || "")) return false;
+  if (!a.facets && !b.facets) return a.value === b.value;
+  if (!a.facets || !b.facets) return false;
+  const given = Object.entries(a.facets);
+  return given.length === Object.keys(b.facets).length
+    && given.every(([facet, value]) => b.facets[facet] === value);
+};

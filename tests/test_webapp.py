@@ -1750,6 +1750,28 @@ def test_a_page_builds_an_answer_input_with_the_shared_builder(page):
     )
 
 
+#: The two rules the question list's pages share, as question_list.js spells
+#: each one's definition.
+SHARED_ROW_RULES = ("const rowKey = ", "const sameAnswer = ")
+
+
+@pytest.mark.parametrize("rule", SHARED_ROW_RULES)
+def test_a_row_rule_is_defined_once_and_read_by_both_pages(rule):
+    """A row's key and whether two answers are one answer have one definition.
+
+    question_list.js holds it, and the report page and the first-run page call
+    it: two copies drift, as a link row's key once did between them.
+    """
+    name = rule.removeprefix("const ").strip(" =")
+    definitions = [page for page in ANSWER_PAGES if rule in page_javascript(page)]
+
+    assert definitions == ["question_list.js"], (
+        f"{name} is defined in {definitions}; define it once, in question_list.js."
+    )
+    for page in ("report_view.js", "first_run.js"):
+        assert f"{name}(" in page_javascript(page), f"{page} does not call {name}"
+
+
 class TestTheReportPageGetsARowPerUnit:
     """#659 F18: grouped counts say how much, and never which or on what grounds."""
 

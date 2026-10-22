@@ -201,7 +201,12 @@ def _credential_settings() -> list[tuple[str, Setting]]:
 
 
 #: The sampling field that the page changes. Each other one it only shows.
-_CHANGED_SAMPLING = "thinking"
+CHANGED_SAMPLING = "thinking"
+
+
+def sampling_key(tier: str, param: str) -> str:
+    """The settings key of one tier's sampling field, as every page spells it."""
+    return f"sampling.{tier}.{param}"
 
 
 def _sampling_settings() -> list[tuple[str, Setting]]:
@@ -217,7 +222,7 @@ def _sampling_settings() -> list[tuple[str, Setting]]:
                 "sampling",
                 ("tiers", tier, param),
             )
-            if param == _CHANGED_SAMPLING:
+            if param == CHANGED_SAMPLING:
                 setting = Setting(
                     variable,
                     "Sampling",
@@ -231,7 +236,7 @@ def _sampling_settings() -> list[tuple[str, Setting]]:
                 setting = Setting(
                     variable, "Sampling", label, "shows", _UNCERTIFIED, file_key
                 )
-            entries.append((f"sampling.{tier}.{param}", setting))
+            entries.append((sampling_key(tier, param), setting))
     return entries
 
 

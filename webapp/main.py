@@ -177,7 +177,7 @@ from analysis_service.config_files import (
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
 from analysis_service.engine import DEFAULT_CALLER
-from analysis_service.errors import refusal_text
+from analysis_service.errors import error_place, refusal_text
 from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     MAX_HELD_FACTS,
@@ -219,6 +219,7 @@ from analysis_service.links import (
     MAX_LINK_ANSWERS,
     LinkAnswer,
     components,
+    fold,
     refuse_answers_source,
 )
 from analysis_service.model_gate import NoThinkingLevel
@@ -265,6 +266,7 @@ from webapp.page import (
     response,
     script_json,
 )
+from webapp.settings_page import CHANGED_SAMPLING, sampling_key
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
     Refusal,
@@ -670,6 +672,26 @@ def _body_of(raw: object, model: type[BaseModel]) -> dict[str, object]:
     return raw
 
 
+def _over_the_bound(
+    body: dict[str, object], model: type[BaseModel], fields: tuple[str, ...]
+) -> bool:
+    """Whether one of ``fields`` in ``body`` is longer than ``model`` admits.
+
+    The /v1 model is the one reader of each list's bound: the route asks it
+    and discards the result, so both entry points refuse the same bodies. A
+    body that fails for any other reason is not over the bound; the route
+    reads it on, and refuses it with the message for that failure.
+    """
+    try:
+        model.model_validate(body)
+    except ValidationError as exc:
+        return any(
+            error["type"] == "too_long" and error_place(error) in fields
+            for error in exc.errors()
+        )
+    return False
+
+
 def _name_of(record: Envelope) -> str:
     return record.system_name or DEFAULT_NAME
 
@@ -1064,6 +1086,7 @@ def _earlier_payload(
         ],
         "links": [
             {
+                "key": fold(link.principal),
                 "principal": link.principal,
                 "options": options,
                 "answer": link.model_dump(mode="json"),
@@ -1166,7 +1189,7 @@ def check_saved(
 def _refusal_of(error: ConfigError) -> Refusal:
     """The refusal of a build error, on the row that it names where one does."""
     key = (
-        f"sampling.{error.tier}.thinking"
+        sampling_key(error.tier, CHANGED_SAMPLING)
         if isinstance(error, NoThinkingLevel)
         else None
     )
@@ -1552,11 +1575,7 @@ def create_app(
             body = _body_of(body, AnswersSubmission)
             raw = body["links"]
             raw_facts = body.get("facts", [])
-            if (
-                isinstance(raw, list)
-                and isinstance(raw_facts, list)
-                and (len(raw) > MAX_LINK_ANSWERS or len(raw_facts) > MAX_FACT_ANSWERS)
-            ):
+            if _over_the_bound(body, AnswersSubmission, ("links", "facts")):
                 return _message(
                     400,
                     f"One request takes at most {MAX_FACT_ANSWERS} answers and"
@@ -1710,7 +1729,7 @@ def create_app(
             raw = body["facts"]
             if not isinstance(raw, list):
                 raise TypeError
-            if len(raw) > MAX_FACT_ANSWERS:
+            if _over_the_bound(body, CorrectionsSubmission, ("facts",)):
                 return _message(
                     400, f"One request takes at most {MAX_FACT_ANSWERS} corrections."
                 )
