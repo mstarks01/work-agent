@@ -123,13 +123,7 @@
     border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 0.8rem; cursor: pointer; }
   .toggle:hover { color: var(--ink); }
 
-  .disclaimer { margin-top: 16px; padding: 10px 14px; border-radius: 10px;
-    background: var(--tint); border: 1px solid var(--border); color: var(--ink-2); font-size: 0.85rem;
-    display: flex; gap: 8px; align-items: center; }
-  .disclaimer .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sev-medium); flex: none; }
-  /* The package's own disclaimer. Quieter than the envelope's, and without the
-     dot: the envelope's says what the service is and is read once, while this
-     says what one framework's claims assert and is read per section. */
+  /* The package's own disclaimer: what one framework's claims assert. */
   .disclaimer-block { color: var(--ink-2); font-size: 0.82rem; margin: 0 0 16px;
     padding-left: 12px; border-left: 2px solid var(--border); }
 
@@ -305,8 +299,9 @@
   .about-list li { margin: 4px 0; }
   #model-gaps th:nth-child(1) { width: 26%; }
   #model-gaps th:nth-child(2) { width: 12%; }
-  #about-view > h2:not(.view-title) { font-size: 1.1rem; text-transform: none; letter-spacing: 0;
+  #about-view > h2 { font-size: 1.1rem; text-transform: none; letter-spacing: 0;
     color: var(--ink); margin: 36px 0 12px; }
+  #about-view > h2:first-child { margin-top: 8px; }
   #about-view h3:not(.analysis > h3) { font-size: 0.92rem; margin: 22px 0 8px; }
   .about-more { margin-top: 26px; border-top: 1px solid var(--hairline); padding-top: 12px; }
   .about-more > summary { cursor: pointer; font-weight: 600; font-size: 1rem; }
@@ -401,14 +396,11 @@
          link to answer them online. -->
     <div id="export-questions" hidden></div>
 
-    <!-- About the analysis: the service's disclaimer, the System Model every
+    <!-- About the analysis: the System Model every
          framework analysed, the question references, each framework's notes,
          and in closed sections the report's identifiers and versions and the
          pipeline. -->
     <div id="about-view" hidden>
-      <h2 class="view-title">About the analysis</h2>
-      <div class="disclaimer"><span class="dot"></span><span id="disclaimer"></span></div>
-
       <h2>System model (extracted DFD)</h2>
       <!-- The model drawn: a column per trust zone, its elements, and the
            flows between them. Built in JS; the tables below hold the same

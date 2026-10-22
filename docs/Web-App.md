@@ -159,9 +159,9 @@ finding. **Save draft** keeps the answers and runs nothing. **Update report**
 starts the report's one follow-up. A final report shows its answers here to
 correct instead, and a correction runs nothing.
 
-**About the analysis** starts with the service's disclaimer and the extracted
-system model: its diagram, its boundary crossings and assumptions, its gaps,
-and a table for each element kind. Then come the reference of each question
+**About the analysis** starts with the extracted system model: its diagram,
+its boundary crossings and assumptions, its gaps, and a table for each element
+kind. Then come the reference of each question
 and each framework's notes and diagnostics. Two closed sections hold the rest:
 **How this report was made** has the report's identifiers, times and the
 versions that ran, and **Pipeline** has the served-build provenance and

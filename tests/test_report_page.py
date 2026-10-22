@@ -272,11 +272,11 @@ def test_the_report_is_the_section_a_reader_lands_on():
 
 
 def test_about_holds_the_identifiers_the_model_and_the_pipeline():
-    """The disclaimer, the identifiers, the element count, the System Model and
-    the pipeline sit under About the analysis, which hides the report."""
+    """The identifiers, the element count, the System Model and the pipeline
+    sit under About the analysis, which hides the report."""
     parts = run_report_page(two_findings(), search="?view=about")
     assert parts["hidden"].split() == ["report-view", "questions-view"]
-    assert parts["disclaimer"].startswith("AI-generated security analysis.")
+    assert parts["sysname"].endswith(" threat assessment")
     assert "Elements in the model" in parts["report-facts"]
     assert "Report IDjob-" in parts["report-facts"]
     assert "Generated" in parts["report-facts"]
