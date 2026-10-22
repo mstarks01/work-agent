@@ -24,6 +24,7 @@ from evals.harness.bundle import (
 )
 from evals.harness.content import prose, structural
 from evals.harness.fingerprint import components_for
+from evals.harness.identity import CaseFlows
 from evals.harness.ledger import append
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import load_case
@@ -109,7 +110,9 @@ def down_vote(entry: dict, artifact: Path, case, path: Path) -> None:
     claim = next(
         claim for claim in stride_threats(report) if claim.id == entry["threat_id"]
     )
-    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    flows = CaseFlows.of_graph(
+        {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    )
     components = components_for(
         "stride",
         claim.category,
@@ -297,9 +300,9 @@ class TestAVoteReachesTheNumbersWithoutASweep:
             (reports_dir(swept) / f"{case.id}.report.json").read_text("utf-8")
         )
         claim = stride_threats(report)[0]
-        flows = {
-            flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
-        }
+        flows = CaseFlows.of_graph(
+            {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+        )
         append(
             cast(
                 components_for(

@@ -25,7 +25,7 @@ from analysis_service.system_model import ModelIndex
 from evals.harness import lane_replay
 from evals.harness.bundle import case_file, reports_dir, write_reports
 from evals.harness.descendants import lane_must_finds
-from evals.harness.identity import SubsetVerbIdentity
+from evals.harness.identity import CaseFlows, SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
@@ -383,7 +383,7 @@ def test_each_lane_scores_the_must_finds_the_run_drafts_match(recorded, case):  
     drafts = json.loads((directory / f"{case.id}.drafts.json").read_text())["stride"]
     prepared = lane_replay.prepare_today(case, "stride", "none")
     references = case.stride_claims()
-    flows = ModelIndex.of(case.model).flow_endpoints
+    flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
 
     by_lane = {
         index

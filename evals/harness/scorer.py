@@ -66,7 +66,7 @@ from analysis_service.system_model import ModelIndex
 from evals.harness import audit
 from evals.harness.content import structural
 from evals.harness.fingerprint import key_claim
-from evals.harness.identity import ClaimPair, ClaimRuling, Matcher
+from evals.harness.identity import CaseFlows, ClaimPair, ClaimRuling, Matcher
 from evals.harness.ledger import Ledger, Vote
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceThreat
 
@@ -741,7 +741,7 @@ def _standing_of_unmatched(
     """
     unlisted: list[UnlistedThreat] = []
     foreign: list[str] = []
-    flows = ModelIndex.of(case.model).flow_endpoints
+    flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
     blessed_ids = {element.id for element in case.model.elements()}
 
     for position in unmatched_positions:

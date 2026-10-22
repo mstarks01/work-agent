@@ -199,6 +199,20 @@ def test_a_claim_matcher_reads_the_flows_flows_by_case_builds():
     assert matchers & inline == set()
 
 
+def test_a_flow_map_names_its_siblings_once():
+    """Only a ``CaseFlows`` builder computes which flows are siblings.
+
+    ``channels`` reads ``CaseFlows.siblings`` and nothing else, so a map built
+    anywhere else would carry no siblings. ``cited_channels`` is the service's
+    own reader of the same question (ADR 0061).
+    """
+    assert _sites(lambda node: _calls(node, "sibling_flows")) == [
+        ("evals/harness/identity.py", "of_graph"),
+        ("evals/harness/reference.py", "_case_flows"),
+        ("src/analysis_service/critic.py", "cited_channels"),
+    ]
+
+
 def test_a_failed_case_has_one_reader():
     """Only ``_failed_cases`` reads the keys that mark a case as failed."""
     keys = {"run_failure", "grounds_failure"}

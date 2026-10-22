@@ -35,7 +35,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Literal, Protocol, Self
 
 from analysis_service.critic import (
     distinct_mechanisms,
@@ -46,17 +46,17 @@ from analysis_service.frameworks.stride.record import StrideCategory
 from analysis_service.system_model import is_zone
 from evals.harness.verbs import same_action
 
-#: One case's **Data Flow**s as ``flow id -> (source id, destination id)``.
-FlowMap = Mapping[str, tuple[str, str]]
-
 
 class CaseFlows(Mapping[str, tuple[str, str]]):
-    """A :data:`FlowMap` built from two graphs, with each graph's sibling flows.
+    """One case's **Data Flow**s as ``flow id -> (source id, destination id)``,
+    with the flows that are siblings in their own graph.
 
     :func:`~evals.harness.reference.flows_by_case` builds it from the blessed
     model and the analysed one. Over the merged map, an extraction flow that
     names a blessed flow another way would count as that flow's sibling, so
-    ``siblings`` is read per graph instead (ADR 0099).
+    ``siblings`` is read per graph instead (ADR 0099). :meth:`of_graph` builds
+    it from one graph. The one shape every flow map has, so a reader of a
+    claim's channels reads ``siblings`` and nothing else.
     """
 
     def __init__(
@@ -74,16 +74,22 @@ class CaseFlows(Mapping[str, tuple[str, str]]):
     def __len__(self) -> int:
         return len(self._endpoints)
 
+    @classmethod
+    def of_graph(cls, endpoints: Mapping[str, tuple[str, str]]) -> Self:
+        """One graph's map: its siblings are the flows that share two elements."""
+        return cls(endpoints, sibling_flows(endpoints))
 
-def channels(element_ids: Iterable[str], flows: FlowMap) -> frozenset[str]:
+
+#: The map of a case the caller holds no graph for: every cited flow ID stays raw.
+NO_FLOWS = CaseFlows({}, frozenset())
+
+
+def channels(element_ids: Iterable[str], flows: CaseFlows) -> frozenset[str]:
     """The sibling flows a claim cites, as the scorer reads them (ADR 0061).
 
-    The scorer's one reader of a claim's channels. A :class:`CaseFlows` names
-    its siblings per graph; any other map is one graph, and its siblings are
-    the flows that share their two elements with another flow in it.
+    The scorer's one reader of a claim's channels.
     """
-    siblings = flows.siblings if isinstance(flows, CaseFlows) else sibling_flows(flows)
-    return frozenset(element_ids) & siblings
+    return frozenset(element_ids) & flows.siblings
 
 
 #: How two claims' derivable directions stand, as :func:`direction_state`
@@ -149,7 +155,7 @@ def comparable_elements(element_ids: Iterable[str]) -> frozenset[str]:
     )
 
 
-def endpoint_form(element_ids: Iterable[str], flows: FlowMap) -> frozenset[str]:
+def endpoint_form(element_ids: Iterable[str], flows: CaseFlows) -> frozenset[str]:
     """Every cited **Data Flow** replaced by the two **Element**s it runs between.
 
     One place in the graph, spelled one way. The recorded labels carry the same
@@ -168,7 +174,7 @@ def endpoint_form(element_ids: Iterable[str], flows: FlowMap) -> frozenset[str]:
 
 
 def flow_directions(
-    element_ids: Iterable[str], flows: FlowMap
+    element_ids: Iterable[str], flows: CaseFlows
 ) -> frozenset[tuple[str, str]]:
     """Every ``(source, destination)`` the **Data Flow**s a claim cites carry.
 
@@ -192,7 +198,7 @@ def flow_directions(
 
 
 def direction_state(
-    left_ids: Iterable[str], right_ids: Iterable[str], flows: FlowMap
+    left_ids: Iterable[str], right_ids: Iterable[str], flows: CaseFlows
 ) -> DirectionState:
     """How two claims' derivable directions stand, in one of four words.
 
@@ -218,7 +224,7 @@ def direction_state(
 
 
 def endpoint_subset(
-    left_ids: Iterable[str], right_ids: Iterable[str], flows: FlowMap
+    left_ids: Iterable[str], right_ids: Iterable[str], flows: CaseFlows
 ) -> bool:
     """Does one claim's **Element** set contain the other's, once resolved?
 
@@ -290,7 +296,7 @@ class SubsetVerbIdentity:
 
     def __init__(
         self,
-        flows_by_case: Mapping[str, FlowMap],
+        flows_by_case: Mapping[str, CaseFlows],
         equivalent: Sequence[frozenset[str]] | None = None,
     ) -> None:
         self._flows = flows_by_case
@@ -310,7 +316,7 @@ class SubsetVerbIdentity:
                 " of this rule cannot answer; assign both from"
                 " evals.harness.verbs, or score MechanicalIdentity instead"
             )
-        flows = self._flows.get(pair.case, {})
+        flows = self._flows.get(pair.case, NO_FLOWS)
         elements = endpoint_subset(
             pair.reference_element_ids, pair.candidate_element_ids, flows
         )

@@ -147,7 +147,7 @@ from evals.harness.grounds import (
     GroundsFailure,
     classify_failure,
 )
-from evals.harness.identity import FlowMap, SubsetVerbIdentity
+from evals.harness.identity import CaseFlows, SubsetVerbIdentity
 from evals.harness.instruments import (
     INSTRUMENTS,
     ModeRun,
@@ -678,7 +678,7 @@ def _score_runs(
     runs: dict[str, modes.AnalysisRun],
     matcher: SubsetVerbIdentity,
     votes: ledger.Ledger,
-    flows_by_case: Mapping[str, FlowMap],
+    flows_by_case: Mapping[str, CaseFlows],
 ) -> tuple[tuple[CaseScore, ...], tuple[CriticYield, ...], tuple[CaseLosses, ...]]:
     """Score every case that carries a STRIDE block, on both sides of the critic.
 

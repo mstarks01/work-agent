@@ -77,7 +77,7 @@ from typing import Any, Literal, get_args
 from analysis_service.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.parsing import strings
-from evals.harness.identity import FlowMap, endpoint_form, endpoint_subset
+from evals.harness.identity import CaseFlows, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore, Standing
 from evals.harness.triggers import case_trigger_recall
@@ -294,7 +294,7 @@ class CaseLosses:
 
 
 def _at_place(
-    reference_ids: Sequence[str], drafts: Sequence[DraftThreat], flows: FlowMap
+    reference_ids: Sequence[str], drafts: Sequence[DraftThreat], flows: CaseFlows
 ) -> list[DraftThreat]:
     """The drafts whose cited place is the reference's, by the identity rule's element half."""
     return [
@@ -308,7 +308,7 @@ def _proposed_at(
     reference_ids: Sequence[str],
     lane_batch: object,
     verb: str,
-    flows: FlowMap,
+    flows: CaseFlows,
 ) -> list[Mapping[str, Any]]:
     """The lane's proposals at the reference's place with the reference's action.
 
@@ -357,7 +357,7 @@ def _charged_to(claims: Sequence[DraftThreat], verb: str) -> DraftThreat:
 
 
 def _relation(
-    reference_ids: Sequence[str], draft_ids: Sequence[str], flows: FlowMap
+    reference_ids: Sequence[str], draft_ids: Sequence[str], flows: CaseFlows
 ) -> Relation | None:
     """How two cited places stand to each other, once endpoint-resolved.
 
@@ -377,7 +377,7 @@ def _relation(
 
 
 def _nearby(
-    reference_ids: Sequence[str], drafts: Sequence[DraftThreat], flows: FlowMap
+    reference_ids: Sequence[str], drafts: Sequence[DraftThreat], flows: CaseFlows
 ) -> DraftThreat | None:
     """The draft sharing an endpoint-resolved element with the reference.
 
@@ -405,7 +405,7 @@ def attribute_case(
     score: CaseScore,
     drafts: Sequence[DraftThreat],
     produced: Sequence[DraftThreat],
-    flows: FlowMap,
+    flows: CaseFlows,
     block: FrameworkAnalysis,
     *,
     proposed: Mapping[str, Any],

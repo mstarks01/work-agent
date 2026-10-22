@@ -76,6 +76,7 @@ from analysis_service.sources import (
     MAX_LABEL_CHARS,
     Source,
     SourceKind,
+    SourceLimits,
     clean_system_name,
 )
 from analysis_service.system_model import SystemModel
@@ -852,7 +853,7 @@ def missing_case_files(case_dir: Path) -> list[str]:
     return [name for name in CASE_FILES if not (case_dir / name).is_file()]
 
 
-def load_case(case_dir: Path | str) -> GoldenCase:
+def load_case(case_dir: Path | str, limits: SourceLimits | None = None) -> GoldenCase:
     """Load and check one golden case directory."""
     case_dir = Path(case_dir)
     missing = missing_case_files(case_dir)
@@ -888,7 +889,9 @@ def load_case(case_dir: Path | str) -> GoldenCase:
     }
     return GoldenCase(
         meta=meta,
-        sources=_load_sources(case_dir, meta),
+        sources=_load_sources(
+            case_dir, meta, source_limits() if limits is None else limits
+        ),
         model=model,
         references=MappingProxyType(references),
         **_load_rulings(case_dir, model, references.get("stride", ())),
@@ -961,8 +964,20 @@ def _load_rulings(
 MAX_CORPUS_SOURCE_BYTES = 262_144
 
 
-def _load_sources(case_dir: Path, meta: CaseMetadata) -> tuple[Source, ...]:
-    """The case's declared sources, in declared order.
+def source_limits() -> SourceLimits:
+    """The deployment's input bounds, from the ``resilience.toml`` the environment names.
+
+    The one site in the harness that reads the environment for the bounds.
+    :func:`load_corpus` reads it once for every case it loads; a caller that
+    loads one case may pass its own.
+    """
+    return load_resilience(ConfigPaths.from_env(os.environ).resilience).source_limits()
+
+
+def _load_sources(
+    case_dir: Path, meta: CaseMetadata, limits: SourceLimits
+) -> tuple[Source, ...]:
+    """The case's declared sources, in declared order, within ``limits``.
 
     A declared file that is missing is a corpus error rather than an empty
     source: a case that silently analyses less text than it claims would score
@@ -1004,9 +1019,6 @@ def _load_sources(case_dir: Path, meta: CaseMetadata) -> tuple[Source, ...]:
                 text=resolved.read_text(encoding="utf-8"),
             )
         )
-    limits = load_resilience(
-        ConfigPaths.from_env(os.environ).resilience
-    ).source_limits()
     breach = limits.breach(sources)
     if breach is not None:
         raise CorpusError(f"{case_dir.name}: {breach.message}")
@@ -1045,7 +1057,8 @@ def load_corpus(corpus_dir: Path | str) -> tuple[GoldenCase, ...]:
     corpus_dir = Path(corpus_dir)
     if not corpus_dir.is_dir():
         raise CorpusError(f"corpus root is not a directory: {corpus_dir}")
-    cases = tuple(load_case(path) for path in _case_dirs(corpus_dir))
+    limits = source_limits()
+    cases = tuple(load_case(path, limits) for path in _case_dirs(corpus_dir))
     if not cases:
         raise CorpusError(f"no cases under {corpus_dir}")
     return cases

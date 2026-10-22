@@ -54,7 +54,7 @@ from analysis_service.critic import (
 from evals.harness import content as digests
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
-from evals.harness.identity import FlowMap, channels
+from evals.harness.identity import NO_FLOWS, CaseFlows, channels
 from evals.harness.ledger import Identity, Ledger, identity_of
 
 
@@ -335,7 +335,7 @@ def _said(vote: ledger.Vote) -> str:
 
 def build(
     findings: Iterable[Finding],
-    flows_by_case: Mapping[str, FlowMap],
+    flows_by_case: Mapping[str, CaseFlows],
     ledger: Ledger,
     voter: str = "",
     sitting: str = "",
@@ -397,7 +397,7 @@ def build(
 
 def _keyed(
     findings: Iterable[Finding],
-    flows_by_case: Mapping[str, FlowMap],
+    flows_by_case: Mapping[str, CaseFlows],
 ) -> Iterator[tuple[str, Components, Finding]]:
     """Each finding with its fingerprint, under its own framework's rule.
 
@@ -422,11 +422,11 @@ def _keyed(
             finding.case,
             finding.lane,
             finding.element_ids,
-            flows_by_case.get(finding.case, {}),
+            flows_by_case.get(finding.case, NO_FLOWS),
             verb=finding.verb,
             identifier=finding.identifier,
             mechanism=frozenset(finding.mechanism)
-            | channels(finding.element_ids, flows_by_case.get(finding.case, {})),
+            | channels(finding.element_ids, flows_by_case.get(finding.case, NO_FLOWS)),
         )
         yield value, components, finding
 
@@ -464,7 +464,7 @@ def from_claim(
 
 def merge_runs(
     runs: Sequence[Sequence[Finding]],
-    flows_by_case: Mapping[str, FlowMap],
+    flows_by_case: Mapping[str, CaseFlows],
 ) -> list[Finding]:
     """One finding per identity, carrying how many runs produced it.
 

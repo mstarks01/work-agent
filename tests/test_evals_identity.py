@@ -37,6 +37,7 @@ from evals.harness.calibration import (
     measure_merges,
 )
 from evals.harness.identity import (
+    CaseFlows,
     ClaimPair,
     IdentityError,
     MechanicalIdentity,
@@ -193,9 +194,9 @@ def corpus():
 def flows_by_case(corpus):
     """Each case's ``flow id -> (source, destination)``, for the endpoint rules."""
     return {
-        case.meta.id: {
-            flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
-        }
+        case.meta.id: CaseFlows.of_graph(
+            {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+        )
         for case in corpus
     }
 
@@ -325,13 +326,15 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
         "flow:entity:shopper>process:storefront-api>place-order",
         "entity:shopper",
     )
-    FLOWS: ClassVar[dict[str, dict[str, tuple[str, str]]]] = {
-        CASE: {
-            "flow:entity:shopper>process:storefront-api>place-order": (
-                "entity:shopper",
-                "process:storefront-api",
-            )
-        }
+    FLOWS: ClassVar[dict[str, CaseFlows]] = {
+        CASE: CaseFlows.of_graph(
+            {
+                "flow:entity:shopper>process:storefront-api>place-order": (
+                    "entity:shopper",
+                    "process:storefront-api",
+                )
+            }
+        )
     }
 
     def _pair(self, candidate_ids):

@@ -30,7 +30,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from evals.harness.calibration import LabelledPair
-from evals.harness.identity import FlowMap, SubsetVerbIdentity, endpoint_subset
+from evals.harness.identity import (
+    NO_FLOWS,
+    CaseFlows,
+    SubsetVerbIdentity,
+    endpoint_subset,
+)
 from evals.harness.ledger import Ledger
 from evals.harness.reference import GoldenCase, ReferenceThreat
 from evals.harness.scorer import score_case
@@ -111,7 +116,7 @@ def _rules_one(
     right_ids: Sequence[str],
     left_verb: str,
     right_verb: str,
-    flows: FlowMap,
+    flows: CaseFlows,
     groups: Groups | None,
 ) -> bool:
     """The shipped rule's two halves, with the equivalence table given rather than read.
@@ -128,7 +133,7 @@ def _rules_one(
 
 def _labelled(
     pairs: Sequence[LabelledPair],
-    flows_by_case: Mapping[str, FlowMap],
+    flows_by_case: Mapping[str, CaseFlows],
     groups: Groups | None,
 ) -> tuple[int, list[Merge]]:
     splits = 0
@@ -144,7 +149,7 @@ def _labelled(
             pair.candidate_element_ids,
             pair.reference_verb,
             pair.candidate_verb,
-            flows_by_case.get(pair.case, {}),
+            flows_by_case.get(pair.case, NO_FLOWS),
             groups,
         )
         if pair.label_match and not ruled:
@@ -165,7 +170,7 @@ def _labelled(
 
 def _references(
     corpus: Sequence[GoldenCase],
-    flows_by_case: Mapping[str, FlowMap],
+    flows_by_case: Mapping[str, CaseFlows],
     groups: Groups | None,
 ) -> list[Merge]:
     merges: list[Merge] = []
@@ -175,7 +180,7 @@ def _references(
             for claim in case.references.get("stride", ())
             if isinstance(claim, ReferenceThreat)
         ]
-        flows = flows_by_case.get(case.meta.id, {})
+        flows = flows_by_case.get(case.meta.id, NO_FLOWS)
         for left, right in itertools.combinations(claims, 2):
             if (
                 left.category != right.category
@@ -208,7 +213,7 @@ def _references(
 def _gain(
     corpus: Sequence[GoldenCase],
     produced: Mapping[str, Sequence[Any]],
-    flows_by_case: Mapping[str, FlowMap],
+    flows_by_case: Mapping[str, CaseFlows],
     groups: Groups | None,
 ) -> tuple[int, int]:
     """Matched references and must-finds over the sweep's reports, under ``groups``.
@@ -231,7 +236,7 @@ def _gain(
 def price(
     groups: Groups | None,
     corpus: Sequence[GoldenCase],
-    flows_by_case: Mapping[str, FlowMap],
+    flows_by_case: Mapping[str, CaseFlows],
     pairs: Sequence[LabelledPair],
     produced: Mapping[str, Sequence[Any]] | None = None,
 ) -> VerbPrice:

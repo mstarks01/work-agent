@@ -58,7 +58,7 @@ from analysis_service.system_model import ModelIndex, SystemModel
 from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.bundle import finished_file, reports_dir
 from evals.harness.fingerprint import IDENTIFIER_OF
-from evals.harness.identity import endpoint_form
+from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.provenance import ProvenanceError
 from evals.harness.reference import MUST_FIND
 from evals.harness.scorer import ratio
@@ -362,9 +362,11 @@ def _content(
             if path is None:
                 continue
             raw = json.loads(path.read_text(encoding="utf-8"))
-            flows = ModelIndex.of(
-                SystemModel.model_validate(raw["system_model"])
-            ).flow_endpoints
+            flows = CaseFlows.of_graph(
+                ModelIndex.of(
+                    SystemModel.model_validate(raw["system_model"])
+                ).flow_endpoints
+            )
             block = next(b for b in raw["analyses"] if b["framework"] == scope[0])
             claims = {claim["id"]: claim for claim in block["claims"]}
             content[scope] = {
