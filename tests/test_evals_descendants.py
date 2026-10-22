@@ -11,9 +11,15 @@ import json
 
 import pytest
 
+from analysis_service.report import Report
+from analysis_service.system_model import ModelIndex
 from evals.harness import descendants
 from evals.harness.artifact import load_artifact
-from evals.harness.bundle import reports_dir
+from evals.harness.bundle import reports_dir, stride_threats
+from evals.harness.identity import SubsetVerbIdentity
+from evals.harness.ledger import Ledger
+from evals.harness.reference import flows_by_case
+from evals.harness.scorer import score_case
 from tests import test_evals_run_grounds as grounds
 from tests.eval_factories import write_finished_sweep
 from tests.test_evals_modes import reaching_refs
@@ -83,6 +89,44 @@ def test_an_injected_finding_the_fan_in_removes_says_why(archive, case):  # noqa
 
     assert index not in row.upper
     assert [title for title, _ in row.dropped] == ["names nothing real"]
+
+
+def test_a_flow_the_extraction_named_resolves_as_the_scorer_resolves_it(
+    archive,
+    case,  # noqa: F811
+):
+    """An end-to-end report cites its own extraction's flow IDs, and the replay
+    matches what ``score`` matches over the same report (#949).
+
+    The extraction labels a matched flow its own way, and the claim names the
+    flow and both of its ends, as a lane writes one.
+    """
+    (plain,) = descendants.replay_artifact(load_artifact(archive), [case])
+    references = case.stride_claims()
+    flow = next(
+        element
+        for index in sorted(plain.archived)
+        for element in references[index].affected_element_ids
+        if element.startswith("flow:")
+    )
+    ends = list(ModelIndex.of(case.model).flow_endpoints[flow])
+    renamed_flow = f"{flow}-as-extracted"
+    path = reports_dir(archive) / f"{case.id}.report.json"
+    raw = json.loads(path.read_text(encoding="utf-8").replace(flow, renamed_flow))
+    for block in raw["analyses"]:
+        for claim in block["claims"]:
+            if renamed_flow in claim.get("affected_element_ids", []):
+                claim["affected_element_ids"] += ends
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    report = Report.model_validate(raw)
+    flows = flows_by_case([case], {case.id: report.system_model})
+    scored = score_case(
+        case, stride_threats(report), SubsetVerbIdentity(flows), Ledger()
+    )
+
+    (renamed,) = descendants.replay_artifact(load_artifact(archive), [case])
+
+    assert renamed.archived == {pair.reference_index for pair in scored.matched}
 
 
 def test_a_finished_case_with_a_lost_proposals_file_is_refused(archive, case):  # noqa: F811
