@@ -90,6 +90,9 @@
   .model-diagram .zone-label { fill: var(--ink-2); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
   .model-diagram .element { filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.12)); }
   .model-diagram .element-box, .model-diagram .element-fill { fill: var(--surface); }
+  .model-diagram .process .element-box { fill: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
+  .model-diagram .external-entity .element-box { fill: color-mix(in srgb, var(--ink-2) 16%, var(--surface)); }
+  .model-diagram .data-store .element-fill { fill: color-mix(in srgb, var(--g-quote) 22%, var(--surface)); }
   .model-diagram .element-box, .model-diagram .element-line { stroke: var(--ink-2); stroke-width: 1.2; }
   .model-diagram .process .element-box { stroke: var(--accent); stroke-width: 1.6; }
   .model-diagram .external-entity .element-box { stroke-width: 1.6; }
