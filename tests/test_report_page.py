@@ -723,4 +723,4 @@ def test_about_draws_the_system_model():
     drawn = parts["model-diagram"]
     for element in valid_model().elements():
         assert element.name in drawn, element.id
-    assert "A dashed box is a trust zone." in drawn
+    assert "A dashed column is a trust zone." in drawn

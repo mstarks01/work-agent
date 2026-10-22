@@ -1529,7 +1529,8 @@ _PLACED = """() => [...document.querySelectorAll('#model-diagram g.element')].ma
   const band = [...document.querySelectorAll('#model-diagram g.zone')]
     .find(z => z.dataset.zone === zone).querySelector('rect').getBBox();
   const box = g.querySelector('rect').getBBox();
-  return { id: g.dataset.element, zone, inside: box.y >= band.y
+  return { id: g.dataset.element, zone, inside: box.x >= band.x
+    && box.x + box.width <= band.x + band.width && box.y >= band.y
     && box.y + box.height <= band.y + band.height, text: g.textContent };
 })"""
 
@@ -1601,32 +1602,54 @@ def test_the_diagram_places_no_element_in_a_zone_the_model_does_not_state(browse
     )
 
 
-def test_the_diagram_s_labels_cover_no_element_on_the_largest_archived_model(browser):
-    """The layout keeps each flow label off every element on the largest model
-    the archive holds."""
+def test_the_diagram_s_flows_and_labels_stay_clear_on_every_archived_model(browser):
+    """On each distinct model the archive holds, no flow label covers an
+    element or another label, and no flow passes over an element it does not
+    join."""
     import glob
 
     from analysis_service.report import Report
 
-    def size(path):
-        model = json.loads(Path(path).read_text())["system_model"]
-        return sum(len(model[k]) for k in ("processes", "data_stores", "data_flows"))
+    reports = {}
+    for path in sorted(
+        glob.glob(
+            str(Path(__file__).parents[1] / "evals/baselines/*/*.reports/*.report.json")
+        )
+    ):
+        report = Report.model_validate_json(Path(path).read_text())
+        reports.setdefault(report.system_model.model_dump_json(), (path, report))
+    found = {}
+    for model, (path, report) in reports.items():
+        page, errors = _drawn(browser, report)
+        faults = page.evaluate(
+            """(model) => {
+          const boxes = s => [...document.querySelectorAll(s)].map(n => n.getBBox());
+          const meet = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width
+            && a.y < b.y + b.height && b.y < a.y + a.height;
+          const labels = boxes('#model-diagram .flow-label-box');
+          const elements = [...document.querySelectorAll('#model-diagram g.element')]
+            .map(g => ({ id: g.dataset.element, box: g.querySelector('rect').getBBox() }));
+          const flows = Object.fromEntries(model.data_flows.map(f => [f.id, f]));
+          const over = [...document.querySelectorAll('#model-diagram path.flow')].flatMap(path => {
+            const f = flows[path.dataset.flow];
+            const length = path.getTotalLength();
+            return elements.filter(e => e.id !== f.source && e.id !== f.destination)
+              .filter(e => Array.from({ length: 50 }, (_, k) => path.getPointAtLength(length * k / 49))
+                .some(p => p.x > e.box.x && p.x < e.box.x + e.box.width
+                  && p.y > e.box.y && p.y < e.box.y + e.box.height))
+              .map(e => `${f.id} over ${e.id}`);
+          });
+          return {
+            covered: labels.filter(l => elements.some(e => meet(l, e.box))).length,
+            stacked: labels.filter((l, at) => labels.some((m, other) => other !== at && meet(l, m))).length,
+            over,
+          };
+        }""",
+            json.loads(model),
+        )
+        page.close()
+        assert errors == [], path
+        if faults != {"covered": 0, "stacked": 0, "over": []}:
+            found[Path(path).name] = faults
 
-    paths = glob.glob(
-        str(Path(__file__).parents[1] / "evals/baselines/*/*.reports/*.report.json")
-    )
-    report = Report.model_validate_json(Path(max(paths, key=size)).read_text())
-    page, errors = _drawn(browser, report)
-    covered = page.evaluate(
-        """() => {
-      const boxes = s => [...document.querySelectorAll(s)].map(n => n.getBBox());
-      const meet = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width
-        && a.y < b.y + b.height && b.y < a.y + a.height;
-      const labels = boxes('#model-diagram .flow-label-box');
-      return labels.filter(l => boxes('#model-diagram g.element rect').some(e => meet(l, e))).length;
-    }"""
-    )
-    page.close()
-
-    assert errors == []
-    assert covered == 0
+    assert found == {}

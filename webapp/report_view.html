@@ -83,24 +83,29 @@
   /* The system model drawn. It scales to the column, and below its least
      readable width it scrolls inside its own box rather than the page. */
   .model-diagram { margin: 0 0 18px; overflow-x: auto; }
-  .model-diagram svg { display: block; width: 100%; min-width: 460px; height: auto; }
+  .model-diagram svg { display: block; width: 100%; height: auto; margin: 0 auto; }
   .model-diagram figcaption { margin-top: 6px; }
-  .model-diagram .zone-box { fill: var(--surface-2); stroke: var(--muted); stroke-dasharray: 6 4; }
+  .model-diagram .zone-box { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1; stroke-dasharray: 6 4; }
   .model-diagram .unplaced .zone-box { fill: none; stroke-dasharray: 2 4; }
-  .model-diagram .zone-label { fill: var(--ink-2); font-size: 12px; font-weight: 600; }
+  .model-diagram .zone-label { fill: var(--ink-2); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+  .model-diagram .element { filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.12)); }
   .model-diagram .element-box, .model-diagram .element-fill { fill: var(--surface); }
-  .model-diagram .element-box, .model-diagram .element-line { stroke: var(--ink-2); stroke-width: 1.4; fill-opacity: 1; }
-  .model-diagram .element-line { fill: none; }
+  .model-diagram .element-box, .model-diagram .element-line { stroke: var(--ink-2); stroke-width: 1.2; }
+  .model-diagram .process .element-box { stroke: var(--accent); stroke-width: 1.6; }
+  .model-diagram .external-entity .element-box { stroke-width: 1.6; }
+  .model-diagram .element-line { fill: none; stroke-width: 1.6; }
   .model-diagram .element-fill { stroke: none; }
-  .model-diagram .element-label { fill: var(--ink); font-size: 12.5px; text-anchor: middle; }
-  .model-diagram .element-label .assumed { fill: var(--muted); font-size: 11px; font-style: italic; }
-  .model-diagram .flow { fill: none; stroke: var(--muted); stroke-width: 1.3; }
-  .model-diagram .flow.crosses { stroke: var(--ink); stroke-width: 2.6; }
+  .model-diagram .element-label { fill: var(--ink); font-size: 12.5px; font-weight: 500; text-anchor: middle; }
+  .model-diagram .element-label .assumed { fill: var(--muted); font-size: 11px; font-weight: 400; font-style: italic; }
+  .model-diagram .flow { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+  .model-diagram .flow.crosses { stroke: var(--sev-high); stroke-width: 2; }
   .model-diagram .flow.undecided { stroke: var(--ink-2); stroke-width: 1.6; stroke-dasharray: 2 3; }
-  .model-diagram .arrowhead { fill: var(--ink-2); }
-  .model-diagram .flow-label-box { fill: var(--plane); fill-opacity: 0.9; }
+  .model-diagram .arrowhead { fill: var(--muted); }
+  .model-diagram .arrowhead.crosses { fill: var(--sev-high); }
+  .model-diagram .flow-label-box { fill: var(--plane); stroke: var(--hairline); stroke-width: 1; }
+  .model-diagram .flow-label-box.crosses { stroke: var(--sev-high); }
   .model-diagram .flow-label { fill: var(--ink-2); font-size: 11px; text-anchor: middle; }
-  @media print { .model-diagram { overflow: visible; } .model-diagram svg { min-width: 0; } }
+  @media print { .model-diagram { overflow: visible; } .model-diagram svg { min-width: 0 !important; } }
 
   /* About's tables wrap their cells rather than widen the page. */
   #about-view table { table-layout: fixed; }
