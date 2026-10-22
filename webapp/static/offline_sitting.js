@@ -88,7 +88,7 @@ function ownList(into, c) {
     into.appendChild(el("p", "hint", "Written. This case's sets are open."));
     return;
   }
-  const go = el("button", "go", "Open the recorded sets");
+  const go = el("button", "primary", "Open the recorded sets");
   go.onclick = () => {
     const lines = box.value.split("\\n").map(s => s.trim()).filter(Boolean);
     if (typed(lines) < DATA.min_own_list) {
@@ -173,7 +173,7 @@ function records(into, c) {
 function bar(into) {
   const done = Object.keys(answers).length;
   const b = el("div", "bar");
-  const save = el("button", "go", "Download my answers");
+  const save = el("button", "primary", "Download my answers");
   save.disabled = !done;
   save.onclick = download;
   b.appendChild(save);
@@ -181,7 +181,7 @@ function bar(into) {
   load.onclick = () => document.getElementById("file").click();
   b.appendChild(load);
   const ready = finished();
-  const publish = el("button", "go", "Open the pull request on GitHub");
+  const publish = el("button", "primary", "Open the pull request on GitHub");
   publish.disabled = !ready.length;
   publish.title = ready.length
     ? ready.length + (ready.length === 1 ? " case" : " cases") + " ready to publish"

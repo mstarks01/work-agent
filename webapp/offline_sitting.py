@@ -66,7 +66,7 @@ from evals.harness.reference import (
     corpus_refusal,
     is_submitted_for,
 )
-from webapp.page import client_script, script_json
+from webapp.page import WORKSPACE_STYLE, client_script, script_json
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -125,7 +125,8 @@ def payload(corpus_dir: Path, submitted_by: str, submitted_for: str) -> dict:
 
 def build(corpus_dir: Path, submitted_by: str, submitted_for: str) -> str:
     """One standalone page, payload and all."""
-    page = _PAGE.replace("<!--script-->", client_script("offline_sitting.js"))
+    page = _PAGE.replace("<!--workspace_style-->", WORKSPACE_STYLE)
+    page = page.replace("<!--script-->", client_script("offline_sitting.js"))
     return page.replace(
         "__PAYLOAD__", script_json(payload(corpus_dir, submitted_by, submitted_for))
     )
@@ -135,56 +136,45 @@ _PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Case Sitting</title>
-<style>
-:root{color-scheme:light dark;--bg:#fbfbfa;--fg:#1a1a18;--dim:#5c5c56;
---line:#dcdcd6;--card:#fff;--accent:#3a5a8c;--warn:#8a4b16}
-@media (prefers-color-scheme:dark){:root{--bg:#16161a;--fg:#e8e8e4;--dim:#9a9a94;
---line:#33333a;--card:#1e1e24;--accent:#8fb0e0;--warn:#d69a5c}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);
-font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+<style><!--workspace_style-->
+/* The standalone sitting page on the first-run app's style: its case rail,
+   its records and its sticky bar. */
 #shell{display:flex;min-height:100vh}
-#rail{width:270px;flex:none;border-right:1px solid var(--line);padding:14px;
-position:sticky;top:0;height:100vh;overflow:auto}
-#stage{flex:1;padding:26px 34px;max-width:900px}
+#rail{width:270px;flex:none;background:var(--sidebar);border-right:1px solid var(--line);
+padding:28px 14px;position:sticky;top:0;height:100vh;overflow:auto}
+#stage{flex:1;padding:36px;max-width:900px}
 h1{font-size:18px;margin:0 0 4px}
-h2{font-size:16px;margin:26px 0 8px}
-h3{font-size:14px;margin:18px 0 6px;color:var(--dim)}
-.sub{color:var(--dim);font-size:13px;margin:0 0 14px}
-.row{display:block;width:100%;text-align:left;background:none;border:0;
-padding:7px 8px;border-radius:6px;color:var(--fg);font:inherit;cursor:pointer}
-.row:hover{background:var(--card)}
-.row[aria-current=true]{background:var(--card);outline:1px solid var(--line)}
-.row .t{font-size:13px}
-.row .s{font-size:11px;color:var(--dim)}
+h2{font-size:17px;margin:28px 0 8px}
+h3{font-size:14px;margin:18px 0 6px;color:var(--muted)}
+.sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.row{display:block;width:100%;min-height:0;text-align:left;background:none;border:0;
+padding:10px 12px;border-radius:7px;color:var(--text);font-weight:400}
+.row:hover,.row[aria-current=true]{background:var(--soft);color:var(--accent)}
+.row .t{font-size:13px;font-weight:500}
+.row .s{font-size:11px;color:var(--muted)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;
 margin-right:7px;background:var(--line)}
-.dot.draft{background:var(--warn)}.dot.finished{background:var(--accent)}
-blockquote{margin:0;padding:10px 14px;border-left:3px solid var(--line);
-background:var(--card);white-space:pre-wrap;font-size:13px;overflow-x:auto}
+.dot.draft{background:transparent;box-shadow:inset 0 0 0 2px var(--accent)}.dot.finished{background:var(--accent)}
+blockquote{margin:0;padding:12px 16px;border-left:3px solid var(--line);border-radius:0 7px 7px 0;
+background:var(--sidebar);white-space:pre-wrap;font-size:13px;overflow-x:auto}
 table{border-collapse:collapse;margin:8px 0;font-size:13px;display:block;
 overflow-x:auto}
-th,td{border:1px solid var(--line);padding:4px 8px;text-align:left}
-textarea{width:100%;min-height:150px;font:inherit;padding:9px;
-border:1px solid var(--line);border-radius:6px;background:var(--card);
-color:var(--fg)}
+th,td{border-bottom:1px solid var(--line);padding:6px 10px;text-align:left}
+th{color:var(--muted)}
+textarea{min-height:150px}
 textarea[readonly]{opacity:.72}
-button{font:inherit;padding:7px 13px;border-radius:6px;border:1px solid var(--line);
-background:var(--card);color:var(--fg);cursor:pointer}
-button.go{background:var(--accent);color:#fff;border-color:transparent}
-button:disabled{opacity:.45;cursor:not-allowed}
-.rec{border:1px solid var(--line);border-radius:8px;padding:11px 13px;
-margin:10px 0;background:var(--card)}
-.rec .meta{color:var(--dim);font-size:12px;margin-top:5px}
-.rec details{margin-top:5px;font-size:13px}
-.rec summary{cursor:pointer;color:var(--dim);font-weight:600}
+input[type=radio]{width:auto;padding:0;accent-color:var(--accent)}
+.rec{border:1px solid var(--line);border-radius:12px;padding:14px 18px;
+margin:12px 0;background:var(--canvas);box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.rec .meta{color:var(--muted);font-size:12px;margin-top:5px}
+.rec details{margin:6px 0 0;font-size:13px}
+.rec summary{font-weight:600}
 .rec .quote{margin:5px 0 2px;padding-left:9px;border-left:2px solid var(--line)}
-.marks{margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
+.marks{margin-top:10px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
 .marks label{cursor:pointer}
-.bar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);
-padding:11px 0;margin-top:26px;display:flex;gap:10px;flex-wrap:wrap;
+.bar{position:sticky;bottom:0;background:var(--canvas);border-top:1px solid var(--line);
+padding:12px 0;margin-top:28px;display:flex;gap:10px;flex-wrap:wrap;
 align-items:center}
-.hint{color:var(--dim);font-size:13px}
 </style></head><body>
 <div id="shell">
   <nav id="rail"><h1>Cases</h1><p class="sub" id="who"></p><div id="rows"></div></nav>
