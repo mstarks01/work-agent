@@ -289,16 +289,12 @@
     $("analysis-tabs").hidden = false;
   }
   // header
-  $("sysname").textContent = `${R.input.system_name} security report`;
+  $("sysname").textContent = `${R.input.system_name} threat assessment`;
   // The static title names no system and no framework. The report names
   // both, so the tab reads the run rather than the template.
   document.title = R.input.system_name + " — report";
   // A time to the second, in UTC.
   const fmt = (t) => `${new Date(t).toISOString().slice(0, 19).replace("T", " ")} UTC`;
-  // The envelope's disclaimer says what the *service* is and how many of its
-  // facts anybody checked. Each block carries its own, saying what that
-  // framework's claims assert.
-  $("disclaimer").textContent = R.disclaimer;
 
   // ---- Sections -----------------------------------------------------------
   // The page has three sections: the report, its questions, and how it was
