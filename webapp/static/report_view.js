@@ -1494,8 +1494,21 @@
     "data-store": "data store",
   };
   // The geometry, in viewBox units.
-  const DIAGRAM = { width: 600, pad: 16, inset: 16, columns: 3, nodeW: 136, nodeH: 56,
-    label: 28, rowGap: 44, bandGap: 32 };
+  const DIAGRAM = { pad: 12, inset: 14, nodeW: 128, nodeH: 54, slotGap: 18,
+    laneGap: 26, rowGap: 68, bottom: 16 };
+  // The way out of a box through each side.
+  const NORMALS = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+  // A point on a cubic curve.
+  const onCurve = ([p, c1, c2, q], t) => {
+    const u = 1 - t;
+    const mix = key => u * u * u * p[key] + 3 * u * u * t * c1[key] + 3 * u * t * t * c2[key] + t * t * t * q[key];
+    return { x: mix("x"), y: mix("y") };
+  };
+  const meets = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const within = (pt, b) => pt.x > b.x && pt.x < b.x + b.w && pt.y > b.y && pt.y < b.y + b.h;
+  // Every order of `items`, the given order first.
+  const orders = items => (items.length <= 1 ? [items] : items.flatMap((item, at) =>
+    orders([...items.slice(0, at), ...items.slice(at + 1)]).map(rest => [item, ...rest])));
 
   function drawModel(model) {
     const nodes = [
@@ -1507,9 +1520,10 @@
     const index = new Map(nodes.map((node, i) => [node.e.id, i]));
     const flows = model.data_flows.filter(f => index.has(f.source) && index.has(f.destination));
 
-    // Each element's rank: the longest path to it along the flows, with each
+    // Each element's row: the longest path to it along the flows, with each
     // flow that closes a cycle left out, so the drawing reads in the flows'
-    // direction from the top down.
+    // direction from the top down. An element that no flow reaches then moves
+    // down to just above the first element it sends to.
     const next = nodes.map(() => []);
     flows.forEach(f => next[index.get(f.source)].push(index.get(f.destination)));
     const state = nodes.map(() => 0);
@@ -1523,176 +1537,280 @@
       state[i] = 2;
     };
     nodes.forEach((_, i) => { if (!state[i]) visit(i); });
+    const forward = next.map((targets, i) => targets.filter(j => j !== i && !closes.has(`${i}>${j}`)));
     const rank = nodes.map(() => 0);
-    nodes.forEach(() => next.forEach((targets, i) => targets.forEach(j => {
-      if (!closes.has(`${i}>${j}`) && rank[j] < rank[i] + 1) rank[j] = rank[i] + 1;
+    nodes.forEach(() => forward.forEach((targets, i) => targets.forEach(j => {
+      if (rank[j] < rank[i] + 1) rank[j] = rank[i] + 1;
     })));
+    const reached = new Set(forward.flat());
+    nodes.forEach((_, i) => {
+      if (!reached.has(i) && forward[i].length) rank[i] = Math.min(...forward[i].map(j => rank[j])) - 1;
+    });
+    const rows = [...new Set(rank)].sort((a, b) => a - b);
+    rows.forEach((r, at) => rank.forEach((value, i) => { if (value === r) rank[i] = at; }));
 
-    // A band per zone that holds an element, in the order the flows reach
-    // them, and the elements with no stated zone last, in a band of their own.
+    // A column per zone that holds an element, in the order that keeps the
+    // flows between zones shortest, and the elements with no stated zone
+    // last, in a column of their own.
     const zones = model.trust_boundaries.map(b => ({ id: b.id, name: b.name, members: [] }));
     const zoneOf = new Map(zones.map(zone => [zone.id, zone]));
     const unplaced = { id: null, name: "Zone not stated", members: [] };
     nodes.forEach((node, i) => (zoneOf.get(node.e.trust_zone) || unplaced).members.push(i));
     const lead = zone => Math.min(...zone.members.map(i => rank[i]));
-    const bands = [...zones, unplaced].filter(zone => zone.members.length)
-      .sort((a, b) => (a.id === null) - (b.id === null) || lead(a) - lead(b));
+    const mean = zone => zone.members.reduce((sum, i) => sum + rank[i], 0) / zone.members.length;
+    const used = zones.filter(zone => zone.members.length)
+      .sort((a, b) => lead(a) - lead(b) || mean(a) - mean(b));
+    const zoneAt = new Map();
+    used.forEach(zone => zone.members.forEach(i => zoneAt.set(i, zone)));
+    const spread = order => flows.reduce((sum, f) => {
+      const a = order.indexOf(zoneAt.get(index.get(f.source)));
+      const b = order.indexOf(zoneAt.get(index.get(f.destination)));
+      return a < 0 || b < 0 ? sum : sum + Math.abs(a - b);
+    }, 0);
+    const best = used.length > 6 ? used
+      : orders(used).reduce((kept, order) => (spread(order) < spread(kept) ? order : kept));
+    const lanes = unplaced.members.length ? [...best, unplaced] : best;
 
+    // Each lane is as wide as its fullest row. Each element takes the slot
+    // nearest the elements it talks to, so the flows run straight.
     const D = DIAGRAM;
-    const bandW = D.width - 2 * D.pad;
-    const gapX = (bandW - 2 * D.inset - D.columns * D.nodeW) / (D.columns - 1);
-    const place = new Map();
-    // Each element's neighbours along the flows, either way, so an element
-    // sits under the elements it talks to and fewer flows cross.
+    const laneOf = new Map();
+    lanes.forEach((lane, l) => lane.members.forEach(i => laneOf.set(i, l)));
+    const cells = lanes.map(lane => {
+      const byRow = new Map();
+      lane.members.forEach(i => byRow.set(rank[i], [...(byRow.get(rank[i]) || []), i]));
+      return [...byRow.values()];
+    });
+    const slots = cells.map(rowsOf => Math.max(...rowsOf.map(row => row.length)));
+    const laneW = slots.map(n => 2 * D.inset + n * D.nodeW + (n - 1) * D.slotGap);
+    const laneX = [];
+    let right = D.pad;
+    laneW.forEach((w, l) => { laneX[l] = right; right += w + D.laneGap; });
+    const width = right - D.laneGap + D.pad;
+    const slotX = (l, s) => laneX[l] + D.inset + s * (D.nodeW + D.slotGap);
+    const slotOf = new Map();
+    cells.forEach((rowsOf, l) => rowsOf.forEach(row => row.forEach((i, at) =>
+      slotOf.set(i, at + Math.floor((slots[l] - row.length) / 2)))));
+    const centreX = i => slotX(laneOf.get(i), slotOf.get(i)) + D.nodeW / 2;
     const neighbours = nodes.map(() => []);
     flows.forEach(f => {
-      neighbours[index.get(f.source)].push(index.get(f.destination));
-      neighbours[index.get(f.destination)].push(index.get(f.source));
+      const a = index.get(f.source);
+      const b = index.get(f.destination);
+      if (a !== b) { neighbours[a].push(b); neighbours[b].push(a); }
     });
-    const across = i => {
-      const placed = neighbours[i].filter(j => place.has(j)).map(j => place.get(j).x);
-      return placed.length ? placed.reduce((sum, x) => sum + x, 0) / placed.length : Infinity;
-    };
-    let top = D.pad;
-    const drawnBands = bands.map(zone => {
-      const members = [...zone.members]
-        .sort((a, b) => across(a) - across(b) || rank[a] - rank[b] || a - b);
-      const rows = Math.ceil(members.length / D.columns);
-      members.forEach((i, at) => {
-        const row = Math.floor(at / D.columns);
-        const inRow = Math.min(D.columns, members.length - row * D.columns);
-        const rowW = inRow * D.nodeW + (inRow - 1) * gapX;
-        const left = D.pad + (bandW - rowW) / 2;
-        place.set(i, {
-          x: left + (at % D.columns) * (D.nodeW + gapX),
-          y: top + D.label + row * (D.nodeH + D.rowGap),
+    for (let sweep = 0; sweep < 4; sweep++) {
+      cells.forEach((rowsOf, l) => rowsOf.forEach(row => {
+        const want = new Map(row.map(i => [i, neighbours[i].length
+          ? neighbours[i].reduce((sum, j) => sum + centreX(j), 0) / neighbours[i].length
+          : centreX(i)]));
+        row.sort((a, b) => want.get(a) - want.get(b) || a - b);
+        let from = 0;
+        row.forEach((i, at) => {
+          const nearest = Math.round((want.get(i) - D.nodeW / 2 - laneX[l] - D.inset) / (D.nodeW + D.slotGap));
+          const slot = Math.min(Math.max(nearest, from), slots[l] - (row.length - at));
+          slotOf.set(i, slot);
+          from = slot + 1;
         });
-      });
-      const height = D.label + rows * D.nodeH + (rows - 1) * D.rowGap + D.inset;
-      const band = { zone, members, top, height };
-      top += height + D.bandGap;
-      return band;
-    });
-    const height = top - D.bandGap + D.pad;
+      }));
+    }
+    // Each zone's name wraps to the width of its lane, and the tallest name
+    // sets the height of every header.
+    const names = lanes.map((lane, l) => wrapped(lane.name, Math.floor((laneW[l] - 24) / 7)));
+    const header = 22 + 15 * Math.max(...names.map(lines => lines.length));
+    const place = new Map(nodes.map((_, i) => [i, {
+      x: slotX(laneOf.get(i), slotOf.get(i)),
+      y: D.pad + header + rank[i] * (D.nodeH + D.rowGap),
+    }]));
+    const height = D.pad + header + rows.length * D.nodeH + (rows.length - 1) * D.rowGap + D.bottom + D.pad;
 
     const root = svg("svg", {
-      viewBox: `0 0 ${D.width} ${height}`,
+      viewBox: `0 0 ${width} ${height}`,
       role: "img",
       "aria-label": `Diagram of the system model: ${counted(nodes.length, "element", "elements")}, ` +
-        `${counted(flows.length, "flow", "flows")} and ${counted(zones.filter(z => z.members.length).length, "trust zone", "trust zones")}. ` +
+        `${counted(flows.length, "flow", "flows")} and ${counted(used.length, "trust zone", "trust zones")}. ` +
         "The table below lists the same elements.",
     });
+    // The drawing keeps about its own size: it never grows far past it, and
+    // below 72% of it the figure scrolls.
+    root.style.maxWidth = `${Math.round(width * 1.1)}px`;
+    root.style.minWidth = `${Math.round(width * 0.72)}px`;
     const defs = svg("defs");
-    const marker = svg("marker", { id: "model-arrow", viewBox: "0 0 10 10", refX: 9, refY: 5,
-      markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" });
-    marker.append(svg("path", { d: "M0,0 L10,5 L0,10 z", class: "arrowhead" }));
-    defs.append(marker);
+    ["", "crosses"].forEach(kind => {
+      const marker = svg("marker", { id: kind ? `model-arrow-${kind}` : "model-arrow", viewBox: "0 0 10 10",
+        refX: 9, refY: 5, markerWidth: 10, markerHeight: 10, markerUnits: "userSpaceOnUse",
+        orient: "auto-start-reverse" });
+      marker.append(svg("path", { d: "M0,1 L10,5 L0,9 z", class: `arrowhead ${kind}`.trim() }));
+      defs.append(marker);
+    });
     root.append(defs);
 
-    drawnBands.forEach(band => {
-      const group = svg("g", { class: band.zone.id === null ? "zone unplaced" : "zone",
-        "data-zone": band.zone.id === null ? "" : band.zone.id });
+    const headers = lanes.map((lane, l) => ({ x: laneX[l], y: D.pad, w: laneW[l], h: header }));
+    lanes.forEach((lane, l) => {
+      const group = svg("g", { class: lane.id === null ? "zone unplaced" : "zone",
+        "data-zone": lane.id === null ? "" : lane.id });
+      const label = svg("text", { x: laneX[l] + 14, y: D.pad + 22, class: "zone-label" });
+      names[l].forEach((line, at) => label.append(svg("tspan", { x: laneX[l] + 14, dy: at ? 15 : 0 }, line)));
       group.append(
-        svg("rect", { x: D.pad, y: band.top, width: bandW, height: band.height, rx: 10, class: "zone-box" }),
-        svg("text", { x: D.pad + 12, y: band.top + 18, class: "zone-label" }, clip(band.zone.name, 60)),
+        svg("rect", { x: laneX[l], y: D.pad, width: laneW[l], height: height - 2 * D.pad, rx: 12, class: "zone-box" }),
+        label,
       );
+      if (names[l].join(" ") !== lane.name) group.append(svg("title", {}, lane.name));
       root.append(group);
     });
 
-    // Flows under the elements, and their labels over them. Two flows between
-    // one pair of elements bend apart, so neither hides the other.
+    // Each flow leaves the side of its source that faces its destination: a
+    // flow down the rows leaves the bottom, a flow back up leaves the top,
+    // and a flow along a row leaves the side. The flows on one side spread
+    // out in the order of where they go, so no two meet at the box.
+    const boxes = nodes.map((_, i) => ({ i, ...place.get(i), w: D.nodeW, h: D.nodeH }));
     const centre = i => ({ x: place.get(i).x + D.nodeW / 2, y: place.get(i).y + D.nodeH / 2 });
-    const edge = (c, toward) => {
-      const dx = toward.x - c.x;
-      const dy = toward.y - c.y;
-      const t = Math.min(dx ? (D.nodeW / 2) / Math.abs(dx) : Infinity, dy ? (D.nodeH / 2) / Math.abs(dy) : Infinity);
-      return { x: c.x + dx * t, y: c.y + dy * t };
-    };
-    const crossing = new Map(R.boundary_crossings.map(c => [c.flow_id, c.decided ? "crosses" : "undecided"]));
-    const pairs = new Map();
-    flows.forEach(f => {
-      const pair = [f.source, f.destination].sort().join("|");
-      pairs.set(pair, [...(pairs.get(pair) || []), f.id]);
-    });
-    const lines = svg("g", { class: "flows" });
-    const labels = svg("g", { class: "flow-labels" });
-    // Whether a point falls on an element other than the flow's two ends.
-    const boxes = [...place].map(([i, p]) => ({ i, x: p.x - 6, y: p.y - 6, w: D.nodeW + 12, h: D.nodeH + 12 }));
-    const onElement = (pt, ends) => boxes.some(b => !ends.includes(b.i)
-      && pt.x > b.x && pt.x < b.x + b.w && pt.y > b.y && pt.y < b.y + b.h);
-    const along = (p, c, q, t) => ({
-      x: (1 - t) * (1 - t) * p.x + 2 * (1 - t) * t * c.x + t * t * q.x,
-      y: (1 - t) * (1 - t) * p.y + 2 * (1 - t) * t * c.y + t * t * q.y,
-    });
-    const taken = [];
-    const overlaps = (r, others) => others.some(o =>
-      r.x < o.x + o.w && o.x < r.x + r.w && r.y < o.y + o.h && o.y < r.y + r.h);
-    flows.forEach(f => {
+    const routes = flows.map((f, n) => {
       const from = index.get(f.source);
       const to = index.get(f.destination);
-      const a = centre(from);
-      const b = centre(to);
-      const text = clip(f.name, 22);
-      const labelW = text.length * 6.4 + 8;
-      let d;
-      let spots;
-      if (from === to) {
-        // A flow from an element to itself: a loop on its right side.
-        const x = a.x + D.nodeW / 2;
-        d = `M${x},${a.y - 12} C${x + 44},${a.y - 30} ${x + 44},${a.y + 30} ${x},${a.y + 12}`;
-        spots = [{ x: x + 34, y: a.y }];
-      } else {
-        // The flow bends away from the other flow between the same two
-        // elements, and further until it passes over no other element.
-        const pair = pairs.get([f.source, f.destination].sort().join("|"));
-        const base = (pair.indexOf(f.id) - (pair.length - 1) / 2) * 56;
-        const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-        const curve = bend => {
-          const c = {
-            x: (a.x + b.x) / 2 - ((b.y - a.y) / length) * bend,
-            y: (a.y + b.y) / 2 + ((b.x - a.x) / length) * bend,
-          };
-          return { c, p: edge(a, c), q: edge(b, c) };
-        };
-        const clear = ({ p, c, q }) => [0.15, 0.3, 0.45, 0.6, 0.75, 0.9]
-          .every(t => !onElement(along(p, c, q, t), [from, to]));
-        const { p, c, q } = [0, 60, -60, 120, -120, 180, -180]
-          .map(extra => curve(base + extra)).find(clear) || curve(base);
-        d = `M${p.x},${p.y} Q${c.x},${c.y} ${q.x},${q.y}`;
-        // Where its label may sit: along the flow, then just beside it.
-        // A flow that runs across takes its label on the side it bends to.
-        const level = Math.abs(b.x - a.x) > Math.abs(b.y - a.y);
-        const down = c.y > (a.y + b.y) / 2;
-        const offsets = down ? [14, 32, 48, -12, -30, -46] : [-12, -30, -46, 14, 32, 48];
-        spots = [0.5, 0.35, 0.65, 0.25, 0.75].flatMap(t => {
-          const at = along(p, c, q, t);
-          return level
-            ? offsets.map(dy => ({ x: at.x, y: at.y + dy }))
-            : [at, { x: at.x, y: at.y - 14 }];
-        });
+      if (from === to) return { f, n, from, to };
+      const sides = rank[to] > rank[from] ? ["bottom", "top"]
+        : rank[to] < rank[from] ? ["top", "bottom"]
+          : centre(to).x > centre(from).x ? ["right", "left"] : ["left", "right"];
+      return { f, n, from, to, out: sides[0], into: sides[1] };
+    });
+    const ports = new Map();
+    routes.filter(r => r.out).forEach(r => {
+      [[r.from, r.out, r.to, "p"], [r.to, r.into, r.from, "q"]].forEach(([i, side, other, end]) => {
+        const key = `${i}:${side}`;
+        ports.set(key, [...(ports.get(key) || []), { r, other, end }]);
+      });
+    });
+    ports.forEach((list, key) => {
+      const [i, side] = key.split(":");
+      const across = side === "top" || side === "bottom";
+      list.sort((a, b) => (across ? centre(a.other).x - centre(b.other).x : centre(a.other).y - centre(b.other).y)
+        || a.r.n - b.r.n);
+      const room = across ? D.nodeW - 40 : D.nodeH - 20;
+      const step = list.length > 1 ? Math.min(32, room / (list.length - 1)) : 0;
+      const { x, y } = place.get(Number(i));
+      list.forEach(({ r, end }, at) => {
+        const shift = (at - (list.length - 1) / 2) * step;
+        r[end] = {
+          top: { x: x + D.nodeW / 2 + shift, y },
+          bottom: { x: x + D.nodeW / 2 + shift, y: y + D.nodeH },
+          left: { x, y: y + D.nodeH / 2 + shift },
+          right: { x: x + D.nodeW, y: y + D.nodeH / 2 + shift },
+        }[side];
+      });
+    });
+    // Each flow is a chain of curves that leave and meet its boxes square to
+    // their sides. A flow between two next rows is one curve in the gap
+    // between them. A flow over more rows turns, in the gap after its source,
+    // into a free channel down the lanes, and turns out of it in the gap
+    // before its destination; a channel used once already costs more, so two
+    // flows seldom share one. A flow along a row bows out until it passes
+    // over no other element.
+    const padded = b => ({ x: b.x - 8, y: b.y - 8, w: b.w + 16, h: b.h + 16 });
+    const clearOf = (curve, ends) => Array.from({ length: 23 }, (_, k) => onCurve(curve, (k + 1) / 24))
+      .every(pt => boxes.every(b => ends.includes(b.i) || !within(pt, padded(b))));
+    const channels = [
+      ...cells.flatMap((_, l) => Array.from({ length: slots[l] }, (_, s) => ({ x: slotX(l, s) + D.nodeW / 2, cost: 0 }))),
+      ...cells.flatMap((_, l) => Array.from({ length: slots[l] - 1 }, (_, s) =>
+        ({ x: slotX(l, s) + D.nodeW + D.slotGap / 2, cost: 0 }))),
+      ...laneX.flatMap((x, l) => [{ x: x + D.inset / 2, cost: 400 }, { x: x + laneW[l] - D.inset / 2, cost: 400 }]),
+    ];
+    const occupied = [];
+    const line = (a, b) => [a, { x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 },
+      { x: a.x + 2 * (b.x - a.x) / 3, y: a.y + 2 * (b.y - a.y) / 3 }, b];
+    routes.forEach(r => {
+      if (!r.out) {
+        const { x, y } = place.get(r.from);
+        const p = { x: x + D.nodeW, y: y + D.nodeH / 2 - 10 };
+        const q = { x: x + D.nodeW, y: y + D.nodeH / 2 + 10 };
+        r.curves = [[p, { x: p.x + 30, y: p.y - 16 }, { x: q.x + 30, y: q.y + 16 }, q]];
+        return;
       }
-      const box = (spot) => ({ x: spot.x - labelW / 2, y: spot.y - 9, w: labelW, h: 16 });
-      const inside = (r) => r.x >= 0 && r.y >= 0 && r.x + r.w <= D.width && r.y + r.h <= height;
-      const spot = spots.find(each => inside(box(each)) && !overlaps(box(each), [...boxes, ...taken]))
-        || spots.find(each => inside(box(each))) || spots[0];
-      taken.push(box(spot));
-      const path = svg("path", { d, class: `flow ${crossing.get(f.id) || ""}`.trim(),
-        "marker-end": "url(#model-arrow)", "data-flow": f.id });
-      path.append(svg("title", {}, `${f.name}: ${NAMES[f.id] || f.id}`));
+      const a = NORMALS[r.out];
+      const b = NORMALS[r.into];
+      const span = Math.abs(rank[r.to] - rank[r.from]);
+      if (span > 1) {
+        const step = a.y * D.rowGap / 2;
+        const top = Math.min(rank[r.from], rank[r.to]);
+        const low = Math.max(rank[r.from], rank[r.to]);
+        const between = boxes.filter(box => rank[box.i] > top && rank[box.i] < low).map(padded);
+        const free = channels.filter(c => between.every(box => c.x <= box.x || c.x >= box.x + box.w));
+        const busy = c => occupied.filter(u => u.x === c.x && u.top < low && top < u.low).length * 300;
+        const channel = free.reduce((kept, c) => {
+          const score = each => each.cost + busy(each) + Math.abs(each.x - r.p.x) + Math.abs(each.x - r.q.x);
+          return !kept || score(c) < score(kept) ? c : kept;
+        }, null);
+        if (channel) {
+          occupied.push({ x: channel.x, top, low });
+          const A = { x: channel.x, y: r.p.y + step };
+          const B = { x: channel.x, y: r.q.y - step };
+          r.curves = [
+            [r.p, { x: r.p.x, y: r.p.y + step / 2 }, { x: A.x, y: A.y - step / 2 }, A],
+            line(A, B),
+            [B, { x: B.x, y: B.y + step / 2 }, { x: r.q.x, y: r.q.y - step / 2 }, r.q],
+          ];
+          return;
+        }
+      }
+      const reach = Math.max(28, 0.45 * (a.x ? Math.abs(r.q.x - r.p.x) : Math.abs(r.q.y - r.p.y)));
+      const curve = bow => [r.p,
+        { x: r.p.x + a.x * reach + (a.x ? 0 : bow), y: r.p.y + a.y * reach + (a.y ? 0 : bow) },
+        { x: r.q.x + b.x * reach + (b.x ? 0 : bow), y: r.q.y + b.y * reach + (b.y ? 0 : bow) },
+        r.q];
+      r.curves = [[0, 90, -90, 150, -150, 210, -210, 270, -270].map(curve)
+        .find(each => clearOf(each, [r.from, r.to])) || curve(0)];
+    });
+
+    // Each label touches its own flow: on it, or just beside it where the
+    // flow has no room. It covers no element and no other label, and the
+    // fewest other flows. A flow down a channel takes its label on the
+    // channel.
+    const crossing = new Map(R.boundary_crossings.map(c => [c.flow_id, c.decided ? "crosses" : "undecided"]));
+    const traces = routes.map(r => r.curves.flatMap(curve => Array.from({ length: 41 }, (_, k) => onCurve(curve, k / 40))));
+    const bounds = { x: 0, y: 0, w: width, h: height };
+    const taken = [];
+    const lines = svg("g", { class: "flows" });
+    const labels = svg("g", { class: "flow-labels" });
+    routes.forEach((r, n) => {
+      const kind = crossing.get(r.f.id) || "";
+      const [first] = r.curves[0];
+      const d = `M${first.x},${first.y}` + r.curves.map(([, c1, c2, q]) => ` C${c1.x},${c1.y} ${c2.x},${c2.y} ${q.x},${q.y}`).join("");
+      const path = svg("path", { d, class: `flow ${kind}`.trim(), "data-flow": r.f.id,
+        "marker-end": kind === "crosses" ? "url(#model-arrow-crosses)" : "url(#model-arrow)" });
+      path.append(svg("title", {}, `${r.f.name}: ${NAMES[r.f.id] || r.f.id}`));
       lines.append(path);
-      const { x, y, w, h } = box(spot);
+      const text = clip(r.f.name, 22);
+      const w = text.length * 6.2 + 10;
+      const main = r.curves[Math.floor(r.curves.length / 2)];
+      const along = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8].map(t => onCurve(main, t));
+      const aside = !r.out ? [{ x: 30 + w / 2, y: 0 }]
+        : NORMALS[r.out].y ? [{ x: 0, y: 0 }, { x: w / 2 + 6, y: 0 }, { x: -w / 2 - 6, y: 0 }, { x: w * 0.3, y: 0 }, { x: -w * 0.3, y: 0 }]
+          : [{ x: 0, y: 0 }, { x: 0, y: 14 }, { x: 0, y: -14 }];
+      const spots = aside.flatMap(o => along.map(pt => ({ x: pt.x + o.x, y: pt.y + o.y })));
+      const cost = spot => {
+        const label = { x: spot.x - w / 2, y: spot.y - 8, w, h: 16 };
+        const inside = label.x >= bounds.x && label.y >= bounds.y
+          && label.x + label.w <= bounds.w && label.y + label.h <= bounds.h;
+        const touches = traces[n].some(pt => within(pt, { x: label.x - 10, y: label.y - 10, w: label.w + 20, h: label.h + 20 }));
+        return 1000 * (boxes.some(b => meets(label, b)) + taken.some(t => meets(label, t)) + !inside + !touches)
+          + 300 * headers.some(h => meets(label, h))
+          + 20 * traces.reduce((sum, trace, other) => sum
+            + (other === n ? 0 : trace.filter(pt => within(pt, label)).length), 0);
+      };
+      const spot = spots.reduce((kept, each) => (cost(each) < cost(kept) ? each : kept));
+      const label = { x: spot.x - w / 2, y: spot.y - 8, w, h: 16 };
+      taken.push(label);
       labels.append(
-        svg("rect", { x, y, width: w, height: h, rx: 3, class: "flow-label-box" }),
-        svg("text", { x: spot.x, y: spot.y + 3, class: "flow-label" }, text),
+        svg("rect", { x: label.x, y: label.y, width: label.w, height: label.h, rx: 8, class: `flow-label-box ${kind}`.trim() }),
+        svg("text", { x: spot.x, y: spot.y + 3.5, class: "flow-label" }, text),
       );
     });
     root.append(lines);
 
-    drawnBands.forEach(band => band.members.forEach(i => {
+    lanes.forEach(lane => lane.members.forEach(i => {
       const { kind, e } = nodes[i];
       const { x, y } = place.get(i);
       const group = svg("g", { class: `element ${kind}`, "data-element": e.id,
-        "data-zone": band.zone.id === null ? "" : band.zone.id });
+        "data-zone": lane.id === null ? "" : lane.id });
       const assumed = ASSUMED_ZONES.has(e.id);
       group.append(svg("title", {}, `${e.name} (${KIND_WORDS[kind]})${assumed ? ", zone assumed" : ""}`));
       if (kind === "data-store") {
@@ -1702,9 +1820,9 @@
         );
       } else {
         group.append(svg("rect", { x, y, width: D.nodeW, height: D.nodeH,
-          rx: kind === "process" ? 18 : 2, class: "element-box" }));
+          rx: kind === "process" ? 16 : 3, class: "element-box" }));
       }
-      const words = wrapped(e.name, 18);
+      const words = wrapped(e.name, 17);
       const all = assumed ? [...words, "zone assumed"] : words;
       const label = svg("text", { x: x + D.nodeW / 2, y: y + D.nodeH / 2 - (all.length - 1) * 7 + 4,
         class: "element-label" });
@@ -1720,8 +1838,8 @@
   const diagram = drawModel(R.system_model);
   if (diagram) {
     const caption = el("figcaption", "meta",
-      "A dashed box is a trust zone. A rectangle is an external entity, a rounded " +
-      "box a process, and two lines a data store. A thick arrow crosses a trust " +
+      "A dashed column is a trust zone. A rectangle is an external entity, a rounded " +
+      "box a process, and two lines a data store. A coloured arrow crosses a trust " +
       "boundary, and a dotted arrow may cross one, because a zone is not stated.");
     $("model-diagram").append(diagram, caption);
   } else {
