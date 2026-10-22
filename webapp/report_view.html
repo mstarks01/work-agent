@@ -292,11 +292,10 @@
   td code, .about-list code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }
   td .unk { color: var(--muted); font-style: italic; }
 
-  .nodes { display: flex; flex-wrap: wrap; gap: 8px; }
-  .node { font-size: 0.76rem; color: var(--ink-2); background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; padding: 4px 10px; }
-  .node b { font-weight: 600; color: var(--ink); }
-  .node .m { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #nodes .meta { margin: 8px 0; }
+  #nodes .m { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #nodes th:nth-child(3) { width: 14%; }
+  #question-refs th:first-child { width: 8%; }
 
   /* Spacing that used to ride in style="" attributes. The report page runs
      under a strict nonce CSP with no 'unsafe-inline', which blocks inline
@@ -402,9 +401,10 @@
          link to answer them online. -->
     <div id="export-questions" hidden></div>
 
-    <!-- How this report was made: its identifiers and versions, the service's
-         disclaimer, each framework's notes, the System Model every framework
-         analysed, and the pipeline. -->
+    <!-- About the analysis: the service's disclaimer, the System Model every
+         framework analysed, the question references, each framework's notes,
+         and in closed sections the report's identifiers and versions and the
+         pipeline. -->
     <div id="about-view" hidden>
       <h2 class="view-title">About the analysis</h2>
       <div class="disclaimer"><span class="dot"></span><span id="disclaimer"></span></div>
@@ -433,11 +433,10 @@
       <details class="about-more" id="record">
         <summary>How this report was made</summary>
         <dl class="facts" id="report-facts"></dl>
-        <div class="meta" id="scope"></div>
       </details>
       <details class="about-more">
         <summary>Pipeline</summary>
-        <div class="nodes" id="nodes"></div>
+        <div id="nodes"></div>
       </details>
     </div>
   </div>
