@@ -234,22 +234,7 @@
   // measurement of typing chose it.
   const AUTOSAVE_DELAY = 400;
   const keyOf = (key) => JSON.stringify(key);
-  // A row's key as the page's maps hold it: a link question's key is a
-  // string, every other question's the JSON of its key tuple.
-  const rowKey = (row) => (row.kind === "link" ? row.q.key : keyOf(row.q.key));
-  // Two answers are one answer when the fields the submitter gives agree. The
-  // service serves every field, with its defaults and with the value it
-  // writes from a facets answer; the page builds only the fields given.
-  const sameAnswer = (a, b) => {
-    if (!a || !b) return !a && !b;
-    if ("principal" in a) return a.principal === b.principal && a.element === b.element;
-    if ((a.detail || "") !== (b.detail || "")) return false;
-    if (!a.facets && !b.facets) return a.value === b.value;
-    if (!a.facets || !b.facets) return false;
-    const given = Object.entries(a.facets);
-    return given.length === Object.keys(b.facets).length
-      && given.every(([facet, value]) => b.facets[facet] === value);
-  };
+  // `rowKey` and `sameAnswer` are question_list.js's, shared with the report page.
   const say = (node, text) => {
     if (node) node.textContent = text;
   };

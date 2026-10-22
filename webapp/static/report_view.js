@@ -797,22 +797,10 @@
   // Whether the report asks the questions its conditional findings wait on.
   const ASKS = !FINAL && !RESUMED_BY
     && (FACT_QUESTIONS.length + LINK_QUESTIONS.length + EARLIER_FACTS.length + EARLIER_LINKS.length) > 0;
-  // Every question row the page draws, by its key as a string: a link
-  // question's key is its principal, and a fact question's the JSON of its
-  // key. One map, so a finding's link and the question it reaches agree.
+  // Every question row the page draws, by `rowKey` (question_list.js's, shared
+  // with the first-run page). One map, so a finding's link and the question it
+  // reaches agree.
   const QUESTION_ROWS = new Map();
-  const rowKey = (row) => (row.kind === "link" ? row.q.principal : JSON.stringify(row.q.key));
-  // Two answers are one answer when the fields the submitter gives agree.
-  const sameAnswer = (a, b) => {
-    if (!a || !b) return !a && !b;
-    if ("principal" in a) return a.principal === b.principal && a.element === b.element;
-    if ((a.detail || "") !== (b.detail || "")) return false;
-    if (!a.facets && !b.facets) return a.value === b.value;
-    if (!a.facets || !b.facets) return false;
-    const given = Object.entries(a.facets);
-    return given.length === Object.keys(b.facets).length
-      && given.every(([facet, value]) => b.facets[facet] === value);
-  };
   // What became of a question before this report, in the words its row shows.
   const HISTORY = {
     open: "New question from this analysis",

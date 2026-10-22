@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import pytest
 
+from analysis_service.api import AnswersSubmission
 from analysis_service.fact_answers import MAX_FACT_ANSWERS
+from analysis_service.links import MAX_LINK_ANSWERS
 from tests import test_webapp
 from tests.test_api import auth, make_client
 from tests.test_webapp import CARRIED, SAME_ORIGIN, posted
@@ -166,3 +168,25 @@ def test_a_correction_over_the_limit_is_refused_with_the_limit(tiers):
 
     assert refused.status_code == 400
     assert str(MAX_FACT_ANSWERS) in refused.json()["message"]
+
+
+@pytest.mark.parametrize(
+    ("field", "answer", "bound"),
+    [
+        ("links", {"principal": "the team", "element": "web-app"}, MAX_LINK_ANSWERS),
+        ("facts", FACT_BODY, MAX_FACT_ANSWERS),
+    ],
+)
+def test_answers_over_the_limit_are_refused_with_the_v1_bound(
+    tiers, field, answer, bound
+):
+    """``/answer`` holds each list to the bound ``AnswersSubmission`` declares,
+    and answers 400 where /v1 answers 422 (the web app's own status rule)."""
+    client, final = _final(tiers)
+    body = {"links": [], "facts": [], field: [answer] * (bound + 1), "revision": 0}
+
+    refused = client.post(f"/answer/{final}", json=body, headers=SAME_ORIGIN)
+
+    assert refused.status_code == 400
+    assert str(bound) in refused.json()["message"]
+    assert AnswersSubmission.model_fields[field].metadata[0].max_length == bound

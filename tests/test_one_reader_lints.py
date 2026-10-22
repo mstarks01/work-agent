@@ -606,3 +606,38 @@ def test_an_assertion_id_has_one_encoder_and_one_decoder():
         ("src/analysis_service/assertions.py", "assertion_id"),
         ("src/analysis_service/assertions.py", "read_assertion_id"),
     ]
+
+
+def _compares_an_answer_bound(node: ast.AST) -> bool:
+    return isinstance(node, ast.Compare) and any(
+        _is_name(operand, "MAX_FACT_ANSWERS", "MAX_LINK_ANSWERS")
+        for operand in (node.left, *node.comparators)
+    )
+
+
+def test_the_answer_bounds_are_read_through_the_v1_models():
+    """No route compares a list's length to an answer bound itself. The /v1
+    models declare each bound as ``max_length``, and ``_over_the_bound`` asks
+    them, so the web app and /v1 refuse the same bodies."""
+    assert [
+        site
+        for site in _sites(_compares_an_answer_bound)
+        if site[0].startswith("webapp/")
+    ] == []
+
+
+def _spells_a_sampling_key(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.JoinedStr)
+        and bool(node.values)
+        and isinstance(node.values[0], ast.Constant)
+        and str(node.values[0].value).startswith("sampling.")
+    )
+
+
+def test_a_sampling_setting_key_is_spelled_once():
+    """Only ``sampling_key`` spells ``sampling.<tier>.<param>``; the page, the
+    view and the startup refusal call it."""
+    assert _sites(_spells_a_sampling_key) == [
+        ("webapp/settings_page.py", "sampling_key")
+    ]
