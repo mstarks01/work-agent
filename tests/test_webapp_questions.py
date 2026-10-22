@@ -2497,6 +2497,25 @@ await ids.save.listeners.click(); await settle();
     ]
 
 
+def test_a_link_answered_and_skipped_has_one_editor():
+    """The skipped list holds the link's one editor, and "Your answers" none.
+
+    Both lists key a link by ``questionKey``, so the set of skipped keys and
+    the answered rows agree on which link is set aside.
+    """
+    answered = _LINK | {"answer": {"element": "entity:shopper"}}
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: [], skipped_early: [], skipped_links: [{json.dumps(_LINK)}],
+  answered_early: [], answered_links: [{json.dumps(answered)}], revision: 1 }}) }});
+calls.push({{ earlier: ids.earlier.querySelectorAll("button").length,
+  skipped: ids.skipped.querySelectorAll("button").length }});
+"""
+    _, counts = _run_form_script(steps)["calls"]
+    assert counts == {"earlier": 0, "skipped": 1}
+
+
 def test_an_earlier_answer_can_be_changed():
     key = ["flow:a>b:x", "encryption_in_transit", "", "", "", ""]
     answered = {

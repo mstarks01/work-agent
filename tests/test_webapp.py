@@ -1752,7 +1752,7 @@ def test_a_page_builds_an_answer_input_with_the_shared_builder(page):
 
 #: The two rules the question list's pages share, as question_list.js spells
 #: each one's definition.
-SHARED_ROW_RULES = ("const rowKey = ", "const sameAnswer = ")
+SHARED_ROW_RULES = ("const questionKey = ", "const rowKey = ", "const sameAnswer = ")
 
 
 @pytest.mark.parametrize("rule", SHARED_ROW_RULES)
@@ -1770,6 +1770,19 @@ def test_a_row_rule_is_defined_once_and_read_by_both_pages(rule):
     )
     for page in ("report_view.js", "first_run.js"):
         assert f"{name}(" in page_javascript(page), f"{page} does not call {name}"
+
+
+@pytest.mark.parametrize("page", ANSWER_PAGES)
+def test_a_question_key_is_spelled_by_question_key_only(page):
+    """Every page map keys a question through ``questionKey``.
+
+    A ``JSON.stringify`` of a key beside it is a second reader of the one
+    rule, and a finding's link then misses the row it names.
+    """
+    spellings = re.findall(r"JSON\.stringify\([^()]*[kK]ey\)", page_javascript(page))
+    definition = ["JSON.stringify(key)"] if page == "question_list.js" else []
+
+    assert spellings == definition, f"{page} spells a question key as {spellings}"
 
 
 class TestTheReportPageGetsARowPerUnit:
