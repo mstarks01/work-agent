@@ -119,6 +119,17 @@ DECLARED: dict[str, str] = {
         " place. A package whose claims carry a catalog identifier rules each"
         " requirement, and its E1 ceiling was zero, so it has no target to list."
     ),
+    "evals/experiments/QA-2026-10-22-01/e8_count.py": (
+        "This code is that framework's, through `SubsetVerbIdentity` and the"
+        " flow map it resolves a cited flow against. It counts the matches that"
+        " a renamed flow loses, which needs an identity composed from an action"
+        " and a place. A package whose claims carry a catalog identifier cites"
+        " no flow, so a renamed flow loses it nothing."
+    ),
+    "evals/experiments/QA-2026-10-22-01/e8_read.py": (
+        "This code is that framework's: it prints the matches `e8_count.py`"
+        " counts, beside their drafts, through the same identity."
+    ),
     "evals/experiments/QA-2026-10-14-01/count_on_reference_models.py": (
         "This code is that framework's. It counts the units that an applicability"
         " rule over capabilities settles, which exists only for a package whose"
