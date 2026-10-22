@@ -33,14 +33,14 @@ See ``evals/harness/ledger.py``.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from analysis_service.critic import (
-    cited_channels,
     distinct_mechanisms,
     endpoint_targets,
+    sibling_flows,
 )
 from analysis_service.frameworks.stride.record import StrideCategory
 from analysis_service.system_model import is_zone
@@ -48,6 +48,43 @@ from evals.harness.verbs import same_action
 
 #: One case's **Data Flow**s as ``flow id -> (source id, destination id)``.
 FlowMap = Mapping[str, tuple[str, str]]
+
+
+class CaseFlows(Mapping[str, tuple[str, str]]):
+    """A :data:`FlowMap` built from two graphs, with each graph's sibling flows.
+
+    :func:`~evals.harness.reference.flows_by_case` builds it from the blessed
+    model and the analysed one. Over the merged map, an extraction flow that
+    names a blessed flow another way would count as that flow's sibling, so
+    ``siblings`` is read per graph instead (ADR 0099).
+    """
+
+    def __init__(
+        self, endpoints: Mapping[str, tuple[str, str]], siblings: frozenset[str]
+    ) -> None:
+        self._endpoints = dict(endpoints)
+        self.siblings = siblings
+
+    def __getitem__(self, flow_id: str) -> tuple[str, str]:
+        return self._endpoints[flow_id]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._endpoints)
+
+    def __len__(self) -> int:
+        return len(self._endpoints)
+
+
+def channels(element_ids: Iterable[str], flows: FlowMap) -> frozenset[str]:
+    """The sibling flows a claim cites, as the scorer reads them (ADR 0061).
+
+    The scorer's one reader of a claim's channels. A :class:`CaseFlows` names
+    its siblings per graph; any other map is one graph, and its siblings are
+    the flows that share their two elements with another flow in it.
+    """
+    siblings = flows.siblings if isinstance(flows, CaseFlows) else sibling_flows(flows)
+    return frozenset(element_ids) & siblings
+
 
 #: How two claims' derivable directions stand, as :func:`direction_state`
 #: answers it. Closed, so a caller counting these into a table cannot key it
@@ -210,7 +247,8 @@ def endpoint_subset(
     would contain a claim on the other. Where both sides cite a sibling flow
     and the cited siblings do not overlap, the sides are not one place. A side
     that cites only the two elements still contains, or is contained by,
-    either sibling.
+    either sibling. A flow is a sibling in its own graph (ADR 0099), so an
+    extraction's renamed flow and the blessed flow it names are one place.
 
     On its own this over-merges, which is why nothing calls it alone:
     :class:`SubsetVerbIdentity` is the rule, and this is one half of it.
@@ -219,9 +257,7 @@ def endpoint_subset(
     right = endpoint_form(right_ids, flows)
     if not left or not right:
         return False
-    if distinct_mechanisms(
-        cited_channels(left_ids, flows), cited_channels(right_ids, flows)
-    ):
+    if distinct_mechanisms(channels(left_ids, flows), channels(right_ids, flows)):
         return False
     return left <= right or right <= left
 

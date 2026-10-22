@@ -281,7 +281,10 @@ The mechanism also holds the sibling flows a claim cites: two flows between one
 pair of elements fold to one place, so the cited flow is what tells a claim on
 one from a claim on the other (ADR 0061). `identity.endpoint_subset` reads the
 same channels, so the scorer does not match a claim on one sibling to a
-reference on the other.
+reference on the other. A flow is a sibling only in its own graph (ADR 0099):
+in an end-to-end run, an extraction flow that names a corpus flow another way
+is one place with that flow, and `identity.channels` reads the siblings that
+`flows_by_case` records for each graph.
 
 A cited assertion row adds its control too: the attribute its predicate
 projects into, or the predicate's own name. With the assertion pass on, a
