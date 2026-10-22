@@ -57,6 +57,7 @@ from evals.harness import sitting as sittings
 from evals.harness.sitting import MIN_OWN_LIST, own_list_is_written
 from webapp.page import (
     LOOPBACK_HOSTS,
+    WORKSPACE_STYLE,
     Grants,
     SecurityHeaders,
     refuse_cross_origin,
@@ -162,7 +163,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
     are different modules: a surface passes its page in rather than writing
     this module's global, so the two cannot disagree about which page is live.
 
-    The template must carry the six placeholders filled below, and
+    The template must carry the seven placeholders filled below, and
     :func:`~webapp.page.render` raises where it does not.
     """
     app = FastAPI(title="Case sitting", docs_url=None, redoc_url=None, openapi_url=None)
@@ -176,6 +177,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 page,
                 _PAGE_GRANTS,
                 script=script,
+                workspace_style=WORKSPACE_STYLE,
                 token=script_json(session.token),
                 minownlist=script_json(MIN_OWN_LIST),
                 # Read off the one table, so a mark the method adds

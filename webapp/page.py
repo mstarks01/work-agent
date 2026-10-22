@@ -73,6 +73,10 @@ _CLOSED = ("base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'")
 #: Where the local apps' client scripts live, one file per page.
 _STATIC = Path(__file__).resolve().parent / "static"
 
+#: The first-run app's stylesheet. Every local page starts from it, so the
+#: pages share one set of colours, controls and type.
+WORKSPACE_STYLE = (_STATIC / "workspace.css").read_text(encoding="utf-8")
+
 #: What a script file may be called. Callers name a file in code, so this
 #: never sees a request value; it is checked so that it cannot start to.
 _SCRIPT_NAME = re.compile(r"[a-z][a-z_]*\.js")
