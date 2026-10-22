@@ -83,7 +83,8 @@ def test_one_missing_control_groups_four_findings():
     (path,) = [p for p in REPORTS if p.name.startswith("01-")]
     (fix,) = _fixes(_archived(path))
     assert fix.label == (
-        "Add authentication to the connection from storefront API to order service"
+        "Add authentication to the connection initiated by storefront API"
+        " to order service"
     )
     assert sorted(fix.placed) == ["E-01", "R-01", "S-03", "T-02"]
 

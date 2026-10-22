@@ -243,7 +243,7 @@ def test_findings_that_rest_on_one_missing_control_share_a_group(monkeypatch):
     text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
     assert (
         "One shared action addresses 2 findings: Add encryption in transit to"
-        " the connection from Web App to Orders DB. T-01 · I-01"
+        " the connection initiated by Web App to Orders DB. T-01 · I-01"
     ) in text
     assert text.count("Orders change in transit") == 1
 

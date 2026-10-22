@@ -28,10 +28,8 @@ from dataclasses import dataclass
 from analysis_service.assertions import ABSENT, AssertionCatalog, assertion_id
 from analysis_service.claims import Claim, FrameworkAnalysis
 from analysis_service.critic import row_controls
-from analysis_service.open_facts import attribute_words, element_names
+from analysis_service.open_facts import attribute_words, element_names, flow_words
 from analysis_service.system_model import DataFlow, SystemModel
-
-CONFIRMED = "confirmed"
 
 #: A missing control: the subject it is missing on, and the control.
 ControlKey = tuple[str, str]
@@ -86,14 +84,13 @@ def missing_controls(
 
 
 def label_of(key: ControlKey, names: Mapping[str, str], model: SystemModel) -> str:
-    """The control to add, and where: a flow reads as its connection."""
+    """The control to add, and where: a flow reads through :func:`flow_words`."""
     subject, control = key
-    where = names.get(subject, subject)
     element = model.get(subject)
     if isinstance(element, DataFlow):
-        source = names.get(element.source, element.source)
-        destination = names.get(element.destination, element.destination)
-        where = f"the connection from {source} to {destination}"
+        where = flow_words(element, names)
+    else:
+        where = names.get(subject, subject)
     return f"Add {attribute_words(control)} to {where}"
 
 
@@ -107,7 +104,7 @@ def fixes(
     rests: dict[ControlKey, list[str]] = defaultdict(list)
     needs: dict[str, frozenset[ControlKey]] = {}
     for claim in block.claims:
-        if claim.verdict.status != CONFIRMED:
+        if claim.verdict.status != "confirmed":
             continue
         needs[claim.id] = missing_controls(claim, rows)
         for key in needs[claim.id]:

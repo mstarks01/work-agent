@@ -574,3 +574,35 @@ def test_a_url_password_has_one_reader():
 
 def test_each_declared_site_still_reads_a_password():
     assert NOT_THE_PASSWORD_RULE.keys() <= set(_sites(_reads_a_password))
+
+
+def _words_a_connection(node: ast.AST) -> bool:
+    """Whether ``node`` spells a flow as a connection between two elements."""
+    return isinstance(node, ast.Constant) and any(
+        words in str(node.value)
+        for words in (
+            "connection from",
+            "connection initiated by",
+            "connection between",
+        )
+    )
+
+
+def test_a_flow_as_a_place_has_one_wording():
+    """Only ``flow_words`` says how a **Data Flow** reads as a place."""
+    assert _sites(_words_a_connection) == [
+        ("src/analysis_service/open_facts.py", "flow_words")
+    ]
+
+
+def _spells_an_assertion_id(node: ast.AST) -> bool:
+    """Whether ``node`` writes or reads the ``assertion:`` prefix of an ID."""
+    return isinstance(node, ast.Constant) and str(node.value).startswith("assertion:")
+
+
+def test_an_assertion_id_has_one_encoder_and_one_decoder():
+    """Only ``assertion_id`` spells an ID and only ``read_assertion_id`` reads one."""
+    assert _sites(_spells_an_assertion_id) == [
+        ("src/analysis_service/assertions.py", "assertion_id"),
+        ("src/analysis_service/assertions.py", "read_assertion_id"),
+    ]

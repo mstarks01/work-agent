@@ -1168,8 +1168,9 @@ def assertion_id(assertion: Assertion) -> str:
     differently produce two IDs. Matching them is an explicit step whose
     unresolved cases stay visible, and no digest can stand in for it.
 
-    A reader resolves an ID by exact lookup, never by splitting it: a subject
-    ID carries colons of its own, exactly as an **Evidence Reference** does.
+    A reader resolves an ID by exact lookup, or reads its parts through
+    :func:`read_assertion_id`, never by splitting it itself: a subject ID
+    carries colons of its own, exactly as an **Evidence Reference** does.
 
     Raises ``KeyError`` for a predicate the registry does not hold, because
     the value key depends on the predicate's value kind. :func:`catalog_issues`
@@ -1177,6 +1178,19 @@ def assertion_id(assertion: Assertion) -> str:
     """
     parts = identity_parts(assertion)
     return f"assertion:{parts.predicate}~{parts.subject}~{parts.scope}~{parts.value}"
+
+
+def read_assertion_id(identity: str) -> IdentityParts | None:
+    """The four parts an :func:`assertion_id` spells, or ``None`` for any other string.
+
+    The one decoder of the ID's shape, beside the one encoder. ``~`` separates
+    the parts because no predicate name, **Element ID** or scope key holds one,
+    and the value is read last so a value key keeps every character it has.
+    """
+    if not identity.startswith("assertion:"):
+        return None
+    parts = identity.removeprefix("assertion:").split("~", 3)
+    return IdentityParts(*parts) if len(parts) == 4 else None
 
 
 class IdentityParts(NamedTuple):

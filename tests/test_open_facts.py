@@ -237,6 +237,17 @@ def test_an_assertion_the_catalog_does_not_hold_has_no_reference_in_its_label():
     assert label_of(UnknownRef(assertion=identity), {}) == UNWORDED_ASSERTION
 
 
+def test_a_reference_of_another_shape_has_no_reference_in_its_label():
+    """A reference the ID decoder refuses is worded like one the catalog lacks."""
+    from analysis_service.open_facts import UNWORDED_ASSERTION
+
+    catalog, _ = _grant_catalog()
+    for identity in ("assertion:authorization-grant", "ground:anything"):
+        assert label_of(UnknownRef(assertion=identity), {}, None, catalog) == (
+            UNWORDED_ASSERTION
+        )
+
+
 def test_every_predicate_asks_a_question_about_its_subject():
     from analysis_service.assertions import REGISTRY
 
