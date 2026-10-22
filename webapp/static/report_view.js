@@ -293,20 +293,12 @@
   // The static title names no system and no framework. The report names
   // both, so the tab reads the run rather than the template.
   document.title = R.input.system_name + " — report";
-  const fmt = (t) => new Date(t).toISOString().replace("T"," ").replace(".000Z"," UTC");
+  // A time to the second, in UTC.
+  const fmt = (t) => `${new Date(t).toISOString().slice(0, 19).replace("T", " ")} UTC`;
   // The envelope's disclaimer says what the *service* is and how many of its
   // facts anybody checked. Each block carries its own, saying what that
   // framework's claims assert.
   $("disclaimer").textContent = R.disclaimer;
-
-  // "in the model", never "analysed". `elements_analyzed` is the embedded
-  // model's own element count and nothing more: no stage records that an
-  // element was examined, and the coverage block below counts which elements a
-  // draft *cited*, which is a different fact again. No field here supports
-  // the statement that every element was examined.
-  const frameworks = R.analyses.map(b => b.framework).join(", ");
-  $("scope").textContent =
-    `${R.elements_analyzed} elements in the model, under ${frameworks}`;
 
   // ---- Sections -----------------------------------------------------------
   // The page has three sections: the report, its questions, and how it was
@@ -1325,8 +1317,14 @@
       href: `/report/${encodeURIComponent(PARENT_RUN)}` })],
     ["Follow-up run", RESUMED_BY && Object.assign(el("a", null, RESUMED_BY), {
       href: `/report/${encodeURIComponent(RESUMED_BY)}` })],
-    ["Started", fmt(R.job.created_at)],
+    // One time where the report started and finished in the same second.
+    ["Started", fmt(R.job.created_at) !== fmt(R.job.completed_at) && fmt(R.job.created_at)],
     ["Generated", fmt(R.job.completed_at)],
+    // "in the model", never "analysed". `elements_analyzed` is the embedded
+    // model's own element count and nothing more: no stage records that an
+    // element was examined. No field here supports the statement that every
+    // element was examined.
+    ["Elements in the model", String(R.elements_analyzed)],
     ["Frameworks", R.analyses.map(b => `${b.framework} ${b.framework_version}`).join(", ")],
     ["Sources", R.input.sources.map(s => s.label).join(", ")],
     ["Report schema", R.schema_version],
@@ -1941,32 +1939,47 @@
     $("model-gaps").append(el("div", "meta", "The system model states every attribute."));
   }
 
-  // pipeline
-  R.nodes.forEach(n => {
-    const row = el("div","node");
-    row.append(
-      el("b", null, n.node), " ",
-      el("span", "m", n.model ? n.model : "code"), ` · ${n.duration_ms} ms`
-    );
-    if (n.execution_fingerprint) {
-      // The whole value, to copy: sha256 of the requested route, the served
-      // build, the resolved tier sampling, the instruction digest and the
-      // build versions.
-      const fp = el("code", "m fingerprint", n.execution_fingerprint);
-      fp.title = "execution-identity fingerprint";
-      row.append(" · fingerprint ", fp);
-    }
-    $("nodes").append(row);
-  });
+  // The pipeline: a table of the steps that called a model, with each
+  // execution fingerprint shown once with the steps that share it, and the
+  // code steps on one line. The fingerprint is the whole value, to copy:
+  // sha256 of the requested route, the served build, the resolved tier
+  // sampling, the instruction digest and the build versions.
+  const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`;
+  const called = R.nodes.filter(n => n.model);
+  if (called.length) {
+    const table = el("table");
+    const head = el("tr");
+    head.append(el("th", null, "Step"), el("th", null, "Model"), el("th", null, "Time"));
+    table.append(head);
+    called.forEach(n => {
+      const row = el("tr");
+      row.append(cell(n.node), cell(code(n.model)), cell(seconds(n.duration_ms)));
+      table.append(row);
+    });
+    $("nodes").append(table);
+    const shared = new Map();
+    called.filter(n => n.execution_fingerprint).forEach(n =>
+      shared.set(n.execution_fingerprint, [...(shared.get(n.execution_fingerprint) || []), n.node]));
+    shared.forEach((steps, fingerprint) => {
+      const line = el("div", "meta");
+      const value = el("code", "fingerprint", fingerprint);
+      value.title = "execution-identity fingerprint";
+      line.append(steps.length === called.length ? "Fingerprint of every model step: "
+        : `Fingerprint of ${steps.join(", ")}: `, value);
+      $("nodes").append(line);
+    });
+  }
+  const local = R.nodes.filter(n => !n.model);
+  if (local.length) {
+    $("nodes").append(el("div", "meta",
+      `Code steps: ${local.map(n => `${n.node} ${n.duration_ms} ms`).join(" · ")}`));
+  }
   // per-tier resolved sampling (provenance clear block)
   Object.entries(R.sampling || {}).forEach(([tier, params]) => {
     const set = Object.entries(params).filter(([, v]) => v !== null)
       .map(([k, v]) => `${k} = ${v}`).join(", ");
-    const row = el("div","node m");
-    row.append(
-      el("b", null, `tier ${tier}`), ` sampling · ${set} `,
-      el("span", "m", "(others: model default)")
-    );
+    const row = el("div", "meta");
+    row.append(`Tier ${tier} sampling: ${set} `, el("span", "m", "(others: model default)"));
     $("nodes").append(row);
   });
 

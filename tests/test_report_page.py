@@ -277,7 +277,7 @@ def test_about_holds_the_identifiers_the_model_and_the_pipeline():
     parts = run_report_page(two_findings(), search="?view=about")
     assert parts["hidden"].split() == ["report-view", "questions-view"]
     assert parts["disclaimer"].startswith("AI-generated security analysis.")
-    assert "elements in the model" in parts["scope"]
+    assert "Elements in the model" in parts["report-facts"]
     assert "Report IDjob-" in parts["report-facts"]
     assert "Generated" in parts["report-facts"]
 
@@ -748,3 +748,34 @@ def test_about_puts_the_model_first_with_a_table_per_kind():
         assert flow.id not in elements
     crossings = model.boundary_crossings()
     assert parts["crossings-title"] == f"Boundary crossings ({len(crossings)})"
+
+
+def test_the_pipeline_shows_each_fingerprint_once_with_its_steps():
+    """The model steps form a table in seconds, a fingerprint the steps share
+    shows once, and the code steps share one line."""
+    from analysis_service.report import NodeRun
+
+    fingerprint = "f" * 64
+    report = sample_report()
+    report = report.model_copy(
+        update={
+            "nodes": [
+                NodeRun(
+                    node=name,
+                    model="gemini-2.5-pro",
+                    requested_model="vertex_ai/gemini-2.5-pro",
+                    instruction_sha256="a" * 64,
+                    duration_ms=ms,
+                    execution_fingerprint=fingerprint,
+                )
+                for name, ms in (("analyze_a", 14500), ("analyze_b", 3200))
+            ]
+            + [NodeRun(node="assemble", duration_ms=20)]
+        }
+    )
+    nodes = run_report_page(render_report(report, report_state(report)).html)["nodes"]
+    assert "StepModelTime" in nodes
+    assert "analyze_agemini-2.5-pro14.5 s" in nodes
+    assert nodes.count(fingerprint) == 1
+    assert f"Fingerprint of every model step: {fingerprint}" in nodes
+    assert "Code steps: assemble 20 ms" in nodes
