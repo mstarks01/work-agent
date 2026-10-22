@@ -33,8 +33,7 @@ from pathlib import Path
 from typing import Any, get_args
 
 from analysis_service.frameworks.stride.record import DraftThreat
-from analysis_service.system_model import ModelIndex
-from evals.harness.identity import endpoint_form
+from evals.harness.identity import FlowMap, endpoint_subset
 from evals.harness.losses import CaseLosses, Loss
 from evals.harness.reference import (
     RULINGS_FILE,
@@ -90,9 +89,15 @@ def rows(
     scores: Sequence[CaseScore],
     charged: Sequence[CaseLosses],
     produced: Mapping[str, Sequence[DraftThreat]],
+    flows: Mapping[str, FlowMap],
     source: str,
 ) -> list[dict[str, str]]:
-    """One ballot row per missed must-find a free same-lane draft may state."""
+    """One ballot row per missed must-find a free same-lane draft may state.
+
+    ``flows`` is :func:`~evals.harness.reference.flows_by_case` over the
+    sweep's analysed models, the map the scorer read, so a place resolves here
+    as it resolved there.
+    """
     by_case = {case.id: case for case in cases}
     matched = {
         score.case_id: {pair.threat_id for pair in score.matched} for score in scores
@@ -108,7 +113,7 @@ def rows(
             draft = drafts[draft_id]
             if draft.id in matched[case.id] or draft.category != loss.lane:
                 continue
-            if _ruled(case, loss.reference_index, draft):
+            if _ruled(case, loss.reference_index, draft, flows[case.id]):
                 continue
             reference = case.stride_claims()[loss.reference_index]
             ballot.append(
@@ -146,24 +151,27 @@ def _shown(reference: ReferenceThreat) -> dict[str, str]:
     }
 
 
-def _ruled(case: GoldenCase, index: int, draft: DraftThreat) -> bool:
+def _ruled(case: GoldenCase, index: int, draft: DraftThreat, flows: FlowMap) -> bool:
     """Whether a person already ruled on this draft's reading of the claim.
 
     A reading is one action at one place. The action reads through
     :func:`~evals.harness.verbs.same_action`, as the matcher and the vote key
-    read it, and the place through
-    :func:`~evals.harness.identity.endpoint_form`, the identity rule's one
-    spelling of a place.
+    read it. The place reads through
+    :func:`~evals.harness.identity.endpoint_subset` both ways: one place in
+    the identity rule's spelling, with its sibling channels (ADR 0061).
     """
     readings = (
         *case.ruled_readings.get(index, ()),
         *case.refused_readings.get(index, ()),
     )
-    flows = ModelIndex.of(case.model).flow_endpoints
-    place = endpoint_form(draft.affected_element_ids, flows)
     return any(
         same_action(reading.verb, draft.verb)
-        and endpoint_form(reading.affected_element_ids, flows) == place
+        and endpoint_subset(
+            reading.affected_element_ids, draft.affected_element_ids, flows
+        )
+        and endpoint_subset(
+            draft.affected_element_ids, reading.affected_element_ids, flows
+        )
         for reading in readings
     )
 

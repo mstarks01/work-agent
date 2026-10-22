@@ -1479,6 +1479,9 @@ def command_near_misses(args: argparse.Namespace) -> int:
         sweep.scores,
         sweep.losses,
         {case: stride_threats(run.report) for case, run in runs.items()},
+        flows_by_case(
+            cases, {case: run.report.system_model for case, run in runs.items()}
+        ),
         source=path.stem,
     )
     near_misses.write(ballot, Path(args.out))
