@@ -254,6 +254,7 @@ from analysis_service.vendors import (
 )
 from webapp.page import (
     LOOPBACK_HOSTS,
+    WORKSPACE_STYLE,
     Grants,
     RenderedPage,
     SecurityHeaders,
@@ -888,7 +889,7 @@ def render_report(
                 "report_view.js",
             )
         ),
-        workspace_style=_WORKSPACE_STYLE,
+        workspace_style=WORKSPACE_STYLE,
         sidebar=_SIDEBAR,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
@@ -1295,7 +1296,7 @@ def create_app(
                     )
                 ),
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
-                workspace_style=_WORKSPACE_STYLE,
+                workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
                 frameworks=_framework_fields(current.frameworks),
                 questions=_QUESTIONS_FIELD,
@@ -1320,7 +1321,7 @@ def create_app(
                     client_script(name) for name in ("sidebar.js", "settings.js")
                 ),
                 settings=script_json(settings_view(process_env, error)),
-                workspace_style=_WORKSPACE_STYLE,
+                workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
             )
         )
@@ -2069,9 +2070,6 @@ _STYLE = """
 
 _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-8")
 _SETTINGS_PAGE = (Path(__file__).parent / "settings.html").read_text(encoding="utf-8")
-_WORKSPACE_STYLE = (Path(__file__).parent / "static" / "workspace.css").read_text(
-    encoding="utf-8"
-)
 #: The sidebar of every workspace page: the form, Settings and the report.
 #: Static markup, so it takes no escape.
 _SIDEBAR = (Path(__file__).parent / "sidebar.html").read_text(encoding="utf-8")

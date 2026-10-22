@@ -266,58 +266,60 @@ _PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Review</title>
-<style nonce="__CSP_NONCE__">
-:root { color-scheme: light dark; --line:#8884; --dim:#777; }
-* { box-sizing:border-box; }
-body { font:16px/1.55 system-ui,sans-serif; margin:0; display:flex; min-height:100vh; }
-nav { flex:0 0 20rem; border-right:1px solid var(--line); padding:1.4rem 1rem;
-      position:sticky; top:0; height:100vh; display:flex; flex-direction:column;
-      overflow-x:hidden; }
-#cases { flex:1; overflow-y:auto; overflow-x:hidden; list-style:none; padding:0; margin:.7rem 0; }
-main { flex:1; padding:2rem 1.5rem 6rem; max-width:50rem; }
-h1 { font-size:1.1rem; margin:0 0 .2rem; } h2 { font-size:1.2rem; }
-h3 { font-size:1rem; } .sub,.hint { color:var(--dim); } .sub { margin-top:0; }
-button,select,input { font:inherit; } button { padding:.5rem 1rem; border-radius:6px;
-  border:1px solid var(--line); background:#8882; cursor:pointer; }
-button:disabled { opacity:.5; cursor:default; }
-.help-button,.pin button { width:100%; }.pin { border-top:1px solid var(--line); padding-top:.8rem; }
-.row { display:flex; gap:.55rem; align-items:flex-start; width:100%; text-align:left; border:0;
-       border-radius:6px; background:none; padding:.45rem .5rem; color:inherit; }
-button.row:hover,li.current .row { background:#8883; }.label { flex:1; min-width:0; overflow-wrap:anywhere; }
+<style nonce="__CSP_NONCE__"><!--workspace_style-->
+/* The review page on the first-run app's style: its case rail and its cards. */
+body { display:flex; min-height:100vh; }
+nav { flex:0 0 20rem; background:var(--sidebar); border-right:1px solid var(--line);
+      padding:28px 18px; position:sticky; top:0; height:100vh; display:flex;
+      flex-direction:column; overflow-x:hidden; }
+#cases { flex:1; overflow-y:auto; overflow-x:hidden; list-style:none; padding:0; margin:12px 0; }
+main { flex:1; margin:0; padding:36px 36px 6rem; max-width:52rem; }
+h1 { font-size:18px; margin:0 0 4px; } h2 { font-size:19px; } h3 { font-size:16px; }
+.sub { color:var(--muted); margin-top:0; }
+input[type=radio] { width:auto; padding:0; accent-color:var(--accent); }
+.help-button,.pin button { width:100%; }.pin { border-top:1px solid var(--line); padding-top:12px; }
+.row { display:flex; gap:10px; align-items:flex-start; justify-content:flex-start; width:100%;
+       min-height:0; text-align:left; border:0; border-radius:7px; background:none;
+       padding:10px 12px; color:var(--text); }
+button.row:hover,li.current .row { background:var(--soft); color:var(--accent); }
+.label { flex:1; min-width:0; overflow-wrap:anywhere; }
 .state-icon { flex:0 0 1rem; width:1rem; text-align:center; font-weight:700; }
-.state-icon.complete { color:#2f9e5e; }.state-icon.error { color:#c34a3c; }
-.reason { display:block; color:var(--dim); font-size:.85rem; margin-top:.15rem; overflow-wrap:anywhere; }
-.hidden { display:none !important; }.note { background:#8881; padding:.8rem 1rem; border-radius:6px; }
-.guide-panel { border:1px solid var(--line); border-radius:8px; padding:.8rem 1rem; margin-bottom:1.5rem; background:#8881; }
-.example { margin:.65rem 0; padding-left:.8rem; border-left:2px solid var(--line); }.why { color:var(--dim); font-size:.9rem; }
-header { display:flex; gap:1rem; align-items:baseline; justify-content:space-between; } header h2 { margin:0; }
-.walk { display:flex; gap:.5rem; align-items:center; }.walk.bottom { margin-top:2rem; justify-content:flex-end; border-top:1px solid var(--line); padding-top:1rem; }
-.progress { color:var(--dim); font-size:.85rem; } section { border-top:1px solid var(--line); margin-top:2rem; padding-top:1rem; }
-textarea { width:100%; min-height:9rem; font:inherit; padding:.6rem; border:1px solid var(--line); border-radius:6px; }
-pre { background:#8881; padding:1rem; overflow-x:auto; white-space:pre-wrap; border-radius:6px; font-size:.88rem; }
-.card { border:1px solid var(--line); border-radius:10px; background:#8881; padding:.9rem 1.1rem; margin:0 0 .8rem; }
-.head { display:flex; gap:.55rem; align-items:baseline; flex-wrap:wrap; }.head h4 { margin:0; flex:1; }
-.num,.id { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.82rem; color:var(--dim); }
-.verbatim { background:none; border-left:2px solid var(--line); border-radius:0; padding:0 0 0 1rem; font:inherit; }
-.scroll { overflow-x:auto; } table { border-collapse:collapse; width:100%; font-size:.84rem; }
-th,td { text-align:left; padding:.35rem .6rem; border-bottom:1px solid var(--line); } th { color:var(--dim); }
-ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }
-.fields { list-style:none; padding:0; font-size:.85rem; }.fields li { margin:.35rem 0; }
+.state-icon.complete { color:var(--accent); }.state-icon.error { color:var(--error); }
+.reason { display:block; color:var(--muted); font-size:13px; font-weight:400; margin-top:3px; overflow-wrap:anywhere; }
+.hidden { display:none !important; }.note { background:var(--sidebar); padding:12px 16px; border-radius:7px; }
+.guide-panel { border:1px solid var(--line); border-radius:18px; padding:16px 20px; margin-bottom:24px;
+               background:var(--canvas); box-shadow:0 1px 3px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.05); }
+.example { margin:10px 0; padding-left:12px; border-left:2px solid var(--line); }.why { color:var(--muted); font-size:14px; }
+header { display:flex; gap:16px; align-items:baseline; justify-content:space-between; } header h2 { margin:0; }
+.walk { display:flex; gap:8px; align-items:center; }.walk.bottom { margin-top:32px; justify-content:flex-end; border-top:1px solid var(--line); padding-top:16px; }
+.progress { color:var(--muted); font-size:13px; } section { border-top:1px solid var(--line); margin-top:32px; padding-top:16px; }
+textarea { min-height:9rem; }
+pre { background:var(--sidebar); padding:16px; overflow-x:auto; white-space:pre-wrap; border-radius:7px; font-size:14px; }
+.card { border:1px solid var(--line); border-radius:12px; background:var(--canvas); padding:14px 18px; margin:0 0 12px;
+        box-shadow:0 1px 3px rgba(0,0,0,.04); }
+.head { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }.head h4 { margin:0; flex:1; }
+.num,.id { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; color:var(--muted); }
+.verbatim { background:none; border-left:2px solid var(--line); border-radius:0; padding:0 0 0 16px; font:inherit; }
+.scroll { overflow-x:auto; } table { border-collapse:collapse; width:100%; font-size:13px; }
+th,td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); } th { color:var(--muted); }
+ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid var(--accent); }
+.fields { list-style:none; padding:0; font-size:14px; }.fields li { margin:6px 0; }
 /* A field label and an element id both read as the report's rounded boxes. */
 .fields .lbl { display:inline-block; border:1px solid var(--line); border-radius:999px;
-  padding:1px .55rem; margin-right:.35rem; background:#8881; color:var(--dim);
-  text-transform:uppercase; letter-spacing:.05em; font-size:.68rem; font-weight:600; }
-.fields code.id { background:#8881; border:1px solid var(--line); border-radius:6px;
-  padding:1px .4rem; }
-.mark { display:flex; gap:.6rem; align-items:baseline; margin-top:.8rem; padding-top:.7rem; border-top:1px solid var(--line); }
-.aside { color:var(--dim); font-size:.85rem; }
-details.standard { margin:.3rem 0 .1rem; font-size:.88rem; } details.standard summary { cursor:pointer; color:var(--dim); font-weight:600; }
-.quote { margin:.4rem 0 .2rem; padding-left:.8rem; border-left:2px solid var(--line); }.framework-picker { border:0; padding:0; margin:1rem 0; }
-.framework-picker label { margin-right:1rem; } details.framework { border:1px solid var(--line); border-radius:8px; padding:.75rem 1rem; margin:.8rem 0; }
-.save-status { margin-left:.7rem; color:var(--dim); }.line { display:flex; justify-content:space-between; gap:1rem; padding:.5rem 0; }
-.attribution { border:1px solid var(--line); border-radius:8px; padding:.8rem 1rem; margin:1rem 0; }.attribution label { display:block; margin:.4rem 0; }
-.text-input { width:min(24rem,100%); padding:.5rem .6rem; border:1px solid var(--line); border-radius:6px; }
-.file-preview { border:1px solid var(--line); border-radius:8px; padding:1rem; margin:1rem 0; }.file-preview h3 { margin-top:0; }.file-preview pre { max-height:40vh; overflow:auto; }
+  padding:1px 9px; margin-right:6px; background:var(--sidebar); color:var(--muted);
+  text-transform:uppercase; letter-spacing:.05em; font-size:11px; font-weight:600; }
+.fields code.id { background:var(--sidebar); border:1px solid var(--line); border-radius:6px;
+  padding:1px 6px; }
+.mark { display:flex; gap:10px; align-items:baseline; margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
+.mark select { width:auto; }
+.aside { color:var(--muted); font-size:13px; }
+details.standard { margin:5px 0 2px; font-size:14px; } details.standard summary { font-weight:600; }
+.quote { margin:6px 0 3px; padding-left:12px; border-left:2px solid var(--line); }.framework-picker { border:0; padding:0; margin:16px 0; }
+.framework-picker label { margin-right:16px; } details.framework { border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:12px 0; }
+.save-status { margin-left:12px; color:var(--muted); }.line { display:flex; justify-content:space-between; gap:16px; padding:8px 0; }
+.attribution { border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:16px 0; }.attribution label { display:block; margin:6px 0; }
+.text-input { width:min(24rem,100%); }
+.file-preview { border:1px solid var(--line); border-radius:12px; padding:16px; margin:16px 0; }.file-preview h3 { margin-top:0; }.file-preview pre { max-height:40vh; overflow:auto; }
 #thanks { font-weight:600; }.readonly-badge { font-weight:600; }
 </style></head><body>
 <nav>
@@ -367,7 +369,7 @@ details.standard { margin:.3rem 0 .1rem; font-size:.88rem; } details.standard su
 <div id="empty">
   <h2>Start a review</h2>
   <p class="note">Begin with the first available case or choose any case from the left. Your independent assessment comes first; model findings remain hidden until you save it.</p>
-  <p><button id="start">Begin review</button></p>
+  <p><button class="primary" id="start">Begin review</button></p>
 </div>
 
 <article id="case" class="hidden">
@@ -377,7 +379,7 @@ details.standard { margin:.3rem 0 .1rem; font-size:.88rem; } details.standard su
 <section id="one"><h2>Part 1 — your independent review</h2>
 <p class="note">Before seeing any model findings, write the security concerns or unanswered questions you notice in the system description, one per line. <b>After you save and reveal the model findings, this list is locked.</b> Resetting clears Part 2 answers but does not allow this independent first pass to be changed.</p>
 <textarea id="own" placeholder="one concern or question per line"></textarea>
-<p><button id="lock">Save and show model findings</button><span id="ownHint" class="save-status"></span></p></section>
+<p><button class="primary" id="lock">Save and show model findings</button><span id="ownHint" class="save-status"></span></p></section>
 <section id="placeholder"><h2>Part 2 — compare with the recorded findings</h2><p class="note">Model findings stay hidden until your independent list is saved.</p></section>
 <section id="two" class="hidden"><h2>Part 2 — compare with the recorded findings</h2>
 <p class="note">These findings were previously produced by an analysis agent for this same case. Not every framework applies to every case, and only reference sets carried by this case are shown; absence alone does not establish that a framework is inapplicable. Answer every finding in every set: the record waits until none is left unmarked, and <b>Unsure</b> is a real answer for one you cannot judge. Collapse a framework to work through one set at a time.</p>
@@ -386,7 +388,7 @@ details.standard { margin:.3rem 0 .1rem; font-size:.88rem; } details.standard su
 <textarea id="missing" placeholder="one potentially missed issue per line"></textarea>
 <h2>Notes</h2><p id="markCounts" class="note"></p><p class="hint">Counts are calculated automatically. Use notes only for context the structured choices do not capture.</p>
 <textarea id="notes" placeholder="optional context or explanation"></textarea>
-<p><button id="finish" disabled>Record review</button><span id="saveStatus" class="save-status" role="status"></span></p><p id="finishHint" class="hint" role="status"></p>
+<p><button class="primary" id="finish" disabled>Record review</button><span id="saveStatus" class="save-status" role="status"></span></p><p id="finishHint" class="hint" role="status"></p>
 <p><button id="resetReview" type="button">Reset review answers</button></p><p class="hint">Reset clears Part 2 marks, missed issues, notes, and any recorded result for this case. Your independent Part 1 list remains locked because the model findings have already been revealed.</p>
 </section>
 <section id="done" class="hidden"><h2 id="doneTitle">Recorded</h2><p id="summary" class="note"></p><p class="note">This case is recorded locally. Continue to the next case when you are ready. At the end you can keep the results local or choose to contribute them.</p></section>
@@ -408,7 +410,7 @@ details.standard { margin:.3rem 0 .1rem; font-size:.88rem; } details.standard su
 <p>Contribution sends one structured JSON review file in a pull request. The file contains your independent list, marks, missed issues, notes, and digests of the case material you reviewed. The app uses an existing GitHub CLI login when available; otherwise it prepares the same single file for GitHub's browser flow. It never asks for your GitHub password or token.</p>
 <fieldset class="attribution"><legend>Reviewer attribution</legend><label><input type="radio" name="reviewerAttribution" value="anonymous" checked> Anonymous / on behalf of someone else</label><label><input type="radio" name="reviewerAttribution" value="self"> Myself</label><p class="hint">Anonymous hides reviewer attribution, not the GitHub account that opens the pull request.</p></fieldset>
 <div id="browserIdentity" class="hidden"><label for="githubAuthor"><b>GitHub username for the pull request</b></label><br><input id="githubAuthor" class="text-input" autocomplete="username" spellcheck="false"><p class="hint">CI requires this name to match the GitHub account that opens the pull request.</p></div>
-<p><button id="showFiles">Show files</button> <button id="submit">Contribute</button><span id="contributeStatus" class="save-status" role="status"></span></p>
+<p><button id="showFiles">Show files</button> <button class="primary" id="submit">Contribute</button><span id="contributeStatus" class="save-status" role="status"></span></p>
 <pre id="result" class="hidden"></pre><p id="thanks" class="hidden">Thank you for contributing this review.</p>
 <div id="browserSteps" class="note hidden"><p><b>Your review is ready to publish.</b></p><p>The link below opens GitHub with the file and its name already filled in. Sign in if you need to. GitHub shows one of two buttons. An account without write access presses <b>Propose changes</b>, and GitHub opens the pull request. An account with write access presses <b>Commit changes</b> and then chooses <b>Create a new branch for this commit and start a pull request</b>, because the default there commits straight to main. CI validates the review before it can merge.</p><p><a id="contributeLink" href="#" target="_blank" rel="noopener">Open the pull request on GitHub</a></p><p class="sub">A copy has also been downloaded, in case you would rather upload it by hand.</p></div>
 <div id="uploadSteps" class="note hidden"><p><b>Your review is ready to publish, and it is too long for GitHub's editor link.</b></p><p>The file has been downloaded. The link below opens GitHub's upload page at the folder it belongs in. Sign in if you need to, drop the downloaded file onto the page, and keep its name exactly as downloaded. GitHub then shows one of two buttons. An account without write access presses <b>Propose changes</b>, and GitHub opens the pull request. An account with write access presses <b>Commit changes</b> and then chooses <b>Create a new branch for this commit and start a pull request</b>, because the default there commits straight to main. CI validates the review before it can merge.</p><p><a id="uploadLink" href="#" target="_blank" rel="noopener">Open the upload page on GitHub</a></p></div>
