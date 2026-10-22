@@ -23,7 +23,7 @@ body {
 [hidden] {
   display:none!important
 }
-.sr-only {
+.sr-only,.sidebar-collapsed .nav-label {
   position:absolute;
   width:1px;
   height:1px;
@@ -214,7 +214,7 @@ small {
 .sidebar-collapsed .sidebar-head {
   flex-direction:column
 }
-.sidebar-collapsed .sidebar nav,.sidebar-collapsed .recent {
+.sidebar-collapsed .recent {
   display:none
 }
 .sidebar-collapsed .sidebar-toggle .collapse-icon {
@@ -228,7 +228,9 @@ small {
   gap:8px
 }
 .sidebar nav>* {
-  display:block;
+  display:flex;
+  align-items:center;
+  gap:10px;
   text-align:left;
   padding:10px 12px;
   border:0;
@@ -237,6 +239,15 @@ small {
   text-decoration:none;
   border-radius:7px;
   background:transparent
+}
+.nav-icon {
+  width:20px;
+  height:20px;
+  fill:currentColor;
+  flex:none
+}
+.sidebar-collapsed .sidebar nav>* {
+  justify-content:center
 }
 .sidebar nav>*:hover,.sidebar nav>*[aria-current=page] {
   background:var(--soft);
@@ -859,6 +870,9 @@ code {
   }
   .sidebar nav>.new-analysis {
     margin:0
+  }
+  .workspace:not(.sidebar-collapsed) .nav-icon {
+    display:none
   }
   .recent {
     display:none

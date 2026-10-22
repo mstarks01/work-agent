@@ -17,6 +17,11 @@
     const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
     toggle.setAttribute("aria-label", label);
     toggle.title = label;
+    // A collapsed link shows only its icon, so its title names it on hover.
+    document.querySelectorAll("#sidebar-navigation a").forEach((link) => {
+      if (collapsed) link.title = link.textContent;
+      else link.removeAttribute("title");
+    });
   };
 
   try {
