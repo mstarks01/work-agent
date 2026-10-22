@@ -47,13 +47,18 @@ from analysis_service.graph import (
     held_assertions,
 )
 from analysis_service.report import Report
-from analysis_service.system_model import ModelIndex, SystemModel
+from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
 from evals.harness.bundle import finished_file, stride_threats
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
-from evals.harness.reference import GoldenCase, development_cases, load_corpus
+from evals.harness.reference import (
+    GoldenCase,
+    development_cases,
+    flows_by_case,
+    load_corpus,
+)
 from evals.harness.scorer import score_case
 
 FRAMEWORK: FrameworkName = "stride"
@@ -77,10 +82,10 @@ class Replayed:
 def _matched(
     case: GoldenCase,
     produced: Sequence[DraftThreat],
-    model: SystemModel | None = None,
+    analysed: SystemModel,
 ) -> frozenset[int]:
-    flows = ModelIndex.of(case.model if model is None else model).flow_endpoints
-    score = score_case(case, produced, SubsetVerbIdentity({case.id: flows}), Ledger())
+    flows = flows_by_case([case], {case.id: analysed})
+    score = score_case(case, produced, SubsetVerbIdentity(flows), Ledger())
     return frozenset(pair.reference_index for pair in score.matched)
 
 
@@ -129,9 +134,9 @@ def replay_case(
     references = case.stride_claims()
     return Replayed(
         case=case.id,
-        archived=_matched(case, stride_threats(report)),
-        lower=_matched(case, kept),
-        upper=_matched(case, [*kept, *unruled]),
+        archived=_matched(case, stride_threats(report), report.system_model),
+        lower=_matched(case, kept, report.system_model),
+        upper=_matched(case, [*kept, *unruled], report.system_model),
         must_find=frozenset(
             index for index, reference in enumerate(references) if reference.must_find
         ),

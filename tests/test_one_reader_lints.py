@@ -186,6 +186,19 @@ def test_a_case_file_is_read_through_finished_file():
     )
 
 
+def test_a_claim_matcher_reads_the_flows_flows_by_case_builds():
+    """No function builds a ``SubsetVerbIdentity`` beside a ``flow_endpoints`` map.
+
+    ``flows_by_case`` decides which model resolves a cited flow: the blessed
+    model, with the run's analysed model filling each gap (#949). A map read
+    beside the matcher resolves an end-to-end claim against one model alone.
+    """
+    matchers = set(_sites(lambda node: _calls(node, "SubsetVerbIdentity")))
+    inline = set(_sites(lambda node: _is_attribute(node, "flow_endpoints")))
+    assert matchers
+    assert matchers & inline == set()
+
+
 def test_a_failed_case_has_one_reader():
     """Only ``_failed_cases`` reads the keys that mark a case as failed."""
     keys = {"run_failure", "grounds_failure"}
