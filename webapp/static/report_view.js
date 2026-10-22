@@ -44,15 +44,15 @@
   const EARLIER_LINKS = EARLIER.links || [];
   // The answers a follow-up question starts from: a facet answer with facets
   // left out, which the question asks again. Keyed by the fact's key.
-  const RETAINED = new Map((EARLIER.retained || []).map(a => [JSON.stringify(a.key), a]));
+  const RETAINED = new Map((EARLIER.retained || []).map(a => [questionKey(a.key), a]));
   // The follow-up's saved draft (ADR 0070): answers saved in batches that no
   // run has read yet. Every editor starts from its draft answer.
   const DRAFT = EARLIER.draft || { links: [], facts: [] };
-  const DRAFT_FACTS = new Map(DRAFT.facts.map(a => [JSON.stringify(a.key), a]));
+  const DRAFT_FACTS = new Map(DRAFT.facts.map(a => [questionKey(a.key), a]));
   const DRAFT_LINKS = new Map(DRAFT.links.map(a => [a.principal, a.element]));
   // An answer to start an editor from: the draft's, over a kept answer's.
   const startFrom = (kept, key) => {
-    const drafted = DRAFT_FACTS.get(JSON.stringify(key));
+    const drafted = DRAFT_FACTS.get(questionKey(key));
     if (!drafted) return kept || null;
     if (!drafted.facets) return drafted;
     return { ...drafted, facets: { ...((kept && kept.facets) || {}), ...drafted.facets } };
@@ -473,7 +473,7 @@
       const list = el("ul");
       waits.forEach(w => {
         const item = el("li");
-        const asked = ASKS && QUESTION_ROWS.has(JSON.stringify(w.key));
+        const asked = ASKS && QUESTION_ROWS.has(questionKey(w.key));
         if (asked) {
           const go = el("a", null, w.label);
           go.href = `?view=questions`;
@@ -851,7 +851,7 @@
   // The answers a row starts from: the draft's, over a kept answer's.
   const startOf = (row) => (row.kind === "link"
     ? (DRAFT_LINKS.has(row.q.principal) ? { principal: row.q.principal, element: DRAFT_LINKS.get(row.q.principal) } : null)
-    : startFrom(RETAINED.get(JSON.stringify(row.q.key)), row.q.key));
+    : startFrom(RETAINED.get(questionKey(row.q.key)), row.q.key));
 
   // Select one group of the list: its box shows, open, and every other box
   // hides. The index marks it.
@@ -883,7 +883,7 @@
   // A link from a finding to a question: the question's group, open, with
   // the focus on its first input.
   const goToQuestion = (key) => {
-    const row = QUESTION_ROWS.get(JSON.stringify(key));
+    const row = QUESTION_ROWS.get(questionKey(key));
     if (!row) return;
     showSection("questions");
     selectGroup(row.box.node);
@@ -995,7 +995,7 @@
         reopen: true,
         onEdit: showState,
         notes: (row) => {
-          const a = answers.find(each => JSON.stringify(each.key) === JSON.stringify(row.q.key));
+          const a = answers.find(each => questionKey(each.key) === questionKey(row.q.key));
           return a && a.corrected ? [el("div", "meta", "Corrected after this report")] : [];
         },
       });
@@ -1048,7 +1048,7 @@
         q: earlierFact(a),
         kind: "fact",
         saved: startFrom(a.answer, a.key),
-        compact: !DRAFT_FACTS.has(JSON.stringify(a.key)),
+        compact: !DRAFT_FACTS.has(questionKey(a.key)),
       })),
     ].map(entry => ({ ...entry, saved: entry.saved || startOf(entry) }));
 
@@ -1081,7 +1081,7 @@
       if (!waitsOn.has(finding)) waitsOn.set(finding, []);
       waitsOn.get(finding).push(index);
     }));
-    const factRow = index => QUESTION_ROWS.get(JSON.stringify(FACT_QUESTIONS[index].key));
+    const factRow = index => QUESTION_ROWS.get(questionKey(FACT_QUESTIONS[index].key));
     const needOf = (index, finding) => (FACT_QUESTIONS[index].needs || {})[finding] || [];
     const knownFor = (index, facets) => {
       const row = factRow(index);
@@ -1167,7 +1167,7 @@
       edited.forEach(({ row, answer }) => {
         row.start = row.read();
         if (row.kind === "link") DRAFT_LINKS.set(answer.principal, answer.element);
-        else DRAFT_FACTS.set(JSON.stringify(answer.key), answer);
+        else DRAFT_FACTS.set(questionKey(answer.key), answer);
       });
     };
     const setBusy = (on) => {
@@ -1904,7 +1904,7 @@
       g.elements.forEach((e, i) => {
         if (i) where.append(", ");
         where.append(ref(e.id));
-        if (QUESTION_ROWS.has(JSON.stringify(e.key)) && ASKS) {
+        if (QUESTION_ROWS.has(questionKey(e.key)) && ASKS) {
           const answer = el("a", null, "Answer");
           answer.href = "?view=questions";
           answer.addEventListener("click", (event) => {

@@ -27,7 +27,6 @@ const questionList = ({
   notes = () => [],
   extras = () => [],
 }) => {
-  const keyOf = (key) => JSON.stringify(key);
   const button = (text, onClick, className = "quiet") => {
     const control = document.createElement("button");
     control.type = "button";
@@ -210,7 +209,7 @@ const questionList = ({
     const selects = q.facets.map((facet, column) => {
       const before = (prefill && prefill.facets && prefill.facets[facet.id]) || "";
       const select = facetSelect(reopen || !before ? "(leave unanswered)" : null, before, reopen);
-      select.dataset.key = keyOf(q.key);
+      select.dataset.key = questionKey(q.key);
       select.dataset.facet = facet.id;
       select.addEventListener("change", (event) => edited(row, event));
       grid.columns[column].push(select);
@@ -470,10 +469,12 @@ const questionList = ({
 };
 
 // Two rules both pages read, so neither keeps its own copy.
-// A row's key as a page's maps hold it: a link question's key is its own
-// `key`, every other question's the JSON of its key tuple. One reader, so a
+// A question's key as every page map holds it: the JSON of the key the
+// service serves, for a link row and a fact row alike. One reader, so a
 // finding's link and the question it reaches agree on every page.
-const rowKey = (row) => (row.kind === "link" ? row.q.key : JSON.stringify(row.q.key));
+const questionKey = (key) => JSON.stringify(key);
+// A row's key is its question's key.
+const rowKey = (row) => questionKey(row.q.key);
 // Two answers are one answer when the fields the submitter gives agree. The
 // service serves every field, with its defaults and with the value it
 // writes from a facets answer; a page builds only the fields given.

@@ -233,7 +233,6 @@
   // option is saved at once. 400 ms is the initial target #1632 sets; no
   // measurement of typing chose it.
   const AUTOSAVE_DELAY = 400;
-  const keyOf = (key) => JSON.stringify(key);
   // `rowKey` and `sameAnswer` are question_list.js's, shared with the report page.
   const say = (node, text) => {
     if (node) node.textContent = text;
@@ -447,9 +446,9 @@
   // What the service holds for each answered question, by key string.
   const answersOf = (data) => {
     const held = new Map();
-    for (const a of data.answered_early || []) held.set(keyOf(a.key), a.answer);
+    for (const a of data.answered_early || []) held.set(questionKey(a.key), a.answer);
     for (const a of data.answered_links || []) {
-      held.set(a.key, { principal: a.principal, element: a.answer.element });
+      held.set(questionKey(a.key), { principal: a.principal, element: a.answer.element });
     }
     return held;
   };
@@ -508,7 +507,7 @@
   // the other question the same way in one save: "no" to the part under a
   // "no", or "yes" to the ancestor over a "yes". The service decides again.
   const offerCorrection = ({ part, ancestor }) => {
-    const [partKey, ancestorKey] = [keyOf(part), keyOf(ancestor)];
+    const [partKey, ancestorKey] = [questionKey(part), questionKey(ancestor)];
     const mine = [partKey, ancestorKey].find((key) => edits.has(key) && edits.get(key).refused);
     const own = mine && edits.get(mine);
     if (!own || !own.answer) return;
@@ -541,7 +540,7 @@
       ...(view.skipped_early || []),
       ...(view.early_held_back || []),
       ...(view.early_below_floor || []),
-    ].find((q) => keyOf(q.key) === key) || null;
+    ].find((q) => questionKey(q.key) === key) || null;
   // "Save now": every editor's current value, and every refused edit again.
   saveButton.addEventListener("click", () => {
     collectEdits();
@@ -758,9 +757,9 @@
   const announce = (before, data) => {
     if (!before) return;
     if (before !== data) {
-      const was = new Set(before.early_questions.map((q) => keyOf(q.key)));
-      const now = new Set(data.early_questions.map((q) => keyOf(q.key)));
-      const moot = (data.early_unnecessary || []).filter((q) => was.has(keyOf(q.key))).length;
+      const was = new Set(before.early_questions.map((q) => questionKey(q.key)));
+      const now = new Set(data.early_questions.map((q) => questionKey(q.key)));
+      const moot = (data.early_unnecessary || []).filter((q) => was.has(questionKey(q.key))).length;
       const added = [...now].filter((key) => !was.has(key)).length;
       noted = [];
       if (moot) noted.push(`${counted(moot, "question is", "questions are")} no longer needed`);
@@ -966,8 +965,8 @@
     // A question answered in part and skipped has its one editor under
     // "Skipped for now", so the page cannot send two answers to one key.
     const setAside = new Set([
-      ...(data.skipped_links || []).map((q) => q.key),
-      ...(data.skipped_early || []).map((q) => keyOf(q.key)),
+      ...(data.skipped_links || []).map((q) => questionKey(q.key)),
+      ...(data.skipped_early || []).map((q) => questionKey(q.key)),
     ]);
     const answered = outside([
       ...(data.answered_links || []).map((a) => ({ q: a, kind: "link", before: { principal: a.principal, element: a.answer.element } })),
@@ -976,11 +975,11 @@
     redraw(earlierBox, (n) => `Your answers (${n})`, answered);
     const skipped = outside([
       ...(data.skipped_links || []).map((q) => ({ q, kind: "link", before: null })),
-      ...(data.skipped_early || []).map((q) => ({ q, kind: "fact", before: held.get(keyOf(q.key)) || null })),
+      ...(data.skipped_early || []).map((q) => ({ q, kind: "fact", before: held.get(questionKey(q.key)) || null })),
     ]);
     redraw(skippedBox, (n) => `Skipped for now (${n}, optional)`, skipped);
     const more = outside([...(data.early_held_back || []), ...(data.early_below_floor || [])]
-      .map((q) => ({ q, kind: "fact", before: held.get(keyOf(q.key)) || null })));
+      .map((q) => ({ q, kind: "fact", before: held.get(questionKey(q.key)) || null })));
     redraw(moreBox, (n) => `More questions (${n}, optional, not in the list)`, more);
     if (!moreBox.hidden) {
       const moreHint = document.createElement("p");
