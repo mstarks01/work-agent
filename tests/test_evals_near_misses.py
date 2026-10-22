@@ -11,9 +11,16 @@ from types import SimpleNamespace
 
 import pytest
 
+from analysis_service.system_model import SystemModel, normalize_element_ids
 from evals.harness import near_misses
 from evals.harness.losses import CaseLosses, Loss
-from evals.harness.reference import RULINGS_FILE, CorpusError, Reading, load_case
+from evals.harness.reference import (
+    RULINGS_FILE,
+    CorpusError,
+    Reading,
+    flows_by_case,
+    load_case,
+)
 from tests.eval_factories import draft_threat
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
@@ -26,7 +33,7 @@ def corpus(tmp_path):
     return tmp_path
 
 
-def _ballot(case, loss, draft, matched=()):
+def _ballot(case, loss, draft, matched=(), analysed=None):
     score = SimpleNamespace(
         case_id=case.id,
         matched=[SimpleNamespace(threat_id=threat_id) for threat_id in matched],
@@ -36,6 +43,7 @@ def _ballot(case, loss, draft, matched=()):
         [score],
         [CaseLosses(case=case.id, losses=(loss,))],
         {case.id: [draft]},
+        flows_by_case([case], {case.id: analysed} if analysed else {}),
         source="sweep",
     )
 
@@ -142,6 +150,71 @@ def test_a_ruled_reading_of_one_action_is_not_asked_again():
 
     assert _ballot(case, loss, draft)
     assert _ballot(ruled, loss, draft) == []
+
+
+def _place_loss(case, index, draft):
+    return Loss(
+        reference_index=index,
+        lane=case.stride_claims()[index].lane,
+        must_find=True,
+        cause="place",
+        reference_verb=case.stride_claims()[index].verb,
+        displaced_draft_id=draft.id,
+        displaced_standing="pooled",
+    )
+
+
+def test_a_reading_ruled_on_a_flow_the_extraction_renamed_is_not_asked_again():
+    """The draft cites the extraction's name for the flow the ruling cites, and
+    the ballot resolves it through the scorer's map (``flows_by_case``)."""
+    case = load_case(CORPUS_DIR / CASE)
+    flow = case.model.data_flows[0]
+    raw = case.model.model_dump(mode="json")
+    raw["data_flows"][0]["name"] = f"{raw['data_flows'][0]['name']} differently put"
+    analysed = normalize_element_ids(SystemModel.model_validate(raw))
+    renamed = next(
+        other.id
+        for other in analysed.data_flows
+        if (other.source, other.destination) == (flow.source, flow.destination)
+    )
+    assert renamed != flow.id
+    ruled = replace(
+        case,
+        ruled_readings={3: (Reading(verb="alter", affected_element_ids=(flow.id,)),)},
+    )
+    draft = draft_threat(
+        1, "tampering", "A record is changed", element_ids=(renamed,), verb="alter"
+    )
+    loss = _place_loss(ruled, 3, draft)
+
+    assert _ballot(ruled, loss, draft)
+    assert _ballot(ruled, loss, draft, analysed=analysed) == []
+
+
+def test_a_reading_ruled_on_one_sibling_flow_does_not_answer_the_other():
+    """ADR 0061: two flows between one pair of elements are two places, so a
+    ruling on the REST requests does not answer a draft on the live status."""
+    case = load_case(CORPUS_DIR / "13-dispatch-control-plane")
+    requests = "flow:process:dispatch-console>process:dispatch-api>dispatch-requests"
+    status = "flow:process:dispatch-console>process:dispatch-api>live-job-status"
+    lane = case.stride_claims()[0].lane
+    verb = case.stride_claims()[0].verb
+    draft = draft_threat(
+        1, lane, "The status feed is read", element_ids=(status,), verb=verb
+    )
+    loss = _place_loss(case, 0, draft)
+
+    on_requests = replace(
+        case,
+        refused_readings={0: (Reading(verb=verb, affected_element_ids=(requests,)),)},
+    )
+    on_status = replace(
+        case,
+        refused_readings={0: (Reading(verb=verb, affected_element_ids=(status,)),)},
+    )
+
+    assert _ballot(on_requests, loss, draft)
+    assert _ballot(on_status, loss, draft) == []
 
 
 def _write(path, rows, columns):
