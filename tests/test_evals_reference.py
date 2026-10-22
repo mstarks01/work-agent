@@ -21,7 +21,7 @@ from analysis_service.resilience import MAX_SOURCE_BYTES_VAR
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel, normalize_element_ids
 from evals import verify_corpus
-from evals.harness.identity import endpoint_form
+from evals.harness.identity import endpoint_form, endpoint_subset
 from evals.harness.reference import (
     MAX_CORPUS_SOURCE_BYTES,
     CaseMetadata,
@@ -332,6 +332,33 @@ class TestTheFlowMapServesTheCitationsItIsAskedAbout:
         # And without it, the candidate's citation stays opaque and cannot match.
         bare = flows_by_case(corpus)[case.id]
         assert endpoint_form([renamed_id], bare) == frozenset({renamed_id})
+
+    def test_a_renamed_flow_is_one_place_with_the_flow_it_names(self):
+        """ADR 0099: the rename is not a sibling of the blessed flow, so the
+        place half of the identity rule matches a citation of one to the other."""
+        corpus = load_corpus(CORPUS_DIR)
+        case = corpus[0]
+        analysed, blessed_id, renamed_id = self._renamed(case)
+
+        flows = flows_by_case(corpus, {case.id: analysed})[case.id]
+
+        assert endpoint_subset([blessed_id], [renamed_id], flows)
+
+    def test_two_blessed_siblings_stay_two_places(self):
+        """ADR 0061 still holds where the corpus itself draws two flows."""
+        corpus = load_corpus(CORPUS_DIR)
+        case, first, second = next(
+            (case, one.id, other.id)
+            for case in corpus
+            for one in case.model.data_flows
+            for other in case.model.data_flows
+            if one.id < other.id
+            and {one.source, one.destination} == {other.source, other.destination}
+        )
+
+        flows = flows_by_case(corpus, {case.id: case.model})[case.id]
+
+        assert not endpoint_subset([first], [second], flows)
 
     def test_a_blessed_entry_wins_a_shared_id(self):
         """A collision resolves the reference against its own graph, never the

@@ -65,6 +65,7 @@ from analysis_service.claims import (
     SeverityLevel,
     derive_severity_level,
 )
+from analysis_service.critic import sibling_flows
 from analysis_service.deployment import ConfigPaths
 from analysis_service.frameworks.asvs.record import AsvsChapter
 from analysis_service.frameworks.stride.record import LANES_OF_VERB, StrideCategory
@@ -77,8 +78,9 @@ from analysis_service.sources import (
     SourceKind,
     clean_system_name,
 )
-from analysis_service.system_model import DataFlow, SystemModel
+from analysis_service.system_model import SystemModel
 from analysis_service.validation import parse_and_validate
+from evals.harness.identity import CaseFlows
 from evals.harness.verbs import check_verb
 
 # Two tiers, because one weight makes every threshold wrong. ``must-find``
@@ -1080,7 +1082,7 @@ def refuse_holdout(case_id: str, corpus_dir: Path | str = DEFAULT_CORPUS) -> Non
 def flows_by_case(
     cases: Sequence[GoldenCase],
     analysed: Mapping[str, SystemModel] = MappingProxyType({}),
-) -> dict[str, dict[str, tuple[str, str]]]:
+) -> dict[str, CaseFlows]:
     """Each case's **Data Flow** map, which the identity rule resolves against.
 
     Per case rather than pooled: two cases may spell one flow ID differently,
@@ -1101,22 +1103,24 @@ def flows_by_case(
     what that ID runs between — resolving the reference against the extraction's
     answer is the substitution this module exists to refuse. An analysed flow
     therefore fills a gap and never replaces an entry.
+
+    **A sibling is a sibling in its own graph** (ADR 0099). Each flow's
+    siblings are read from the graph that supplies its endpoints. An
+    extraction flow that names a corpus flow another way runs between the same
+    two elements, but it is that flow, not a second channel beside it.
     """
-    return {
-        case.id: {
-            **{
-                flow.id: (flow.source, flow.destination)
-                for flow in _data_flows(analysed.get(case.id))
-            },
-            **{
-                flow.id: (flow.source, flow.destination)
-                for flow in case.model.data_flows
-            },
-        }
-        for case in cases
-    }
+    return {case.id: _case_flows(case.model, analysed.get(case.id)) for case in cases}
 
 
-def _data_flows(model: SystemModel | None) -> tuple[DataFlow, ...]:
-    """A model's flows, or none where no analysed model was handed in."""
-    return tuple(model.data_flows) if model is not None else ()
+def _case_flows(blessed: SystemModel, analysed: SystemModel | None) -> CaseFlows:
+    """One case's map: the blessed flows over the analysed ones, each graph's siblings."""
+    corpus = _endpoints(blessed)
+    extracted = _endpoints(analysed) if analysed is not None else {}
+    return CaseFlows(
+        {**extracted, **corpus},
+        sibling_flows(corpus) | (sibling_flows(extracted) - corpus.keys()),
+    )
+
+
+def _endpoints(model: SystemModel) -> dict[str, tuple[str, str]]:
+    return {flow.id: (flow.source, flow.destination) for flow in model.data_flows}

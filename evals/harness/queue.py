@@ -49,13 +49,12 @@ from typing import Any
 from analysis_service.claims import Claim, FrameworkName
 from analysis_service.critic import (
     NO_ROWS,
-    cited_channels,
     grounded_mechanism,
 )
 from evals.harness import content as digests
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
-from evals.harness.identity import FlowMap
+from evals.harness.identity import FlowMap, channels
 from evals.harness.ledger import Identity, Ledger, identity_of
 
 
@@ -427,7 +426,7 @@ def _keyed(
             verb=finding.verb,
             identifier=finding.identifier,
             mechanism=frozenset(finding.mechanism)
-            | cited_channels(finding.element_ids, flows_by_case.get(finding.case, {})),
+            | channels(finding.element_ids, flows_by_case.get(finding.case, {})),
         )
         yield value, components, finding
 
