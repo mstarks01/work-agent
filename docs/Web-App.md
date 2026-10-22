@@ -159,12 +159,15 @@ finding. **Save draft** keeps the answers and runs nothing. **Update report**
 starts the report's one follow-up. A final report shows its answers here to
 correct instead, and a correction runs nothing.
 
-**About the analysis** holds the report's identifiers and times, the versions
-that ran, the service's disclaimer, each framework's notes and diagnostics, the
-reference of each question, the extracted DFD with its boundary crossings and
-assumptions, and the served-build provenance and fingerprint of every LLM node.
+**About the analysis** starts with the service's disclaimer and the extracted
+system model: its diagram, its boundary crossings and assumptions, its gaps,
+and a table for each element kind. Then come the reference of each question
+and each framework's notes and diagnostics. Two closed sections hold the rest:
+**How this report was made** has the report's identifiers, times and the
+versions that ran, and **Pipeline** has the served-build provenance and
+fingerprint of every LLM node.
 
-**The system model diagram**, above the DFD table, draws the model: a dashed
+**The system model diagram**, above the DFD tables, draws the model: a dashed
 column for each trust zone, the elements inside the zone the model states, and
 an arrow for each flow. The elements go down the page in the order the flows
 reach them, so a flow inside a zone runs down its column and a flow between
@@ -173,10 +176,13 @@ may cross one, because a zone is not stated. Each flow's name sits on its
 arrow. An element whose zone the model does not state is drawn outside every
 zone, in a column named **Zone not stated**, and an element whose zone the
 service inferred says "zone assumed". Hover over an element or a flow to see
-its whole name. The table under the diagram lists the same elements in words.
+its whole name. Under the diagram, a table for each element kind (external
+entities, processes, data stores and data flows) lists the same elements in
+words, with a column for each attribute. Hover over a name to see its ID.
 
-**Gaps in the system model**, in About the analysis, lists each attribute that
-the description leaves unstated, with the elements it is unstated on. The
+**Gaps in the system model**, in About the analysis, is a table of each
+attribute that the description leaves unstated, with the count and the
+elements it is unstated on. The
 attribute on the most elements comes first. Where the report asks about an
 element, an **Answer** link opens that question.
 

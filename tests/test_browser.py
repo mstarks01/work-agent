@@ -241,6 +241,8 @@ def test_a_report_moves_between_its_three_sections(page):
     page.get_by_role("link", name="About the analysis").click()
     page.wait_for_url("**?view=about")
     assert page.locator("#elements").is_visible()
+    assert not page.locator("#nodes").is_visible()
+    page.get_by_text("Pipeline", exact=True).click()
     assert page.locator("#nodes").is_visible()
     assert not page.locator("#analyses").is_visible()
     page.get_by_role("link", name="Report", exact=True).click()
@@ -1098,6 +1100,7 @@ def test_reopening_a_completed_analysis_displays_its_report(page):
     page.wait_for_url("**/report/**")
     report_url = page.url
     page.get_by_role("link", name="About the analysis").click()
+    page.get_by_text("How this report was made").click()
     assert "Generated" in page.inner_text("#report-facts")
     page.goto(analysis_url)
     page.wait_for_url(report_url)

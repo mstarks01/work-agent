@@ -360,7 +360,7 @@ Start with these parts of the result:
 - **Marks:** look for repaired quotes, dropped claims, unresolved evidence, or
   unresolved references. These show where one proposal was degraded or removed
   without discarding the entire analysis.
-- **Provenance:** under **About the analysis**, see which model route was requested, which model identifier
+- **Provenance:** under **About the analysis**, open **Pipeline** to see which model route was requested, which model identifier
   the provider returned, and which execution fingerprint each call produced.
   These values support auditing; they do not establish that a finding is right.
 

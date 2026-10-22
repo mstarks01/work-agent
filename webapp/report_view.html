@@ -289,11 +289,8 @@
   table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
   th { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; font-weight: 600; }
-  td code, .crossing code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }
-  td .unk { color: var(--sev-high); font-weight: 600; }
-  .crossing { font-size: 0.85rem; color: var(--ink-2); padding: 6px 0; }
-  .assume { font-size: 0.85rem; color: var(--ink-2); }
-  .gap { font-size: 0.88rem; padding: 4px 0; }
+  td code, .about-list code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }
+  td .unk { color: var(--muted); font-style: italic; }
 
   .nodes { display: flex; flex-wrap: wrap; gap: 8px; }
   .node { font-size: 0.76rem; color: var(--ink-2); background: var(--surface); border: 1px solid var(--border);
@@ -305,7 +302,16 @@
      under a strict nonce CSP with no 'unsafe-inline', which blocks inline
      style attributes; a class costs nothing and a generated one-off colour
      goes through element.style.* instead, which CSP does not govern. */
-  .belowtable { margin-top: 12px; }
+  .about-list { margin: 0 0 14px; padding-left: 20px; font-size: 0.88rem; color: var(--ink-2); }
+  .about-list li { margin: 4px 0; }
+  #model-gaps th:nth-child(1) { width: 26%; }
+  #model-gaps th:nth-child(2) { width: 12%; }
+  #about-view > h2:not(.view-title) { font-size: 1.1rem; text-transform: none; letter-spacing: 0;
+    color: var(--ink); margin: 36px 0 12px; }
+  #about-view h3:not(.analysis > h3) { font-size: 0.92rem; margin: 22px 0 8px; }
+  .about-more { margin-top: 26px; border-top: 1px solid var(--hairline); padding-top: 12px; }
+  .about-more > summary { cursor: pointer; font-weight: 600; font-size: 1rem; }
+  .about-more[open] > summary { margin-bottom: 12px; }
 
   /* The report sits in the workspace layout, whose styles above set rules for
      bare elements. These put back what the report's own rules expect.
@@ -401,31 +407,38 @@
          analysed, and the pipeline. -->
     <div id="about-view" hidden>
       <h2 class="view-title">About the analysis</h2>
-      <dl class="facts" id="report-facts"></dl>
       <div class="disclaimer"><span class="dot"></span><span id="disclaimer"></span></div>
-      <div class="meta" id="scope"></div>
-      <div id="framework-notes"></div>
+
+      <h2>System model (extracted DFD)</h2>
+      <!-- The model drawn: a column per trust zone, its elements, and the
+           flows between them. Built in JS; the tables below hold the same
+           facts. -->
+      <figure class="model-diagram" id="model-diagram"></figure>
+      <h3 id="crossings-title"></h3>
+      <ul id="crossings" class="about-list"></ul>
+      <h3 id="assumptions-title"></h3>
+      <ul id="assumptions" class="about-list"></ul>
+      <!-- What the System Model leaves unstated, built in JS from the gaps
+           payload. -->
+      <h3>Gaps in the system model</h3>
+      <div id="model-gaps"></div>
+      <div id="elements"></div>
 
       <h2>Question references</h2>
       <div id="question-refs"></div>
 
-      <!-- What the System Model leaves unstated, built in JS from the gaps
-           payload. -->
-      <h2>Gaps in the system model</h2>
-      <div id="model-gaps"></div>
+      <h2>Framework notes</h2>
+      <div id="framework-notes"></div>
 
-      <h2>System model (extracted DFD)</h2>
-      <!-- The model drawn: a box per trust zone, its elements, and the flows
-           between them. Built in JS; the table below holds the same facts. -->
-      <figure class="model-diagram" id="model-diagram"></figure>
-      <table id="elements"><thead><tr>
-        <th>Type</th><th>ID</th><th>Name</th><th>Trust zone</th><th>Key attributes</th>
-      </tr></thead><tbody></tbody></table>
-      <div id="crossings" class="belowtable"></div>
-      <div id="assumptions" class="belowtable"></div>
-
-      <h2>Pipeline</h2>
-      <div class="nodes" id="nodes"></div>
+      <details class="about-more" id="record">
+        <summary>How this report was made</summary>
+        <dl class="facts" id="report-facts"></dl>
+        <div class="meta" id="scope"></div>
+      </details>
+      <details class="about-more">
+        <summary>Pipeline</summary>
+        <div class="nodes" id="nodes"></div>
+      </details>
     </div>
   </div>
 </div>

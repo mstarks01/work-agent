@@ -1846,82 +1846,100 @@
     $("model-diagram").hidden = true;
   }
 
-  // system model table. Each entry returns the cell's children rather than a
-  // string of markup — `technology`, `protocol`, `authentication` and
-  // `data_classification` are free-text copied out of submitted prose, and this
-  // column is where the unescaped-innerHTML bug lived.
-  const attrs = {
-    "external-entity": e => [
-      `kind: ${e.kind}` + (e.assets.length ? ` · assets: ${e.assets.join(", ")}` : ""),
-    ],
-    "process": e => [`${e.technology} · exposure: ${e.exposure} · presents: ${e.interface_kind}`],
-    "data-store": e => [
-      `${e.technology} · ${e.data_classification} · at rest: `, mark(e.encryption_at_rest),
-    ],
-    "data-flow": e => [
-      `${e.protocol} · auth: ${e.authentication} · in transit: `, mark(e.encryption_in_transit),
-    ],
-  };
-  function mark(v){ return v === "unknown" ? el("span", "unk", "unknown") : v; }
-  const rows = [
-    ...R.system_model.external_entities.map(e => ["external-entity", e]),
-    ...R.system_model.processes.map(e => ["process", e]),
-    ...R.system_model.data_stores.map(e => ["data-store", e]),
-    ...R.system_model.data_flows.map(e => ["data-flow", e]),
+  // The model's elements, a table per kind. Each column names its attribute,
+  // and every value the model does not state reads "unknown" in one style.
+  // An element's ID shows on hover over its name.
+  // Each cell gets its children as nodes, never markup: `technology`,
+  // `protocol`, `authentication` and `data_classification` are free text
+  // copied out of submitted prose.
+  const mark = (v) => (v === "unknown" ? el("span", "unk", "unknown") : String(v));
+  const named = (e) => cell(Object.assign(el("span", "ref", e.name), { title: e.id }));
+  const zoneCell = (zone) => cell(zone === "unknown" ? mark(zone) : ref(zone));
+  const ELEMENT_TABLES = [
+    { title: "External entities", rows: R.system_model.external_entities,
+      head: ["Name", "Trust zone", "Kind", "Assets"],
+      cells: e => [named(e), zoneCell(e.trust_zone), cell(mark(e.kind)),
+        cell(e.assets.length ? e.assets.join(", ") : "none stated")] },
+    { title: "Processes", rows: R.system_model.processes,
+      head: ["Name", "Trust zone", "Technology", "Exposure", "Presents"],
+      cells: e => [named(e), zoneCell(e.trust_zone), cell(mark(e.technology)),
+        cell(mark(e.exposure)), cell(mark(e.interface_kind))] },
+    { title: "Data stores", rows: R.system_model.data_stores,
+      head: ["Name", "Trust zone", "Technology", "Classification", "Encrypted at rest"],
+      cells: e => [named(e), zoneCell(e.trust_zone), cell(mark(e.technology)),
+        cell(mark(e.data_classification)), cell(mark(e.encryption_at_rest))] },
+    { title: "Data flows", rows: R.system_model.data_flows,
+      head: ["Name", "From → to", "Protocol", "Authentication", "Encrypted in transit"],
+      cells: e => [named(e), cell(ref(e.source), " → ", ref(e.destination)), cell(mark(e.protocol)),
+        cell(mark(e.authentication)), cell(mark(e.encryption_in_transit))] },
   ];
-  const tb = $("elements").querySelector("tbody");
-  rows.forEach(([type, e]) => {
-    const zone = e.trust_zone || (e.source + " → " + e.destination);
-    const tr = el("tr");
-    tr.append(
-      cell(type), cell(code(e.id)), cell(e.name), cell(code(zone)), cell(...attrs[type](e))
-    );
-    tb.append(tr);
+  ELEMENT_TABLES.filter(t => t.rows.length).forEach(t => {
+    const table = el("table");
+    const head = el("tr");
+    t.head.forEach(h => head.append(el("th", null, h)));
+    table.append(head);
+    t.rows.forEach(e => {
+      const row = el("tr");
+      row.append(...t.cells(e));
+      table.append(row);
+    });
+    $("elements").append(el("h3", null, `${t.title} (${t.rows.length})`), table);
   });
-  R.boundary_crossings.forEach(c => {
-    const d = el("div","crossing");
-    d.append(
-      "Boundary crossing: ", ref(c.flow_id), " — ",
-      ref(c.source_zone), " → ", ref(c.destination_zone)
-    );
-    // A crossing one of whose zones the service inferred says so here. The
-    // assumption itself is listed below with its basis; without this line a
-    // reader has to join the two lists to find out that the crossing rests on
-    // a placement nobody stated.
-    c.assumed_endpoints.forEach(id => d.append(" — assumed zone for ", ref(id)));
-    $("crossings").append(d);
-  });
-  R.system_model.assumptions.forEach(a => {
-    const d = el("div","assume");
-    d.append(`Assumption: ${a.assumption} (`, ref(a.element_id), `) — ${a.basis}`);
-    $("assumptions").append(d);
-  });
+
+  // Each flow that crosses a trust boundary, or may cross one because a zone
+  // is not stated. A crossing one of whose zones the service inferred says
+  // so here, so a reader does not have to join it to the assumptions to find
+  // out that it rests on a placement nobody stated.
+  const listed = (id, title, items, line) => {
+    $(`${id}-title`).textContent = `${title} (${items.length})`;
+    items.forEach(item => {
+      const li = el("li");
+      li.append(...line(item));
+      $(id).append(li);
+    });
+    $(`${id}-title`).hidden = $(id).hidden = !items.length;
+  };
+  listed("crossings", "Boundary crossings", R.boundary_crossings, c => [
+    ref(c.flow_id), ": ", ref(c.source_zone), " → ", ref(c.destination_zone),
+    ...(c.decided ? [] : [" — may cross, because a zone is not stated"]),
+    ...c.assumed_endpoints.flatMap(id => [" — assumed zone for ", ref(id)]),
+  ]);
+  listed("assumptions", "Assumptions", R.system_model.assumptions, a => [
+    ref(a.element_id), `: ${a.assumption} — ${a.basis}`,
+  ]);
 
   // What the model leaves unstated, on the most elements first. An element
   // whose fact this report asks links to its question.
   const GAPS = JSON.parse($("gaps").textContent);
-  GAPS.forEach(g => {
-    const words = NAMES[g.attribute] || g.attribute;
-    const count = g.elements.length;
-    const row = el("div", "gap");
-    row.append(el("b", null, words[0].toUpperCase() + words.slice(1)),
-      ` is not stated for ${count} ${count === 1 ? "element" : "elements"}: `);
-    g.elements.forEach((e, i) => {
-      if (i) row.append(", ");
-      row.append(ref(e.id));
-      if (QUESTION_ROWS.has(JSON.stringify(e.key)) && ASKS) {
-        const answer = el("a", null, "Answer");
-        answer.href = "?view=questions";
-        answer.addEventListener("click", (event) => {
-          event.preventDefault();
-          goToQuestion(e.key);
-        });
-        row.append(" (", answer, ")");
-      }
+  if (GAPS.length) {
+    const table = el("table");
+    const head = el("tr");
+    head.append(el("th", null, "Not stated"), el("th", null, "Elements"), el("th", null, "Where"));
+    table.append(head);
+    GAPS.forEach(g => {
+      const words = NAMES[g.attribute] || g.attribute;
+      const where = el("td");
+      g.elements.forEach((e, i) => {
+        if (i) where.append(", ");
+        where.append(ref(e.id));
+        if (QUESTION_ROWS.has(JSON.stringify(e.key)) && ASKS) {
+          const answer = el("a", null, "Answer");
+          answer.href = "?view=questions";
+          answer.addEventListener("click", (event) => {
+            event.preventDefault();
+            goToQuestion(e.key);
+          });
+          where.append(" (", answer, ")");
+        }
+      });
+      const row = el("tr");
+      row.append(cell(words[0].toUpperCase() + words.slice(1)), cell(String(g.elements.length)), where);
+      table.append(row);
     });
-    $("model-gaps").append(row);
-  });
-  if (!GAPS.length) $("model-gaps").append(el("div", "meta", "The system model states every attribute."));
+    $("model-gaps").append(table);
+  } else {
+    $("model-gaps").append(el("div", "meta", "The system model states every attribute."));
+  }
 
   // pipeline
   R.nodes.forEach(n => {

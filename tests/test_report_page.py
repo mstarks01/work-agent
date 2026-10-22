@@ -681,9 +681,10 @@ def test_about_lists_the_model_s_gaps_with_their_questions():
     the report asks about links to its question."""
     parts = run_report_page(page(), "?view=about")
     gaps = parts["model-gaps"]
-    assert "Encryption in transit is not stated for 1 element: " in gaps
+    assert "Not statedElementsWhere" in gaps
+    assert "Encryption in transit1" in gaps
     assert "(Answer)" in gaps
-    assert "Encryption at rest is not stated for 1 element: Orders DB" in gaps
+    assert "Encryption at rest1Orders DB" in gaps
 
 
 def test_a_count_of_one_reads_in_the_singular():
@@ -724,3 +725,26 @@ def test_about_draws_the_system_model():
     for element in valid_model().elements():
         assert element.name in drawn, element.id
     assert "A dashed column is a trust zone." in drawn
+
+
+def test_about_puts_the_model_first_with_a_table_per_kind():
+    """About opens on the system model, gives each element kind its own table
+    with a column per attribute, and keeps the record and the pipeline in
+    closed sections."""
+    html = two_findings()
+    parts = run_report_page(html, "?view=about")
+    model = valid_model()
+    order = [
+        html.index(f'id="{part}"')
+        for part in ("model-diagram", "crossings", "model-gaps", "elements")
+        + ("question-refs", "record", "nodes")
+    ]
+    assert order == sorted(order)
+    assert re.search(r'<details class="about-more" id="record">', html)
+    elements = parts["elements"]
+    assert f"Data flows ({len(model.data_flows)})" in elements
+    assert "NameFrom → toProtocolAuthenticationEncrypted in transit" in elements
+    for flow in model.data_flows:
+        assert flow.id not in elements
+    crossings = model.boundary_crossings()
+    assert parts["crossings-title"] == f"Boundary crossings ({len(crossings)})"
