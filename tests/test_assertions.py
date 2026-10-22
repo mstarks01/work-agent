@@ -57,12 +57,14 @@ from analysis_service.assertions import (
     conflicts,
     contradiction_issues,
     contradictions,
+    identity_parts,
     merged,
     offered,
     project,
     projected_attribute,
     projection_fields,
     quarantine,
+    read_assertion_id,
     referent_type,
     resolve_catalog,
     settled,
@@ -373,6 +375,22 @@ class TestAssertionIdentity:
         """The value key depends on the predicate, so the gate reports it first."""
         with pytest.raises(KeyError):
             assertion_id(self.stated(predicate="vibes"))
+
+    def test_an_id_reads_back_to_the_parts_that_composed_it(self):
+        """The one decoder agrees with the one encoder on every row shape."""
+        for row in (
+            self.stated(),
+            self.stated(value="unknown"),
+            self.stated(scope=[Qualifier(kind="resource", value="orders")]),
+        ):
+            assert read_assertion_id(assertion_id(row)) == identity_parts(row)
+
+    def test_a_string_of_another_shape_reads_as_no_id(self):
+        for text in ("", "evidence:flow:a>b", "assertion:x~y~z", "x~y~z~w"):
+            assert read_assertion_id(text) is None
+
+    def test_the_value_is_read_last_and_keeps_its_characters(self):
+        assert read_assertion_id("assertion:a~b~c~d~e") == ("a", "b", "c", "d~e")
 
 
 class TestASpanIsLocatedByCode:

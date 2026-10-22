@@ -26,7 +26,7 @@ pydantic's coercion path are unaffected.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
@@ -56,16 +56,25 @@ def error_place(error: Mapping[str, Any]) -> str:
 MAX_RENDERED_ERRORS = 20
 
 
-def shown_errors(errors: Sequence[Mapping[str, Any]]) -> list[tuple[str, str]]:
+class ShownError(NamedTuple):
+    """One error a refusal names: where it sits, and what the rule said."""
+
+    #: The place from :func:`error_place`; empty for the entry that counts the rest.
+    place: str
+    message: str
+
+
+def shown_errors(errors: Sequence[Mapping[str, Any]]) -> list[ShownError]:
     """The place and message of each error a refusal names: the first
     :data:`MAX_RENDERED_ERRORS`, then one entry with no place that counts the
     rest."""
     shown = [
-        (error_place(error), error["msg"]) for error in errors[:MAX_RENDERED_ERRORS]
+        ShownError(error_place(error), error["msg"])
+        for error in errors[:MAX_RENDERED_ERRORS]
     ]
     if len(errors) > MAX_RENDERED_ERRORS:
         hidden = len(errors) - MAX_RENDERED_ERRORS
-        shown.append(("", f"and {hidden} more problems not shown"))
+        shown.append(ShownError("", f"and {hidden} more problems not shown"))
     return shown
 
 
@@ -77,7 +86,7 @@ def refusal_text(exc: ValueError) -> str:
     """
     if isinstance(exc, ValidationError):
         return "; ".join(
-            f"{place}: {message}" if place else message
-            for place, message in shown_errors(exc.errors(include_input=False))
+            f"{error.place}: {error.message}" if error.place else error.message
+            for error in shown_errors(exc.errors(include_input=False))
         )
     return str(exc)

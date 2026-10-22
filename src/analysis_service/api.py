@@ -859,8 +859,8 @@ def create_app(
     @app.exception_handler(RequestValidationError)
     async def _validation_error(request: Request, exc: RequestValidationError):
         errors = [
-            {"loc": place, "msg": message}
-            for place, message in shown_errors(exc.errors())
+            {"loc": error.place, "msg": error.message}
+            for error in shown_errors(exc.errors())
         ]
         return _problem_response(422, "request body is invalid", errors=errors)
 

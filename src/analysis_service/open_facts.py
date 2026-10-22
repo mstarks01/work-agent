@@ -25,6 +25,7 @@ from analysis_service.assertions import (
     AssertionCatalog,
     assertion_id,
     identity_parts,
+    read_assertion_id,
 )
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import UnknownRef
@@ -165,6 +166,18 @@ def _attribute_questions(attribute: str) -> tuple[str, str]:
     )
 
 
+def flow_words(flow: DataFlow, names: Mapping[str, str]) -> str:
+    """How a **Data Flow** reads as a place: the connection its source initiates.
+
+    The one wording of a flow as a place; every label that names one calls
+    this. The direction is the flow's own (``GLOSSARY.md``): the source starts
+    the connection.
+    """
+    source = names.get(flow.source, flow.source)
+    destination = names.get(flow.destination, flow.destination)
+    return f"the connection initiated by {source} to {destination}"
+
+
 def assertion_label(
     identity: str, names: Mapping[str, str], catalog: AssertionCatalog | None
 ) -> str:
@@ -176,15 +189,14 @@ def assertion_label(
     A reference the catalog does not hold gets :data:`UNWORDED_ASSERTION`,
     never the reference itself.
     """
-    if catalog is None:
+    asked = read_assertion_id(identity)
+    if catalog is None or asked is None:
         return UNWORDED_ASSERTION
     subjects = {subject.id: subject.label for subject in catalog.subjects}
     for entry in catalog.entries:
         if entry.predicate not in REGISTRY:
             continue
-        parts = identity_parts(entry)
-        stem = f"assertion:{parts.predicate}~{parts.subject}~{parts.scope}~"
-        if not identity.startswith(stem):
+        if identity_parts(entry)[:3] != asked[:3]:
             continue
         subject = subjects.get(entry.subject) or names.get(entry.subject, entry.subject)
         question = REGISTRY[entry.predicate].question.format(subject=subject)
@@ -213,7 +225,7 @@ def label_of(
     if isinstance(flow, DataFlow):
         source = names.get(flow.source, flow.source)
         destination = names.get(flow.destination, flow.destination)
-        where = f"the connection initiated by {source} to {destination}"
+        where = flow_words(flow, names)
         if ref.kind == "attribute":
             match ref.attribute:
                 case "authentication":

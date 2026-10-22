@@ -714,12 +714,46 @@ def stamp_attempt(responses: Sequence, attempt: int) -> Sequence:
     return responses
 
 
+#: Each finish reason that leaves a fragment, in the order they are checked:
+#: the error it raises, the log line, and the error's message. The log line
+#: takes the model's name as its one ``%s``, and the message as ``{model}``.
+_UNFINISHED: dict[str, tuple[type[RuntimeError], str, str]] = {
+    _SAFETY_FINISH_REASON: (
+        RefusedCompletionError,
+        (
+            "%s: completion stopped at the provider's content filter;"
+            " failing the node rather than validating a fragment"
+        ),
+        (
+            "{model} refused the request: the provider stopped the completion"
+            f" at its content filter (finish reason {_SAFETY_FINISH_REASON}),"
+            " so what it emitted is a fragment rather than an answer."
+            " The same request stops the same way again; use another model"
+            " for this node's tier."
+        ),
+    ),
+    _MAX_TOKENS_FINISH_REASON: (
+        TruncatedCompletionError,
+        (
+            "%s: completion stopped at max_output_tokens with partial output;"
+            " failing the node rather than validating a fragment"
+        ),
+        (
+            "{model} stopped at max_output_tokens with its output incomplete, so"
+            " what it emitted is a fragment rather than an answer."
+            f" {TRUNCATION_REMEDY}"
+        ),
+    ),
+}
+
+
 def reject_unfinished(responses: Sequence, model: str) -> None:
     """Raise if the provider stopped any of ``responses`` at the cap or the filter.
 
     Every response is checked rather than just the last: a non-streaming call
     yields one today, but the collection is a sequence and an unfinished part
-    anywhere in it is an unfinished answer.
+    anywhere in it is an unfinished answer. :data:`_UNFINISHED` holds each
+    reason that is refused, with what it raises.
 
     ``finish_reason`` is read instead of ``error_code``, which ADK sets to the
     same value. The former is the provider's own word for what happened; the
@@ -727,27 +761,7 @@ def reject_unfinished(responses: Sequence, model: str) -> None:
     no error, and it stops being set the day that overloading is reconsidered.
     """
     reasons = [response.finish_reason for response in responses]
-    if _SAFETY_FINISH_REASON in reasons:
-        logger.error(
-            "%s: completion stopped at the provider's content filter;"
-            " failing the node rather than validating a fragment",
-            model,
-        )
-        raise RefusedCompletionError(
-            f"{model} refused the request: the provider stopped the completion"
-            f" at its content filter (finish reason {_SAFETY_FINISH_REASON}),"
-            f" so what it emitted is a fragment rather than an answer."
-            f" The same request stops the same way again; use another model"
-            f" for this node's tier."
-        )
-    if _MAX_TOKENS_FINISH_REASON in reasons:
-        logger.error(
-            "%s: completion stopped at max_output_tokens with partial output;"
-            " failing the node rather than validating a fragment",
-            model,
-        )
-        raise TruncatedCompletionError(
-            f"{model} stopped at max_output_tokens with its output incomplete, so"
-            f" what it emitted is a fragment rather than an answer."
-            f" {TRUNCATION_REMEDY}"
-        )
+    for reason, (error, log_line, message) in _UNFINISHED.items():
+        if reason in reasons:
+            logger.error(log_line, model)
+            raise error(message.format(model=model))
