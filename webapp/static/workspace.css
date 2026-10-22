@@ -184,14 +184,7 @@ small {
 }
 .brand {
   display:flex;
-  align-items:center;
-  gap:10px;
-  font-size:20px;
-  font-weight:600;
-  letter-spacing:-.03em;
-  text-decoration:none;
-  color:var(--text);
-  white-space:nowrap
+  align-items:center
 }
 .brand svg {
   color:var(--accent);
@@ -221,7 +214,7 @@ small {
 .sidebar-collapsed .sidebar-head {
   flex-direction:column
 }
-.sidebar-collapsed .brand-label,.sidebar-collapsed .sidebar nav,.sidebar-collapsed .recent {
+.sidebar-collapsed .sidebar nav,.sidebar-collapsed .recent {
   display:none
 }
 .sidebar-collapsed .sidebar-toggle .collapse-icon {
@@ -807,9 +800,6 @@ code {
   .sidebar {
     padding:24px 14px
   }
-  .brand {
-    font-size:18px
-  }
   .question-layout {
     grid-template-columns:160px minmax(0,1fr);
     gap:20px
@@ -927,9 +917,6 @@ code {
   }
   .shared-controls button {
     width:100%
-  }
-  .brand {
-    font-size:17px
   }
   .question-layout {
     min-width:0
