@@ -1061,7 +1061,9 @@ class TestAStoreFailureAsARunStartsOrEnds:
         assert asyncio.run(store.sweep_orphans(later)) == 1
 
     def test_a_report_put_that_hangs(self, env, monkeypatch):
-        monkeypatch.setattr(jobs_module, "STORE_TIMEOUT_SECONDS", 0.05)
+        # The bound covers every store call, so it leaves room for an SQLite
+        # commit on a loaded runner; only the hanging put reaches it.
+        monkeypatch.setattr(jobs_module, "STORE_TIMEOUT_SECONDS", 1.0)
         store = SqlJobStore(engine_for(env), ReportPutFails(env, hang=True))
         stored = executed(store, CountingRunner())
         assert stored.status == "failed"
