@@ -164,7 +164,14 @@ def test_sidebar_collapses_and_stays_collapsed_on_settings(page):
     )
     page.goto("/settings")
     assert "sidebar-collapsed" in page.locator(".workspace").get_attribute("class")
+    # A collapsed link shows only its icon, and keeps its name and a title.
+    settings = page.get_by_role("link", name="Settings")
+    assert settings.locator(".nav-icon").is_visible()
+    assert settings.locator(".nav-label").bounding_box()["width"] <= 1
+    assert settings.get_attribute("title") == "Settings"
     page.click("#sidebar-toggle")
+    assert settings.locator(".nav-label").bounding_box()["width"] > 1
+    assert settings.get_attribute("title") is None
     assert (
         page.locator("#sidebar-toggle").get_attribute("aria-label")
         == "Collapse sidebar"
