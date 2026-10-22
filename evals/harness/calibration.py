@@ -88,9 +88,10 @@ from analysis_service.frameworks import FrameworkName
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
 from analysis_service.parsing import strings
 from evals.harness.identity import (
+    NO_FLOWS,
+    CaseFlows,
     ClaimPair,
     DirectionState,
-    FlowMap,
     IdentityError,
     Matcher,
     direction_state,
@@ -488,7 +489,7 @@ class IdentityValidation:
     #: Would the shipped rule treat these two *distinct* reference claims as
     #: one finding? Every within-case pair is a pair the corpus already records
     #: as two, so every ``True`` is an error.
-    collides: Callable[[Any, Any, FlowMap], bool]
+    collides: Callable[[Any, Any, CaseFlows], bool]
     #: The collisions this corpus is known to carry, as ``(case, lane) ->
     #: reason``. A collision outside this table fails
     #: ``tests/test_evals_identity.py``: three recorded exceptions must not
@@ -496,7 +497,7 @@ class IdentityValidation:
     recorded_collisions: Mapping[tuple[str, str], str]
 
 
-def _stride_collides(left: Any, right: Any, flows: FlowMap) -> bool:
+def _stride_collides(left: Any, right: Any, flows: CaseFlows) -> bool:
     """Endpoint subset and one action, within a lane: what the matcher rules.
 
     ``tests/test_evals_identity.py`` pins this against
@@ -515,7 +516,7 @@ def _stride_collides(left: Any, right: Any, flows: FlowMap) -> bool:
     ) and same_action(left.verb, right.verb)
 
 
-def _asvs_collides(left: Any, right: Any, flows: FlowMap) -> bool:
+def _asvs_collides(left: Any, right: Any, flows: CaseFlows) -> bool:
     """One requirement ruled in one place: what the fingerprint keys.
 
     No verb, because a claim naming a catalog requirement composes none —
@@ -596,7 +597,7 @@ class DirectionResult:
 def measure_direction(
     corpus: Sequence[GoldenCase],
     pairs: Sequence[LabelledPair],
-    flows_by_case: Mapping[str, FlowMap],
+    flows_by_case: Mapping[str, CaseFlows],
     matcher: Matcher,
 ) -> DirectionResult:
     """Price a direction component on the recorded labels and the corpus.
@@ -616,7 +617,7 @@ def measure_direction(
     """
     cited: Counter[int] = Counter()
     for case in corpus:
-        flows = flows_by_case.get(case.id, {})
+        flows = flows_by_case.get(case.id, NO_FLOWS)
         for claim in case.references.get("stride", ()):
             cited[len(flow_directions(claim.affected_element_ids, flows))] += 1
 
@@ -634,7 +635,7 @@ def measure_direction(
         state = direction_state(
             pair.reference_element_ids,
             candidate_ids,
-            flows_by_case.get(pair.case, {}),
+            flows_by_case.get(pair.case, NO_FLOWS),
         )
         priced[(pair.label_match, state)] += 1
 
@@ -675,7 +676,7 @@ def measure_direction(
 def measure_merges(
     corpus: Sequence[GoldenCase],
     framework: FrameworkName,
-    flows_by_case: Mapping[str, FlowMap],
+    flows_by_case: Mapping[str, CaseFlows],
 ) -> MergeResult:
     """Price one package's shipped rule on the merge direction.
 
@@ -700,7 +701,7 @@ def measure_merges(
     merges: list[MergedPair] = []
     for case in corpus:
         claims = case.references.get(framework, ())
-        flows = flows_by_case.get(case.id, {})
+        flows = flows_by_case.get(case.id, NO_FLOWS)
         for left, right in itertools.combinations(claims, 2):
             if left.lane != right.lane:
                 continue

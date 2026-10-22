@@ -19,6 +19,7 @@ from evals.harness import critic_yield
 from evals.harness.content import structural
 from evals.harness.critic_yield import aggregate_yield, score_case_with_yield
 from evals.harness.fingerprint import components_for, version_for
+from evals.harness.identity import CaseFlows
 from evals.harness.ledger import Ledger
 from evals.harness.reference import load_case
 from evals.harness.scorer import score_case
@@ -52,7 +53,9 @@ def _identity_matcher(drafts):
 
 def _rejecting(case, *drafts):
     """A ledger holding a substance down-vote on each given draft."""
-    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    flows = CaseFlows.of_graph(
+        {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    )
     return Ledger(
         [
             cast(
@@ -256,7 +259,9 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
         report=_report_with(case, [promote(kept)]),
         drafts={"stride": (kept, junk)},
     )
-    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    flows = CaseFlows.of_graph(
+        {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    )
     scores, yields, _ = run._score_runs(
         [case],
         {case.id: analysis},
@@ -287,7 +292,9 @@ def test_a_case_with_no_stride_proposal_is_charged_as_proposing_nothing(case):
         drafts={"stride": (kept,)},
         proposals={},
     )
-    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    flows = CaseFlows.of_graph(
+        {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    )
 
     _, _, (charged,) = run._score_runs(
         [case],
@@ -314,7 +321,9 @@ def test_a_holdout_case_is_scored_and_charged_no_losses(case):
     analysis = modes.AnalysisRun(
         report=_report_with(case, [promote(kept)]), drafts={"stride": (kept,)}
     )
-    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    flows = CaseFlows.of_graph(
+        {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    )
 
     def score(subject):
         return run._score_runs(
@@ -463,7 +472,7 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
     reference = _must_find(case)
     killed = _draft_for(reference, 1)
     saved = _draft_for(_expected(case), 2)
-    flows = ModelIndex.of(case.model).flow_endpoints
+    flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
     matcher = SubsetVerbIdentity({case.id: flows})
     produced = [promote(saved)]
     scored = score_case_with_yield(case, [killed, saved], produced, matcher, Ledger())

@@ -32,7 +32,6 @@ is why it gates on every PR rather than waiting for a sweep.
 from __future__ import annotations
 
 import itertools
-from types import MappingProxyType
 
 import pytest
 
@@ -40,7 +39,12 @@ from analysis_service.critic import endpoint_targets
 from analysis_service.system_model import ModelIndex, TrustBoundary
 from evals import verify_corpus
 from evals.harness.fingerprint import key_claim
-from evals.harness.identity import ClaimPair, SubsetVerbIdentity, endpoint_form
+from evals.harness.identity import (
+    CaseFlows,
+    ClaimPair,
+    SubsetVerbIdentity,
+    endpoint_form,
+)
 from evals.harness.reference import GoldenCase, ReferenceThreat, load_corpus
 
 #: Corpus pairs the scorer's matcher credits as one claim and the ledger keys as
@@ -140,7 +144,7 @@ def identity_key(case: GoldenCase, claim: ReferenceThreat) -> str:
     Resolving here is not a relaxation of the equality rule
     above; it is the same rule over the same spelling of a place.
     """
-    flows = ModelIndex.of(case.model).flow_endpoints
+    flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
     elements = ", ".join(sorted(endpoint_form(claim.affected_element_ids, flows)))
     return f"{case.meta.id} | {claim.category} | {elements}"
 
@@ -218,7 +222,7 @@ class TestTheFourReadersOfOnePlace:
         """The pair with no relation between them: they must simply agree."""
         disagreements = []
         for case in corpus:
-            flows = ModelIndex.of(case.model).flow_endpoints
+            flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
             for claim in case.stride_claims():
                 runtime = endpoint_targets(claim.affected_element_ids, flows)
                 harness = endpoint_form(claim.affected_element_ids, flows)
@@ -304,7 +308,7 @@ class TestTheFourReadersOfOnePlace:
         """
         wider = 0
         for case in corpus:
-            flows = ModelIndex.of(case.model).flow_endpoints
+            flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
             matcher = SubsetVerbIdentity({case.id: flows})
             for left, right in itertools.combinations(case.stride_claims(), 2):
                 if left.category != right.category:
@@ -374,7 +378,7 @@ def _fingerprint_collisions(corpus):
 
 
 #: Case 13's shape: two flows between one console and one API, and one other.
-SIBLING_FLOWS = MappingProxyType(
+SIBLING_FLOWS = CaseFlows.of_graph(
     {
         "flow:process:console>process:api>requests": ("process:console", "process:api"),
         "flow:process:console>process:api>status": ("process:console", "process:api"),
@@ -417,6 +421,22 @@ class TestTwoSiblingFlowsAreTwoPlaces:
         ends = ["process:console", "process:api"]
         assert endpoint_subset(ends, ON_REST, SIBLING_FLOWS)
         assert endpoint_subset(ends, ON_SOCKET, SIBLING_FLOWS)
+
+    @pytest.mark.parametrize(
+        ("left", "right"),
+        [
+            (("process:console", "process:api"), ON_REST),
+            (ON_REST, ON_SOCKET),
+            (ON_REST, ("process:api", "store:db", "flow:process:api>store:db>write")),
+        ],
+    )
+    def test_endpoint_subset_reads_the_same_either_way_round(self, left, right):
+        """One call answers a pair; a caller never needs the reverse call too."""
+        from evals.harness.identity import endpoint_subset
+
+        assert endpoint_subset(left, right, SIBLING_FLOWS) == endpoint_subset(
+            right, left, SIBLING_FLOWS
+        )
 
     def test_one_shared_control_does_not_join_two_channels(self):
         from analysis_service.critic import distinct_mechanisms

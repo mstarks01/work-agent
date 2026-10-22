@@ -55,7 +55,7 @@ from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex
 from evals.harness.content import prose as prose_digest
 from evals.harness.fingerprint import identifier_of, key_claim, lane_field
-from evals.harness.identity import FlowMap
+from evals.harness.identity import CaseFlows
 from evals.harness.ledger import STYLE_REASONS, Ledger
 from evals.harness.reference import GoldenCase
 
@@ -100,7 +100,7 @@ def measure_case(
     case_id: str,
     framework: FrameworkName,
     claims: Iterable[Claim],
-    flows: FlowMap,
+    flows: CaseFlows,
     votes: Ledger,
     rows: Mapping[str, str] = NO_ROWS,
 ) -> CaseWriting:
@@ -186,7 +186,7 @@ def measure(
         report = reports.get(case.id)
         if report is None:
             continue
-        flows = ModelIndex.of(case.model).flow_endpoints
+        flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
         held = row_controls(report.assertions.catalog if report.assertions else None)
         rows += [
             measure_case(case.id, block.framework, block.claims, flows, votes, held)

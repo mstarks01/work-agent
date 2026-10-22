@@ -25,7 +25,12 @@ from analysis_service.system_model import ModelIndex
 from evals.harness import losses
 from evals.harness.content import prose, structural
 from evals.harness.fingerprint import key_claim
-from evals.harness.identity import SubsetVerbIdentity, endpoint_form, endpoint_subset
+from evals.harness.identity import (
+    CaseFlows,
+    SubsetVerbIdentity,
+    endpoint_form,
+    endpoint_subset,
+)
 from evals.harness.ledger import Ledger, cast
 from evals.harness.losses import CAUSES, attribute_case, pooled
 from evals.harness.reference import Reading, load_case
@@ -46,7 +51,7 @@ def case():
 
 @pytest.fixture(scope="module")
 def flows(case):
-    return ModelIndex.of(case.model).flow_endpoints
+    return CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
 
 
 #: The case that carries two references at one place under one verb, which is
@@ -63,7 +68,7 @@ def merge_case():
 
 @pytest.fixture(scope="module")
 def merge_flows(merge_case):
-    return ModelIndex.of(merge_case.model).flow_endpoints
+    return CaseFlows.of_graph(ModelIndex.of(merge_case.model).flow_endpoints)
 
 
 def charge(

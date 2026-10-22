@@ -13,6 +13,7 @@ from __future__ import annotations
 import pytest
 
 from evals.harness.fingerprint import components_for, version_for
+from evals.harness.identity import CaseFlows
 from evals.harness.ledger import Ledger
 from evals.harness.queue import (
     PRIORITIES,
@@ -25,7 +26,9 @@ from evals.harness.queue import (
 from tests.eval_factories import SAMPLE_CONTENT, SAMPLE_PROSE, cast, other_content
 
 FLOWS = {
-    "01": {"flow:process:a>process:b>call": ("process:a", "process:b")},
+    "01": CaseFlows.of_graph(
+        {"flow:process:a>process:b>call": ("process:a", "process:b")}
+    ),
 }
 
 

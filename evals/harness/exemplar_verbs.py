@@ -65,7 +65,7 @@ from analysis_service.frameworks import PACKAGES, package_for, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.skills import lane_exemplars_doc
 from evals.harness.fingerprint import IDENTIFIER_OF
-from evals.harness.identity import endpoint_subset
+from evals.harness.identity import NO_FLOWS, endpoint_subset
 from evals.harness.reference import MUST_FIND, GoldenCase, development_cases
 
 __all__ = [
@@ -266,7 +266,7 @@ def collisions(framework: FrameworkName) -> tuple[Collision, ...]:
                     continue
                 if family_of(left.verb) != family_of(right.verb):
                     continue
-                if not endpoint_subset(left.element_ids, right.element_ids, {}):
+                if not endpoint_subset(left.element_ids, right.element_ids, NO_FLOWS):
                     continue
                 found.append(
                     Collision(

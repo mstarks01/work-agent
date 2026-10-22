@@ -93,7 +93,7 @@ from evals.harness.ledger import (
     cast,
     load,
 )
-from evals.harness.reference import load_corpus
+from evals.harness.reference import flows_by_case, load_corpus
 from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
@@ -246,12 +246,7 @@ def build_session(
     only exists if the caller says where one run ends and the next begins.
     """
     corpus = load_corpus(verify_corpus.CORPUS_DIR)
-    flows = {
-        case.meta.id: {
-            flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
-        }
-        for case in corpus
-    }
+    flows = flows_by_case(corpus)
     sources = {
         case.meta.id: "\n\n".join(source.text for source in case.sources)
         for case in corpus

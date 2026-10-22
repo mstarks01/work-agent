@@ -20,13 +20,14 @@ from analysis_service.frameworks.stride.record import StrideCategory
 from evals.harness import writing
 from evals.harness.content import prose as prose_digest
 from evals.harness.fingerprint import key_claim
+from evals.harness.identity import NO_FLOWS
 from evals.harness.ledger import Ledger, Vote
 from tests.eval_factories import SAMPLE_CONTENT, produced_threat
 from tests.factories import sample_report
 from tests.test_asvs import _block as asvs_block
 from tests.test_asvs import sample_asvs_claim
 
-FLOWS: dict[str, tuple[str, str]] = {}
+FLOWS = NO_FLOWS
 CASE = "01-payments-checkout"
 
 

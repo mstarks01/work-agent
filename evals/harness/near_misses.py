@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any, get_args
 
 from analysis_service.frameworks.stride.record import DraftThreat
-from evals.harness.identity import FlowMap, endpoint_subset
+from evals.harness.identity import CaseFlows, endpoint_subset
 from evals.harness.losses import CaseLosses, Loss
 from evals.harness.reference import (
     RULINGS_FILE,
@@ -89,7 +89,7 @@ def rows(
     scores: Sequence[CaseScore],
     charged: Sequence[CaseLosses],
     produced: Mapping[str, Sequence[DraftThreat]],
-    flows: Mapping[str, FlowMap],
+    flows: Mapping[str, CaseFlows],
     source: str,
 ) -> list[dict[str, str]]:
     """One ballot row per missed must-find a free same-lane draft may state.
@@ -151,14 +151,15 @@ def _shown(reference: ReferenceThreat) -> dict[str, str]:
     }
 
 
-def _ruled(case: GoldenCase, index: int, draft: DraftThreat, flows: FlowMap) -> bool:
+def _ruled(case: GoldenCase, index: int, draft: DraftThreat, flows: CaseFlows) -> bool:
     """Whether a person already ruled on this draft's reading of the claim.
 
     A reading is one action at one place. The action reads through
     :func:`~evals.harness.verbs.same_action`, as the matcher and the vote key
     read it. The place reads through
-    :func:`~evals.harness.identity.endpoint_subset` both ways: one place in
-    the identity rule's spelling, with its sibling channels (ADR 0061).
+    :func:`~evals.harness.identity.endpoint_subset`, which is symmetric: one
+    place in the identity rule's spelling, with its sibling channels (ADR
+    0061).
     """
     readings = (
         *case.ruled_readings.get(index, ()),
@@ -168,9 +169,6 @@ def _ruled(case: GoldenCase, index: int, draft: DraftThreat, flows: FlowMap) -> 
         same_action(reading.verb, draft.verb)
         and endpoint_subset(
             reading.affected_element_ids, draft.affected_element_ids, flows
-        )
-        and endpoint_subset(
-            draft.affected_element_ids, reading.affected_element_ids, flows
         )
         for reading in readings
     )

@@ -63,7 +63,7 @@ from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.asvs.record import requirement_of
 from evals.harness.content import stored_version
-from evals.harness.identity import FlowMap, endpoint_form
+from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.verbs import canonical, check_verb
 
 #: The version a caller gets when it does not choose. Bumping it is a re-keying
@@ -269,7 +269,7 @@ def components_for(
     framework: FrameworkName,
     lane: str,
     element_ids: Iterable[str],
-    flows: FlowMap,
+    flows: CaseFlows,
     verb: str | None = None,
     identifier: str | None = None,
     scope: str = "",
@@ -349,7 +349,7 @@ def key_claim(
     scope: str,
     lane: str,
     element_ids: Iterable[str],
-    flows: FlowMap,
+    flows: CaseFlows,
     verb: str | None = None,
     identifier: str | None = None,
     mechanism: Iterable[str] = (),

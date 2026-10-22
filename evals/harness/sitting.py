@@ -71,7 +71,7 @@ from evals.harness.fingerprint import (
     fingerprint,
     key_claim,
 )
-from evals.harness.identity import FlowMap
+from evals.harness.identity import CaseFlows
 from evals.harness.reference import (
     CLAIMS_DIR,
     GoldenCase,
@@ -693,7 +693,7 @@ def mark_targets(case: GoldenCase) -> tuple[MarkTarget, ...]:
     package carries which, and a package that ships a new record type arrives
     here through its own answers.
     """
-    flows: FlowMap = ModelIndex.of(case.model).flow_endpoints
+    flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
     grouped: dict[str, list[str]] = {}
     frameworks: dict[str, FrameworkName] = {}
     aliases: dict[str, set[str]] = {}
@@ -718,7 +718,7 @@ def mark_targets(case: GoldenCase) -> tuple[MarkTarget, ...]:
 
 
 def _older_keys_of(
-    case_id: str, framework: FrameworkName, claim: ReferenceClaim, flows: FlowMap
+    case_id: str, framework: FrameworkName, claim: ReferenceClaim, flows: CaseFlows
 ) -> set[str]:
     """Every key this claim carried under any version this build computes.
 
@@ -779,7 +779,7 @@ def current_marks(prepared: Prepared, marks: Mapping[str, Mark]) -> dict[str, Ma
 
 
 def _key_of(
-    case_id: str, framework: FrameworkName, claim: ReferenceClaim, flows: FlowMap
+    case_id: str, framework: FrameworkName, claim: ReferenceClaim, flows: CaseFlows
 ) -> str:
     """One reference claim's fingerprint, or a refusal that names the claim.
 
