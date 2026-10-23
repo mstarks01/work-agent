@@ -252,7 +252,8 @@ def test_a_cited_change_is_kept():
     assert restored == []
 
 
-def test_an_uncited_deletion_is_put_back_and_a_cited_one_stands():
+def test_an_element_the_patch_leaves_out_stays_unless_it_is_cited():
+    """A cited element left out is deleted; an uncited one is in place, unnamed."""
     previous = dump()
     repaired = dump()
     repaired["data_flows"] = []
@@ -264,7 +265,32 @@ def test_an_uncited_deletion_is_put_back_and_a_cited_one_stands():
     assert [flow["id"] for flow in merged["data_flows"]] == [
         "flow:process:web-app>store:orders-db>store-order"
     ]
-    assert restored == ["flow:process:web-app>store:orders-db>store-order"]
+    assert restored == []
+
+
+def test_a_patch_of_the_cited_element_alone_keeps_the_rest_of_the_model():
+    """In ``elements`` scope the repair emits only what the scope lists."""
+    previous = dump()
+    patch = {
+        group: []
+        for group in (
+            "external_entities",
+            "processes",
+            "data_stores",
+            "data_flows",
+            "trust_boundaries",
+        )
+    }
+    patch["data_stores"] = [{**previous["data_stores"][0], "technology": "corrected"}]
+    patch["assumptions"] = []
+
+    merged, restored = restore_unimplicated(previous, patch, ["store:orders-db"])
+
+    assert merged["data_stores"][0]["technology"] == "corrected"
+    for group in ("external_entities", "processes", "data_flows", "trust_boundaries"):
+        assert merged[group] == previous[group]
+    assert merged["assumptions"] == previous["assumptions"]
+    assert restored == []
 
 
 def test_an_added_element_is_kept():
@@ -284,14 +310,29 @@ def test_an_added_element_is_kept():
     assert restored == []
 
 
-def test_assumptions_are_the_repairs_own():
+def test_an_assumption_follows_its_element():
+    """A put-back element keeps its first-pass entry; a cited one takes the repair's."""
     previous = dump()
     repaired = dump()
     repaired["assumptions"] = []
 
-    merged, _ = restore_unimplicated(previous, repaired, [])
+    kept, _ = restore_unimplicated(previous, repaired, [])
+    cited, _ = restore_unimplicated(previous, repaired, ["process:web-app"])
 
-    assert merged["assumptions"] == []
+    assert kept["assumptions"] == previous["assumptions"]
+    assert cited["assumptions"] == []
+
+
+def test_an_assumption_the_repair_writes_on_an_uncited_element_is_dropped():
+    previous = dump()
+    repaired = dump()
+    repaired["assumptions"] = [
+        {**previous["assumptions"][0], "assumption": "rewritten while I was here"}
+    ]
+
+    merged, _ = restore_unimplicated(previous, repaired, ["store:orders-db"])
+
+    assert merged["assumptions"] == previous["assumptions"]
 
 
 @pytest.mark.parametrize("group", ["external_entities", "processes", "data_stores"])
