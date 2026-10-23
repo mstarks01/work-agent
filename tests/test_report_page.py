@@ -688,12 +688,38 @@ def test_about_lists_the_model_s_gaps_with_their_questions():
 
 
 def test_a_count_of_one_reads_in_the_singular():
+    """Every count on the page is worded by ``counted`` (#1878): the summary's
+    confirmed and dismissed findings, and the scope's units and their needs."""
+    from analysis_service.claims import ScopeEntry, Verdict
+
     parts = run_report_page(page())
     assert (
         "1 additional finding is conditional on missing information."
         in parts["analyses"]
     )
     assert parts["questions-tab"] == "Questions (1)"
+    dismissed = sample_threat(
+        "I-01",
+        "information-disclosure",
+        verdict=Verdict(status="rejected", reason="The source states HTTPS."),
+    )
+    report = sample_report(
+        [sample_threat(), asking_threat(ASKED).model_copy(update={"id": "S-02"})],
+        [dismissed],
+        scope=[
+            ScopeEntry(
+                unit="V1",
+                state="needs-other-evidence",
+                reason="A description cannot show it.",
+                needs="a penetration test",
+            )
+        ],
+    )
+    parts = run_report_page(render_report(report, report_state(report)).html)
+    assert "1 confirmed finding: 1 high." in parts["analyses"]
+    assert "1 was dismissed." in parts["analyses"]
+    assert "1 unit with no claim raised" in parts["framework-notes"]
+    assert "1 needs a penetration test" in parts["framework-notes"]
 
 
 def test_the_export_lists_each_question_with_its_findings_and_a_link():
@@ -707,6 +733,36 @@ def test_the_export_lists_each_question_with_its_findings_and_a_link():
     assert "Is the connection initiated by Web App to Orders DB encrypted?" in printed
     assert "New question from this analysis" in printed
     assert "Used by: S-01" in printed
+
+
+def test_the_export_lists_the_link_answers_and_the_corrections_the_page_shows():
+    """The export lists what the Questions section draws: a link answer the
+    report read, worded as the page words it, and the note under an answer
+    corrected after a final report."""
+    from analysis_service.links import LinkAnswer
+
+    report = sample_report([asking_threat(ASKED)])
+    follow_up = render_report(
+        report,
+        report_state(
+            report, links=[LinkAnswer(principal="batch loader", element="none")]
+        ),
+    ).html
+    printed = run_report_page(follow_up)["export-questions"]
+    assert "Answers this report readbatch loaderAnswer: none of these" in printed
+
+    final = render_report(
+        report,
+        report_state(
+            report,
+            answered=[FactAnswer(key=ASKED.key, value="TLS 1.3")],
+            final=True,
+            corrections=[FactAnswer(key=ASKED.key, value="unknown")],
+        ),
+    ).html
+    printed = run_report_page(final)["export-questions"]
+    assert "Answer: I don't know" in printed
+    assert "Corrected after this report" in printed
 
 
 def test_the_page_carries_the_zones_the_service_assumed():

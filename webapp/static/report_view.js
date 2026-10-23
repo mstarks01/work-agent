@@ -697,7 +697,7 @@
     const box = el("div", "summary");
     const confirmed = block.claims.filter(c => c.verdict.status === "confirmed").length;
     const first = el("p");
-    let lead = `${confirmed} confirmed ${confirmed === 1 ? "finding" : "findings"}`;
+    let lead = counted(confirmed, "confirmed finding", "confirmed findings");
     const graded = block.summary.by_severity_confirmed;
     if (graded && confirmed) {
       lead += ": " + SEV_ORDER.filter(l => graded[l])
@@ -711,7 +711,7 @@
     }
     if (dismissed) {
       rest.push(conditional
-        ? `${dismissed} ${dismissed === 1 ? "was" : "were"} dismissed.`
+        ? `${counted(dismissed, "was", "were")} dismissed.`
         : `${counted(dismissed, "finding was", "findings were")} dismissed.`);
     }
     if (conditional) rest.push("You can use this report without answering any questions.");
@@ -751,7 +751,7 @@
       line.append(`One shared action addresses ${f.rests.length} findings: `, el("b", null, f.label), ". ");
       f.rests.forEach((id, i) => {
         const link = el("a", "tid", id);
-        link.href = `#finding-${block.framework}-${id}`;
+        link.href = `#${findingId({ framework: block.framework, id })}`;
         link.addEventListener("click", (event) => {
           event.preventDefault();
           goToFinding(`${block.framework}/${id}`);
@@ -863,23 +863,6 @@
       else link.removeAttribute("aria-current");
     });
   };
-  const indexGroups = () => {
-    $("question-index").replaceChildren();
-    [...$("list").children].forEach((box, index) => {
-      box.id = `question-group-${index}`;
-      const link = el("a", null, box.querySelector(".group-heading").textContent);
-      const count = box.querySelectorAll(".question, tr[data-key]").length;
-      link.append(el("small", null, counted(count, "question", "questions")));
-      link.href = `#${box.id}`;
-      link.box = box;
-      link.addEventListener("click", (event) => {
-        event.preventDefault();
-        selectGroup(box);
-        box.querySelector("summary").focus();
-      });
-      $("question-index").append(link);
-    });
-  };
   // A link from a finding to a question: the question's group, open, with
   // the focus on its first input.
   const goToQuestion = (key) => {
@@ -920,7 +903,7 @@
       prev = row;
     });
     $("question-layout").hidden = false;
-    indexGroups();
+    indexGroups($("question-index"), $("list"), selectGroup);
     if ($("list").children.length) selectGroup($("list").children[0]);
   };
   // A link question as a row of the list: its options with their names.
@@ -928,12 +911,37 @@
     ...q,
     options: q.options.map(id => ({ id, name: NAMES[id] })),
     group: "links",
-    group_heading: "Match each user, team or account to a part of your system",
+    group_heading: LINK_GROUP_HEADING,
   });
   // An answer this report read, as a row the list draws compact. The answers
   // share one group, after the questions.
   const EARLIER_GROUP = { group: "earlier", group_heading: "Answers this report read" };
   const earlierFact = (a) => ({ ...a, ...EARLIER_GROUP, element: a.label });
+  // The note under an answer its owner corrected after a final report.
+  const correctionNote = (q) => (q.corrected ? [el("div", "meta", "Corrected after this report")] : []);
+  // Every row the Questions section draws, as `drawList` takes it: a final
+  // report's answers, each open to a correction, or the questions a report
+  // asks with the answers it read. The export lists the same rows.
+  const ENTRIES = FINAL
+    ? (CORRECTIONS.answers || []).map(a => ({ q: earlierFact(a), kind: "fact", saved: a.answer, compact: true }))
+    : !ASKS ? [] : [
+      ...LINK_QUESTIONS.map(q => ({ q: linkQuestion(q), kind: "link" })),
+      ...FACT_QUESTIONS.map(q => ({ q, kind: "fact" })),
+      ...EARLIER_LINKS.map(a => ({
+        q: { ...linkQuestion(a), ...EARLIER_GROUP },
+        kind: "link",
+        saved: DRAFT_LINKS.has(a.principal)
+          ? { principal: a.principal, element: DRAFT_LINKS.get(a.principal) }
+          : { principal: a.principal, element: a.answer.element },
+        compact: !DRAFT_LINKS.has(a.principal),
+      })),
+      ...EARLIER_FACTS.map(a => ({
+        q: earlierFact(a),
+        kind: "fact",
+        saved: startFrom(a.answer, a.key),
+        compact: !DRAFT_FACTS.has(questionKey(a.key)),
+      })),
+    ].map(entry => ({ ...entry, saved: entry.saved || startOf(entry) }));
 
   // The action area: what the answers on the page are, and the two buttons.
   const status = el("p", "save-line");
@@ -982,8 +990,7 @@
       "choose \"I don't know\". A correction is kept beside this report and marks the " +
       "findings that rest on it. Saving corrections does not run the analysis again, " +
       "and does not change the verdicts in this report.";
-    const answers = CORRECTIONS.answers || [];
-    if (!answers.length) {
+    if (!ENTRIES.length) {
       $("questions-state").append(el("p", "meta", "This report read no answers to correct."));
     } else {
       const save = button("Save corrections", true);
@@ -991,14 +998,7 @@
         const n = changes().length;
         status.textContent = n ? `${counted(n, "correction", "corrections")} not saved yet` : "No new corrections";
       };
-      drawList(answers.map(a => ({ q: earlierFact(a), kind: "fact", saved: a.answer, compact: true })), {
-        reopen: true,
-        onEdit: showState,
-        notes: (row) => {
-          const a = answers.find(each => questionKey(each.key) === questionKey(row.q.key));
-          return a && a.corrected ? [el("div", "meta", "Corrected after this report")] : [];
-        },
-      });
+      drawList(ENTRIES, { reopen: true, onEdit: showState, notes: (row) => correctionNote(row.q) });
       let saving = false;
       save.addEventListener("click", async () => {
         if (saving) return;
@@ -1033,25 +1033,6 @@
     $("questions-lead").textContent = "This report asks no questions.";
   } else {
     $("questions-lead").textContent = "Answer what you know. You can save and come back.";
-    const entries = [
-      ...LINK_QUESTIONS.map(q => ({ q: linkQuestion(q), kind: "link" })),
-      ...FACT_QUESTIONS.map(q => ({ q, kind: "fact" })),
-      ...EARLIER_LINKS.map(a => ({
-        q: { ...linkQuestion(a), ...EARLIER_GROUP },
-        kind: "link",
-        saved: DRAFT_LINKS.has(a.principal)
-          ? { principal: a.principal, element: DRAFT_LINKS.get(a.principal) }
-          : { principal: a.principal, element: a.answer.element },
-        compact: !DRAFT_LINKS.has(a.principal),
-      })),
-      ...EARLIER_FACTS.map(a => ({
-        q: earlierFact(a),
-        kind: "fact",
-        saved: startFrom(a.answer, a.key),
-        compact: !DRAFT_FACTS.has(questionKey(a.key)),
-      })),
-    ].map(entry => ({ ...entry, saved: entry.saved || startOf(entry) }));
-
     const save = button("Save draft", false);
     const update = button("Update report", true);
     let revision = EARLIER.revision || 0;
@@ -1097,7 +1078,7 @@
         .filter(([finding, asked]) => asked.every(index => knownFor(index, needOf(index, finding))))
         .length;
       coverage.textContent =
-        `Your answers cover every question for ${covered} of the ${waitsOn.size} findings ` +
+        `Your answers cover every question for ${covered} of the ${counted(waitsOn.size, "finding", "findings")} ` +
         "that wait on one. The analysis decides again whether they are settled.";
       const given = FACT_QUESTIONS.filter((q, index) => knownFor(index, [])).length;
       const reached = [...waitsOn]
@@ -1109,7 +1090,7 @@
           "The follow-up then runs the whole analysis once, and its report is final."
         : "No answer given yet.";
     };
-    drawList(entries, {
+    drawList(ENTRIES, {
       reopen: false,
       onEdit: () => {
         showState();
@@ -1341,7 +1322,7 @@
       const byState = {};
       block.scope.forEach(e => { (byState[e.state] = byState[e.state] || []).push(e); });
       const ruledOutClaims = block.rejected_claims.filter(c => rulesOut(block, c));
-      const lines = [`${block.scope.length} units with no claim raised`];
+      const lines = [`${counted(block.scope.length, "unit", "units")} with no claim raised`];
       const count = (state) => (byState[state] || []).length;
       if (count("not-applicable")) lines.push(`${count("not-applicable")} ruled out — does not apply`);
       if (ruledOutClaims.length) {
@@ -1358,7 +1339,7 @@
         lines.push(`${deferred.length} could not be evaluated from this input`);
         const byNeed = {};
         deferred.forEach(e => { byNeed[e.needs] = (byNeed[e.needs] || 0) + 1; });
-        Object.keys(byNeed).sort().forEach(need => lines.push(`  ${byNeed[need]} need ${need}`));
+        Object.keys(byNeed).sort().forEach(need => lines.push(`  ${counted(byNeed[need], "needs", "need")} ${need}`));
       }
       const list = el("ul", "meta");
       lines.forEach(line => list.append(el("li", null, line)));
@@ -1982,23 +1963,24 @@
     note.append(link);
     exportQuestions.append(note);
   }
-  const exported = [
-    ...LINK_QUESTIONS.map(q => ({ group: "Match each user, team or account to a part of your system", label: q.principal })),
-    ...FACT_QUESTIONS.map(q => ({ group: q.group_heading, label: q.label, history: q.history, findings: q.findings })),
-    ...(FINAL ? (CORRECTIONS.answers || []) : EARLIER_FACTS).map(a => ({
-      group: "Answers this report read", label: a.label, answer: answerText(a.answer) })),
-  ];
+  // The rows the Questions section draws, under their group headings. An
+  // earlier answer prints as its text; an open question prints its history
+  // and the findings it informs.
   const byGroup = new Map();
-  exported.forEach(q => {
-    if (!byGroup.has(q.group)) byGroup.set(q.group, []);
-    byGroup.get(q.group).push(q);
+  ENTRIES.forEach(entry => {
+    const group = entry.q.group_heading;
+    if (!byGroup.has(group)) byGroup.set(group, []);
+    byGroup.get(group).push(entry);
   });
-  byGroup.forEach((questions, group) => {
+  byGroup.forEach((entries, group) => {
     exportQuestions.append(el("h3", null, group));
-    questions.forEach(q => {
+    entries.forEach(({ q, kind }) => {
       const item = el("div", "export-question");
-      item.append(el("b", null, q.label));
-      if (q.answer) item.append(el("div", "meta", `Answer: ${q.answer}`));
+      item.append(el("b", null, kind === "link" ? q.principal : q.label));
+      if (q.answer) {
+        item.append(el("div", "meta", `Answer: ${kind === "link" ? linkAnswerText(q.answer) : answerText(q.answer)}`));
+      }
+      item.append(...correctionNote(q));
       if (q.history) item.append(el("div", "meta", HISTORY[q.history] || q.history));
       if ((q.findings || []).length) {
         item.append(el("div", "meta", "Used by: " +
@@ -2007,7 +1989,7 @@
       exportQuestions.append(item);
     });
   });
-  if (!exported.length) exportQuestions.append(el("p", "meta", "This report asks no questions."));
+  if (!ENTRIES.length) exportQuestions.append(el("p", "meta", "This report asks no questions."));
 
   // Entering the export opens what was closed and shows every section;
   // leaving it closes those again and returns to the section the reader was
