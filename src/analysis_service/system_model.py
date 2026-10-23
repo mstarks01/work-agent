@@ -833,10 +833,36 @@ class EmittedSystemModel(BaseModel):
     assumptions: list[Assumption] = Field(default_factory=list)
 
 
+class ExcerptRepair(BaseModel):
+    """An element excerpt the extraction gate replaced with the source's own span.
+
+    The ladder refused what the model wrote, and
+    :func:`~analysis_service.grounding.repair_prepared` found a window of the
+    cited source near enough to hand back, with no negation or number changed
+    (:func:`~analysis_service.grounding.meaning_moved`). The element now carries
+    that window, and this record carries what the model wrote, so the
+    substitution is on the record rather than silent (ADR 0100).
+
+    Written by :func:`~analysis_service.validation.repair_excerpts` alone and
+    outside :class:`EmittedSystemModel`, so no extraction can report on its
+    own accuracy. ``similarity`` is the ratio that licensed the replacement, and
+    ``scan_complete`` is whether the rung ranked every window first.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    element_id: str = Field(min_length=1)
+    written: str = Field(min_length=1, max_length=1000)  # source_excerpt's bound
+    similarity: float = Field(ge=0.0, le=1.0)
+    scan_complete: bool
+
+
 class SystemModel(EmittedSystemModel):
     """The canonical structured representation of the system under analysis."""
 
     capabilities: list[CapabilityStatement] = Field(default_factory=list)
+    #: Each element excerpt the gate replaced with its source's own span.
+    excerpt_repairs: list[ExcerptRepair] = Field(default_factory=list)
 
     def elements(self) -> list[Element]:
         """All elements in a stable order: :data:`ELEMENT_GROUPS`, each in list order."""

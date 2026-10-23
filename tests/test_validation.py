@@ -7,13 +7,20 @@ import pytest
 from analysis_service.assertions import _ELEMENT_TYPES
 from analysis_service.early_questions import element_type
 from analysis_service.evidence import _element_gloss
+from analysis_service.graph import render_model
 from analysis_service.links import components
 from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import UNKNOWN, SystemModel, make_flow_id
+from analysis_service.system_model import (
+    UNKNOWN,
+    ExcerptRepair,
+    SystemModel,
+    make_flow_id,
+)
 from analysis_service.validation import (
     CITATION_FIELDS,
     MAX_ELEMENTS,
     parse_and_validate,
+    restore_unimplicated,
     validate,
 )
 from tests.factories import valid_model
@@ -782,3 +789,116 @@ def test_a_flow_between_same_named_endpoints_of_two_types_derives_two_flows():
         make_flow_id("entity:x", store, "read"),
         make_flow_id("process:x", store, "read"),
     }
+
+
+class TestTheRungRepairsAnExcerpt:
+    """ADR 0100: the ADR 0018 rung runs at the extraction gate before it refuses."""
+
+    SOURCES: ClassVar[dict[str, str]] = {
+        "Kickoff call": (
+            "Ana: a quote. Each node publishes readings over MQTT to the device"
+            " gateway, and the gateway stores them. The orders DB is not encrypted"
+            " at rest by the service."
+        ),
+    }
+
+    def gated(self, excerpt: str, normalize_ids: bool = True):
+        model = TestCitationsResolve().model_citing("Kickoff call", excerpt)
+        return parse_and_validate(
+            model.model_dump(), normalize_ids=normalize_ids, sources=self.SOURCES
+        )
+
+    def test_an_excerpt_off_by_its_last_mark_passes_with_the_source_span(self):
+        written = "Each node publishes readings over MQTT to the device gateway."
+
+        model, issues = self.gated(written)
+
+        assert issues == []
+        assert model.processes[0].source_excerpt == (
+            "Each node publishes readings over MQTT to the device gateway,"
+        )
+        (repair,) = model.excerpt_repairs
+        assert (repair.element_id, repair.written) == ("process:web-app", written)
+        assert 0.9 <= repair.similarity <= 1.0
+
+    def test_a_paraphrase_is_still_refused(self):
+        _, issues = self.gated("Nodes send their readings to the gateway using MQTT.")
+
+        assert [issue.code for issue in issues] == ["unverifiable-excerpt"]
+
+    def test_a_quote_cut_with_an_ellipsis_is_still_refused(self):
+        model, issues = self.gated(
+            "Each node publishes their readings … gateway keeps them."
+        )
+
+        assert [issue.code for issue in issues] == ["unverifiable-excerpt"]
+        assert model.excerpt_repairs == []
+
+    def test_a_repair_that_moves_the_meaning_is_still_refused(self):
+        model, issues = self.gated("The orders DB is encrypted at rest by the service.")
+
+        assert [issue.code for issue in issues] == ["unverifiable-excerpt"]
+        assert model.excerpt_repairs == []
+
+    def test_an_authored_model_is_never_rewritten(self):
+        written = "Each node publishes readings over MQTT to the device gateway."
+
+        model, issues = self.gated(written, normalize_ids=False)
+
+        assert [issue.code for issue in issues] == ["unverifiable-excerpt"]
+        assert model.processes[0].source_excerpt == written
+
+    def test_a_record_naming_no_element_is_refused(self):
+        model = TestCitationsResolve().model_citing("Kickoff call")
+        model.excerpt_repairs = [
+            ExcerptRepair(
+                element_id="process:ghost",
+                written="a quote",
+                similarity=0.95,
+                scan_complete=True,
+            )
+        ]
+
+        issues = validate(model, sources=self.SOURCES)
+
+        assert [(issue.code, issue.field) for issue in issues] == [
+            ("invalid-reference", "excerpt_repairs")
+        ]
+
+    def test_the_overlay_keeps_the_record_of_an_element_it_restores(self):
+        records = [
+            {
+                "element_id": "process:web-app",
+                "written": "w",
+                "similarity": 0.95,
+                "scan_complete": True,
+            },
+            {
+                "element_id": "store:orders-db",
+                "written": "w",
+                "similarity": 0.95,
+                "scan_complete": True,
+            },
+        ]
+        previous = {**valid_model().model_dump(mode="json"), "excerpt_repairs": records}
+        repaired = valid_model().model_dump(mode="json")
+
+        overlaid, _ = restore_unimplicated(previous, repaired, ["store:orders-db"])
+
+        assert [entry["element_id"] for entry in overlaid["excerpt_repairs"]] == [
+            "process:web-app"
+        ]
+
+    def test_no_agent_is_shown_the_record(self):
+        model = valid_model().model_dump(mode="json")
+        model["excerpt_repairs"] = [
+            {
+                "element_id": "process:web-app",
+                "written": "tidied words",
+                "similarity": 0.95,
+                "scan_complete": True,
+            }
+        ]
+
+        assert "tidied words" not in render_model(model)
+        assert "excerpt_repairs" not in render_model(model)

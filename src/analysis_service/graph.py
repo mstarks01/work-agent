@@ -1436,8 +1436,18 @@ def validate_extraction(
     if issues or model is None:
         parked = extracted_model if model is None else model.model_dump(mode="json")
         # Fenced for the same reason as the agents' copy: this is the model
-        # built from caller words, handed straight back to a model.
-        state.prompt(STATE_PREVIOUS_MODEL, render_fenced(parked))
+        # built from caller words, handed straight back to a model. A parsed
+        # model is shown without ``excerpt_repairs``, which the repair schema
+        # does not carry: the gate's own record, kept on the baseline for the
+        # overlay.
+        shown = (
+            parked
+            if model is None
+            else {
+                key: value for key, value in parked.items() if key != "excerpt_repairs"
+            }
+        )
+        state.prompt(STATE_PREVIOUS_MODEL, render_fenced(shown))
         state.prompt(
             STATE_VALIDATION_ISSUES,
             render_fenced([issue.model_dump(mode="json") for issue in issues]),
@@ -1515,10 +1525,15 @@ def _without_source_fields(valid_model: dict) -> dict:
     lifted out of a note — a quote the ladder cannot tell from a legitimate one,
     because it *is* verbatim submitter text.
 
+    ``excerpt_repairs`` goes too, for the first reason: it holds what an
+    extraction wrote before the gate put the source's span in its place.
+
     The honest cost: the bytes an agent saw are no longer the bytes the report
     carries.
     """
-    stripped = dict(valid_model)
+    stripped = {
+        key: value for key, value in valid_model.items() if key != "excerpt_repairs"
+    }
     for collection, entries in stripped.items():
         if collection == "assumptions" or not isinstance(entries, list):
             continue

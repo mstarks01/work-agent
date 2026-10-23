@@ -31,7 +31,16 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state, leading_word
 from analysis_service.capabilities import CAPABILITIES
-from analysis_service.grounding import normalize, verify_normalized
+from analysis_service.grounding import (
+    PreparedSource,
+    deadline_spent,
+    meaning_moved,
+    normalize,
+    prepare_source,
+    repair_deadline,
+    repair_prepared,
+    verify_normalized,
+)
 from analysis_service.references import canonical
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import (
@@ -41,6 +50,7 @@ from analysis_service.system_model import (
     Assumption,
     CapabilityStatement,
     Element,
+    ExcerptRepair,
     SystemModel,
     assumable_attributes,
     derive_element_id,
@@ -256,6 +266,18 @@ def validate(
             )
 
     issues.extend(_citation_issues(elements, model.capabilities, sources))
+    element_ids = {element.id for element in elements}
+    issues += [
+        ValidationIssue(
+            code="invalid-reference",
+            message=f"excerpt repair names {repair.element_id!r}, which is not an"
+            " element of this model",
+            element_id=repair.element_id,
+            field="excerpt_repairs",
+        )
+        for repair in model.excerpt_repairs
+        if repair.element_id not in element_ids
+    ]
     return issues
 
 
@@ -510,8 +532,10 @@ def _citation_issues(
 
     Failing closed is affordable because extraction has the ``repair`` pass: an
     excerpt the gate cannot find is cited back to the transcriber that wrote
-    it, with the source still in front of it. That is the opposite of the draft
-    seam, where the same failure has nowhere to go.
+    it, with the source still in front of it. A model that arrived from a model
+    reaches this rule after :func:`repair_excerpts`, which has already put the
+    source's own span in place of an excerpt the ADR 0018 rung could repair, so
+    only what the rung could not repair costs that pass.
 
     A **Capability** statement is cited by the same rule, because it asserts a
     fact about the application in a source's words exactly as an element does.
@@ -633,6 +657,54 @@ def _quote_issue(
     return None
 
 
+def repair_excerpts(model: SystemModel, sources: Mapping[str, str]) -> SystemModel:
+    """``model`` with each refused element excerpt replaced by its source's span.
+
+    The ADR 0018 rung, asked at the extraction gate (ADR 0100). An excerpt the
+    ladder refuses against the source it cites is given to
+    :func:`~analysis_service.grounding.repair_prepared`. Where that finds a
+    window and :func:`~analysis_service.grounding.meaning_moved` names nothing,
+    the element carries the window, and an :class:`ExcerptRepair` records what
+    the model wrote. Anything else is left for the gate to refuse as
+    ``unverifiable-excerpt``, so the repair pass still sees it.
+
+    Run only on a model that arrived from a model, after
+    :func:`~analysis_service.system_model.normalize_element_ids` has snapped
+    each label to the job's spelling. An authored model is never rewritten, and
+    a quote of the answers Source is the gate's to refuse. The scans of one
+    call share :func:`~analysis_service.grounding.repair_deadline`.
+    """
+    if not sources:
+        return model
+    folded = {label: normalize(text) for label, text in sources.items()}
+    prepared: dict[str, PreparedSource] = {}
+    deadline = repair_deadline()
+    repaired = model.model_copy(deep=True)
+    for element in repaired.elements():
+        written, label = element.source_excerpt, element.source_label
+        if not written or not sources.get(label) or label == ANSWERS_LABEL:
+            continue
+        if verify_normalized(written, folded[label]):
+            continue
+        if label not in prepared:
+            if deadline_spent(deadline):
+                continue
+            prepared[label] = prepare_source(sources[label])
+        repair = repair_prepared(written, prepared[label], deadline)
+        if repair is None or meaning_moved(written, repair.span):
+            continue
+        element.source_excerpt = repair.span
+        repaired.excerpt_repairs.append(
+            ExcerptRepair(
+                element_id=element.id,
+                written=written,
+                similarity=round(repair.similarity, 3),
+                scan_complete=repair.complete,
+            )
+        )
+    return repaired
+
+
 def parse_and_validate(
     data: object,
     max_elements: int = MAX_ELEMENTS,
@@ -689,7 +761,7 @@ def parse_and_validate(
     if normalize_ids:
         emitted = model.elements()
         shared = duplicate_ids(emitted)
-        model = normalize_element_ids(model, sources)
+        model = repair_excerpts(normalize_element_ids(model, sources), sources)
         # The deep copy keeps the walk order, so the two walks pair by position.
         issues = [
             ValidationIssue(
@@ -825,6 +897,13 @@ def restore_unimplicated(
     """
     named = set(implicated)
     result: dict[str, Any] = dict(repaired)
+    # A restored element is the one the first gate repaired, so its record
+    # stays; a named element's record goes, and the gate asks again.
+    result["excerpt_repairs"] = [
+        entry
+        for entry in previous.get("excerpt_repairs", ())
+        if entry["element_id"] not in named
+    ]
     restored: list[str] = []
     for group in ELEMENT_GROUPS:
         before = {entry["id"]: entry for entry in previous.get(group, ())}
