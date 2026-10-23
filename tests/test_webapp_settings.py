@@ -35,7 +35,7 @@ from tests.test_settings_env import (
 )
 from tests.test_webapp import LOOPBACK
 from webapp.main import Workspace, create_app
-from webapp.settings_page import CHANGED_SAMPLING, SETTINGS, sampling_key
+from webapp.settings_page import CHANGED_SAMPLING, SETTINGS, sampling_key, tier_key
 
 #: A key that no fixture holds, so a page that carries it leaked the file.
 KEY = "sk-ant-page-must-never-show-this"
@@ -122,6 +122,15 @@ class TestTheRows:
             assert SETTINGS[row["vendor_key"]].variable == vendor_var
             assert SETTINGS[row["model_key"]].variable == model_var
             assert rows[row["model_key"]]["vendor_key"] == row["vendor_key"]
+
+    def test_the_data_names_each_tier_vendor_row(self, tmp_path):
+        """The server states which rows choose a tier's vendor, so the page
+        parses no key to find them."""
+        data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
+
+        assert data["vendor_rows"] == [tier_key(tier, "vendor") for tier in TIER_NAMES]
+        for tier, key in zip(TIER_NAMES, data["vendor_rows"], strict=True):
+            assert SETTINGS[key].variable == env_vars_for(tier)[0]
 
     def test_the_data_lists_each_suggested_model_that_takes_no_level(self, tmp_path):
         data = page_data(client_for(tmp_path, hand_written()).get("/settings"))

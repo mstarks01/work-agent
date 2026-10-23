@@ -35,11 +35,10 @@ function pending(row) {
   return value === null ? row.shipped : value;
 }
 
-const TIER_VENDOR = /^tiers\.[^.]+\.vendor$/;
-
-// Each vendor that a tier names, with the unsaved changes applied.
+// Each vendor that a tier names, with the unsaved changes applied. The server
+// lists the keys of the rows that choose a tier's vendor.
 const chosenVendors = () =>
-  new Set(SETTINGS.rows.filter((row) => TIER_VENDOR.test(row.key)).map(pending).filter(Boolean));
+  new Set(SETTINGS.vendor_rows.map(rowOf).filter(Boolean).map(pending).filter(Boolean));
 
 // The credential mode of a vendor: its only one, else the chosen one.
 function chosenMode(vendor) {

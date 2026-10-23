@@ -109,7 +109,8 @@ def settings_view(
     error: ConfigError | None,
 ) -> dict[str, Any]:
     """The page's data: the rows, the unknown lines of ``settings.env``, the
-    engine's error, the modes of each vendor, the ``iam`` notes and the model
+    engine's error, the modes of each vendor, the keys of the rows that choose
+    a tier's vendor (``vendor_rows``), the ``iam`` notes and the model
     suggestions of each vendor. The page's script picks the suggestions of a
     tier from the vendor that the unsaved changes choose for it.
     """
@@ -176,6 +177,7 @@ def settings_view(
             for vendor in VENDOR_NAMES
             if (setup := IAM_SETUP[vendor]) is not None
         ],
+        "vendor_rows": [tier_key(tier, "vendor") for tier in TIER_NAMES],
         "models": {vendor: list(tool_models(vendor)) for vendor in VENDOR_NAMES},
         "no_thinking": {
             vendor: list(no_thinking_models(vendor)) for vendor in VENDOR_NAMES
