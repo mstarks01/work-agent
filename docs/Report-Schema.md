@@ -994,6 +994,7 @@ class NodeRun:
     reasks: int  # 1 where the first answer failed its schema and the node asked once more
     schema_path: Literal["native", "tool", "prompt"] | None  # how the schema travelled
     schema_fallback: str | None  # a rule name from ladder.SCHEMA_REFUSALS
+    answer_unwrapped: bool  # the tool call's answer came out of a lone `answer` key
     served_trust: (
         Literal["provider_reported", "requested_echo"] | None
     )  # what `model` is worth as evidence; None for code-only nodes
@@ -1097,6 +1098,10 @@ class TokenUsage:
 - **`schema_fallback`** names the rule that moved the node's tier down its
   ladder of formats, on the call where the provider refused the format above. It holds the rule's name and never the provider's message,
   which can quote the prompt back.
+- **`answer_unwrapped`** is `true` where the node's tool call put its whole
+  answer under a lone `answer` key that the node's schema does not have. The
+  executor reads the object under that key as the answer, and the schema check
+  then reads that object.
 
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops

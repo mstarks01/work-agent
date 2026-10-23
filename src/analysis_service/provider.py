@@ -105,6 +105,16 @@ SCHEMA_FALLBACK_METADATA_KEY = "schema_fallback"
 #: where the call sent no schema.
 SCHEMA_PATH_METADATA_KEY = "schema_path"
 
+#: The ``custom_metadata`` key under which a tool-path response says that
+#: :func:`answer_from_tool_call` took its answer out of a lone ``answer`` key.
+#: Absent where the answer arrived as the schema's own object.
+ANSWER_UNWRAPPED_METADATA_KEY = "answer_unwrapped"
+
+#: The one key a model wraps a tool call's answer in, against a schema that has
+#: no such field. ``claude-sonnet-5`` on the forced tool rung writes the
+#: extraction and the repair this way, and repeats the wrapper on the re-ask.
+WRAPPER_KEY = "answer"
+
 #: What the model reads after an answer that does not match its node's schema.
 #: The validation errors follow it, one per line.
 REASK_INSTRUCTION = (
@@ -245,6 +255,8 @@ class GenerationResult:
     schema_path: SchemaPath | None
     #: The refusal rule that moved this call down its tier's ladder, or ``None``.
     schema_fallback: SchemaRefusal | None = None
+    #: Whether the answer came out of a lone ``answer`` key on the tool path.
+    answer_unwrapped: bool = False
 
     @classmethod
     def of(cls, response: LlmResponse) -> Self:
@@ -266,6 +278,7 @@ class GenerationResult:
             cache_write_tokens=stamped.get(CACHE_WRITE_METADATA_KEY),
             schema_path=stamped.get(SCHEMA_PATH_METADATA_KEY),
             schema_fallback=stamped.get(SCHEMA_FALLBACK_METADATA_KEY),
+            answer_unwrapped=stamped.get(ANSWER_UNWRAPPED_METADATA_KEY, False),
         )
 
     def followed_by(self, later: Self) -> Self:
@@ -286,6 +299,7 @@ class GenerationResult:
                 self.cache_write_tokens, later.cache_write_tokens
             ),
             schema_fallback=self.schema_fallback or later.schema_fallback,
+            answer_unwrapped=self.answer_unwrapped or later.answer_unwrapped,
         )
 
     def into_response(self) -> LlmResponse:
@@ -302,6 +316,7 @@ class GenerationResult:
             CACHE_WRITE_METADATA_KEY: self.cache_write_tokens,
             SCHEMA_PATH_METADATA_KEY: self.schema_path,
             SCHEMA_FALLBACK_METADATA_KEY: self.schema_fallback,
+            ANSWER_UNWRAPPED_METADATA_KEY: self.answer_unwrapped or None,
         }
         present = {key: value for key, value in stamped.items() if value is not None}
         return LlmResponse(
@@ -440,7 +455,10 @@ class InProcessExecutor:
         except Exception as exc:
             raise ProviderCallFailed(classify(exc)) from exc
         if path == "tool":
-            responses = [answer_from_tool_call(response) for response in responses]
+            fields = _answer_fields(llm_request)
+            responses = [
+                answer_from_tool_call(response, fields) for response in responses
+            ]
         elif path == "prompt":
             responses = [answer_unfenced(response) for response in responses]
         return [
@@ -634,7 +652,9 @@ def answer_unfenced(response: LlmResponse) -> LlmResponse:
     return response.model_copy(update={"content": content})
 
 
-def answer_from_tool_call(response: LlmResponse) -> LlmResponse:
+def answer_from_tool_call(
+    response: LlmResponse, fields: frozenset[str] = frozenset()
+) -> LlmResponse:
     """``response`` with a call to :data:`OUTPUT_TOOL_NAME` turned into JSON text.
 
     The node reads its answer as text, as it does on the native path, so the
@@ -642,6 +662,12 @@ def answer_from_tool_call(response: LlmResponse) -> LlmResponse:
     is dropped, because ADK joins every text part and a preamble would break
     the JSON. A response that did not call the tool passes unchanged, and the
     schema check above the seam decides what happens to its text.
+
+    ``fields`` are the top-level properties of the schema the tool carried.
+    Arguments whose only key is :data:`WRAPPER_KEY`, holding an object, where
+    ``fields`` has no such property, become that object, and the response
+    carries :data:`ANSWER_UNWRAPPED_METADATA_KEY`. Every other shape of
+    arguments is sent on as it is, and the schema check reads it.
     """
     parts = response.content.parts if response.content is not None else None
     calls = [
@@ -652,10 +678,30 @@ def answer_from_tool_call(response: LlmResponse) -> LlmResponse:
     ]
     if not calls or response.content is None:
         return response
+    args = calls[0].args or {}
+    wrapped = args.keys() == {WRAPPER_KEY} and WRAPPER_KEY not in fields
+    unwrapped = wrapped and isinstance(args[WRAPPER_KEY], Mapping)
     kept = [part for part in parts or () if part.thought]
-    answer = types.Part(text=json.dumps(calls[0].args or {}))
+    answer = types.Part(text=json.dumps(args[WRAPPER_KEY] if unwrapped else args))
     content = response.content.model_copy(update={"parts": [*kept, answer]})
-    return response.model_copy(update={"content": content})
+    update: dict[str, Any] = {"content": content}
+    if unwrapped:
+        update["custom_metadata"] = {
+            **(response.custom_metadata or {}),
+            ANSWER_UNWRAPPED_METADATA_KEY: True,
+        }
+    return response.model_copy(update=update)
+
+
+def _answer_fields(llm_request: LlmRequest) -> frozenset[str]:
+    """The top-level properties of the schema :func:`schema_as_tool` sent."""
+    tools = llm_request.config.tools if llm_request.config is not None else None
+    for tool in tools or ():
+        for declaration in getattr(tool, "function_declarations", None) or ():
+            if declaration.name == OUTPUT_TOOL_NAME:
+                schema = declaration.parameters_json_schema or {}
+                return frozenset(schema.get("properties", {}))
+    return frozenset()
 
 
 def schema_errors(schema: Any, results: Sequence[GenerationResult]) -> str | None:

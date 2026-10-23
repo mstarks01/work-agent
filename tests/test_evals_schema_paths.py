@@ -28,15 +28,22 @@ ARCHIVED = next((PROJECT_ROOT / "evals" / "baselines").rglob("*.report.json"))
 
 
 class _ToolReplies(_Replies):
-    """Scripted answers on the tool path, the first after a native refusal."""
+    """Scripted answers on the tool path, the first after a native refusal.
+
+    The first answer also came out of a lone ``answer`` key.
+    """
 
     async def generate(self, request: GenerationRequest):
         results = await super().generate(request)
-        fallback: SchemaRefusal | None = (
-            "schema_field_refused" if len(self.seen) == 1 else None
-        )
+        first = len(self.seen) == 1
+        fallback: SchemaRefusal | None = "schema_field_refused" if first else None
         return [
-            replace(result, schema_path="tool", schema_fallback=fallback)
+            replace(
+                result,
+                schema_path="tool",
+                schema_fallback=fallback,
+                answer_unwrapped=first,
+            )
             for result in results
         ]
 
@@ -63,6 +70,7 @@ def test_a_graph_run_s_schema_facts_are_counted_per_node():
     assert lane == {
         "executions": 1,
         "reasks": 1,
+        "unwrapped": 1,
         "paths": {"tool": 1},
         "fallbacks": {"schema_field_refused": 1},
     }

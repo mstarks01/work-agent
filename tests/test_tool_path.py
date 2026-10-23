@@ -20,6 +20,7 @@ from analysis_service.binding import build_tier_adapters
 from analysis_service.ladder import OUTPUT_TOOL_NAME
 from analysis_service.model_gate import _litellm
 from analysis_service.provider import (
+    ANSWER_UNWRAPPED_METADATA_KEY,
     PROMPT_SCHEMA_INSTRUCTION,
     SCHEMA_PATH_METADATA_KEY,
     answer_from_tool_call,
@@ -48,7 +49,7 @@ TOOL_TIER = {"ANALYSIS_SAMPLING_STRONG_STRUCTURED_OUTPUT": "tool"}
 ANSWER: dict[str, Any] = {"claims": []}
 
 
-def tool_call_message() -> dict[str, Any]:
+def tool_call_message(arguments: Any = ANSWER) -> dict[str, Any]:
     return {
         "role": "assistant",
         "content": None,
@@ -58,7 +59,7 @@ def tool_call_message() -> dict[str, Any]:
                 "type": "function",
                 "function": {
                     "name": OUTPUT_TOOL_NAME,
-                    "arguments": json.dumps(ANSWER),
+                    "arguments": json.dumps(arguments),
                 },
             }
         ],
@@ -167,6 +168,44 @@ def test_a_response_without_the_tool_call_passes_unchanged():
     text = _response(types.Part(text='{"claims": []}'))
 
     assert answer_from_tool_call(text) is text
+
+
+def test_an_answer_in_a_lone_answer_key_reaches_the_node_unwrapped():
+    """``claude-sonnet-5`` wraps a forced tool call's answer (QA-2026-10-23-01)."""
+    client = Capturing(tool_call_message({"answer": ANSWER}))
+
+    responses = drive_strong_tier("bedrock", client, sampling_env=TOOL_TIER)
+
+    (response,) = responses
+    (part,) = response.content.parts
+    assert SCHEMA.model_validate_json(part.text).claims == []
+    assert response.custom_metadata[ANSWER_UNWRAPPED_METADATA_KEY] is True
+
+
+def test_an_answer_in_the_schema_s_own_shape_carries_no_unwrap_mark():
+    (response,) = drive_strong_tier(
+        "bedrock", Capturing(tool_call_message()), sampling_env=TOOL_TIER
+    )
+
+    assert ANSWER_UNWRAPPED_METADATA_KEY not in response.custom_metadata
+
+
+@pytest.mark.parametrize(
+    ("args", "fields"),
+    [
+        ({"answer": ANSWER}, frozenset({"answer"})),
+        ({"answer": "{}"}, frozenset({"claims"})),
+        ({"answer": ANSWER, "claims": []}, frozenset({"claims"})),
+    ],
+)
+def test_any_other_wrapper_shape_passes_to_the_schema_check(args, fields):
+    call = types.Part.from_function_call(name=OUTPUT_TOOL_NAME, args=args)
+
+    converted = answer_from_tool_call(_response(call), fields)
+
+    (part,) = converted.content.parts
+    assert json.loads(part.text) == args
+    assert converted.custom_metadata is None
 
 
 def test_a_request_without_a_schema_gets_no_tool():
