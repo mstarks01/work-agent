@@ -885,18 +885,36 @@ def restore_unimplicated(
     returns: the elements the issues named, and the flows through them, whose
     IDs a rename of a named element re-derives. Per element group: an element the issues
     named keeps whatever the repair made of it, deleted included; an element
-    they did not name reads as it did before, whether the repair changed or
-    dropped it, and its ID is returned so the report can say so; an element
+    they did not name reads as it did before. The repair is asked to leave such
+    an element out, so one it left out is in place; one it returned changed is
+    put back, and its ID is returned so the report can say so; an element
     the repair added is kept, since a dangling reference is sometimes answered
     by the element it was pointing at. That last rule is also what lets an
     endpoint repair through: a flow's ID is derived from its endpoints, so
     repointing one arrives as the cited flow deleted and a new flow added,
-    and both halves are permitted. ``assumptions`` are the repair's own:
-    the prompt tells it to add one for every value it inferred, and the gate
-    checks each against the model.
+    and both halves are permitted. ``assumptions`` follow their elements: an
+    element put back keeps the first pass's entries, and every other entry is
+    the repair's own, which the gate checks against the model.
     """
     named = set(implicated)
     result: dict[str, Any] = dict(repaired)
+    kept_ids = {
+        entry["id"]
+        for group in ELEMENT_GROUPS
+        for entry in previous.get(group, ())
+        if entry["id"] not in named
+    }
+    # An assumption follows its element: one on an element put back is the
+    # first pass's, and the repair's own are for what it may change.
+    result["assumptions"] = [
+        entry
+        for entry in previous.get("assumptions", ())
+        if entry["element_id"] in kept_ids
+    ] + [
+        entry
+        for entry in repaired.get("assumptions", ())
+        if entry["element_id"] not in kept_ids
+    ]
     # A restored element is the one the first gate repaired, so its record
     # stays; a named element's record goes, and the gate asks again.
     result["excerpt_repairs"] = [
@@ -914,7 +932,7 @@ def restore_unimplicated(
                 if element_id in after:
                     merged.append(after[element_id])
                 continue
-            if after.get(element_id) != entry:
+            if element_id in after and after[element_id] != entry:
                 restored.append(element_id)
             merged.append(entry)
         merged += [

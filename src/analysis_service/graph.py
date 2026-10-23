@@ -727,6 +727,7 @@ STATE_ELEMENT_ROSTER = "element_roster"
 STATE_DOMAIN_SKILLS = "domain_skills"
 STATE_PREVIOUS_MODEL = "previous_model"
 STATE_VALIDATION_ISSUES = "validation_issues"
+STATE_REPAIR_SCOPE = "repair_scope"
 # The machine-readable half of what ``validate`` parks for ``repair``: the
 # normalized model the issues cite and the scope a repair of them may change,
 # read back by ``revalidate`` to put every uncited element back (#675 D01).
@@ -860,6 +861,7 @@ SHARED_RENDERED_KEYS: frozenset[str] = frozenset(
         STATE_DOMAIN_SKILLS,
         STATE_PREVIOUS_MODEL,
         STATE_VALIDATION_ISSUES,
+        STATE_REPAIR_SCOPE,
     }
 )
 
@@ -1456,6 +1458,13 @@ def validate_extraction(
         state.put(
             STATE_REPAIR_BASELINE,
             {"model": parked, "scope": scope, "implicated": implicated},
+        )
+        # The scope decides what ``repair`` emits: the listed elements, or the
+        # whole model. Fenced, because the IDs are built from caller words.
+        state.prompt(
+            STATE_REPAIR_SCOPE,
+            f"`{scope}`"
+            + (f"\n\n{render_fenced(implicated)}" if scope == "elements" else ""),
         )
         return _routed(ROUTE_INVALID, {"issue_count": len(issues)})
 

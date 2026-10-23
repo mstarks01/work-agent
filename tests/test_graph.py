@@ -1234,6 +1234,23 @@ def test_validate_logs_a_stated_control_its_source_never_mentions(caplog):
     assert "none of tls, 1.3 appears" in flagged[1]
 
 
+def test_the_repair_prompt_states_its_scope():
+    """``elements`` lists the IDs the repair may emit; ``whole`` lists none."""
+    broken = valid_model().model_dump(mode="json")
+    broken["data_flows"][0]["destination"] = "process:does-not-exist"
+    ctx = FakeContext()
+    graph.validate_extraction(ctx, KEYS, broken)
+
+    scope = ctx.state[graph.STATE_REPAIR_SCOPE]
+    assert scope.startswith("`elements`")
+    assert broken["data_flows"][0]["id"].split(">")[0] in scope
+
+    whole = FakeContext()
+    graph.validate_extraction(whole, KEYS, {"not": "a model"})
+
+    assert whole.state[graph.STATE_REPAIR_SCOPE] == "`whole`"
+
+
 def test_validate_routes_invalid_and_feeds_the_repair_prompt():
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
