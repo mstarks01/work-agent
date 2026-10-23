@@ -373,7 +373,10 @@ class Threat(DraftThreat, RuledClaim):
     STRIDE's alone.
     """
 
-    confidence: Rating  # critic-calibrated grounding in model facts
+    #: The critic's rating of how firmly the threat is grounded in model facts.
+    #: ``None`` only on a lane rejection code wrote for a draft the critic left
+    #: unruled (:func:`~analysis_service.critic.complete_rulings`).
+    confidence: Rating | None = None
     #: The critic's reading of this threat's ``mitigations``, or ``None`` where
     #: it made none. Carried into the report because a reader acting on a
     #: recommendation is who the reading is for; the report is where the advice

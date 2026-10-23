@@ -71,6 +71,7 @@ from analysis_service.frameworks.asvs.record import (
     RequirementRulingProposal,
 )
 from analysis_service.frameworks.stride.record import (
+    LANES_OF_VERB,
     STRIDE_VERSION,
     DraftThreat,
     StrideAnalysis,
@@ -821,8 +822,16 @@ def sample_threat(
         " the customer against the web app.",
         "affected_element_ids": ["flow:entity:customer>process:web-app>login"],
         # The default draft's action, matching its title: a stolen session used
-        # against the web app. Tests that care about identity override it.
-        "verb": "use-credential",
+        # against the web app. In another lane, the first verb the lane may
+        # file, so a default draft is never misfiled. Tests that care about
+        # identity override it.
+        "verb": (
+            "use-credential"
+            if category == "spoofing"
+            else next(
+                verb for verb, lanes in LANES_OF_VERB.items() if category in lanes
+            )
+        ),
         # One quote and one derived fact, so a default draft exercises two
         # branches rather than the cheapest one. The quote is a verbatim span of
         # the source ``sample_report`` submits, so it verifies through the

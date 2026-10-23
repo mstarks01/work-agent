@@ -54,6 +54,7 @@ from analysis_service.claims import (
     ASSERTION_GROUNDS,
     ATTRIBUTE_GROUNDS,
     Claim,
+    ProposedVerdict,
     RepairedQuote,
     RuledClaim,
     Ruling,
@@ -473,8 +474,8 @@ def complete_rulings(
     hand-written pair naming an attribute the model does not carry is a failure
     the service can prevent and a critic cannot (#409).
 
-    **A missing ruling is not filled in here.** Every draft is shown, so a draft
-    with no ruling means the critic dropped it, and
+    **A missing ruling is not filled in here**, with one exception. Every draft
+    is shown, so a draft with no ruling means the critic dropped it, and
     :func:`review_issues` routes that to the bounded re-ask. Completing it from
     the draft's own grounds would hand back an automatic verdict for a claim
     nobody reviewed, and it would arrive silently, on the path where the critic
@@ -483,7 +484,11 @@ def complete_rulings(
     A ruling on a draft the package's own table calls misfiled
     (:meth:`~analysis_service.claims.Claim.misfiled`) becomes a ``lane``
     rejection with the table's reason, whatever the critic ruled. That is the
-    one rejection this service writes rather than reads.
+    one rejection this service writes rather than reads. So it is also the
+    exception: a misfiled draft the critic left unruled gains that rejection,
+    because a re-ask could only produce a ruling this would replace. The
+    ruling carries no package field, so a rating such as STRIDE's
+    ``confidence`` stays empty: nobody rated the draft.
 
     An ``immaterial_unknowns`` entry that names no unknown ground of the draft
     is removed. It dismisses nothing, and left in place it reads as though it
@@ -538,6 +543,15 @@ def complete_rulings(
             }
         )
         completed.append(ruling.model_copy(update={"verdict": verdict}))
+    ruled = {ruling.id for ruling in rulings}
+    completed += [
+        Ruling(
+            id=claim_id,
+            verdict=ProposedVerdict(reason=reason, rejected_because="lane"),
+        )
+        for claim_id, reason in misfiled.items()
+        if claim_id not in ruled
+    ]
     return completed
 
 
