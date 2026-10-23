@@ -22,6 +22,7 @@ from analysis_service.deployment import (
 from analysis_service.errors import ConfigError
 from analysis_service.jobs import InMemoryJobStore
 from analysis_service.model_gate import tool_models
+from analysis_service.model_tiers import TIER_NAMES, env_vars_for
 from analysis_service.settings_variables import secret_vars
 from analysis_service.store_backends import env_variables as store_variables
 from analysis_service.vendors import VENDOR_NAMES
@@ -34,7 +35,7 @@ from tests.test_settings_env import (
 )
 from tests.test_webapp import LOOPBACK
 from webapp.main import Workspace, create_app
-from webapp.settings_page import SETTINGS
+from webapp.settings_page import CHANGED_SAMPLING, SETTINGS, sampling_key
 
 #: A key that no fixture holds, so a page that carries it leaked the file.
 KEY = "sk-ant-page-must-never-show-this"
@@ -108,6 +109,19 @@ class TestTheRows:
         row = rows_of(client_for(tmp_path, hand_written()))["sampling.base.thinking"]
 
         assert row["unset"] == "The model's own level"
+
+    def test_a_thinking_row_names_its_tier_and_the_rows_of_that_tier(self, tmp_path):
+        """The server states the tier a thinking row belongs to, and the keys
+        of that tier's vendor row and model row, so the page parses no key."""
+        rows = rows_of(client_for(tmp_path, hand_written()))
+
+        for tier in TIER_NAMES:
+            vendor_var, model_var = env_vars_for(tier)
+            row = rows[sampling_key(tier, CHANGED_SAMPLING)]
+            assert row["tier"] == tier
+            assert SETTINGS[row["vendor_key"]].variable == vendor_var
+            assert SETTINGS[row["model_key"]].variable == model_var
+            assert rows[row["model_key"]]["vendor_key"] == row["vendor_key"]
 
     def test_the_data_lists_each_suggested_model_that_takes_no_level(self, tmp_path):
         data = page_data(client_for(tmp_path, hand_written()).get("/settings"))

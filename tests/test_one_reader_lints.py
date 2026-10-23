@@ -622,21 +622,46 @@ def test_an_assertion_id_has_one_encoder_and_one_decoder():
     ]
 
 
-def _compares_an_answer_bound(node: ast.AST) -> bool:
-    return isinstance(node, ast.Compare) and any(
-        _is_name(operand, "MAX_FACT_ANSWERS", "MAX_LINK_ANSWERS")
-        for operand in (node.left, *node.comparators)
+def _declares_a_max_length(node: ast.AST, *names: str) -> TypeGuard[ast.Call]:
+    """Whether ``node`` is a ``Field`` call whose ``max_length`` is one of
+    ``names``, or any name where ``names`` is empty."""
+    return _calls(node, "Field") and any(
+        keyword.arg == "max_length"
+        and isinstance(keyword.value, ast.Name)
+        and (not names or keyword.value.id in names)
+        for keyword in node.keywords
     )
 
 
+#: Each name a /v1 model declares as a list's ``max_length``: the bounds the
+#: web app reads through those models.
+_V1_BOUNDS = frozenset(
+    keyword.value.id
+    for node in ast.walk(parse(REPO_ROOT / "src/analysis_service/api.py"))
+    if _declares_a_max_length(node)
+    for keyword in node.keywords
+    if keyword.arg == "max_length" and isinstance(keyword.value, ast.Name)
+)
+
+
+def _reads_a_v1_bound(node: ast.AST) -> bool:
+    """Whether ``node`` compares a length to a /v1 bound, or declares the bound
+    as a ``max_length`` of its own."""
+    if isinstance(node, ast.Compare):
+        return any(
+            _is_name(operand, *_V1_BOUNDS) for operand in (node.left, *node.comparators)
+        )
+    return _declares_a_max_length(node, *_V1_BOUNDS)
+
+
 def test_the_answer_bounds_are_read_through_the_v1_models():
-    """No route compares a list's length to an answer bound itself. The /v1
-    models declare each bound as ``max_length``, and ``_over_the_bound`` asks
-    them, so the web app and /v1 refuse the same bodies."""
+    """No route compares a list's length to a /v1 bound itself, and none
+    declares a bound of its own. The /v1 models declare each bound as
+    ``max_length``, and ``_over_the_bound`` asks them, so the web app and /v1
+    refuse the same bodies."""
+    assert {"MAX_SKIPS", "MAX_HELD_FACTS"} <= _V1_BOUNDS
     assert [
-        site
-        for site in _sites(_compares_an_answer_bound)
-        if site[0].startswith("webapp/")
+        site for site in _sites(_reads_a_v1_bound) if site[0].startswith("webapp/")
     ] == []
 
 
@@ -655,3 +680,21 @@ def test_a_sampling_setting_key_is_spelled_once():
     assert _sites(_spells_a_sampling_key) == [
         ("webapp/settings_page.py", "sampling_key")
     ]
+
+
+def _spells_a_tier_key(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.JoinedStr)
+        and bool(node.values)
+        and isinstance(node.values[0], ast.Constant)
+        and str(node.values[0].value).startswith("tiers.")
+    )
+
+
+def test_a_tier_setting_key_is_spelled_once():
+    """Only ``tier_key`` spells the ``tiers.<tier>.<field>`` key of a Deployment
+    Setting; the page and the view call it. The loaders under ``src`` spell the
+    same text as the TOML table path an error names, which is not this key."""
+    assert [
+        site for site in _sites(_spells_a_tier_key) if site[0].startswith("webapp/")
+    ] == [("webapp/settings_page.py", "tier_key")]

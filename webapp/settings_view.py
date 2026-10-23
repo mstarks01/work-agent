@@ -83,6 +83,7 @@ from webapp.settings_page import (
     SETTINGS,
     Setting,
     sampling_key,
+    tier_key,
 )
 
 #: The value of each store setting that this app gives where no source sets
@@ -185,10 +186,12 @@ def settings_view(
 def _controls() -> dict[str, dict[str, Any]]:
     """The closed set of each Deployment Setting whose loader holds one, from
     that loader's table, so the page offers a choice in place of free text.
-    ``multiple`` marks a list of names separated by commas."""
+    ``multiple`` marks a list of names separated by commas. A tier's model row
+    carries the key of its vendor row, and a tier's thinking row its tier and
+    the keys of both, so the page parses no key."""
     flag = ("true", "false")
     choices: dict[str, tuple[str, ...]] = {
-        **{f"tiers.{tier}.vendor": VENDOR_NAMES for tier in TIER_NAMES},
+        **{tier_key(tier, "vendor"): VENDOR_NAMES for tier in TIER_NAMES},
         **{
             f"credentials.{vendor}.mode": tuple(VENDORS[vendor].credential_modes)
             for vendor in VENDOR_NAMES
@@ -223,9 +226,16 @@ def _controls() -> dict[str, dict[str, Any]]:
         },
         "frameworks.carried": {"options": list(FRAMEWORK_NAMES), "multiple": True},
         **{
+            tier_key(tier, "model"): {"vendor_key": tier_key(tier, "vendor")}
+            for tier in TIER_NAMES
+        },
+        **{
             sampling_key(tier, CHANGED_SAMPLING): {
                 "options": list(get_args(ReasoningEffort)),
                 "unset": "The model's own level",
+                "tier": tier,
+                "vendor_key": tier_key(tier, "vendor"),
+                "model_key": tier_key(tier, "model"),
             }
             for tier in TIER_NAMES
         },

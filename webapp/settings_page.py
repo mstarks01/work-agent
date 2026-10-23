@@ -126,6 +126,11 @@ def _tiers_file(*keys: str) -> tuple[deployment.ConfigPathName, tuple[str, ...]]
     return "model_tiers", keys
 
 
+def tier_key(tier: str, field: str) -> str:
+    """The settings key of one tier's vendor or model row, as every page spells it."""
+    return f"tiers.{tier}.{field}"
+
+
 def _model_settings() -> list[tuple[str, Setting]]:
     entries = []
     for tier in TIER_NAMES:
@@ -133,7 +138,7 @@ def _model_settings() -> list[tuple[str, Setting]]:
         name = tier.capitalize()
         entries += [
             _changes(
-                f"tiers.{tier}.{field}",
+                tier_key(tier, field),
                 var,
                 "Models",
                 f"{name} {field}",
@@ -331,7 +336,7 @@ SETTINGS = _table(
 #: charges of a vendor with one charge mode, and the CA file, whose loader
 #: opens the file that the value names.
 EXAMPLES: dict[str, str] = {
-    **{f"tiers.{tier}.model": "gpt-4.1" for tier in TIER_NAMES},
+    **{tier_key(tier, "model"): "gpt-4.1" for tier in TIER_NAMES},
     "upstreams.openrouter": "anthropic",
     "credentials.vertex.project": "my-project-123",
     "credentials.vertex.location": "us-central1",
