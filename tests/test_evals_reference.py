@@ -277,7 +277,7 @@ def test_a_field_with_a_wrong_value_still_names_the_field(tmp_path):
         load_case(case_dir)
 
 
-class TestTheFlowMapServesTheCitationsItIsAskedAbout:
+class TestCaseFlowsServesTheCitationsItIsAskedAbout:
     """``flows_by_case`` against an analysed model that renames a flow (#949).
 
     ``endpoint_form`` resolves a cited flow by looking its ID up in this map and
