@@ -284,6 +284,31 @@ def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[UnreconciledRuling]
     return issues
 
 
+def _confirmed_exclusion_issues(
+    drafts: Sequence[Claim], rulings: Iterable[Ruling]
+) -> list[UnreconciledRuling]:
+    """Every completed ruling that confirms a draft ruling its own unit out.
+
+    A draft that excludes its unit (:meth:`~analysis_service.claims.Claim.excludes`)
+    says the unit does not apply, and ``confirmed`` says it does. So the two
+    cannot make one verdict. Which rejection the draft takes is the critic's
+    judgement, so the ruling goes to the re-ask rather than to a rule here.
+    """
+    excluding = {draft.id for draft in drafts if type(draft).excludes(draft)}
+    return [
+        UnreconciledRuling.of(
+            claim_id=ruling.id,
+            kind="verdict-shape",
+            message=f"claim {ruling.id!r} excludes its requirement and is ruled"
+            " confirmed, which says the requirement applies: set rejected_because"
+            " to evidence where the stated facts show it does not apply, or to"
+            " reasoning where they do not",
+        )
+        for ruling in rulings
+        if ruling.id in excluding and ruling.verdict.status == "confirmed"
+    ]
+
+
 def _unresolved_unknown_ref_issues(
     rulings: Iterable[Ruling], system_model: SystemModel
 ) -> list[UnreconciledRuling]:
@@ -729,8 +754,10 @@ def review_issues(
     drafted_ids = {draft.id for draft in drafts}
     ruled_ids = {ruling.id for ruling in rulings}
     dropped = sorted(drafted_ids - ruled_ids)
-    per_ruling = _verdict_shape_issues(rulings) + _unresolved_unknown_ref_issues(
-        rulings, system_model
+    per_ruling = (
+        _verdict_shape_issues(rulings)
+        + _confirmed_exclusion_issues(drafts, rulings)
+        + _unresolved_unknown_ref_issues(rulings, system_model)
     )
     problems = [
         UnreconciledRuling.of(
