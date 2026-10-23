@@ -3021,7 +3021,7 @@ class _FrameworkSubgraph:
     — so it is built once here and instantiated per selection. Holding the built
     nodes together is what lets :func:`build_pipeline` name the edges without
     re-deriving a single node name. ``merge`` routes around the critic when
-    code settled every draft (:data:`ROUTE_SETTLED`), straight to ``router``.
+    the lanes drafted nothing (:data:`ROUTE_SETTLED`), straight to ``router``.
     """
 
     nodes: FrameworkNodes
