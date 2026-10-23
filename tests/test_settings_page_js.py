@@ -38,7 +38,8 @@ const rows = [
     key_saved: false, vendor: "anthropic", modes: ["api_key"] },
 ];
 const settings = { revision: "one", rows, modes: { anthropic: ["api_key"], openai: ["api_key"] },
-  models: {}, iam: [], unknown: [], settings_file: "settings.env", error: null };
+  vendor_rows: ["tiers.base.vendor"], models: {}, iam: [], unknown: [], settings_file: "settings.env",
+  error: null };
 const ids = Object.fromEntries([
   "settings", "settings-rows", "model-lists", "settings-search", "changes-list",
   "changes-panel", "changes-column", "save-changes", "discard-changes", "save-errors", "save-status",
@@ -103,10 +104,11 @@ eval(scriptText + `
 
 
 def test_the_script_spells_no_tier_key():
-    """The server states each thinking row's tier and the keys of its tier's
-    vendor and model rows, so the script parses no ``sampling.`` key and spells
-    no ``tiers.`` key."""
+    """The server states each thinking row's tier, the keys of its tier's
+    vendor and model rows, and the keys of the tier vendor rows, so the script
+    parses no ``sampling.`` or ``tiers.`` key and spells no ``tiers.`` key."""
     script = SETTINGS_SCRIPT.read_text()
 
     assert "sampling\\." not in script
+    assert "tiers\\." not in script
     assert "`tiers.${" not in script
