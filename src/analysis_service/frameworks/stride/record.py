@@ -16,9 +16,9 @@ nothing.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Literal, get_args
+from typing import Literal, Self, get_args
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from analysis_service.actions import ActionVerb
 from analysis_service.claims import (
@@ -380,6 +380,14 @@ class Threat(DraftThreat, RuledClaim):
     #: already sits, and a judgement on it that reached no reader would be a
     #: fact with nobody to act on it.
     recommendation: RecommendationReading | None = None
+
+    @model_validator(mode="after")
+    def _no_reading_on_a_rejection(self) -> Self:
+        # The critic reads the advice only on a threat that survived, so a
+        # reading on a rejected one is advice nobody will act on.
+        if self.verdict.status == "rejected":
+            self.recommendation = None
+        return self
 
 
 class ThreatProposal(Proposal):
