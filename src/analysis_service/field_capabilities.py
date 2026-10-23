@@ -297,13 +297,21 @@ FIELD_CAPABILITIES: tuple[FieldCapability, ...] = (
 def with_field_capabilities(model: SystemModel) -> SystemModel:
     """The model with each capability its closed fields prove written as present.
 
-    **The one writer of a field capability.** A capability that a statement
-    already names is left as it is. A row whose proving elements carry no
-    quote writes nothing, because a statement must quote its source.
+    **The one writer of a field capability.** A capability that a statement of
+    another origin names is left as it is. A row whose proving elements carry
+    no quote writes nothing, because a statement must quote its source. It
+    runs again on a model whose fields changed, such as the catalog
+    projection's (:func:`~analysis_service.evidence.prepared_view`): a field
+    statement the fields still prove stays where it is, and one they no
+    longer prove is removed.
     """
-    named = {statement.capability for statement in model.capabilities}
+    named = {
+        statement.capability
+        for statement in model.capabilities
+        if statement.origin != "field"
+    }
     parts = _Parts.of(model)
-    updated = model.model_copy(deep=True)
+    proven = []
     for row in FIELD_CAPABILITIES:
         if row.capability in named:
             continue
@@ -313,7 +321,7 @@ def with_field_capabilities(model: SystemModel) -> SystemModel:
         )
         if cited is None:
             continue
-        updated.capabilities.append(
+        proven.append(
             CapabilityStatement(
                 capability=row.capability,
                 state="present",
@@ -323,4 +331,13 @@ def with_field_capabilities(model: SystemModel) -> SystemModel:
                 basis=f"{cited.name}: {row.basis}",
             )
         )
+    updated = model.model_copy(deep=True)
+    kept = [
+        statement
+        for statement in updated.capabilities
+        if statement.origin != "field" or statement in proven
+    ]
+    updated.capabilities = kept + [
+        statement for statement in proven if statement not in kept
+    ]
     return updated

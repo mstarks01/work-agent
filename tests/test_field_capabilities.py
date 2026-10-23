@@ -5,7 +5,9 @@ from __future__ import annotations
 import pytest
 
 from analysis_service import graph
+from analysis_service.assertions import Assertion, AssertionCatalog, Subject
 from analysis_service.capabilities import CAPABILITIES
+from analysis_service.evidence import prepared_view
 from analysis_service.field_capabilities import (
     FIELD_CAPABILITIES,
     with_field_capabilities,
@@ -267,3 +269,67 @@ def test_the_sensitive_rows_read_the_disclosure_tags_but_the_most_over_tagged():
 
     assert SENSITIVE_ASSET_TAGS - SENSITIVE_TAGS == {"business-critical-data"}
     assert SECRET_TAGS <= SENSITIVE_TAGS
+
+
+WEB_APP = Subject(id="process:web-app", type="component", label="web app")
+
+
+def _exposed(value):
+    """The model a job's lanes read, where one row states the web app's exposure."""
+    row = Assertion(
+        subject=WEB_APP.id,
+        predicate="internet-exposure",
+        value=value,
+        basis="inferred",
+        origin="assertion-pass",
+        explanation="the description says who can reach the web app",
+    )
+    return AssertionCatalog(subjects=[WEB_APP], entries=[row])
+
+
+def test_a_projected_field_proves_the_capability_it_now_states():
+    """The catalog projection runs after the gate, so a row the projection
+    writes into a closed field proves what the field proves."""
+    gated = with_field_capabilities(_model())
+    model, applied, _ = prepared_view(gated, _exposed("internet-facing"))
+    assert [projection.attribute for projection in applied] == ["exposure"]
+    assert "external-facing-http-services" in {
+        statement.capability for statement in model.capabilities
+    }
+
+
+def test_a_projected_field_takes_back_the_capability_it_no_longer_proves():
+    gated = with_field_capabilities(valid_model())
+    model, applied, _ = prepared_view(gated, _exposed("internal"))
+    assert [projection.attribute for projection in applied] == ["exposure"]
+    assert "external-facing-http-services" not in {
+        statement.capability for statement in model.capabilities
+    }
+    assert validate(model) == []
+
+
+def test_a_projection_leaves_a_statement_of_another_origin_as_it_is():
+    gated = with_field_capabilities(_model())
+    answer = CapabilityStatement(
+        capability="external-facing-http-services",
+        state="absent",
+        source_excerpt="no",
+        source_label=ANSWERS_LABEL,
+        origin="answer",
+    )
+    gated.capabilities.append(answer)
+    model, _, _ = prepared_view(gated, _exposed("internet-facing"))
+    assert [
+        statement
+        for statement in model.capabilities
+        if statement.capability == "external-facing-http-services"
+    ] == [answer]
+
+
+def test_a_second_projection_changes_nothing():
+    """A report's model is projected already (``open_facts.prepared_model``)."""
+    once, _, _ = prepared_view(
+        with_field_capabilities(_model()), _exposed("internet-facing")
+    )
+    twice, _, _ = prepared_view(once, _exposed("internet-facing"))
+    assert twice == once
