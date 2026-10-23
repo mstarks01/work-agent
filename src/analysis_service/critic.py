@@ -441,7 +441,8 @@ def complete_rulings(
     A ruling that names no failed check gains, in ``related_unknowns``, every
     unknown ground of its draft that the critic did not dismiss in
     ``immaterial_unknowns``, beside any open fact the critic named. Where the
-    critic wrote no reason, it gains one naming them. So a draft that rests on
+    critic wrote no reason, it gains one naming every open fact it carries, the
+    critic's own included. So a draft that rests on
     an unstated fact reads ``needs-info`` whether or not the critic listed it,
     and silence never confirms. Code supplies those references because a
     hand-written pair naming an attribute the model does not carry is a failure
@@ -494,16 +495,21 @@ def complete_rulings(
         # the critic just said the argument does not use.
         dismissed = ruling.verdict.dismissed_refs()
         derived = [ref for ref in by_id.get(ruling.id, []) if ref.key not in dismissed]
-        if ruling.verdict.rejected_because is not None or not derived:
+        if ruling.verdict.rejected_because is not None:
             completed.append(ruling)
             continue
         named = {ref.key for ref in ruling.verdict.related_unknowns}
-        added = [ref for ref in derived if ref.key not in named]
-        reason = ruling.verdict.reason or rests_on(derived)
+        related = [
+            *ruling.verdict.related_unknowns,
+            *(ref for ref in derived if ref.key not in named),
+        ]
+        if not related:
+            completed.append(ruling)
+            continue
         verdict = ruling.verdict.model_copy(
             update={
-                "related_unknowns": [*ruling.verdict.related_unknowns, *added],
-                "reason": reason,
+                "related_unknowns": related,
+                "reason": ruling.verdict.reason or rests_on(related),
             }
         )
         completed.append(ruling.model_copy(update={"verdict": verdict}))
