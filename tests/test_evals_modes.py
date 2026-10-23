@@ -2540,3 +2540,22 @@ class TestAStateAgreementIsJoinedToItsBasis:
 
         # Every replaced value agreed; only the checkable ones can be charged.
         assert score.state_agrees_unbased < replaced
+
+
+def test_attributes_are_scored_on_the_model_the_analysis_reads():
+    """A protocol default written after the gate counts, as the lanes read it.
+
+    The extraction prompt leaves ``encryption_in_transit`` to code where the
+    protocol guarantees it (ADR 0082), so a flow the model left ``unknown``
+    over HTTPS agrees with a reference that states the encryption.
+    """
+    case = load_case(CORPUS / "14-loyalty-oauth-platform")
+    model = case.model.model_copy(deep=True)
+    for flow in model.data_flows:
+        if flow.protocol == "HTTPS":
+            flow.encryption_in_transit = "unknown"
+
+    assert (
+        score_of(case, model).scored_field_agreement
+        == score_of(case, case.model).scored_field_agreement
+    )

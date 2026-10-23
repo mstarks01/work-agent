@@ -100,6 +100,7 @@ from analysis_service.graph import (
     ModelResolver,
     Pipeline,
     Rejected,
+    after_gate,
     result_of,
     tier_node_by_graph_node,
 )
@@ -1926,6 +1927,10 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
     crossings_match = _crossings_match(case.model, result.extracted)
     unbased, read = _basis(case, result.extracted)
     alignment = align(case, result.extracted)
+    # Attributes are scored on the model the analysis reads, so a value the
+    # code writes after the gate, such as a protocol default (ADR 0082),
+    # counts as the analysis sees it. The other checks read the emission.
+    published = after_gate(result.extracted) if result.extracted else None
     return ExtractionScore(
         case_id=case.id,
         matched=tuple(sorted(blessed_ids & extracted_ids)),
@@ -1933,7 +1938,7 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         extra=tuple(sorted(extracted_ids - blessed_ids)),
         crossings_match=crossings_match,
         alignment=alignment,
-        attributes=_check_attributes(case.model, result.extracted, alignment),
+        attributes=_check_attributes(case.model, published, alignment),
         blessed_scored_fields=_scored_fields(case.model),
         zone_pairs=_zone_pairs(case.model, result.extracted, alignment),
         blessed_initiators=tuple(sorted(pure_initiators(case.model))),

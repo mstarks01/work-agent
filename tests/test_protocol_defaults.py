@@ -79,28 +79,13 @@ def test_every_row_says_what_it_writes_and_where_the_standard_defines_it():
         assert all(name == name.lower() for name in default.names)
 
 
-def test_every_protocol_the_extraction_prompt_names_is_a_row_of_the_table():
-    """Two readers of one rule: the prompt asks the model to write it, and the
-    table writes it where the model did not. They must name the same protocols."""
-    rule = next(
-        line
-        for line in (REPO_ROOT / "prompts/extract.md")
-        .read_text(encoding="utf-8")
-        .splitlines()
-        if "An encrypted protocol states" in line
-    )
-    encrypted, authenticating = set(), set()
-    for default in PROTOCOL_DEFAULTS:
-        target = (
-            encrypted
-            if default.attribute == "encryption_in_transit"
-            else authenticating
-        )
-        target.update(default.names)
-    for name in ("HTTPS", "TLS", "mTLS", "WSS", "FTPS", "SSH", "SFTP"):
-        assert name in rule and name.lower() in encrypted, name
-    assert "mTLS also states `authentication`" in rule
-    assert "mtls" in authenticating
+def test_the_extraction_prompt_leaves_the_protocol_defaults_to_code():
+    """One reader of the rule: the table writes what a protocol guarantees, so
+    the prompt does not ask the model to write it too (ADR 0082)."""
+    prompt = (REPO_ROOT / "prompts/extract.md").read_text(encoding="utf-8")
+
+    assert "An encrypted protocol states" not in prompt
+    assert "Write a protocol in `protocol` only." in prompt
 
 
 def test_the_gate_publishes_the_model_with_its_protocol_defaults():
