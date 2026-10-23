@@ -248,6 +248,27 @@ class TestAssetVocabulary:
         issues = [i for i in validate(model) if i.code == "illegal-asset-tag"]
         assert issues[0].element_id == "store:orders-db"
 
+    def test_an_extraction_that_writes_no_tag_as_a_word_passes_with_none(self):
+        """``""`` and ``unknown`` say "no tag", so the repair pass is not spent on them."""
+        model = valid_model()
+        model.data_stores[0].assets = ["", " Unknown ", "pii"]
+        normalized, issues = parse_and_validate(model.model_dump(), normalize_ids=True)
+        assert "illegal-asset-tag" not in codes(issues)
+        assert normalized.data_stores[0].assets == ["pii"]
+
+    def test_an_extraction_tag_outside_the_vocabulary_still_fails_the_gate(self):
+        model = valid_model()
+        model.data_stores[0].assets = ["unknown", "pci"]
+        _, issues = parse_and_validate(model.model_dump(), normalize_ids=True)
+        tagged = [i for i in issues if i.code == "illegal-asset-tag"]
+        assert [i.message.split("'")[1] for i in tagged] == ["pci"]
+
+    def test_an_authored_model_still_reports_a_no_tag_word(self):
+        model = valid_model()
+        model.data_stores[0].assets = ["unknown"]
+        _, issues = parse_and_validate(model.model_dump())
+        assert "illegal-asset-tag" in codes(issues)
+
 
 class TestParseFailures:
     def test_schema_failure_returns_no_model(self):

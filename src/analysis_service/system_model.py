@@ -67,6 +67,13 @@ CORE_ASSET_TAGS = frozenset(
 )
 
 
+#: The spellings of "no tag" that :func:`normalize_element_ids` drops from a
+#: model's ``assets``, compared stripped and lower-cased. The prompt tells the
+#: model to leave the list empty where no tag applies; a model that writes the
+#: absence as a word instead has said the same thing.
+NO_ASSET_TAG = frozenset({"", UNKNOWN})
+
+
 def assets_field() -> Any:
     """The ``assets`` field, with :data:`CORE_ASSET_TAGS` stated to the provider.
 
@@ -1244,6 +1251,10 @@ def normalize_element_ids(
     rule, a label naming no source is left untouched for the gate to report.
     The caller's label is never rewritten; the *model's echo of it* is, so the
     report cites the bytes the caller actually submitted.
+
+    An asset tag in :data:`NO_ASSET_TAG` is dropped for the same reason: it is
+    a spelling of the empty list, so it decides nothing. Every other tag
+    outside :data:`CORE_ASSET_TAGS` stays for the gate to report.
     """
     normalized = model.model_copy(deep=True)
     zoned = normalized.zoned_elements()
@@ -1286,5 +1297,10 @@ def normalize_element_ids(
             cited.source_label = (
                 canonical(cited.source_label, source_labels) or cited.source_label
             )
+
+    for element in normalized.elements():
+        element.assets = [
+            tag for tag in element.assets if tag.strip().lower() not in NO_ASSET_TAG
+        ]
 
     return normalized

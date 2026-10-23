@@ -654,8 +654,9 @@ def parse_and_validate(
     reported, because there the two disagreeing fields are an authoring error
     a human should see rather than a slug to canonicalize. It carries the same
     decision for an element's ``source_label``, which that pass snaps to the
-    job's own spelling: same flag, same reason, so a model arriving from a
-    model has one policy about its spellings rather than two.
+    job's own spelling, and for an asset tag that spells "no tag", which it
+    drops: same flag, same reason, so a model arriving from a model has one
+    policy about its spellings rather than two.
 
     ``sources`` maps each of the job's source labels to that source's text. The
     keys are what a ``source_label`` must name; the values are what a
