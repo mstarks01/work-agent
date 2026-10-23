@@ -11,6 +11,7 @@ from analysis_service.claims import (
     Ground,
     Mitigation,
     ProposedVerdict,
+    Ruling,
     SeverityLevel,
     UnknownRef,
     Verdict,
@@ -1468,3 +1469,49 @@ def test_a_rejected_threat_carries_no_reading_of_its_advice(verdict, kept):
     assert len(claims) == 1
     claim = claims[0]
     assert claim.recommendation == (reading if kept else None)
+
+
+class TestAConfirmedExclusion:
+    """An ASVS draft that rules its requirement out is never ``confirmed`` (#1559)."""
+
+    def _draft(self, direction):
+        from analysis_service.frameworks.asvs.record import DraftRequirementRuling
+
+        return DraftRequirementRuling.model_validate(
+            {
+                **sample_draft("S-01").model_dump(
+                    exclude={"category", "verb", "severity", "mitigations"}
+                ),
+                "id": "v5.0.0-6.2.1",
+                "chapter": "authentication",
+                "direction": direction,
+            }
+        )
+
+    def _problems(self, direction, verdict):
+        draft = self._draft(direction)
+        ruling = Ruling(id=draft.id, verdict=verdict)
+        return review_issues([draft], [ruling], valid_model())
+
+    def test_it_goes_to_the_re_ask(self):
+        problems = self._problems("excluded", ProposedVerdict())
+
+        assert "excludes its requirement and is ruled confirmed" in "; ".join(
+            problems.messages
+        )
+        assert problems.implicated == frozenset({"v5.0.0-6.2.1"})
+
+    def test_a_rejected_exclusion_is_no_problem(self):
+        verdict = ProposedVerdict(rejected_because="evidence", reason="not applicable")
+
+        assert not self._problems("excluded", verdict)
+
+    def test_a_confirmed_gap_is_no_problem(self):
+        assert not self._problems("gap", ProposedVerdict())
+
+    def test_a_stride_draft_never_excludes(self):
+        problems = review_issues(
+            [sample_draft("S-01")], [sample_ruling("S-01")], valid_model()
+        )
+
+        assert not problems
