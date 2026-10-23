@@ -52,10 +52,10 @@ from analysis_service.analysis import (
     control_state,
     crossing_facts,
     crossings_by_flow,
+    downstream_calls,
     inbound_flows,
     internet_exposed_elements,
     is_unverified,
-    reachable_from,
     sensitive_assets,
     zone_kinds,
 )
@@ -539,7 +539,7 @@ def _internet_exposed_process(
             {
                 "exposure": "internet-facing",
                 "inbound_flows": len(inbound_flows(model, process.id)),
-                "reachable_elements": len(reachable_from(model, process.id)),
+                "called_elements": len(downstream_calls(model, process.id)),
             },
         )
 

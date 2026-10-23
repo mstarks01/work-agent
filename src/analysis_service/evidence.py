@@ -81,6 +81,7 @@ from analysis_service.analysis import (
     control_state,
     model_text,
     names_term,
+    second_order_reach,
 )
 from analysis_service.assertions import (
     ABSENT,
@@ -630,6 +631,10 @@ def render_element_roster(model: SystemModel) -> str:
     which is what the left column is for.
 
     Order is the model's own, so one System Model renders one table every run.
+
+    **The second-order reach follows the table**, one line for each element a
+    loss travels on from: :func:`~analysis_service.analysis.second_order_reach`
+    walks it, so a lane reads the walk rather than repeating it.
     """
     elements = list(model.elements())
     rows = "\n".join(
@@ -640,7 +645,31 @@ def render_element_roster(model: SystemModel) -> str:
         f"{len(elements)} elements, and this table is all of them."
         " Name one exactly as it appears here.\n\n"
         "| cite this exactly | what it is |\n| --- | --- |\n"
-        f"{rows}\n"
+        f"{rows}\n{_render_reach(model)}"
+    )
+
+
+def _render_reach(model: SystemModel) -> str:
+    """Each zoned element's second-order reach, or ``""`` where none has any."""
+    lines = []
+    for element in model.zoned_elements():
+        reach = second_order_reach(model, element.id)
+        parts = []
+        if reach.reached:
+            parts.append("reaches " + ", ".join(f"`{_cell(i)}`" for i in reach.reached))
+        if reach.open:
+            parts.append(
+                "operations unknown toward "
+                + ", ".join(f"`{_cell(i)}`" for i in reach.open)
+            )
+        if parts:
+            lines.append(f"- `{_cell(element.id)}`: " + "; ".join(parts))
+    if not lines:
+        return ""
+    return (
+        "\n**Second-order reach**, walked in code: where a loss at each element"
+        " travels next. It belongs in a claim's `description`, never in"
+        " `affected_element_ids`.\n\n" + "\n".join(lines) + "\n"
     )
 
 

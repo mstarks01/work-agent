@@ -20,11 +20,12 @@ from analysis_service.analysis import (
     crossing_facts,
     crossing_flow_ids,
     crossings_by_flow,
+    downstream_calls,
     inbound_flows,
     internet_exposed_elements,
     is_unverified,
     outbound_flows,
-    reachable_from,
+    second_order_reach,
     sensitive_assets,
     states_a_protocol,
     unknown_controls,
@@ -171,15 +172,15 @@ class TestTraversal:
             "flow:process:worker>store:vault>read"
         ]
 
-    def test_reachable_from_is_breadth_first_and_excludes_the_start(self, chain):
-        assert reachable_from(chain, "entity:user") == [
+    def test_downstream_calls_is_breadth_first_and_excludes_the_start(self, chain):
+        assert downstream_calls(chain, "entity:user") == [
             "process:edge",
             "process:worker",
             "store:vault",
         ]
-        assert reachable_from(chain, "store:vault") == []
+        assert downstream_calls(chain, "store:vault") == []
 
-    def test_reachable_from_terminates_on_a_cycle(self):
+    def test_downstream_calls_terminates_on_a_cycle(self):
         model = SystemModel(
             processes=[
                 Process(
@@ -198,7 +199,77 @@ class TestTraversal:
             ],
             trust_boundaries=[TrustBoundary(id="boundary:z", name="Z", kind="network")],
         )
-        assert reachable_from(model, "process:a") == ["process:b"]
+        assert downstream_calls(model, "process:a") == ["process:b"]
+
+
+def _processes(*names):
+    return [
+        Process(
+            id=f"process:{name}",
+            name=name,
+            technology="x",
+            trust_zone="boundary:z",
+            exposure="internal",
+            interface_kind="non-web",
+        )
+        for name in names
+    ]
+
+
+def _reach_model(*flows):
+    return SystemModel(
+        processes=_processes("a", "b", "c", "d"),
+        data_flows=list(flows),
+        trust_boundaries=[TrustBoundary(id="boundary:z", name="Z", kind="network")],
+    )
+
+
+class TestSecondOrderReach:
+    """``analyze.md`` step 5's walk: a loss travels by ``operations``, not by arrow."""
+
+    def test_a_write_carries_the_loss_outward(self):
+        model = _reach_model(flow("process:a", "process:b", "push", operations="write"))
+
+        assert second_order_reach(model, "process:a").reached == ("process:b",)
+        assert second_order_reach(model, "process:b").reached == ()
+
+    def test_a_read_carries_the_loss_back_to_the_caller(self):
+        model = _reach_model(flow("process:a", "process:b", "pull", operations="read"))
+
+        assert second_order_reach(model, "process:b").reached == ("process:a",)
+        assert second_order_reach(model, "process:a").reached == ()
+
+    def test_read_write_carries_both_ways(self):
+        model = _reach_model(
+            flow("process:a", "process:b", "sync", operations="read-write")
+        )
+
+        assert second_order_reach(model, "process:a").reached == ("process:b",)
+        assert second_order_reach(model, "process:b").reached == ("process:a",)
+
+    def test_an_unknown_flow_is_open_and_the_walk_stops_there(self):
+        model = _reach_model(
+            flow("process:a", "process:b", "talk"),
+            flow("process:b", "process:c", "push", operations="write"),
+        )
+
+        reach = second_order_reach(model, "process:a")
+
+        assert reach.reached == ()
+        assert reach.open == ("process:b",)
+
+    def test_the_walk_is_breadth_first_and_ends_on_a_cycle(self):
+        model = _reach_model(
+            flow("process:a", "process:b", "one", operations="write"),
+            flow("process:b", "process:c", "two", operations="write"),
+            flow("process:c", "process:a", "three", operations="write"),
+            flow("process:c", "process:d", "four"),
+        )
+
+        reach = second_order_reach(model, "process:a")
+
+        assert reach.reached == ("process:b", "process:c")
+        assert reach.open == ("process:d",)
 
 
 class TestStructuralFacts:
@@ -257,7 +328,7 @@ class TestStructuralFacts:
 def test_every_helper_is_stable_across_calls(chain):
     """Same model in, same bytes out — the property the prompt depends on."""
     for _ in range(3):
-        assert reachable_from(chain, "entity:user") == [
+        assert downstream_calls(chain, "entity:user") == [
             "process:edge",
             "process:worker",
             "store:vault",

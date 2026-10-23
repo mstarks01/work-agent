@@ -22,12 +22,12 @@ so. ``"company SSO"`` is stated, and this module has nothing further to say
 about whether that SSO is any good. That judgement is the category agent's, and
 pushing it here would be the thing this design exists to avoid.
 
-Reachability is over Data Flows in their stated direction, which is who
-initiates; see :class:`~analysis_service.system_model.DataFlow`. A flow is
-therefore not a channel an attacker can only ride forwards, and the second-order
-reach a category agent reasons about is wider than what :func:`reachable_from`
-returns. The helper answers the narrow structural question, and the prompt says
-so.
+A Data Flow's direction is who initiates; see
+:class:`~analysis_service.system_model.DataFlow`. So two walks over the flows
+answer two questions. :func:`downstream_calls` follows every outbound flow: what
+a request into an element goes on to call. :func:`second_order_reach` follows
+the flows a loss travels along, read off each flow's ``operations``: what a
+claim about an element reaches next, which the lane agents read.
 
 Every function takes the model as its first argument rather than living on
 :class:`SystemModel`, because the model is a schema shared with the report, and
@@ -66,6 +66,7 @@ __all__ = [
     "crossing_facts",
     "crossing_flow_ids",
     "crossings_by_flow",
+    "downstream_calls",
     "inbound_flows",
     "internet_exposed_elements",
     "is_unverified",
@@ -74,7 +75,7 @@ __all__ = [
     "model_text",
     "names_term",
     "outbound_flows",
-    "reachable_from",
+    "second_order_reach",
     "sensitive_assets",
     "states_a_protocol",
     "unknown_controls",
@@ -245,8 +246,11 @@ def outbound_flows(model: SystemModel, element_id: str) -> list[DataFlow]:
     return [flow for flow in model.data_flows if flow.source == element_id]
 
 
-def reachable_from(model: SystemModel, element_id: str) -> list[str]:
-    """Element IDs reachable by following outbound flows, excluding the start.
+def downstream_calls(model: SystemModel, element_id: str) -> list[str]:
+    """Element IDs a request into this element goes on to call, excluding the start.
+
+    It follows every outbound flow, whatever its ``operations``: a call depth,
+    not the reach of a loss, which is :func:`second_order_reach`.
 
     Breadth-first, so the order is by distance and then by model order — a
     stable order that also reads as "what is one hop away, then two". The
@@ -266,6 +270,68 @@ def reachable_from(model: SystemModel, element_id: str) -> list[str]:
                 next_frontier.append(flow.destination)
         frontier = next_frontier
     return order
+
+
+class Reach(NamedTuple):
+    """What a loss at one element reaches next, and what the model leaves open."""
+
+    #: Element IDs a loss reaches, in walk order: nearest first.
+    reached: tuple[str, ...]
+    #: Element IDs one flow with ``operations`` ``unknown`` away from the start
+    #: or a reached element, where the direction settles nothing.
+    open: tuple[str, ...]
+
+
+#: Which ``operations`` carry a loss along a flow, from each end. An outbound
+#: flow carries it where the initiator hands something over; an inbound flow
+#: carries it back to the caller where the caller consumes what it read.
+_CARRIES_OUT: frozenset[str] = frozenset({"write", "read-write"})
+_CARRIES_BACK: frozenset[str] = frozenset({"read", "read-write"})
+
+
+def second_order_reach(model: SystemModel, element_id: str) -> Reach:
+    """What a claim about ``element_id`` reaches, over the flows a loss travels.
+
+    **The one rule for second-order reach** (``prompts/analyze.md`` step 5).
+    An arrow's direction is who initiates, never which way the harm travels, so
+    a step reads each flow's ``operations``: outward along a ``write`` or
+    ``read-write`` flow, and back to the caller along a ``read`` or
+    ``read-write`` flow into the element. A flow whose ``operations`` is
+    ``unknown`` is not a step: its far end is listed as open, and the walk does
+    not go past it. Breadth-first, so the order is by distance and then by
+    model order.
+    """
+    reached: list[str] = []
+    open_ends: list[str] = []
+    seen = {element_id}
+    frontier = [element_id]
+    while frontier:
+        next_frontier: list[str] = []
+        for current in frontier:
+            steps = [
+                *(
+                    (flow.destination, flow.operations, _CARRIES_OUT)
+                    for flow in outbound_flows(model, current)
+                ),
+                *(
+                    (flow.source, flow.operations, _CARRIES_BACK)
+                    for flow in inbound_flows(model, current)
+                ),
+            ]
+            for far, operations, carrying in steps:
+                if far in seen:
+                    continue
+                if operations in carrying:
+                    seen.add(far)
+                    reached.append(far)
+                    next_frontier.append(far)
+                elif operations == "unknown" and far not in open_ends:
+                    open_ends.append(far)
+        frontier = next_frontier
+    return Reach(
+        reached=tuple(reached),
+        open=tuple(end for end in open_ends if end not in seen),
+    )
 
 
 def sensitive_assets(element: Element) -> tuple[str, ...]:

@@ -1106,6 +1106,19 @@ class TestTheElementRoster:
 
         assert render_element_roster(model) == render_element_roster(model)
 
+    def test_the_second_order_reach_follows_the_table(self):
+        """The lane reads step 5's walk from code, one line per element it reaches from."""
+        model = valid_model()
+        flow = model.data_flows[0]
+        for other in model.data_flows:
+            other.operations = "unknown"
+        flow.operations = "write"
+
+        roster = render_element_roster(model)
+
+        _, reach = roster.split("**Second-order reach**")
+        assert f"- `{flow.source}`: reaches `{flow.destination}`" in reach
+
 
 class TestAnAbsenceIsAGround:
     """#412: a claim about what a system does not have needs a ground that says so.

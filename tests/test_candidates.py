@@ -296,7 +296,7 @@ class TestFiring:
         hits = fired(model, "denial-of-service-internet-exposed-process")
         assert hits[0].element_ids == ("process:api",)
         assert hits[0].facts["inbound_flows"] == 2
-        assert hits[0].facts["reachable_elements"] == 2
+        assert hits[0].facts["called_elements"] == 2
 
     def test_shared_dependency_names_its_callers(self, model):
         hits = fired(model, "denial-of-service-shared-dependency")
