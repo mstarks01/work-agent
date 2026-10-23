@@ -116,7 +116,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Any, Literal, get_args
+from typing import Any, Literal, get_args
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -126,7 +126,7 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from analysis_service import (
@@ -147,7 +147,6 @@ from analysis_service.answer_forms import (
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import (
     ANSWER_LIMITS,
-    MAX_SKIPS,
     AlreadyResumed,
     Answers,
     AnswerState,
@@ -179,8 +178,6 @@ from analysis_service.deployment import Deployment
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.errors import error_place, refusal_text
 from analysis_service.fact_answers import (
-    MAX_FACT_ANSWERS,
-    MAX_HELD_FACTS,
     FactAnswer,
     SkipKey,
     answer_facets,
@@ -216,7 +213,6 @@ from analysis_service.jobs import (
     readable,
 )
 from analysis_service.links import (
-    MAX_LINK_ANSWERS,
     LinkAnswer,
     components,
     fold,
@@ -674,22 +670,26 @@ def _body_of(raw: object, model: type[BaseModel]) -> dict[str, object]:
 
 def _over_the_bound(
     body: dict[str, object], model: type[BaseModel], fields: tuple[str, ...]
-) -> bool:
-    """Whether one of ``fields`` in ``body`` is longer than ``model`` admits.
+) -> str | None:
+    """The /v1 refusal of each of ``fields`` in ``body`` that is longer than
+    ``model`` admits, or ``None`` where none is.
 
     The /v1 model is the one reader of each list's bound: the route asks it
-    and discards the result, so both entry points refuse the same bodies. A
-    body that fails for any other reason is not over the bound; the route
-    reads it on, and refuses it with the message for that failure.
+    and keeps only the refusals of a bound, so both entry points refuse the
+    same bodies and name the bound the same way. A body that fails for any
+    other reason is not over the bound; the route reads it on, and refuses it
+    with the message for that failure.
     """
     try:
         model.model_validate(body)
     except ValidationError as exc:
-        return any(
-            error["type"] == "too_long" and error_place(error) in fields
+        refusals = [
+            f"{error_place(error)}: {error['msg']}"
             for error in exc.errors()
-        )
-    return False
+            if error["type"] == "too_long" and error_place(error) in fields
+        ]
+        return "; ".join(refusals) if refusals else None
+    return None
 
 
 def _name_of(record: Envelope) -> str:
@@ -1575,12 +1575,12 @@ def create_app(
             body = _body_of(body, AnswersSubmission)
             raw = body["links"]
             raw_facts = body.get("facts", [])
-            if _over_the_bound(body, AnswersSubmission, ("links", "facts")):
+            if refused := _over_the_bound(
+                body, AnswersSubmission, ("links", "facts", "skip", "presented")
+            ):
                 return _message(
                     400,
-                    f"One request takes at most {MAX_FACT_ANSWERS} answers and"
-                    f" {MAX_LINK_ANSWERS} element choices. Save your answers in"
-                    " parts, then run the follow-up.",
+                    f"{refused}. Save your answers in parts, then run the follow-up.",
                 )
             if not isinstance(raw, list):
                 raise TypeError
@@ -1729,10 +1729,8 @@ def create_app(
             raw = body["facts"]
             if not isinstance(raw, list):
                 raise TypeError
-            if _over_the_bound(body, CorrectionsSubmission, ("facts",)):
-                return _message(
-                    400, f"One request takes at most {MAX_FACT_ANSWERS} corrections."
-                )
+            if refused := _over_the_bound(body, CorrectionsSubmission, ("facts",)):
+                return _message(400, f"{refused}.")
             facts = [await _fact_answer(fact, questions) for fact in raw]
             revision = _revision(body["revision"])
         except (InvalidFactAnswer, _UnknownKey) as exc:
@@ -1851,12 +1849,9 @@ def _option_control(name: FrameworkName, field: str, annotation: object) -> str:
     )
 
 
-_SKIPS: TypeAdapter[list[SkipKey]] = TypeAdapter(
-    Annotated[list[SkipKey], Field(max_length=MAX_SKIPS)]
-)
-_PRESENTED: TypeAdapter[list[UnknownKey]] = TypeAdapter(
-    Annotated[list[UnknownKey], Field(max_length=MAX_HELD_FACTS)]
-)
+# Each list's bound is the /v1 model's, which ``_over_the_bound`` asks first.
+_SKIPS: TypeAdapter[list[SkipKey]] = TypeAdapter(list[SkipKey])
+_PRESENTED: TypeAdapter[list[UnknownKey]] = TypeAdapter(list[UnknownKey])
 
 
 def _presented(raw: object) -> list[UnknownKey]:

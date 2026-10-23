@@ -59,10 +59,10 @@ const deletedKeys = () =>
   SETTINGS.rows.filter((row) => row.secret && row.key_saved && row.source === "page" && row.vendor && !chosenVendors().has(row.vendor));
 
 // The vendor whose models a tier's model row suggests: the vendor that the
-// unsaved changes choose for the tier.
+// unsaved changes choose for the tier. The server puts the vendor row's key
+// on the model row.
 function suggests(row) {
-  const tier = /^tiers\.([^.]+)\.model$/.exec(row.key);
-  const vendor = tier && rowOf(`tiers.${tier[1]}.vendor`);
+  const vendor = row.vendor_key && rowOf(row.vendor_key);
   return vendor ? pending(vendor) : null;
 }
 
@@ -149,12 +149,12 @@ function choiceControl(row) {
 }
 
 // The vendor and the model of the tier whose thinking row this is, with the
-// unsaved changes applied, or null for another row.
+// unsaved changes applied, or null for another row. The server states the
+// row's tier and the keys of that tier's vendor row and model row.
 function thinkingModel(row) {
-  const tier = /^sampling\.([^.]+)\.thinking$/.exec(row.key);
-  if (!tier) return null;
-  const vendor = rowOf(`tiers.${tier[1]}.vendor`);
-  const model = rowOf(`tiers.${tier[1]}.model`);
+  if (!row.tier) return null;
+  const vendor = rowOf(row.vendor_key);
+  const model = rowOf(row.model_key);
   return vendor && model ? { vendor: pending(vendor), model: pending(model) } : null;
 }
 

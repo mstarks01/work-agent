@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import pytest
 
+from analysis_service.answer_state import MAX_SKIPS
 from analysis_service.api import AnswersSubmission
-from analysis_service.fact_answers import MAX_FACT_ANSWERS
+from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS
 from analysis_service.links import MAX_LINK_ANSWERS
 from tests import test_webapp
 from tests.test_api import auth, make_client
@@ -175,6 +176,8 @@ def test_a_correction_over_the_limit_is_refused_with_the_limit(tiers):
     [
         ("links", {"principal": "the team", "element": "web-app"}, MAX_LINK_ANSWERS),
         ("facts", FACT_BODY, MAX_FACT_ANSWERS),
+        ("skip", "web-app", MAX_SKIPS),
+        ("presented", FACT_BODY["key"], MAX_HELD_FACTS),
     ],
 )
 def test_answers_over_the_limit_are_refused_with_the_v1_bound(

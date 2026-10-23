@@ -1,4 +1,5 @@
-"""Offline checks for pending Settings edits while a save is in flight."""
+"""Offline checks of the Settings script: a pending edit while a save is in
+flight, and the keys the script never spells."""
 
 from __future__ import annotations
 
@@ -99,3 +100,13 @@ eval(scriptText + `
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_the_script_spells_no_tier_key():
+    """The server states each thinking row's tier and the keys of its tier's
+    vendor and model rows, so the script parses no ``sampling.`` key and spells
+    no ``tiers.`` key."""
+    script = SETTINGS_SCRIPT.read_text()
+
+    assert "sampling\\." not in script
+    assert "`tiers.${" not in script
