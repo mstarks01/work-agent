@@ -63,7 +63,7 @@ from analysis_service.claims import (
     UnreconciledRuling,
     UnverifiedGround,
     Verdict,
-    name_unknown,
+    rests_on,
 )
 from analysis_service.evidence import ground_gloss
 from analysis_service.frameworks import FrameworkSchemas, lane_of
@@ -499,9 +499,7 @@ def complete_rulings(
             continue
         named = {ref.key for ref in ruling.verdict.related_unknowns}
         added = [ref for ref in derived if ref.key not in named]
-        reason = ruling.verdict.reason or (
-            f"The claim rests on {_named(derived)}, which the input never stated."
-        )
+        reason = ruling.verdict.reason or rests_on(derived)
         verdict = ruling.verdict.model_copy(
             update={
                 "related_unknowns": [*ruling.verdict.related_unknowns, *added],
@@ -510,17 +508,6 @@ def complete_rulings(
         )
         completed.append(ruling.model_copy(update={"verdict": verdict}))
     return completed
-
-
-def _named(refs: Iterable[UnknownRef]) -> str:
-    """References as one sentence fragment, through the module's one speller.
-
-    :func:`~analysis_service.claims.name_unknown` is that speller, so the
-    three checks that name a reference and the sentence
-    :meth:`~analysis_service.claims.Claim.settled_by_grounds` composes cannot
-    describe one fact four ways.
-    """
-    return ", ".join(name_unknown(ref) for ref in refs)
 
 
 def _without_stray_dismissals(ruling: Ruling, cited: Iterable[UnknownRef]) -> Ruling:
