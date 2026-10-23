@@ -633,6 +633,14 @@ tool is not measured. The `prompt` rung is the weakest. It sends the format the
 `constrain_output = false` measurement below found fenced and incomplete, but
 it states the schema in the prompt, strips a fence and relies on the re-ask.
 
+**A tool call that wraps its answer in a lone `answer` key is unwrapped.**
+`claude-sonnet-5` on the forced tool writes the extraction and the repair as
+`{"answer": {...}}`, and it repeats the wrapper on the re-ask
+(`QA-2026-10-23-01`). Where the node's schema has no `answer` field and the
+value is an object, the executor reads that object as the answer. The node
+records `nodes[].answer_unwrapped`. The schema check then reads the object as
+it reads any other answer.
+
 The ladder is decided as a **call**, not a table: the check asks the installed
 library what it would send for this pair. Under the
 pinned library, the same Claude generation can be native on one vendor and

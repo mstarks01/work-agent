@@ -122,8 +122,9 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 #   present.**
 # * ``nodes[]`` carries ``attempts`` (default 1), the provider-call count the
 #   retry driver stamps; ``reasks`` (0 or 1, default 0), the schema re-ask
-#   count the adapter stamps (ADR 0058); and ``schema_path`` and
-#   ``schema_fallback`` (default ``None``).
+#   count the adapter stamps (ADR 0058); ``schema_path`` and
+#   ``schema_fallback`` (default ``None``); and ``answer_unwrapped`` (default
+#   ``False``).
 # * ``unknown_claim_identities``: a claim naming an identifier its framework's
 #   own catalog does not hold, dropped and marked. Only a framework carrying a
 #   catalog it did not author can produce one, so the list is empty for STRIDE
@@ -391,6 +392,10 @@ class NodeRun(BaseModel):
     It is the rule's name and never the provider's message, which can quote
     the prompt back.
 
+    ``answer_unwrapped`` is true where the node's tool call put its whole answer
+    under a lone ``answer`` key that its schema does not have, and the executor
+    read the object under that key as the answer.
+
     ``served_trust`` says what this row's ``model`` is worth as evidence, and it
     is **here rather than once per report**. A deployment may select a
     different vendor per tier, so one report can hold rows whose served builds
@@ -413,6 +418,7 @@ class NodeRun(BaseModel):
     reasks: int = Field(default=0, ge=0, le=1)
     schema_path: SchemaPath | None = None
     schema_fallback: SchemaRefusal | None = None
+    answer_unwrapped: bool = False
     # ``allow_inf_nan`` off, because a stored figure is only as trustworthy as
     # whatever wrote it — the reasoning ``_stored_system_name`` states below.
     # ``analysis_service.charges.reported_charge_of`` refuses a non-finite

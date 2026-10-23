@@ -55,6 +55,7 @@ from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.ladder import SchemaPath, SchemaRefusal
 from analysis_service.prompt_cache import CACHE_WRITE_METADATA_KEY
 from analysis_service.provider import (
+    ANSWER_UNWRAPPED_METADATA_KEY,
     REASKS_METADATA_KEY,
     SCHEMA_FALLBACK_METADATA_KEY,
     SCHEMA_PATH_METADATA_KEY,
@@ -146,6 +147,7 @@ class _NodeFinish:
     reasks: int = 0
     schema_path: SchemaPath | None = None
     schema_fallback: SchemaRefusal | None = None
+    answer_unwrapped: bool = False
     reported_charge_usd: float | None = None
     served_upstream: str | None = None
 
@@ -402,6 +404,7 @@ class GraphExecutor:
                             reasks=_reasks_of(event),
                             schema_path=_schema_path_of(event),
                             schema_fallback=_schema_fallback_of(event),
+                            answer_unwrapped=_answer_unwrapped_of(event),
                             reported_charge_usd=_reported_charge_of(event),
                             served_upstream=_served_upstream_of(event),
                         )
@@ -480,6 +483,7 @@ class GraphExecutor:
                     reasks=finish.reasks,
                     schema_path=finish.schema_path,
                     schema_fallback=finish.schema_fallback,
+                    answer_unwrapped=finish.answer_unwrapped,
                     reported_charge_usd=finish.reported_charge_usd,
                     served_upstream=finish.served_upstream,
                 )
@@ -607,6 +611,13 @@ def _schema_fallback_of(event) -> SchemaRefusal | None:
     """The refusal rule that moved this event's tier down its ladder, if any."""
     return (getattr(event, "custom_metadata", None) or {}).get(
         SCHEMA_FALLBACK_METADATA_KEY
+    )
+
+
+def _answer_unwrapped_of(event) -> bool:
+    """Whether the executor took this event's answer out of a lone ``answer`` key."""
+    return (getattr(event, "custom_metadata", None) or {}).get(
+        ANSWER_UNWRAPPED_METADATA_KEY, False
     )
 
 

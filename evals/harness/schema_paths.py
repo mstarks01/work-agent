@@ -1,9 +1,9 @@
 """How each node's schema reached the provider, read off archived reports.
 
 ADR 0058 lets a tier send a node schema natively, as a tool's parameters, or
-stated in the request text, and records three facts on each node execution:
-``schema_path``, ``schema_fallback`` and ``reasks``. This command is the eval
-harness's reader of those three facts. It counts them per node over every
+stated in the request text, and records four facts on each node execution:
+``schema_path``, ``schema_fallback``, ``reasks`` and ``answer_unwrapped``. This
+command is the eval harness's reader of those four facts. It counts them per node over every
 archived report under a root, so a paired run of the native and tool paths
 (#1413) reads its re-ask rate and its fallbacks from the record rather than
 from a log.
@@ -37,6 +37,7 @@ class NodeSchemaPaths:
 
     executions: int = 0
     reasks: int = 0
+    unwrapped: int = 0
     paths: Counter[str] = field(default_factory=Counter)
     fallbacks: Counter[str] = field(default_factory=Counter)
 
@@ -44,18 +45,20 @@ class NodeSchemaPaths:
         return {
             "executions": self.executions,
             "reasks": self.reasks,
+            "unwrapped": self.unwrapped,
             "paths": dict(sorted(self.paths.items())),
             "fallbacks": dict(sorted(self.fallbacks.items())),
         }
 
 
 def schema_paths(nodes: Iterable[NodeRun]) -> dict[str, NodeSchemaPaths]:
-    """Each node's schema path, fallbacks and re-asks, by node name."""
+    """Each node's schema path, fallbacks, re-asks and unwraps, by node name."""
     totals: dict[str, NodeSchemaPaths] = {}
     for node in nodes:
         total = totals.setdefault(node.node, NodeSchemaPaths())
         total.executions += 1
         total.reasks += node.reasks
+        total.unwrapped += node.answer_unwrapped
         total.paths[node.schema_path or NO_SCHEMA] += 1
         if node.schema_fallback is not None:
             total.fallbacks[node.schema_fallback] += 1
