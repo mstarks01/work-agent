@@ -25,6 +25,7 @@ from analysis_service.critic import (
 from analysis_service.fan_in import join_drafts, snap_drafts
 from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
+from analysis_service.frameworks.stride.record import RecommendationReading
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from analysis_service.system_model import mentioned_ids
 from tests.factories import sample_draft, sample_ruling, severity, valid_model
@@ -1442,3 +1443,25 @@ def test_the_critic_cannot_reject_a_draft_as_a_duplicate():
     assert archived.rejected_because == "duplicate", (
         "an archived report must still load"
     )
+
+
+@pytest.mark.parametrize(
+    ("verdict", "kept"),
+    [
+        (ProposedVerdict(rejected_because="reasoning", reason="no"), False),
+        (ProposedVerdict(), True),
+    ],
+)
+def test_a_rejected_threat_carries_no_reading_of_its_advice(verdict, kept):
+    """The critic reads the advice only on a threat that survived the gates."""
+    reading = RecommendationReading(sound=False, note="names a stated control")
+    ruling = sample_ruling("S-01", verdict=verdict, recommendation=reading)
+
+    assembled = assemble_claims(
+        [sample_draft("S-01")], [ruling], valid_model(), SCHEMAS
+    )
+
+    claims = list(assembled.claims) + list(assembled.rejected_claims)
+    assert len(claims) == 1
+    claim = claims[0]
+    assert claim.recommendation == (reading if kept else None)
