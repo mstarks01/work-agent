@@ -957,6 +957,30 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         assert "40 facts" in ruling.verdict.reason
         assert len(ruling.verdict.related_unknowns) == 40
 
+    def test_a_completed_ruling_counts_the_facts_a_long_sentence_cannot_name(
+        self, model
+    ):
+        """The reason ``complete_rulings`` writes has the same bound.
+
+        Assembly builds the report's verdict from it, and the schema refuses a
+        reason over the bound, so an unbounded sentence failed the job there.
+        """
+        rows = [
+            f"assertion:mfa-requirement~principal:customer-account-{index:02d}~any~unknown"
+            for index in range(15)
+        ]
+        draft = sample_draft(
+            "S-01",
+            grounds=[Ground(kind="unknown-assertion", assertion=row) for row in rows],
+        )
+
+        assembled = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
+
+        verdict = assembled.claims[0].verdict
+        assert len(verdict.reason) <= REASON_MAX_CHARS
+        assert "15 facts" in verdict.reason
+        assert len(verdict.related_unknowns) == 15
+
     def test_the_critics_own_unknowns_and_reason_are_kept(self, model):
         ruling = sample_ruling(
             "S-01",

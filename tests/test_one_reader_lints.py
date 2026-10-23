@@ -609,6 +609,18 @@ def test_a_flow_as_a_place_has_one_wording():
     ]
 
 
+def _words_a_resting_reason(node: ast.AST) -> bool:
+    """Whether ``node`` spells the reason code writes for a claim on open facts."""
+    return isinstance(node, ast.Constant) and "The claim rests on" in str(node.value)
+
+
+def test_the_reason_a_claim_rests_on_has_one_writer():
+    """Only ``rests_on`` writes the sentence, so every copy keeps its bound."""
+    assert _sites(_words_a_resting_reason) == [
+        ("src/analysis_service/claims.py", "rests_on")
+    ]
+
+
 def _spells_an_assertion_id(node: ast.AST) -> bool:
     """Whether ``node`` writes or reads the ``assertion:`` prefix of an ID."""
     return isinstance(node, ast.Constant) and str(node.value).startswith("assertion:")

@@ -705,11 +705,26 @@ class Ground(BaseModel):
 
 
 # The bound on a verdict's ``reason``, named because code writes one too.
-# :meth:`Claim.settled_by_grounds` composes a sentence from a draft's unknown
-# grounds, and a draft can cite more pairs than a sentence of this length names.
-# A writer that cannot read the bound writes a string the schema refuses, and
-# that fails the node rather than the claim.
+# :func:`rests_on` composes a sentence from a draft's unknown grounds, and a
+# draft can cite more pairs than a sentence of this length names. A writer that
+# cannot read the bound writes a string the schema refuses, and that fails the
+# node rather than the claim.
 REASON_MAX_CHARS = 1000
+
+
+def rests_on(refs: Sequence[UnknownRef]) -> str:
+    """The reason a claim resting on ``refs`` carries, within the bound.
+
+    **The one writer of the sentence code puts in a reason.** It names each
+    fact, and names the count instead when the names overrun
+    ``REASON_MAX_CHARS``. ``related_unknowns`` carries every fact either way, so
+    the prose is the only thing that shortens.
+    """
+    named = ", ".join(name_unknown(ref) for ref in refs)
+    reason = f"The claim rests on {named}, which the input never stated."
+    if len(reason) > REASON_MAX_CHARS:
+        reason = f"The claim rests on {len(refs)} facts the input never stated."
+    return reason
 
 
 class VerdictFields(BaseModel):
@@ -1156,18 +1171,12 @@ class Claim(BaseModel):
         ruling carries fields beyond the neutral shape overrides this to fill
         them.
 
-        The sentence names each pair, and names the count instead when the
-        pairs overrun ``REASON_MAX_CHARS``. ``related_unknowns`` carries every
-        pair either way, so the prose is the only thing that shortens.
+        The reason is :func:`rests_on`'s.
         """
         unknowns = draft.unknown_grounds()
         if not unknowns:
             return None
-        named = ", ".join(name_unknown(ref) for ref in unknowns)
-        reason = f"The claim rests on {named}, which the input never stated."
-        if len(reason) > REASON_MAX_CHARS:
-            reason = f"The claim rests on {len(unknowns)} facts the input never stated."
-        verdict = ProposedVerdict(reason=reason, related_unknowns=unknowns)
+        verdict = ProposedVerdict(reason=rests_on(unknowns), related_unknowns=unknowns)
         return Ruling(id=draft.id, verdict=verdict)
 
     @classmethod
