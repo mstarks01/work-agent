@@ -1,0 +1,1 @@
+{"attempts": 7, "audit_id": "QA-2026-10-23-01", "budget_usd": 6.0, "mode": "implement", "recorded": "2026-10-23T09:00:00Z", "words": "Begin the fixes and you may spend $6 (in reply to: fix B1-B3 and C1-C4 offline, one PR per lever, and measure P1, the per-lane verb enum, on cases 01, 14 and 15 for about $3 to $6; recommendation: yes)"}
