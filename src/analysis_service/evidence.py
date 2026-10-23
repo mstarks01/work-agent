@@ -109,6 +109,7 @@ from analysis_service.claims import (
     UnknownClaimIdentity,
     UnresolvedEvidence,
 )
+from analysis_service.field_capabilities import with_field_capabilities
 from analysis_service.frameworks import FrameworkPackage, schemas_for
 from analysis_service.system_model import (
     UNKNOWN,
@@ -319,9 +320,13 @@ def prepared_view(
     replay's offered count and the population table — so a guarantee tested
     through one is the guarantee the other runs. The projection is applied first because a zone
     predicate moves ``trust_zone``, and the evidence is derived from the model
-    it produced.
+    it produced. A projection can move a closed field a field capability reads,
+    such as ``exposure``, so the field capabilities are written again on the
+    model it produced.
     """
     projected, applied = apply_projection(model, assertions)
+    if applied:
+        projected = with_field_capabilities(projected)
     return projected, applied, evidence_catalog(projected, assertions)
 
 
