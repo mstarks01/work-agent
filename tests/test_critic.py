@@ -14,6 +14,7 @@ from analysis_service.claims import (
     SeverityLevel,
     UnknownRef,
     Verdict,
+    rests_on,
 )
 from analysis_service.critic import (
     CriticOutputError,
@@ -368,14 +369,16 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
     def _rulings(self, **verdict):
         return [sample_ruling("S-01", verdict=ProposedVerdict(**verdict))]
 
-    def test_a_needs_info_without_a_reason_is_reported(self, model):
-        problems = review_issues(
-            [sample_draft("S-01")],
-            self._rulings(related_unknowns=[UnknownRef(subject="is it logged")]),
-            model,
-        )
+    def test_a_needs_info_without_a_reason_gains_one_naming_its_open_facts(self, model):
+        """Code names the facts the critic listed, so no re-ask is spent on it."""
+        asked = UnknownRef(subject="is it logged")
+        rulings = self._rulings(related_unknowns=[asked])
 
-        assert "ruled needs-info and states no reason" in "; ".join(problems.messages)
+        problems = review_issues([sample_draft("S-01")], rulings, model)
+
+        assert "states no reason" not in "; ".join(problems.messages)
+        (completed,) = complete_rulings([sample_draft("S-01")], rulings)
+        assert completed.verdict.reason == rests_on([asked])
 
     def test_open_facts_on_a_rejection_are_reported(self, model):
         """A draft that fails a check rests on no open fact."""
