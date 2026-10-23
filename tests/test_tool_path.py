@@ -48,6 +48,9 @@ TOOL_TIER = {"ANALYSIS_SAMPLING_STRONG_STRUCTURED_OUTPUT": "tool"}
 
 ANSWER: dict[str, Any] = {"claims": []}
 
+#: The top-level properties of ``SCHEMA``.
+FIELDS = frozenset(SCHEMA.model_fields)
+
 
 def tool_call_message(arguments: Any = ANSWER) -> dict[str, Any]:
     return {
@@ -157,7 +160,7 @@ def test_a_preamble_is_dropped_and_a_thought_is_kept():
     preamble = types.Part(text="Here is my answer:")
     call = types.Part.from_function_call(name=OUTPUT_TOOL_NAME, args=ANSWER)
 
-    converted = answer_from_tool_call(_response(thought, preamble, call))
+    converted = answer_from_tool_call(_response(thought, preamble, call), FIELDS)
 
     texts = [(part.text, bool(part.thought)) for part in converted.content.parts]
     assert texts == [("thinking", True), (json.dumps(ANSWER), False)]
@@ -167,7 +170,7 @@ def test_a_response_without_the_tool_call_passes_unchanged():
     """Its text goes to the schema check, which may re-ask."""
     text = _response(types.Part(text='{"claims": []}'))
 
-    assert answer_from_tool_call(text) is text
+    assert answer_from_tool_call(text, FIELDS) is text
 
 
 def test_an_answer_in_a_lone_answer_key_reaches_the_node_unwrapped():

@@ -652,9 +652,7 @@ def answer_unfenced(response: LlmResponse) -> LlmResponse:
     return response.model_copy(update={"content": content})
 
 
-def answer_from_tool_call(
-    response: LlmResponse, fields: frozenset[str] = frozenset()
-) -> LlmResponse:
+def answer_from_tool_call(response: LlmResponse, fields: frozenset[str]) -> LlmResponse:
     """``response`` with a call to :data:`OUTPUT_TOOL_NAME` turned into JSON text.
 
     The node reads its answer as text, as it does on the native path, so the
