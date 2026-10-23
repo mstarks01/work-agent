@@ -145,7 +145,7 @@ const answerEditor = (q, { choices, prefill, reopen, changed = () => {} }) => {
     controls = [input];
   }
   set(value);
-  input.dataset.key = JSON.stringify(q.key);
+  input.dataset.key = questionKey(q.key);
   const readDetail = () => (detail ? detail.value.trim() : "");
   return {
     input,

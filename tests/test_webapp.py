@@ -1750,9 +1750,14 @@ def test_a_page_builds_an_answer_input_with_the_shared_builder(page):
     )
 
 
-#: The two rules the question list's pages share, as question_list.js spells
-#: each one's definition.
-SHARED_ROW_RULES = ("const questionKey = ", "const rowKey = ", "const sameAnswer = ")
+#: The rules the question list's pages share, as question_list.js spells each
+#: one's definition.
+SHARED_ROW_RULES = (
+    "const questionKey = ",
+    "const rowKey = ",
+    "const sameAnswer = ",
+    "const linkAnswerText = ",
+)
 
 
 @pytest.mark.parametrize("rule", SHARED_ROW_RULES)
@@ -1772,7 +1777,11 @@ def test_a_row_rule_is_defined_once_and_read_by_both_pages(rule):
         assert f"{name}(" in page_javascript(page), f"{page} does not call {name}"
 
 
-@pytest.mark.parametrize("page", ANSWER_PAGES)
+#: Every script the two pages that take answers load.
+QUESTION_KEY_PAGES = (*ANSWER_PAGES, "answer_editor.js", "workspace.js", "sidebar.js")
+
+
+@pytest.mark.parametrize("page", QUESTION_KEY_PAGES)
 def test_a_question_key_is_spelled_by_question_key_only(page):
     """Every page map keys a question through ``questionKey``.
 
@@ -1783,6 +1792,84 @@ def test_a_question_key_is_spelled_by_question_key_only(page):
     definition = ["JSON.stringify(key)"] if page == "question_list.js" else []
 
     assert spellings == definition, f"{page} spells a question key as {spellings}"
+
+
+def test_the_shared_modules_load_before_the_page_script_that_draws_the_list():
+    """``first_run.js`` and ``report_view.js`` call ``questionList`` as they
+    load, so ``question_list.js`` and ``answer_editor.js`` come first on each
+    page. ``answer_editor.js`` reads ``questionKey`` and ``workspace.js`` reads
+    ``indexGroups`` inside a function, so neither needs to load after
+    ``question_list.js``.
+    """
+    source = (PROJECT_ROOT / "webapp" / "main.py").read_text(encoding="utf-8")
+    served = [
+        re.findall(r'"(\w+\.js)"', block)
+        for block in re.findall(r"for name in \(([^)]*)\)", source)
+    ]
+    lists = [names for names in served if "question_list.js" in names]
+
+    assert [names[-1] for names in lists] == ["report_view.js", "first_run.js"]
+    for names in lists:
+        for shared in ("answer_editor.js", "question_list.js"):
+            assert names.index(shared) < names.index(names[-1]), names
+
+
+def test_the_link_group_heading_is_spelled_once():
+    """The heading over the link questions has one spelling, in
+    ``question_list.js``, and each page and the export read it there."""
+    heading = "Match each user, team or account to a part of your system"
+    spelled = {
+        path.name: page_javascript(path.name).count(heading)
+        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
+        if heading in page_javascript(path.name)
+    }
+
+    assert spelled == {"question_list.js": 1}
+    for page in ("report_view.js", "first_run.js"):
+        assert "LINK_GROUP_HEADING" in page_javascript(page), page
+
+
+#: The pages that word a count, each loaded beside ``answer_editor.js``.
+COUNTED_PAGES = ("report_view.js", "first_run.js", "question_list.js", "workspace.js")
+
+
+@pytest.mark.parametrize("page", COUNTED_PAGES)
+def test_a_count_of_one_is_worded_by_counted_only(page):
+    """A ternary on a count of one is ``counted``'s own rule (#1878).
+
+    A page that spells the singular itself is a second reader, and reads
+    "1 units" where the two drift.
+    """
+    assert re.findall(r"=== 1 \?", page_javascript("answer_editor.js")) == ["=== 1 ?"]
+    assert re.findall(r"=== 1 \?.*", page_javascript(page)) == [], (
+        f"{page} words a count of one itself; word it with counted."
+    )
+
+
+def test_a_finding_anchor_is_spelled_once():
+    """``findingId`` is the one spelling of a finding's anchor; a link built by
+    hand beside it reaches nothing once the spelling moves."""
+    assert viewer_javascript().count("finding-${") == 1
+
+
+def test_the_question_index_is_built_once_for_both_pages():
+    """``indexGroups`` in ``question_list.js`` builds the index on the report
+    page and on the first-run page: it hides a box with no row that shows and
+    counts the rows of each box that does. A page keeps only its click."""
+    defined = [
+        path.name
+        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
+        if "const indexGroups = " in page_javascript(path.name)
+    ]
+    spelled = [
+        path.name
+        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
+        if "question-group-" in page_javascript(path.name)
+    ]
+
+    assert defined == spelled == ["question_list.js"]
+    for page in ("report_view.js", "workspace.js"):
+        assert "indexGroups(" in page_javascript(page), page
 
 
 class TestTheReportPageGetsARowPerUnit:

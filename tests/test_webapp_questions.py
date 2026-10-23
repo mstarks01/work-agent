@@ -627,6 +627,130 @@ def _run_form_script(steps: str, search: str = "") -> dict:
     return json.loads(done.stdout.strip().splitlines()[-1])
 
 
+def test_the_conflict_line_words_a_link_answer_of_none_as_the_page_does():
+    """A link answer another tab saved reads "none of these" in the conflict
+    line, as it reads in every other place the page words one."""
+    question = {
+        "key": "shopper accounts",
+        "principal": "shopper accounts",
+        "rows": 1,
+        "options": [{"id": "entity:shopper", "name": "Shopper"}],
+    }
+    theirs = {"principal": "shopper accounts", "element": "none"}
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+  link_questions: [{json.dumps(question)}], early_questions: [], revision: 0 }}) }});
+globalThis.fetch = async (url) => url.startsWith("/answer/")
+  ? {{ ok: false, status: 409, json: async () => ({{ message: "stale" }}) }}
+  : {{ ok: true, json: async () => ({{ questions: {{ run: "r1", link_questions: [],
+      early_questions: [], answered_early: [],
+      answered_links: [{{ ...{json.dumps(question)}, answer: {json.dumps(theirs)} }}],
+      revision: 1 }} }}) }};
+const select = ids.questions.querySelectorAll("select")[0];
+select.value = "entity:shopper";
+select.listeners.change({{ type: "change" }});
+await new Promise((resolve) => setTimeout(resolve, 20));
+const conflict = ids.questions.querySelectorAll("div").find((d) => d.className === "conflict");
+calls.push({{ conflict: conflict.children[0].textContent }});
+"""
+    seen = _run_form_script(steps)
+    assert (
+        seen["calls"][-1]["conflict"]
+        == "Changed elsewhere to \u201cnone of these\u201d. "
+    )
+
+
+# A stand-in DOM for the question index alone: boxes of rows, as
+# ``questionList`` draws them, with the selectors ``indexGroups`` reads.
+_INDEX_HARNESS = r"""
+class Node {
+  constructor(tag, className = "") { this.tag = tag; this.className = className; this.children = [];
+    this.dataset = {}; this.hidden = false; this.textContent = ""; this.listeners = {}; this.href = ""; }
+  append(...kids) { this.children.push(...kids); }
+  replaceChildren(...kids) { this.children = [...kids]; }
+  addEventListener(name, fn) { this.listeners[name] = fn; }
+  focus() {}
+  matches(selector) { return selector.split(", ").some((part) => part.startsWith(".")
+    ? this.className.split(" ").includes(part.slice(1))
+    : this.tag === part.replace(/\[.*$/, "") && (!part.includes("[data-key]") || "key" in this.dataset)); }
+  querySelectorAll(selector) {
+    const out = [];
+    const walk = (n) => { for (const c of n.children) if (typeof c === "object") {
+      if (c.matches(selector)) out.push(c); walk(c); } };
+    walk(this);
+    return out;
+  }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+}
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent, ...n.children.map(text)].join("");
+globalThis.document = {
+  getElementById: (id) => Object.assign(new Node("script"), { textContent: LIMITS }),
+  createElement: (tag) => new Node(tag),
+};
+const box = (heading, ...rows) => {
+  const node = new Node("details", "question-group");
+  const title = new Node("summary");
+  const label = new Node("span", "group-heading");
+  label.textContent = heading;
+  title.append(label);
+  const each = new Node("details", "each-one");
+  each.append(...rows);
+  node.append(title, each);
+  return node;
+};
+const row = (hidden = false) => Object.assign(new Node("p", "question"), { hidden });
+const facetRow = () => Object.assign(new Node("tr"), { dataset: { key: "k" } });
+const table = new Node("table");
+table.append(new Node("tr"), facetRow(), facetRow());
+const list = new Node("div");
+list.append(box("Links", row()), box("Skipped", row(true)), box("Facets", table));
+const index = new Node("nav");
+"""
+
+
+def test_the_index_hides_an_empty_box_and_counts_the_rows_of_each_other():
+    """``indexGroups`` builds the index both pages show: a box whose rows are
+    all hidden hides and gets no link, and each link carries its box's count
+    of rows, in the singular for one. A click opens the box and runs the
+    page's own part."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the question list's script")
+    script = "\n".join(
+        (PROJECT_ROOT / "webapp" / "static" / name).read_text()
+        for name in ("answer_editor.js", "question_list.js")
+    )
+    program = (
+        _INDEX_HARNESS.replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
+        + script
+        + """
+const clicked = [];
+indexGroups(index, list, (box, link) => clicked.push([box.id, text(link)]));
+index.children[1].listeners.click({ preventDefault() {} });
+console.log(JSON.stringify({
+  links: index.children.map((link) => [link.href, text(link)]),
+  hidden: list.children.map((box) => box.hidden),
+  opened: list.children.map((box) => Boolean(box.open)),
+  clicked,
+}));
+"""
+    )
+    done = subprocess.run(
+        [node, "-e", program], capture_output=True, text=True, timeout=30, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    seen = json.loads(done.stdout.strip().splitlines()[-1])
+    assert seen["links"] == [
+        ["#question-group-0", "Links1 question"],
+        ["#question-group-2", "Facets2 questions"],
+    ]
+    assert seen["hidden"] == [False, True, False]
+    assert seen["opened"] == [False, False, True]
+    assert seen["clicked"] == [["question-group-2", "Facets2 questions"]]
+
+
 def test_the_form_script_asks_answers_and_follows_to_the_report():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
@@ -1238,7 +1362,7 @@ def tallies(
 const inputs = [...box.all("input"), ...box.all("select")];
 const byKey = new Map(inputs.map(i => [i.dataset.key, i]));
 for (const q of {json.dumps(answer)}) {{
-  const input = byKey.get(JSON.stringify(q.key));
+  const input = byKey.get(questionKey(q.key));
   input.value = {json.dumps(value)} ?? (q.choices.length ? q.choices[0] : "an answer");
   (input.listeners.input || input.listeners.change)();
 }}

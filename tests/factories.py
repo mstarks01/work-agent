@@ -87,6 +87,7 @@ from analysis_service.graph import (
 )
 from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.jobs import Checkpoint, InMemoryJobStore
+from analysis_service.links import LinkAnswer
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import (
     ModelTierConfig,
@@ -1138,6 +1139,7 @@ def report_state(
     report: Report,
     *,
     answered: Sequence[FactAnswer] = (),
+    links: Sequence[LinkAnswer] = (),
     final: bool = False,
     shown: Sequence[UnknownKey] = (),
     skipped: Sequence[UnknownKey] = (),
@@ -1153,7 +1155,7 @@ def report_state(
         waiting=False,
         final=final,
         sources=(),
-        answers=AnswerSet(facts=tuple(answered)),
+        answers=AnswerSet(facts=tuple(answered), links=tuple(links)),
         shown=shown,
         skipped=skipped,
         corrections=corrections,

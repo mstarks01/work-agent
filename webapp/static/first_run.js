@@ -619,7 +619,7 @@
     const { theirs } = edit.conflict;
     const text = document.createElement("span");
     text.textContent = theirs
-      ? `Changed elsewhere to “${answerText(theirs.element ? { value: theirs.element } : theirs)}”. `
+      ? `Changed elsewhere to “${theirs.element ? linkAnswerText(theirs) : answerText(theirs)}”. `
       : "Removed elsewhere. ";
     const keep = button("Keep mine", () => {
       row.saved = theirs;
@@ -677,7 +677,7 @@
     const held = answersOf(data);
     const listed = [
       ...data.link_questions.map((q) => ({
-        q: { ...q, group: "links", group_heading: "Match each user, team or account to a part of your system" },
+        q: { ...q, group: "links", group_heading: LINK_GROUP_HEADING },
         kind: "link",
       })),
       ...data.early_questions.map((q) => ({ q, kind: "fact" })),
@@ -766,7 +766,7 @@
       if (added) noted.push(`${counted(added, "relevant question", "relevant questions")} added`);
     }
     const parts = queued
-      ? [...noted, `${queued} of them ${queued === 1 ? "shows" : "show"} when you leave the answer you are typing`]
+      ? [...noted, `${counted(queued, "of them shows", "of them show")} when you leave the answer you are typing`]
       : noted;
     say(changesNote, parts.join(". ") + (parts.length ? "." : ""));
   };
@@ -857,8 +857,7 @@
     // (AnswerState.carried, ADRs 0072 and 0079).
     const dropped = [
       ...(data.carried_dropped || []).map((a) => `${a.label} — ${answerText(a)}`),
-      ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${
-        a.element === "none" ? "none of these" : a.element}`),
+      ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${linkAnswerText(a)}`),
     ];
     if (dropped.length) {
       const lead = document.createElement("p");
@@ -934,9 +933,7 @@
       row.append(label);
       const kept = document.createElement("span");
       if (before) {
-        kept.textContent = ` — ${kind === "link"
-          ? (before.element === "none" ? "none of these" : before.element)
-          : answerText(before)}`;
+        kept.textContent = ` — ${kind === "link" ? linkAnswerText(before) : answerText(before)}`;
       }
       row.append(kept);
       const open = button(before ? "Change" : "Answer it", () => {

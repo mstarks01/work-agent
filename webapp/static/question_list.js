@@ -169,7 +169,7 @@ const questionList = ({
     const name = document.createElement("b");
     name.textContent = row.q.principal;
     const shown = document.createElement("span");
-    shown.textContent = ` — ${answer.element === "none" ? "none of these" : answer.element}`;
+    shown.textContent = ` — ${linkAnswerText(answer)}`;
     row.compact = true;
     row.read = () => null;
     const fields = document.createElement("div");
@@ -475,6 +475,36 @@ const questionList = ({
 const questionKey = (key) => JSON.stringify(key);
 // A row's key is its question's key.
 const rowKey = (row) => questionKey(row.q.key);
+// The heading of the box of link questions, on both pages and in the export.
+const LINK_GROUP_HEADING = "Match each user, team or account to a part of your system";
+// A link answer as one line of text: the element, or "none of these".
+const linkAnswerText = (answer) => (answer.element === "none" ? "none of these" : answer.element);
+// The index beside the list: a link for each box with a row that shows, with
+// its count of rows. A box whose rows are all hidden hides. A click opens the
+// box, runs `select(box, link)`, and moves the focus to the box's heading.
+const indexGroups = (index, list, select) => {
+  index.replaceChildren();
+  [...list.children].forEach((box, at) => {
+    const rows = [...box.querySelectorAll(".question, tr[data-key]")].filter((row) => !row.hidden);
+    box.hidden = !rows.length;
+    if (box.hidden) return;
+    box.id = `question-group-${at}`;
+    const link = document.createElement("a");
+    link.textContent = box.querySelector(".group-heading").textContent;
+    const count = document.createElement("small");
+    count.textContent = counted(rows.length, "question", "questions");
+    link.append(count);
+    link.href = `#${box.id}`;
+    link.box = box;
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      box.open = true;
+      select(box, link);
+      box.querySelector("summary").focus();
+    });
+    index.append(link);
+  });
+};
 // Two answers are one answer when the fields the submitter gives agree. The
 // service serves every field, with its defaults and with the value it
 // writes from a facets answer; a page builds only the fields given.
