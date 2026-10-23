@@ -1515,3 +1515,29 @@ class TestAConfirmedExclusion:
         )
 
         assert not problems
+
+
+class TestAnUnruledMisfiledDraft:
+    """Code writes the lane rejection a re-ask could only produce for code to replace."""
+
+    def _misfiled(self):
+        return sample_draft("S-01", verb="flood")
+
+    def test_it_raises_no_problem_for_the_re_ask(self):
+        problems = review_issues([self._misfiled()], [], valid_model())
+
+        assert not problems
+
+    def test_it_reaches_the_report_as_a_lane_rejection_nobody_rated(self):
+        assembled = assemble_claims([self._misfiled()], [], valid_model(), SCHEMAS)
+
+        assert assembled.claims == []
+        (claim,) = list(assembled.rejected_claims)
+        assert claim.verdict.rejected_because == "lane"
+        assert "denial-of-service" in claim.verdict.reason
+        assert claim.confidence is None
+
+    def test_a_draft_in_its_own_lane_still_goes_to_the_re_ask(self):
+        problems = review_issues([sample_draft("S-01")], [], valid_model())
+
+        assert "dropped draft 'S-01'" in "; ".join(problems.messages)
