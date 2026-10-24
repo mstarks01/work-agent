@@ -22,6 +22,28 @@
       "ruling": "Both describe missing shopper attribution in receipts that identify only the order service; the draft appropriately makes missing identity retention conditional.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 near-miss ballot row 14: #739 second call r1"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "replay",
+        "affected_element_ids": [
+          "flow:entity:shopper>process:storefront-api>place-order",
+          "entity:shopper"
+        ]
+      },
+      "reading": {
+        "verb": "use-credential",
+        "affected_element_ids": [
+          "entity:shopper",
+          "process:storefront-api",
+          "flow:entity:shopper>process:storefront-api>place-order"
+        ]
+      },
+      "verdict": "same",
+      "ruling": "Both describe an attacker presenting a stolen shopper session cookie to the storefront API to place orders as that shopper. Here, use-credential describes the same replay action; the verb difference does not change the threat.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-01-0 row 1: 01-spoofing-1 S-02"
     }
   ]
 }
