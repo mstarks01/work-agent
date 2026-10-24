@@ -29,7 +29,7 @@ from evals import review_submission as review_submissions
 from evals import verify_corpus
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
-from evals.harness.reference import CorpusError
+from evals.harness.reference import CorpusError, load_case
 from webapp.page import client_script
 from webapp.sitting import _PAGE, build_session, create_app
 from webapp.sitting import main as app_main
@@ -40,8 +40,22 @@ CASE = "01-payments-checkout"
 OTHER = "03-batch-data-pipeline"
 
 
-def unused_verb(claims: list[dict]) -> str:
-    """An action no claim already files at the first claim's place.
+def unruled(tree: Path, case: str = CASE) -> int:
+    """The index of the first STRIDE claim that no ruling names.
+
+    A ruling names its claim by lane, verb and place, and the corpus load
+    refuses a ruling whose claim moved. So a test that moves a claim's identity
+    moves one that ``rulings.json`` leaves alone, read through :func:`load_case`.
+    """
+    golden = load_case(tree / "evals" / "corpus" / case)
+    named = {*golden.ruled_readings, *golden.refused_readings}
+    return next(
+        index for index in range(len(golden.stride_claims())) if index not in named
+    )
+
+
+def unused_verb(claims: list[dict], index: int) -> str:
+    """An action no claim already files at the place of claim ``index``.
 
     Derived rather than named, because every test that calls it needs a *new*
     identity. A verb the case already carries there composes the identity that
@@ -53,15 +67,15 @@ def unused_verb(claims: list[dict]) -> str:
     One reader for the three fixtures that move a claim's identity, because
     three copies of a verb name is three places to miss when ``CASE`` changes.
     """
-    first = claims[0]
+    moved = claims[index]
     taken = {
         claim["verb"]
         for claim in claims
-        if claim["category"] == first["category"]
-        and claim["affected_element_ids"] == first["affected_element_ids"]
+        if claim["category"] == moved["category"]
+        and claim["affected_element_ids"] == moved["affected_element_ids"]
     }
     family = [
-        verb for verb in ACTION_VERBS if family_of(verb) == family_of(first["verb"])
+        verb for verb in ACTION_VERBS if family_of(verb) == family_of(moved["verb"])
     ]
     return next(verb for verb in family if verb not in taken)
 
@@ -745,13 +759,14 @@ class TestTheMarks:
         """
         claims_file = tree / "evals" / "corpus" / CASE / "claims" / "stride.json"
         claims = json.loads(claims_file.read_text("utf-8"))
-        claims[0]["verb"] = None
+        index = unruled(tree)
+        claims[index]["verb"] = None
         claims_file.write_text(json.dumps(claims, indent=2), encoding="utf-8")
 
         with pytest.raises(sittings.SittingError) as refused:
             session_for(tree, "ada", CASE)
         assert CASE in str(refused.value)
-        assert claims[0]["claim"] in str(refused.value)
+        assert claims[index]["claim"] in str(refused.value)
 
 
 class TestTheRail:
@@ -2603,16 +2618,17 @@ class TestACorpusEditUnderAMergedSitting:
         claims = json.loads(path.read_text("utf-8"))
         added = {
             **claims[0],
-            "verb": unused_verb(claims),
+            "verb": unused_verb(claims, 0),
             "claim": "A captured request is replayed to the service.",
         }
         path.write_text(json.dumps([*claims, added], indent=2) + "\n", encoding="utf-8")
 
     def rekey_claim(self, tree, case=CASE):
-        """The first claim keeps its place and changes its identity."""
+        """A claim no ruling names keeps its place and changes its identity."""
         path = self.claims_file(tree, case)
         claims = json.loads(path.read_text("utf-8"))
-        claims[0]["verb"] = unused_verb(claims)
+        index = unruled(tree, case)
+        claims[index]["verb"] = unused_verb(claims, index)
         path.write_text(json.dumps(claims, indent=2) + "\n", encoding="utf-8")
 
     def opened(self, tree, reviewer="ada"):
@@ -2711,7 +2727,8 @@ class TestARecordSignsWhatWasServed:
     def move_claims(self, tree, case=CASE):
         path = tree / "evals" / "corpus" / case / "claims" / "stride.json"
         claims = json.loads(path.read_text("utf-8"))
-        claims[0]["verb"] = unused_verb(claims)
+        index = unruled(tree, case)
+        claims[index]["verb"] = unused_verb(claims, index)
         path.write_text(json.dumps(claims, indent=2) + "\n", encoding="utf-8")
 
     def digest_now(self, tree, name, case=CASE):
