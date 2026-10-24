@@ -138,7 +138,11 @@ default-groups = ["dev", "web"]
 # google-adk caps opentelemetry-api and opentelemetry-sdk at 1.42.1, and
 # 1.42.1 carries CVE-2026-114603. 1.45.1 fixes it, so the override lifts the
 # cap past google-adk's own requirement. Drop it when google-adk allows 1.45.1.
+# litellm caps filelock below 4.0, and 3.32.0 carries CVE-2026-112907,
+# CVE-2026-112913 and CVE-2026-112940. 4.2.1 fixes them. Drop the filelock
+# override when litellm allows 4.2.1.
 override-dependencies = [
+    "filelock==4.2.1",
     "opentelemetry-api==1.45.1",
     "opentelemetry-sdk==1.45.1",
 ]
