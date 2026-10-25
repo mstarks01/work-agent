@@ -66,6 +66,7 @@ from analysis_service.report import (
     latency_by_node,
     usage_by_node,
 )
+from analysis_service.retry import UnfinishedCompletionError
 from evals.harness import (
     assembly,
     assertion_use,
@@ -526,6 +527,8 @@ async def _run_mode(
                     "error": repr(outcome.error),
                     "state": dict(outcome.state),
                 }
+                if isinstance(outcome.error, UnfinishedCompletionError):
+                    failed_states[case.id]["fragment"] = outcome.error.fragment
             if not isinstance(outcome.error, MEASURED):
                 # Not a measurement: the provider or the transport failed, and
                 # the next case would fail the same way. Stop, but keep what

@@ -826,6 +826,49 @@ class TestAFilterStopIsRefused:
         assert "anthropic/claude-opus-5-5" in message
         assert "SAFETY" in message
 
+    def test_the_message_names_the_node_from_its_adk_label(self):
+        """The provider gives no reason, so the node is the first thing to know."""
+        request = LlmRequest(
+            contents=_ANY_REQUEST.contents,
+            config=types.GenerateContentConfig(
+                labels={"adk_agent_name": "analyze_stride_tampering"}
+            ),
+        )
+        adapter = ExecutedLlm(
+            model="fake/model",
+            executor=FakeExecutor(outcomes=[refused()]),
+            retry_policy=policy(),
+        )
+
+        async def scenario():
+            async for _ in adapter.generate_content_async(request):
+                pass
+
+        with pytest.raises(RefusedCompletionError) as excinfo:
+            asyncio.run(scenario())
+        assert str(excinfo.value).startswith("analyze_stride_tampering: ")
+
+    def test_the_error_carries_the_fragment_and_the_message_does_not(self):
+        """The fragment is the only evidence of what the filter stopped.
+
+        It is model output about a submitter's system, so it stays out of the
+        message that logs and the job's error carry.
+        """
+        base = FakeExecutor(outcomes=[refused('{"claims":[{"title":"Firmware')])
+        with pytest.raises(RefusedCompletionError) as excinfo:
+            drive(base, policy())
+        assert excinfo.value.fragment == '{"claims":[{"title":"Firmware'
+        assert "Firmware" not in str(excinfo.value)
+
+
+def test_adk_still_labels_a_request_with_its_node():
+    """``provider._node_of`` reads this label, so a rename in ADK is a failure here."""
+    from google.adk.flows.llm_flows import base_llm_flow
+
+    from analysis_service.provider import _NODE_LABEL
+
+    assert base_llm_flow._ADK_AGENT_NAME_LABEL_KEY == _NODE_LABEL
+
 
 class TestTheFinishReasonContract:
     """The one assumption the fake cannot carry: what ADK actually puts there.

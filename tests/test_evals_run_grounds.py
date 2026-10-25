@@ -33,6 +33,7 @@ from analysis_service.graph import (
     analyze_node_name,
     tier_node_by_graph_node,
 )
+from analysis_service.retry import RefusedCompletionError
 from analysis_service.sampling import load_sampling
 from evals.harness import modes
 from evals.harness.archive import kind_of
@@ -522,6 +523,23 @@ def test_a_critic_that_fails_its_gate_is_captured_and_the_sweep_continues(
     written = reports_dir(out) / f"{case.id}.failure.json"
     assert json.loads(written.read_text("utf-8")) == json.loads(json.dumps(captured))
     assert kind_of(written.name) == "failure"
+
+
+def test_a_refused_completion_keeps_its_fragment_in_the_failure_record(
+    monkeypatch, case
+):
+    """A refusal names no reason, so its fragment is written beside the state."""
+
+    def refuse(*args: Any, **kwargs: Any) -> Any:
+        raise RefusedCompletionError("analyze_stride_spoofing: refused", "S-01 frag")
+
+    monkeypatch.setattr(fan_in_module, "join_drafts", refuse)
+
+    run = sweep(monkeypatch, case, None)
+
+    captured = run.failed_states[case.id]
+    assert captured["error"].startswith("RefusedCompletionError(")
+    assert captured["fragment"] == "S-01 frag"
 
 
 class TestCasesInFlight:

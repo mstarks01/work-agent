@@ -385,7 +385,9 @@ def write_failures(out: str, failed: Mapping[str, Mapping[str, Any]]) -> None:
     A case that fails inside the graph leaves no report, so without this file
     the gate's message is the only record, and every look at the failure costs
     a paid run (#1097). The file holds the fault's ``repr`` and every key the
-    graph's nodes wrote: the drafts, the critic's rulings and the marks.
+    graph's nodes wrote: the drafts, the critic's rulings and the marks. A
+    completion the provider stopped adds the ``fragment`` it sent before the
+    stop.
 
     The suffix is one no reader loads: ``score`` and ``replay`` read named
     files only, so a captured failure never reads as a finished case.
