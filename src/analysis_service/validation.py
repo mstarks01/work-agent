@@ -894,7 +894,10 @@ def restore_unimplicated(
     repointing one arrives as the cited flow deleted and a new flow added,
     and both halves are permitted. ``assumptions`` follow their elements: an
     element put back keeps the first pass's entries, and every other entry is
-    the repair's own, which the gate checks against the model.
+    the repair's own, which the gate checks against the model. The repair may
+    also add an entry on an element put back, for an attribute the first pass
+    recorded none on: that is the repoint ``repair.md`` asks for when the
+    first pass put the assumption on an ID no element carries.
     """
     named = set(implicated)
     result: dict[str, Any] = dict(repaired)
@@ -905,15 +908,20 @@ def restore_unimplicated(
         if entry["id"] not in named
     }
     # An assumption follows its element: one on an element put back is the
-    # first pass's, and the repair's own are for what it may change.
-    result["assumptions"] = [
+    # first pass's, and the repair's own are for what it may change, or new.
+    kept_assumptions = [
         entry
         for entry in previous.get("assumptions", ())
         if entry["element_id"] in kept_ids
-    ] + [
+    ]
+    kept_pairs = {
+        (entry["element_id"], entry["attribute"]) for entry in kept_assumptions
+    }
+    result["assumptions"] = kept_assumptions + [
         entry
         for entry in repaired.get("assumptions", ())
         if entry["element_id"] not in kept_ids
+        or (entry["element_id"], entry["attribute"]) not in kept_pairs
     ]
     # A restored element is the one the first gate repaired, so its record
     # stays; a named element's record goes, and the gate asks again.
