@@ -5,12 +5,14 @@ import re
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.compact import CompactDataStore
 from analysis_service.system_model import (
     ELEMENT_ID,
     FLOW_DELIMITER,
     FLOW_ID_RULES,
     Assumption,
     DataFlow,
+    EmittedSystemModel,
     ExternalEntity,
     FlowIdError,
     ModelIndex,
@@ -607,3 +609,27 @@ class TestModelIndex:
 
         assert index.get(renamed) is not None
         assert index.get("process:renamed") is None
+
+
+class TestTheClassificationTierIsASchemaFact:
+    """The provider reads the tier set; the field still holds a projection."""
+
+    TIERS = ("public", "internal", "confidential", "unknown")
+
+    def test_both_store_schemas_state_the_tier_set(self):
+        emitted = EmittedSystemModel.model_json_schema()["$defs"]["DataStore"]
+        compact = CompactDataStore.model_json_schema()
+        for schema in (emitted, compact):
+            assert schema["properties"]["data_classification"]["enum"] == list(
+                self.TIERS
+            )
+
+    def test_a_projected_value_still_loads(self):
+        """Code writes ``unknown; <why>: <tier>`` into the field of a report."""
+        model = valid_model().model_dump(mode="json")
+        projected = "unknown; the sources state this and no reviewer has checked it: confidential"
+        model["data_stores"][0]["data_classification"] = projected
+        assert (
+            SystemModel.model_validate(model).data_stores[0].data_classification
+            == projected
+        )
