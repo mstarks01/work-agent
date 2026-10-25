@@ -480,6 +480,16 @@ class InProcessExecutor:
         )
 
 
+#: The label ADK's flow puts on every model request, naming the node that asks.
+_NODE_LABEL = "adk_agent_name"
+
+
+def _node_of(llm_request: LlmRequest) -> str | None:
+    """The graph node that sent ``llm_request``, from the label ADK sets on it."""
+    labels = (llm_request.config.labels if llm_request.config else None) or {}
+    return labels.get(_NODE_LABEL)
+
+
 class ExecutedLlm(BaseLlm):
     """A node's model, answering through the seam under the process's retries.
 
@@ -511,12 +521,15 @@ class ExecutedLlm(BaseLlm):
                 " attempt and check no finish reason"
             )
         request = GenerationRequest.project(self.model, llm_request)
-        results, attempt = await self._answered(request)
+        node = _node_of(llm_request)
+        results, attempt = await self._answered(request, node)
         reasks = 0
         errors = schema_errors(llm_request.config.response_schema, results)
         if errors is not None:
             answer = results[-1].content if results else None
-            later, later_attempt = await self._answered(request.reasked(answer, errors))
+            later, later_attempt = await self._answered(
+                request.reasked(answer, errors), node
+            )
             results = [results[-1].followed_by(later[-1]), *later[:-1]]
             attempt += later_attempt
             reasks = 1
@@ -525,7 +538,7 @@ class ExecutedLlm(BaseLlm):
             yield response
 
     async def _answered(
-        self, request: GenerationRequest
+        self, request: GenerationRequest, node: str | None
     ) -> tuple[list[GenerationResult], int]:
         """One answer to ``request``, with the attempts it took.
 
@@ -534,7 +547,9 @@ class ExecutedLlm(BaseLlm):
         never mistaken for one of them.
         """
         results, attempt = await self._attempt_with_retries(request)
-        reject_unfinished([result.into_response() for result in results], self.model)
+        reject_unfinished(
+            [result.into_response() for result in results], self.model, node
+        )
         return list(results), attempt
 
     async def _attempt_with_retries(

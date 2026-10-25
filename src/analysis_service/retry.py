@@ -133,7 +133,21 @@ TRUNCATION_REMEDY = (
 )
 
 
-class TruncatedCompletionError(RuntimeError):
+class UnfinishedCompletionError(RuntimeError):
+    """A completion the provider stopped before its answer was whole.
+
+    ``fragment`` is the text the provider sent before the stop. A refusal
+    names no reason, so the fragment is the only evidence of what the filter
+    stopped. The message never carries it: the fragment is model output about
+    a submitter's system, and a message reaches logs and the job's error.
+    """
+
+    def __init__(self, message: str, fragment: str = "") -> None:
+        super().__init__(message)
+        self.fragment = fragment
+
+
+class TruncatedCompletionError(UnfinishedCompletionError):
     """A completion stopped at ``max_output_tokens`` with its output half-written.
 
     The vendor-visible twin of :class:`~analysis_service.graph.SilentNodeError`,
@@ -159,7 +173,7 @@ class TruncatedCompletionError(RuntimeError):
     """
 
 
-class RefusedCompletionError(RuntimeError):
+class RefusedCompletionError(UnfinishedCompletionError):
     """A completion the provider stopped at its content filter.
 
     The text before the stop is a fragment, so a validator would report it as
@@ -717,7 +731,7 @@ def stamp_attempt(responses: Sequence, attempt: int) -> Sequence:
 #: Each finish reason that leaves a fragment, in the order they are checked:
 #: the error it raises, the log line, and the error's message. The log line
 #: takes the model's name as its one ``%s``, and the message as ``{model}``.
-_UNFINISHED: dict[str, tuple[type[RuntimeError], str, str]] = {
+_UNFINISHED: dict[str, tuple[type[UnfinishedCompletionError], str, str]] = {
     _SAFETY_FINISH_REASON: (
         RefusedCompletionError,
         (
@@ -747,8 +761,11 @@ _UNFINISHED: dict[str, tuple[type[RuntimeError], str, str]] = {
 }
 
 
-def reject_unfinished(responses: Sequence, model: str) -> None:
+def reject_unfinished(responses: Sequence, model: str, node: str | None = None) -> None:
     """Raise if the provider stopped any of ``responses`` at the cap or the filter.
+
+    ``node`` is the graph node that asked, and the message names it first.
+    The error carries the text of every response as its ``fragment``.
 
     Every response is checked rather than just the last: a non-streaming call
     yields one today, but the collection is a sequence and an unfinished part
@@ -763,5 +780,13 @@ def reject_unfinished(responses: Sequence, model: str) -> None:
     reasons = [response.finish_reason for response in responses]
     for reason, (error, log_line, message) in _UNFINISHED.items():
         if reason in reasons:
-            logger.error(log_line, model)
-            raise error(message.format(model=model))
+            asker = f"{model} ({node})" if node else model
+            logger.error(log_line, asker)
+            fragment = "".join(
+                part.text or ""
+                for response in responses
+                if response.content
+                for part in response.content.parts or ()
+            )
+            prefix = f"{node}: " if node else ""
+            raise error(prefix + message.format(model=model), fragment)
