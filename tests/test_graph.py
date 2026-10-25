@@ -57,7 +57,7 @@ from analysis_service.frameworks.stride.record import (
     ThreatRulings,
 )
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.model_tiers import LLM_NODES
+from analysis_service.model_tiers import LLM_NODES, framework_of_lane_key
 from analysis_service.report import (
     InputRef,
     Job,
@@ -678,9 +678,11 @@ def test_every_canonical_llm_node_is_a_graph_node(pipeline):
     this build can spell. This pipeline is built for one selection, so it
     exercises that selection's keys and no others — an install running STRIDE
     alone still configures ASVS's three, and no graph of its will ever bind
-    them.
+    them. A lane runs on its own lane key, which the config may leave unset.
     """
-    assert set(TIER_NODES.values()) <= set(LLM_NODES)
+    assert {
+        key for key in TIER_NODES.values() if framework_of_lane_key(key) is None
+    } <= set(LLM_NODES)
     # And every LLM node this graph built has a key in the map. A subset in
     # this direction too, because the map names every node any *entry* of this
     # build can build: the assertion graph's node is in it and in no graph of

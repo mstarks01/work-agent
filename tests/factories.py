@@ -1364,9 +1364,9 @@ def scripted_pipeline(
     journey to the report nothing checks.
 
     **The stand-ins are named by walking the built graph, not by inverting the
-    tier map.** That map stopped being invertible when the lanes moved onto one
-    ``analyze/<framework>`` key: six nodes now resolve on it, so a tier name no
-    longer identifies a node. The resolver therefore mints a fresh stand-in per
+    tier map.** That map is not invertible: every lane a node map does not
+    set resolves on one ``analyze/<framework>`` key, so a tier name does not
+    identify a node. The resolver therefore mints a fresh stand-in per
     call — one per node, where production shares one adapter per tier — and the
     walk afterwards is what learns which node got which. Per-node rather than
     per-tier is also what keeps ``seen`` a record of one node's prompts.
@@ -1376,7 +1376,9 @@ def scripted_pipeline(
 
     def resolve(tier_node: str) -> BaseLlm:
         model = llm_class(
-            model=BASE_MODEL if tiers.nodes[tier_node] == "base" else STRONG_MODEL,
+            model=BASE_MODEL
+            if tiers.resolve_tier(tier_node) == "base"
+            else STRONG_MODEL,
             reply=EMPTY_CLAIMS,
             seen=[],
         )

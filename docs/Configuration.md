@@ -437,11 +437,9 @@ and the message names the three missing keys — that message is the fix. Adding
 framework does not move `model_tiers.toml`'s version, because adding a node key
 is a data edit under the same schema.
 
-One knob per framework rather than one per lane. Every lane of one framework
-runs the same judgement on the same tier, so one key per lane would hold one
-value that nothing reads; an operator choosing to run one framework cheaper
-than another is the choice that has a purpose. The loader **checks that a
-framework's `recritic` key resolves to the same tier as its `critic`** — a
+One knob per framework, and an optional key per lane, which
+[A lane on its own tier](#a-lane-on-its-own-tier) describes. The loader
+**checks that a framework's `recritic` key resolves to the same tier as its `critic`** — a
 re-ask on a cheaper model than the pass it corrects is the failure this check
 refuses. A comment cannot hold 2N keys to that rule.
 
@@ -462,6 +460,34 @@ is framework names separated by commas, with no spaces, for example
 `ANALYSIS_FRAMEWORKS_CARRIED=stride`. The loader refuses an empty value, a
 space, an empty name, a name that occurs two times and a name that this build
 does not know. Each refusal names the variable.
+
+### A lane on its own tier
+
+A lane runs on its framework's `analyze/<framework>` tier unless the map sets
+its own key, `analyze/<framework>/<lane>`. Use a lane key when one model
+refuses one lane: for example, a strong model that stops the denial-of-service lane at its content
+filter and runs the other lanes well.
+
+```toml
+[tiers.strong]
+vendor = "anthropic"
+model = "claude-opus-5-5"
+
+[tiers.review]
+vendor = "anthropic"
+model = "claude-sonnet-5"
+
+[nodes]
+"analyze/stride" = "strong"
+"analyze/stride/denial-of-service" = "review"
+"critic/stride" = "strong"
+```
+
+A lane key names one of the three tiers. The loader refuses a lane key under a
+framework this build does not carry, and the package check refuses a lane that
+the package does not declare. Under `distinct_model` or `distinct_provider`,
+each lane key must sit apart from its framework's critic, as
+`analyze/<framework>` must.
 
 ### Sampling
 

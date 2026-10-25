@@ -51,7 +51,12 @@ from analysis_service.claims import (
 )
 from analysis_service.errors import ConfigError
 from analysis_service.markdown_loader import MarkdownFormatError, MarkdownLoader
-from analysis_service.model_tiers import FRAMEWORK_ROLES, tier_key
+from analysis_service.model_tiers import (
+    FRAMEWORK_ROLES,
+    framework_of_lane_key,
+    lane_key,
+    tier_key,
+)
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -1105,4 +1110,15 @@ def validate_packages(
             raise FrameworkPackageError(
                 f"model_tiers.toml carries no {', '.join(missing)} for framework"
                 f" {name!r}"
+            )
+        declared = {lane_key(name, lane) for lane in package.lanes}
+        stray = sorted(
+            key
+            for key in tiers
+            if framework_of_lane_key(key) == name and key not in declared
+        )
+        if stray:
+            raise FrameworkPackageError(
+                f"model_tiers.toml keys {stray}, but framework {name!r} declares"
+                f" only the lanes {list(package.lanes)}"
             )

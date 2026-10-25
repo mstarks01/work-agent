@@ -4,12 +4,12 @@
 # The loader reads the `version` below only, and refuses every other version.
 #
 # NODE KEYS ARE PER FRAMEWORK: `analyze/<framework>`, `critic/<framework>` and
-# `recritic/<framework>`.
+# `recritic/<framework>`. A lane may also have its own optional key,
+# `analyze/<framework>/<lane>`; a lane with no key runs on `analyze/<framework>`.
 #
-# WHY THE FRAMEWORK AND NOT THE LANE: a lane is a framework's internal fact, and
-# every lane of one framework runs the same judgement on the same tier. What an
-# operator chooses between is running one framework's analysis on a cheaper tier
-# than another's, and that is a knob per framework.
+# WHY THE FRAMEWORK FIRST: every lane of one framework runs the same judgement,
+# so one key per framework is the usual knob. A lane key exists for a model
+# that refuses one lane at its content filter and runs the others well.
 #
 # WHY `analyze/`: `Analyst` names a human, the person who reads the report, so
 # each node is named for what it does: it analyses one lane. The graph's own node

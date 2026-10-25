@@ -10,6 +10,9 @@ from pydantic import ValidationError
 
 from analysis_service.charges import records_reported_charge
 from analysis_service.claims import FRAMEWORK_NAMES
+from analysis_service.deployment import DEFAULT_FRAMEWORKS_DIR
+from analysis_service.frameworks import FrameworkPackageError, validate_packages
+from analysis_service.graph import FrameworkNodes, analyze_node_name
 from analysis_service.model_tiers import (
     FRAMEWORK_NODES,
     LLM_NODES,
@@ -19,6 +22,7 @@ from analysis_service.model_tiers import (
     ModelTierConfig,
     TierSelection,
     env_vars_for,
+    lane_key,
     load_model_tiers,
     tiers_in_use,
     validate_model_string,
@@ -1137,3 +1141,67 @@ def test_the_review_tier_needs_no_credentials_until_something_runs_on_it():
         env=secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "sk-not-a-real-key"),
     )
     assert set(adapters) == {"base", "strong"}
+
+
+class TestLaneKeys:
+    """A lane key moves one lane off its framework's ``analyze`` tier.
+
+    The case it exists for: a strong model that refuses one lane at its content
+    filter, while it runs the other lanes well.
+    """
+
+    DOS = lane_key("stride", "denial-of-service")
+
+    def nodes_with(self, **lanes: str) -> dict[str, str]:
+        nodes = {
+            node: "base" if node in ("extract", "repair") else "strong"
+            for node in LLM_NODES
+        }
+        return nodes | lanes
+
+    def test_a_lane_key_moves_its_lane_and_no_other(self, config_path):
+        text = config_toml(nodes=self.nodes_with(**{self.DOS: "review"}))
+        config = load_model_tiers(config_path(text), env={})
+        assert config.resolve_tier(self.DOS) == "review"
+        assert config.resolve_tier(lane_key("stride", "spoofing")) == "strong"
+        assert config.resolve_tier("critic/stride") == "strong"
+
+    def test_a_lane_the_map_does_not_set_runs_on_its_framework_key(self, config_path):
+        config = load_model_tiers(config_path(config_toml()), env={})
+        assert config.resolve_tier(self.DOS) == config.resolve_tier("analyze/stride")
+
+    @pytest.mark.parametrize("key", ["analyze/nope/flood", "analyze/stride/"])
+    def test_a_key_under_no_carried_framework_is_refused(self, config_path, key):
+        text = config_toml(nodes=self.nodes_with(**{key: "review"}))
+        with pytest.raises(ModelConfigError, match="unknown node names"):
+            load_model_tiers(config_path(text), env={})
+
+    def test_the_package_check_refuses_a_lane_the_package_does_not_declare(self):
+        keys = (*LLM_NODES, lane_key("stride", "flooding"))
+        with pytest.raises(FrameworkPackageError, match="declares only the lanes"):
+            validate_packages(("stride",), DEFAULT_FRAMEWORKS_DIR, keys)
+
+    def test_a_lane_on_the_critic_model_breaches_independence(self, config_path):
+        """Each lane is an analysis its critic must sit apart from."""
+        nodes = {
+            node: "base"
+            if node in ("extract", "repair")
+            else "review"
+            if node.startswith(("critic/", "recritic/"))
+            else "strong"
+            for node in LLM_NODES
+        } | {self.DOS: "review"}
+        text = config_toml(nodes=nodes, independence="distinct_model")
+        with pytest.raises(
+            ModelConfigError,
+            match="analyze/stride/denial-of-service and critic/stride are not",
+        ):
+            load_model_tiers(config_path(text), env={})
+
+    def test_the_graph_runs_the_lane_on_its_own_key(self):
+        assert (
+            FrameworkNodes("stride").tier_nodes[
+                analyze_node_name("stride", "denial-of-service")
+            ]
+            == self.DOS
+        )
