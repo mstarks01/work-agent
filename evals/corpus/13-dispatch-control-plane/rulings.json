@@ -22,6 +22,28 @@
       "ruling": "The reference concerns cross-site requests riding an authorized engineer's browser session. The draft concerns callers gaining dispatch authority through missing server-side authentication or authorization; it does not state cross-site request inducement or use of the engineer's session.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01-near-miss-ballot-3 row 2: mstarks01-e32ad9c5 E-01"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "ride-session",
+        "affected_element_ids": [
+          "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+          "flow:process:dispatch-console>process:dispatch-api>live-job-status"
+        ]
+      },
+      "reading": {
+        "verb": "intercept",
+        "affected_element_ids": [
+          "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+          "process:dispatch-console",
+          "process:dispatch-api"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The reference describes an attacker-controlled page abusing an engineer's browser session to read API responses across origins; the draft describes an on-path attacker reading network traffic. The attacker position, mechanism and required controls differ.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 13: 13-dispatch-control-plane I-02"
     }
   ]
 }

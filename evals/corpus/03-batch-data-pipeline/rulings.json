@@ -21,6 +21,49 @@
       "ruling": "The draft explicitly includes altered claim rows passing schema-only checks into the warehouse; the upload path and plant wording are acceptable.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 near-miss ballot row 3: baseline 6bff717 T-01"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "process:ingest-scheduler",
+          "store:landing-bucket"
+        ]
+      },
+      "reading": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "entity:insurance-partner",
+          "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
+          "store:landing-bucket",
+          "process:ingest-scheduler"
+        ]
+      },
+      "verdict": "same",
+      "ruling": "Both describe placing an attacker-supplied file in another partner's folder so the scheduler processes it as that partner's extract without verifying its origin.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 2: 03-batch-data-pipeline S-02"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "store:claims-warehouse",
+          "flow:entity:data-analyst>store:claims-warehouse>run-queries"
+        ]
+      },
+      "reading": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:claims-warehouse"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The reference concerns an analyst reading unnecessary personal data through an overly broad grant; the draft concerns storage-copy exposure with unverified encryption at rest.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 3: 03-batch-data-pipeline I-05"
     }
   ]
 }

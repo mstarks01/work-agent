@@ -22,6 +22,71 @@
       "ruling": "Both describe replacing published bucket assets with malicious content delivered to readers; alter versus plant is a filing difference.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 filing ballot 2 row 2: baseline 6bff717 T-04"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:cdn-bucket",
+          "entity:cdn"
+        ]
+      },
+      "reading": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "flow:process:web-server>store:cdn-bucket>asset-publish",
+          "store:cdn-bucket",
+          "process:web-server"
+        ]
+      },
+      "verdict": "same",
+      "ruling": "Both describe an attacker using bucket write access to plant or substitute a published asset that the CDN delivers to the site's readers. The draft explicitly includes CDN delivery despite omitting the CDN entity from its place list.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 8: 10-cookbook-generic-cms T-03"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:cdn-bucket",
+          "flow:entity:reader>entity:cdn>asset-fetch"
+        ]
+      },
+      "reading": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "process:web-server",
+          "flow:process:web-server>store:cdn-bucket>asset-publish",
+          "store:cdn-bucket"
+        ]
+      },
+      "verdict": "same",
+      "ruling": "Both describe planting attacker-controlled assets in the CDN bucket for delivery as trusted site content. Compromising the publishing web server is a specific way to obtain the write access assumed by the reference; the draft's added assertions about authorization are not validated by this match.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 9: 10-cookbook-generic-cms E-01"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "inject",
+        "affected_element_ids": [
+          "process:web-server",
+          "store:mysql-database",
+          "entity:reader"
+        ]
+      },
+      "reading": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:mysql-database"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The reference describes stored comment injection executed as markup or script in readers' browsers; the draft describes offline alteration of a database copy. Neither the attack path nor the execution outcome matches.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 10: 10-cookbook-generic-cms T-06"
     }
   ]
 }

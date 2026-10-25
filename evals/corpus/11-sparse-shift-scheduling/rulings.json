@@ -44,6 +44,51 @@
       "ruling": "Both describe a colleague gaining manager-only rota-writing authority if role enforcement fails; escalate accurately describes the reference's attack.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01 filing ballot 2 row 3: baseline 6bff717 E-01"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "disable",
+        "affected_element_ids": [
+          "store:file-share",
+          "process:scheduling-service"
+        ]
+      },
+      "reading": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "store:file-share",
+          "flow:process:scheduling-service>store:file-share>write-payroll-export",
+          "flow:entity:payroll-system>store:file-share>collect-payroll-export"
+        ]
+      },
+      "verdict": "same",
+      "ruling": "The reference leaves the means of blocking export writes open; the draft supplies share exhaustion or disablement as that means. Both prevent the scheduling service from making the weekly export available to payroll. This match does not validate the draft's assumptions about accumulation or its claim that payroll necessarily stops.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 11: 11-sparse-shift-scheduling D-02"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "process:scheduling-web-app",
+          "flow:entity:colleague>process:scheduling-web-app>view-shifts"
+        ]
+      },
+      "reading": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "process:scheduling-web-app",
+          "process:scheduling-service",
+          "flow:process:scheduling-web-app>process:scheduling-service>rota-requests",
+          "store:rota-database"
+        ]
+      },
+      "verdict": "same",
+      "ruling": "The draft explicitly includes a colleague reaching the manager's rota-writing capability through missing role enforcement, which is the reference threat. Its additional horizontal access scenario does not remove that match.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 12: 11-sparse-shift-scheduling E-01"
     }
   ]
 }
