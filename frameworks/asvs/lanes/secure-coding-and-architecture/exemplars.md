@@ -39,8 +39,7 @@ The notes describe what a customer sends and never what comes back. Whether a re
   "description": "V15.3.1 asks that the application returns only the fields of a data object a caller needs, rather than the whole object. It applies here because `process:web-api` serves `entity:customer` over `flow:entity:customer>process:web-api>submit-payment` and the data behind it lives in `store:accounts-db`, a store classified confidential and tagged `pii` and `financial`. The notes describe what a customer sends and never describe what the API sends back, so whether a response carries a whole account record or the fields the customer needs is open. The requirement applies and the input does not settle it; the response serialisers in `process:web-api` would.",
   "affected_element_ids": [
     "entity:customer",
-    "process:web-api",
-    "store:accounts-db"
+    "process:web-api"
   ],
   "evidence_refs": [
     "crossing:flow:entity:customer>process:web-api>submit-payment"

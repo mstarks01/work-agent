@@ -12,7 +12,7 @@ Termination is the subject, not lifetime: what the backend does once logout or e
   "direction": "question",
   "needs_evidence": "code",
   "title": "Nothing says a terminated customer session stops being accepted",
-  "description": "V7.4.1 asks that once a session is terminated — by logout or by expiry — the application refuses any further use of it, which for a stateful session means invalidating it at the backend. It applies here because `flow:entity:customer>process:web-api>submit-payment` carries a session cookie issued after a password login, so this system holds a session rather than authenticating each request independently. The notes say the cookie is issued and say nothing about logout, expiry, or whether `process:web-api` invalidates the session record when either happens. The requirement applies and the input does not settle it; the session handling in `process:web-api` would.",
+  "description": "V7.4.1 asks that once a session is terminated — by logout or by expiry — the application refuses any further use of it, which for a stateful session means invalidating it at the backend. It applies here because `flow:entity:customer>process:web-api>submit-payment` carries a session cookie issued to `entity:customer` after a password login, so this system holds a session rather than authenticating each request independently. The notes say the cookie is issued and say nothing about logout, expiry, or whether `process:web-api` invalidates the session record when either happens. The requirement applies and the input does not settle it; the session handling in `process:web-api` would.",
   "affected_element_ids": [
     "entity:customer",
     "process:web-api",
@@ -37,7 +37,7 @@ Generation is the requirement the input can least often settle, and assuming a f
   "direction": "question",
   "needs_evidence": "prose",
   "title": "The session token's generation is never described",
-  "description": "V7.2.3 sets a floor on the entropy of a session token and asks how it is generated. It applies here for the same reason V7.4.1 does: a session cookie is issued to `entity:customer` after a password login. The notes name the cookie and describe neither its length, its alphabet, nor the generator behind it. The requirement applies and the input does not settle it, and the framework `process:web-api` runs on is not evidence about the token — a stated generator would be.",
+  "description": "V7.2.3 sets a floor on the entropy of a session token and asks how it is generated. It applies here for the same reason V7.4.1 does: a session cookie is issued to `entity:customer` over `flow:entity:customer>process:web-api>submit-payment` after a password login. The notes name the cookie and describe neither its length, its alphabet, nor the generator behind it. The requirement applies and the input does not settle it, and the framework `process:web-api` runs on is not evidence about the token — a stated generator would be.",
   "affected_element_ids": [
     "process:web-api",
     "flow:entity:customer>process:web-api>submit-payment"

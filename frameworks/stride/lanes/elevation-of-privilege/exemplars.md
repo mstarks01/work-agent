@@ -56,7 +56,7 @@ Written against exemplar system B. Elevation does not need a privilege bug when 
 {
   "sequence": 2,
   "title": "A publisher selects its own tenant and writes into any customer's partition",
-  "description": "`process:stream-processor` reads the tenant key out of the device payload carried on `flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry`, which crosses from `boundary:field` into `boundary:ingest`, and then writes under that key over `flow:process:stream-processor>store:telemetry-store>write-readings` using a service account holding write on every tenant partition. Nothing between the two re-derives the tenant from an authenticated identity, so a publisher that sets another customer's tenant in its own payload is not defeating an authorization check — it is supplying the input that check would have been made from. Second-order: the writing identity already spans the whole of `store:telemetry-store`, so the escalation is from one fleet's data to every tenant's in a single hop, and the readings land through the ordinary ingest path rather than an anomalous one.",
+  "description": "`process:stream-processor` reads the tenant key out of the device payload carried on `flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry`, which crosses from `boundary:field` into `boundary:ingest`. It receives that payload over `flow:process:mqtt-broker>process:stream-processor>consume-topic` and then writes under that key over `flow:process:stream-processor>store:telemetry-store>write-readings` using a service account holding write on every tenant partition. Nothing between the two re-derives the tenant from an authenticated identity, so a publisher that sets another customer's tenant in its own payload is not defeating an authorization check — it is supplying the input that check would have been made from. Second-order: the writing identity already spans the whole of `store:telemetry-store`, so the escalation is from one fleet's data to every tenant's in a single hop, and the readings land through the ordinary ingest path rather than an anomalous one.",
   "affected_element_ids": [
     "entity:sensor-gateway",
     "process:stream-processor",
@@ -66,7 +66,8 @@ Written against exemplar system B. Elevation does not need a privilege bug when 
   ],
   "verb": "abuse-grant",
   "evidence_refs": [
-    "crossing:flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry"
+    "crossing:flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry",
+    "crossing:flow:process:mqtt-broker>process:stream-processor>consume-topic"
   ],
   "quotes": [
     {
