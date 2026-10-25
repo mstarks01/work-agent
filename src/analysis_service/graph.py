@@ -207,6 +207,7 @@ from analysis_service.model_tiers import (
     FrameworkRole,
     ReviewIndependence,
     TierName,
+    lane_key,
     tier_key,
 )
 from analysis_service.prompt_cache import remember_stable_prefix, stable_prefix
@@ -513,12 +514,11 @@ class FrameworkNodes:
     def tier_nodes(self) -> dict[str, str]:
         """This framework's graph node names against the tier keys they run on.
 
-        One ``analyze/<framework>`` key covers every lane, which is
-        ``model_tiers.toml`` v5's own rule: a lane is a framework's internal
-        fact and all of them run the same judgement on the same tier.
+        Each lane has its own key, ``analyze/<framework>/<lane>``. A node map
+        that does not set it runs the lane on ``analyze/<framework>``.
         """
         return {
-            **{lane.node_name: tier_key("analyze", self.name) for lane in self.lanes},
+            **{lane.node_name: lane_key(self.name, lane.lane) for lane in self.lanes},
             self.node(CRITIC_ROLE): tier_key(CRITIC_ROLE, self.name),
             self.node(RECRITIC_ROLE): tier_key(RECRITIC_ROLE, self.name),
         }

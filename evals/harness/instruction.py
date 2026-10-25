@@ -66,9 +66,12 @@ class NodeInstruction:
 
 
 def _framework_of(tier_key: str) -> FrameworkName | str:
-    """The framework half of a tier key, or :data:`SHARED` when it has none."""
-    _, separator, name = tier_key.partition("/")
-    return name if separator else SHARED
+    """The framework part of a tier key, or :data:`SHARED` when it has none.
+
+    A lane key, ``analyze/<framework>/<lane>``, has the framework second too.
+    """
+    _, separator, rest = tier_key.partition("/")
+    return rest.partition("/")[0] if separator else SHARED
 
 
 def collect(pipelines: Iterable[Pipeline]) -> list[NodeInstruction]:

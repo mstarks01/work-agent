@@ -146,6 +146,33 @@ def tier_key(role: FrameworkRole, framework: str) -> str:
     return f"{role}/{framework}"
 
 
+def lane_key(framework: str, lane: str) -> str:
+    """The tier-config key of one lane, ``analyze/<framework>/<lane>``.
+
+    **The one spelling of a lane's tier key.** A node map may set it, and a
+    lane it does not set runs on ``analyze/<framework>``.
+    """
+    return f"{tier_key('analyze', framework)}/{lane}"
+
+
+def framework_of_lane_key(node: str) -> str | None:
+    """The framework whose lane ``node`` keys, or ``None`` if it keys no lane.
+
+    The loader cannot list a package's lanes, because the packages import this
+    module. So it accepts a lane key under every carried framework, and
+    :func:`~analysis_service.frameworks.validate_packages` refuses a lane the
+    package does not declare.
+    """
+    return next(
+        (
+            name
+            for name in FRAMEWORK_NAMES
+            if node.startswith(lane_key(name, "")) and node != lane_key(name, "")
+        ),
+        None,
+    )
+
+
 def _framework_nodes() -> tuple[str, ...]:
     return tuple(
         tier_key(role, name) for name in FRAMEWORK_NAMES for role in FRAMEWORK_ROLES
@@ -371,7 +398,11 @@ class ModelTierConfig(BaseModel):
             validate_model_string(
                 selection.model, selection.vendor, source=f"tiers.{tier}.model"
             )
-        unknown = sorted(set(self.nodes) - set(LLM_NODES))
+        unknown = sorted(
+            node
+            for node in self.nodes
+            if node not in LLM_NODES and framework_of_lane_key(node) is None
+        )
         if unknown:
             raise ValueError(f"unknown node names: {unknown}")
         missing = [node for node in LLM_NODES if node not in self.nodes]
@@ -599,17 +630,23 @@ class ModelTierConfig(BaseModel):
             return []
         breaches = []
         for name in FRAMEWORK_NAMES:
-            analyze = self.tiers[self.nodes[tier_key("analyze", name)]]
             critic = self.tiers[self.nodes[tier_key("critic", name)]]
-            detail = self._independence_detail(analyze, critic)
-            if detail is not None:
-                breaches.append(
-                    f"review_independence is {self.review_independence!r} but"
-                    f" analyze/{name} and critic/{name} are not independent:"
-                    f" {detail}. Point critic/{name} and recritic/{name} at a"
-                    f" tier whose selection differs, or set review_independence"
-                    f' to "shared" and accept a same-domain review'
-                )
+            analyses = [
+                tier_key("analyze", name),
+                *(node for node in self.nodes if framework_of_lane_key(node) == name),
+            ]
+            for analysis in analyses:
+                analyze = self.tiers[self.nodes[analysis]]
+                detail = self._independence_detail(analyze, critic)
+                if detail is not None:
+                    breaches.append(
+                        f"review_independence is {self.review_independence!r}"
+                        f" but {analysis} and critic/{name} are not independent:"
+                        f" {detail}. Point critic/{name} and recritic/{name} at"
+                        f" a tier whose selection differs, or set"
+                        f' review_independence to "shared" and accept a'
+                        f" same-domain review"
+                    )
         return breaches
 
     def _independence_detail(
@@ -668,11 +705,15 @@ class ModelTierConfig(BaseModel):
         """The tier the named LLM node runs on.
 
         The node -> tier map lives here once; ``resolve_sampling`` reuses it via
-        this method so sampling never re-derives or duplicates it.
+        this method so sampling never re-derives or duplicates it. A lane key
+        the map does not set resolves to its framework's ``analyze`` key.
         """
-        if node not in self.nodes:
+        if node in self.nodes:
+            return self.nodes[node]
+        framework = framework_of_lane_key(node)
+        if framework is None:
             raise ModelConfigError(f"unknown LLM node: {node!r}")
-        return self.nodes[node]
+        return self.nodes[tier_key("analyze", framework)]
 
     def resolve_model(self, node: str) -> TierSelection:
         """The ``(vendor, model)`` pair the named LLM node runs on."""

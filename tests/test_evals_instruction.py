@@ -135,7 +135,7 @@ class TestTheSharedNodesCarryNoFramework:
             if row.framework == SHARED:
                 assert "/" not in tier_key
             else:
-                assert tier_key.endswith(f"/{row.framework}")
+                assert tier_key.split("/")[1] == row.framework
 
 
 class TestOneNodeIsRecordedOnce:
