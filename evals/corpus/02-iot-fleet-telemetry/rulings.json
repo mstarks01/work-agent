@@ -43,6 +43,28 @@
       "ruling": "Firmware replacement and forged telemetry are different attacks on different assets.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01-near-miss-ballot-1 row 1: baseline 6bff717 T-01"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:firmware-bucket",
+          "entity:sensor-node"
+        ]
+      },
+      "reading": {
+        "verb": "alter-in-transit",
+        "affected_element_ids": [
+          "flow:entity:sensor-node>store:firmware-bucket>poll-firmware",
+          "entity:sensor-node",
+          "store:firmware-bucket"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The reference requires bucket write access to plant firmware at rest; the draft requires an on-path position to substitute firmware in transit. The shared installation outcome does not make these the same attack.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 1: 02-iot-fleet-telemetry T-02"
     }
   ]
 }

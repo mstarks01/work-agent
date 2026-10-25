@@ -1,0 +1,48 @@
+{
+  "case": "06-cookbook-online-game",
+  "stride": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "forge",
+        "affected_element_ids": [
+          "process:game-client",
+          "flow:process:game-client>process:game-server>gameplay-traffic"
+        ]
+      },
+      "reading": {
+        "verb": "alter-in-transit",
+        "affected_element_ids": [
+          "flow:process:game-client>process:game-server>gameplay-traffic",
+          "process:game-client",
+          "process:game-server"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The reference concerns a player modifying their own client to generate manipulated actions; the draft concerns an on-path attacker altering messages in transit. These require different attacker access and actions.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 4: 06-cookbook-online-game T-02"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "forge",
+        "affected_element_ids": [
+          "flow:process:lobby>process:game-server>hand-over-match"
+        ]
+      },
+      "reading": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "process:lobby",
+          "process:game-server",
+          "flow:process:lobby>process:game-server>hand-over-match"
+        ]
+      },
+      "verdict": "same",
+      "ruling": "Both describe a reachable game server accepting a fabricated lobby hand-over with attacker-chosen match composition and player identifiers when caller authentication is ineffective.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 5: 06-cookbook-online-game S-05"
+    }
+  ]
+}

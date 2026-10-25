@@ -21,6 +21,50 @@
       "ruling": "The reference concerns gaining catalogue-management authority; the draft concerns access to other customers' records.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-09-25-01-near-miss-ballot-1 row 5: baseline 6bff717 E-01"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "process:catalogue-spreadsheet"
+        ]
+      },
+      "reading": {
+        "verb": "use-credential",
+        "affected_element_ids": [
+          "process:catalogue-spreadsheet",
+          "process:web-api",
+          "flow:process:catalogue-spreadsheet>process:web-api>sql-statements"
+        ]
+      },
+      "verdict": "same",
+      "ruling": "Both describe using identity material obtained from the catalogue spreadsheet to impersonate the catalogue tool to the web API. The draft's additional claims about credential rotation and expiry are not needed for this match and are not validated by it.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 6: 09-cookbook-sokify-retail S-03"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "process:web-api"
+        ]
+      },
+      "reading": {
+        "verb": "alter-in-transit",
+        "affected_element_ids": [
+          "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "process:catalogue-spreadsheet",
+          "process:web-api"
+        ]
+      },
+      "verdict": "different",
+      "ruling": "The reference concerns driving the spreadsheet macros to issue malicious catalogue changes; the draft concerns intercepting and rewriting SQL after the spreadsheet sends it.",
+      "reviewed_by": "mstarks01",
+      "source": "ballot-2026-10-24 row 7: 09-cookbook-sokify-retail T-02"
     }
   ]
 }
