@@ -2477,3 +2477,21 @@ class TestTheImplementationAudit:
         assert len(entry.support) == MAX_SPANS
         assert codes(cut) == ["support-truncated"]
         assert catalog_issues(joined) == []
+
+
+@pytest.mark.parametrize("reason", ["unmeasured", "truncated"])
+def test_a_proposal_may_not_claim_a_reason_only_code_writes(reason):
+    """``unmeasured`` and ``truncated`` describe the work, not the source."""
+    row = {
+        "subject_type": "component",
+        "subject": "process:web-app",
+        "predicate": "data-classification",
+        "value": "unknown",
+        "reason": reason,
+        "basis": "stated",
+    }
+    with pytest.raises(ValidationError):
+        AssertionProposal.model_validate(row)
+    assert (
+        AssertionProposal.model_validate({**row, "reason": "silent"}).reason == "silent"
+    )

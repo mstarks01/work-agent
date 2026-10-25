@@ -104,6 +104,7 @@ from typing import Any, Literal, get_args
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.system_model import (
+    DATA_CLASSIFICATION_FIELD,
     ELEMENT_GROUPS,
     ENDPOINT_PREFIXES,
     UNKNOWN,
@@ -284,7 +285,7 @@ class CompactDataStore(_CompactElement):
 
     technology: str = Field(max_length=200)
     trust_zone: str = _ref_field(ZONE_REF)
-    data_classification: str = Field(max_length=200)
+    data_classification: str = DATA_CLASSIFICATION_FIELD
     encryption_at_rest: str = Field(max_length=200)
 
 

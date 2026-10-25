@@ -403,6 +403,15 @@ EntityKind = Literal["human", "external-system"]
 Exposure = Literal["internet-facing", "internal", "unknown"]
 InterfaceKind = Literal["web", "non-web", "unknown"]
 Operations = Literal["read", "write", "read-write", "unknown"]
+#: A store's sensitivity tier, never a list of what it holds.
+DataClassification = Literal["public", "internal", "confidential", "unknown"]
+
+#: The tier field as a model fills it. The set is a schema fact and not a
+#: validator: a provider reads the enum, and code may still write a
+#: projected value here (``unknown; <why>: <tier>``).
+DATA_CLASSIFICATION_FIELD = Field(
+    max_length=200, json_schema_extra={"enum": [*get_args(DataClassification)]}
+)
 BoundaryKind = Literal["network", "privilege", "tenant", "other"]
 
 
@@ -474,7 +483,7 @@ class DataStore(_Element):
 
     technology: str = Field(max_length=200)
     trust_zone: str
-    data_classification: str = Field(max_length=200)
+    data_classification: str = DATA_CLASSIFICATION_FIELD
     encryption_at_rest: str = Field(max_length=200)
 
 

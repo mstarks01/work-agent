@@ -85,6 +85,7 @@ from analysis_service.system_model import (
     ELEMENT_ID,
     UNKNOWN,
     Assumption,
+    DataClassification,
     DataFlow,
     Element,
     SystemModel,
@@ -282,6 +283,10 @@ Origin = Literal["answer", "assertion-pass"]
 #: last is what makes a bound reportable: an overflowing run writes rows it
 #: could not fill rather than a model that looks complete.
 UnknownReason = Literal["silent", "hedged", "unmeasured", "truncated"]
+
+#: The reasons a model may propose. ``unmeasured`` and ``truncated`` describe
+#: the work, not the source, so code writes them and the schema refuses them.
+ProposedReason = Literal["silent", "hedged"]
 
 #: How a predicate's value is read.
 ValueKind = Literal["text", "term", "reference"]
@@ -528,7 +533,7 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             question="Which sensitivity tier is the data in {subject} in?",
             subjects=frozenset({"component"}),
             value="term",
-            terms=frozenset({"public", "internal", "confidential"}),
+            terms=frozenset(get_args(DataClassification)) - {UNKNOWN},
             projects_into="data_classification",
         ),
         "signature-verification": Predicate(
@@ -2167,7 +2172,7 @@ class AssertionProposal(BaseModel):
         json_schema_extra={"enum": [*sorted(REGISTRY)]},
     )
     value: str = Field(min_length=1, max_length=MAX_VALUE_CHARS)
-    reason: UnknownReason | None = None
+    reason: ProposedReason | None = None
     scope: list[Qualifier] = Field(default_factory=list, max_length=MAX_QUALIFIERS)
     basis: ProposedBasis
     quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
