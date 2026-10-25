@@ -335,6 +335,25 @@ def test_an_assumption_the_repair_writes_on_an_uncited_element_is_dropped():
     assert merged["assumptions"] == previous["assumptions"]
 
 
+def test_an_assumption_repointed_off_a_dangling_id_is_kept():
+    """``repair.md`` asks for the repoint, so the overlay keeps what it adds.
+
+    The first pass put the assumption on an ID no element carries, so the
+    scope names that ID and not the element the assumption was about. The
+    element is put back, but it has no assumption of its own on that
+    attribute, so the repaired one is new information and not an edit.
+    """
+    previous = dump()
+    entry = previous["assumptions"][0]
+    previous["assumptions"] = [{**entry, "element_id": "process:web"}]
+    repaired = dump()
+    repaired["assumptions"] = [entry]
+
+    merged, _ = restore_unimplicated(previous, repaired, ["process:web"])
+
+    assert merged["assumptions"] == [entry]
+
+
 @pytest.mark.parametrize("group", ["external_entities", "processes", "data_stores"])
 def test_every_group_is_walked(group):
     previous = dump()
