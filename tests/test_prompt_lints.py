@@ -68,6 +68,7 @@ from analysis_service.evidence import (
     UNKNOWN_PREFIX,
     render_catalog,
 )
+from analysis_service.fan_in import within_bound
 from analysis_service.frameworks import CRITIC_DOC, OUTPUT_DOC, PACKAGES
 from analysis_service.frameworks.stride.record import (
     LANES_OF_VERB,
@@ -93,7 +94,9 @@ from analysis_service.system_model import (
     ELEMENT_ID,
     ENDPOINT_PREFIXES,
     FLOW_ID_VERSION,
+    DataFlow,
     FlowIdError,
+    ModelIndex,
     flow_id_version,
     mentioned_ids,
     normalize_name,
@@ -552,6 +555,73 @@ def test_exemplar_descriptions_cite_only_ids_the_exemplar_system_has(framework, 
             if mention not in known_ids
         ]
         assert not unknown, f"{framework} {lane} description cites {sorted(unknown)}"
+
+
+def system_index(system):
+    """One exemplar system's graph, built from the flow IDs it defines.
+
+    The bound reads flows and nothing else (:meth:`ModelIndex.reach`), so the
+    flows' endpoints are the whole graph.
+    """
+    endpoints = {}
+    for ref in system_ids(system):
+        if ref.startswith(f"{DataFlow.id_prefix}:"):
+            parts = parse_flow_id(ref, flow_id_version(ref))
+            endpoints[ref] = (parts.source, parts.destination)
+    adjacent = {}
+    for flow_id, ends in endpoints.items():
+        for end in ends:
+            adjacent.setdefault(end, set()).update((flow_id, *ends))
+    return ModelIndex(
+        elements={},
+        flow_endpoints=endpoints,
+        adjacent={end: frozenset(near) for end, near in adjacent.items()},
+    )
+
+
+def ref_place(ref):
+    """The element or flow one catalog reference is about."""
+    prefix, _, rest = ref.partition(":")
+    return rest if prefix == CROSSING_PREFIX else rest.rpartition(":")[0]
+
+
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_exemplar_elements_sit_inside_the_fan_in_bound(framework, lane):
+    """An exemplar cites no element that the fan-in drops.
+
+    The fan-in keeps an element only within the bound of the draft's grounds
+    (:func:`~analysis_service.fan_in.within_bound`), or, with no ground that
+    names a place, only where the description names it. It also drops a
+    ground that reaches none of the elements. An exemplar that breaks either
+    rule teaches a shape that the code cuts before any reader sees it.
+    """
+    for proposal in exemplar_proposals(framework, lane):
+        system = owning_system(proposal)
+        if system is None:
+            continue
+        index = system_index(system)
+        affected = set(proposal.affected_element_ids)
+        places = {ref_place(ref) for ref in proposal.evidence_refs}
+        reach = (
+            within_bound(index, places)
+            if places
+            else set(mentioned_ids(proposal.description))
+        )
+        dropped = sorted(affected - reach) if reach else []
+        stray = [
+            ref
+            for ref in proposal.evidence_refs
+            if not within_bound(index, {ref_place(ref)}) & affected
+        ]
+        assert not dropped, (
+            f"{framework} {lane} {proposal.title!r}: the fan-in drops {dropped}."
+            " Name a ground within two hops of each element, or name the element"
+            " in the description when the draft has no ground."
+        )
+        assert not stray, (
+            f"{framework} {lane} {proposal.title!r}: the fan-in drops the grounds"
+            f" {stray}, because they reach none of the draft's elements."
+        )
 
 
 @pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
