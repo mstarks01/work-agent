@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from analysis_service import StubPipelineRunner
 from analysis_service.analysis import ABSENT_WORD
+from analysis_service.answer_bodies import BodyRefused, read_answers
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.assertions import AssertionRecord
@@ -285,8 +286,9 @@ class TestTheSaves:
     @pytest.mark.parametrize(
         "skip", ["x", [["a", "b"]], [[1, 2, 3, 4, 5, 6]], [""], ["x" * 201], [7]]
     )
-    def test_a_malformed_skip_is_refused(self, tiers, skip):
-        """The save carries a valid answer, so only the skip can refuse it."""
+    def test_a_malformed_skip_is_refused_with_the_reader_s_words(self, tiers, skip):
+        """The save carries a valid answer, so only the skip can refuse it, and
+        the page shows the body reader's own refusal."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
         paused = start(client, questions=True)
         key = shown_list(client, paused)["early_questions"][0]["key"]
@@ -296,7 +298,9 @@ class TestTheSaves:
             f"/answer/{paused}", json=body | {"skip": skip}, headers=SAME_ORIGIN
         )
         assert saved.status_code == 400
-        assert saved.json()["message"].startswith("Expected a JSON body")
+        with pytest.raises(BodyRefused) as refused:
+            read_answers(body | {"skip": skip})
+        assert saved.json()["message"] == str(refused.value)
 
     def test_a_start_after_a_skipped_list_admits_what_the_route_admits(self, tiers):
         """The engine admits each later answer the route admits (#1289).

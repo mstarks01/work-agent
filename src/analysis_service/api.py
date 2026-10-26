@@ -42,6 +42,7 @@ from uuid import uuid4
 import anyio.to_thread
 from fastapi import (
     BackgroundTasks,
+    Body,
     Depends,
     FastAPI,
     HTTPException,
@@ -55,13 +56,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Receive, Scope, Send
 
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_bodies import (
+    BodyRefused,
+    read_amendment,
+    read_answers,
+    read_corrections,
+)
 from analysis_service.answer_state import (
-    MAX_SKIPS,
     AlreadyResumed,
-    Answers,
-    Revision,
-    SkipKey,
     SourcesOverLimit,
     StaleRevision,
 )
@@ -71,10 +73,9 @@ from analysis_service.auth import (
     build_verifier,
 )
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.claims import FrameworkName, UnknownKey
+from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment, FrameworkNotCarried
 from analysis_service.errors import ConfigError, shown_errors
-from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.job_answers import (
@@ -363,59 +364,6 @@ class JobSubmission(BaseModel):
     @classmethod
     def _clean_system_name(cls, value: str | None) -> str | None:
         return clean_system_name(value)
-
-
-class AnswersSubmission(BaseModel):
-    """Answers to a job's questions, sent against that job.
-
-    ``links`` answers which element a principal is, and ``facts`` answers the
-    open facts a report's conditional findings rest on. Both empty is legal
-    only for a job waiting on answers, where it means "continue without
-    answers"; against a finished report it runs the follow-up on the saved
-    draft alone. ``save`` keeps a waiting job's answers without starting the
-    analysis (ADR 0078), or a finished report's draft without starting its
-    follow-up (ADR 0070), and ``skip`` names questions of a waiting job's
-    list the submitter skips for now: a fact by its key, a link question by
-    its ``key`` (:data:`SkipKey`). ``presented`` names the early questions
-    the page showed: the job records them as shown, and a skip is taken only
-    of one of them (ADR 0069). ``revision`` is the revision the answers
-    were read against, which a waiting job and every save require. One
-    request carries at most the ``answer_limits`` the questions route
-    publishes; a follow-up larger than that saves its draft in batches.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
-    facts: list[FactAnswer] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
-    # Strict, as the first-run app reads them: ``true`` is no revision, and
-    # ``"yes"`` is no save.
-    save: bool = Field(default=False, strict=True)
-    skip: list[SkipKey] = Field(default_factory=list, max_length=MAX_SKIPS)
-    presented: list[UnknownKey] = Field(default_factory=list, max_length=MAX_HELD_FACTS)
-    revision: Revision | None = None
-
-
-class AmendmentSubmission(BaseModel):
-    """An amendment to a paused job's description (ADR 0072): what is true
-    that the model misses or reads wrongly, in the submitter's own words.
-    ``revision`` is the revision the questions were read with."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    text: str
-    revision: Revision
-
-
-class CorrectionsSubmission(BaseModel):
-    """Corrections to a final report's answers (ADR 0054): changed values, or
-    "I don't know" in place of an answer that was a guess."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    facts: list[FactAnswer] = Field(max_length=MAX_FACT_ANSWERS)
-    #: The revision the questions were read with (ADR 0090).
-    revision: Revision
 
 
 class NodeCompletion(BaseModel):
@@ -712,6 +660,14 @@ JOB_REFUSAL_STATUS: dict[type[Exception], int] = {
 _REFUSAL_STATUS = {**JOB_REFUSAL_STATUS, AlreadyResumed: 409}
 
 
+def _invalid_body(errors: Sequence[Mapping[str, Any]]) -> JSONResponse:
+    """The ``422`` that lists each place a body fails and what the rule said."""
+    shown = [
+        {"loc": error.place, "msg": error.message} for error in shown_errors(errors)
+    ]
+    return _problem_response(422, "request body is invalid", errors=shown)
+
+
 async def _refusal_response(status: int, request: Request, exc: Exception):
     fields: dict[str, Any] = exc.fields() if isinstance(exc, Refused) else {}
     return _problem_response(status, str(exc), **fields)
@@ -843,11 +799,15 @@ def create_app(
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(request: Request, exc: RequestValidationError):
-        errors = [
-            {"loc": error.place, "msg": error.message}
-            for error in shown_errors(exc.errors())
-        ]
-        return _problem_response(422, "request body is invalid", errors=errors)
+        return _invalid_body(exc.errors())
+
+    @app.exception_handler(BodyRefused)
+    async def _body_refused(request: Request, exc: BodyRefused):
+        # The reader's places start at the body's own keys; the request's
+        # places start at ``body``, as every other refusal of a body does.
+        return _invalid_body(
+            [{**error, "loc": ("body", *error["loc"])} for error in exc.errors]
+        )
 
     @app.exception_handler(Exception)
     async def _unhandled_error(request: Request, exc: Exception):
@@ -927,9 +887,9 @@ def create_app(
     @app.post("/v1/jobs/{job_id}/answers", status_code=201)
     async def answer_job(
         job_id: str,
-        answers: AnswersSubmission,
         request: Request,
         background_tasks: BackgroundTasks,
+        raw: Annotated[Any, Body()],
         owner_id: str = Depends(require_owner),
     ) -> JSONResponse:
         """Answer a finished report's questions, and resume its job from ``prepare``.
@@ -947,17 +907,9 @@ def create_app(
         and every save, takes answers only against the current revision:
         ``400`` where none is sent, ``409`` where it has moved.
         """
+        answers = read_answers(raw)
         outcome = await _answers(request).answer(
-            job_id,
-            owner_id,
-            Answers(
-                given=AnswerSet(links=tuple(answers.links), facts=tuple(answers.facts)),
-                save=answers.save,
-                skips=answers.skip,
-                presented=answers.presented,
-                revision=answers.revision,
-            ),
-            start=_starter(request, background_tasks),
+            job_id, owner_id, answers, start=_starter(request, background_tasks)
         )
         if isinstance(outcome, Started):
             return _started(outcome)
@@ -1055,9 +1007,9 @@ def create_app(
     @app.post("/v1/jobs/{job_id}/amendments", status_code=201)
     async def amend_job(
         job_id: str,
-        body: AmendmentSubmission,
         request: Request,
         background_tasks: BackgroundTasks,
+        raw: Annotated[Any, Body()],
         owner_id: str = Depends(require_owner),
     ) -> JSONResponse:
         """Extract a paused job's description again with an amendment (ADR 0072).
@@ -1068,6 +1020,7 @@ def create_app(
         ``job_id``. ``400`` where the job does not wait on answers, ``409``
         where its revision has moved or a job already locks it.
         """
+        body = read_amendment(raw)
         started = await _answers(request).amend(
             job_id,
             owner_id,
@@ -1080,8 +1033,8 @@ def create_app(
     @app.post("/v1/jobs/{job_id}/corrections")
     async def correct_job(
         job_id: str,
-        body: CorrectionsSubmission,
         request: Request,
+        raw: Annotated[Any, Body()],
         owner_id: str = Depends(require_owner),
     ) -> JSONResponse:
         """Correct a final report's answers, and run nothing (ADR 0054).
@@ -1091,6 +1044,7 @@ def create_app(
         names no answer the report read, or changes none. ``409`` where
         another correction moved the revision that the request names.
         """
+        body = read_corrections(raw)
         corrected = await _answers(request).correct(
             job_id, owner_id, body.facts, revision=body.revision
         )
