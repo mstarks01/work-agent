@@ -30,9 +30,9 @@ from pydantic import ValidationError
 from analysis_service import graph
 from analysis_service.assertions import assertion_id
 from analysis_service.capabilities import resolve
-from analysis_service.claims import ProposedVerdict, Severity
+from analysis_service.claims import AnalysisMarks, ProposedVerdict, Severity
 from analysis_service.compact import COMPACT_FORMAT
-from analysis_service.critic import review_issues
+from analysis_service.critic_round import CriticRound, Revision, rulings_of
 from analysis_service.evidence import evidence_catalog, ground_gloss
 from analysis_service.fan_in import join_drafts
 from analysis_service.frameworks import PACKAGES, schemas_for
@@ -403,11 +403,11 @@ def a_field_the_ruling_does_not_carry_refuses_the_whole_answer():
     sound = sample_ruling("S-01").model_dump(mode="json")
     surplus = {**sample_ruling("S-02").model_dump(mode="json"), "surplus": "x"}
     with pytest.raises(ValidationError):
-        graph.rulings_of([sound, surplus], schemas_for("stride"))
+        rulings_of([sound, surplus], schemas_for("stride"))
 
     for name in PACKAGES:
         with pytest.raises(ValidationError) as refused:
-            graph.rulings_of([{"surplus": "x"}], schemas_for(name))
+            rulings_of([{"surplus": "x"}], schemas_for(name))
         assert [
             error["loc"][-1]
             for error in refused.value.errors()
@@ -419,7 +419,12 @@ def a_field_the_ruling_does_not_carry_refuses_the_whole_answer():
 def a_ruling_whose_fields_do_not_fit_comes_back_to_the_critic(pipeline):  # noqa: F811
     unreasoned = sample_ruling(verdict=ProposedVerdict(rejected_because="lane"))
 
-    problems = review_issues([sample_draft("S-01")], [unreasoned], valid_model())
+    critic_round = CriticRound.of(
+        "stride", valid_model(), [sample_draft("S-01")], AnalysisMarks(), None
+    )
 
-    assert [problem.kind for problem in problems.problems] == ["verdict-shape"]
+    outcome = critic_round.first([unreasoned.model_dump(mode="json")])
+
+    assert isinstance(outcome, Revision)
+    assert [problem.kind for problem in outcome.problems] == ["verdict-shape"]
     assert routed_targets(pipeline, ROUTER_NODE)[graph.ROUTE_REVISE] == RECRITIC_NODE

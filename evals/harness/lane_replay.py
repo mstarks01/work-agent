@@ -8,11 +8,10 @@ rebuilds the request the lane made from ``<case>.lanes.json`` and sends that
 request again, or a changed one.
 
 **The graph's readers, never a second copy.** The instruction is
-:func:`~analysis_service.graph.analyze_instruction`, templated by ADK's own
-``inject_session_state`` over the captured state keys, so a placeholder ADK
-would substitute is substituted the same way here. The user turn is ADK's
-``to_user_content`` over ``prepare``'s captured output, which is how ADK hands
-a lane its input. The answer parses under the package's own proposal schema.
+:func:`~analysis_service.graph.analyze_instruction`, and
+:func:`~analysis_service.critic_round.node_request` templates it over the
+captured state keys and builds the user turn from ``prepare``'s captured
+output, the way ADK does for the node. The answer parses under the package's own proposal schema.
 ``tests/test_evals_lane_replay.py`` holds the rebuilt request against the one a
 real graph run sent.
 
@@ -43,15 +42,13 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
-from google.adk.agents.readonly_context import ReadonlyContext
-from google.adk.utils.content_utils import to_user_content
-from google.adk.utils.instructions_utils import inject_session_state
 from google.genai import types
 from pydantic import BaseModel
 
 from analysis_service.claims import FrameworkName
+from analysis_service.critic_round import node_request
 from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphRun, seed_state
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
@@ -149,23 +146,12 @@ async def compose(
         **material["shared"],
         **{lane.key(name): value for name, value in held.items()},
     }
-    # ADK reads only ``_invocation_context.session.state`` for a state name,
-    # and the artifact service only for an ``artifact.`` name no lane prompt
-    # carries. The test that composes against a real run is what holds this.
-    context = SimpleNamespace(
-        _invocation_context=SimpleNamespace(
-            session=SimpleNamespace(state=state), artifact_service=None
-        )
-    )
     template = analyze_instruction(
         package_loader, prompt_loader, package_for(framework), lane
     )
-    instruction = await inject_session_state(template, cast(ReadonlyContext, context))
-    turn = to_user_content(material["prepared"])
-    closing = lane_closing(package_loader, framework)
-    if closing:
-        turn.parts = [*(turn.parts or []), types.Part(text=closing)]
-    return instruction, turn
+    return await node_request(
+        template, state, material["prepared"], lane_closing(package_loader, framework)
+    )
 
 
 def fresh_leads(

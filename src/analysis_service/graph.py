@@ -151,7 +151,6 @@ from analysis_service.claims import (
     LaneCoverage,
     ProposalBatch,
     Refusal,
-    Ruling,
     SharedElementName,
 )
 from analysis_service.compact import (
@@ -163,12 +162,15 @@ from analysis_service.compact import (
     parse_extraction,
 )
 from analysis_service.coverage import lane_scope
-from analysis_service.critic import (
+from analysis_service.critic_round import (
+    Accepted,
+    CriticRound,
+    Failed,
+    FirstPass,
     Revision,
-    assemble_claims,
-    critic_view,
-    merge_retry,
-    review,
+    critic_instruction,
+    node_instruction,
+    recritic_instruction,
 )
 from analysis_service.domains import select_domain_packs
 from analysis_service.errors import error_place
@@ -215,9 +217,7 @@ from analysis_service.prompts import (
     compose_analyze_prompt,
     compose_assert_prompt,
     compose_capabilities_prompt,
-    compose_critic_prompt,
     compose_extract_prompt,
-    compose_recritic_prompt,
     compose_repair_prompt,
     lane_closing,
 )
@@ -238,11 +238,10 @@ from analysis_service.sampling import (
     TierSampling,
 )
 from analysis_service.skills import (
-    compose_critic_skills,
     compose_domain_skills,
     compose_lane_skills,
 )
-from analysis_service.sources import fenced
+from analysis_service.sources import render_fenced
 from analysis_service.system_model import (
     BoundaryCrossing,
     EmittedSystemModel,
@@ -350,23 +349,6 @@ LANE_ARTIFACTS: Mapping[str, str] = MappingProxyType(
         "scope": "scope",
         "reference_notes": "notes",
         "prior_cases": "cases",
-    }
-)
-
-
-# The per-framework artifacts a review prompt reads, as ``{placeholder}`` in
-# ``critic.md`` and ``recritic.md`` against the state-key artifact it resolves
-# to. The same trick :data:`LANE_ARTIFACTS` plays one node earlier and for the
-# same reason: N critics run in parallel against one session state, which cannot
-# hold N values for one key, so ``{drafts}`` is substituted at build time into
-# ``{draft_view_stride}`` and each critic reads only its own framework's.
-REVIEW_ARTIFACTS: Mapping[str, str] = MappingProxyType(
-    {
-        "drafts": "draft_view",
-        "previous_review": "previous_review",
-        "critic_issues": "critic_issues",
-        "draft_roster": "draft_roster",
-        "unreconciled_drafts": "unreconciled_drafts",
     }
 )
 
@@ -696,7 +678,7 @@ def _routed(route: str | list[str], output: dict[str, Any]) -> Event:
 #
 # Two key families, and the invariant that keeps them honest:
 # *structured* keys are the code's view (Pydantic round-trips), *rendered*
-# keys are the model's view (:func:`render` output). Both copies of an
+# keys are the model's view (:func:`~analysis_service.sources.render` output). Both copies of an
 # artifact are kept on purpose — reading back exactly the bytes a model saw is
 # what makes a failed job debuggable — so the rule that stops them drifting
 # is: **a rendered key is written once by the FunctionNode that derives it,
@@ -802,9 +784,9 @@ LANE_SHARED_KEYS: tuple[str, ...] = (
 # fan-ins never write one key.
 #
 # ``drafts`` holds one framework's merged drafts whole, because that is what
-# ``assemble_claims`` merges rulings onto; ``draft_view`` is the *prompt* view of
-# the same drafts, built by :func:`~analysis_service.critic.critic_view` and
-# narrowed to the fields a verdict is reached from. ``marks`` is every service-owned mark that fan-in produced, as
+# the :class:`~analysis_service.critic_round.CriticRound` merges rulings onto;
+# ``draft_view`` is the *prompt* view of the same drafts, built by the round
+# and narrowed to the fields a verdict is reached from. ``marks`` is every service-owned mark that fan-in produced, as
 # one :class:`~analysis_service.claims.AnalysisMarks` — one key rather than one per
 # mark kind, since they share an owner, a standing and a policy.
 FRAMEWORK_RENDERED_ARTIFACTS: tuple[str, ...] = (
@@ -1227,40 +1209,6 @@ def _block_of(payload: dict[str, Any]) -> FrameworkAnalysis:
     return block_type.model_validate(payload)
 
 
-def render(value: Any) -> str:
-    """The one way a structured value enters a prompt: pretty, stable JSON."""
-    return json.dumps(value, indent=2, ensure_ascii=False, sort_keys=False)
-
-
-def render_fenced(value: Any) -> str:
-    """A rendered value plus a fence it cannot close.
-
-    ``render`` is ``json.dumps`` with ``ensure_ascii=False``. It escapes quotes,
-    backslashes, ``\\n`` and ``\\r`` — and **not** backticks, and **not**
-    U+2028, U+2029 or U+0085, which it passes through as themselves. Those three
-    are line terminators to ``str.splitlines`` and to most renderers, so a value
-    holding one plus a backtick run has both halves of a closing fence.
-
-    A System Model carries caller words by rule — ``source_excerpt`` verbatim,
-    and ``notes`` quoting what a speaker said — and a merged draft carries a
-    lane agent's own prose. Against a fence written into the prompt file, such a
-    value closes the block and lands the bytes after it in instruction position.
-    Against this one it cannot, because the fence is sized over the body: a body
-    holding ``` gets a four-backtick fence.
-
-    That is the hole :func:`~analysis_service.sources.render_sources` closes one
-    node upstream, with the same technique and the same sizing rule — sized once
-    over the whole rendered document, because this seam renders one JSON blob
-    rather than N caller-controlled blocks.
-
-    **Every rendered key a prompt interpolates goes through here**, and no
-    prompt file writes a fence of its own. A static fence is only ever as long
-    as itself, so the two cannot be mixed: one written in the file would be the
-    one a body could close.
-    """
-    return fenced(render(value))
-
-
 def unfence(rendered: str) -> str:
     """The body back out of :func:`render_fenced`.
 
@@ -1558,8 +1506,8 @@ def _without_source_fields(valid_model: dict) -> dict:
 
 
 # Draft fields stripped from the set rendered to a critic and its re-ask.
-# They survive on the framework's own ``drafts`` key, so assemble_claims still
-# carries them into the report exactly as the agent wrote them.
+# They survive on the framework's own ``drafts`` key, so the round's assembly
+# still carries them into the report exactly as the agent wrote them.
 #
 # **Named by field rather than by framework**, which is the honest form of a
 # neutral rule here: a field a critic does not rule on is one no framework's
@@ -1962,12 +1910,11 @@ def merge_drafts(
     not the empty list.
 
     Two state keys, two shapes, on purpose. ``drafts`` holds the drafts whole,
-    because that is what ``assemble_claims`` merges rulings onto to build the
-    block. ``draft_view`` is the *prompt* view, built by
-    :func:`~analysis_service.critic.critic_view` and narrowed to the fields a
-    verdict is actually reached from. The re-ask builds its own view through
-    the same function, so the two passes cannot disagree about what a critic
-    reads.
+    because that is what the :class:`~analysis_service.critic_round.CriticRound`
+    merges rulings onto to build the block. ``draft_view`` is the *prompt*
+    view, built by the round and narrowed to the fields a verdict is actually
+    reached from. The re-ask builds its own view through the same round, so the
+    two passes cannot disagree about what a critic reads.
     """
     state = keys.state(ctx)
     lanes = nodes.lanes
@@ -2003,81 +1950,56 @@ def merge_drafts(
     state.put(
         nodes.key("coverage"), [row.model_dump(mode="json") for row in merged.coverage]
     )
-    state.prompt(
-        nodes.key("draft_view"),
-        render_fenced(
-            critic_view(
-                merged.drafts,
-                repaired=merged.marks.repaired_quotes,
-                unverified=merged.marks.unverified_grounds,
-                assertions=held_assertions(state),
-            )
-        ),
+    critic_round = CriticRound.of(
+        nodes.name, model, merged.drafts, merged.marks, held_assertions(state)
     )
+    state.prompt(nodes.key("draft_view"), render_fenced(critic_round.view()))
     return _routed(
-        ROUTE_REVIEW if merged.drafts else ROUTE_SETTLED,
-        merge_summary(nodes.name, merged.drafts, merged.marks),
+        ROUTE_REVIEW if merged.drafts else ROUTE_SETTLED, critic_round.summary()
     )
-
-
-def merge_summary(
-    framework: FrameworkName, drafts: Sequence[Claim], marks: AnalysisMarks
-) -> dict[str, Any]:
-    """What the ``merge`` node outputs, and so the user turn its critic receives.
-
-    ADK hands a node's output to the next node through ``to_user_content``, so
-    this dictionary is the critic's user turn. The one reader of that shape: the
-    node returns it, and the critic replay builds its request from it.
-    """
-    return {
-        "framework": framework,
-        "draft_count": len(drafts),
-        "unverified_count": len(marks.unverified_grounds),
-        "unresolved_mention_count": len(marks.unresolved_mentions),
-    }
 
 
 def route_review(
     valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes
 ) -> Event:
-    """Run the mechanical check on one critic's output and route on the result.
+    """Park what one critic pass's outcome carries, and take the edge it names.
 
     The check runs here rather than in :func:`assemble_report` because
     re-asking a malformed critic means deciding *before* assembly whether it is
-    malformed. Clean output routes to ``accept``; a critic that dropped,
-    invented or duplicated a ruling, or hung a ``needs-info`` verdict on an
-    element the model does not contain, routes to ``revise``, with the failing
-    rulings and the problem list parked where the re-ask prompt reads them.
+    malformed. The whole judgement is the
+    :class:`~analysis_service.critic_round.CriticRound`'s: it returns an
+    :class:`~analysis_service.critic_round.Accepted`, a
+    :class:`~analysis_service.critic_round.Revision` or a
+    :class:`~analysis_service.critic_round.Failed`, and this function parks
+    what the value carries and routes on which one it got. Clean output routes
+    to ``accept``; a critic that dropped, invented or duplicated a ruling, or
+    hung a ``needs-info`` verdict on an element the model does not contain,
+    routes to ``revise``, with the failing rulings and the problem list parked
+    where the re-ask prompt reads them.
 
-    **The check and the re-ask view are one value.**
-    :func:`~analysis_service.critic.review` returns either an
-    :class:`~analysis_service.critic.Accepted` or a
-    :class:`~analysis_service.critic.Revision`, and the Revision carries its own
-    messages, its roster and the drafts those messages name. So the prompt and
-    the check cannot disagree about which claims are in trouble: they come out
-    of one call over one set. This function parks what the value carries and
-    takes the edge it names, and composes nothing.
-
-    Both of a framework's review nodes run this same function — what differs is
-    where their ``revise`` edge points (``recritic`` for the first look,
+    Both of a framework's review nodes run this same function. What differs
+    is where their ``revise`` edge points (``recritic`` for the first look,
     ``critic_failed`` for the second), exactly as the two validate nodes share
-    one function.
+    one function. The second look is told apart by the ``first_review`` key
+    the first look parked: the round merges the re-ask onto it, ``reviewed``
+    is rewritten so ``assemble`` reads the merged set and never the re-ask's
+    own, and what the re-ask changed beyond its brief is recorded on the
+    marks beside the first pass's problems.
 
     **Both of this framework's keys are read from state rather than bound as
     parameters**, and that is what makes N critics expressible at all: ADK binds
     a FunctionNode's parameters by name, and a name derived per framework cannot
     be spelled in a signature. Reading them keeps the absence handling
-    honest — **an LLM node that emits no
-    text does not write its output key at all**, so a silent critic arrives here
-    as ``None`` rather than as a parameter-binding ``ValueError`` naming this
-    function, which would read as a graph defect rather than as what it is. A
-    model returns nothing when its completion is truncated at
-    ``max_output_tokens`` — reasoning tokens are spent against that same cap, so
-    the critic, which rules on every draft in one pass, is the node that hits it
-    first. Absent output is output that dropped every draft, so it takes the
-    ``revise`` edge the graph already has: one bounded re-ask, then
-    ``critic_failed`` raises the ``CriticOutputError`` that names what did not
-    reconcile.
+    honest. **An LLM node that emits no text does not write its output key at
+    all**, so a silent critic arrives here as ``None`` rather than as a
+    parameter-binding ``ValueError`` naming this function, which would read as
+    a graph defect rather than as what it is. A model returns nothing when its
+    completion is truncated at ``max_output_tokens``: reasoning tokens are
+    spent against that same cap, so the critic, which rules on every draft in
+    one pass, is the node that hits it first. Absent output is output that
+    dropped every draft, so it takes the ``revise`` edge the graph already
+    has: one bounded re-ask, then ``critic_failed`` raises the
+    ``CriticOutputError`` that names what did not reconcile.
 
     An absent *drafts* key is the narrower case: a graph entered past this
     framework's own ``merge`` has none, and an empty draft set with an empty
@@ -2088,109 +2010,84 @@ def route_review(
     out of ``merge``: the lanes drafted nothing, the critic was never called,
     and an empty ruling set against an empty draft set reconciles, so the same
     check takes ``accept``. A draft its own grounds make conditional does not
-    reach here that way — it is shown to the critic like any other, and a
+    reach here that way. It is shown to the critic like any other, and a
     ruling missing for it is a dropped draft the re-ask is asked to supply.
     """
-    model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
-    package_drafts = _drafts_of(state.get(nodes.key("drafts")), nodes.package)
-    ruled = _claims_of(state.get(nodes.key("reviewed")))
-    parked = AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {})
+    critic_round = _parked_round(state, SystemModel.model_validate(valid_model), nodes)
+    emitted = _claims_of(state.get(nodes.key("reviewed")))
+    recorded = list(critic_round.marks.unreconciled_rulings)
     first = state.get(nodes.key("first_review"))
-    if first is not None:
-        # The second look. The re-ask was asked to change only what the
-        # problems named and to carry every other ruling across unchanged;
-        # this is where that is held rather than hoped for. What it changed
-        # beyond its brief is recorded beside the first pass's problems and
-        # discarded, and ``reviewed`` is rewritten so ``assemble`` reads the
-        # merged set and never the re-ask's own.
-        ruled, drift = merge_retry(
-            first,
-            _canonical_rulings(ruled, nodes.schemas),
-            state.get(nodes.key("repairable")) or [],
-            [draft.id for draft in package_drafts],
+    if first is None:
+        outcome: Accepted | Revision | Failed = critic_round.first(emitted)
+    else:
+        merged, drift = critic_round.merge(
+            FirstPass(first, state.get(nodes.key("repairable")) or []), emitted
         )
-        state.put(nodes.key("reviewed"), {"claims": list(ruled)})
-        parked = parked.model_copy(
-            update={"unreconciled_rulings": [*parked.unreconciled_rulings, *drift]}
-        )
-        state.put(nodes.key("marks"), parked.model_dump(mode="json"))
-    rulings = rulings_of(ruled, nodes.schemas)
-    outcome = review(
-        package_drafts,
-        rulings,
-        model,
-        repaired=parked.repaired_quotes,
-        unverified=parked.unverified_grounds,
-        assertions=held_assertions(state),
-    )
+        state.put(nodes.key("reviewed"), {"claims": merged})
+        recorded += drift
+        outcome = critic_round.outcome(merged)
     if isinstance(outcome, Revision):
-        # ``previous_review`` is the parked payload itself rather than anything
+        # ``previous_review`` is the emission itself rather than anything
         # recomputed, because what the re-ask must reconcile with is the bytes
-        # the critic actually returned.
-        state.prompt(nodes.key("previous_review"), render_fenced(ruled))
+        # the critic actually returned. ``first_review`` is the same rulings
+        # in the spelling the second look merges onto.
+        state.prompt(nodes.key("previous_review"), render_fenced(emitted))
         state.prompt(nodes.key("critic_issues"), render_fenced(outcome.messages))
         state.prompt(nodes.key("draft_roster"), render_fenced(outcome.roster))
         state.prompt(
             nodes.key("unreconciled_drafts"), render_fenced(outcome.unreconciled)
         )
-        # The same bytes, kept where code reads them back: the second look
-        # merges the re-ask onto these, and ``repairable`` is the whole of
-        # what it may replace.
-        state.put(nodes.key("first_review"), _canonical_rulings(ruled, nodes.schemas))
-        state.put(nodes.key("repairable"), list(outcome.repairable))
+        state.put(nodes.key("first_review"), outcome.first.rulings)
+        state.put(nodes.key("repairable"), outcome.first.repairable)
+    if isinstance(outcome, Accepted):
+        # The marker ``assemble`` reads a framework as finished by. ``reviewed``
+        # alone cannot say so: it holds the first critic's malformed rulings for
+        # as long as the re-ask runs.
+        state.put(nodes.key("accepted"), True)
+    else:
         # Recorded onto this framework's marks before the re-ask runs, so the
         # report says how the first pass failed even when the re-ask repairs it
-        # completely. Merged rather than assigned: ``marks`` already holds what
-        # fan-in produced, and a second look must not drop it.
+        # completely.
+        recorded += outcome.problems
+    if recorded != critic_round.marks.unreconciled_rulings:
+        # Merged rather than assigned: ``marks`` already holds what fan-in
+        # produced, and a second look must not drop it.
         state.put(
             nodes.key("marks"),
-            parked.model_copy(
-                update={
-                    "unreconciled_rulings": [
-                        *parked.unreconciled_rulings,
-                        *outcome.problems,
-                    ]
-                }
+            critic_round.marks.model_copy(
+                update={"unreconciled_rulings": recorded}
             ).model_dump(mode="json"),
         )
-        return _routed(ROUTE_REVISE, {"issue_count": len(outcome.messages)})
-    # The marker ``assemble`` reads a framework as finished by. ``reviewed``
-    # alone cannot say so: it holds the first critic's malformed rulings for
-    # as long as the re-ask runs.
-    state.put(nodes.key("accepted"), True)
-    return _routed(ROUTE_ACCEPT, {"reviewed_count": outcome.count})
+    if isinstance(outcome, Accepted):
+        return _routed(ROUTE_ACCEPT, {"reviewed_count": outcome.count})
+    return _routed(ROUTE_REVISE, {"issue_count": len(outcome.messages)})
+
+
+def _parked_round(
+    state: SessionState,
+    model: SystemModel,
+    nodes: FrameworkNodes,
+    *,
+    accepted: bool = True,
+) -> CriticRound:
+    """One framework's round over the artifacts its ``merge`` node parked.
+
+    ``accepted`` false reads the drafts as absent, for a framework whose
+    router has not accepted yet (see :func:`_framework_block`).
+    """
+    return CriticRound.of(
+        nodes.name,
+        model,
+        _drafts_of(state.get(nodes.key("drafts")) if accepted else None, nodes.package),
+        AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
+        held_assertions(state),
+    )
 
 
 def _drafts_of(drafts: list | None, package: FrameworkPackage) -> list[Claim]:
     """One framework's parked drafts, revalidated as its own record type."""
     return [package.record.model_validate(draft) for draft in drafts or []]
-
-
-def rulings_of(ruled: Sequence[Any], schemas: FrameworkSchemas) -> list[Ruling]:
-    """One critic's emission, revalidated as this framework's own ruling type.
-
-    Public because it is the one reader of "what shape is a critic's answer",
-    and the graph is not its only caller: ``evals/critic_review`` replays a
-    critic outside the graph, and ``evals/harness/follow_up_policies.py``
-    reads an archived critic sample, and each has to parse it the same way.
-    Parsing with the neutral :class:`~analysis_service.claims.Ruling` instead
-    refuses every STRIDE ruling, because ``frameworks/stride/critic.md`` asks
-    for a ``confidence`` the neutral model forbids.
-    """
-    return list(schemas.rulings.model_validate({"claims": list(ruled)}).claims)
-
-
-def _canonical_rulings(ruled: Sequence[Any], schemas: FrameworkSchemas) -> list[dict]:
-    """The same emission, as the ruling model spells it.
-
-    What :func:`~analysis_service.critic.merge_retry` compares. A provider may
-    spell one ruling two ways across two calls -- an optional key present as
-    ``null`` in one and absent in the other -- and a comparison over the raw
-    payloads would read that as a re-ask changing a ruling it was told to carry
-    across. The model's own dump is one spelling per ruling.
-    """
-    return [ruling.model_dump(mode="json") for ruling in rulings_of(ruled, schemas)]
 
 
 def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) -> dict:
@@ -2207,16 +2104,15 @@ def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) 
     so a binding failure would kill the run at the one place built to report why
     it died.
     """
-    model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
-    # ``review`` returned a Revision here by construction; assemble_claims
-    # raises the CriticOutputError naming exactly what still does not reconcile.
-    assemble_claims(
-        _drafts_of(state.get(nodes.key("drafts")), nodes.package),
-        rulings_of(_claims_of(state.get(nodes.key("reviewed"))), nodes.schemas),
-        model,
-        nodes.schemas,
-    )
+    # The second look parked the merged set on ``reviewed`` and routed here, so
+    # the round's outcome over it is the Failed that names what still does not
+    # reconcile.
+    outcome = _parked_round(
+        state, SystemModel.model_validate(valid_model), nodes
+    ).outcome(_claims_of(state.get(nodes.key("reviewed"))))
+    if isinstance(outcome, Failed):
+        raise outcome.error
     raise AssertionError("fail_review reached on reconciled critic output")
 
 
@@ -2238,11 +2134,11 @@ def assemble_report(
     be written per selection.
 
     Reached only on the ``accept`` edge of every framework's router, so each
-    mechanical check has already passed in :func:`route_review`.
-    :func:`assemble_claims` re-runs it and fails closed regardless — nothing
-    reaches the report on output that did not survive the gate — then splits each
-    framework's ruled claims into the actionable and rejected arrays by verdict
-    rather than any model's say-so.
+    mechanical check has already passed in :func:`route_review`. The
+    :class:`~analysis_service.critic_round.CriticRound` re-runs it and fails
+    closed regardless — nothing reaches the report on output that did not
+    survive the gate — then splits each framework's ruled claims into the
+    actionable and rejected arrays by verdict rather than any model's say-so.
 
     **Absent keys are read as absent rather than as zero.** A graph driven from a
     seeded state that never ran a framework's ``merge`` has no drafts, no marks
@@ -2532,13 +2428,15 @@ def _framework_block(
     # that dropped every draft. A framework whose router did not accept
     # therefore reads as unfinished: no drafts, no rulings. A critic that never
     # reconciles is caught on its own router, which raises in ``critic_failed``.
-    accepted = state.get(nodes.key("accepted"))
-    drafts = _drafts_of(state.get(nodes.key("drafts")) if accepted else None, package)
-    rulings = rulings_of(
-        _claims_of(state.get(nodes.key("reviewed")) if accepted else None), schemas
+    accepted = bool(state.get(nodes.key("accepted")))
+    critic_round = _parked_round(state, model, nodes, accepted=accepted)
+    outcome = critic_round.outcome(
+        _claims_of(state.get(nodes.key("reviewed")) if accepted else None)
     )
-    claims, rejected = assemble_claims(drafts, rulings, model, schemas)
-    marks = AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {})
+    if isinstance(outcome, Failed):
+        raise outcome.error
+    claims, rejected = outcome.claims, outcome.rejected
+    marks = critic_round.marks
     retrieved = state.get(nodes.key("retrieved")) or {}
     refusal = _refusal(package, state.get(nodes.key("precondition")))
     return schemas.block(
@@ -2941,31 +2839,6 @@ def _read_model_node_func(keys: GraphKeys) -> Callable[..., Any]:
     return read
 
 
-def _instruction(skills: str, prompt: str) -> str:
-    """Skill text then prompt text: what to know, then what to do with it.
-
-    **The prefix this shares is across jobs for one lane, and never across the
-    lanes of one job.** The skill text is a lane's own, so the first bytes of
-    two lanes' instructions already differ; what one lane repeats from case to
-    case is its skill, the rubric and ``analyze.md`` down to the first
-    job-varying placeholder.
-
-    The lanes of one job read one **System Model** and one set of sources
-    between them, and ``analyze.md`` lays those out after ``{scope}``, which
-    :data:`LANE_ARTIFACTS` makes per lane. So the material every lane shares
-    sits behind the first thing that separates them.
-
-    **Moving the shared material first would cost more than it saves** (#1400).
-    The lanes of one job start together from one ``prepare`` route, so none
-    finds another's cache entry written. And the order here is what lets each
-    lane's own prefix, 4,576 to 6,520 tokens of skill and prompt, cache across
-    jobs (:mod:`analysis_service.prompt_cache`); with the job data first, that
-    prefix would shrink to the few tokens of ``analyze.md`` before its title
-    names the lane.
-    """
-    return f"{skills.strip()}\n\n{prompt.strip()}\n"
-
-
 def analyze_instruction(
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
@@ -2993,47 +2866,7 @@ def analyze_instruction(
     prompt = compose_analyze_prompt(prompt_loader, package_loader, lane.lane)
     for placeholder, binding in lane.prompt_bindings.items():
         prompt = prompt.replace(f"{{{placeholder}}}", binding)
-    return _instruction(skills, prompt)
-
-
-def critic_instruction(
-    package_loader: MarkdownLoader,
-    prompt_loader: MarkdownLoader,
-    package: FrameworkPackage,
-    nodes: FrameworkNodes,
-) -> str:
-    """One framework's critic instruction, as the graph builds its critic node.
-
-    Public so a replay of an archived critic call builds the same template the
-    node was given, rather than a second copy of how it is put together.
-    """
-    return _review_instruction(
-        package_loader, prompt_loader, package, nodes, compose_critic_prompt
-    )
-
-
-def _review_instruction(
-    package_loader: MarkdownLoader,
-    prompt_loader: MarkdownLoader,
-    package: FrameworkPackage,
-    nodes: FrameworkNodes,
-    compose_prompt: Callable[[MarkdownLoader], str],
-) -> str:
-    """One framework's critic or re-ask instruction, with its keys resolved.
-
-    Both share :func:`~analysis_service.skills.compose_critic_skills` byte for
-    byte, so the re-ask reads the same rubric, the same ``critic.md`` and the
-    same lane digest the critic did — it may have to re-rule a draft it dropped
-    — and the two share that cacheable prefix across jobs.
-
-    The two placeholders a review prompt carries are this framework's own state
-    keys, substituted here for the reason :func:`analyze_instruction` gives:
-    N critics run against one session state.
-    """
-    prompt = compose_prompt(prompt_loader)
-    for placeholder, artifact in REVIEW_ARTIFACTS.items():
-        prompt = prompt.replace(f"{{{placeholder}}}", f"{{{nodes.key(artifact)}}}")
-    return _instruction(compose_critic_skills(package_loader, package), prompt)
+    return node_instruction(skills, prompt)
 
 
 @dataclass(frozen=True)
@@ -3134,8 +2967,8 @@ def _framework_subgraph(
         recritic=_llm_node(
             name=nodes.node(RECRITIC_ROLE),
             tier_node=tier_nodes[nodes.node(RECRITIC_ROLE)],
-            instruction=_review_instruction(
-                package_loader, prompt_loader, package, nodes, compose_recritic_prompt
+            instruction=recritic_instruction(
+                package_loader, prompt_loader, package, nodes
             ),
             output_schema=schemas.rulings,
             output_key=reviewed_key,

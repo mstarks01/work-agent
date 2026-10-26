@@ -27,10 +27,10 @@ from analysis_service.evidence import evidence_catalog
 from analysis_service.fan_in import join_drafts
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride import STRIDE
-from analysis_service.graph import render, render_fenced, unfence
+from analysis_service.graph import unfence
 from analysis_service.grounding import normalize
 from analysis_service.report import Report
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
+from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, render, render_fenced
 from analysis_service.system_model import ELEMENT_GROUPS, ModelIndex, SystemModel
 from analysis_service.validation import parse_and_validate
 from evals.harness.flow_ids import rewrite_text

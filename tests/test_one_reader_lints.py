@@ -1,6 +1,7 @@
 """Rules that one function reads, and the lints that find a second reader.
 
-Each lint walks ``src``, ``webapp`` and ``evals/harness`` for the expression
+Each lint walks ``src``, ``webapp``, ``evals/harness`` and
+``evals/critic_review`` for the expression
 that applies a rule, and names each function that holds it. Every function but
 the one reader calls that reader (``docs/agents/one-rule-one-reader.md``). A
 function that applies the rule for another reason is declared with that
@@ -23,7 +24,7 @@ Site = tuple[str, str]
 
 
 #: The trees each lint walks.
-ROOTS = ("src", "webapp", "evals/harness")
+ROOTS = ("src", "webapp", "evals/harness", "evals/critic_review")
 
 
 def _sites(
@@ -201,6 +202,20 @@ def test_a_claim_matcher_reads_the_flows_flows_by_case_builds():
     inline = set(_sites(lambda node: _is_attribute(node, "flow_endpoints")))
     assert matchers
     assert matchers & inline == set()
+
+
+#: The primitives the Critic's round is built from. Each builds or checks what
+#: a critic reads or returned, and a second caller is a second reader of one
+#: draft (#1082): a view with fewer marks, a merge with its own brief, an
+#: assembly outside the round's outcome.
+CRITIC_PRIMITIVES = ("critic_view", "review", "merge_retry", "assemble_claims")
+
+
+def test_the_critic_round_is_the_one_caller_of_the_critic_primitives():
+    """Only ``critic_round`` calls what builds a view, merges a re-ask or assembles."""
+    sites = _sites(lambda node: any(_calls(node, name) for name in CRITIC_PRIMITIVES))
+    assert sites
+    assert {path for path, _ in sites} == {"src/analysis_service/critic_round.py"}
 
 
 def test_a_flow_map_names_its_siblings_once():

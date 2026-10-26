@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from typing import get_args
 
 import pytest
 
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.prompts import compose_critic_prompt
 from analysis_service.system_model import SystemModel
 from evals.critic_review import replay as R
 from evals.critic_review.loading import (
@@ -28,8 +28,14 @@ from evals.critic_review.loading import (
     corpus_sources,
     load_fixtures,
 )
-from evals.critic_review.model import CriticFixture
+from evals.critic_review.model import CriticFixture, Expectation
+from evals.harness import critic_replay
 from evals.harness.assembly import ruling_type
+from tests.test_evals_lane_replay import (  # noqa: F401  (fixtures)
+    finished,
+    recorded,
+)
+from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
 PACKAGE = PACKAGES["stride"]
 PACKAGE_RULINGS = schemas_for("stride").rulings
@@ -57,34 +63,62 @@ def model() -> SystemModel:
 
 
 def composed(fixtures, model) -> str:
-    return R.compose(
-        fixtures,
-        model,
-        corpus_sources("01-payments-checkout"),
-        PACKAGE,
-        PACKAGE_LOADER,
-        PROMPT_LOADER,
+    instruction, _ = asyncio.run(
+        R.compose(
+            fixtures,
+            model,
+            corpus_sources("01-payments-checkout"),
+            PACKAGE,
+            PACKAGE_LOADER,
+            PROMPT_LOADER,
+        )
+    )
+    return instruction
+
+
+def test_the_replays_request_is_the_graphs(recorded, case):  # noqa: F811
+    """The request this harness sends equals the one the graph sent, byte for byte.
+
+    A scripted sweep records every request its critic node received. The same
+    drafts, wrapped as fixtures, compose here through the round's own renderer,
+    and the instruction and the user turn are the recorded ones. The recorded
+    run carries no fan-in marks, which is the one way a fixture set differs
+    from a job, so the two requests can be equal at all.
+    """
+    out, seen = recorded
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    assert archived.marks.unverified_grounds == []
+    assert archived.marks.repaired_quotes == []
+    fixtures = [
+        CriticFixture(
+            id=draft.id,
+            kind="credible-conditional",
+            framework="stride",
+            case=case.id,
+            draft=draft.model_dump(mode="json"),
+            expect=Expectation(survives=True),
+            rationale="a draft the recorded run produced",
+        )
+        for draft in archived.drafts
+    ]
+
+    instruction, turn = asyncio.run(
+        R.compose(
+            fixtures,
+            archived.model,
+            case.sources,
+            PACKAGE,
+            PACKAGE_LOADER,
+            PROMPT_LOADER,
+        )
     )
 
-
-def test_the_harness_fills_exactly_the_placeholders_the_prompt_declares():
-    """Two readers of "what does the critic prompt need", checked against each other.
-
-    The graph turns each placeholder into a state key and ADK templates it; this
-    module substitutes the block itself, because there is no session here to
-    hold one. A placeholder added to ``critic.md`` and not to
-    :data:`~evals.critic_review.replay.PLACEHOLDERS` would reach a model as a
-    literal brace, and a critic reading ``{boundary_crossings}`` where the
-    crossings should be rules on a model it cannot see and never says why.
-    """
-    declared = set(re_placeholders(compose_critic_prompt(PROMPT_LOADER)))
-
-    assert declared == set(R.PLACEHOLDERS)
+    sent = {text: contents for text, contents in seen}
+    assert instruction in sent, "no node sent this critic instruction"
+    assert sent[instruction] == [turn]
 
 
 def re_placeholders(text: str) -> list[str]:
-    import re
-
     return re.findall(r"\{([a-z_]+)\}", text)
 
 
@@ -177,7 +211,7 @@ def rule(claim_id: str, status: str, reason: str = "") -> dict:
 
 
 def run(fixtures, model, payload: dict):
-    async def call(_: str) -> str:
+    async def call(instruction: str, turn) -> str:
         return json.dumps(payload)
 
     return asyncio.run(
@@ -655,11 +689,22 @@ def test_the_words_behind_the_advice_verdict_are_kept(fixtures, model):
         assert outcome.to_json()["recommendation_note"] == "narrows no grant"
 
 
-def test_the_user_turn_is_the_merge_nodes_output_over_the_fixture_drafts(fixtures):
+def test_the_user_turn_is_the_merge_nodes_output_over_the_fixture_drafts(
+    fixtures, model
+):
     """A real critic receives its fan-in's summary, never a bare word."""
     stride = [fixture for fixture in fixtures if fixture.framework == "stride"]
 
-    turn = R.user_turn(stride, PACKAGE)
+    _, turn = asyncio.run(
+        R.compose(
+            stride,
+            model,
+            corpus_sources("01-payments-checkout"),
+            PACKAGE,
+            PACKAGE_LOADER,
+            PROMPT_LOADER,
+        )
+    )
 
     assert turn.role == "user"
     assert json.loads(turn.parts[0].text) == {

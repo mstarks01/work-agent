@@ -34,11 +34,12 @@ a model differently.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -442,12 +443,46 @@ def fenced(body: str) -> str:
     """``body`` inside the shortest fence it cannot close.
 
     The one spelling of the block layout. :func:`render_sources` wraps each
-    source in it, and :func:`analysis_service.graph.render_fenced` wraps each
+    source in it, and :func:`render_fenced` wraps each
     rendered value a prompt interpolates in it, so the two seams cannot come to
     lay a block out differently.
     """
     fence = fence_for(body)
     return f"{fence}\n{body}\n{fence}"
+
+
+def render(value: Any) -> str:
+    """The one way a structured value enters a prompt: pretty, stable JSON."""
+    return json.dumps(value, indent=2, ensure_ascii=False, sort_keys=False)
+
+
+def render_fenced(value: Any) -> str:
+    """A rendered value plus a fence it cannot close.
+
+    ``render`` is ``json.dumps`` with ``ensure_ascii=False``. It escapes quotes,
+    backslashes, ``\\n`` and ``\\r`` — and **not** backticks, and **not**
+    U+2028, U+2029 or U+0085, which it passes through as themselves. Those three
+    are line terminators to ``str.splitlines`` and to most renderers, so a value
+    holding one plus a backtick run has both halves of a closing fence.
+
+    A System Model carries caller words by rule — ``source_excerpt`` verbatim,
+    and ``notes`` quoting what a speaker said — and a merged draft carries a
+    lane agent's own prose. Against a fence written into the prompt file, such a
+    value closes the block and lands the bytes after it in instruction position.
+    Against this one it cannot, because the fence is sized over the body: a body
+    holding ``` gets a four-backtick fence.
+
+    That is the hole :func:`render_sources` closes one
+    node upstream, with the same technique and the same sizing rule — sized once
+    over the whole rendered document, because this seam renders one JSON blob
+    rather than N caller-controlled blocks.
+
+    **Every rendered key a prompt interpolates goes through here**, and no
+    prompt file writes a fence of its own. A static fence is only ever as long
+    as itself, so the two cannot be mixed: one written in the file would be the
+    one a body could close.
+    """
+    return fenced(render(value))
 
 
 def render_sources(sources: Sequence[Source]) -> str:

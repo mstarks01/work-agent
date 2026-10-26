@@ -36,7 +36,7 @@ from evals.critic_review.loading import (
     load_fixtures,
 )
 from evals.critic_review.model import CriticFixture
-from evals.critic_review.replay import replay, user_turn
+from evals.critic_review.replay import replay
 from evals.harness.bundle import check_out
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import node_call
@@ -109,16 +109,11 @@ def main(argv: list[str] | None = None) -> int:
     case_id = _one_case(fixtures)
     model = corpus_model(case_id)
     # The node's own route, sampling and output schema, through the one helper
-    # every replay uses, and the user turn a real critic receives: its fan-in's
-    # summary, built by the function the merge node returns it from.
+    # every replay uses. The request it sends is the graph's, instruction and
+    # user turn, rendered by the critic's round.
     node = node_call(
         Deployment.from_env(), _critic_node(framework), schemas_for(framework).rulings
     )
-    turn = user_turn(fixtures, package)
-
-    async def call(instruction: str) -> str:
-        return await node(instruction, turn)
-
     score, problems = asyncio.run(
         replay(
             fixtures,
@@ -127,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
             package,
             MarkdownLoader(REPO_ROOT / "frameworks" / framework),
             MarkdownLoader(REPO_ROOT / "prompts"),
-            call,
+            node,
         )
     )
 
