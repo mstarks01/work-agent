@@ -15,8 +15,10 @@ first-run app to a page message.
 presented questions are listed, whether a skip is of a presented question,
 whether the revision is current, and whether an answer fits its question are
 rules of the job, and :class:`~analysis_service.job_answers.JobAnswers` applies
-them after the body is read. A body is bounded in size before it reaches here,
-by each app's body limit middleware.
+them after the body is read. The reader bounds each list and each field; it
+does not bound the body's size. ``/v1`` bounds that with its body limit
+middleware before the body is parsed, and the first-run app, which serves
+only its own loopback page, applies no body limit on these routes.
 """
 
 from __future__ import annotations
