@@ -2,9 +2,9 @@
 
 ## Scope
 
-Chapter V13 of ASVS 5.0: how the application and its environment are configured and built. Your lane covers secret management, dependency and supply-chain controls, the separation of environments, unnecessary features and services, and the configuration of the platform the application runs on.
+Chapter V13 of ASVS 5.0: how the application and its environment are configured and built. Your lane covers configuration documentation, communication between backend components and the credentials it uses, secret management, and what a deployment leaks, such as source control metadata, debug modes, directory listings and version details.
 
-Chapter boundaries: what a secret protects is chapter V11. What a running process is permitted to do is chapter V8. Your subject is what shipped and how it was set up.
+Chapter boundaries: what a secret protects is chapter V11. What a running process is permitted to do is chapter V8. Third-party components, their inventory and the functionality a production build includes are chapter V15. Your subject is what shipped and how it was set up.
 
 ## Applicability
 
@@ -54,9 +54,7 @@ Read the model for what it does carry: elements tagged with secrets, a technolog
 The recurring ways this chapter's requirements go unanswered in a system description. Each names what to look for; none is a finding on its own.
 
 **Secrets are named without their storage.** An element carrying a `secrets` asset tag with no stated key store is the clearest trigger this chapter has.
-**Dependencies are assumed managed.** Requirements about a dependency inventory and its currency cannot be settled from a system description, and the answer is needs-info rather than absent.
-**Environments are undifferentiated in the telling.** Where the input describes one deployment, the separation requirements are open rather than failed.
-**Defaults are unmentioned.** Debug endpoints, sample content and default accounts are requirements here, and prose about a working system never mentions them.
+**Defaults are unmentioned.** Debug modes, directory listings and default service credentials are requirements here, and prose about a working system never mentions them.
 
 ## Guardrails
 

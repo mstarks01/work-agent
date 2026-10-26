@@ -20,14 +20,10 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
   ],
   "verb": "intercept",
   "evidence_refs": [
-    "crossing:flow:process:web-api>process:ledger-service>post-transfer"
+    "crossing:flow:process:web-api>process:ledger-service>post-transfer",
+    "absent:flow:process:web-api>process:ledger-service>post-transfer:encryption_in_transit"
   ],
-  "quotes": [
-    {
-      "text": "not authenticated and not encrypted",
-      "source_label": "Payments platform notes"
-    }
-  ],
+  "quotes": [],
   "severity": {
     "likelihood": "medium",
     "impact": "high",
