@@ -710,3 +710,35 @@ def test_a_tier_setting_key_is_spelled_once():
     assert [
         site for site in _sites(_spells_a_tier_key) if site[0].startswith("webapp/")
     ] == [("webapp/settings_page.py", "tier_key")]
+
+
+def _mints_a_job(node: ast.AST) -> bool:
+    return (
+        _calls(node, "create")
+        and isinstance(node.func, ast.Attribute)
+        and _is_name(node.func.value, "JobRecord")
+    )
+
+
+def _starts_a_job(node: ast.AST) -> bool:
+    return _calls(node, "admit") and any(kw.arg == "start" for kw in node.keywords)
+
+
+def test_a_new_job_is_created_and_admitted_in_job_answers():
+    """Only ``JobAnswers`` creates a job record and admits it with a ``start``.
+
+    A submission, a Resumed Job and an amended job are new jobs, and the three
+    operations that make them are the one admission's (ADR 0077). The engine
+    builds a record for an in-process run, which no store admits.
+    """
+    assert _sites(_mints_a_job) == [
+        ("src/analysis_service/engine.py", "_build_job"),
+        ("src/analysis_service/job_answers.py", "amend"),
+        ("src/analysis_service/job_answers.py", "answer"),
+        ("src/analysis_service/job_answers.py", "submit"),
+    ]
+    assert _sites(_starts_a_job) == [
+        ("src/analysis_service/job_answers.py", "amend"),
+        ("src/analysis_service/job_answers.py", "answer"),
+        ("src/analysis_service/job_answers.py", "submit"),
+    ]

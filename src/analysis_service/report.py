@@ -645,9 +645,10 @@ class Job(BaseModel):
     A report only exists for a completed job, so ``status`` admits exactly the
     ``completed`` state from the job-lifecycle contract.
 
-    ``frameworks`` is what was *asked for*, in submission order. The envelope's
-    own check reads it: the analysis blocks must answer exactly this list, in
-    this order, so a framework that produced nothing cannot be dropped quietly.
+    ``frameworks`` is what was *asked for*, in the order of
+    ``config/frameworks.toml`` (ADR 0102). The envelope's own check reads it:
+    the analysis blocks must answer exactly this list, in this order, so a
+    framework that produced nothing cannot be dropped quietly.
     """
 
     model_config = ConfigDict(extra="forbid")

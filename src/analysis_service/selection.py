@@ -21,9 +21,10 @@ refused rather than collapsed because ``analyses`` is a list in the report so
 a dropped block is visible, and de-duplicating here would hand back one block
 for two the caller asked for — the same invisible loss, one layer earlier.
 
-Order is the caller's and is preserved. It is the order the report's blocks
-carry, and the envelope checks the two agree; an entry point that prefers
-another order sorts what this returns.
+The selection comes back in ``carried`` order, which is the order of
+``config/frameworks.toml``, whatever order the caller listed (ADR 0102). It is
+the order the report's blocks carry, and the envelope checks the two agree. No
+entry point sorts what this returns.
 """
 
 from __future__ import annotations
@@ -110,13 +111,14 @@ def resolve_names(
 
 
 def resolve_selection(
-    carried: Collection[FrameworkName], requested: Sequence[Requested]
+    carried: Sequence[FrameworkName], requested: Sequence[Requested]
 ) -> list[FrameworkSelection]:
-    """The selection as the job will carry it, or the :class:`SelectionError` refusing it."""
+    """The selection as the job will carry it, in ``carried`` order, or the
+    :class:`SelectionError` refusing it."""
     names = resolve_names(carried, [entry.name for entry in requested])
+    by_name = dict(zip(names, requested, strict=True))
     narrowed = [
-        (name, dict(entry.options))
-        for name, entry in zip(names, requested, strict=True)
+        (name, dict(by_name[name].options)) for name in carried if name in by_name
     ]
     # Validated against the package's own options model, which declares no
     # defaulted field — so an option this framework requires and the caller
