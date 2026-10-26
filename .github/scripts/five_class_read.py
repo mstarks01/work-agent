@@ -7,7 +7,7 @@ under the heading :data:`HEADING`, with one entry for each class.
 
 A change to a module that decides what a prompt says the code does also needs
 a prompt read: the heading :data:`PROMPT_HEADING`, with one entry for each
-prompt that :data:`PROMPT_READERS` names for the module.
+prompt that the table :data:`TABLE` pairs with the module.
 
     five_class_read.py <base sha> <head sha>   reads the body from PR_BODY
 """
@@ -18,8 +18,12 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Iterable
+import tomllib
+from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from fnmatch import fnmatchcase
+from pathlib import Path
+from typing import Any
 
 HEADING = "## Five-class read"
 
@@ -58,78 +62,66 @@ CODE_PATHS = (
 
 PROMPT_HEADING = "## Prompt read"
 
-#: Each module that decides an outcome a prompt states, as an ``fnmatch``
-#: pattern, against the prompts that state its outcomes. A prompt sentence
-#: about a refusal, a repair, a drop or an open question is true only while the
-#: module does that, so a change to the module needs a read of the prompts.
-#: ``tests/test_five_class_read.py`` holds each pattern and each prompt to a
-#: real file, and holds every prompt to some module.
-PROMPT_READERS: dict[str, tuple[str, ...]] = {
-    "src/analysis_service/actions.py": (
-        "frameworks/stride/output.md",
-        "frameworks/stride/lanes/*/skill.md",
-    ),
-    "src/analysis_service/assertions.py": ("prompts/assert.md", "prompts/analyze.md"),
-    "src/analysis_service/bands.py": ("frameworks/stride/severity_rubric.md",),
-    "src/analysis_service/capabilities.py": ("prompts/capabilities.md",),
-    "src/analysis_service/capability_reader.py": ("prompts/capabilities.md",),
-    "src/analysis_service/claims.py": (
-        "prompts/analyze.md",
-        "prompts/critic.md",
-        "frameworks/*/output.md",
-    ),
-    "src/analysis_service/compact.py": ("prompts/extract-compact.md",),
-    "src/analysis_service/critic.py": (
-        "prompts/critic.md",
-        "prompts/recritic.md",
-        "frameworks/*/critic.md",
-    ),
-    "src/analysis_service/evidence.py": (
-        "prompts/analyze.md",
-        "frameworks/*/lanes/*/exemplars.md",
-    ),
-    "src/analysis_service/fan_in.py": (
-        "prompts/analyze.md",
-        "frameworks/*/output.md",
-        "frameworks/*/lanes/*/exemplars.md",
-    ),
-    "src/analysis_service/frameworks/asvs/*": (
-        "frameworks/asvs/output.md",
-        "frameworks/asvs/critic.md",
-        "frameworks/asvs/lanes/*/skill.md",
-    ),
-    "src/analysis_service/frameworks/stride/*": (
-        "frameworks/stride/output.md",
-        "frameworks/stride/critic.md",
-        "frameworks/stride/lanes/*/skill.md",
-    ),
-    "src/analysis_service/graph.py": (
-        "prompts/extract-compact.md",
-        "prompts/repair.md",
-        "prompts/recritic.md",
-    ),
-    "src/analysis_service/grounding.py": ("prompts/analyze.md", "prompts/extract.md"),
-    "src/analysis_service/prompts.py": (
-        "prompts/assert.md",
-        "prompts/capabilities.md",
-        "prompts/critic.md",
-        "frameworks/stride/lane_closing.md",
-    ),
-    "src/analysis_service/question_kinds.py": (
-        "prompts/critic.md",
-        "prompts/recritic.md",
-    ),
-    "src/analysis_service/system_model.py": (
-        "prompts/extract.md",
-        "prompts/extract-compact.md",
-        "prompts/analyze.md",
-    ),
-    "src/analysis_service/validation.py": (
-        "prompts/extract.md",
-        "prompts/extract-compact.md",
-        "prompts/repair.md",
-    ),
-}
+#: The table that pairs each prompt with the modules that decide what it says,
+#: beside this script. :func:`main` reads the base branch's copy, as the
+#: workflow runs the base branch's copy of this script, and falls back to this
+#: one where the base holds none.
+TABLE = Path(__file__).with_name("prompt_outcomes.toml")
+
+#: The placeholder in a module pattern or a prompt path that stands for a
+#: framework package's directory name. A changed path fills it, so a package
+#: that lands later is paired with its own text with no edit to the table.
+PACKAGE = "{package}"
+
+
+def readers(table: Mapping[str, Any]) -> dict[str, tuple[str, ...]]:
+    """Each module pattern against the prompts it decides, from the table.
+
+    An ``outcome`` row pairs each of its modules with its prompt; a ``reader``
+    row pairs its module with each of its prompts.
+    """
+    pairs: dict[str, set[str]] = defaultdict(set)
+    for outcome in table.get("outcome", ()):
+        for module in outcome["modules"]:
+            pairs[module].add(outcome["prompt"])
+    for reader in table.get("reader", ()):
+        pairs[reader["module"]].update(reader["prompts"])
+    return {module: tuple(sorted(prompts)) for module, prompts in sorted(pairs.items())}
+
+
+def package_of(path: str, pattern: str) -> str | None:
+    """The package name ``path`` fills ``pattern``'s placeholder with: the empty
+    string for a pattern with none, or None where ``path`` does not match."""
+    head, placeholder, _ = pattern.partition(PACKAGE)
+    if not placeholder:
+        return "" if fnmatchcase(path, pattern) else None
+    name = path.removeprefix(head).split("/", 1)[0]
+    filled = pattern.replace(PACKAGE, name)
+    return name if path.startswith(head) and fnmatchcase(path, filled) else None
+
+
+def prompts_to_read(
+    paths: Iterable[str], pairs: Mapping[str, Iterable[str]], root: Path = Path()
+) -> list[str]:
+    """Each prompt that ``pairs`` names for a path in ``paths`` and that is on
+    disk under ``root``. A package text the package does not carry, such as a
+    severity rubric for a record that grades nothing, is not asked for, and a
+    prompt that another named glob covers is asked for once, under the glob."""
+    paths = list(paths)
+    named = {
+        prompt.replace(PACKAGE, name)
+        for pattern, prompts in pairs.items()
+        for name in {package_of(path, pattern) for path in paths}
+        if name is not None
+        for prompt in prompts
+    }
+    return sorted(
+        prompt
+        for prompt in named
+        if any(root.glob(prompt))
+        and not any(other != prompt and fnmatchcase(prompt, other) for other in named)
+    )
+
 
 #: An HTML comment, closed or open to the end of the body. GitHub does not
 #: render it.
@@ -163,18 +155,6 @@ def rendered(body: str) -> list[str]:
         else:
             lines.append(line)
     return lines
-
-
-def prompts_to_read(paths: Iterable[str]) -> list[str]:
-    """Each prompt that :data:`PROMPT_READERS` names for a path in ``paths``."""
-    return sorted(
-        {
-            prompt
-            for pattern, prompts in PROMPT_READERS.items()
-            if any(fnmatchcase(path, pattern) for path in paths)
-            for prompt in prompts
-        }
-    )
 
 
 def section(body: str, heading: str = HEADING) -> str | None:
@@ -242,6 +222,18 @@ def changed_paths(base: str, head: str) -> list[str]:
     return [path for path in listed.split("\0") if path]
 
 
+def table_text(base: str) -> str:
+    """The text of :data:`TABLE` at ``base``, or of this script's own copy where
+    ``base`` holds none."""
+    shown = subprocess.run(
+        ["git", "show", f"{base}:.github/scripts/{TABLE.name}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return shown.stdout if shown.returncode == 0 else TABLE.read_text(encoding="utf-8")
+
+
 def main(argv: list[str]) -> int:
     base, head = argv
     paths = changed_paths(base, head)
@@ -262,7 +254,7 @@ def main(argv: list[str]) -> int:
         status = 1
     else:
         print("The body holds a five-class read.")
-    prompts = prompts_to_read(paths)
+    prompts = prompts_to_read(paths, readers(tomllib.loads(table_text(base))))
     unread = missing(body, PROMPT_HEADING, prompts) if prompts else []
     if unread:
         print(

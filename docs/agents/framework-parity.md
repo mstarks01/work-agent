@@ -216,7 +216,7 @@ for free" is a claim to check, never one to assume.
 
 ## Where this is enforced
 
-Seven mechanical instances, each for a narrow question:
+Eight mechanical instances, each for a narrow question:
 
 - **`tests/test_framework_neutrality.py`** — every framework literal outside a
   package root is declared with a reason, so a new one fails until somebody says
@@ -247,6 +247,15 @@ Seven mechanical instances, each for a narrow question:
   leaves the case on the unreviewed list.
 - **The merge bar in `verify_corpus.py`** — every lane of every carried package
   has a `must-find` record somewhere in the corpus.
+- **`test_a_package_module_asks_for_the_texts_the_package_declares` in
+  `tests/test_five_class_read.py`** — the prompt-read table
+  `.github/scripts/prompt_outcomes.toml` pairs a package's module directory
+  with its texts through a `{package}` placeholder. The test fills the
+  placeholder for every package in `PACKAGES` and compares the result with the
+  texts the package declares: its output contract, its critic part, its
+  severity rubric where its record grades, its lane closing where it declares
+  one, and each lane's skill. A package that lands later is paired with no
+  table edit.
 
 Everything else in this document is a rule for the PR body, because the general
 form is not mechanically checkable: no test can tell that a *number* was computed

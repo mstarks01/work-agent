@@ -55,9 +55,17 @@ holds each path that a live workflow sweeps to the code paths.
 A pull request that changes a module that decides what a prompt says the code
 does also needs a `## Prompt read` section. The section has one entry for each
 prompt that the check names for the module, with text after the name. The entry
-says whether each outcome sentence in the prompt is still true. `PROMPT_READERS`
-in `.github/scripts/five_class_read.py` holds the map from modules to prompts,
-and `tests/test_five_class_read.py` holds every prompt to some module.
+says whether each outcome sentence in the prompt is still true. The table
+`.github/scripts/prompt_outcomes.toml` is the one home of the pairing. Each
+`outcome` row pins one prompt sentence to the modules that decide it, and each
+`reader` row pairs a module with the prompts it decides where no sentence is
+pinned yet. The check derives the map from modules to prompts from the table,
+and reads the base branch's copy of it. A row writes `{package}` for a
+framework package's directory, so a change under one package's module directory
+asks for a read of that package's own texts, and a new package needs no row.
+`tests/test_five_class_read.py` holds each row to the tree, holds the package
+rows to `PACKAGES`, and holds every prompt to some row.
+`tests/test_one_reader_lints.py` refuses a pairing written in Python.
 
 The check has a limit. GitHub runs the copy of `five-class.yml` that the pull
 request carries. The workflow runs the base branch's copy of the script, but a
@@ -110,17 +118,19 @@ the code are read by different people on different days and nothing compares
 them.
 
 The decidable half is linted: `tests/test_prompt_lints.py` holds each closed
-vocabulary, each extraction failure code, the verb menu, every computed key a
-critic is shown, every verb a lane may file, and what each output contract
-says the service does. **Grow that table when a round finds a new pair** — a
-one-line entry there is worth more than the finding it replaces.
+vocabulary, the verb menu, every computed key a critic is shown, and every verb
+a lane may file. **Grow that table when a round finds a new pair** — a one-line
+entry there is worth more than the finding it replaces.
 
 A sentence that states an outcome of the code, such as a refusal, a repair, a
-drop or an open question, goes in `tests/test_prompt_outcomes.py`. Each test
-there checks the sentence and runs the code that decides the outcome, so a
-change to either side fails it. Where a prompt can take a sentence from a table
-that the code reads, render the sentence from the table instead, as
-`render_predicates` does.
+drop or an open question, goes in an `outcome` row of
+`.github/scripts/prompt_outcomes.toml`, with a check function of the row's
+name in `tests/test_prompt_outcomes.py`. One test runs over the rows: it checks
+the sentence and runs the row's check, so a change to either side fails it. A
+row names the `validation.IssueCode` values its sentence is the rule against,
+and the test holds the rows to that set. Where a prompt can take a sentence
+from a table that the code reads, render the sentence from the table instead,
+as `render_predicates` does.
 
 An exemplar teaches the model a draft shape, so it must pass every check that
 real lane output meets. `tests/test_exemplar_fan_in.py` sends each exemplar

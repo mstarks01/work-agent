@@ -1,0 +1,306 @@
+# The pairing of each prompt with the code that decides what it says.
+#
+# This file is the one home of that pairing. Two readers read it and nothing
+# else states a pair: `.github/scripts/five_class_read.py` derives the map from
+# modules to prompts for the `## Prompt read` check, and
+# `tests/test_prompt_outcomes.py` runs each row's check against the code and
+# pins each row's sentence in the prompt file. `tests/test_five_class_read.py`
+# holds the rows to the tree and to the framework registry, and
+# `tests/test_one_reader_lints.py` refuses a pairing written anywhere else.
+#
+# `[[outcome]]` rows pin one prompt sentence that states what the code does.
+#   prompt       the prompt file, relative to the repository root
+#   sentence     the whole sentence, as the file spells it; line breaks are
+#                read as spaces. A sentence from a CC BY-SA 4.0 file is a short
+#                phrase instead (docs/agents/licensing.md).
+#   modules      the module paths that decide the outcome, as fnmatch patterns;
+#                `{package}` stands for a framework package's directory name
+#   check        the name of the function in tests/test_prompt_outcomes.py that
+#                runs the code, or
+#   wording      the reason no code decides the sentence, so only the pin runs
+#   issue_codes  the `validation.IssueCode` values the check produces, where
+#                the sentence is the rule against one
+#
+# `[[reader]]` rows pair a module with the prompts whose outcomes it decides
+# where no sentence is pinned yet. A `reason` says what the module decides.
+#   module       one module path pattern, as above
+#   prompts      the prompt paths, as glob patterns; `*` matches any name
+#
+# The two kinds never state the same pair. To add a pinned sentence, add an
+# `[[outcome]]` row and its check function; to add a module that decides a
+# prompt, add a `[[reader]]` row.
+
+# --- Extraction ---------------------------------------------------------------
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = """Your output is validated mechanically — unique typed IDs, endpoints
+that resolve, zone membership, legal enum and asset values."""
+modules = ["src/analysis_service/validation.py"]
+check = "a_payload_the_schema_refuses_returns_no_model"
+issue_codes = ["schema"]
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = """If it fails, you will see the specific issues and get exactly one
+chance to repair them."""
+modules = ["src/analysis_service/graph.py"]
+check = "a_failed_extraction_gets_one_repair_pass_then_a_rejection"
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = """**Two things of one type that the text calls by one name are the one
+exception**, because they would share an ID and an ID two elements carry names
+neither of them."""
+modules = ["src/analysis_service/validation.py"]
+check = "two_elements_under_one_id_are_refused"
+issue_codes = ["duplicate-id"]
+
+[[outcome]]
+prompt = "prompts/extract-compact.md"
+sentence = """Two elements of the *same* type may not share a ref: that one points
+at neither, so every reference to it fails and the whole model goes back for
+repair."""
+modules = ["src/analysis_service/compact.py"]
+check = "a_ref_two_elements_claim_binds_to_neither"
+issue_codes = ["duplicate-ref"]
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = """IDs are recomputed from the names you give in code, so do not
+abbreviate one — an ID that differs from its element's name is replaced by the
+name's slug, and every reference to it follows automatically."""
+modules = ["src/analysis_service/validation.py"]
+check = "an_id_that_differs_from_its_name_is_replaced_by_the_slug"
+issue_codes = ["id-mismatch"]
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = """**A `name` needs at least one ASCII letter a-z or digit 0-9**,
+because its ID is built from them and drops other letters: where the text names
+a thing only in another script, write the name in ASCII letters and put the
+text's own spelling in `notes`."""
+modules = ["src/analysis_service/validation.py", "src/analysis_service/system_model.py"]
+check = "a_name_with_no_ascii_letter_or_digit_has_no_id"
+issue_codes = ["empty-slug"]
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = "Both endpoints must be zoned elements you have already created."
+modules = ["src/analysis_service/validation.py"]
+check = "a_flow_to_an_element_the_model_lacks_is_refused"
+issue_codes = ["invalid-reference"]
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = """If the text implies no zones at all, create one that covers the
+system as described."""
+modules = ["src/analysis_service/validation.py"]
+check = "a_model_with_no_trust_zone_is_refused"
+issue_codes = ["no-trust-zones"]
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = """**`unknown` is not one of them:** where nothing in the list
+applies, leave `assets` empty."""
+modules = ["src/analysis_service/validation.py"]
+check = "an_unknown_asset_tag_is_dropped_as_no_tag"
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = """A tag outside the list fails the whole model mechanically and
+spends your one repair pass."""
+modules = ["src/analysis_service/validation.py"]
+check = "a_tag_outside_the_vocabulary_is_refused"
+issue_codes = ["illegal-asset-tag"]
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = """Give every element a `source_excerpt`: a short verbatim quote from
+the source it came from, plus the `source_label` naming that source — see rule 7
+below."""
+modules = ["src/analysis_service/validation.py"]
+check = "an_element_with_no_verbatim_excerpt_is_refused"
+issue_codes = ["missing-citation", "unverifiable-excerpt"]
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = "An attribute you left `unknown` inferred nothing and takes no entry."
+modules = ["src/analysis_service/validation.py"]
+check = "an_assumption_on_an_unknown_attribute_is_refused"
+issue_codes = ["assumption-on-unknown"]
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = "**Never leave a security-relevant attribute empty.**"
+modules = ["src/analysis_service/validation.py"]
+check = "an_empty_control_is_refused"
+issue_codes = ["blank-control"]
+
+[[outcome]]
+prompt = "prompts/extract.md"
+sentence = """Otherwise name the mechanism first: never open a control with
+`no`, `not` or `without`."""
+modules = ["src/analysis_service/validation.py"]
+check = "a_control_that_opens_with_a_negation_is_refused"
+issue_codes = ["ambiguous-control"]
+
+[[outcome]]
+prompt = "prompts/extract-compact.md"
+sentence = """An omitted attribute, or a flow with no `operations`, is worse: the
+schema refuses the whole object, and the job ends with no repair."""
+modules = ["src/analysis_service/graph.py", "src/analysis_service/compact.py"]
+check = "an_omitted_compact_attribute_ends_the_job_with_no_repair"
+
+# --- Lane output -------------------------------------------------------------
+
+[[outcome]]
+prompt = "frameworks/stride/output.md"
+sentence = """Two drafts sharing a number lose the second: the service keeps the
+first and records the rest on the report as dropped."""
+modules = ["src/analysis_service/fan_in.py"]
+check = "a_repeated_threat_id_keeps_the_first_draft_and_drops_the_rest"
+
+[[outcome]]
+prompt = "frameworks/stride/output.md"
+sentence = """A trust zone is context, not a target: a threat that names only
+zones is dropped."""
+modules = ["src/analysis_service/fan_in.py", "src/analysis_service/frameworks/stride/record.py"]
+check = "a_threat_that_names_only_zones_is_dropped"
+
+[[outcome]]
+prompt = "frameworks/asvs/output.md"
+sentence = """A requirement you file twice loses the second draft: the service
+keeps the first and records the rest on the report as dropped."""
+modules = ["src/analysis_service/fan_in.py"]
+check = "a_repeated_requirement_keeps_the_first_draft_and_drops_the_rest"
+
+[[outcome]]
+prompt = "frameworks/stride/severity_rubric.md"
+sentence = """The severity band (`low | medium | high | critical`) is **derived
+mechanically from the matrix below — never assert a band yourself**; a stated
+band that contradicts the matrix is a validation error."""
+modules = ["src/analysis_service/claims.py"]
+check = "a_stated_band_that_contradicts_the_matrix_is_refused"
+
+[[outcome]]
+prompt = "frameworks/asvs/lanes/security-logging-and-error-handling/skill.md"
+sentence = "a gap needs a stated fact"
+modules = ["src/analysis_service/frameworks/asvs/record.py"]
+check = "a_gap_on_absent_elements_alone_is_dropped"
+
+[[outcome]]
+prompt = "prompts/analyze.md"
+sentence = """A row that says the sources disagree is open too, whichever value
+it states."""
+modules = ["src/analysis_service/evidence.py"]
+check = "a_disputed_row_is_open_whichever_value_it_states"
+
+[[outcome]]
+prompt = "prompts/capabilities.md"
+sentence = """A capability with a parent includes the parent, and code records
+the parent from the child."""
+modules = ["src/analysis_service/capabilities.py"]
+check = "code_records_the_parent_from_a_present_child"
+
+# --- Critic ------------------------------------------------------------------
+
+[[outcome]]
+prompt = "prompts/critic.md"
+sentence = """Include nothing it does not name: a field this framework's record
+does not carry is refused, and your whole answer is refused with it."""
+modules = [
+    "src/analysis_service/graph.py",
+    "src/analysis_service/frameworks/{package}/record.py",
+]
+check = "a_field_the_ruling_does_not_carry_refuses_the_whole_answer"
+
+[[outcome]]
+prompt = "prompts/critic.md"
+sentence = """Code checks your rulings after you answer, and a ruling whose
+fields do not fit together comes back to you."""
+modules = ["src/analysis_service/critic.py", "src/analysis_service/graph.py"]
+check = "a_ruling_whose_fields_do_not_fit_comes_back_to_the_critic"
+
+# --- Modules with no pinned sentence yet ---------------------------------------
+
+[[reader]]
+module = "src/analysis_service/actions.py"
+prompts = ["frameworks/*/output.md", "frameworks/*/lanes/*/skill.md"]
+reason = "the verb vocabulary a contract lists and a lane skill names"
+
+[[reader]]
+module = "src/analysis_service/assertions.py"
+prompts = ["prompts/assert.md", "prompts/analyze.md"]
+reason = "the predicate registry the assertion pass fills and the catalog shows"
+
+[[reader]]
+module = "src/analysis_service/capability_reader.py"
+prompts = ["prompts/capabilities.md"]
+reason = "how a capability answer is read back"
+
+[[reader]]
+module = "src/analysis_service/claims.py"
+prompts = ["prompts/analyze.md", "prompts/critic.md", "frameworks/*/output.md"]
+reason = "the shared claim, ground and verdict shapes every contract describes"
+
+[[reader]]
+module = "src/analysis_service/critic.py"
+prompts = ["prompts/recritic.md", "frameworks/*/critic.md"]
+reason = "the review that sends a ruling back and the digest a critic reads"
+
+[[reader]]
+module = "src/analysis_service/evidence.py"
+prompts = ["frameworks/*/lanes/*/exemplars.md"]
+reason = "the evidence catalog and the ground glosses an exemplar cites"
+
+[[reader]]
+module = "src/analysis_service/fan_in.py"
+prompts = ["prompts/analyze.md", "frameworks/*/lanes/*/exemplars.md"]
+reason = "the checks every draft meets after the lanes answer"
+
+[[reader]]
+module = "src/analysis_service/frameworks/{package}/*"
+prompts = [
+    "frameworks/{package}/output.md",
+    "frameworks/{package}/critic.md",
+    "frameworks/{package}/severity_rubric.md",
+    "frameworks/{package}/lane_closing.md",
+    "frameworks/{package}/lanes/*/skill.md",
+]
+reason = "a package's record, rules and bands decide what its own text states"
+
+[[reader]]
+module = "src/analysis_service/graph.py"
+prompts = ["prompts/repair.md", "prompts/recritic.md"]
+reason = "the repair and re-ask routes"
+
+[[reader]]
+module = "src/analysis_service/grounding.py"
+prompts = ["prompts/analyze.md", "prompts/extract.md"]
+reason = "the quote ladder that verifies an excerpt"
+
+[[reader]]
+module = "src/analysis_service/prompts.py"
+prompts = [
+    "prompts/assert.md",
+    "prompts/capabilities.md",
+    "prompts/critic.md",
+    "frameworks/*/lane_closing.md",
+]
+reason = "how each prompt is composed and what is appended to it"
+
+[[reader]]
+module = "src/analysis_service/question_kinds.py"
+prompts = ["prompts/critic.md", "prompts/recritic.md"]
+reason = "the kinds of question a ruling may raise"
+
+[[reader]]
+module = "src/analysis_service/system_model.py"
+prompts = ["prompts/extract-compact.md", "prompts/analyze.md"]
+reason = "the element and flow shapes and the ID rules"
+
+[[reader]]
+module = "src/analysis_service/validation.py"
+prompts = ["prompts/extract-compact.md", "prompts/repair.md"]
+reason = "the validity gate both extraction routes and the repair pass meet"
