@@ -720,28 +720,6 @@ class TestPrincipals:
         )
         assert asyncio.run(store.principal(identity_of("carol"))) is None
 
-    def test_a_refused_submission_leaves_no_principal(self):
-        client, store = make_client(max_active_jobs=0)
-        refused = client.post("/v1/jobs", json=submission(), headers=auth())
-        assert refused.status_code == 429
-        assert asyncio.run(store.principal(identity_of("alice"))) is None
-
-    def test_the_first_submission_creates_the_principal_and_logs_the_sub_once(
-        self, caplog
-    ):
-        client, store = make_client()
-        with caplog.at_level(logging.INFO):
-            first = submit(client)
-            second = submit(client)
-        principal = asyncio.run(store.principal(identity_of("alice")))
-        assert principal is not None
-        assert UUID(principal.owner_id).version == 4
-        assert principal.identity == identity_of("alice")
-        owners = {asyncio.run(store.get(job)).owner_id for job in (first, second)}
-        assert owners == {principal.owner_id}
-        assert caplog.text.count("alice") == 1
-        assert principal.owner_id in caplog.text
-
     def test_two_issuers_with_one_sub_are_two_owners(self):
         client, store = make_client(verifier=IssuerVerifier())
         job_id = submit(client, "one-token")

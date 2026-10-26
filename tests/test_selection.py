@@ -4,12 +4,17 @@ from types import SimpleNamespace
 
 import pytest
 
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_names, resolve_selection
 from tests.factories import sample_selection
 
 CARRIED = tuple(PACKAGES)
+
+#: The complete option set of each package, keyed by framework and checked
+#: against the registry, for a test that needs every selection accepted.
+COMPLETE_OPTIONS: dict[FrameworkName, dict] = {"asvs": {"level": 2}, "stride": {}}
 
 
 def test_an_empty_selection_is_refused():
@@ -50,12 +55,16 @@ def test_options_are_held_to_the_packages_own_model():
         assert name in str(caught.value)
 
 
-def test_the_callers_order_is_preserved():
-    reversed_selection = list(reversed(sample_selection()))
-    resolved = resolve_selection(CARRIED, reversed_selection)
-    assert [entry.name for entry in resolved] == [
-        entry.name for entry in reversed_selection
+def test_the_selection_comes_back_in_the_carried_order():
+    """ADR 0102: the caller's order decides nothing."""
+    assert set(COMPLETE_OPTIONS) == set(PACKAGES)
+    picked = [
+        FrameworkSelection(name=name, options=COMPLETE_OPTIONS[name])
+        for name in reversed(CARRIED)
     ]
+    resolved = resolve_selection(CARRIED, picked)
+    assert [entry.name for entry in resolved] == list(CARRIED)
+    assert resolved == list(reversed(picked))
 
 
 def test_a_bare_name_passes_the_name_rule_whatever_its_options_require():

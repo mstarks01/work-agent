@@ -61,8 +61,9 @@ store keeps, with no change to the rule.
 
 ## Evidence
 
-`tests/test_reuse_answers.py` (what a job holds, the route, the owner check,
-the refusals, an answer taken and an answer dropped), the `/analyze` tests in
+`tests/test_reuse_answers.py` (what a job holds, the owner check, the
+refusals, an answer taken and an answer dropped), the carried set of a new
+submission in `tests/test_job_answers.py`, the `/analyze` tests in
 `tests/test_webapp.py`, the submit test in `tests/test_webapp_questions.py`
 and `test_a_new_analysis_reuses_the_answers_of_an_earlier_one` in
 `tests/test_browser.py`.

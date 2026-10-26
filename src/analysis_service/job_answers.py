@@ -1,11 +1,15 @@
-"""The one writer of a job's answers, and the one starter of the job they start.
+"""The one writer of a job's answers, and the one starter of every new job.
 
-Every surface that takes a submission to a job reads the job through here,
-builds its **Answer State** from the record, admits the submission, and
-either stores the answers, a draft or a correction, or creates the **Resumed
-Job** and starts it. The Answer State itself writes nothing
-(:mod:`analysis_service.answer_state`); this module is what writes, so no
-caller stores answers or starts a job by hand.
+Every surface that submits a new job, or a submission to a job, comes through
+here. A new job is read from its **Submission**: this module checks the
+selection, composes the sources, holds them to the bounds, names the owner,
+carries the earlier job's answers and admits the job. A submission to a job
+reads the job through here, builds its **Answer State** from the record,
+admits the submission, and either stores the answers, a draft or a
+correction, or creates the **Resumed Job** and starts it. The Answer State
+itself writes nothing (:mod:`analysis_service.answer_state`); this module is
+what writes, so no caller creates a job, stores answers or starts a job by
+hand.
 
 A refusal here is typed and never a status code. A driver maps each one to
 its own transport: the ``/v1`` routes to a problem response, the first-run
@@ -38,6 +42,7 @@ from analysis_service.answer_state import (
     AnswerState,
     SavedAnswers,
     SavedDraft,
+    SourcesOverLimit,
 )
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy
@@ -72,6 +77,7 @@ from analysis_service.principals import Identity, Principal, log_created
 from analysis_service.questions import question_fallback
 from analysis_service.report import Report
 from analysis_service.report_conditions import corrected_findings
+from analysis_service.selection import Requested, resolve_selection
 from analysis_service.sources import Source, SourceLimits
 from analysis_service.system_model import SystemModel
 
@@ -94,6 +100,7 @@ __all__ = [
     "SaveConflict",
     "Start",
     "Started",
+    "Submission",
     "Submitter",
     "UnreadableSchema",
     "Withheld",
@@ -307,6 +314,24 @@ class Started:
 
 
 @dataclass(frozen=True)
+class Submission:
+    """A new job as a route parsed it, before :meth:`JobAnswers.submit` reads it.
+
+    ``frameworks`` is the selection as the caller listed it. ``system_name``
+    passed :func:`~analysis_service.sources.clean_system_name` already: each
+    route refuses an unclean name in its own way. ``answers_from`` names the
+    earlier job whose answers the new job carries (ADR 0079).
+    """
+
+    sources: Sequence[Source]
+    frameworks: Sequence[Requested]
+    system_name: str | None = None
+    links: Sequence[LinkAnswer] = ()
+    questions: bool = False
+    answers_from: str | None = None
+
+
+@dataclass(frozen=True)
 class Submitter:
     """The owner of a new submission: the owner ID its job names.
 
@@ -336,7 +361,10 @@ class JobAnswers:
 
     ``runner_for`` looks a runner up by selection and entry. ``limits`` bounds
     what a job may carry, ``ceiling`` how many jobs one owner may have in
-    flight, and ``budget`` the tokens a window admits. ``carries_catalog``
+    flight, and ``budget`` the tokens a window admits. ``frameworks`` is what
+    the deployment carries, in ``config/frameworks.toml`` order, which is
+    what a submission selects from and the order its report's blocks take
+    (ADR 0102). ``carries_catalog``
     says whether a job here builds an assertion catalog. A link answer places
     a principal in that catalog, so a deployment without one refuses it
     (:class:`NoCatalog`); the answer's line also goes into the job's answers
@@ -350,6 +378,7 @@ class JobAnswers:
     limits: SourceLimits
     ceiling: int
     budget: BudgetPolicy
+    frameworks: Sequence[FrameworkName]
     carries_catalog: bool
     gate: CertificationGate | None = None
 
@@ -489,21 +518,63 @@ class JobAnswers:
         answerable = await self.answerable(job_id, owner_id)
         return await anyio.to_thread.run_sync(answerable.payload)
 
-    def submitted_sources(
-        self, sources: Sequence[Source], links: Sequence[LinkAnswer]
-    ) -> list[Source]:
-        """A new job's sources with its link answers composed in, or a refusal.
+    async def submit(
+        self, identity: Identity, submission: Submission, *, start: Start
+    ) -> Started:
+        """Create the job ``submission`` describes, admit it and start it.
 
-        The same :class:`NoCatalog` refusal :meth:`answer` makes, and the
-        ``ValueError`` of :func:`~analysis_service.links.with_link_answers`.
-        The answers go only onto a job that has sources of its own: answers
-        alone would carry the body past the ladder's empty-sources rung.
+        **The one submission of a new job, for both HTTP surfaces** (ADR
+        0077). The steps run shape before size, and every refusal comes
+        before the owner is named, so a refused submission creates no
+        principal:
+
+        1. the selection, by :func:`~analysis_service.selection.resolve_selection`,
+           which orders it in the deployment's carried order and raises
+           :class:`~analysis_service.selection.SelectionError`;
+        2. the sources with the link answers composed in, which raises the
+           :class:`NoCatalog` refusal :meth:`answer` makes, or :class:`Refused`
+           for the ``ValueError`` of
+           :func:`~analysis_service.links.with_link_answers`; the answers go
+           only onto a job that has sources of its own, because answers alone
+           would carry the body past the ladder's empty-sources rung;
+        3. the source limits, which raise
+           :class:`~analysis_service.answer_state.SourcesOverLimit`;
+        4. the owner, by :meth:`submitter`;
+        5. the carried answers, by :meth:`carried_from`;
+        6. the record, with the tokens the submission reserves;
+        7. the admission, by :meth:`admit`.
+
+        The limits run before the admission because the call that reserves
+        the slot is the call that inserts the record, and it needs the record.
+        A count taken before the limits is a count another submission can
+        land behind. A submission that breaks a limit and sits on the ceiling
+        hears about the limit; both answers refuse it, and neither runs a
+        model.
         """
-        if links and not self.carries_catalog:
+        selection = resolve_selection(self.frameworks, submission.frameworks)
+        if submission.links and not self.carries_catalog:
             raise NoCatalog()
-        if not sources:
-            return list(sources)
-        return with_link_answers(sources, links)
+        sources = list(submission.sources)
+        if sources:
+            sources = self._refusing(with_link_answers, sources, submission.links)
+        breach = self.limits.breach(sources)
+        if breach is not None:
+            raise SourcesOverLimit(breach)
+        submitter = await self.submitter(identity)
+        carried = await self.carried_from(
+            submission.answers_from, submitter.owner_id, asks=submission.questions
+        )
+        record = JobRecord.create(
+            owner_id=submitter.owner_id,
+            sources=sources,
+            frameworks=selection,
+            system_name=submission.system_name,
+            answers=AnswerSet(links=tuple(submission.links)),
+            carried=carried,
+            ask_questions=submission.questions,
+            reserved_tokens=budgets.estimate(sources, selection),
+        )
+        return await self.admit(record, start=start, principal=submitter.new)
 
     async def answer(
         self, job_id: str, owner_id: str, answers: Answers, *, start: Start

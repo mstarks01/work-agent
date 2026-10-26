@@ -35,9 +35,10 @@ The security posture is deliberate throughout:
 * The picker is an allowlist, checked server-side (A01). A submitted name must
   be one this install carries, and a submitted option must satisfy that
   package's own options model, both before an engine exists. The form's
-  checkboxes decide nothing: :func:`_selection` re-derives the selection from
-  the carried list, so an invented name, a repeated one and a reordered pair are
-  refused or normalised rather than reaching the graph.
+  checkboxes decide nothing: the one submission
+  (:meth:`~analysis_service.job_answers.JobAnswers.submit`) re-derives the
+  selection from the carried list, so an invented name, a repeated one and a
+  reordered pair are refused or normalised rather than reaching the graph.
 * The injection point is the whole trust boundary. A report carries the
   submitter's own prose, so every ``<`` is escaped to ``\u003c`` before the JSON
   enters the viewer's ``<script>`` block. Otherwise a description containing
@@ -135,7 +136,6 @@ from analysis_service import (
     FrameworkSelection,
     Report,
     Source,
-    budgets,
 )
 from analysis_service.answer_forms import (
     answer_choices,
@@ -197,6 +197,7 @@ from analysis_service.job_answers import (
     RunnerFor,
     Start,
     Started,
+    Submission,
     UnreadableSchema,
     Withheld,
 )
@@ -216,7 +217,6 @@ from analysis_service.links import (
     LinkAnswer,
     components,
     fold,
-    refuse_answers_source,
 )
 from analysis_service.model_gate import NoThinkingLevel
 from analysis_service.model_tiers import ModelTierConfig
@@ -228,7 +228,7 @@ from analysis_service.principals import Identity
 from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
-from analysis_service.selection import resolve_selection
+from analysis_service.selection import SelectionError
 from analysis_service.settings_variables import deployment_env, merged_env
 from analysis_service.sources import (
     ANSWERS_LABEL,
@@ -560,15 +560,13 @@ class Current:
     """What the routes run on now: the job operations of one Deployment on
     the running store, the job deadline, and what the pages show of it.
 
-    ``answers`` holds the runner, the bounds and the certification gate.
-    ``frameworks`` is what the picker offers and allow-lists. The Deployment
-    stays in memory through ``answers.runner_for`` while a request or a job
-    holds it.
+    ``answers`` holds the runner, the bounds, the carried frameworks that the
+    picker offers, and the certification gate. The Deployment stays in memory
+    through ``answers.runner_for`` while a request or a job holds it.
     """
 
     answers: JobAnswers
     deadline_seconds: float
-    frameworks: tuple[FrameworkName, ...]
 
 
 class CellEmpty(Exception):
@@ -728,7 +726,7 @@ class Startup:
     no analysis can run on a model nobody chose — fail-closed, but explained.
 
     ``frameworks`` is what this install carries, which is what the picker
-    offers and what :func:`_selection` allow-lists against. It is not itself a
+    offers and what the one submission allow-lists against. It is not itself a
     selection and it is never used as one: a submission names its own, and the
     form ships with every box unticked.
     """
@@ -751,11 +749,11 @@ class Startup:
                 limits=settings.limits,
                 ceiling=1,
                 budget=settings.budget,
+                frameworks=self.frameworks,
                 carries_catalog=settings.carries_catalog,
                 gate=settings.gate,
             ),
             deadline_seconds=settings.deadline_seconds,
-            frameworks=self.frameworks,
         )
 
 
@@ -1321,7 +1319,7 @@ def create_app(
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
-                frameworks=_framework_fields(current.frameworks),
+                frameworks=_framework_fields(current.answers.frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 source_limit=str(current.answers.limits.max_total_bytes),
@@ -1513,42 +1511,34 @@ def create_app(
             )
         try:
             submission = _Submission.model_validate(body)
-            sources = submission.sources
-            refuse_answers_source(sources)
-            selection = _selection(current.frameworks, submission.frameworks)
         except ValueError as exc:
             # The sentence /v1 answers with: each field and rule a schema
-            # refusal names, the framework or option a selection refusal
-            # names, and never a value the submitter sent.
+            # refusal names, and never a value the submitter sent.
             return _message(400, refusal_text(exc))
         try:
             name = clean_system_name(submission.name)
         except ValueError:
             return _message(400, _NAME_REFUSED)
-        ask_questions = submission.questions
-        answers_from = submission.answers_from
-        breach = answers.limits.breach(sources)
-        if breach is not None:
-            return _message(400, breach.message)
-        submitter = await answers.submitter(OPERATOR)
-        carried = await answers.carried_from(
-            answers_from, submitter.owner_id, asks=ask_questions
-        )
-        record = JobRecord.create(
-            owner_id=submitter.owner_id,
-            sources=sources,
-            frameworks=selection,
-            system_name=name,
-            carried=carried,
-            ask_questions=ask_questions,
-            reserved_tokens=budgets.estimate(sources, selection),
-        )
-        async with workspace.make_room(answers):
-            started = await answers.admit(
-                record,
-                start=workspace.start(current.deadline_seconds),
-                principal=submitter.new,
-            )
+        # The steps are the one submission's (:meth:`JobAnswers.submit`); this
+        # route maps a selection refusal to the page's status, and a handler
+        # answers each other refusal. The room is made around the whole
+        # submission, so a refused body deletes nothing.
+        try:
+            async with workspace.make_room(answers):
+                started = await answers.submit(
+                    OPERATOR,
+                    Submission(
+                        sources=submission.sources,
+                        frameworks=submission.frameworks,
+                        system_name=name,
+                        questions=submission.questions,
+                        answers_from=submission.answers_from,
+                    ),
+                    start=workspace.start(current.deadline_seconds),
+                )
+        except SelectionError as exc:
+            # The framework or option the refusal names, never a value sent.
+            return _message(400, refusal_text(exc))
         return JSONResponse({"run": started.job_id})
 
     @app.post("/answer/{run_id}")
@@ -1761,29 +1751,6 @@ def _revision(value: object) -> int:
     return _REVISION.validate_python(value)
 
 
-def _selection(
-    carried: Sequence[FrameworkName], requested: Sequence[FrameworkRequest]
-) -> list[FrameworkSelection]:
-    """One submission's selection: checked by the shared reader, in carried order.
-
-    **The checkboxes decide nothing.** What arrives is a list of names and
-    options from a page the submitter controls, so it is held to
-    :func:`~analysis_service.selection.resolve_selection` — the one reader the
-    HTTP route and the engine share — and then ordered by ``carried`` rather
-    than by what the page posted, so the block order of every report is
-    ``config/frameworks.toml`` order. A name sent twice is refused, as the
-    route refuses it: collapsing it would answer a submission with a selection
-    nobody made.
-
-    Raises :class:`~analysis_service.selection.SelectionError` for a
-    selection the install cannot run.
-    """
-    picked = {
-        selection.name: selection for selection in resolve_selection(carried, requested)
-    }
-    return [picked[name] for name in carried if name in picked]
-
-
 def _framework_fields(frameworks: Sequence[FrameworkName]) -> str:
     """The picker: a checkbox per carried framework, and a control per option.
 
@@ -1794,7 +1761,8 @@ def _framework_fields(frameworks: Sequence[FrameworkName]) -> str:
     an empty options model has no fields to walk.
 
     Every box starts unticked so the submitter chooses the analyses to run. The
-    :func:`_selection` allow-list is what rules on the answer.
+    :func:`~analysis_service.selection.resolve_selection` allow-list is what
+    rules on the answer, in :meth:`~analysis_service.job_answers.JobAnswers.submit`.
     """
     rows = []
     for name in frameworks:

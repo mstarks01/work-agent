@@ -430,12 +430,6 @@ def test_picking_one_framework_runs_only_that_one(client, name):
     assert frameworks_of(client, body) == [name]
 
 
-def test_the_block_order_is_the_installs_order_not_the_pages(client):
-    """A reordered post is normalised, not honoured: block order is config's."""
-    body = posted("A web app talks to a database.", frameworks=reversed(CARRIED))
-    assert frameworks_of(client, body) == list(CARRIED)
-
-
 def test_a_framework_named_twice_is_refused(client):
     """As the HTTP route refuses it, through the one reader both share.
 

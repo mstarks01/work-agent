@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from dataclasses import replace
+from uuid import UUID
 
 import pytest
 
+from analysis_service import budgets
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import (
     AlreadyResumed,
@@ -21,7 +24,7 @@ from analysis_service.answer_state import (
     SourcesOverLimit,
     StaleRevision,
 )
-from analysis_service.claims import UnknownRef
+from analysis_service.claims import FrameworkName, UnknownRef
 from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import LineageConflict, check_fact_answers
@@ -36,10 +39,13 @@ from analysis_service.job_answers import (
     Refused,
     RunnerUnavailable,
     Started,
+    Submission,
 )
 from analysis_service.jobs import InMemoryJobStore, JobRecord, StubPipelineRunner
 from analysis_service.links import LinkAnswer
-from analysis_service.sources import SourceLimits
+from analysis_service.report import FrameworkSelection
+from analysis_service.selection import SelectionError
+from analysis_service.sources import ANSWERS_LABEL, Source, SourceLimits
 from tests.factories import (
     SEEDING_BUDGET,
     admit,
@@ -52,6 +58,13 @@ from tests.test_questions import TestTheRoutes
 
 OWNER = "alice"
 ROOMY = SourceLimits(max_total_bytes=100_000, max_sources=10)
+#: What the deployment under test carries, in its config order.
+CARRIED: tuple[FrameworkName, ...] = ("stride", "asvs")
+#: The complete selection of each carried package, as a submission lists it.
+PICKED = (
+    FrameworkSelection(name="stride"),
+    FrameworkSelection(name="asvs", options={"level": 2}),
+)
 #: The fact the completed report of :meth:`TestTheRoutes.completed` asks.
 ASKED = (valid_model().data_flows[1].id, "encryption_in_transit", "", "", "", "")
 
@@ -80,6 +93,7 @@ def operations(
         limits=ROOMY,
         ceiling=ceiling,
         budget=SEEDING_BUDGET,
+        frameworks=CARRIED,
         carries_catalog=catalog,
     )
 
@@ -451,6 +465,133 @@ class TestAmending:
                 answers.amend(job, OWNER, "More text.", revision=0, start=starts)
             )
         assert starts.started == []
+
+
+def submission(**changes) -> Submission:
+    """A complete submission of every carried framework, in config order."""
+    return Submission(
+        **{"sources": valid_model_sources(), "frameworks": PICKED} | changes
+    )
+
+
+class TestSubmitting:
+    """The one submission of a new job, for both HTTP surfaces (ADR 0077)."""
+
+    def submit(self, answers: JobAnswers, submission: Submission) -> JobRecord:
+        starts = Starts()
+        started = asyncio.run(
+            answers.submit(identity_of(OWNER), submission, start=starts)
+        )
+        assert isinstance(started, Started)
+        assert [record.id for record, _ in starts.started] == [started.job_id]
+        record = asyncio.run(answers.store.get(started.job_id))
+        assert record is not None
+        return record
+
+    @pytest.mark.parametrize("picked", [PICKED, tuple(reversed(PICKED))])
+    def test_the_blocks_follow_the_config_order_whatever_order_was_sent(self, picked):
+        """ADR 0102: the report's blocks are in ``config/frameworks.toml`` order."""
+        record = self.submit(
+            operations(InMemoryJobStore()), submission(frameworks=picked)
+        )
+        assert record.selection() == CARRIED
+        assert record.frameworks == list(PICKED)
+
+    def test_a_selection_the_install_cannot_run_is_refused_before_an_owner_exists(
+        self,
+    ):
+        store = InMemoryJobStore()
+        twice = (PICKED[0], PICKED[0])
+        with pytest.raises(SelectionError, match="repeats stride"):
+            self.submit(operations(store), submission(frameworks=twice))
+        assert asyncio.run(store.principal(identity_of(OWNER))) is None
+
+    def test_an_answers_source_of_the_callers_own_is_refused(self):
+        forged = Source(kind="answers", label=ANSWERS_LABEL, text="shoppers: web-app")
+        with pytest.raises(Refused, match="composed by this service"):
+            self.submit(
+                operations(InMemoryJobStore()),
+                submission(sources=[*valid_model_sources(), forged]),
+            )
+
+    def test_a_link_answer_needs_a_catalog(self):
+        link = LinkAnswer(principal="shoppers", element="entity:shopper")
+        with pytest.raises(NoCatalog):
+            self.submit(
+                operations(InMemoryJobStore(), catalog=False),
+                submission(links=[link]),
+            )
+
+    def test_the_link_answers_ride_on_the_record_and_in_its_sources(self):
+        link = LinkAnswer(principal="shoppers", element="entity:shopper")
+        record = self.submit(operations(InMemoryJobStore()), submission(links=[link]))
+        assert record.answers.links == (link,)
+        assert [source.kind for source in record.sources] == ["description", "answers"]
+        assert record.reserved_tokens == budgets.estimate(
+            record.sources, record.frameworks
+        )
+
+    @pytest.mark.parametrize(
+        ("sources", "rung"),
+        [
+            pytest.param([], "empty", id="empty"),
+            pytest.param(
+                [Source.description("x", label=f"Doc {n}") for n in range(11)],
+                "count",
+                id="count",
+            ),
+        ],
+    )
+    def test_sources_over_the_limits_are_refused_by_rung(self, sources, rung):
+        with pytest.raises(SourcesOverLimit) as refused:
+            self.submit(operations(InMemoryJobStore()), submission(sources=sources))
+        assert refused.value.breach.rung == rung
+
+    def test_a_refused_submission_leaves_no_principal(self):
+        store = InMemoryJobStore()
+        with pytest.raises(NotAdmitted):
+            self.submit(operations(store, ceiling=0), submission())
+        assert asyncio.run(store.principal(identity_of(OWNER))) is None
+
+    def test_the_first_submission_creates_the_principal_and_logs_the_sub_once(
+        self, caplog
+    ):
+        store = InMemoryJobStore()
+        answers = operations(store)
+        with caplog.at_level(logging.INFO):
+            first = self.submit(answers, submission())
+            second = self.submit(answers, submission())
+        principal = asyncio.run(store.principal(identity_of(OWNER)))
+        assert principal is not None
+        assert UUID(principal.owner_id).version == 4
+        assert {first.owner_id, second.owner_id} == {principal.owner_id}
+        assert caplog.text.count(OWNER) == 1
+        assert principal.owner_id in caplog.text
+
+    def test_a_new_job_carries_the_earlier_jobs_answers(self):
+        """ADR 0079: the new job keeps them apart from its own answers."""
+        store = InMemoryJobStore()
+        answers = operations(store)
+        saved = FactAnswer(
+            key=("store:orders-db", "encryption_at_rest", "", "", "", ""), value="AES"
+        )
+        earlier = waiting(store, owner=OWNER)
+        record = asyncio.run(store.get(earlier))
+        asyncio.run(
+            store.save(record.model_copy(update={"answers": AnswerSet(facts=(saved,))}))
+        )
+
+        child = self.submit(answers, submission(questions=True, answers_from=earlier))
+
+        assert child.carried.facts == (saved,) and child.answers.empty
+        assert child.amends is None, "it locks nothing"
+        assert asyncio.run(store.resumed_by(earlier, OWNER)) is None
+
+    def test_carried_answers_need_the_questions_on(self):
+        store = InMemoryJobStore()
+        earlier = waiting(store, owner=OWNER)
+        with pytest.raises(Refused, match="turn the questions on"):
+            self.submit(operations(store), submission(answers_from=earlier))
 
 
 class TestTheOneAdmission:

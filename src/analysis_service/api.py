@@ -55,7 +55,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Receive, Scope, Send
 
-from analysis_service import budgets
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import (
     MAX_SKIPS,
@@ -74,7 +73,7 @@ from analysis_service.auth import (
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.deployment import Deployment, FrameworkNotCarried
-from analysis_service.errors import ConfigError, refusal_text, shown_errors
+from analysis_service.errors import ConfigError, shown_errors
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
@@ -91,6 +90,7 @@ from analysis_service.job_answers import (
     SaveConflict,
     Start,
     Started,
+    Submission,
     UnreadableSchema,
     Withheld,
 )
@@ -113,9 +113,8 @@ from analysis_service.links import (
 )
 from analysis_service.parsing import ascii_int
 from analysis_service.principals import Identity
-from analysis_service.report import FrameworkSelection
 from analysis_service.report_changes import report_changes
-from analysis_service.selection import SelectionError, resolve_selection
+from analysis_service.selection import SelectionError
 from analysis_service.sources import Source, SourceLimits, clean_system_name
 from analysis_service.store_backends import audited_delete, build_store, store_lifespan
 from analysis_service.validation import ValidationIssue
@@ -317,8 +316,10 @@ class JobSubmission(BaseModel):
     acceptable is again the deployment's, so an unknown or uncarried name is
     refused by the route rather than by this schema.
 
-    The list is ordered, and the order is kept: it is the order the report's
-    analysis blocks carry.
+    The order of the list decides nothing. The report's analysis blocks follow
+    the order of ``config/frameworks.toml``, whatever order the submission
+    listed (ADR 0102). :func:`~analysis_service.selection.resolve_selection`
+    is the one reader of that rule.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -442,23 +443,6 @@ class JobStatusView(BaseModel):
     error: str | None = None
 
 
-def _resolve_selection(
-    carried: Sequence[FrameworkName], requested: Sequence[FrameworkRequest]
-) -> list[FrameworkSelection]:
-    """The submission's framework selection, or the 422 that refuses it.
-
-    The rule is :func:`~analysis_service.selection.resolve_selection`, the one
-    reader every entry point shares; this translates its refusal into the
-    status the input ladder answers shape faults with. Refused before a job
-    record exists, so a name this install does not carry never reaches the
-    registry and every later lookup is a defect rather than a caller's mistake.
-    """
-    try:
-        return resolve_selection(carried, requested)
-    except SelectionError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from None
-
-
 def _answers(request: Request) -> JobAnswers:
     """The job answer operations this app serves, under its deployment's bounds.
 
@@ -473,6 +457,7 @@ def _answers(request: Request) -> JobAnswers:
         limits=state.limits,
         ceiling=state.max_active_jobs,
         budget=state.budget,
+        frameworks=state.frameworks,
         carries_catalog=state.carries_catalog,
         gate=state.certification,
     )
@@ -917,48 +902,26 @@ def create_app(
         background_tasks: BackgroundTasks,
         identity: Annotated[Identity, Depends(require_identity)],
     ) -> JSONResponse:
-        # Shape before budget: a framework this service does not carry is the
-        # wrong request at any size, and answering it with a byte count would
-        # quote a cap the caller never came near.
-        selection = _resolve_selection(
-            request.app.state.frameworks, submission.frameworks
-        )
-        answers = _answers(request)
+        # The route maps the refusals to their statuses; the steps are the
+        # one submission's (:meth:`JobAnswers.submit`). A selection refusal
+        # is a shape fault, so it takes the status the input ladder answers
+        # shape faults with. Each other refusal is answered by a handler:
+        # the source limits by rung, the typed refusals by the table.
         try:
-            sources = answers.submitted_sources(submission.sources, submission.links)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=refusal_text(exc)) from exc
-        breach = request.app.state.limits.breach(sources)
-        if breach is not None:
-            raise HTTPException(
-                status_code=_STATUS_BY_RUNG[breach.rung], detail=breach.message
+            started = await _answers(request).submit(
+                identity,
+                Submission(
+                    sources=submission.sources,
+                    frameworks=submission.frameworks,
+                    system_name=submission.system_name,
+                    links=submission.links,
+                    questions=submission.questions,
+                    answers_from=submission.answers_from,
+                ),
+                start=_starter(request, background_tasks),
             )
-        # The ladder runs first because the ceiling is enforced by the same
-        # call that inserts the record, and that call needs the record. The
-        # ordering is the price of the atomicity: a count taken before the
-        # ladder is a count another submission can land behind, which is the
-        # race this seam exists to close. What the caller loses is that a
-        # submission which breaches a rung *and* sits on the ceiling hears
-        # about the rung; both answers refuse it, and neither runs a model.
-        submitter = await answers.submitter(identity)
-        carried = await answers.carried_from(
-            submission.answers_from, submitter.owner_id, asks=submission.questions
-        )
-        record = JobRecord.create(
-            owner_id=submitter.owner_id,
-            sources=sources,
-            frameworks=selection,
-            system_name=submission.system_name,
-            answers=AnswerSet(links=tuple(submission.links)),
-            carried=carried,
-            ask_questions=submission.questions,
-            reserved_tokens=budgets.estimate(sources, selection),
-        )
-        started = await answers.admit(
-            record,
-            start=_starter(request, background_tasks),
-            principal=submitter.new,
-        )
+        except SelectionError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
         return _started(started)
 
     @app.post("/v1/jobs/{job_id}/answers", status_code=201)

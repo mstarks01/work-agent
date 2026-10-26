@@ -76,18 +76,8 @@ class TestWhatAJobHolds:
 
 
 class TestTheRoute:
-    def test_a_new_job_carries_the_earlier_job_s_answers(self):
-        client, store = catalog_client()
-        saved = _fact("AES")
-        earlier = _holding(store, answers=AnswerSet(facts=(saved,)))
-
-        response = _submit(client, earlier)
-
-        assert response.status_code == 201, response.text
-        child = asyncio.run(store.get(response.json()["job_id"]))
-        assert child.carried.facts == (saved,) and child.answers.empty
-        assert child.amends is None, "it locks nothing"
-        assert asyncio.run(store.resumed_by(earlier, "alice")) is None
+    """The status each refusal takes; the carried set itself is tested in
+    ``tests/test_job_answers.py``."""
 
     def test_another_owner_s_job_reads_as_missing(self):
         client, store = catalog_client()
