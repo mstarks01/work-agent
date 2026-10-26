@@ -41,19 +41,6 @@ from tests.test_prompt_lints import (
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "exemplar-systems"
 
-#: The gate issues each fixture has, by system. Source A never names the
-#: payments provider or its settlement webhook, so the gate finds no excerpt
-#: for either element. A fix to source A removes the entry.
-GATE_ISSUES = {
-    "A": {
-        ("missing-citation", "entity:payments-provider"),
-        (
-            "missing-citation",
-            "flow:entity:payments-provider>process:web-api>settlement-webhook",
-        ),
-    },
-}
-
 
 def fixture_model(name):
     """The System Model fixture for one exemplar system, by its letter."""
@@ -76,8 +63,7 @@ def test_every_exemplar_system_has_a_fixture():
 @pytest.mark.parametrize("name", sorted(exemplar_systems()))
 def test_the_exemplar_fixture_passes_the_validity_gate(name):
     issues = validate(fixture_model(name), sources=sources_of(name))
-    found = {(issue.code, issue.element_id) for issue in issues}
-    assert found == GATE_ISSUES.get(name, set())
+    assert [(issue.code, issue.element_id) for issue in issues] == []
 
 
 @pytest.mark.parametrize("name", sorted(exemplar_systems()))

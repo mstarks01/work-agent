@@ -71,7 +71,7 @@
       "protocol": "topic subscription",
       "authentication": "unknown",
       "data_description": "raw device payloads",
-      "encryption_in_transit": "TLS",
+      "encryption_in_transit": "unknown",
       "source_excerpt": "Its topics are consumed by the stream processor",
       "source_label": "Fleet telemetry platform notes",
       "operations": "read"

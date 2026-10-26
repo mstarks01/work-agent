@@ -16,7 +16,7 @@
       "name": "Payments Provider",
       "kind": "external-system",
       "trust_zone": "boundary:public-internet",
-      "source_excerpt": "",
+      "source_excerpt": "Our payments provider posts settlement confirmations",
       "source_label": "Payments platform notes"
     }
   ],
@@ -97,7 +97,7 @@
       "authentication": "unknown",
       "data_description": "settlement confirmations",
       "encryption_in_transit": "TLS (HTTPS)",
-      "source_excerpt": "",
+      "source_excerpt": "posts settlement confirmations to a webhook on the same API",
       "source_label": "Payments platform notes",
       "operations": "write"
     },
