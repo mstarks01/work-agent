@@ -10,7 +10,7 @@ Chapter boundaries: what happens once identity is established is chapter V7. Wha
 
 The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. The password requirements, for example, stay open until the input says whether an in-scope component handles passwords.
 
-Read the model's `DataFlow.authentication` values, its `ExternalEntity` kinds, and any `assets` tag naming credentials. An `authentication` reading `unknown` means the question is open, never that the control is absent — that distinction decides between a ruling you write conditionally and one you do not write at all.
+Read the model's `DataFlow.authentication` values, its `ExternalEntity` kinds, and any `assets` tag naming credentials. An `authentication` reading `unknown` means the question is open, never that the control is absent — that distinction decides between a ruling you write conditionally and one you write plainly.
 
 ### The requirements of this chapter
 

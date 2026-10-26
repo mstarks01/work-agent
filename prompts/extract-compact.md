@@ -18,6 +18,6 @@ Four fields hold a ref. Write a ref and nothing else, with the one exception nam
 
 **Write `operations` on every flow.** This schema gives it no default, so a flow that leaves it out is malformed output rather than a flow whose operations nobody stated. Where the text says only that the two talk, write `unknown`.
 
-You may leave out `description`, `assets`, `source_speaker` and `notes` when you have nothing to put in them. Leave nothing else out. An omitted `source_excerpt` or `source_label` still fails rule 7, and an omitted attribute still fails the gate: the word for a fact the text does not state is `unknown`, never an absent field.
+You may leave out `description`, `assets`, `source_speaker` and `notes` when you have nothing to put in them. Leave nothing else out. An omitted `source_excerpt` or `source_label` still fails rule 7. An omitted attribute, or a flow with no `operations`, is worse: the schema refuses the whole object, and the job ends with no repair. The word for a fact the text does not state is `unknown`, never an absent field.
 
 Every rule above this section still holds. Rule 3 still decides what you write in `name`, and the ID it describes is what code builds from that name.

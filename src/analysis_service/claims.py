@@ -89,10 +89,11 @@ VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
 # an audit trail, and a reader has to be able to tell which step ended a
 # draft; the reason says it in prose, and this says it in a field the code reads.
 #
-# **The steps, not a package's reasons.** ``prompts/critic.md`` numbers three
+# **The steps, not a package's reasons.** ``prompts/critic.md`` numbers two
 # checks and every package's own critic text names the same in its own words,
-# because the property is neutral: a draft can fail on its own substance, on
-# where it was filed, or on another draft already covering it. The first check
+# because the property is neutral: a draft can fail on its own substance or on
+# where it was filed. ``duplicate`` is the value archived reports carry, and
+# :data:`CriticStep` says why the critic does not write it. The first check
 # has two outcomes, and they are two values because they say different things
 # about the draft's *unit* (#659). ``evidence`` says the model's stated facts
 # settle that the draft's subject is not there — a framework that ruled a

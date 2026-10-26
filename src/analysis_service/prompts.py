@@ -250,10 +250,10 @@ def render_capabilities() -> str:
 Stage = Literal["catalog"]
 
 #: How a ``reference`` predicate's value is spelled, per stage that renders the
-#: table. No resolver takes a display name, so each stage states its spelling:
-#: the catalog stage writes the subject's identity, which
-#: :func:`~analysis_service.assertions.resolve_catalog` looks up among the
-#: subjects the catalog declares.
+#: table, so each stage states its spelling: the catalog stage takes the
+#: subject's ID or its name, and
+#: :func:`~analysis_service.assertions.resolve_catalog` resolves either one to
+#: the same subject.
 #:
 #: Keyed by the composer that renders it, so a stage added tomorrow raises here
 #: rather than inheriting whichever sentence happened to be first. **No default
@@ -261,7 +261,7 @@ Stage = Literal["catalog"]
 #: inherits one spelling in silence, which is the failure this table answers
 #: rather than a shorter way to call it.
 REFERENCE_FORMS: Mapping[Stage, str] = MappingProxyType(
-    {"catalog": "the ID of a {referent}"}
+    {"catalog": "the ID or the name of a {referent}"}
 )
 
 
