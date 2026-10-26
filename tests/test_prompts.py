@@ -168,23 +168,23 @@ def test_exemplar_name_is_relative_to_the_package_root(package_loader):
 
 
 class TestThePredicateTableSpeaksItsStageSpelling:
-    """A ``reference`` value is a handle at one stage and an ID at another.
+    """Each stage's table names the spellings its resolver reads.
 
-    The rendered table said "the name of a component", and no resolver takes
-    a display name: the catalog stage looks the value up among the subjects
-    the catalog declares. A row following the table lost its fact with
-    ``dangling-value`` or ``dangling-reference`` and nothing said why (#1082).
+    The catalog stage resolves a ``reference`` value written as an ID or as a
+    name (``test_a_reference_written_as_a_name_resolves`` in
+    ``tests/test_assertions.py``), so its table names both. A table naming a
+    form the resolver refuses loses the row with ``illegal-value``, and
+    nothing says why (#1082).
     """
 
     @pytest.mark.parametrize(
         ("stage", "spelling"),
-        [("catalog", "the ID of a zone")],
+        [("catalog", "the ID or the name of a zone")],
     )
     def test_each_stage_names_the_form_its_resolver_reads(self, stage, spelling):
         rendered = render_predicates(stage)
 
         assert f"| `network-membership` | component | {spelling} |" in rendered
-        assert "the name of a" not in rendered
 
     def test_the_table_answers_for_every_stage_and_no_more(self):
         """The table against the type that names its keys.
