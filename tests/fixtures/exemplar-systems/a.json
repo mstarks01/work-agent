@@ -1,0 +1,167 @@
+{
+  "external_entities": [
+    {
+      "id": "entity:customer",
+      "name": "Customer",
+      "kind": "human",
+      "trust_zone": "boundary:public-internet",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "Customers sign in with an email and password and get a session cookie",
+      "source_label": "Payments platform notes"
+    },
+    {
+      "id": "entity:payments-provider",
+      "name": "Payments Provider",
+      "kind": "external-system",
+      "trust_zone": "boundary:public-internet",
+      "source_excerpt": "",
+      "source_label": "Payments platform notes"
+    }
+  ],
+  "processes": [
+    {
+      "id": "process:web-api",
+      "name": "Web API",
+      "technology": "FastAPI on Cloud Run",
+      "trust_zone": "boundary:dmz",
+      "exposure": "internet-facing",
+      "interface_kind": "web",
+      "source_excerpt": "They submit payments through the web API, which is the only thing we expose to the internet.",
+      "source_label": "Payments platform notes"
+    },
+    {
+      "id": "process:ledger-service",
+      "name": "Ledger Service",
+      "technology": "Python worker",
+      "trust_zone": "boundary:core",
+      "exposure": "unknown",
+      "interface_kind": "non-web",
+      "assets": [
+        "financial"
+      ],
+      "source_excerpt": "The web API hands each transfer to the ledger service over gRPC",
+      "source_label": "Payments platform notes"
+    }
+  ],
+  "data_stores": [
+    {
+      "id": "store:accounts-db",
+      "name": "Accounts DB",
+      "technology": "PostgreSQL",
+      "trust_zone": "boundary:core",
+      "data_classification": "confidential",
+      "encryption_at_rest": "unknown",
+      "assets": [
+        "pii",
+        "financial"
+      ],
+      "source_excerpt": "The ledger service talks to the accounts database",
+      "source_label": "Payments platform notes"
+    },
+    {
+      "id": "store:audit-log",
+      "name": "Audit Log",
+      "technology": "append-only bucket",
+      "trust_zone": "boundary:core",
+      "data_classification": "internal",
+      "encryption_at_rest": "encrypted at rest (CMEK)",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "Every transfer is written to the audit bucket",
+      "source_label": "Payments platform notes"
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow:entity:customer>process:web-api>submit-payment",
+      "name": "Submit Payment",
+      "source": "entity:customer",
+      "destination": "process:web-api",
+      "protocol": "HTTPS",
+      "authentication": "session cookie issued after password login, no MFA",
+      "data_description": "payment instructions and account identifiers",
+      "encryption_in_transit": "TLS 1.3",
+      "source_excerpt": "They submit payments through the web API",
+      "source_label": "Payments platform notes",
+      "operations": "write"
+    },
+    {
+      "id": "flow:entity:payments-provider>process:web-api>settlement-webhook",
+      "name": "Settlement Webhook",
+      "source": "entity:payments-provider",
+      "destination": "process:web-api",
+      "protocol": "HTTPS POST",
+      "authentication": "unknown",
+      "data_description": "settlement confirmations",
+      "encryption_in_transit": "TLS (HTTPS)",
+      "source_excerpt": "",
+      "source_label": "Payments platform notes",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:web-api>process:ledger-service>post-transfer",
+      "name": "Post Transfer",
+      "source": "process:web-api",
+      "destination": "process:ledger-service",
+      "protocol": "gRPC",
+      "authentication": "none (accepted by network position)",
+      "data_description": "transfer instructions with customer IDs",
+      "encryption_in_transit": "none",
+      "source_excerpt": "that call is not authenticated and not encrypted",
+      "source_label": "Payments platform notes",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:ledger-service>store:accounts-db>read-write-balances",
+      "name": "Read Write Balances",
+      "source": "process:ledger-service",
+      "destination": "store:accounts-db",
+      "protocol": "PostgreSQL wire protocol",
+      "authentication": "shared static password from an environment variable, full read/write",
+      "data_description": "balances and account-holder PII",
+      "encryption_in_transit": "unknown",
+      "source_excerpt": "a single shared password out of an environment variable",
+      "source_label": "Payments platform notes",
+      "operations": "read-write"
+    },
+    {
+      "id": "flow:process:ledger-service>store:audit-log>append-transfer-record",
+      "name": "Append Transfer Record",
+      "source": "process:ledger-service",
+      "destination": "store:audit-log",
+      "protocol": "HTTPS append",
+      "authentication": "ledger service account",
+      "data_description": "transfer records tagged with the ledger service identity only",
+      "encryption_in_transit": "TLS 1.3",
+      "source_excerpt": "the entry names the ledger service and never the customer",
+      "source_label": "Payments platform notes",
+      "operations": "write"
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "boundary:public-internet",
+      "name": "Public Internet",
+      "kind": "network",
+      "source_excerpt": "the only thing we expose to the internet",
+      "source_label": "Payments platform notes"
+    },
+    {
+      "id": "boundary:dmz",
+      "name": "DMZ",
+      "kind": "network",
+      "source_excerpt": "the only thing we expose to the internet",
+      "source_label": "Payments platform notes"
+    },
+    {
+      "id": "boundary:core",
+      "name": "Core",
+      "kind": "network",
+      "source_excerpt": "both sit inside our network",
+      "source_label": "Payments platform notes"
+    }
+  ]
+}

@@ -2,11 +2,11 @@
 
 The counterpart of ``test_skill_lints.py`` for prompt content (tickets 019,
 020): the four agent prompts carry exactly the four fixed H2 headings in
-order, the six exemplar files match the ``StrideCategory`` literals, and
-every fenced ``json`` block in them parses as a ``ThreatProposal`` citing only
-elements an exemplar system defines. An exemplar that cites an element that
-does not exist teaches the model to hallucinate IDs, so that check is worth
-as much as the shape ones.
+order, and the six exemplar files match the ``StrideCategory`` literals.
+``tests/test_exemplar_fan_in.py`` sends every fenced ``json`` block in them
+through the fan-in, which parses each one and resolves its IDs. An exemplar
+that cites an element that does not exist teaches the model to hallucinate
+IDs, so that check is worth as much as the shape ones.
 
 ``## Output`` sections are prose-only by design — the machine-enforced shape
 lives in ``ThreatProposal`` and nowhere else — so a fenced block appearing there
@@ -47,7 +47,6 @@ from pathlib import Path
 from typing import Literal, get_args, get_origin
 
 import pytest
-from pydantic import ValidationError
 
 from analysis_service.actions import menu
 from analysis_service.claims import (
@@ -68,7 +67,6 @@ from analysis_service.evidence import (
     UNKNOWN_PREFIX,
     render_catalog,
 )
-from analysis_service.fan_in import within_bound
 from analysis_service.frameworks import CRITIC_DOC, OUTPUT_DOC, PACKAGES
 from analysis_service.frameworks.stride.record import (
     LANES_OF_VERB,
@@ -94,9 +92,7 @@ from analysis_service.system_model import (
     ELEMENT_ID,
     ENDPOINT_PREFIXES,
     FLOW_ID_VERSION,
-    DataFlow,
     FlowIdError,
-    ModelIndex,
     flow_id_version,
     mentioned_ids,
     normalize_name,
@@ -481,30 +477,6 @@ def test_each_exemplar_section_holds_exactly_one_json_block(framework, lane):
 
 
 @pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
-def test_every_exemplar_block_parses_as_its_packages_proposal(framework, lane):
-    """The exemplars are parsed against the schema the agent emits, not the one
-    the service resolves it into — an exemplar the node's own output schema
-    would reject is a worked example of a dead run.
-
-    **Against its own package's record**, resolved through ``schemas_for``. A
-    worked draft is written in one framework's record shape (ADR 0011), so
-    parsing ASVS's against STRIDE's would fail on every file, and parsing it
-    against nothing checks nothing (#280).
-
-    ``extra="forbid"`` is doing real work here: an exemplar spelling out an
-    ``id`` or a ``category`` would be teaching an agent to emit two fields the
-    lane already determines, and it fails this parse rather than being read as
-    harmless decoration."""
-    record = proposal_type(framework)
-    for heading, body in exemplar_sections(framework, lane).items():
-        for block in json_blocks(body):
-            try:
-                record.model_validate(json.loads(block))
-            except (ValidationError, json.JSONDecodeError) as exc:
-                pytest.fail(f"{framework} {lane} '## {heading}': {exc}")
-
-
-@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
 def test_exemplar_drafts_are_numbered_from_01_without_gaps(framework, lane):
     """The numbering rule the prompt states, demonstrated by its own drafts.
 
@@ -526,17 +498,6 @@ def test_exemplar_drafts_are_numbered_from_01_without_gaps(framework, lane):
 
 
 @pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
-def test_exemplar_references_resolve_in_the_exemplar_system(framework, lane):
-    """Every cited element exists, and all of them in the same worked system."""
-    for proposal in exemplar_proposals(framework, lane):
-        system = owning_system(proposal)
-        if system is None:
-            continue
-        unknown = set(proposal.affected_element_ids) - system_ids(system)
-        assert not unknown, f"{framework} {lane} cites {sorted(unknown)}"
-
-
-@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
 def test_exemplar_descriptions_cite_only_ids_the_exemplar_system_has(framework, lane):
     """The prose half, through the extractor the service marks reports with.
 
@@ -555,73 +516,6 @@ def test_exemplar_descriptions_cite_only_ids_the_exemplar_system_has(framework, 
             if mention not in known_ids
         ]
         assert not unknown, f"{framework} {lane} description cites {sorted(unknown)}"
-
-
-def system_index(system):
-    """One exemplar system's graph, built from the flow IDs it defines.
-
-    The bound reads flows and nothing else (:meth:`ModelIndex.reach`), so the
-    flows' endpoints are the whole graph.
-    """
-    endpoints = {}
-    for ref in system_ids(system):
-        if ref.startswith(f"{DataFlow.id_prefix}:"):
-            parts = parse_flow_id(ref, flow_id_version(ref))
-            endpoints[ref] = (parts.source, parts.destination)
-    adjacent = {}
-    for flow_id, ends in endpoints.items():
-        for end in ends:
-            adjacent.setdefault(end, set()).update((flow_id, *ends))
-    return ModelIndex(
-        elements={},
-        flow_endpoints=endpoints,
-        adjacent={end: frozenset(near) for end, near in adjacent.items()},
-    )
-
-
-def ref_place(ref):
-    """The element or flow one catalog reference is about."""
-    prefix, _, rest = ref.partition(":")
-    return rest if prefix == CROSSING_PREFIX else rest.rpartition(":")[0]
-
-
-@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
-def test_exemplar_elements_sit_inside_the_fan_in_bound(framework, lane):
-    """An exemplar cites no element that the fan-in drops.
-
-    The fan-in keeps an element only within the bound of the draft's grounds
-    (:func:`~analysis_service.fan_in.within_bound`), or, with no ground that
-    names a place, only where the description names it. It also drops a
-    ground that reaches none of the elements. An exemplar that breaks either
-    rule teaches a shape that the code cuts before any reader sees it.
-    """
-    for proposal in exemplar_proposals(framework, lane):
-        system = owning_system(proposal)
-        if system is None:
-            continue
-        index = system_index(system)
-        affected = set(proposal.affected_element_ids)
-        places = {ref_place(ref) for ref in proposal.evidence_refs}
-        reach = (
-            within_bound(index, places)
-            if places
-            else set(mentioned_ids(proposal.description))
-        )
-        dropped = sorted(affected - reach) if reach else []
-        stray = [
-            ref
-            for ref in proposal.evidence_refs
-            if not within_bound(index, {ref_place(ref)}) & affected
-        ]
-        assert not dropped, (
-            f"{framework} {lane} {proposal.title!r}: the fan-in drops {dropped}."
-            " Name a ground within two hops of each element, or name the element"
-            " in the description when the draft has no ground."
-        )
-        assert not stray, (
-            f"{framework} {lane} {proposal.title!r}: the fan-in drops the grounds"
-            f" {stray}, because they reach none of the draft's elements."
-        )
 
 
 @pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
@@ -701,9 +595,9 @@ def test_exemplar_quote_labels_match_the_block(framework, lane):
 def test_exemplar_evidence_refs_are_in_the_exemplar_catalog(framework, lane):
     """Every ID an exemplar cites is one its own worked system offers.
 
-    Membership, exactly as the resolver asks it. The reference lint beside this
-    one covers ``affected_element_ids`` only, so without this the surface an
-    agent copies from would be unchecked — and an exemplar composing an ID that
+    Membership, exactly as the resolver asks it. The fan-in runs no resolver on
+    a draft that its package defers, so this lint holds every draft, deferred
+    or not, to the catalog. An exemplar composing an ID that
     resolves against nothing teaches an agent to do the same, at the one seam
     where that fails the whole lane.
     """
