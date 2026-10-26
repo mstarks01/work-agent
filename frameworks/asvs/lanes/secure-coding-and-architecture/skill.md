@@ -2,15 +2,15 @@
 
 ## Scope
 
-Chapter V15 of ASVS 5.0: the properties of the code and the shape of the system that hold across every other chapter. Your lane covers defensive coding practice, the safe handling of untrusted data inside the application, concurrency, third-party and generated code, and the architectural separation the standard still asks for after removing its architecture chapter.
+Chapter V15 of ASVS 5.0: the properties of the code and the shape of the system that hold across every other chapter. Your lane covers defensive coding practice, the safe handling of untrusted data inside the application, concurrency, third-party components and their inventory, and the documentation and protection of functionality that is dangerous or uses much resource.
 
-Chapter boundaries: encoding at an interpreter is chapter V1. Configuration and dependency management is chapter V13. Your subject is how the code is written and how the system is divided.
+Chapter boundaries: encoding at an interpreter is chapter V1. Configuration and secret management is chapter V13. Your subject is how the code is written and what it is built from.
 
 ## Applicability
 
 The service decides which requirements of this chapter apply, and the scope line lists the ones it rules in and the ones it leaves open. It is the chapter with the least to read in a System Model, because its subject is code rather than structure — and that is a fact worth stating in a ruling rather than working around.
 
-What the model does answer is separation: `trust_zone` on each element and the derived boundary crossings say how the system is divided, and the requirements about component separation rest on exactly that. For the rest, name the requirement, say the input carries prose rather than code, and let the ruling be needs-info.
+What the model does carry is the components it names: a technology that names a library, a framework or a package ecosystem is where the requirements about third-party components start. For the rest, name the requirement, say the input carries prose rather than code, and let the ruling be needs-info.
 
 ### The requirements of this chapter
 
@@ -56,7 +56,6 @@ The recurring ways this chapter's requirements go unanswered in a system descrip
 **The subject is code and the input is prose.** Most rulings here are needs-info for one reason, and stating it once per ruling is honest rather than repetitive.
 **Third-party components are named without their handling.** Where the input names a library or a service, the requirements about untrusted code apply.
 **Concurrency is implied by the architecture.** A model with a queue, a worker pool or a shared store raises the race-condition requirements even where the input never mentions them.
-**Separation is stated in the model.** Where `trust_zone` divides the system, cite it. Where every element shares one zone, cite that instead — it is a stated fact, not a gap.
 
 ## Guardrails
 

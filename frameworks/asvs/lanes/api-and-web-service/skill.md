@@ -2,7 +2,7 @@
 
 ## Scope
 
-Chapter V4 of ASVS 5.0: the contract an API offers its callers. Your lane covers HTTP method and content-type handling, the API-specific rules for REST, GraphQL and WebSocket surfaces, resource limits on requests, and the parts of an API's documentation the standard treats as verifiable.
+Chapter V4 of ASVS 5.0: the contract an API offers its callers. Your lane covers HTTP method and content-type handling, how HTTP messages are framed and parsed, per-message signatures, and the rules for GraphQL and WebSocket surfaces, including GraphQL query limits.
 
 Chapter boundaries: how a caller proves who they are is chapter V6. What a token contains is chapter V9. Whether a request is authorized is chapter V8. Your subject is the shape of the request and the response.
 
@@ -49,8 +49,7 @@ Read the model's `DataFlow` protocols. They are the record of what each connecti
 The recurring ways this chapter's requirements go unanswered in a system description. Each names what to look for; none is a finding on its own.
 
 **The protocol is named and the method policy is not.** A flow speaking HTTP says an API exists; it says nothing about which methods are permitted. That is the shape of most rulings here.
-**A schema or specification is assumed.** Requirements about a documented API contract cannot be settled from a system description. Say the requirement applies and the input does not carry the artifact.
-**Resource limits go unmentioned.** Where the model shows an internet-facing process, a request-size or complexity limit is a requirement that applies and a fact the prose rarely holds.
+**GraphQL is named without its query limits.** Where the input states a GraphQL API, the query-limit requirement applies, and the prose rarely says which limit is in place.
 **No WebSocket in the model.** Rule the WebSocket requirement out on the absence, naming the protocols the flows actually state.
 
 ## Guardrails

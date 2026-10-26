@@ -2,9 +2,9 @@
 
 ## Scope
 
-Chapter V3 of ASVS 5.0: what a browser is told to do with a response. Your lane covers security response headers, cookie attributes, the same-origin and CORS rules a response declares, framing and clickjacking defences, browser storage of sensitive data, and the cross-site request forgery defences that live in the frontend contract.
+Chapter V3 of ASVS 5.0: what a browser is told to do with a response. Your lane covers security response headers, cookie attributes, the same-origin and CORS rules a response declares, framing and clickjacking defences, and the cross-site request forgery defences that live in the frontend contract.
 
-Chapter boundaries: how a response body was built is chapter V1. What a session token *is* is chapter V7. Whether a caller is authorized is chapter V8. Your subject is the instruction the server gives the browser.
+Chapter boundaries: how a response body was built is chapter V1. What a session token *is* is chapter V7. What the browser stores is chapter V14. Whether a caller is authorized is chapter V8. Your subject is the instruction the server gives the browser.
 
 ## Applicability
 
