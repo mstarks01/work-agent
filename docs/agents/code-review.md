@@ -52,6 +52,13 @@ block. `.github/scripts/five_class_read.py` holds the class names and the code
 paths. `tests/test_five_class_read.py` holds the names to the table below, and
 holds each path that a live workflow sweeps to the code paths.
 
+A pull request that changes a module that decides what a prompt says the code
+does also needs a `## Prompt read` section. The section has one entry for each
+prompt that the check names for the module, with text after the name. The entry
+says whether each outcome sentence in the prompt is still true. `PROMPT_READERS`
+in `.github/scripts/five_class_read.py` holds the map from modules to prompts,
+and `tests/test_five_class_read.py` holds every prompt to some module.
+
 The check has a limit. GitHub runs the copy of `five-class.yml` that the pull
 request carries. The workflow runs the base branch's copy of the script, but a
 pull request that edits the workflow can remove that step or the whole check.
@@ -108,8 +115,20 @@ critic is shown, every verb a lane may file, and what each output contract
 says the service does. **Grow that table when a round finds a new pair** — a
 one-line entry there is worth more than the finding it replaces.
 
-The rest is judgement and is this axis's real work. Read every shipped example
-against the rule above it, and every reference label against the policy the
+A sentence that states an outcome of the code, such as a refusal, a repair, a
+drop or an open question, goes in `tests/test_prompt_outcomes.py`. Each test
+there checks the sentence and runs the code that decides the outcome, so a
+change to either side fails it. Where a prompt can take a sentence from a table
+that the code reads, render the sentence from the table instead, as
+`render_predicates` does.
+
+An exemplar teaches the model a draft shape, so it must pass every check that
+real lane output meets. `tests/test_exemplar_fan_in.py` sends each exemplar
+draft through `fan_in` against a fixture of its exemplar system. A new check in
+the fan-in covers the exemplars with no new lint.
+
+The rest is judgement and is this axis's real work. Run it in each round.
+Read every shipped example against the rule above it, and every reference label against the policy the
 prompt states. No lint sees this kind of defect. The #1082 audit lists eleven,
 for example an exemplar that places a component from a sentence about what
 reaches it, a lane skill that invites an action its own table refuses, and a

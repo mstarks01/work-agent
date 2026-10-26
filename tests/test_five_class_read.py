@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+from fnmatch import fnmatchcase
 from pathlib import Path
 
 import pytest
@@ -233,3 +234,79 @@ def test_the_check_reruns_when_the_body_is_edited():
     assert "types: [opened, edited, reopened, synchronize]" in text
     assert ".github/scripts/five_class_read.py" in text
     assert "PR_BODY: ${{ github.event.pull_request.body }}" in text
+
+
+#: Every prompt a model reads, as ``glob`` patterns from the repository root:
+#: the shared bodies, each package's own parts, and each lane's files. A
+#: package's ``disclaimer.md`` goes to the report, and its ``cases`` and
+#: ``notes`` are retrieved material, so none of them states an outcome.
+PROMPT_FILES = (
+    "prompts/*.md",
+    "frameworks/*/critic.md",
+    "frameworks/*/output.md",
+    "frameworks/*/severity_rubric.md",
+    "frameworks/*/lane_closing.md",
+    "frameworks/*/lanes/*/*.md",
+)
+
+
+def _tracked() -> list[str]:
+    return run_command(["git", "ls-files"], REPO_ROOT).split()
+
+
+@pytest.mark.parametrize("pattern", sorted(check.PROMPT_READERS))
+def test_each_reader_is_a_module(pattern):
+    assert any(fnmatchcase(path, pattern) for path in _tracked())
+
+
+@pytest.mark.parametrize(
+    "prompt", sorted({p for ps in check.PROMPT_READERS.values() for p in ps})
+)
+def test_each_prompt_a_reader_names_is_a_file(prompt):
+    assert list(REPO_ROOT.glob(prompt))
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    sorted(
+        str(path.relative_to(REPO_ROOT))
+        for pattern in PROMPT_FILES
+        for path in REPO_ROOT.glob(pattern)
+    ),
+)
+def test_each_prompt_has_a_module_that_decides_its_outcomes(prompt):
+    named = {p for ps in check.PROMPT_READERS.values() for p in ps}
+    assert any(fnmatchcase(prompt, pattern) for pattern in named), (
+        f"{prompt} is in no row of PROMPT_READERS, so a change to the code it"
+        " describes asks for no read of it."
+    )
+
+
+def test_a_module_change_names_its_prompts():
+    assert check.prompts_to_read(
+        ["docs/guide.md", "src/analysis_service/compact.py"]
+    ) == ["prompts/extract-compact.md"]
+    assert check.prompts_to_read(["src/analysis_service/report.py"]) == []
+
+
+def test_a_prompt_read_names_each_prompt_with_text_after_it():
+    prompts = ["frameworks/*/output.md", "prompts/analyze.md"]
+    body = (
+        f"{check.PROMPT_HEADING}\n\n- `frameworks/*/output.md`: true.\n"
+        "- `prompts/analyze.md`: true."
+    )
+    assert check.missing(body, check.PROMPT_HEADING, prompts) == []
+    assert check.missing("", check.PROMPT_HEADING, prompts) == [check.PROMPT_HEADING]
+    assert check.missing(
+        f"{check.PROMPT_HEADING}\n\n- `prompts/analyze.md`: true.",
+        check.PROMPT_HEADING,
+        prompts,
+    ) == ["frameworks/*/output.md"]
+
+
+def test_a_module_change_with_no_prompt_read_is_refused(repo):
+    base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
+    head = _commit(repo, "src/analysis_service/compact.py")
+    read = f"{check.PROMPT_HEADING}\n\n- prompts/extract-compact.md: still true."
+    assert _run(repo, base, head, FULL_SECTION) == 1
+    assert _run(repo, base, head, f"{FULL_SECTION}\n\n{read}") == 0
