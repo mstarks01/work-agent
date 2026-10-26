@@ -40,7 +40,6 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, NamedTuple, get_args
 
@@ -238,10 +237,19 @@ class ReviewProblems(NamedTuple):
     @property
     def messages(self) -> list[str]:
         """Each problem's sentence, in the words the re-ask reads."""
-        return [problem.message for problem in self.problems]
+        return problem_messages(self.problems)
 
     def __bool__(self) -> bool:
         return bool(self.problems)
+
+
+def problem_messages(problems: Iterable[UnreconciledRuling]) -> list[str]:
+    """Each problem's sentence, in the words the re-ask reads.
+
+    The one home of the sentence list: the check's record, the round's
+    outcomes and the failure a job reports all spell it through this.
+    """
+    return [problem.message for problem in problems]
 
 
 def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[UnreconciledRuling]:
@@ -1106,10 +1114,11 @@ def critic_view(
 ) -> list[dict]:
     """The drafts a critic is shown, with everything computed for it already.
 
-    One function rather than four calls in the right order, because the graph
-    builds this view twice — once for the first pass over the whole fan-in, once
-    for the bounded re-ask over the few drafts it names — and the two must agree
-    about what a critic reads.
+    One function rather than four calls in the right order, because the
+    :class:`~analysis_service.critic_round.CriticRound` builds this view twice —
+    once for the first pass over the whole fan-in, once for the bounded re-ask
+    over the few drafts it names — and the two must agree about what a critic
+    reads.
 
     **Every draft is shown.** A draft citing an unknown ground is conditional,
     and :meth:`Claim.settled_by_grounds` still says so in code — but whether an
@@ -1135,82 +1144,3 @@ def critic_view(
     """
     chosen = list(drafts) if only is None else [d for d in drafts if d.id in only]
     return _ruling_view(chosen, repaired, unverified, assertions)
-
-
-@dataclass(frozen=True)
-class Accepted:
-    """One critic pass that reconciled with its drafts."""
-
-    #: How many rulings it returned, for the routing event.
-    count: int
-
-
-@dataclass(frozen=True)
-class Revision:
-    """One critic pass that did not, and everything the re-ask needs.
-
-    Built in one place so **the prompt and the check cannot disagree about
-    which claims are in trouble**. The messages say what did not reconcile and
-    the view carries the drafts those messages name, and both come out of the
-    same call over the same set.
-    """
-
-    #: One :class:`~analysis_service.claims.UnreconciledRuling` per problem:
-    #: the claim, which check found it, and the sentence the re-ask is asked to
-    #: fix it by.
-    problems: list[UnreconciledRuling]
-    #: Every drafted ID: the covering set the re-ask must reproduce.
-    roster: list[str]
-    #: The few drafts a structural fix cannot be made without reading.
-    unreconciled: list[dict]
-    #: Every drafted ID a problem names, sorted: the whole of what the re-ask
-    #: may change. :func:`merge_retry` holds it to that.
-    repairable: list[str]
-
-    @property
-    def messages(self) -> list[str]:
-        """Each problem's sentence, in the words the re-ask reads."""
-        return [problem.message for problem in self.problems]
-
-
-def review(
-    drafts: Sequence[Claim],
-    rulings: Sequence[Ruling],
-    system_model: SystemModel,
-    *,
-    repaired: Sequence[RepairedQuote] = (),
-    unverified: Sequence[UnverifiedGround] = (),
-    assertions: AssertionCatalog | None = None,
-) -> Accepted | Revision:
-    """Rule on one critic pass: reconciled, or a revision and what it must read.
-
-    The whole mechanical check on a critic's output, and the whole of what a
-    re-ask is told, behind one call. A caller routes on which of the two it
-    gets back and parks what that value carries; deciding *what* a re-ask reads
-    is this module's, because it is the same judgement as deciding what the
-    first pass read.
-
-    The re-ask sees a **roster of IDs plus the few it must read**, not the whole
-    set again. Its job is structural — cover exactly the drafted IDs, once each,
-    with unknowns that resolve — and an ID carries the whole of that claim.
-
-    The three evidence arguments are the ones the first pass was given, passed
-    on so the few drafts it must read arrive spelled the way they were spelled
-    the first time. A re-ask told less than the first pass was told is a second
-    reader of one draft (#1082).
-    """
-    problems = review_issues(drafts, rulings, system_model)
-    if not problems:
-        return Accepted(count=len(rulings))
-    return Revision(
-        problems=list(problems.problems),
-        roster=[draft.id for draft in drafts],
-        unreconciled=critic_view(
-            drafts,
-            only=problems.implicated,
-            repaired=repaired,
-            unverified=unverified,
-            assertions=assertions,
-        ),
-        repairable=sorted(problems.repairable),
-    )

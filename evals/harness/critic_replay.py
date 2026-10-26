@@ -6,17 +6,15 @@ view the ``merge`` node rendered, against the model and crossings its lanes
 read. One call answers what the critic makes of those drafts again, or of
 drafts ``run.py descendants`` changed or injected.
 
-**The graph's readers, never a second copy.** The instruction is
-:func:`~analysis_service.graph.critic_instruction` templated by ADK's
-``inject_session_state``. ``{system_model}`` and ``{boundary_crossings}`` are
-the job-wide keys ``<case>.lanes.json`` captured. The draft view is
-:func:`~analysis_service.critic.critic_view` rendered by
-:func:`~analysis_service.graph.render_fenced`, over ``<case>.drafts.json``, the
-repaired quotes and unverified grounds the report's block carries, and the
-report's assertion catalog. The user turn is ADK's ``to_user_content`` over
-:func:`~analysis_service.graph.merge_summary`. The answer is parsed by
-:func:`~analysis_service.graph.rulings_of`. ``tests/test_evals_critic_replay.py``
-holds the rebuilt request against the one a real graph run sent.
+**The graph's readers, never a second copy.** The request is
+:func:`~analysis_service.critic_round.critic_request` over a
+:class:`~analysis_service.critic_round.CriticRound` built from
+``<case>.drafts.json``, the repaired quotes and unverified grounds the report's
+block carries, and the report's assertion catalog. ``{system_model}`` and
+``{boundary_crossings}`` are the job-wide keys ``<case>.lanes.json`` captured.
+The answer is parsed by :func:`~analysis_service.critic_round.rulings_of`.
+``tests/test_evals_critic_replay.py`` holds the rebuilt request against the one
+a real graph run sent.
 
 **The prompt files are today's.** The command prints both commits.
 """
@@ -31,17 +29,14 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
-from google.adk.agents.readonly_context import ReadonlyContext
-from google.adk.utils.content_utils import to_user_content
-from google.adk.utils.instructions_utils import inject_session_state
 from google.genai import types
 
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import AnalysisMarks, Claim, FrameworkName, Ruling
-from analysis_service.critic import complete_rulings, critic_view, review_issues
+from analysis_service.critic import complete_rulings, review_issues
+from analysis_service.critic_round import CriticRound, critic_request, rulings_of
 from analysis_service.deployment import Deployment
 from analysis_service.execution import seed_state
 from analysis_service.frameworks import PACKAGES, schemas_for
@@ -53,10 +48,6 @@ from analysis_service.graph import (
     STATE_SYSTEM_MODEL,
     STATE_VALID_MODEL,
     FrameworkNodes,
-    critic_instruction,
-    merge_summary,
-    render_fenced,
-    rulings_of,
 )
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.report import Report
@@ -175,34 +166,25 @@ async def compose(
     prompt_loader: MarkdownLoader,
 ) -> tuple[str, types.Content]:
     """The instruction and the user turn the critic was sent, rebuilt."""
-    nodes = FrameworkNodes(archived.framework)
     record = archived.assertions
-    view = critic_view(
+    critic_round = CriticRound.of(
+        archived.framework,
+        archived.model,
         archived.drafts,
-        repaired=archived.marks.repaired_quotes,
-        unverified=archived.marks.unverified_grounds,
-        assertions=None if record is None else record.catalog,
+        archived.marks,
+        None if record is None else record.catalog,
     )
-    state = {
-        STATE_SYSTEM_MODEL: archived.shared[STATE_SYSTEM_MODEL],
-        STATE_BOUNDARY_CROSSINGS: archived.shared[STATE_BOUNDARY_CROSSINGS],
-        STATE_INPUT_TEXT: archived.shared[STATE_INPUT_TEXT],
-        nodes.key("draft_view"): render_fenced(view),
+    shared = {
+        key: archived.shared[key]
+        for key in (STATE_SYSTEM_MODEL, STATE_BOUNDARY_CROSSINGS, STATE_INPUT_TEXT)
     }
-    # ADK reads only ``_invocation_context.session.state`` for a state name.
-    context = SimpleNamespace(
-        _invocation_context=SimpleNamespace(
-            session=SimpleNamespace(state=state), artifact_service=None
-        )
+    return await critic_request(
+        package_loader,
+        prompt_loader,
+        FrameworkNodes(archived.framework),
+        shared,
+        critic_round,
     )
-    template = critic_instruction(
-        package_loader, prompt_loader, PACKAGES[archived.framework], nodes
-    )
-    instruction = await inject_session_state(template, cast(ReadonlyContext, context))
-    turn = to_user_content(
-        merge_summary(archived.framework, archived.drafts, archived.marks)
-    )
-    return instruction, turn
 
 
 def parse(raw: str, framework: FrameworkName) -> list[Ruling]:

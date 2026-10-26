@@ -7,16 +7,16 @@ differently — and an end-to-end comparison cannot tell those apart. Here the
 drafts are fixed bytes a person signed, so the only thing that varies between
 two runs of this module is the critic.
 
-It calls the seams the graph calls. :func:`~analysis_service.critic.critic_view`
-builds what a critic reads and :func:`~analysis_service.graph.render_fenced`
-renders it, which is the same pair the ``merge`` node writes to state; the
-prompt is :func:`~analysis_service.prompts.compose_critic_prompt` over the
-package's own critic skills. What this module does that the node does not is
-fill the prompt's placeholders itself: in the graph those become state key
-names and ADK templates them at run time, and there is no session here to hold
-one. The text a model receives is the same either way, and
-``tests/test_critic_review_replay.py`` holds the placeholder set to the prompt
-file's own so a new one fails here rather than arriving unfilled.
+It sends the request the graph sends.
+:func:`~analysis_service.critic_round.critic_request` renders the instruction
+and the user turn over a :class:`~analysis_service.critic_round.CriticRound`
+built from the fixture drafts, and the job-wide keys are rendered by the same
+functions ``prepare`` writes them with. The fixtures carry no fan-in marks and
+no assertion catalog, so the round holds empty marks and no catalog, and that
+is the one way this request differs from a job's: a critic here reads no
+``repaired_quotes``, no ``unverified_quotes`` and no ``assertion_facts``.
+``tests/test_critic_review_replay.py`` holds the rendered request against the
+one a graph run sends over the same drafts.
 
 The model call is injected. A scripted one makes the mechanical half of this
 deterministic and free, so it gates on every PR; a real one is what measures
@@ -31,103 +31,73 @@ from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from google.adk.utils.content_utils import to_user_content
 from google.genai import types
 
 from analysis_service.claims import AnalysisMarks, Ruling, UnknownKey
-from analysis_service.critic import complete_rulings, critic_view, review_issues
+from analysis_service.critic import complete_rulings, review_issues
+from analysis_service.critic_round import CriticRound, critic_request, rulings_of
 from analysis_service.execution import seed_state
 from analysis_service.frameworks import FrameworkPackage, schemas_for
 from analysis_service.graph import (
+    STATE_BOUNDARY_CROSSINGS,
     STATE_INPUT_TEXT,
-    merge_summary,
-    render_fenced,
-    rulings_of,
+    STATE_SYSTEM_MODEL,
+    FrameworkNodes,
+    render_crossings,
+    render_model,
 )
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.prompts import compose_critic_prompt
-from analysis_service.skills import compose_critic_skills
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 from evals.critic_review.model import CriticFixture
 from evals.harness.alignment import singular
 
-#: The placeholders this module fills, and the whole of what ``critic.md``
-#: declares. Held to the prompt file by a test rather than trusted: an unfilled
-#: placeholder reaches a model as a literal brace, and a critic reading
-#: ``{boundary_crossings}`` where the crossings should be rules on a model it
-#: cannot see and says nothing about why.
-PLACEHOLDERS: tuple[str, ...] = (
-    "system_model",
-    "boundary_crossings",
-    "drafts",
-    "input_text",
-)
-
-#: An async callable taking one composed instruction and returning the model's
-#: raw text. Injected so the mechanical half runs scripted and free.
-CriticCall = Callable[[str], Awaitable[str]]
+#: An async callable taking one composed instruction and user turn and returning
+#: the model's raw text. Injected so the mechanical half runs scripted and free.
+CriticCall = Callable[[str, types.Content], Awaitable[str]]
 
 
-def compose(
+def critic_round(
+    fixtures: list[CriticFixture], model: SystemModel, package: FrameworkPackage
+) -> CriticRound:
+    """The round a critic runs over this fixture set.
+
+    One round over every fixture rather than one per fixture, because that is
+    how a critic reads a real job: the whole set at once. Scoring one draft at
+    a time would also change what the model is asked, which is the thing under
+    test. The fixtures carry no fan-in marks and no catalog, so the marks are
+    empty and the catalog is absent, stated here rather than defaulted.
+    """
+    drafts = [_draft_of(fixture, package) for fixture in fixtures]
+    return CriticRound.of(package.name, model, drafts, AnalysisMarks(), None)
+
+
+async def compose(
     fixtures: list[CriticFixture],
     model: SystemModel,
     sources: Sequence[Source],
     package: FrameworkPackage,
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
-) -> str:
-    """The instruction a critic reads over this fixture set.
+) -> tuple[str, types.Content]:
+    """The instruction and the user turn a critic node sends over this fixture set.
 
-    One prompt over every fixture rather than one per fixture, because that is
-    how a critic reads a real job: the whole set at once, with the duplicate
-    step able to see across it. Scoring one draft at a time would also change
-    what the model is asked, which is the thing under test.
-
-    **One half of the production view is absent, and this is where that is
-    written down.** ``merge_drafts`` builds the first pass's view as
-    ``critic_view(drafts, repaired=marks.repaired_quotes)``, so a
-    production critic sees what the agent wrote beside each span the repair
-    pass put in its place. :class:`~evals.critic_review.model.CriticFixture`
-    has no field for a repaired quote and ``cases.json`` carries none, so this
-    composes the view without them and grades the critic on a prompt that is
-    short by that mark. What it measures is therefore the re-ask's view rather
-    than the first pass's. Closing it needs a fixture field and a reader to
-    sign the rows that use it; until then a score here says nothing about how
-    a critic reads a repaired quote.
+    The job-wide keys are rendered as ``prepare`` renders them, so the critic
+    reads the stripped model and not a dump that still carries each element's
+    ``source_excerpt``.
     """
-    drafts = [_draft_of(fixture, package) for fixture in fixtures]
-    filled = {
-        "system_model": render_fenced(model.model_dump(mode="json")),
-        "boundary_crossings": render_fenced(
-            [
-                crossing.model_dump(mode="json")
-                for crossing in model.boundary_crossings()
-            ]
-        ),
-        "drafts": render_fenced(critic_view(drafts)),
+    shared = {
+        STATE_SYSTEM_MODEL: render_model(model.model_dump(mode="json")),
+        STATE_BOUNDARY_CROSSINGS: render_crossings(model.boundary_crossings()),
         STATE_INPUT_TEXT: seed_state(sources)[STATE_INPUT_TEXT],
     }
-    prompt = compose_critic_prompt(prompt_loader)
-    for name, block in filled.items():
-        prompt = prompt.replace("{" + name + "}", block)
-    skills = compose_critic_skills(package_loader, package)
-    return f"{skills.strip()}\n\n{prompt.strip()}\n"
-
-
-def user_turn(
-    fixtures: list[CriticFixture], package: FrameworkPackage
-) -> types.Content:
-    """The user turn a critic receives over this fixture set.
-
-    ADK hands the ``merge`` node's output to the critic through
-    ``to_user_content``, and :func:`~analysis_service.graph.merge_summary` is
-    that output. The fixtures carry drafts and no fan-in marks, so the mark
-    counts in it are zero: the same gap :func:`compose` records for repaired
-    quotes, and closed the same way.
-    """
-    drafts = [_draft_of(fixture, package) for fixture in fixtures]
-    return to_user_content(merge_summary(package.name, drafts, AnalysisMarks()))
+    return await critic_request(
+        package_loader,
+        prompt_loader,
+        FrameworkNodes(package.name),
+        shared,
+        critic_round(fixtures, model, package),
+    )
 
 
 def _draft_of(fixture: CriticFixture, package: FrameworkPackage) -> Any:
@@ -143,9 +113,9 @@ def parse_rulings(raw: str, package: FrameworkPackage) -> list[Ruling]:
     flattering wrong answer available.
 
     **The graph's own reader, never a second one.**
-    :func:`~analysis_service.graph.rulings_of` is what the ``review`` node
-    parses a critic's emission with, and this module exists to run that critic
-    outside the graph. The neutral :class:`~analysis_service.claims.Ruling`
+    :func:`~analysis_service.critic_round.rulings_of` is what the ``review``
+    node parses a critic's emission with, and this module exists to run that
+    critic outside the graph. The neutral :class:`~analysis_service.claims.Ruling`
     refuses every real STRIDE ruling here: ``frameworks/stride/critic.md`` —
     which :func:`compose` loads — asks for a ``confidence`` on every ruling,
     and the neutral model is ``extra="forbid"``. A scripted ruling carries no
@@ -565,9 +535,9 @@ async def replay(
     a job, and the replay reports it rather than scoring around it.
     """
     drafts = [_draft_of(fixture, package) for fixture in fixtures]
-    raw = await call(
-        compose(fixtures, model, sources, package, package_loader, prompt_loader)
+    instruction, turn = await compose(
+        fixtures, model, sources, package, package_loader, prompt_loader
     )
-    rulings = parse_rulings(raw, package)
+    rulings = parse_rulings(await call(instruction, turn), package)
     problems = review_issues(drafts, rulings, model)
     return score(fixtures, rulings, package), list(problems.messages)

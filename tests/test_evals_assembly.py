@@ -7,6 +7,8 @@ that the report lacks, found by nothing earlier in the pipeline.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from analysis_service.claims import CLAIM_BOUND_MARKS
@@ -73,13 +75,17 @@ def test_a_claim_assembly_files_elsewhere_is_unexplained(
     monkeypatch,
 ):
     """Assembly changed under the archive: it now rejects what the critic kept."""
-    real = assembly.assemble_claims
+    real = assembly.CriticRound.outcome
 
-    def rejects_first(drafts, rulings, model, schemas):
-        claims, rejected = real(drafts, rulings, model, schemas)
-        return claims[1:], [*rejected, claims[0]]
+    def rejects_first(self, emitted):
+        outcome = real(self, emitted)
+        return replace(
+            outcome,
+            claims=outcome.claims[1:],
+            rejected=[*outcome.rejected, outcome.claims[0]],
+        )
 
-    monkeypatch.setattr(assembly, "assemble_claims", rejects_first)
+    monkeypatch.setattr(assembly.CriticRound, "outcome", rejects_first)
 
     (row,) = assembly.replay_artifact(load_artifact(archive), [case])
 

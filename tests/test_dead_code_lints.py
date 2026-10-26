@@ -96,11 +96,6 @@ TEST_ONLY: dict[str, str] = {
     ),
     "KIND_NAMES": "the whole-name half of what kind_of reads",
     "KIND_SUFFIXES": "the suffix half of what kind_of reads",
-    "PLACEHOLDERS": (
-        "what the critic replay fills, held against the prompt file by a test"
-        " rather than trusted: an unfilled placeholder reaches a model as a"
-        " literal brace and the critic rules on a model it cannot see"
-    ),
     "UNREVIEWED_FILE": (
         "where the UNREVIEWED table lives, so the test that reads the table"
         " and the sitting that names it cannot point at two different files"

@@ -109,9 +109,10 @@ valid model goes on to the next node.
   framework**: two frameworks' subgraphs never touch between `prepare` and
   `assemble`, because a critic rules its own framework's claims against its own
   framework's question.
-- **route_review** runs the mechanical checks the assembler depends on. If the
-  critic's output fails them, one bounded **recritic** re-ask runs; a second
-  failure is a `failed` job, not a rejection.
+- **route_review** parks and routes on the **Critic Round**'s outcome
+  (`critic_round.py`), which runs the mechanical checks the assembler depends
+  on. If the critic's output fails them, one bounded **recritic** re-ask runs;
+  a second failure is a `failed` job, not a rejection.
 - **assemble** builds the final report.
 
 Untrusted input is placed in fenced prompt sections that tell the model to treat

@@ -32,8 +32,8 @@ from pathlib import Path
 
 from analysis_service.claims import UnknownKey
 from analysis_service.critic import complete_rulings
+from analysis_service.critic_round import rulings_of
 from analysis_service.frameworks import SCHEMAS
-from analysis_service.graph import rulings_of
 from analysis_service.questions import (
     Basis,
     Finding,
@@ -183,7 +183,7 @@ def with_rulings(report: Report, rulings: Path) -> Report:
     Each ruling is completed against its draft as the service completes it
     (:func:`~analysis_service.critic.complete_rulings`), so a draft that rests
     on an unstated fact reads ``needs-info`` here as it would in a report.
-    The sample is parsed by :func:`~analysis_service.graph.rulings_of`, as the
+    The sample is parsed by :func:`~analysis_service.critic_round.rulings_of`, as the
     graph parses a critic's emission.
     """
     emitted = json.loads(rulings.read_text(encoding="utf-8"))["claims"]

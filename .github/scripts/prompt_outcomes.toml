@@ -210,7 +210,7 @@ prompt = "prompts/critic.md"
 sentence = """Include nothing it does not name: a field this framework's record
 does not carry is refused, and your whole answer is refused with it."""
 modules = [
-    "src/analysis_service/graph.py",
+    "src/analysis_service/critic_round.py",
     "src/analysis_service/frameworks/{package}/record.py",
 ]
 check = "a_field_the_ruling_does_not_carry_refuses_the_whole_answer"
@@ -219,7 +219,11 @@ check = "a_field_the_ruling_does_not_carry_refuses_the_whole_answer"
 prompt = "prompts/critic.md"
 sentence = """Code checks your rulings after you answer, and a ruling whose
 fields do not fit together comes back to you."""
-modules = ["src/analysis_service/critic.py", "src/analysis_service/graph.py"]
+modules = [
+    "src/analysis_service/critic.py",
+    "src/analysis_service/critic_round.py",
+    "src/analysis_service/graph.py",
+]
 check = "a_ruling_whose_fields_do_not_fit_comes_back_to_the_critic"
 
 # --- Modules with no pinned sentence yet ---------------------------------------
@@ -248,6 +252,11 @@ reason = "the shared claim, ground and verdict shapes every contract describes"
 module = "src/analysis_service/critic.py"
 prompts = ["prompts/recritic.md", "frameworks/*/critic.md"]
 reason = "the review that sends a ruling back and the digest a critic reads"
+
+[[reader]]
+module = "src/analysis_service/critic_round.py"
+prompts = ["prompts/recritic.md", "frameworks/*/critic.md"]
+reason = "the round that accepts, re-asks or fails a framework's rulings"
 
 [[reader]]
 module = "src/analysis_service/evidence.py"

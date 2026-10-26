@@ -5,8 +5,9 @@ two arrays. It is deterministic, so it can run again on any archived case:
 the drafts are ``<case>.drafts.json``, and every ruling the critic made is
 still in the report, because each ruled claim carries its own verdict and the
 fields its package's ruling declares. :func:`rulings_from_report` rebuilds
-them, and :func:`replay_case` runs :func:`~analysis_service.critic.assemble_claims`,
-the function the ``assemble`` node calls, over the pair.
+them, and :func:`replay_case` asks the
+:class:`~analysis_service.critic_round.CriticRound` for its outcome over the
+pair, as the ``assemble`` node does.
 
 **What it answers.** Two questions, both about the code between the critic
 and the report.
@@ -37,8 +38,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, get_args
 
-from analysis_service.claims import Claim, FrameworkAnalysis, FrameworkName, Ruling
-from analysis_service.critic import CriticOutputError, assemble_claims
+from analysis_service.claims import (
+    AnalysisMarks,
+    Claim,
+    FrameworkAnalysis,
+    FrameworkName,
+    Ruling,
+)
+from analysis_service.critic_round import CriticRound, Failed
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
@@ -122,14 +129,16 @@ def replay_case(
     ruled = {claim.id for claim in block.all_claims()}
     omitted = tuple(sorted(draft.id for draft in drafts if draft.id not in ruled))
     accounted = [draft for draft in drafts if draft.id in ruled]
-    try:
-        claims, rejected = assemble_claims(
-            accounted,
-            rulings_from_report(block, accounted),
-            model,
-            schemas_for(framework),
-        )
-    except CriticOutputError as refusal:
+    # The block carries no fan-in marks and no catalog a replay of assembly
+    # reads: the view is not built here, only the rulings are checked and merged.
+    critic_round = CriticRound.of(framework, model, accounted, AnalysisMarks(), None)
+    outcome = critic_round.outcome(
+        [
+            ruling.model_dump(mode="json")
+            for ruling in rulings_from_report(block, accounted)
+        ]
+    )
+    if isinstance(outcome, Failed):
         return AssemblyReplay(
             case=case.id,
             framework=framework,
@@ -137,16 +146,16 @@ def replay_case(
             replayed=(),
             rejected_reported=tuple(claim.id for claim in block.rejected_claims),
             rejected_replayed=(),
-            refused=str(refusal),
+            refused=str(outcome.error),
             omitted=omitted,
         )
     return AssemblyReplay(
         case=case.id,
         framework=framework,
         reported=tuple(claim.id for claim in block.claims),
-        replayed=tuple(claim.id for claim in claims),
+        replayed=tuple(claim.id for claim in outcome.claims),
         rejected_reported=tuple(claim.id for claim in block.rejected_claims),
-        rejected_replayed=tuple(claim.id for claim in rejected),
+        rejected_replayed=tuple(claim.id for claim in outcome.rejected),
         omitted=omitted,
     )
 

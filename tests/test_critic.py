@@ -1144,59 +1144,6 @@ def test_ruling_view_says_when_a_verb_belongs_to_another_lane():
     assert "filed_in_wrong_lane" not in clean
 
 
-class TestOneReviewCall:
-    """The check and the re-ask view come out of one call, over one set.
-
-    A graph node that called four functions and composed the view itself
-    could let the messages name one set of drafts and the view carry another.
-    The pair exists to prevent that.
-    """
-
-    def test_a_pass_that_reconciles_is_accepted_with_its_count(self):
-        drafts = [sample_draft("S-01")]
-        rulings = [sample_ruling("S-01")]
-
-        outcome = critic.review(drafts, rulings, valid_model())
-
-        assert isinstance(outcome, critic.Accepted)
-        assert outcome.count == 1
-
-    def test_a_dropped_ruling_revises(self):
-        drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
-
-        outcome = critic.review(drafts, [sample_ruling("S-01")], valid_model())
-
-        assert isinstance(outcome, critic.Revision)
-        assert outcome.messages
-
-    def test_the_roster_is_every_drafted_id_and_the_view_is_not(self):
-        """The re-ask reproduces rulings, not drafts.
-
-        An ID carries the whole of a claim it need not read, so the roster is
-        the covering set and only the drafts a structural fix cannot be made
-        without reading travel in full.
-        """
-        drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
-
-        outcome = critic.review(drafts, [sample_ruling("S-01")], valid_model())
-
-        assert outcome.roster == ["S-01", "T-01"]
-        assert [draft["id"] for draft in outcome.unreconciled] == ["T-01"]
-
-    def test_every_draft_the_view_carries_is_one_a_message_names(self):
-        """The property the pair exists for, over a pass that drops both."""
-        drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
-
-        outcome = critic.review(drafts, [], valid_model())
-
-        shown = {draft["id"] for draft in outcome.unreconciled}
-        assert shown
-        for draft_id in shown:
-            assert any(draft_id in message for message in outcome.messages), (
-                f"{draft_id} travels in full but no message says why"
-            )
-
-
 class TestTheCriticView:
     def test_narrowing_renders_what_the_whole_view_holds(self):
         """``only`` narrows what is rendered and nothing else."""
