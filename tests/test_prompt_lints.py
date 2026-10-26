@@ -67,7 +67,7 @@ from analysis_service.evidence import (
     UNKNOWN_PREFIX,
     render_catalog,
 )
-from analysis_service.frameworks import CRITIC_DOC, OUTPUT_DOC, PACKAGES
+from analysis_service.frameworks import CRITIC_DOC, PACKAGES
 from analysis_service.frameworks.stride.record import (
     LANES_OF_VERB,
     STRIDE_CATEGORIES,
@@ -95,7 +95,6 @@ from analysis_service.system_model import (
     FlowIdError,
     flow_id_version,
     mentioned_ids,
-    normalize_name,
     parse_flow_id,
 )
 from analysis_service.token_caps import (
@@ -905,119 +904,6 @@ def test_the_critic_prompt_names_every_rejection_step(step):
     )
 
 
-# ---------------------------------------------------------------------------
-# Every way an extraction can fail the gate is a rule the prompt has to carry.
-#
-# `validation.IssueCode` is the closed set of ways a model's output is refused.
-# Each one kills the job — `repair` gets a single pass — so each is a failure
-# the prompt is responsible for preventing.
-#
-# The phrase this table stores is the rule, not a remedy for ignoring it. Rule 4
-# states the precondition an `invalid-reference` breaks; it does not tell a model
-# what to do when it wants a flow to an element it never inventoried. That is
-# deliberate. Two edits supplying such a remedy — one where the model notices the
-# dangling endpoint, one where the omission happens — each measured at under half
-# a standard deviation over ten runs, so the prompt carries the rule and nothing
-# else. `evals/TUNING.md` holds the numbers, and says to budget for a null result
-# before writing a third.
-#
-# The table is the decidable half. A code added to `IssueCode` fails here until
-# somebody says what the prompt does about it — which is the point, because the
-# alternative is finding out from a dead job on a live sweep.
-EXTRACTION_FAILURE_RULES: dict[str, tuple[str, str]] = {
-    "schema": ("Your output is validated mechanically", EXTRACT_PROMPT_NAME),
-    # The rule and not the prohibition (#1040). "Two elements sharing a name
-    # share an ID, which is an error: name them apart" could not be obeyed
-    # beside "name it as the text does", so the prompt now says what to write.
-    "duplicate-id": (
-        "Two things of one type that the text calls by one name",
-        EXTRACT_PROMPT_NAME,
-    ),
-    # The compact transport's own refusal, so its rule is in the compact
-    # transport's own text. A phrase checked against ``extract.md`` would be a
-    # rule the route that can trip this never reads.
-    "duplicate-ref": (
-        "A ref is unique among the elements of its own type",
-        EXTRACT_COMPACT_PROMPT_NAME,
-    ),
-    "id-mismatch": ("IDs are recomputed from the names you give", EXTRACT_PROMPT_NAME),
-    "empty-slug": (
-        "A `name` needs at least one ASCII letter a-z or digit 0-9",
-        EXTRACT_PROMPT_NAME,
-    ),
-    "invalid-reference": (
-        "Both endpoints must be zoned elements you have already created",
-        EXTRACT_PROMPT_NAME,
-    ),
-    "no-trust-zones": (
-        "create one that covers the system as described",
-        EXTRACT_PROMPT_NAME,
-    ),
-    "illegal-asset-tag": ("`unknown` is not one of them", EXTRACT_PROMPT_NAME),
-    "too-many-elements": ("", EXTRACT_PROMPT_NAME),  # a size ceiling; see below
-    "missing-citation": ("Give every element a `source_excerpt`", EXTRACT_PROMPT_NAME),
-    "unverifiable-excerpt": ("a short verbatim quote", EXTRACT_PROMPT_NAME),
-    "assumption-on-unknown": (
-        "An attribute you left `unknown` inferred nothing and takes no entry",
-        EXTRACT_PROMPT_NAME,
-    ),
-    "blank-control": (
-        "Never leave a security-relevant attribute empty",
-        EXTRACT_PROMPT_NAME,
-    ),
-    "ambiguous-control": (
-        "never open a control with `no`, `not` or `without`",
-        EXTRACT_PROMPT_NAME,
-    ),
-}
-
-
-def test_every_extraction_failure_mode_is_declared():
-    """The table answers `IssueCode`, with nothing left over.
-
-    Self-completing against the enum: a new way to refuse an extraction fails
-    here until the prompt accounts for it, or until somebody declares — as
-    ``too-many-elements`` is declared — that no wording prevents it.
-    """
-    from analysis_service.validation import IssueCode
-
-    assert set(EXTRACTION_FAILURE_RULES) == set(get_args(IssueCode))
-
-
-@pytest.mark.parametrize("code,rule", sorted(EXTRACTION_FAILURE_RULES.items()))
-def test_the_prompt_carries_the_rule_that_prevents_each_failure(code, rule):
-    """The rule that keeps a job alive is in the prompt the job reads.
-
-    The table names the prompt as well as the phrase, because the two
-    extraction transports read different text: a rule only the compact route
-    can trip belongs in the compact route's own delta, and checking it against
-    ``extract.md`` would pass while the route that needs it read nothing.
-
-    ``too-many-elements`` carries an empty phrase deliberately: it is an
-    admission cap on model *size*, and no instruction stops a genuinely large
-    system from being large. Every other code is a mistake wording can prevent.
-    """
-    phrase, prompt = rule
-    if not phrase:
-        pytest.skip(f"{code} is a size ceiling rather than a rule a model can follow")
-
-    assert phrase in loader.load(prompt), (
-        f"{prompt}.md carries no rule against {code!r}. A model that trips it "
-        f"kills the job and spends its one repair pass."
-    )
-
-
-@pytest.mark.parametrize("name", ["é", "１"])
-def test_the_empty_slug_rule_names_only_ascii(name):
-    """The ``empty-slug`` phrase says ASCII, so the slug keeps nothing else.
-
-    A non-ASCII letter or digit makes no slug. A rule that folds one to ASCII
-    makes the phrase false, and this fails until the phrase follows it.
-    """
-    with pytest.raises(ValueError):
-        normalize_name(name)
-
-
 def _computed_view_keys() -> frozenset[str]:
     """Every key :func:`~analysis_service.critic._ruling_view` can put on a draft.
 
@@ -1123,43 +1009,6 @@ def test_a_lane_skill_does_not_invite_a_verb_its_lane_refuses(lane, verb):
         f" LANES_OF_VERB files that verb in {', '.join(LANES_OF_VERB[verb])}."
         f" A draft it invites is rejected as misfiled. Reword it, or declare"
         f" the reason in CROSS_LANE_VERBS."
-    )
-
-
-#: What each package's output contract must say about a policy the service
-#: applies to its drafts, keyed by the phrase a reader has to find.
-#:
-#: The twin of :data:`EXTRACTION_FAILURE_RULES`, for the seam after extraction.
-#: :func:`~analysis_service.fan_in._drop_duplicate_ids` keeps the first draft
-#: and records the rest, so a contract that says a duplicate ID "fails the
-#: job" tells a lane agent the wrong consequence of its own mistake (#1082).
-#: STRIDE's ``DraftThreat.untargeted`` drops a threat that names only trust
-#: zones, and its contract says so (ADR 0097). ASVS refuses no such claim.
-OUTPUT_CONTRACT_RULES: dict[str, tuple[str, ...]] = {
-    "stride": ("lose the second", "names only zones is dropped"),
-    "asvs": ("loses the second draft",),
-}
-
-
-@pytest.mark.parametrize(
-    "framework,phrase",
-    sorted(
-        (framework, phrase)
-        for framework, phrases in OUTPUT_CONTRACT_RULES.items()
-        for phrase in phrases
-    ),
-)
-def test_the_output_contract_states_what_the_service_does(framework, phrase):
-    """The contract says what really happens to a draft the seam refuses.
-
-    A contract that overstates the consequence -- "fails the job" for a drop
-    -- teaches a reader that a partial loss is impossible, which is how the
-    loss goes unlooked-for.
-    """
-    assert phrase in PACKAGE_LOADERS[framework].load(OUTPUT_DOC), (
-        f"frameworks/{framework}/output.md does not say {phrase!r}. The fan-in"
-        f" keeps the first draft under a repeated ID and records the rest;"
-        f" a contract saying otherwise hides a partial loss."
     )
 
 

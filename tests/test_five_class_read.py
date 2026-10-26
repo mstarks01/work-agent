@@ -7,11 +7,20 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from fnmatch import fnmatchcase
 from pathlib import Path
 
 import pytest
 
+from analysis_service.claims import FrameworkName
+from analysis_service.frameworks import (
+    CRITIC_DOC,
+    LANE_CLOSING_DOC,
+    OUTPUT_DOC,
+    PACKAGES,
+    SEVERITY_RUBRIC_DOC,
+)
 from evals.harness.submit import run_command
 from tests.source_tree import REPO_ROOT
 from tests.test_workflow_lints import FILTERED_WORKFLOWS, _filter_paths
@@ -168,10 +177,10 @@ def test_the_names_on_one_line_are_not_a_read():
     assert check.missing(body) == [f"text after {name}" for name in check.CLASSES[:-1]]
 
 
-def _commit(repo: Path, path: str) -> str:
+def _commit(repo: Path, path: str, text: str | None = None) -> str:
     file = repo / path
     file.parent.mkdir(parents=True, exist_ok=True)
-    file.write_text(path, encoding="utf-8")
+    file.write_text(path if text is None else text, encoding="utf-8")
     run_command(["git", "add", path], repo)
     run_command(
         [
@@ -249,21 +258,127 @@ PROMPT_FILES = (
     "frameworks/*/lanes/*/*.md",
 )
 
+#: The table that pairs each prompt with the modules that decide it, read once
+#: for every test here and for ``tests/test_prompt_outcomes.py``.
+TABLE = tomllib.loads(check.TABLE.read_text(encoding="utf-8"))
+READERS = check.readers(TABLE)
+
+#: The keys an outcome row may carry, and the keys a reader row carries.
+OUTCOME_KEYS = frozenset(
+    {"prompt", "sentence", "modules", "check", "wording", "issue_codes"}
+)
+READER_KEYS = frozenset({"module", "prompts", "reason"})
+
 
 def _tracked() -> list[str]:
     return run_command(["git", "ls-files"], REPO_ROOT).split()
 
 
-@pytest.mark.parametrize("pattern", sorted(check.PROMPT_READERS))
+def _filled(pattern: str) -> list[str]:
+    """``pattern`` with its placeholder filled for each carried package, or
+    ``pattern`` alone where it carries none."""
+    if check.PACKAGE not in pattern:
+        return [pattern]
+    return [pattern.replace(check.PACKAGE, name) for name in PACKAGES]
+
+
+def test_the_table_sits_beside_the_script():
+    assert check.TABLE == SCRIPT.with_name("prompt_outcomes.toml")
+    assert check.TABLE.is_file()
+
+
+@pytest.mark.parametrize(
+    "outcome", TABLE["outcome"], ids=lambda row: row["sentence"][:40]
+)
+def test_each_outcome_row_pins_a_sentence_and_names_what_decides_it(outcome):
+    assert set(outcome) <= OUTCOME_KEYS
+    assert ("check" in outcome) != ("wording" in outcome)
+    assert outcome["sentence"].strip()
+    assert outcome["modules"]
+
+
+@pytest.mark.parametrize("reader", TABLE["reader"], ids=lambda row: row["module"])
+def test_each_reader_row_names_its_prompts_and_a_reason(reader):
+    assert set(reader) == READER_KEYS
+    assert reader["prompts"]
+    assert reader["reason"].strip()
+
+
+def test_a_pair_has_one_home():
+    """An outcome row and a reader row never state the same pair, and one
+    module has one reader row."""
+    pinned = {
+        (module, row["prompt"]) for row in TABLE["outcome"] for module in row["modules"]
+    }
+    read = {
+        (row["module"], prompt) for row in TABLE["reader"] for prompt in row["prompts"]
+    }
+    assert pinned & read == set()
+    assert len(TABLE["reader"]) == len({row["module"] for row in TABLE["reader"]})
+
+
+@pytest.mark.parametrize(
+    "pattern", sorted(filled for module in READERS for filled in _filled(module))
+)
 def test_each_reader_is_a_module(pattern):
     assert any(fnmatchcase(path, pattern) for path in _tracked())
 
 
 @pytest.mark.parametrize(
-    "prompt", sorted({p for ps in check.PROMPT_READERS.values() for p in ps})
+    "prompt",
+    sorted(
+        prompt
+        for prompts in READERS.values()
+        for prompt in prompts
+        if check.PACKAGE not in prompt
+    ),
 )
 def test_each_prompt_a_reader_names_is_a_file(prompt):
     assert list(REPO_ROOT.glob(prompt))
+
+
+def _package_texts(name: FrameworkName) -> set[str]:
+    """The texts a package declares that state an outcome: its output contract,
+    its critic part, its severity rubric where its record grades, its lane
+    closing where it declares one, and each lane's skill."""
+    package = PACKAGES[name]
+    docs = {CRITIC_DOC, OUTPUT_DOC}
+    if package.carries_severity():
+        docs.add(SEVERITY_RUBRIC_DOC)
+    closing = LANE_CLOSING_DOC[name]
+    if closing:
+        docs.add(closing)
+    return {f"frameworks/{name}/{doc}.md" for doc in docs} | {
+        f"frameworks/{name}/lanes/*/skill.md"
+    }
+
+
+@pytest.mark.parametrize("name", sorted(PACKAGES))
+def test_a_package_module_asks_for_the_texts_the_package_declares(name):
+    """The package rows against the registry: a change under a package's own
+    module directory asks for each text that package declares, and for no text
+    of any other package."""
+    asked = check.prompts_to_read(
+        [f"src/analysis_service/frameworks/{name}/record.py"], READERS, REPO_ROOT
+    )
+    own = {prompt for prompt in asked if prompt.startswith("frameworks/")}
+
+    assert own == _package_texts(name)
+
+
+def test_a_package_text_the_package_lacks_is_not_asked_for():
+    pairs = {
+        "src/pkg/{package}/*": (
+            "frameworks/{package}/severity_rubric.md",
+            "frameworks/{package}/output.md",
+        )
+    }
+    ungraded = [name for name in PACKAGES if not PACKAGES[name].carries_severity()]
+    if not ungraded:
+        pytest.skip("every carried package grades, so every one has a rubric")
+    for name in ungraded:
+        asked = check.prompts_to_read([f"src/pkg/{name}/rules.py"], pairs, REPO_ROOT)
+        assert asked == [f"frameworks/{name}/output.md"]
 
 
 @pytest.mark.parametrize(
@@ -275,18 +390,58 @@ def test_each_prompt_a_reader_names_is_a_file(prompt):
     ),
 )
 def test_each_prompt_has_a_module_that_decides_its_outcomes(prompt):
-    named = {p for ps in check.PROMPT_READERS.values() for p in ps}
+    named = {
+        prompt.replace(check.PACKAGE, "*")
+        for prompts in READERS.values()
+        for prompt in prompts
+    }
     assert any(fnmatchcase(prompt, pattern) for pattern in named), (
-        f"{prompt} is in no row of PROMPT_READERS, so a change to the code it"
-        " describes asks for no read of it."
+        f"{prompt} is in no row of {check.TABLE.name}, so a change to the code"
+        " it describes asks for no read of it."
     )
 
 
 def test_a_module_change_names_its_prompts():
     assert check.prompts_to_read(
-        ["docs/guide.md", "src/analysis_service/compact.py"]
+        ["docs/guide.md", "src/analysis_service/compact.py"], READERS, REPO_ROOT
     ) == ["prompts/extract-compact.md"]
-    assert check.prompts_to_read(["src/analysis_service/report.py"]) == []
+    assert (
+        check.prompts_to_read(["src/analysis_service/report.py"], READERS, REPO_ROOT)
+        == []
+    )
+
+
+def test_a_prompt_a_named_glob_covers_is_asked_for_once():
+    pairs = {
+        "src/a.py": ("prompts/critic.md",),
+        "src/b.py": ("prompts/*.md",),
+    }
+    assert check.prompts_to_read(["src/a.py", "src/b.py"], pairs, REPO_ROOT) == [
+        "prompts/*.md"
+    ]
+
+
+TABLE_ROW = """
+[[reader]]
+module = "src/module.py"
+prompts = ["prompts/extract.md"]
+reason = "test"
+"""
+
+
+def test_the_check_reads_the_base_branchs_table(repo):
+    """The table a pull request carries cannot free the pull request: the check
+    reads the base commit's copy, and falls back to its own copy only where the
+    base holds none."""
+    _commit(repo, ".github/scripts/prompt_outcomes.toml", TABLE_ROW)
+    _commit(repo, "prompts/extract.md")
+    base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
+    _commit(repo, "src/module.py")
+    head = _commit(repo, ".github/scripts/prompt_outcomes.toml", "")
+    read = f"{FULL_SECTION}\n\n{check.PROMPT_HEADING}\n\n- `prompts/extract.md`: true."
+
+    assert _run(repo, base, head, FULL_SECTION) == 1
+    assert _run(repo, base, head, read) == 0
 
 
 def test_a_prompt_read_names_each_prompt_with_text_after_it():
@@ -305,6 +460,9 @@ def test_a_prompt_read_names_each_prompt_with_text_after_it():
 
 
 def test_a_module_change_with_no_prompt_read_is_refused(repo):
+    """The base holds no table, so the check reads the script's own copy, and
+    asks for the prompt the tree holds."""
+    _commit(repo, "prompts/extract-compact.md")
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
     head = _commit(repo, "src/analysis_service/compact.py")
     read = f"{check.PROMPT_HEADING}\n\n- prompts/extract-compact.md: still true."

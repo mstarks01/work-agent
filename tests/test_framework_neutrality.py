@@ -763,7 +763,14 @@ def test_no_scorer_names_a_package_this_build_does_not_carry():
 # above sees only a directory path. So this asks
 # a different question of a smaller set of files, and asks it of the syntax tree
 # rather than the text, because a docstring naming a framework is prose.
-LINT_MODULES = sorted((REPO_ROOT / "tests").glob("test_*lints*.py"))
+LINT_MODULES = sorted(
+    [
+        *(REPO_ROOT / "tests").glob("test_*lints*.py"),
+        # Each outcome row pins shipped prompt text, so the file is a lint
+        # whatever its name says.
+        REPO_ROOT / "tests" / "test_prompt_outcomes.py",
+    ]
+)
 
 #: A lint importing one package's own module, and why that is right.
 #:
@@ -776,6 +783,12 @@ LINT_MODULES = sorted((REPO_ROOT / "tests").glob("test_*lints*.py"))
 #: a check over a field only one package's record declares. Write the reason as
 #: a property of the framework, never as its name, exactly as ``DECLARED`` does.
 DECLARED_LINT_IMPORTS: dict[str, str] = {
+    "tests/test_prompt_outcomes.py": (
+        "a lane skill's sentence that a gap needs a stated fact is a rule of a"
+        " package whose claims may rule on the absence of a component, and the"
+        " check builds that package's own proposal shape to run the rule. Every"
+        " other row runs through PACKAGES or a neutral module."
+    ),
     "tests/test_prompt_lints.py": (
         "a lane skill may not invite an action its lane cannot file, and only"
         " a package whose claims compose an identity from an action verb has"

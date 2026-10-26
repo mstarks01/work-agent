@@ -2,8 +2,9 @@
 # a "## Five-class read" section in its body, with one entry for each defect
 # class of docs/agents/code-review.md. A pull request that changes a module that
 # decides what a prompt says also holds a "## Prompt read" section.
-# .github/scripts/five_class_read.py holds the rules, the class names and the
-# map from modules to prompts.
+# .github/scripts/five_class_read.py holds the rules and the class names, and
+# .github/scripts/prompt_outcomes.toml beside it holds the map from modules to
+# prompts; the script reads the base branch's copy of both.
 #
 # Its own workflow, so an edited pull request body is checked without running
 # the whole offline suite again.

@@ -10,6 +10,7 @@ reason, and a second test fails when the declaration stops being live.
 from __future__ import annotations
 
 import ast
+import re
 from collections.abc import Callable, Iterator
 from typing import TypeGuard
 
@@ -24,12 +25,14 @@ Site = tuple[str, str]
 ROOTS = ("src", "webapp", "evals/harness")
 
 
-def _sites(match: Callable[[ast.AST], bool]) -> list[Site]:
-    """Each site in :data:`ROOTS` that holds a node ``match`` accepts, once."""
+def _sites(
+    match: Callable[[ast.AST], bool], roots: tuple[str, ...] = ROOTS
+) -> list[Site]:
+    """Each site in ``roots`` that holds a node ``match`` accepts, once."""
     return sorted(
         {
             (path.relative_to(REPO_ROOT).as_posix(), function)
-            for path in source_files(*ROOTS)
+            for path in source_files(*roots)
             for node, function in _walk(parse(path), "<module>")
             if match(node)
         }
@@ -742,3 +745,43 @@ def test_a_new_job_is_created_and_admitted_in_job_answers():
         ("src/analysis_service/job_answers.py", "answer"),
         ("src/analysis_service/job_answers.py", "submit"),
     ]
+
+
+#: A module path under the service package, and a prompt path: the two halves
+#: of a pairing that only ``.github/scripts/prompt_outcomes.toml`` states.
+_MODULE_PATH = re.compile(r"^src/analysis_service/")
+_PROMPT_PATH = re.compile(r"^(?:prompts|frameworks)/.*\.md$")
+
+
+def _spells(node: ast.AST, pattern: re.Pattern[str]) -> bool:
+    """Whether a string constant under ``node`` matches ``pattern``."""
+    return any(
+        isinstance(child, ast.Constant)
+        and isinstance(child.value, str)
+        and bool(pattern.match(child.value))
+        for child in ast.walk(node)
+    )
+
+
+def _pairs_a_module_with_a_prompt(node: ast.AST) -> bool:
+    """A dict that maps a module path to a prompt path, or a pair of the two."""
+    if isinstance(node, ast.Dict):
+        return any(
+            key is not None
+            and _spells(key, _MODULE_PATH)
+            and _spells(value, _PROMPT_PATH)
+            for key, value in zip(node.keys, node.values, strict=True)
+        )
+    if isinstance(node, ast.Tuple | ast.List) and len(node.elts) == 2:
+        module, prompt = node.elts
+        return _spells(module, _MODULE_PATH) and _spells(prompt, _PROMPT_PATH)
+    return False
+
+
+def test_a_module_to_prompt_pairing_is_written_only_in_the_table():
+    """The prompt read's map derives from the table, and the outcome tests read
+    the same rows, so no Python holds a second copy of a pair."""
+    assert (
+        _sites(_pairs_a_module_with_a_prompt, (*ROOTS, "tests", ".github/scripts"))
+        == []
+    )
