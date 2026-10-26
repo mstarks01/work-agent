@@ -33,7 +33,7 @@ Its one source, rendered as yours will be:
 ````
 label: Payments platform notes
 ----
-Customers sign in with an email and password and get a session cookie; we never added MFA. They submit payments through the web API, which is the only thing we expose to the internet.
+Customers sign in with an email and password and get a session cookie; we never added MFA. They submit payments through the web API, which is the only thing we expose to the internet. Our payments provider posts settlement confirmations to a webhook on the same API.
 
 The web API hands each transfer to the ledger service over gRPC, and that call is not authenticated and not encrypted — we accepted it because both sit inside our network.
 
@@ -48,18 +48,18 @@ Trust zones: `boundary:public-internet` (network), `boundary:dmz` (network), `bo
 |---|---|---|
 | `entity:customer` | External Entity, human | zone `boundary:public-internet`; assets `pii` |
 | `entity:payments-provider` | External Entity, external-system | zone `boundary:public-internet` |
-| `process:web-api` | Process | FastAPI on Cloud Run; zone `boundary:dmz`; exposure `internet-facing`; assets none |
-| `process:ledger-service` | Process | Python worker; zone `boundary:core`; exposure `unknown`; assets `financial` |
+| `process:web-api` | Process | FastAPI on Cloud Run; zone `boundary:dmz`; exposure `internet-facing`; interface `web`; assets none |
+| `process:ledger-service` | Process | Python worker; zone `boundary:core`; exposure `unknown`; interface `non-web`; assets `financial` |
 | `store:accounts-db` | Data Store | PostgreSQL; zone `boundary:core`; classification `confidential`; `encryption_at_rest: unknown`; assets `pii`, `financial` |
 | `store:audit-log` | Data Store | append-only bucket; zone `boundary:core`; classification `internal`; encrypted at rest (CMEK); assets `business-critical-data` |
 
 | Flow | Attributes |
 |---|---|
-| `flow:entity:customer>process:web-api>submit-payment` | HTTPS/TLS 1.3; `authentication`: session cookie issued after password login, no MFA; carries payment instructions and account identifiers |
-| `flow:entity:payments-provider>process:web-api>settlement-webhook` | HTTPS POST; `authentication: unknown`; carries settlement confirmations |
-| `flow:process:web-api>process:ledger-service>post-transfer` | gRPC; `authentication: none` (accepted by network position); `encryption_in_transit: none`; carries transfer instructions with customer IDs |
-| `flow:process:ledger-service>store:accounts-db>read-write-balances` | PostgreSQL wire protocol; `authentication`: shared static password from an environment variable, full read/write; `encryption_in_transit: unknown`; carries balances and account-holder PII |
-| `flow:process:ledger-service>store:audit-log>append-transfer-record` | HTTPS append; `authentication`: ledger service account; TLS 1.3; records tagged with the ledger service identity only |
+| `flow:entity:customer>process:web-api>submit-payment` | HTTPS/TLS 1.3; operations `write`; `authentication`: session cookie issued after password login, no MFA; carries payment instructions and account identifiers |
+| `flow:entity:payments-provider>process:web-api>settlement-webhook` | HTTPS POST over TLS; operations `write`; `authentication: unknown`; carries settlement confirmations |
+| `flow:process:web-api>process:ledger-service>post-transfer` | gRPC; operations `write`; `authentication: none` (accepted by network position); `encryption_in_transit: none`; carries transfer instructions with customer IDs |
+| `flow:process:ledger-service>store:accounts-db>read-write-balances` | PostgreSQL wire protocol; operations `read-write`; `authentication`: shared static password from an environment variable, full read/write; `encryption_in_transit: unknown`; carries balances and account-holder PII |
+| `flow:process:ledger-service>store:audit-log>append-transfer-record` | HTTPS append; operations `write`; `authentication`: ledger service account; TLS 1.3; records tagged with the ledger service identity only |
 
 Its evidence catalog, rendered as yours will be:
 
@@ -98,25 +98,26 @@ Trust zones: `boundary:field` (network), `boundary:ingest` (network), `boundary:
 | Element | Type | Key attributes |
 |---|---|---|
 | `entity:sensor-gateway` | External Entity, external-system | zone `boundary:field` |
-| `process:mqtt-broker` | Process | managed MQTT; zone `boundary:ingest`; exposure `internet-facing`; assets none |
-| `process:stream-processor` | Process | stream consumer; zone `boundary:platform`; exposure `unknown`; assets `business-critical-data` |
+| `process:mqtt-broker` | Process | managed MQTT; zone `boundary:ingest`; exposure `internet-facing`; interface `non-web`; assets none |
+| `process:stream-processor` | Process | stream consumer; zone `boundary:platform`; exposure `unknown`; interface `non-web`; assets `business-critical-data` |
 | `store:telemetry-store` | Data Store | time-series, one shared partition space keyed by tenant; zone `boundary:platform`; classification `confidential`; `encryption_at_rest: unknown`; assets `business-critical-data` |
 
 | Flow | Attributes |
 |---|---|
-| `flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry` | MQTT over TLS; `authentication`: one client certificate shared by every device image; payload carries the tenant_id |
-| `flow:process:mqtt-broker>process:stream-processor>consume-topic` | topic subscription; `authentication: unknown`; carries raw device payloads |
-| `flow:process:stream-processor>store:telemetry-store>write-readings` | time-series write API; `authentication`: one service account holding write on every tenant partition; `encryption_in_transit: unknown` |
+| `flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry` | MQTT over TLS; operations `write`; `authentication`: one client certificate shared by every device image; payload carries the tenant_id |
+| `flow:process:mqtt-broker>process:stream-processor>consume-topic` | topic subscription; operations `read`; `authentication: unknown`; `encryption_in_transit: unknown`; carries raw device payloads |
+| `flow:process:stream-processor>store:telemetry-store>write-readings` | time-series write API; operations `write`; `authentication`: one service account holding write on every tenant partition; `encryption_in_transit: unknown` |
 
 Its evidence catalog:
 
-6 facts, and this table is all of them.
+7 facts, and this table is all of them.
 
 | cite this exactly | what it says |
 | --- | --- |
 | `unknown:process:stream-processor:exposure` | `exposure` never stated |
 | `unknown:store:telemetry-store:encryption_at_rest` | `encryption_at_rest` never stated |
 | `unknown:flow:process:mqtt-broker>process:stream-processor>consume-topic:authentication` | `authentication` never stated |
+| `unknown:flow:process:mqtt-broker>process:stream-processor>consume-topic:encryption_in_transit` | `encryption_in_transit` never stated |
 | `unknown:flow:process:stream-processor>store:telemetry-store>write-readings:encryption_in_transit` | `encryption_in_transit` never stated |
 | `crossing:flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry` | crosses a trust boundary |
 | `crossing:flow:process:mqtt-broker>process:stream-processor>consume-topic` | crosses a trust boundary |

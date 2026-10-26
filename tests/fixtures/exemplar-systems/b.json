@@ -1,0 +1,116 @@
+{
+  "external_entities": [
+    {
+      "id": "entity:sensor-gateway",
+      "name": "Sensor Gateway",
+      "kind": "external-system",
+      "trust_zone": "boundary:field",
+      "source_excerpt": "Every sensor gateway publishes to our MQTT broker over TLS",
+      "source_label": "Fleet telemetry platform notes"
+    }
+  ],
+  "processes": [
+    {
+      "id": "process:mqtt-broker",
+      "name": "MQTT Broker",
+      "technology": "managed MQTT",
+      "trust_zone": "boundary:ingest",
+      "exposure": "internet-facing",
+      "interface_kind": "non-web",
+      "source_excerpt": "The broker sits on the public internet so gateways can reach it from anywhere.",
+      "source_label": "Fleet telemetry platform notes"
+    },
+    {
+      "id": "process:stream-processor",
+      "name": "Stream Processor",
+      "technology": "stream consumer",
+      "trust_zone": "boundary:platform",
+      "exposure": "unknown",
+      "interface_kind": "non-web",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "Its topics are consumed by the stream processor",
+      "source_label": "Fleet telemetry platform notes"
+    }
+  ],
+  "data_stores": [
+    {
+      "id": "store:telemetry-store",
+      "name": "Telemetry Store",
+      "technology": "time-series, one shared partition space keyed by tenant",
+      "trust_zone": "boundary:platform",
+      "data_classification": "confidential",
+      "encryption_at_rest": "unknown",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "writes the readings into the shared time-series store under that key",
+      "source_label": "Fleet telemetry platform notes"
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry",
+      "name": "Publish Telemetry",
+      "source": "entity:sensor-gateway",
+      "destination": "process:mqtt-broker",
+      "protocol": "MQTT over TLS",
+      "authentication": "one client certificate shared by every device image",
+      "data_description": "telemetry; the payload carries the tenant_id",
+      "encryption_in_transit": "TLS",
+      "source_excerpt": "Every sensor gateway publishes to our MQTT broker over TLS, but they all share one client certificate",
+      "source_label": "Fleet telemetry platform notes",
+      "operations": "write"
+    },
+    {
+      "id": "flow:process:mqtt-broker>process:stream-processor>consume-topic",
+      "name": "Consume Topic",
+      "source": "process:mqtt-broker",
+      "destination": "process:stream-processor",
+      "protocol": "topic subscription",
+      "authentication": "unknown",
+      "data_description": "raw device payloads",
+      "encryption_in_transit": "unknown",
+      "source_excerpt": "Its topics are consumed by the stream processor",
+      "source_label": "Fleet telemetry platform notes",
+      "operations": "read"
+    },
+    {
+      "id": "flow:process:stream-processor>store:telemetry-store>write-readings",
+      "name": "Write Readings",
+      "source": "process:stream-processor",
+      "destination": "store:telemetry-store",
+      "protocol": "time-series write API",
+      "authentication": "one service account holding write on every tenant partition",
+      "data_description": "device readings keyed by tenant_id",
+      "encryption_in_transit": "unknown",
+      "source_excerpt": "Its service account can write every tenant's partition.",
+      "source_label": "Fleet telemetry platform notes",
+      "operations": "write"
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "boundary:field",
+      "name": "Field",
+      "kind": "network",
+      "source_excerpt": "gateways can reach it from anywhere",
+      "source_label": "Fleet telemetry platform notes"
+    },
+    {
+      "id": "boundary:ingest",
+      "name": "Ingest",
+      "kind": "network",
+      "source_excerpt": "The broker sits on the public internet",
+      "source_label": "Fleet telemetry platform notes"
+    },
+    {
+      "id": "boundary:platform",
+      "name": "Platform",
+      "kind": "network",
+      "source_excerpt": "the shared time-series store",
+      "source_label": "Fleet telemetry platform notes"
+    }
+  ]
+}
