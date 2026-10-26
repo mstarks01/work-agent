@@ -14,9 +14,9 @@ import asyncio
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
+from analysis_service.answer_bodies import AnswersSubmission
 from analysis_service.answer_sets import AnswerSet, HeldAnswerSet
 from analysis_service.answer_state import ANSWER_LIMITS
-from analysis_service.api import AnswersSubmission
 from analysis_service.claims import UnknownRef, Verdict
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
 from analysis_service.jobs import JobRecord

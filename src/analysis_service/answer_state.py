@@ -531,6 +531,18 @@ class QuestionSet:
             ],
         }
 
+    def label(self, key: UnknownKey) -> str | None:
+        """What a person reads for the fact ``key`` names, or ``None`` where no
+        question of this set names it.
+
+        A question an earlier save answered is named too, because it still
+        takes a new answer. A refusal of an answer names its question by this,
+        and never by a key the page did not send as a question.
+        """
+        if key not in self.asked and key not in {q.key for q, _ in self.answered_early}:
+            return None
+        return fact_label(key, self.model, self.catalog)
+
     @property
     def done(self) -> bool:
         """True where a waiting job has nothing left to ask."""

@@ -8,20 +8,10 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_state import MAX_SKIPS
-from analysis_service.api import AnswersSubmission
-from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS
-from analysis_service.links import MAX_LINK_ANSWERS
 from tests import test_webapp
 from tests.test_api import auth, make_client
 from tests.test_webapp import CARRIED, SAME_ORIGIN, posted
-from tests.test_webapp_questions import (
-    FACT,
-    PausingRunner,
-    client_for,
-    ran,
-    start,
-)
+from tests.test_webapp_questions import PausingRunner, client_for
 
 tiers = test_webapp.tiers
 
@@ -102,53 +92,6 @@ def test_a_refusal_never_repeats_the_value_it_refused(tiers):
     assert message.startswith("sources.0.label: ")
 
 
-def _paused(tiers):
-    client = client_for(tiers, PausingRunner())
-    run = start(client, questions=True)
-    assert ran(client, run) == "awaiting-answers"
-    return client, run
-
-
-def _final(tiers):
-    client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
-    finished = start(client, questions=False)
-    assert ran(client, finished) == "completed"
-    final = client.post(
-        f"/answer/{finished}",
-        json={"links": [], "facts": [dict(FACT)]},
-        headers=SAME_ORIGIN,
-    ).json()["run"]
-    assert ran(client, final) == "completed"
-    return client, final
-
-
-FACT_BODY = {"key": list(FACT["key"]), "value": "unknown"}
-
-
-@pytest.mark.parametrize(
-    ("state", "route", "body"),
-    [
-        pytest.param(_paused, "answer", {"links": [], "facts": [], "revision": 0}),
-        pytest.param(_paused, "amend", {"text": "A CDN fronts it.", "revision": 0}),
-        pytest.param(_final, "correct", {"facts": [FACT_BODY], "revision": 0}),
-    ],
-)
-def test_each_answer_route_refuses_a_key_it_does_not_read(tiers, state, route, body):
-    """As the /v1 models refuse one (``extra="forbid"``)."""
-    client, run = state(tiers)
-
-    refused = client.post(
-        f"/{route}/{run}", json=body | {"colour": "red"}, headers=SAME_ORIGIN
-    )
-
-    assert refused.status_code == 400, refused.text
-    assert "colour" not in refused.json()["message"]
-    assert (
-        client.post(f"/{route}/{run}", json=body, headers=SAME_ORIGIN).status_code
-        == 200
-    )
-
-
 def test_analyze_refuses_a_key_it_does_not_read(tiers):
     client = client_for(tiers, PausingRunner())
     body = posted(TEXT) | {"colour": "red"}
@@ -159,37 +102,3 @@ def test_analyze_refuses_a_key_it_does_not_read(tiers):
     assert api_status == 422
     assert web_status == 400, web_message
     assert "colour" not in web_message
-
-
-def test_a_correction_over_the_limit_is_refused_with_the_limit(tiers):
-    client, final = _final(tiers)
-    body = {"facts": [FACT_BODY] * (MAX_FACT_ANSWERS + 1), "revision": 0}
-
-    refused = client.post(f"/correct/{final}", json=body, headers=SAME_ORIGIN)
-
-    assert refused.status_code == 400
-    assert str(MAX_FACT_ANSWERS) in refused.json()["message"]
-
-
-@pytest.mark.parametrize(
-    ("field", "answer", "bound"),
-    [
-        ("links", {"principal": "the team", "element": "web-app"}, MAX_LINK_ANSWERS),
-        ("facts", FACT_BODY, MAX_FACT_ANSWERS),
-        ("skip", "web-app", MAX_SKIPS),
-        ("presented", FACT_BODY["key"], MAX_HELD_FACTS),
-    ],
-)
-def test_answers_over_the_limit_are_refused_with_the_v1_bound(
-    tiers, field, answer, bound
-):
-    """``/answer`` holds each list to the bound ``AnswersSubmission`` declares,
-    and answers 400 where /v1 answers 422 (the web app's own status rule)."""
-    client, final = _final(tiers)
-    body = {"links": [], "facts": [], field: [answer] * (bound + 1), "revision": 0}
-
-    refused = client.post(f"/answer/{final}", json=body, headers=SAME_ORIGIN)
-
-    assert refused.status_code == 400
-    assert str(bound) in refused.json()["message"]
-    assert AnswersSubmission.model_fields[field].metadata[0].max_length == bound

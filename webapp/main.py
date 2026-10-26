@@ -106,7 +106,6 @@ import logging
 import os
 from collections.abc import (
     AsyncIterator,
-    Awaitable,
     Callable,
     Collection,
     Mapping,
@@ -127,7 +126,7 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
-from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from analysis_service import (
@@ -137,6 +136,12 @@ from analysis_service import (
     Report,
     Source,
 )
+from analysis_service.answer_bodies import (
+    BodyRefused,
+    read_amendment,
+    read_answers,
+    read_corrections,
+)
 from analysis_service.answer_forms import (
     answer_choices,
     answer_form,
@@ -144,22 +149,15 @@ from analysis_service.answer_forms import (
     answer_suggestions,
     facets_json,
 )
-from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import (
     ANSWER_LIMITS,
     AlreadyResumed,
-    Answers,
     AnswerState,
-    QuestionSet,
-    Revision,
     SourcesOverLimit,
     StaleRevision,
 )
 from analysis_service.api import (
     JOB_REFUSAL_STATUS,
-    AmendmentSubmission,
-    AnswersSubmission,
-    CorrectionsSubmission,
     FrameworkRequest,
     JobSubmission,
 )
@@ -176,7 +174,7 @@ from analysis_service.config_files import (
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
 from analysis_service.engine import DEFAULT_CALLER
-from analysis_service.errors import error_place, refusal_text
+from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import (
     FactAnswer,
     SkipKey,
@@ -664,30 +662,6 @@ def _body_of(raw: object, model: type[BaseModel]) -> dict[str, object]:
             + "."
         )
     return raw
-
-
-def _over_the_bound(
-    body: dict[str, object], model: type[BaseModel], fields: tuple[str, ...]
-) -> str | None:
-    """The /v1 refusal of each of ``fields`` in ``body`` that is longer than
-    ``model`` admits, or ``None`` where none is.
-
-    The /v1 model is the one reader of each list's bound: the route asks it
-    and keeps only the refusals of a bound, so both entry points refuse the
-    same bodies and name the bound the same way. A body that fails for any
-    other reason is not over the bound; the route reads it on, and refuses it
-    with the message for that failure.
-    """
-    try:
-        model.model_validate(body)
-    except ValidationError as exc:
-        refusals = [
-            f"{error_place(error)}: {error['msg']}"
-            for error in exc.errors()
-            if error["type"] == "too_long" and error_place(error) in fields
-        ]
-        return "; ".join(refusals) if refusals else None
-    return None
 
 
 def _name_of(record: Envelope) -> str:
@@ -1557,57 +1531,24 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            body = await request.json()
-        except ValueError:
-            body = None  # refused below, as every other malformed body is
-        questions = _questions_of(workspace, answers, run_id)
-        try:
-            body = _body_of(body, AnswersSubmission)
-            raw = body["links"]
-            raw_facts = body.get("facts", [])
-            if refused := _over_the_bound(
-                body, AnswersSubmission, ("links", "facts", "skip", "presented")
-            ):
-                return _message(
-                    400,
-                    f"{refused}. Save your answers in parts, then run the follow-up.",
-                )
-            if not isinstance(raw, list):
-                raise TypeError
-            links = [LinkAnswer.model_validate(link) for link in raw]
-            if not isinstance(raw_facts, list):
-                raise TypeError
-            facts = [await _fact_answer(fact, questions) for fact in raw_facts]
-            save = body.get("save", False)
-            if not isinstance(save, bool):
-                raise TypeError
-            skips = _skips(body.get("skip", []))
-            presented = _presented(body.get("presented", []))
-            revision = body.get("revision")
-            if revision is not None:
-                revision = _revision(revision)
-        except (InvalidFactAnswer, _UnknownKey) as exc:
-            return _message(400, str(exc))
-        except (ValidationError, ValueError, KeyError, TypeError):
-            return _message(
-                400,
-                "Expected a JSON body with a 'links' list and a 'facts' list of"
-                " answers this report asked for.",
-            )
+            submitted = read_answers(await _json(request))
+        except BodyRefused as refused:
+            message = await _refusal_words(refused, workspace, answers, run_id)
+            if refused.over_a_bound:
+                message += ". Save your answers in parts, then run the follow-up."
+            return _message(400, message)
         owner_id = await workspace.owner_id(answers, run_id)
         # A save starts no job, so it needs no room.
-        room = nullcontext() if save else workspace.make_room(answers, answering=run_id)
+        room = (
+            nullcontext()
+            if submitted.save
+            else workspace.make_room(answers, answering=run_id)
+        )
         async with room:
             outcome = await answers.answer(
                 run_id,
                 owner_id,
-                Answers(
-                    given=AnswerSet(links=tuple(links), facts=tuple(facts)),
-                    save=save,
-                    skips=skips,
-                    presented=presented,
-                    revision=revision,
-                ),
+                submitted,
                 start=workspace.start(current.deadline_seconds),
             )
         if isinstance(outcome, Started):
@@ -1632,22 +1573,16 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            body = _body_of(await request.json(), AmendmentSubmission)
-            text = body["text"]
-            revision = _revision(body["revision"])
-            if not isinstance(text, str):
-                raise TypeError
-        except _UnknownKey as exc:
-            return _message(400, str(exc))
-        except (ValueError, KeyError, TypeError):
-            return _message(400, "Expected a JSON body with a 'text' and a 'revision'.")
+            amendment = read_amendment(await _json(request))
+        except BodyRefused as refused:
+            return _message(400, str(refused))
         owner_id = await workspace.owner_id(answers, run_id)
         async with workspace.make_room(answers, answering=run_id):
             started = await answers.amend(
                 run_id,
                 owner_id,
-                text,
-                revision=revision,
+                amendment.text,
+                revision=amendment.revision,
                 start=workspace.start(current.deadline_seconds),
             )
         return JSONResponse({"run": started.job_id})
@@ -1713,42 +1648,21 @@ def create_app(
             return _message(403, "This request did not come from the app's own page.")
         current = cell.read(unavailable)
         answers = current.answers
-        questions = _questions_of(workspace, answers, run_id)
         try:
-            body = _body_of(await request.json(), CorrectionsSubmission)
-            raw = body["facts"]
-            if not isinstance(raw, list):
-                raise TypeError
-            if refused := _over_the_bound(body, CorrectionsSubmission, ("facts",)):
-                return _message(400, f"{refused}.")
-            facts = [await _fact_answer(fact, questions) for fact in raw]
-            revision = _revision(body["revision"])
-        except (InvalidFactAnswer, _UnknownKey) as exc:
-            return _message(400, str(exc))
-        except (ValidationError, ValueError, KeyError, TypeError):
+            corrections = read_corrections(await _json(request))
+        except BodyRefused as refused:
             return _message(
-                400,
-                "Expected a JSON body with a 'facts' list of corrections and a"
-                " 'revision'.",
+                400, await _refusal_words(refused, workspace, answers, run_id)
             )
         corrected = await answers.correct(
-            run_id, await workspace.owner_id(answers, run_id), facts, revision=revision
+            run_id,
+            await workspace.owner_id(answers, run_id),
+            corrections.facts,
+            revision=corrections.revision,
         )
         return JSONResponse({"run": corrected.job_id})
 
     return app
-
-
-_REVISION: TypeAdapter[int] = TypeAdapter(Revision)
-
-
-def _revision(value: object) -> int:
-    """The revision a page sent, or :class:`ValidationError`.
-
-    Read by :data:`~analysis_service.answer_state.Revision`, the type the HTTP
-    models declare, so the page and the route refuse the same values.
-    """
-    return _REVISION.validate_python(value)
 
 
 def _framework_fields(frameworks: Sequence[FrameworkName]) -> str:
@@ -1817,71 +1731,41 @@ def _option_control(name: FrameworkName, field: str, annotation: object) -> str:
     )
 
 
-# Each list's bound is the /v1 model's, which ``_over_the_bound`` asks first.
-_SKIPS: TypeAdapter[list[SkipKey]] = TypeAdapter(list[SkipKey])
-_PRESENTED: TypeAdapter[list[UnknownKey]] = TypeAdapter(list[UnknownKey])
+async def _json(request: Request) -> object:
+    """The request's body as JSON, or ``None`` for a body that is not JSON.
 
-
-def _presented(raw: object) -> list[UnknownKey]:
-    """The early questions the page says it showed, or a ``TypeError``."""
+    ``None`` is a body the reader refuses as it refuses every other body
+    that is not an object, so a page gets the one refusal wording.
+    """
     try:
-        return _PRESENTED.validate_python(raw)
-    except ValidationError as exc:
-        raise TypeError from exc
+        return await request.json()
+    except ValueError:
+        return None
 
 
-def _skips(raw: object) -> list[SkipKey]:
-    """The keys a save skips (:data:`SkipKey`), or a ``TypeError``."""
+async def _refusal_words(
+    refused: BodyRefused, workspace: Workspace, answers: JobAnswers, run_id: str
+) -> str:
+    """The page's words for a refused body.
+
+    A refusal that names a question of the run names it by its label, which
+    means something on a page where its six-part key does not; the words
+    are the rule's own, which name the submitter's choices, so they are safe
+    to show. The run is read only for that label. Every other refusal is the
+    reader's own sentence.
+    """
+    if refused.question is None:
+        return str(refused)
     try:
-        return _SKIPS.validate_python(raw)
-    except ValidationError as exc:
-        raise TypeError from exc
-
-
-class InvalidFactAnswer(Exception):
-    """One fact answer the page sent does not parse; the message names its question."""
-
-
-def _questions_of(
-    workspace: Workspace, answers: JobAnswers, run_id: str
-) -> Callable[[], Awaitable[QuestionSet]]:
-    """The run's Question Set, read only where a refusal needs a label."""
-
-    async def read() -> QuestionSet:
         answerable = await answers.answerable(
             run_id, await workspace.owner_id(answers, run_id)
         )
-        return answerable.state().questions
-
-    return read
-
-
-async def _fact_answer(
-    raw: object, questions: Callable[[], Awaitable[QuestionSet]]
-) -> FactAnswer:
-    """The answer, or an :class:`InvalidFactAnswer` that names the question it answers.
-
-    The message is the validator's own, which names the submitter's choices,
-    so it is safe to show. The questions are read only for that message.
-    """
-    try:
-        return FactAnswer.model_validate(raw)
-    except ValidationError as error:
-        reason = error.errors()[0]["msg"].removeprefix("Value error, ")
-        key = raw.get("key") if isinstance(raw, dict) else None
-        parts = tuple(key) if isinstance(key, list) else ()
-        label = None
-        if all(isinstance(part, str) for part in parts):
-            try:
-                asked = await questions()
-            except (NoSuchJob, NotCompleted, Withheld):
-                asked = None
-            if asked is not None:
-                known = asked.asked | {q.key for q, _ in asked.answered_early}
-                if parts in known:
-                    label = fact_label(parts, asked.model, asked.catalog)
-        lead = "An answer" if label is None else f'The answer to "{label}"'
-        raise InvalidFactAnswer(f"{lead} was refused: {reason}") from None
+    except (NoSuchJob, NotCompleted, Withheld):
+        return str(refused)
+    label = answerable.state().questions.label(refused.question)
+    if label is None:
+        return str(refused)
+    return f'The answer to "{label}" was refused: {refused.reason}'
 
 
 def _frame(event: str, data: dict[str, object]) -> str:

@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import re
 from collections.abc import Callable, Iterator
+from functools import partial
 from typing import TypeGuard
 
 from tests.source_tree import REPO_ROOT, parse, source_files
@@ -372,6 +373,17 @@ LOC_READERS: dict[Site, str] = {
         "it asks whether the error sits on one grounds entry, by index, and"
         " makes no place"
     ),
+    ("src/analysis_service/answer_bodies.py", "_question_of"): (
+        "it finds the fact answer the error sits in, by index, and makes no place"
+    ),
+    ("src/analysis_service/answer_bodies.py", "over_a_bound"): (
+        "it asks whether the error sits on a list of the body itself, and"
+        " makes no place"
+    ),
+    ("src/analysis_service/api.py", "_body_refused"): (
+        "it puts the reader's places under ``body``, where every other"
+        " refusal of a request body sits; ``error_place`` then makes the place"
+    ),
 }
 
 
@@ -387,6 +399,7 @@ def test_each_declared_site_still_reads_the_rule_itself():
     assert LOC_READERS.keys() <= set(_sites(_reads_loc))
     assert CONFIG_DEFAULT_READERS.keys() <= set(_sites(_reads_a_config_default))
     assert ID_DERIVERS.keys() <= set(_sites(_derives_an_id))
+    assert STORED_ANSWER_READERS.keys() <= set(_sites(_validates_an_answer))
 
 
 def test_the_cell_has_one_reader():
@@ -648,11 +661,16 @@ def _declares_a_max_length(node: ast.AST, *names: str) -> TypeGuard[ast.Call]:
     )
 
 
+#: The modules that declare the /v1 body models: a job's submission, and the
+#: answer bodies both drivers read through ``answer_bodies``.
+_V1_MODELS = ("src/analysis_service/api.py", "src/analysis_service/answer_bodies.py")
+
 #: Each name a /v1 model declares as a list's ``max_length``: the bounds the
 #: web app reads through those models.
 _V1_BOUNDS = frozenset(
     keyword.value.id
-    for node in ast.walk(parse(REPO_ROOT / "src/analysis_service/api.py"))
+    for module in _V1_MODELS
+    for node in ast.walk(parse(REPO_ROOT / module))
     if _declares_a_max_length(node)
     for keyword in node.keywords
     if keyword.arg == "max_length" and isinstance(keyword.value, ast.Name)
@@ -672,12 +690,86 @@ def _reads_a_v1_bound(node: ast.AST) -> bool:
 def test_the_answer_bounds_are_read_through_the_v1_models():
     """No route compares a list's length to a /v1 bound itself, and none
     declares a bound of its own. The /v1 models declare each bound as
-    ``max_length``, and ``_over_the_bound`` asks them, so the web app and /v1
-    refuse the same bodies."""
+    ``max_length``, and ``answer_bodies`` reads each answer body through
+    them, so the web app and /v1 refuse the same bodies."""
     assert {"MAX_SKIPS", "MAX_HELD_FACTS"} <= _V1_BOUNDS
     assert [
         site for site in _sites(_reads_a_v1_bound) if site[0].startswith("webapp/")
     ] == []
+
+
+#: The models an answer body is read into, and the two answers inside one.
+_ANSWER_MODELS = (
+    "AnswersSubmission",
+    "AmendmentSubmission",
+    "CorrectionsSubmission",
+    "LinkAnswer",
+    "FactAnswer",
+)
+
+
+def _validates_an_answer(node: ast.AST) -> bool:
+    return (
+        _calls(node, "model_validate")
+        and isinstance(node.func, ast.Attribute)
+        and _is_name(node.func.value, *_ANSWER_MODELS)
+    )
+
+
+#: Each site that validates an answer the service itself wrote, and where that
+#: answer comes from. No request body reaches one.
+STORED_ANSWER_READERS: dict[Site, str] = {
+    ("src/analysis_service/fact_answers.py", "merged_facts"): (
+        "builds one facet answer from two answers admission already read"
+    ),
+    ("src/analysis_service/graph.py", "_resolve_assertions"): (
+        "reads the answers the driver seeded in the graph state, which admission wrote"
+    ),
+    ("evals/harness/withheld.py", "load_answer_file"): "reads a corpus answer file",
+    ("evals/harness/withheld.py", "answers_within_saves"): (
+        "builds the answers a replayed save gives"
+    ),
+    ("evals/harness/early_rounds.py", "answer"): (
+        "builds the answer an offline answerer gives"
+    ),
+    ("evals/harness/early_rounds.py", "dont_know"): (
+        "builds the answer an offline answerer gives"
+    ),
+}
+
+
+def test_an_answer_body_has_one_reader():
+    """Only ``answer_bodies`` reads an answer out of a request body. The
+    ``/v1`` routes and the first-run app both call it, so one site applies
+    the keys, shapes and bounds a body meets."""
+    assert set(_sites(_validates_an_answer)) == STORED_ANSWER_READERS.keys()
+    assert ("src/analysis_service/answer_bodies.py", "_read") in _sites(
+        partial(_calls, name="model_validate")
+    )
+
+
+def _reads_a_body_key(node: ast.AST) -> bool:
+    """Whether ``node`` reads the ``skip`` or ``presented`` key of a body by
+    hand, or builds a type adapter over a body field's type."""
+    if isinstance(node, ast.Subscript):
+        return isinstance(node.slice, ast.Constant) and node.slice.value in (
+            "skip",
+            "presented",
+        )
+    if _calls(node, "get"):
+        return (
+            bool(node.args)
+            and isinstance(node.args[0], ast.Constant)
+            and node.args[0].value in ("skip", "presented")
+        )
+    return _calls(node, "TypeAdapter") and _held(
+        node, lambda inner: _is_name(inner, "SkipKey", "Revision")
+    )
+
+
+def test_no_site_reads_an_answer_body_field_by_hand():
+    """The reader's models read each field; no route reads one off the body."""
+    assert _sites(_reads_a_body_key) == []
 
 
 def _spells_a_sampling_key(node: ast.AST) -> bool:
