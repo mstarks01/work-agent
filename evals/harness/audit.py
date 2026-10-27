@@ -1141,7 +1141,7 @@ def append_grant(grant: Grant, directory: Path | None = None) -> Path:
 
 
 @dataclass(frozen=True)
-class Standing:
+class AuditState:
     """What one audit holds and has used: the reading a resume starts from."""
 
     audit_id: str
@@ -1171,9 +1171,9 @@ def _cost(experiment: Experiment) -> float:
     return experiment.estimated_usd or 0.0
 
 
-def standing(
+def audit_state(
     audit_id: str, ledger: Sequence[Experiment], grants: Sequence[Grant]
-) -> Standing:
+) -> AuditState:
     """The grants of one audit added up, beside what its rows have used."""
     rows = [one for one in ledger if one.audit_id == audit_id]
     mode = max((one.mode for one in grants), key=MODES.index, default=MODES[0])
@@ -1185,7 +1185,7 @@ def standing(
         )
         for blocked, extension in extensions.items()
     }
-    return Standing(
+    return AuditState(
         audit_id=audit_id,
         grants=len(grants),
         mode=mode,
@@ -1256,7 +1256,7 @@ def admit(
     """
     where = new.experiment_id
     by_id = {one.experiment_id: one for one in ledger}
-    held = standing(new.audit_id, ledger, grants)
+    held = audit_state(new.audit_id, ledger, grants)
 
     spent = held.spent_usd + _cost(new)
     if spent > held.budget_usd + 1e-9:
@@ -1527,7 +1527,7 @@ def exhausted_line(
     return "exhausted holdouts, counted as development: " + ", ".join(named)
 
 
-def render_standing(held: Standing) -> Iterator[str]:
+def render_audit_state(held: AuditState) -> Iterator[str]:
     """One audit's grants beside what it has used, for a resume to start from."""
     if not held.grants:
         yield f"{held.audit_id}: no grant on record, so mode audit and $0 to spend"
@@ -1669,8 +1669,8 @@ def command_experiments(args: argparse.Namespace) -> int:
             print(record(Path(args.record)))
             return 0
         if args.audit:
-            for line in render_standing(
-                standing(args.audit, load(), load_grants(args.audit))
+            for line in render_audit_state(
+                audit_state(args.audit, load(), load_grants(args.audit))
             ):
                 print(line)
             print()

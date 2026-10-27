@@ -26,7 +26,7 @@ them, and :func:`fact_kind` says which.
 each answer as one line of the answers Source. The admission check refuses
 an answer longer than :func:`~analysis_service.answer_forms.answer_limit`,
 which keeps the line, with the longest detail, within
-:data:`~analysis_service.assertions.MAX_QUOTE_CHARS`.
+:data:`~analysis_service.system_model.EXCERPT_MAX_CHARS`.
 
 **An answer of** ``unknown`` **says the submitter does not know.** It writes
 nothing structured, the fact stays open, and it covers no finding. It reaches
@@ -121,7 +121,7 @@ MAX_HELD_FACTS = 5 * MAX_FACT_ANSWERS
 MAX_DETAIL_CHARS = 300
 
 #: What a save skips for now: an early question's fact key, or a link
-#: question's key, the :func:`~analysis_service.links.fold` of its principal.
+#: question's key, the :func:`~analysis_service.links.fold_principal` of its principal.
 #: A skip of a link places nothing and never means "none of these".
 SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length=200)]
 

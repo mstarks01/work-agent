@@ -96,9 +96,7 @@ def report_rows(report: Report) -> Mapping[str, str]:
     return row_controls(report.assertions.catalog if report.assertions else None)
 
 
-def grounded_mechanism(
-    claim: Claim, rows: Mapping[str, str] = NO_ROWS
-) -> frozenset[str]:
+def grounded_mechanism(claim: Claim, rows: Mapping[str, str]) -> frozenset[str]:
     """The controls a claim's own grounds say are unstated, missing or settled.
 
     Read from fields, never prose: the attribute of each unknown or absent
@@ -146,7 +144,7 @@ def cited_channels(
 def mechanism_of(
     claim: Claim,
     flows: Mapping[str, tuple[str, str]],
-    rows: Mapping[str, str] = NO_ROWS,
+    rows: Mapping[str, str],
 ) -> frozenset[str]:
     """A claim's whole mechanism: its grounded controls and its channels."""
     return grounded_mechanism(claim, rows) | cited_channels(

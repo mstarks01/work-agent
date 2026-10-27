@@ -53,7 +53,9 @@ from analysis_service.capabilities import (
 )
 from analysis_service.grounding import MovedKind, meaning_moved
 from analysis_service.question_kinds import ALL_FACET_IDS, MAX_FACETS, QUESTION_KINDS
+from analysis_service.sources import MAX_LABEL_CHARS
 from analysis_service.system_model import (
+    ELEMENT_ID_MAX_CHARS,
     SystemModel,
     all_attribute_names,
 )
@@ -317,7 +319,7 @@ class UnknownRef(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    element_id: str = Field(default="", max_length=300)
+    element_id: str = Field(default="", max_length=ELEMENT_ID_MAX_CHARS)
     # The provider-facing schema lists the legal names, so a constrained
     # critic cannot spell ``description`` or ``notes`` here: the live critic
     # did so 132 times in six runs and every one fired the bounded re-ask.
@@ -364,7 +366,9 @@ class UnknownRef(BaseModel):
     )
     #: The parts of the ``question`` kind the argument rests on, by facet ID,
     #: where it rests on some of them and not on all (ADR 0073). Empty where it
-    #: rests on the whole question, and for every other spelling. A facet the
+    #: rests on the whole question, and for every other spelling: the review
+    #: seam (:func:`~analysis_service.critic.review_issues`) refuses facets on
+    #: an entry of another spelling. A facet the
     #: kind does not have names nothing, and a reference that names none of
     #: its kind's facets waits on the whole question
     #: (:func:`~analysis_service.fact_answers.needed_facets`).
@@ -487,6 +491,11 @@ def name_unknown(ref: UnknownRef) -> str:
 # validation here and cost the job the whole report. One name, so the bound the
 # producer tests and the bound this field accepts cannot drift apart.
 GROUND_TERM_MAX_CHARS = 100
+
+#: The longest quote a ground carries. A quote candidate and a quote repair
+#: hold the same bound, so a candidate that validates resolves into a ground
+#: that validates.
+GROUND_TEXT_MAX_CHARS = 1000
 
 
 # How long the lists a model fills may get (OWASP LLM10). Every scalar a lane
@@ -621,9 +630,10 @@ class Ground(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: GroundKind
-    text: str = Field(default="", max_length=1000)  # quote
-    source_label: str = Field(default="", max_length=200)  # quote
-    element_id: str = Field(default="", max_length=300)  # both attribute branches
+    text: str = Field(default="", max_length=GROUND_TEXT_MAX_CHARS)  # quote
+    source_label: str = Field(default="", max_length=MAX_LABEL_CHARS)  # quote
+    # both attribute branches
+    element_id: str = Field(default="", max_length=ELEMENT_ID_MAX_CHARS)
     # The same enum its sibling above carries. Both Ground shapes carry the
     # enum, so a critic cannot spell ``description`` on either.
     attribute: AttributeName = Field(
@@ -631,7 +641,7 @@ class Ground(BaseModel):
         max_length=100,
         json_schema_extra={"enum": ["", *all_attribute_names()]},
     )  # both attribute branches
-    flow_id: str = Field(default="", max_length=300)  # derived-fact
+    flow_id: str = Field(default="", max_length=ELEMENT_ID_MAX_CHARS)  # derived-fact
     term: str = Field(default="", max_length=GROUND_TERM_MAX_CHARS)  # absent-element
     assertion: str = Field(default="", max_length=600)  # assertion
 
@@ -1352,8 +1362,8 @@ class QuoteCandidate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    text: str = Field(min_length=1, max_length=1000)
-    source_label: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1, max_length=GROUND_TEXT_MAX_CHARS)
+    source_label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
 
 
 class Proposal(BaseModel):
@@ -1721,7 +1731,7 @@ class RepairedQuote(BaseModel):
 
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
     index: int = Field(ge=0)
-    written: str = Field(min_length=1, max_length=1000)  # Ground.text's bound
+    written: str = Field(min_length=1, max_length=GROUND_TEXT_MAX_CHARS)
     similarity: float = Field(ge=0.0, le=1.0)
     moved: list[MovedKind]
     scan_complete: bool | None = None
@@ -2622,8 +2632,9 @@ class FrameworkAnalysis(BaseModel):
     knowledge_docs: list[str] = Field(default_factory=list)
     #: How many **Candidates** fire only because of the assertion catalog: the
     #: leads this job's rules give that the same rules give no lane on the model
-    #: before the catalog's projection. ``None`` where no catalog was held, so
-    #: an unmeasured job never reads as a zero.
+    #: before the catalog's projection. ``None`` where no catalog was held or
+    #: the precondition refused the model, so an unmeasured block never reads
+    #: as a zero.
     catalog_leads: int | None = Field(default=None, ge=0)
     summary: SerializeAsAny[BlockSummary]
 

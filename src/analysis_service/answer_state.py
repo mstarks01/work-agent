@@ -92,7 +92,7 @@ from analysis_service.links import (
     LinkQuestion,
     apply_answers,
     check_answers,
-    fold,
+    fold_principal,
     link_questions,
     resumed_sources,
 )
@@ -584,7 +584,7 @@ class QuestionSet:
         merged = merged_facts(earlier.facts, facts)
         complete: frozenset[SkipKey] = answered_keys(merged) & {
             fact.key for fact in facts
-        } | {fold(link.principal) for link in links}
+        } | {fold_principal(link.principal) for link in links}
         shown = self._check_presented(presented)
         self._check_skips(skips, complete, save, shown)
         if self.final:
@@ -895,7 +895,7 @@ def question_set(
         and question.key not in aside | done
         and not passes_floor(question, listed)
     )
-    linked = {fold(link.principal): link for link in answered.links}
+    linked = {fold_principal(link.principal): link for link in answered.links}
     open_links = link_questions(catalog, view)
     return QuestionSet(
         model=view,
@@ -1266,7 +1266,7 @@ def grouped(questions: Sequence[EarlyQuestion]) -> tuple[EarlyQuestion, ...]:
 
 
 def by_turn(
-    questions: Sequence[EarlyQuestion], charged: Mapping[str, int] | None = None
+    questions: Sequence[EarlyQuestion], charged: Mapping[str, int] | None
 ) -> list[EarlyQuestion]:
     """The questions with the selected frameworks taken in turn.
 
@@ -1315,7 +1315,7 @@ def _in_turn(
     *,
     serves: Callable[[_Item], set[str]],
     choices: Callable[[_Item], int],
-    charged: Mapping[str, int] | None = None,
+    charged: Mapping[str, int] | None,
 ) -> list[_Item]:
     """The items with the selected frameworks taking turns.
 
@@ -1348,8 +1348,11 @@ def _adds_information(earlier: AnswerSet, given: AnswerSet) -> bool:
     of a facet answer only the facets answered otherwise count. A changed
     detail counts too (ADR 0073).
     """
-    placed = {fold(link.principal): link.element for link in earlier.links}
-    if any(placed.get(fold(link.principal)) != link.element for link in given.links):
+    placed = {fold_principal(link.principal): link.element for link in earlier.links}
+    if any(
+        placed.get(fold_principal(link.principal)) != link.element
+        for link in given.links
+    ):
         return True
     before = {fact.key: fact for fact in earlier.facts}
     after = {fact.key: fact for fact in merged_facts(earlier.facts, given.facts)}
@@ -1582,10 +1585,12 @@ class AnswerState:
             return Carried(taken=NO_ANSWERS, dropped=NO_ANSWERS)
         base = self._question_set(self.answers)
         saved = {answer.key for answer in self.answers.facts}
-        placed = {fold(link.principal) for link in self.answers.links}
+        placed = {fold_principal(link.principal) for link in self.answers.links}
         facts = [a for a in self.carried_in.facts if a.key not in saved]
         links = [
-            link for link in self.carried_in.links if fold(link.principal) not in placed
+            link
+            for link in self.carried_in.links
+            if fold_principal(link.principal) not in placed
         ]
         taken_facts = tuple(
             a for a in facts if self._admits(base, AnswerSet(facts=(a,)))

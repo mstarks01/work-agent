@@ -79,10 +79,19 @@ from analysis_service.grounding import (
     placements,
     verify_quote,
 )
+from analysis_service.parsing import Sha256Hex
 from analysis_service.references import canonical
-from analysis_service.sources import ANSWERS_LABEL, check_answer_quotes, text_digest
+from analysis_service.sources import (
+    ANSWERS_LABEL,
+    MAX_LABEL_CHARS,
+    check_answer_quotes,
+    text_digest,
+)
 from analysis_service.system_model import (
+    CONTROL_VALUE_MAX_CHARS,
     ELEMENT_ID,
+    ELEMENT_ID_MAX_CHARS,
+    EXCERPT_MAX_CHARS,
     UNKNOWN,
     Assumption,
     DataClassification,
@@ -104,7 +113,6 @@ __all__ = [
     "MAX_ASSERTIONS",
     "MAX_PREMISES",
     "MAX_QUALIFIERS",
-    "MAX_QUOTE_CHARS",
     "MAX_SPANS",
     "MAX_SUBJECTS",
     "PROJECTION_EFFECT",
@@ -126,6 +134,7 @@ __all__ = [
     "CatalogIssue",
     "CatalogIssueCode",
     "CatalogProposal",
+    "CatalogStatus",
     "Conflict",
     "Contradiction",
     "Origin",
@@ -138,7 +147,6 @@ __all__ = [
     "QuoteProposal",
     "Refusal",
     "SpanSource",
-    "Standing",
     "Subject",
     "SubjectType",
     "SupportSpan",
@@ -353,12 +361,6 @@ MAX_PREMISES = 8
 #: The most qualifiers one scope may carry, one per :data:`QualifierKind` and
 #: one over.
 MAX_QUALIFIERS = 6
-
-#: What a value may run to, matching the control attributes it projects into.
-MAX_VALUE_CHARS = 200
-
-#: What a quote may run to, matching a **Source Excerpt**.
-MAX_QUOTE_CHARS = 1000
 
 
 @dataclass(frozen=True)
@@ -652,7 +654,7 @@ class Qualifier(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: QualifierKind
-    value: str = Field(min_length=1, max_length=MAX_VALUE_CHARS)
+    value: str = Field(min_length=1, max_length=CONTROL_VALUE_MAX_CHARS)
 
 
 class SupportSpan(BaseModel):
@@ -673,11 +675,11 @@ class SupportSpan(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    source_label: str = Field(min_length=1, max_length=200)
-    digest: str = Field(min_length=64, max_length=64)
+    source_label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
+    digest: Sha256Hex
     start: int = Field(ge=0)
     end: int = Field(gt=0)
-    quote: str = Field(min_length=1, max_length=MAX_QUOTE_CHARS)
+    quote: str = Field(min_length=1, max_length=EXCERPT_MAX_CHARS)
 
 
 class Subject(BaseModel):
@@ -699,7 +701,7 @@ class Subject(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    id: str = Field(max_length=300, pattern=ELEMENT_ID)
+    id: str = Field(max_length=ELEMENT_ID_MAX_CHARS, pattern=ELEMENT_ID)
     type: SubjectType
     label: str = Field(min_length=1, max_length=200)
 
@@ -718,9 +720,9 @@ class Assertion(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    subject: str = Field(max_length=300, pattern=ELEMENT_ID)
+    subject: str = Field(max_length=ELEMENT_ID_MAX_CHARS, pattern=ELEMENT_ID)
     predicate: str = Field(min_length=1, max_length=60)
-    value: str = Field(min_length=1, max_length=MAX_VALUE_CHARS)
+    value: str = Field(min_length=1, max_length=CONTROL_VALUE_MAX_CHARS)
     scope: list[Qualifier] = Field(default_factory=list, max_length=MAX_QUALIFIERS)
     basis: Basis
     origin: Origin
@@ -1321,12 +1323,13 @@ def spans_for(quote: str, prepared: SpanSource) -> tuple[SupportSpan, ...]:
     split :func:`~analysis_service.grounding.fragments` makes — ``strict``,
     so the two readers cannot silently drift apart.
 
-    **A quote past :data:`MAX_QUOTE_CHARS` takes no span.** Refused rather than
-    cut: a truncated quote beside the offsets of the whole one is a span that
-    does not hold what it says it holds, and a citation is bounded but never
-    rewritten — the rule a **Source**'s label already follows.
+    **A quote past
+    :data:`~analysis_service.system_model.EXCERPT_MAX_CHARS` takes no span.**
+    Refused rather than cut: a truncated quote beside the offsets of the whole
+    one is a span that does not hold what it says it holds, and a citation is
+    bounded but never rewritten — the rule a **Source**'s label already follows.
     """
-    if len(quote) > MAX_QUOTE_CHARS:
+    if len(quote) > EXCERPT_MAX_CHARS:
         return ()
     located = locate_quote(quote, prepared.indexed)
     if located is None:
@@ -1559,7 +1562,7 @@ def projection_fields() -> Mapping[str, str]:
 #: no row at all; ``unknown`` is rows that all read :data:`UNKNOWN`;
 #: ``conflicting`` is a disagreement and nothing settled beside it;
 #: ``answered`` is at least one row a consumer may rest on.
-Standing = Literal["unasked", "answered", "unknown", "conflicting"]
+CatalogStatus = Literal["unasked", "answered", "unknown", "conflicting"]
 
 
 @dataclass(frozen=True)
@@ -1583,7 +1586,7 @@ class Answer:
     conflicts: tuple[Conflict, ...]
 
     @property
-    def standing(self) -> Standing:
+    def status(self) -> CatalogStatus:
         if self.settled:
             return "answered"
         if self.conflicts:
@@ -2132,8 +2135,8 @@ class QuoteProposal(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    source_label: str = Field(min_length=1, max_length=200)
-    quote: str = Field(min_length=1, max_length=MAX_QUOTE_CHARS)
+    source_label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
+    quote: str = Field(min_length=1, max_length=EXCERPT_MAX_CHARS)
 
 
 class AssertionProposal(BaseModel):
@@ -2171,7 +2174,7 @@ class AssertionProposal(BaseModel):
         max_length=60,
         json_schema_extra={"enum": [*sorted(REGISTRY)]},
     )
-    value: str = Field(min_length=1, max_length=MAX_VALUE_CHARS)
+    value: str = Field(min_length=1, max_length=CONTROL_VALUE_MAX_CHARS)
     reason: ProposedReason | None = None
     scope: list[Qualifier] = Field(default_factory=list, max_length=MAX_QUALIFIERS)
     basis: ProposedBasis
@@ -3080,7 +3083,9 @@ def qualified(
     text = f"{UNKNOWN}; {because or _QUALIFIED_BECAUSE[projection.reason]}" + (
         f": {said}" if said else ""
     )
-    return text if len(text) <= MAX_VALUE_CHARS else text[: MAX_VALUE_CHARS - 1] + "…"
+    if len(text) <= CONTROL_VALUE_MAX_CHARS:
+        return text
+    return text[: CONTROL_VALUE_MAX_CHARS - 1] + "…"
 
 
 def projected_attribute(predicate: str, subject: str) -> str:

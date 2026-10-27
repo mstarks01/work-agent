@@ -78,7 +78,7 @@ def rulings_from_report(
             name: getattr(claim.verdict, name) for name in verdict_type.model_fields
         }
         for name in record.model_fields:
-            if name in ("id", "verdict") or not hasattr(claim, name):
+            if name in Ruling.model_fields or not hasattr(claim, name):
                 continue
             value = getattr(claim, name)
             draft = by_id.get(claim.id)

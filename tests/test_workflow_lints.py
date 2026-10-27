@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.vendors import SECRET_FILE_SUFFIX
+from analysis_service.config_files import SECRET_FILE_SUFFIX
 from tests.source_tree import PYTHON, REPO_ROOT, WORKFLOWS, parse, source_files
 
 pytestmark = pytest.mark.lint

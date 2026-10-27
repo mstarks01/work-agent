@@ -368,7 +368,7 @@ def _snapped_ground(
 def snap_drafts(
     drafts: Iterable[Claim],
     element_ids: Collection[str],
-    source_labels: Collection[str] = (),
+    source_labels: Collection[str],
 ) -> list[Claim]:
     """Every reference a draft carries, in the spelling the job holds.
 

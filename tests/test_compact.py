@@ -32,6 +32,7 @@ from analysis_service.compact import (
     REF,
     REF_TAGS,
     REFERENCE_FIELDS,
+    CompactAssumption,
     CompactSystemModel,
     ExtractionFormat,
     expand,
@@ -49,6 +50,7 @@ from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from analysis_service.system_model import (
     ELEMENT_GROUPS,
     UNKNOWN,
+    Assumption,
     Element,
     EmittedSystemModel,
     Process,
@@ -675,6 +677,25 @@ class TestTheTablesAnswerTheirRegistries:
                     diverging[f"{group}.{name}"] = field.default
 
         assert set(diverging) == {"data_flows.operations"}
+
+    def test_a_compact_row_keeps_every_bound_the_full_row_has(self):
+        """A value one route admits, the other route admits too.
+
+        Each compact field that mirrors a full field carries the full field's
+        length and pattern constraints. A reference field holds a ref on the
+        compact route, so only its compact side carries a pattern.
+        """
+        pairs = [*COMPACT_ELEMENTS.values(), (CompactAssumption, Assumption)]
+        diverging = [
+            f"{compact_type.__name__}.{name}"
+            for compact_type, full_type in pairs
+            for name, field in full_type.model_fields.items()
+            if field.metadata
+            and name in compact_type.model_fields
+            and compact_type.model_fields[name].metadata != field.metadata
+        ]
+
+        assert diverging == []
 
     def test_the_root_lists_are_the_full_route_s_own(self):
         """One vocabulary for both routes, so expansion is a row-by-row copy."""

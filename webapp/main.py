@@ -212,7 +212,7 @@ from analysis_service.jobs import (
 from analysis_service.links import (
     LinkAnswer,
     components,
-    fold,
+    fold_principal,
 )
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import (
@@ -1054,7 +1054,7 @@ def _earlier_payload(
         ],
         "links": [
             {
-                "key": fold(link.principal),
+                "key": fold_principal(link.principal),
                 "principal": link.principal,
                 "options": options,
                 "answer": link.model_dump(mode="json"),

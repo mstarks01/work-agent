@@ -22,6 +22,7 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import text_digest
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
@@ -120,7 +121,7 @@ class AdversarialCase(BaseModel):
     #: says so per case rather than repository-wide.
     provenance: str = Field(min_length=1)
     source_file: str = "source.md"
-    source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_sha256: Sha256Hex
     expectations: Expectations
 
     @property

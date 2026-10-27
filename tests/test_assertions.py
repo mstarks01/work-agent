@@ -23,7 +23,6 @@ from analysis_service.assertions import (
     GATE_REFUSALS,
     GRAPH_BOUND,
     MAX_ASSERTIONS,
-    MAX_QUOTE_CHARS,
     MAX_SPANS,
     MAX_SUBJECTS,
     PROJECTION_EFFECT,
@@ -77,6 +76,7 @@ from analysis_service.deployment import DEFAULT_PROMPTS_DIR
 from analysis_service.evidence import evidence_catalog, unknown_evidence_ref
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import (
+    EXCERPT_MAX_CHARS,
     UNKNOWN,
     CapabilityStatement,
     SystemModel,
@@ -424,7 +424,7 @@ class TestASpanIsLocatedByCode:
 
     def test_a_quote_past_the_bound_takes_no_span(self):
         """Refused rather than cut: a cut quote beside whole offsets is a lie."""
-        assert support_span("x" * (MAX_QUOTE_CHARS + 1), SOURCE_LABEL, SOURCE) is None
+        assert support_span("x" * (EXCERPT_MAX_CHARS + 1), SOURCE_LABEL, SOURCE) is None
 
     def test_the_digest_pins_the_text_the_span_was_taken_from(self):
         span = support_span("session", SOURCE_LABEL, SOURCE)
@@ -899,14 +899,14 @@ class TestWhatAConsumerMayRestOn:
     def test_a_predicate_nobody_asked_about_is_unasked(self):
         held = catalog([self.row()])
 
-        assert answer(held, FLOW, "credential-rotation").standing == "unasked"
-        assert answer(held, WEBHOOK, "mfa-requirement").standing == "unasked"
+        assert answer(held, FLOW, "credential-rotation").status == "unasked"
+        assert answer(held, WEBHOOK, "mfa-requirement").status == "unasked"
 
     def test_a_stated_absence_is_answered_and_held(self):
         held = catalog([self.row()])
         found = answer(held, FLOW, "mfa-requirement")
 
-        assert found.standing == "answered"
+        assert found.status == "answered"
         assert found.holding(ABSENT) == (self.row(),)
         assert settled(held) == (self.row(),)
 
@@ -915,8 +915,8 @@ class TestWhatAConsumerMayRestOn:
         leaves every other predicate on that flow unasked."""
         held = catalog([stated()])
 
-        assert answer(held, FLOW, "mfa-requirement").standing == "unasked"
-        assert answer(held, FLOW, "authorization-grant").standing == "unasked"
+        assert answer(held, FLOW, "mfa-requirement").status == "unasked"
+        assert answer(held, FLOW, "authorization-grant").status == "unasked"
 
     def test_a_control_on_one_interaction_leaves_anothers_unknown_alone(self):
         rows = (
@@ -933,8 +933,8 @@ class TestWhatAConsumerMayRestOn:
         )
         held = catalog([self.row(value="required"), unknown], rows=rows)
 
-        assert answer(held, FLOW, "mfa-requirement").standing == "answered"
-        assert answer(held, WEBHOOK, "mfa-requirement").standing == "unknown"
+        assert answer(held, FLOW, "mfa-requirement").status == "answered"
+        assert answer(held, WEBHOOK, "mfa-requirement").status == "unknown"
         assert unknown not in settled(held)
 
     def test_an_unsupported_row_is_set_aside_rather_than_read_as_a_fact(self):
@@ -943,13 +943,13 @@ class TestWhatAConsumerMayRestOn:
 
         assert found.rows == (judged,)
         assert found.settled == ()
-        assert found.standing == "unknown"
+        assert found.status == "unknown"
 
     def test_a_conflict_settles_nothing_and_stays_visible(self):
         held = catalog([self.row(), self.row(value="required")])
         found = answer(held, FLOW, "mfa-requirement")
 
-        assert found.standing == "conflicting"
+        assert found.status == "conflicting"
         assert found.settled == ()
         assert len(found.conflicts) == 1
         assert settled(held) == ()
@@ -962,7 +962,7 @@ class TestWhatAConsumerMayRestOn:
         held = catalog([self.row(), admins])
         found = answer(held, FLOW, "mfa-requirement")
 
-        assert found.standing == "answered"
+        assert found.status == "answered"
         assert found.settled == (self.row(), admins)
         assert found.holding(ABSENT) == (self.row(),)
         assert not found.holding(ABSENT)[0].scope

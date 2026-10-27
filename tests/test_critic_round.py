@@ -24,7 +24,7 @@ from analysis_service.critic_round import (
     CriticRound,
     Failed,
     FirstPass,
-    Revision,
+    Reask,
     critic_request,
     rulings_of,
 )
@@ -55,10 +55,10 @@ def two_drafts():
     return [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
 
 
-def revised(drafts, *rulings) -> Revision:
+def revised(drafts, *rulings) -> Reask:
     """The first look over ``rulings``, which must not reconcile."""
     outcome = round_over(*drafts).first(emitted(*rulings))
-    assert isinstance(outcome, Revision)
+    assert isinstance(outcome, Reask)
     return outcome
 
 
@@ -126,7 +126,7 @@ class TestTheFirstLook:
         (first_pass,) = [row for row in critic_round.view() if row["id"] == "T-01"]
         outcome = critic_round.first(emitted(sample_ruling("S-01")))
 
-        assert isinstance(outcome, Revision)
+        assert isinstance(outcome, Reask)
         assert first_pass["unverified_quotes"]
         assert outcome.unreconciled == [first_pass]
 

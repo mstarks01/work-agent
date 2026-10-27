@@ -935,11 +935,11 @@ def test_the_first_run_page_words_each_stop():
 
 
 def test_the_settings_page_shows_each_source():
-    """``settings.js`` shows each :data:`~webapp.settings_view.Source` and no
+    """``settings.js`` shows each :data:`~webapp.settings_view.ValueOrigin` and no
     other. A source the table lacks throws, and the row does not render."""
-    from webapp.settings_view import Source
+    from webapp.settings_view import ValueOrigin
 
-    assert _table_keys("settings.js", "sources") == set(get_args(Source))
+    assert _table_keys("settings.js", "sources") == set(get_args(ValueOrigin))
 
 
 def _graph_node_names() -> set[str]:

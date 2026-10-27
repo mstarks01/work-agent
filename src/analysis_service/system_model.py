@@ -36,7 +36,7 @@ from analysis_service.capabilities import (
     StatedPresence,
 )
 from analysis_service.references import canonical
-from analysis_service.sources import check_answer_quotes
+from analysis_service.sources import MAX_LABEL_CHARS, check_answer_quotes
 
 UNKNOWN = "unknown"
 
@@ -324,7 +324,7 @@ def make_flow_id(
     return flow_id_rule(version).build(source_id, destination_id, label)
 
 
-def parse_flow_id(flow_id: str, version: int = FLOW_ID_VERSION) -> FlowParts:
+def parse_flow_id(flow_id: str, version: int) -> FlowParts:
     """Decode a flow ID back into the three parts it was built from.
 
     The round trip against :func:`make_flow_id` is what makes the encoding
@@ -396,6 +396,9 @@ ELEMENT_ID = "^(?:{})$".format(
     "|".join([_PLAIN_ID, *(rule.pattern for _, rule in sorted(FLOW_ID_RULES.items()))])
 )
 
+#: The longest **Element ID** a field holds, wherever the field holds one.
+ELEMENT_ID_MAX_CHARS = 300
+
 
 #: The closed sets of the element fields a model fills. Named once, so the
 #: compact transport (:mod:`analysis_service.compact`) states the same sets.
@@ -406,15 +409,24 @@ Operations = Literal["read", "write", "read-write", "unknown"]
 #: A store's sensitivity tier, never a list of what it holds.
 DataClassification = Literal["public", "internal", "confidential", "unknown"]
 
+#: The longest ``source_excerpt`` an element or a statement carries, and so
+#: the longest excerpt the extraction gate replaces and the longest quote a
+#: support span or a capability row holds.
+EXCERPT_MAX_CHARS = 1000
+
+#: The longest value a control attribute holds. The element field, each
+#: record that keeps the field's raw text
+#: (:class:`~analysis_service.analysis.UnknownControl`,
+#: :class:`~analysis_service.basis.StatedControl`), and each assertion value
+#: and scope qualifier that projects into the field, read this one bound.
+CONTROL_VALUE_MAX_CHARS = 200
+
 #: The tier field as a model fills it. The set is a schema fact and not a
 #: validator: a provider reads the enum, and code may still write a
 #: projected value here (``unknown; <why>: <tier>``).
-#: The longest ``source_excerpt`` an element or a statement carries, and so
-#: the longest excerpt the extraction gate replaces.
-EXCERPT_MAX_CHARS = 1000
-
 DATA_CLASSIFICATION_FIELD = Field(
-    max_length=200, json_schema_extra={"enum": [*get_args(DataClassification)]}
+    max_length=CONTROL_VALUE_MAX_CHARS,
+    json_schema_extra={"enum": [*get_args(DataClassification)]},
 )
 BoundaryKind = Literal["network", "privilege", "tenant", "other"]
 
@@ -424,7 +436,7 @@ class _Element(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(max_length=300, pattern=ELEMENT_ID)
+    id: str = Field(max_length=ELEMENT_ID_MAX_CHARS, pattern=ELEMENT_ID)
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
     assets: list[str] = assets_field()
@@ -435,7 +447,7 @@ class _Element(BaseModel):
     # the pairing unstated. An element drawing on several sources records that
     # in ``notes``. Gate-enforced against the job's labels: see
     # :func:`~analysis_service.validation.validate`.
-    source_label: str = Field(default="", max_length=200)
+    source_label: str = Field(default="", max_length=MAX_LABEL_CHARS)
     # Who spoke the quote, where the text attributes it. Provenance on a quote,
     # never a role and never a claim a category agent weighs. It exists to be
     # *strippable*: a participant name inside a verbatim excerpt is unreachable,
@@ -488,7 +500,7 @@ class DataStore(_Element):
     technology: str = Field(max_length=200)
     trust_zone: str
     data_classification: str = DATA_CLASSIFICATION_FIELD
-    encryption_at_rest: str = Field(max_length=200)
+    encryption_at_rest: str = Field(max_length=CONTROL_VALUE_MAX_CHARS)
 
 
 class DataFlow(_Element):
@@ -499,9 +511,9 @@ class DataFlow(_Element):
     source: str
     destination: str
     protocol: str = Field(max_length=200)
-    authentication: str = Field(max_length=200)
+    authentication: str = Field(max_length=CONTROL_VALUE_MAX_CHARS)
     data_description: str = Field(max_length=1000)
-    encryption_in_transit: str = Field(max_length=200)
+    encryption_in_transit: str = Field(max_length=CONTROL_VALUE_MAX_CHARS)
     #: What the initiator does at the destination — the fact ``direction`` does
     #: **not** carry. A service reading a database and a service writing one are
     #: the same shape without this, so a rule about writes fired on both and told
@@ -698,7 +710,7 @@ class Assumption(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     assumption: str = Field(min_length=1, max_length=1000)
-    element_id: str = Field(max_length=300)
+    element_id: str = Field(max_length=ELEMENT_ID_MAX_CHARS)
     # The provider-facing schema lists the legal names, on the rule
     # :class:`~analysis_service.claims.Ground` already follows: a model asked
     # for a bounded string writes prose into it, and one wrote a 100-character
@@ -750,7 +762,7 @@ class CapabilityStatement(BaseModel):
     )
     state: StatedPresence
     source_excerpt: str = Field(min_length=1, max_length=EXCERPT_MAX_CHARS)
-    source_label: str = Field(min_length=1, max_length=200)
+    source_label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
     origin: StatementOrigin
     #: The element and the rule that prove a ``field`` statement. A statement
     #: of another origin carries none.
@@ -812,8 +824,29 @@ class BoundaryCrossing(BaseModel):
     destination_zone: str
     #: False when either zone is :data:`UNKNOWN`. Read it rather than comparing
     #: the zones again, so the three outcomes have one reader.
+    #: :meth:`_decide` writes it from the zones on each load and each
+    #: construction, and refuses a stated value that disagrees. So no writer
+    #: passes it, and the default only keeps it out of the constructor's
+    #: required arguments.
     decided: bool = True
     assumed_endpoints: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _decide(cls, data: Any) -> Any:
+        """``decided`` from the two zones. A stored crossing without the field
+        loads with the derived value."""
+        if not isinstance(data, Mapping):
+            return data
+        zones = (data.get("source_zone"), data.get("destination_zone"))
+        decided = UNKNOWN not in zones
+        if data.get("decided", decided) != decided:
+            raise ValueError(
+                f"decided is {data['decided']!r}, and the zones {zones!r} say"
+                f" {decided!r}: a crossing is undecided exactly when a zone is"
+                f" {UNKNOWN!r}"
+            )
+        return {**data, "decided": decided}
 
 
 class EmittedSystemModel(BaseModel):
@@ -978,24 +1011,19 @@ class SystemModel(EmittedSystemModel):
                         f"cannot derive crossings: flow {flow.id!r} endpoint "
                         f"{endpoint!r} is not a zoned element in this model"
                     )
-            source_zone = zone_by_id[flow.source]
-            destination_zone = zone_by_id[flow.destination]
-            decided = UNKNOWN not in (source_zone, destination_zone)
-            if decided and source_zone == destination_zone:
-                continue
-            crossings.append(
-                BoundaryCrossing(
-                    flow_id=flow.id,
-                    source_zone=source_zone,
-                    destination_zone=destination_zone,
-                    decided=decided,
-                    assumed_endpoints=[
-                        endpoint
-                        for endpoint in (flow.source, flow.destination)
-                        if endpoint in assumed
-                    ],
-                )
+            crossing = BoundaryCrossing(
+                flow_id=flow.id,
+                source_zone=zone_by_id[flow.source],
+                destination_zone=zone_by_id[flow.destination],
+                assumed_endpoints=[
+                    endpoint
+                    for endpoint in (flow.source, flow.destination)
+                    if endpoint in assumed
+                ],
             )
+            if crossing.decided and crossing.source_zone == crossing.destination_zone:
+                continue
+            crossings.append(crossing)
         return crossings
 
     def shared_names(self) -> dict[str, list[str]]:

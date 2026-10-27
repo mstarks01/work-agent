@@ -135,6 +135,8 @@ CRITIC_DOC = "critic"
 DISCLAIMER_DOC = "disclaimer"
 OUTPUT_DOC = "output"
 SEVERITY_RUBRIC_DOC = "severity_rubric"
+LANE_SKILL_DOC = "skill"
+LANE_EXEMPLARS_DOC = "exemplars"
 
 #: The text each lane of a package reads **last**, as the final part of its
 #: user turn, or ``None`` for a package that closes nothing. A table rather
@@ -1000,12 +1002,12 @@ def _disk_issues(package: FrameworkPackage, root: Path) -> list[str]:
         return [str(exc)]
 
     for lane in package.lanes:
-        for doc in ("skill", "exemplars"):
+        for doc in (LANE_SKILL_DOC, LANE_EXEMPLARS_DOC):
             path = root / "lanes" / lane / f"{doc}.md"
             expected.add(path)
             if not _readable(loader, root, path):
                 issues.append(f"lane {lane!r} has no {doc}.md")
-            elif doc == "skill":
+            elif doc == LANE_SKILL_DOC:
                 issues += _heading_issues(lane, path)
 
     for doc in (CRITIC_DOC, DISCLAIMER_DOC, OUTPUT_DOC):
@@ -1070,12 +1072,12 @@ def _heading_issues(lane: str, path: Path) -> list[str]:
     try:
         text = path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        return [f"lane {lane!r} skill.md is not UTF-8"]
+        return [f"lane {lane!r} {LANE_SKILL_DOC}.md is not UTF-8"]
     found = [line[3:].strip() for line in text.splitlines() if line.startswith("## ")]
     if found[: len(LANE_SECTION_HEADINGS)] != list(LANE_SECTION_HEADINGS):
         return [
             (
-                f"lane {lane!r} skill.md headings are {found!r}, expected"
+                f"lane {lane!r} {LANE_SKILL_DOC}.md headings are {found!r}, expected"
                 f" {list(LANE_SECTION_HEADINGS)!r} in order"
             )
         ]

@@ -43,7 +43,9 @@ from collections.abc import Sequence
 
 from analysis_service.frameworks import (
     CRITIC_DOC,
+    LANE_EXEMPLARS_DOC,
     LANE_SECTION_HEADINGS,
+    LANE_SKILL_DOC,
     SEVERITY_RUBRIC_DOC,
     FrameworkPackage,
 )
@@ -69,12 +71,12 @@ __all__ = [
 
 def lane_skill_doc(lane: str) -> str:
     """The loader name of one lane's skill, under a package's own root."""
-    return f"lanes/{lane}/skill"
+    return f"lanes/{lane}/{LANE_SKILL_DOC}"
 
 
 def lane_exemplars_doc(lane: str) -> str:
     """The loader name of one lane's worked drafts, under a package's own root."""
-    return f"lanes/{lane}/exemplars"
+    return f"lanes/{lane}/{LANE_EXEMPLARS_DOC}"
 
 
 def _lane_title(lane: str) -> str:

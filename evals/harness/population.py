@@ -46,7 +46,7 @@ from analysis_service.assertions import (
     settled,
 )
 from analysis_service.evidence import prepared_view
-from analysis_service.reassess import Verdict, reassess
+from analysis_service.reassess import ReviewerAssessment, reassess
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
@@ -291,7 +291,7 @@ def reassess_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def parsed_verdicts(held: object) -> dict[str, Verdict]:
+def parsed_verdicts(held: object) -> dict[str, ReviewerAssessment]:
     """A verdict file's ``verdicts`` object, each entry checked for its shape.
 
     Each entry is an object holding a string ``assessment`` and a string
@@ -309,7 +309,7 @@ def parsed_verdicts(held: object) -> dict[str, Verdict]:
                 f"{identity}: a verdict is an object with a string `assessment`"
                 " and a string `assessor`"
             )
-        verdicts[identity] = Verdict(entry["assessment"], entry["assessor"])
+        verdicts[identity] = ReviewerAssessment(entry["assessment"], entry["assessor"])
     return verdicts
 
 

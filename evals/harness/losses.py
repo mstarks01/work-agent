@@ -79,7 +79,7 @@ from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.parsing import strings
 from evals.harness.identity import CaseFlows, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import CaseScore, Standing
+from evals.harness.scorer import CaseScore, VoteStatus
 from evals.harness.triggers import case_trigger_recall
 from evals.harness.verbs import same_action
 
@@ -169,7 +169,7 @@ class Loss:
     #: same way. ``pooled`` means a person read the neighbouring claim and
     #: accepted it, so the lane found something real and wrote it one element
     #: over. ``rejected`` means the lane wrote something a person refused.
-    displaced_standing: Standing | None = None
+    displaced_standing: VoteStatus | None = None
     #: For a ``fan-in`` row: the title of the lane's proposal at the place,
     #: what the fan-in did to it, and why, read from the block's own marks —
     #: the ``dropped_claims`` reason for a removal, and one entry per element

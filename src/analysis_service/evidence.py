@@ -187,7 +187,7 @@ def evidence_ref(ground: Ground) -> str:
 
 
 def ground_places(
-    ground: Ground, assertions: AssertionCatalog | None = None
+    ground: Ground, assertions: AssertionCatalog | None
 ) -> frozenset[str]:
     """The graph elements one ground is about, or none.
 
@@ -583,7 +583,7 @@ def render_catalog(
     )
 
 
-def ground_gloss(ground: Ground, assertions: AssertionCatalog | None = None) -> str:
+def ground_gloss(ground: Ground, assertions: AssertionCatalog | None) -> str:
     """What one ground asserts, in the words the evidence table already uses.
 
     **The one reader of "what does this ground say".** The lane agent selects

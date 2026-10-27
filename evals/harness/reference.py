@@ -70,7 +70,7 @@ from analysis_service.deployment import ConfigPaths
 from analysis_service.frameworks.asvs.record import AsvsChapter
 from analysis_service.frameworks.stride.record import LANES_OF_VERB, StrideCategory
 from analysis_service.markdown_loader import RESOLVE_ERRORS
-from analysis_service.parsing import signer
+from analysis_service.parsing import Sha256Hex, signer
 from analysis_service.resilience import load_resilience
 from analysis_service.sources import (
     MAX_LABEL_CHARS,
@@ -527,7 +527,7 @@ class CaseSource(BaseModel):
     kind: SourceKind
     label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
     file: str = Field(min_length=1, max_length=200, pattern=CORPUS_RELATIVE_PATH)
-    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    sha256: Sha256Hex
 
 
 class ReadRecord(BaseModel):
@@ -542,7 +542,7 @@ class ReadRecord(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     file: str = Field(min_length=1, max_length=200, pattern=CORPUS_RELATIVE_PATH)
-    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    sha256: Sha256Hex
 
 
 #: What a sitting records when the person who read the case is not named.
@@ -634,7 +634,7 @@ class CaseMetadata(BaseModel):
     holdout: bool
     sources: list[CaseSource] = Field(min_length=1)
     # The aggregate, taken over the refs exactly as a report's InputRef is.
-    source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_sha256: Sha256Hex
     # Non-empty: a case no framework grades is a case that scores nothing, and
     # a corpus quietly carrying one lowers no denominator visibly.
     frameworks: list[CaseFramework] = Field(min_length=1)

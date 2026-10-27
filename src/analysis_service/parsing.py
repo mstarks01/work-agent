@@ -27,7 +27,8 @@ because TOML and JSON read ``9.0`` and ``true`` as values equal to an integer.
 :func:`strings` asks whether a value is a list of strings, because a string
 in that place reads one character at a time. :func:`signer` asks who signed a
 file, because a value of spaces reads as a signature. :data:`Signer` is the
-model field that asks it as the file loads.
+model field that asks it as the file loads. :data:`Sha256Hex` is the one
+shape of a SHA-256 digest that a model field holds.
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ import math
 import re
 from typing import Annotated, TypeGuard
 
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, Field
 
 _ASCII_DIGITS = re.compile(r"[0-9]+")
 
@@ -100,3 +101,7 @@ def signer(value: object) -> str | None:
 #: A model field that says who signed, read through :func:`signer` as it loads.
 #: It holds a name or ``None``, so ``is None`` is the whole unsigned test.
 Signer = Annotated[str | None, BeforeValidator(signer)]
+
+#: A lowercase SHA-256 hex digest, as a model field holds one. A value of
+#: another shape refuses as the model loads, before a comparison reads it.
+Sha256Hex = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]

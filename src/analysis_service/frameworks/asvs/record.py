@@ -554,7 +554,7 @@ def _scope_state(
     unit: str,
     refusal: Refusal | None,
     deferred: Mapping[str, str],
-    ruled_out: Mapping[str, str] = MappingProxyType({}),
+    ruled_out: Mapping[str, str],
 ) -> ScopeState:
     """Which of the four states one unlisted requirement is in.
 

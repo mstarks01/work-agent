@@ -134,11 +134,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
-    CONTROL_VALUE_MAX_CHARS,
     control_state,
     matches_term,
 )
-from analysis_service.system_model import SystemModel
+from analysis_service.sources import MAX_LABEL_CHARS
+from analysis_service.system_model import (
+    CONTROL_VALUE_MAX_CHARS,
+    ELEMENT_ID_MAX_CHARS,
+    SystemModel,
+)
 
 __all__ = [
     "CONTROL_SCOPE",
@@ -146,12 +150,12 @@ __all__ = [
     "IN_SCOPE",
     "MAX_SCAN_WORK",
     "Coverage",
-    "Disposition",
+    "Measurability",
     "StatedControl",
     "UnbasedControl",
     "content_tokens",
+    "control_measurability",
     "coverage",
-    "dispositions",
     "read_controls",
     "unbased_controls",
 ]
@@ -236,10 +240,10 @@ class UnbasedControl(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    element_id: str = Field(min_length=1, max_length=300)
+    element_id: str = Field(min_length=1, max_length=ELEMENT_ID_MAX_CHARS)
     attribute: str = Field(min_length=1, max_length=100)
     value: str = Field(min_length=1, max_length=CONTROL_VALUE_MAX_CHARS)
-    source_label: str = Field(min_length=1, max_length=200)
+    source_label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
     tokens: tuple[str, ...]
 
     def __str__(self) -> str:
@@ -267,7 +271,7 @@ def content_tokens(value: str) -> tuple[str, ...]:
 #: ``measurable`` is the only one the scan sees; the other two name a control
 #: this diagnostic has nothing to say about, which is a different answer from
 #: "looked and found no problem".
-Disposition = Literal["measurable", "uncited", "tokenless"]
+Measurability = Literal["measurable", "uncited", "tokenless"]
 
 
 class StatedControl(NamedTuple):
@@ -275,7 +279,7 @@ class StatedControl(NamedTuple):
 
     **The one reader of "which values does this diagnostic measure".** Both
     rungs of the published measurement and the shipped
-    :func:`unbased_controls` walk the model through :func:`dispositions`, so
+    :func:`unbased_controls` walk the model through :func:`control_measurability`, so
     a denominator and a rate can never be computed over two different sets.
     """
 
@@ -340,9 +344,9 @@ class Coverage(BaseModel):
         }
 
 
-def dispositions(
+def control_measurability(
     model: SystemModel, sources: Mapping[str, str]
-) -> Iterator[tuple[StatedControl, Disposition]]:
+) -> Iterator[tuple[StatedControl, Measurability]]:
     """Every stated in-scope control, each with whether this can read it.
 
     Walks elements in :meth:`SystemModel.elements` order and attributes in
@@ -354,7 +358,7 @@ def dispositions(
     is no assertion to have a basis, which is not the same as an assertion
     nobody could check.
 
-    Two dispositions are outside the measurement, each for a reason that is not
+    Two values are outside the measurement, each for a reason that is not
     a pass:
 
     * ``uncited`` — the element's ``source_label`` names no source the job
@@ -401,9 +405,9 @@ def read_controls(
     flags: list[UnbasedControl] = []
     counts = {"measurable": 0, "uncited": 0, "tokenless": 0}
     exhausted = 0
-    for control, disposition in dispositions(model, sources):
-        counts[disposition] += 1
-        if disposition != "measurable":
+    for control, measurability in control_measurability(model, sources):
+        counts[measurability] += 1
+        if measurability != "measurable":
             continue
         echoes_none = scan.echoes_none(control)
         if echoes_none is None:

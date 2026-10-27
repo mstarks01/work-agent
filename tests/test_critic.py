@@ -206,6 +206,24 @@ class TestAssembleThreats:
         with pytest.raises(CriticOutputError, match="hangs its needs-info verdict"):
             assemble_claims(drafts, rulings, model, SCHEMAS)
 
+    def test_facets_on_an_entry_that_is_not_a_question_are_a_fault(self, model):
+        """A facet names a part of a question kind, so a subject entry with
+        facets names a part of nothing."""
+        drafts = [sample_draft("S-01")]
+        rulings = [
+            sample_ruling(
+                "S-01",
+                verdict=ProposedVerdict(
+                    reason="the input does not say what is recorded",
+                    related_unknowns=[
+                        UnknownRef(subject="is it logged", facets=["records-actor"])
+                    ],
+                ),
+            )
+        ]
+        with pytest.raises(CriticOutputError, match="names facets on a subject entry"):
+            assemble_claims(drafts, rulings, model, SCHEMAS)
+
     def test_a_question_with_no_place_in_the_model_resolves(self, model):
         """The second spelling passes the seam with no element to point at.
 
@@ -1063,7 +1081,7 @@ class TestAnAbsenceRidesTheCriticPath:
 
     def test_snapping_leaves_it_alone(self, draft):
         """There is no ID to canonicalise: a term is a word, not a reference."""
-        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        [snapped] = snap_drafts([draft], ELEMENT_IDS, ())
 
         assert snapped.grounds == [Ground(kind="absent-element", term="ldap")]
 

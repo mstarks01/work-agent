@@ -44,7 +44,7 @@ from analysis_service.binding import NodeBinding, build_tier_adapters
 from analysis_service.conformance import (
     PROBED_PARAMS,
     REFERENCE_MODELS,
-    Capability,
+    ProviderCapability,
     ProviderProfile,
     profile,
     reference_matrix,
@@ -258,12 +258,12 @@ class TestTheMatrixItself:
         answered = profile(vendor, "anthropic/claude-opus-4.7")
 
         assert silent.known, "the map no longer carries the silent slug at all"
-        assert silent.structured_output is Capability.UNKNOWN
-        assert answered.structured_output is Capability.SUPPORTED
+        assert silent.structured_output is ProviderCapability.UNKNOWN
+        assert answered.structured_output is ProviderCapability.SUPPORTED
         # The cells that are answered stay answered: silence about one
         # capability must not spread to the params, which are probed by a call
         # rather than read off a key.
-        assert Capability.UNKNOWN not in set(silent.params.values())
+        assert ProviderCapability.UNKNOWN not in set(silent.params.values())
 
     def test_an_unmapped_model_is_unknown_rather_than_unsupported(self):
         """The distinction the module exists for.
@@ -275,8 +275,8 @@ class TestTheMatrixItself:
         """
         entry = profile(vendor_for("openai"), "gpt-nonexistent-9")
         assert not entry.known
-        assert set(entry.params.values()) == {Capability.UNKNOWN}
-        assert entry.structured_output is Capability.UNKNOWN
+        assert set(entry.params.values()) == {ProviderCapability.UNKNOWN}
+        assert entry.structured_output is ProviderCapability.UNKNOWN
         assert entry.output_ceiling is None
         assert set(entry.unknowns) == {*PROBED_PARAMS, "structured_output"}
 
@@ -290,20 +290,20 @@ class TestTheMatrixItself:
         be inventing a capability, which the issue lists as a non-goal.
         """
         anthropic = profile(vendor_for("anthropic"), "claude-sonnet-4-6")
-        assert anthropic.params["seed"] is Capability.UNSUPPORTED
+        assert anthropic.params["seed"] is ProviderCapability.UNSUPPORTED
 
         gpt4o = profile(vendor_for("openai"), "gpt-4o")
-        assert gpt4o.params["reasoning_effort"] is Capability.UNSUPPORTED
+        assert gpt4o.params["reasoning_effort"] is ProviderCapability.UNSUPPORTED
 
         gemini = profile(vendor_for("vertex"), "gemini-2.5-pro")
-        assert gemini.params["seed"] is Capability.SUPPORTED
+        assert gemini.params["seed"] is ProviderCapability.SUPPORTED
 
         # One set of weights, two routes, one cell apart: litellm maps
         # ``seed`` for ``vertex_ai/`` and refuses it for ``gemini/``. A
         # capability is a property of the ``(vendor, model)`` pair, and this
         # is the pair that proves the vendor half is not decorative.
         developer_api = profile(vendor_for("gemini"), "gemini-2.5-pro")
-        assert developer_api.params["seed"] is Capability.UNSUPPORTED
+        assert developer_api.params["seed"] is ProviderCapability.UNSUPPORTED
         assert {
             name: cell for name, cell in developer_api.params.items() if name != "seed"
         } == {name: cell for name, cell in gemini.params.items() if name != "seed"}
@@ -345,13 +345,15 @@ class TestTheMatrixItself:
         assert build_refuses("vertex", "claude-opus-5")
         assert (
             profile(vendor_for("vertex"), "claude-opus-5").structured_output
-            is Capability.UNSUPPORTED
+            is ProviderCapability.UNSUPPORTED
         )
 
         for vendor, model in reference_pairs():
             entry = profile(vendor_for(vendor), model)
             refused = build_refuses(vendor, model)
-            assert refused == (entry.structured_output is Capability.UNSUPPORTED), (
+            assert refused == (
+                entry.structured_output is ProviderCapability.UNSUPPORTED
+            ), (
                 f"the build {'refuses' if refused else 'accepts'} native output"
                 f" for {vendor}/{model} and the matrix calls it"
                 f" {entry.structured_output.value}"

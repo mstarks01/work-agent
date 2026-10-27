@@ -26,7 +26,12 @@ from analysis_service.assertions import (
 )
 from analysis_service.claims import Ground
 from analysis_service.evidence import evidence_catalog
-from analysis_service.reassess import ReviewError, Verdict, reassess, reviewed
+from analysis_service.reassess import (
+    ReviewerAssessment,
+    ReviewError,
+    reassess,
+    reviewed,
+)
 from tests.factories import sample_report, sample_threat
 
 SHOPPERS = Subject(
@@ -74,7 +79,7 @@ def report(*, cite: bool = True):
 
 
 def reject(row: Assertion, assessment: Assessment = "unsupported") -> dict:
-    return {assertion_id(row): Verdict(assessment, REVIEWER)}
+    return {assertion_id(row): ReviewerAssessment(assessment, REVIEWER)}
 
 
 def test_a_rejected_row_leaves_the_evidence() -> None:
@@ -108,7 +113,7 @@ def test_a_rejected_projection_reopens_its_lead(assessment) -> None:
 
 def test_a_supported_row_may_close_a_lead() -> None:
     """What a review is for: a checked mechanism becomes the control."""
-    verdicts = {assertion_id(MECHANISM): Verdict("supported", REVIEWER)}
+    verdicts = {assertion_id(MECHANISM): ReviewerAssessment("supported", REVIEWER)}
     result = reassess(report(cite=False), verdicts)
     flow = next(flow for flow in result.model.data_flows if flow.id == LOGIN)
 
@@ -123,7 +128,7 @@ def test_a_finding_on_a_row_the_review_supports_stands() -> None:
         grounds=[Ground(kind="assertion", assertion=assertion_id(MECHANISM))]
     )
     cited = sample_report(threats=[threat], assertions=report().assertions)
-    verdicts = {assertion_id(MECHANISM): Verdict("supported", REVIEWER)}
+    verdicts = {assertion_id(MECHANISM): ReviewerAssessment("supported", REVIEWER)}
     result = reassess(cited, verdicts)
 
     assert assertion_id(MECHANISM) not in result.evidence
@@ -144,7 +149,7 @@ def test_a_rejected_row_does_not_dispute_the_row_that_stands() -> None:
 
 
 def test_a_review_that_rejects_nothing_withdraws_nothing() -> None:
-    verdicts = {assertion_id(ABSENCE): Verdict("supported", REVIEWER)}
+    verdicts = {assertion_id(ABSENCE): ReviewerAssessment("supported", REVIEWER)}
     result = reassess(report(), verdicts)
 
     assert result.withdrawn == () and result.rejected == ()
@@ -153,9 +158,15 @@ def test_a_review_that_rejects_nothing_withdraws_nothing() -> None:
 @pytest.mark.parametrize(
     ("verdicts", "match"),
     [
-        ({"assertion:nothing": Verdict("unsupported", REVIEWER)}, "does not hold"),
-        ({assertion_id(ABSENCE): Verdict("unchecked", REVIEWER)}, "not a verdict"),
-        ({assertion_id(ABSENCE): Verdict("unsupported", " ")}, "names who"),
+        (
+            {"assertion:nothing": ReviewerAssessment("unsupported", REVIEWER)},
+            "does not hold",
+        ),
+        (
+            {assertion_id(ABSENCE): ReviewerAssessment("unchecked", REVIEWER)},
+            "not a verdict",
+        ),
+        ({assertion_id(ABSENCE): ReviewerAssessment("unsupported", " ")}, "names who"),
     ],
 )
 def test_a_verdict_that_cannot_be_applied_is_refused(verdicts, match) -> None:

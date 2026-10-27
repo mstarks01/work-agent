@@ -11,6 +11,7 @@ reason, and a second test fails when the declaration stops being live.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import re
 from collections.abc import Callable, Iterable, Iterator
 from functools import partial
@@ -20,6 +21,10 @@ from typing import TypeGuard
 
 import pytest
 
+from analysis_service.analysis import CONTROL_ATTRIBUTES
+from analysis_service.claims import Ruling
+from analysis_service.sql_store import DIGEST_COLUMNS
+from evals.harness.prices import UnitPrices
 from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
 
 pytestmark = pytest.mark.lint
@@ -136,7 +141,7 @@ def _strips_file_suffix(node: ast.AST) -> bool:
 def test_the_file_suffix_of_a_key_variable_has_one_reader():
     """Only ``refused_var`` strips the suffix of a key variable."""
     readers = set(_sites(_strips_file_suffix)) - NOT_A_KEY.keys()
-    assert readers == {("src/analysis_service/vendors.py", "refused_var")}
+    assert readers == {("src/analysis_service/config_files.py", "refused_var")}
 
 
 def test_each_declared_site_still_strips():
@@ -936,6 +941,249 @@ def test_a_new_job_is_created_and_admitted_in_job_answers():
         ("src/analysis_service/job_answers.py", "amend"),
         ("src/analysis_service/job_answers.py", "answer"),
         ("src/analysis_service/job_answers.py", "submit"),
+    ]
+
+
+#: Each field name that holds one shared bound, and the constant that states
+#: the bound. A field of one of these names reads its constant, so no model
+#: admits a value that a sibling model refuses.
+_SHARED_BOUNDS: dict[str, str] = {
+    "source_label": "MAX_LABEL_CHARS",
+    "source_excerpt": "EXCERPT_MAX_CHARS",
+    "element_id": "ELEMENT_ID_MAX_CHARS",
+    "flow_id": "ELEMENT_ID_MAX_CHARS",
+    **dict.fromkeys(CONTROL_ATTRIBUTES, "CONTROL_VALUE_MAX_CHARS"),
+}
+
+#: Each field of a :data:`_SHARED_BOUNDS` name that holds another bound, and
+#: why.
+OTHER_BOUND: dict[tuple[str, str], str] = {
+    ("src/analysis_service/claims.py", "element_id"): (
+        "an unresolved element mark keeps the reference as the model wrote it,"
+        " which names no Element ID; the producer cuts it at"
+        " ELEMENT_REF_MAX_CHARS"
+    ),
+}
+
+
+def _bound_sites() -> Iterator[tuple[str, str, str | None]]:
+    """Each ``Field`` with a ``max_length`` that a :data:`_SHARED_BOUNDS`
+    field name or an ``ELEMENT_ID`` pattern asks for: the file, the field and
+    the name of the bound it reads, or ``None`` for a literal."""
+    for path in FILES:
+        for node in ast.walk(parse(path)):
+            if not (
+                isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Name)
+                and node.value is not None
+                and _calls(node.value, "Field")
+            ):
+                continue
+            keywords = {keyword.arg: keyword.value for keyword in node.value.keywords}
+            bound = keywords.get("max_length")
+            asked = node.target.id in _SHARED_BOUNDS or _is_name(
+                keywords.get("pattern", ast.Constant(None)), "ELEMENT_ID"
+            )
+            if asked and bound is not None:
+                name = bound.id if isinstance(bound, ast.Name) else None
+                yield path.relative_to(REPO_ROOT).as_posix(), node.target.id, name
+
+
+def _expected_bound(field: str) -> str:
+    return _SHARED_BOUNDS.get(field, "ELEMENT_ID_MAX_CHARS")
+
+
+def test_a_shared_bound_is_read_by_its_name():
+    """A source label, an excerpt, an Element ID and a control value each have
+    one bound, and every field that holds one reads the constant."""
+    assert [
+        site
+        for site in _bound_sites()
+        if site[2] != _expected_bound(site[1]) and site[:2] not in OTHER_BOUND
+    ] == []
+
+
+def test_each_declared_field_still_holds_another_bound():
+    held = {site[:2] for site in _bound_sites() if site[2] != _expected_bound(site[1])}
+    assert OTHER_BOUND.keys() <= held
+
+
+def _spells_a_digest_shape(node: ast.AST) -> bool:
+    """Whether ``node`` is a pattern string that spells a SHA-256 hex digest.
+    A string with a space in it is prose that names the shape."""
+    return (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and "[0-9a-f]{64}" in node.value
+        and " " not in node.value
+    )
+
+
+def test_the_shape_of_a_digest_is_spelled_once():
+    """Only ``parsing.Sha256Hex`` spells the shape, and each model field that
+    holds a digest reads it."""
+    assert _sites(_spells_a_digest_shape) == [
+        ("src/analysis_service/parsing.py", "<module>")
+    ]
+
+
+def _digests_a_source_text(node: ast.AST) -> bool:
+    """Whether ``node`` hashes the ``text`` of a value, as a Source's content
+    digest does."""
+    return _calls(node, "sha256") and any(
+        _is_attribute(child, "text") for arg in node.args for child in ast.walk(arg)
+    )
+
+
+def test_a_source_digest_has_one_writer():
+    """Only ``sources.text_digest`` hashes a Source's text, so a report's
+    source ref and a support span pin one text to one digest."""
+    assert _sites(_digests_a_source_text) == []
+
+
+def _spells_a_lane_doc(node: ast.AST) -> bool:
+    """Whether ``node`` spells the name or the file of a lane's skill or its
+    exemplars."""
+    return (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and " " not in node.value
+        and (
+            node.value in ("skill", "exemplars")
+            or node.value.endswith(("/skill", "/exemplars", "skill.md", "exemplars.md"))
+        )
+    )
+
+
+#: Each function that spells ``skill`` for another meaning, and the meaning.
+NOT_A_LANE_DOC: dict[Site, str] = {
+    ("evals/harness/audit.py", "<module>"): (
+        "a finding's owner: the skill text as one of the places a fix belongs"
+    ),
+}
+
+
+def test_a_lane_doc_name_is_spelled_once():
+    """Only ``frameworks`` spells a lane's two file names; the loader names,
+    the package gate and the roster writer read the declarations."""
+    assert set(_sites(_spells_a_lane_doc)) - NOT_A_LANE_DOC.keys() == {
+        ("src/analysis_service/frameworks/__init__.py", "<module>")
+    }
+
+
+def test_each_declared_site_still_spells_skill():
+    assert NOT_A_LANE_DOC.keys() <= set(_sites(_spells_a_lane_doc))
+
+
+def _lists_the_ruling_fields(node: ast.AST) -> bool:
+    """Whether ``node`` is a literal collection of the base ruling's fields."""
+    return isinstance(node, ast.Tuple | ast.List | ast.Set) and {
+        element.value for element in node.elts if isinstance(element, ast.Constant)
+    } == set(Ruling.model_fields)
+
+
+def test_the_base_ruling_fields_are_read_from_the_model():
+    """Assembly and its replay read ``Ruling.model_fields``, so a field added
+    to the base ruling reaches both."""
+    assert _sites(_lists_the_ruling_fields) == []
+
+
+#: The rate names of a unit price, from the dataclass that declares them.
+_RATE_NAMES = frozenset(
+    field.name for field in dataclasses.fields(UnitPrices) if field.name != "model"
+)
+
+
+def _spells_a_rate_name(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and node.value in _RATE_NAMES
+
+
+def test_a_unit_price_rate_name_is_spelled_only_where_it_is_declared():
+    """The Baseline shape check reads the rates from ``UnitPrices``, so a rate
+    added there is a rate the check asks for."""
+    assert {path for path, _ in _sites(_spells_a_rate_name)} == {
+        "evals/harness/prices.py"
+    }
+
+
+#: Each name that GLOSSARY.md defines, or that one module owns, and the one
+#: module that declares it. A second module that declares the name gives one
+#: name two meanings.
+_ONE_MEANING: dict[str, str] = {
+    "Capability": "src/analysis_service/capabilities.py",
+    "Disposition": "",
+    "Revision": "src/analysis_service/answer_state.py",
+    "Source": "src/analysis_service/sources.py",
+    "Standing": "evals/harness/roster.py",
+    "fold": "src/analysis_service/references.py",
+}
+
+
+def _module_names(tree: ast.Module) -> Iterator[str]:
+    """Each name a module's own top level declares."""
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+            yield node.name
+        elif isinstance(node, ast.Assign):
+            yield from (
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            )
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            yield node.target.id
+
+
+def test_a_defined_name_has_one_declaration():
+    """A glossary term names one type, so a reader of the name reads one
+    meaning. ``Disposition`` names ``reference.AsvsDisposition``, so no module
+    declares the bare name."""
+    declared: dict[str, set[str]] = {name: set() for name in _ONE_MEANING}
+    for path in FILES:
+        for name in _module_names(parse(path)):
+            if name in declared:
+                declared[name].add(path.relative_to(REPO_ROOT).as_posix())
+    assert declared == {
+        name: {owner} if owner else set() for name, owner in _ONE_MEANING.items()
+    }
+
+
+def _reads_an_object_digest_off_a_row(node: ast.AST) -> bool:
+    """Whether ``node`` reads a digest column of :data:`DIGEST_COLUMNS` as an
+    attribute of a row, and not as a column of the table."""
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr in DIGEST_COLUMNS.values()
+        and not _is_attribute(node.value, "c", "jobs")
+    )
+
+
+def test_an_object_digest_is_read_through_its_column_table():
+    """The object reader and ``_names`` read the digest of an object through
+    ``DIGEST_COLUMNS``. A save hands ``check_save`` the report digest it
+    compares the stored digest with. Other models hold a field of the same
+    name, so the lint reads the store's module."""
+    store = [REPO_ROOT / "src/analysis_service/sql_store.py"]
+    assert _sites(_reads_an_object_digest_off_a_row, store) == [
+        ("src/analysis_service/sql_store.py", "save")
+    ]
+
+
+def _reads_a_secret_file(node: ast.AST) -> bool:
+    """Whether ``node`` opens a private file under the rule of a secret file.
+    ``read_private`` passes its own ``secret`` on, which is no new read."""
+    return (_calls(node, "read_private") or _calls(node, "private_fd")) and any(
+        keyword.arg == "secret"
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value is True
+        for keyword in node.keywords
+    )
+
+
+def test_a_secret_file_has_one_reader():
+    """Each loader of a key or a password asks ``read_secret`` with its own
+    error class, so the mode rule, the newline rule and the secret rule have
+    one reader."""
+    assert _sites(_reads_a_secret_file) == [
+        ("src/analysis_service/config_files.py", "read_secret")
     ]
 
 

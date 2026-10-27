@@ -29,6 +29,7 @@ from evals.harness.baseline import (
     assemble,
     charges_of,
     configuration_label,
+    manifest_problems,
     price_sweep,
     verify,
 )
@@ -1021,3 +1022,50 @@ def test_the_ancestor_check_measures_against_the_remote_main_where_one_exists(tm
     git(clone, "checkout", "--detach", "origin/main")
     git(clone, "branch", "-D", "main")
     assert baseline.default_base_ref(clone) == "origin/main"
+
+
+def _manifest_with(row: dict[str, object]) -> dict[str, object]:
+    return {"sweeps": [{"artifact": "a.json", "cost": {"unit_prices": [row]}}]}
+
+
+_PRICED = UnitPrices(
+    model="m",
+    input_per_token=1e-6,
+    output_per_token=2e-6,
+    cache_read_per_token=1e-7,
+    cache_write_per_token=1.25e-6,
+)
+
+
+def test_a_unit_prices_row_with_every_rate_has_the_shape():
+    assert manifest_problems(_manifest_with(_PRICED.to_json())) == []
+
+
+@pytest.mark.parametrize(
+    ("rate", "shaped"),
+    [
+        ("input_per_token", False),
+        ("output_per_token", False),
+        ("cache_read_per_token", True),
+        ("cache_write_per_token", True),
+    ],
+)
+def test_only_a_rate_that_may_be_none_may_be_none(rate, shaped):
+    """A rate that ``UnitPrices`` holds as ``None`` may be ``None``, and every
+    other rate must be a number."""
+    row = {**_PRICED.to_json(), rate: None}
+    assert (manifest_problems(_manifest_with(row)) == []) is shaped
+
+
+@pytest.mark.parametrize(
+    "rate",
+    [
+        "input_per_token",
+        "output_per_token",
+        "cache_read_per_token",
+        "cache_write_per_token",
+    ],
+)
+def test_a_negative_rate_is_a_problem(rate):
+    row = {**_PRICED.to_json(), rate: -1.0}
+    assert manifest_problems(_manifest_with(row))

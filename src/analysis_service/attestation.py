@@ -13,7 +13,7 @@ is most likely to be misread as answering is the one it must not.
 
 A valid signature says a report is authentic. It does not say the findings are
 correct, and it does not say the run was certified. Certification is a separate,
-deployment-local verdict about execution identity; see
+deployment-local result about execution identity; see
 :mod:`analysis_service.certification`. A signed uncertified report is an
 ordinary thing, and anyone who reads a green signature as an endorsement of the
 analysis has read it backwards.
@@ -68,6 +68,7 @@ from pydantic import (
 )
 
 from analysis_service.errors import ConfigError
+from analysis_service.parsing import Sha256Hex
 
 #: The canonicalization rules a signature is over. Bumped when any of them
 #: changes, because every existing signature stops verifying when they do — which
@@ -169,7 +170,7 @@ class Attestation(BaseModel):
 
     canonical_version: int = Field(ge=1)
     payload_type: str
-    report_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    report_sha256: Sha256Hex
     key_id: str = Field(min_length=1, max_length=200)
     #: base64, over the canonical bytes.
     signature: str = Field(min_length=1)
@@ -348,7 +349,7 @@ class Keyring(BaseModel):
         return next((key for key in self.keys if key.key_id == key_id), None)
 
 
-Verdict = Literal[
+VerificationOutcome = Literal[
     # The signature is good and the key's policy allows it.
     "verified",
     # No attestation was supplied. Not a failure, and emphatically not trust.
@@ -367,7 +368,7 @@ Verdict = Literal[
 class Verification(BaseModel):
     """What a verifier concluded, and why.
 
-    ``verdict`` is one of six and never a boolean, because the states a caller
+    ``outcome`` is one of six and never a boolean, because the states a caller
     must act on differently are more than two: an **unsigned** report is an
     ordinary artifact from a deployment that does not sign, an **unknown-key**
     one may be perfectly good to somebody with a fuller keyring, and a
@@ -378,7 +379,7 @@ class Verification(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    verdict: Verdict
+    outcome: VerificationOutcome
     key_id: str | None = None
     signer_status: KeyStatus | None = None
     detail: str
@@ -390,7 +391,7 @@ class Verification(BaseModel):
         Not whether its findings are right, and not whether the run was
         certified. See the module docstring.
         """
-        return self.verdict == "verified"
+        return self.outcome == "verified"
 
 
 def verify(
@@ -400,14 +401,14 @@ def verify(
 ) -> Verification:
     """Check one report against one attestation, under one keyring.
 
-    Fails closed at every step, and each failure has its own verdict rather than
+    Fails closed at every step, and each failure has its own outcome rather than
     a shared one: an unsupported canonicalization is not the same event as a bad
     signature, and an operator debugging the first should not be reading the
     message for the second.
     """
     if attestation is None:
         return Verification(
-            verdict="unsigned",
+            outcome="unsigned",
             detail=(
                 "no attestation was supplied. This report may be genuine; nothing"
                 " here establishes that it is."
@@ -415,7 +416,7 @@ def verify(
         )
     if attestation.canonical_version != CANONICAL_VERSION:
         return Verification(
-            verdict="unsupported",
+            outcome="unsupported",
             key_id=attestation.key_id,
             detail=(
                 f"the attestation uses canonicalization version"
@@ -425,7 +426,7 @@ def verify(
         )
     if attestation.payload_type != PAYLOAD_TYPE:
         return Verification(
-            verdict="unsupported",
+            outcome="unsupported",
             key_id=attestation.key_id,
             detail=f"unexpected payload type {attestation.payload_type!r}",
         )
@@ -433,7 +434,7 @@ def verify(
     key = keyring.get(attestation.key_id)
     if key is None:
         return Verification(
-            verdict="unknown-key",
+            outcome="unknown-key",
             key_id=attestation.key_id,
             detail=(
                 f"key {attestation.key_id!r} is not in this keyring. The"
@@ -444,7 +445,7 @@ def verify(
     actual = digest(report)
     if actual != attestation.report_sha256:
         return Verification(
-            verdict="invalid",
+            outcome="invalid",
             key_id=key.key_id,
             signer_status=key.status,
             detail=(
@@ -457,14 +458,14 @@ def verify(
         signature = base64.b64decode(attestation.signature, validate=True)
     except (ValueError, TypeError):
         return Verification(
-            verdict="invalid",
+            outcome="invalid",
             key_id=key.key_id,
             signer_status=key.status,
             detail="the signature is not valid base64",
         )
     if len(signature) != _SIGNATURE_LENGTH:
         return Verification(
-            verdict="invalid",
+            outcome="invalid",
             key_id=key.key_id,
             signer_status=key.status,
             detail=f"an Ed25519 signature is {_SIGNATURE_LENGTH} bytes,"
@@ -474,7 +475,7 @@ def verify(
         key.loaded().verify(signature, attestation.signed_payload())
     except InvalidSignature:
         return Verification(
-            verdict="invalid",
+            outcome="invalid",
             key_id=key.key_id,
             signer_status=key.status,
             detail="the signature does not check out against this key",
@@ -485,7 +486,7 @@ def verify(
         # whether a revoked key really signed this, or whether somebody is
         # replaying its id over a forged document. Those are different incidents.
         return Verification(
-            verdict="revoked",
+            outcome="revoked",
             key_id=key.key_id,
             signer_status=key.status,
             detail=(
@@ -501,7 +502,7 @@ def verify(
     )
     if retired_before and key.retired_at is not None:
         return Verification(
-            verdict="invalid",
+            outcome="invalid",
             key_id=key.key_id,
             signer_status=key.status,
             detail=(
@@ -511,7 +512,7 @@ def verify(
         )
 
     return Verification(
-        verdict="verified",
+        outcome="verified",
         key_id=key.key_id,
         signer_status=key.status,
         detail=(

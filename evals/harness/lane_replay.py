@@ -173,7 +173,6 @@ def fresh_leads(
     """
     nodes = FrameworkNodes(framework)
     inputs = framework_lane_inputs(
-        nodes.package,
         nodes,
         case.model,
         case.declaration(framework).options,

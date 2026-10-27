@@ -384,7 +384,7 @@ def build_tier_adapters(
     tiers: ModelTierConfig,
     sampling: SamplingConfig,
     resilience: ResilienceConfig,
-    env: Mapping[str, str] | None = None,
+    env: Mapping[str, str] | None,
 ) -> dict[TierName, ExecutedLlm]:
     """One configured ``LiteLlm`` per **bound** tier, or fail closed before any call.
 

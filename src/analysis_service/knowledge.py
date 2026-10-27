@@ -82,7 +82,7 @@ def select_documents(
     index: Mapping[str, tuple[str, ...]],
     fired: Collection[str],
     limit: int,
-    seen: Collection[str] = (),
+    seen: Collection[str],
 ) -> tuple[str, ...]:
     """The documents these fired rules earn, most-matched first, capped.
 

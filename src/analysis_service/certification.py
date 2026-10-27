@@ -56,13 +56,12 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.config_files import read_toml
 from analysis_service.model_tiers import TIER_NAMES, TierName
-from analysis_service.parsing import is_version
+from analysis_service.parsing import Sha256Hex, is_version
 from analysis_service.report import NodeRun
 
 # The manifest schema version. Keyed by tier, with no compatibility shim for
@@ -75,12 +74,6 @@ from analysis_service.report import NodeRun
 # compared across schemas, because the failure of comparing is a run reported
 # certified against a hash of a different thing.
 MANIFEST_VERSION = 3
-
-# A fingerprint is a lowercase sha256 hex digest. Validating the shape on write
-# is defence in depth against TOML injection through a crafted key (OWASP A05).
-_HEX64 = r"^[0-9a-f]{64}$"
-
-Fingerprint = Annotated[str, Field(pattern=_HEX64)]
 
 # Node key -> the tier it runs on. The caller supplies this because only it
 # knows which naming the observations use.
@@ -101,7 +94,10 @@ class BlessedManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: int
-    tiers: dict[TierName, frozenset[Fingerprint]] = Field(default_factory=dict)
+    # A fingerprint is a lowercase sha256 hex digest. Validating the shape on
+    # write is defence in depth against TOML injection through a crafted key
+    # (OWASP A05).
+    tiers: dict[TierName, frozenset[Sha256Hex]] = Field(default_factory=dict)
 
     def blessed_for(self, tier: TierName) -> frozenset[str]:
         """The fingerprints blessed for one tier — empty if the manifest omits it."""

@@ -41,6 +41,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import carries_line_break
 from evals.harness import sitting as sittings
 from evals.harness.reference import (
@@ -66,10 +67,6 @@ MAX_LINES = 200
 #: line. Every one of these values is written into a document that a pull
 #: request then carries, so the ceiling is on what merges, not on what parses.
 MAX_NOTES = 20_000
-
-#: A digest as it must be spelled, so a value that is not one refuses before
-#: it reaches a comparison.
-_SHA256 = r"^[0-9a-f]{64}$"
 
 
 def _one_line(value: str) -> str:
@@ -147,7 +144,7 @@ class CaseAnswers(BaseModel):
     #: against the tree at import, never trusted as the digest that merges.
     #: The value is shaped here so a file that carries something other than a
     #: digest refuses, rather than reading as a file that moved.
-    opened_digests: dict[Line, Annotated[str, Field(pattern=_SHA256)]] = Field(
+    opened_digests: dict[Line, Sha256Hex] = Field(
         default_factory=dict, max_length=MAX_LINES
     )
 

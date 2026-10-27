@@ -51,7 +51,7 @@ def test_a_flow_reads_as_its_two_endpoints(report):
 
     names = {element.id: element.name for element in report.system_model.elements()}
     flows = {flow.id: flow for flow in report.system_model.data_flows}
-    cards = conditions(report.analyses, report.system_model, [], [])
+    cards = conditions(report.analyses, report.system_model, [], [], (), None)
     for card in cards.values():
         for key, label, _ in card:
             if key[0] in flows:
@@ -104,7 +104,7 @@ def test_every_free_text_subject_is_its_own_fact(path):
             for ref in claim.verdict.related_unknowns
             if ref.subject and not ref.names_an_element and not ref.assertion
         }
-        cards = conditions(report.analyses, report.system_model, [], [])
+        cards = conditions(report.analyses, report.system_model, [], [], (), None)
         asked = {
             key[3]
             for claim in _needs_info(block)

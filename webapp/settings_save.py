@@ -38,6 +38,7 @@ from analysis_service.config_files import (
     SettingsLine,
     create_private,
     read_settings,
+    refused_var,
     secret_refusal,
     value_refusal,
     write_settings_env,
@@ -53,7 +54,7 @@ from analysis_service.settings_variables import (
 from analysis_service.store_backends import build_store, retention_days
 from analysis_service.store_backends import env_variables as store_variables
 from analysis_service.store_settings import StoreConfigError
-from analysis_service.vendors import VENDORS, refused_var
+from analysis_service.vendors import VENDORS
 from webapp.settings_page import CHANGED_SAMPLING, SETTINGS, sampling_key
 from webapp.settings_view import with_store_defaults
 

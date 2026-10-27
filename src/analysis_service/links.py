@@ -67,7 +67,7 @@ __all__ = [
     "NoCatalogError",
     "apply_answers",
     "check_answers",
-    "fold",
+    "fold_principal",
     "link_questions",
     "merged_facts",
     "merged_links",
@@ -94,7 +94,7 @@ MAX_HELD_LINKS = 5 * MAX_LINK_ANSWERS
 _WORD = re.compile(r"[a-z0-9]+")
 
 
-def fold(name: str) -> str:
+def fold_principal(name: str) -> str:
     """One spelling for every way the runs wrote one principal.
 
     Case, punctuation, a possessive and a plural all vary between runs of the
@@ -146,7 +146,7 @@ Spans = tuple[tuple[int, int], ...]
 
 
 def _composed(
-    links: Sequence[LinkAnswer], facts: Sequence[FactAnswer] = ()
+    links: Sequence[LinkAnswer], facts: Sequence[FactAnswer]
 ) -> tuple[str, Spans, Spans]:
     """The answers Source's text, and where each answer's line sits in it."""
     lines = [*map(_line, links), *map(fact_line, facts)]
@@ -163,7 +163,7 @@ def _refuse_repeats(links: Sequence[LinkAnswer]) -> None:
     Refused rather than resolved by order: the service cannot know which of the
     two the submitter meant.
     """
-    principals = [fold(link.principal) for link in links]
+    principals = [fold_principal(link.principal) for link in links]
     for at, principal in enumerate(principals):
         if principal in principals[:at]:
             first = principals.index(principal)
@@ -181,8 +181,8 @@ def merged_links(
     submitter gave it knowing the report the earlier answer produced.
     """
     _refuse_repeats(later)
-    merged = {fold(link.principal): link for link in earlier}
-    merged.update({fold(link.principal): link for link in later})
+    merged = {fold_principal(link.principal): link for link in earlier}
+    merged.update({fold_principal(link.principal): link for link in later})
     return list(merged.values())
 
 
@@ -246,7 +246,7 @@ def resumed_sources(
 class LinkQuestion:
     """One principal the report cannot place, and what an answer would place."""
 
-    #: :func:`fold` of the principal's name; one question per value.
+    #: :func:`fold_principal` of the principal's name; one question per value.
     key: str
     #: The principal as the report first spelled it.
     principal: str
@@ -290,7 +290,7 @@ def link_questions(
     for subject in catalog.subjects:
         if subject.type != "principal":
             continue
-        key = fold(subject.label)
+        key = fold_principal(subject.label)
         if answer(catalog, subject.id, "represented-by").settled:
             linked.add(key)
             continue
@@ -302,7 +302,7 @@ def link_questions(
     named: dict[str, list[str]] = defaultdict(list)
     for element in model.elements():
         if element.id in options:
-            named[fold(element.name)].append(element.id)
+            named[fold_principal(element.name)].append(element.id)
     return tuple(
         LinkQuestion(
             key=key,
@@ -381,7 +381,7 @@ def check_answers(
     written by :func:`apply_answers` here, and each issue it would raise is a
     refusal, so a wrong link costs nothing. A link answer with no catalog to
     write it into raises :class:`NoCatalogError`. ``asked`` is the facts the
-    job's questions name, and ``asked_links`` the :func:`fold` keys of the
+    job's questions name, and ``asked_links`` the :func:`fold_principal` keys of the
     principals they ask about; ``earlier`` and ``earlier_links`` are the
     answers of the earlier saves, which a later save may answer again. A
     link to any other principal is refused, so a submission cannot replace a
@@ -393,9 +393,12 @@ def check_answers(
         raise NoCatalogError(
             "this report carries no assertion catalog, so it asked no link question"
         )
-    answerable = {*asked_links, *(fold(link.principal) for link in earlier_links)}
+    answerable = {
+        *asked_links,
+        *(fold_principal(link.principal) for link in earlier_links),
+    }
     for at, link in enumerate(links):
-        if fold(link.principal) not in answerable:
+        if fold_principal(link.principal) not in answerable:
             raise ValueError(
                 f"links[{at}]: this job asked no question about its principal"
             )
@@ -435,11 +438,11 @@ def _link_rows(
     principals = defaultdict(list)
     for subject in subjects:
         if subject.type == "principal":
-            principals[fold(subject.label)].append(subject.id)
+            principals[fold_principal(subject.label)].append(subject.id)
     issues: list[CatalogIssue] = []
     answered: dict[str, Assertion] = {}
     for link, (start, end) in zip(links, spans, strict=True):
-        targets = principals.get(fold(link.principal), [])
+        targets = principals.get(fold_principal(link.principal), [])
         if not targets:
             issues.append(
                 CatalogIssue(

@@ -35,12 +35,12 @@ loader = MarkdownLoader(PROJECT_ROOT / "frameworks" / "stride")
 
 def select_notes(fired) -> tuple[str, ...]:
     """STRIDE's reference notes for one lane's fired rules."""
-    return select_documents(NOTES, fired, MAX_NOTES)
+    return select_documents(NOTES, fired, MAX_NOTES, ())
 
 
 def select_cases(fired) -> tuple[str, ...]:
     """STRIDE's worked cases for one lane's fired rules."""
-    return select_documents(CASES, fired, MAX_CASES)
+    return select_documents(CASES, fired, MAX_CASES, ())
 
 
 class TestSelection:
@@ -105,7 +105,7 @@ class TestSelection:
             "spoofing-unverified-boundary-auth",
             "spoofing-unverified-external-caller",
         }
-        best = select_documents(NOTES, fired, MAX_NOTES)[0]
+        best = select_documents(NOTES, fired, MAX_NOTES, ())[0]
 
         assert best == "identity-at-a-boundary"
         assert select_documents(NOTES, fired, MAX_NOTES, seen=[best])[0] == best, (
@@ -122,7 +122,7 @@ class TestSelection:
         file.
         """
         tied = {"spoofing-unverified-boundary-auth"}
-        first = select_documents(CASES, tied, MAX_CASES)
+        first = select_documents(CASES, tied, MAX_CASES, ())
 
         assert first == ("unknown-is-not-absent",)
         assert select_documents(CASES, tied, MAX_CASES, seen=first) == (

@@ -73,7 +73,7 @@ from analysis_service.assertions import (
     subject_id,
 )
 from analysis_service.claims import FrameworkName
-from analysis_service.parsing import Signer
+from analysis_service.parsing import Sha256Hex, Signer
 from analysis_service.system_model import SystemModel
 from evals.harness.reference import CorpusError
 
@@ -156,7 +156,7 @@ class RestingClaim(BaseModel):
     #: so the entry stops matching the moment the claim moves or changes. A
     #: digest rather than the sentence, because this file is a generation
     #: input and the leakage lint refuses a reference claim in one.
-    claim_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    claim_sha256: Sha256Hex
 
 
 class UnheldFact(BaseModel):

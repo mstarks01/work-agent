@@ -101,7 +101,7 @@ class TestTheFollowUp:
         answer = FactAnswer(
             key=KEY, facets={"records-actor": "yes", "record-protected": "unknown"}
         )
-        found = conditions(_analyses(), valid_model(), [answer], [KEY])
+        found = conditions(_analyses(), valid_model(), [answer], [KEY], (), None)
         assert [status for _, _, status in found["stride/S-01"]] == ["answered"]
         assert [status for _, _, status in found["stride/S-02"]] == ["partial"]
 

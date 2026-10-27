@@ -103,7 +103,9 @@ from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.sources import MAX_LABEL_CHARS
 from analysis_service.system_model import (
+    CONTROL_VALUE_MAX_CHARS,
     DATA_CLASSIFICATION_FIELD,
     ELEMENT_GROUPS,
     ENDPOINT_PREFIXES,
@@ -260,7 +262,7 @@ class _CompactElement(BaseModel):
     description: str = Field(default="", max_length=2000)
     assets: list[str] = assets_field()
     source_excerpt: str = Field(default="", max_length=EXCERPT_MAX_CHARS)
-    source_label: str = Field(default="", max_length=200)
+    source_label: str = Field(default="", max_length=MAX_LABEL_CHARS)
     source_speaker: str = Field(default="", max_length=200)
     notes: str = Field(default="", max_length=2000)
 
@@ -287,7 +289,7 @@ class CompactDataStore(_CompactElement):
     technology: str = Field(max_length=200)
     trust_zone: str = _ref_field(ZONE_REF)
     data_classification: str = DATA_CLASSIFICATION_FIELD
-    encryption_at_rest: str = Field(max_length=200)
+    encryption_at_rest: str = Field(max_length=CONTROL_VALUE_MAX_CHARS)
 
 
 class CompactDataFlow(_CompactElement):
@@ -299,9 +301,9 @@ class CompactDataFlow(_CompactElement):
     source: str = _ref_field()
     destination: str = _ref_field()
     protocol: str = Field(max_length=200)
-    authentication: str = Field(max_length=200)
+    authentication: str = Field(max_length=CONTROL_VALUE_MAX_CHARS)
     data_description: str = Field(max_length=1000)
-    encryption_in_transit: str = Field(max_length=200)
+    encryption_in_transit: str = Field(max_length=CONTROL_VALUE_MAX_CHARS)
     operations: Operations
 
 
@@ -422,7 +424,7 @@ REFERENCE_FIELDS: tuple[str, ...] = ("trust_zone", "source", "destination")
 
 def parse_extraction(
     payload: object,
-    extraction_format: str = FULL_FORMAT,
+    extraction_format: str,
     *,
     sources: Mapping[str, str] = MappingProxyType({}),
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:

@@ -11,9 +11,9 @@ from collections.abc import Iterator
 
 import pytest
 
-from analysis_service.config_files import SETTINGS_DIR_VAR
+from analysis_service.config_files import SETTINGS_DIR_VAR, refused_var
 from analysis_service.offline import OFFLINE_ENV
-from analysis_service.vendors import VENDORS, refused_var
+from analysis_service.vendors import VENDORS
 
 # The shared assertion helpers in ``tests.factories`` show their values in a
 # failure only where pytest rewrites the module before its first import.

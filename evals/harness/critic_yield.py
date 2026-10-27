@@ -51,7 +51,7 @@ from evals.harness.ledger import Ledger
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import (
     CaseScore,
-    Standing,
+    VoteStatus,
     candidate_claim,
     ratio,
     score_case,
@@ -61,14 +61,14 @@ from evals.harness.scorer import (
 # first two are hits against the reference set, and the rest are the ways of
 # missing it.
 #
-# **Composed from ``Standing`` rather than restating it.** The ways an unmatched
+# **Composed from ``VoteStatus`` rather than restating it.** The ways an unmatched
 # finding can stand are the scorer's vocabulary, and a second copy here would
 # disagree with it the first time one was added. So the four names below are
 # the ones this module owns, and every standing arrives with the scorer's own
 # type.
-Disposition = (
+ScoredOutcome = (
     Literal["matched-must-find", "matched-expected", "lane-error", "unscored"]
-    | Standing
+    | VoteStatus
 )
 
 
@@ -85,7 +85,7 @@ class KilledDraft:
     threat_id: str
     category: StrideCategory
     claim: str
-    disposition: Disposition
+    disposition: ScoredOutcome
     reference_index: int | None
     #: The step the critic said it rejected the draft at, off the block's own
     #: verdict: ``lane``, ``reasoning``, ``duplicate``, ``evidence`` and the
@@ -324,14 +324,14 @@ def _yield(
 ) -> CriticYield:
     steps = steps or {}
     surviving = set(post.produced_ids)
-    dispositions = _dispositions(pre)
+    outcomes = _scored_outcomes(pre)
     killed = tuple(
         KilledDraft(
             threat_id=draft.id,
             category=draft.category,
             claim=candidate_claim(draft),
-            disposition=dispositions[draft.id][0],
-            reference_index=dispositions[draft.id][1],
+            disposition=outcomes[draft.id][0],
+            reference_index=outcomes[draft.id][1],
             cause=steps.get(draft.id),
         )
         for draft in drafts
@@ -353,7 +353,7 @@ def _yield(
     )
 
 
-def _dispositions(score: CaseScore) -> dict[str, tuple[Disposition, int | None]]:
+def _scored_outcomes(score: CaseScore) -> dict[str, tuple[ScoredOutcome, int | None]]:
     """Every produced threat's fate in one scoring pass, keyed by threat ID.
 
     Threat IDs are unique within a run — :func:`~analysis_service.critic.
@@ -364,9 +364,9 @@ def _dispositions(score: CaseScore) -> dict[str, tuple[Disposition, int | None]]
     a future scorer path which stops covering the produced set surfaces as a
     visible label in the artifact rather than a ``KeyError`` mid-sweep.
     """
-    records: dict[str, tuple[Disposition, int | None]] = {}
+    records: dict[str, tuple[ScoredOutcome, int | None]] = {}
     for pair in score.matched:
-        matched: Disposition = (
+        matched: ScoredOutcome = (
             "matched-must-find" if pair.must_find else "matched-expected"
         )
         records[pair.threat_id] = (matched, pair.reference_index)
