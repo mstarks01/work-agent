@@ -9,7 +9,7 @@
 - **Relates to**: [ADR 0031](0031-a-claim-identity-carries-no-direction.md),
   whose identity rule keyed the pairs.
 - **Amended by**: [ADR 0060](0060-two-mechanisms-at-one-place-are-two-findings.md),
-  under which `report_changes` also reads `critic.mechanism_of`, so two
+  under which `report_changes` also reads `claim_identity.mechanism_of`, so two
   mechanisms under one key are two findings
 
 ## Context
@@ -42,7 +42,7 @@ writes `duplicate` writes a value outside its schema.
 `duplicate-on-unit` joins the archived kinds, because archived reports carry
 both and are scored again.
 
-**Which finding a claim is stays one function.** `critic.finding_key` keys a
+**Which finding a claim is stays one function.** `claim_identity.finding_key` keys a
 claim by framework, lane, verb and folded place, or by its unit for a catalog
 claim. `report_changes` reads it; nothing rejects by it.
 

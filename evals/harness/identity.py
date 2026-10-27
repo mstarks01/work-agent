@@ -37,7 +37,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol, Self
 
-from analysis_service.critic import (
+from analysis_service.claim_identity import (
     distinct_mechanisms,
     endpoint_targets,
     sibling_flows,
@@ -164,7 +164,7 @@ def endpoint_form(element_ids: Iterable[str], flows: CaseFlows) -> frozenset[str
     difference and labels the pair a match — and this is what makes those two
     citations equal without asking anybody.
 
-    It asks :func:`~analysis_service.critic.endpoint_targets`, the service's
+    It asks :func:`~analysis_service.claim_identity.endpoint_targets`, the service's
     fold, rather than repeating it, so the scorer and the service cannot fold a
     place two ways. That fold reads the flow map rather than parsing an
     **Element ID**, because a flow's ID spells its endpoints by *name* and two

@@ -32,7 +32,7 @@ that sets `ANALYSIS_ASSERTIONS` meets the gap today.
 attribute the row's predicate projects into, so a row and an attribute ground
 about one control read alike (`transport-encryption` reads as
 `encryption_in_transit`), or the predicate's own name where it projects into
-nothing (`credential-custody`). `critic.row_controls` builds the map once per
+nothing (`credential-custody`). `claim_identity.row_controls` builds the map once per
 job from its catalog, by each row's exact ID, which a reader never splits.
 
 The sweep's scorer, the writing instrument, the review queue and the follow-up

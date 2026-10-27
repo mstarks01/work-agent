@@ -56,11 +56,11 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
+from analysis_service.claim_identity import NO_ROWS, mechanism_of
 from analysis_service.claims import (
     SeverityLevel,
     derive_severity_level,
 )
-from analysis_service.critic import NO_ROWS, mechanism_of
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from analysis_service.system_model import ModelIndex
 from evals.harness import audit

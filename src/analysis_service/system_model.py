@@ -562,7 +562,7 @@ def is_zone(element_id: str) -> bool:
     """Whether an element ID names a **Trust Boundary**.
 
     A zone is the context a claim sits in rather than what it is about, so a
-    claim's targets drop it (:func:`~analysis_service.critic.endpoint_targets`)
+    claim's targets drop it (:func:`~analysis_service.claim_identity.endpoint_targets`)
     and a framework whose claims must name a target refuses a claim that names
     only zones (ADR 0097). The one reader of that test.
     """

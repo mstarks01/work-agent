@@ -273,7 +273,7 @@ A key can hold two different findings: a fake server and a fake caller share a
 lane, a verb and a place. So every vote also stores the claim's mechanism, the
 controls its grounds say are unstated or missing, and two claims under one key
 are two findings where both mechanisms name something and do not overlap
-(`critic.distinct_mechanisms`, ADR 0060). `Ledger.verdicts_for` is the one
+(`claim_identity.distinct_mechanisms`, ADR 0060). `Ledger.verdicts_for` is the one
 reader of which vote answers a finding, and the review queue asks one question
 per key and mechanism. A vote stored without a mechanism binds by its key alone.
 
@@ -408,6 +408,7 @@ one requirement in one place, and one vote answering for both.
 
 | Module | What it owns |
 |---|---|
+| `src/analysis_service/claim_identity.py` | The service's half: `finding_key`, the endpoint fold `endpoint_targets`, the sibling flows, a claim's mechanism, `distinct_mechanisms`, and the row controls of a catalog (`row_controls`) and of a **Report** (`report_rows`). Each caller passes the flow map of the graph its claims were reached in. |
 | `evals/harness/verbs.py` | The closed vocabulary, the equivalence table, the two it cannot separate. |
 | `evals/harness/fingerprint.py` | `Components`, the versioned hash, and the version read back off the value. |
 | `evals/harness/identity.py` | `endpoint_subset`, `SubsetVerbIdentity`, and the `Matcher` protocol one scoreboard scores every rule through. |

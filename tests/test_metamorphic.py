@@ -21,8 +21,8 @@ import pytest
 
 from analysis_service.analysis import unknown_controls
 from analysis_service.candidates import generate_candidates
+from analysis_service.claim_identity import finding_key
 from analysis_service.coverage import build_coverage
-from analysis_service.critic import finding_key
 from analysis_service.evidence import evidence_catalog
 from analysis_service.fan_in import join_drafts
 from analysis_service.frameworks import PACKAGES

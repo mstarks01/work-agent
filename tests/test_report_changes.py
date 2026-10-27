@@ -7,8 +7,8 @@ Deterministic, credential-free, and free of provider calls.
 
 from __future__ import annotations
 
+from analysis_service.claim_identity import finding_key
 from analysis_service.claims import UnknownRef, Verdict
-from analysis_service.critic import finding_key
 from analysis_service.report_changes import report_changes
 from analysis_service.system_model import ModelIndex
 from tests.factories import sample_report, sample_threat, valid_model

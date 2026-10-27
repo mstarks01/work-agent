@@ -22,10 +22,10 @@ ledger row `QA-2026-10-03-02-E2` were these.
 ## Decision
 
 **A claim's mechanism also holds the sibling flows it cites**
-(`critic.cited_channels`): a cited flow that runs between the same two elements
+(`claim_identity.cited_channels`): a cited flow that runs between the same two elements
 as another flow. Two claims under one key are apart where their controls do not
 overlap, or where their cited sibling flows do not
-(`critic.distinct_mechanisms`).
+(`claim_identity.distinct_mechanisms`).
 
 **The place half of the scorer's rule reads the same channels**:
 `identity.endpoint_subset` refuses two sides that cite non-overlapping sibling

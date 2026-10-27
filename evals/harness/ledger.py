@@ -79,7 +79,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from analysis_service.critic import distinct_mechanisms
+from analysis_service.claim_identity import distinct_mechanisms
 from evals.harness.content import (
     PROSE_PREFIX,
     STRUCTURAL_PREFIX,
@@ -520,7 +520,7 @@ class Ledger:
 
         Keyed by fingerprint, voter and mechanism. A later vote replaces an
         earlier vote by one voter on one key unless the two rest on distinct
-        mechanisms (:func:`~analysis_service.critic.distinct_mechanisms`, ADR
+        mechanisms (:func:`~analysis_service.claim_identity.distinct_mechanisms`, ADR
         0060): then both are live, because they answer two findings that
         share a key. Latest by position rather than by timestamp: the file is
         append-only, so position *is* chronology. Iteration order is the order

@@ -48,12 +48,12 @@ sys.path.insert(0, str(_REPO_ROOT))
 
 from analysis_service.actions import FAMILIES
 from analysis_service.assertions import support_span
+from analysis_service.claim_identity import endpoint_targets
 from analysis_service.claims import (
     FrameworkName,
     Rating,
     derive_severity_level,
 )
-from analysis_service.critic import endpoint_targets
 from analysis_service.frameworks import PACKAGES, run_precondition
 from analysis_service.frameworks.asvs.catalog import ASVS_LEVELS, requirements_for
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES

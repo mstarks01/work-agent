@@ -59,13 +59,13 @@ from pydantic import (
     model_validator,
 )
 
+from analysis_service.claim_identity import sibling_flows
 from analysis_service.claims import (
     FrameworkName,
     Rating,
     SeverityLevel,
     derive_severity_level,
 )
-from analysis_service.critic import sibling_flows
 from analysis_service.deployment import ConfigPaths
 from analysis_service.frameworks.asvs.record import AsvsChapter
 from analysis_service.frameworks.stride.record import LANES_OF_VERB, StrideCategory

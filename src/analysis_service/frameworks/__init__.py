@@ -526,7 +526,7 @@ def lane_of(claim: Claim) -> str | None:
 
     ``None`` for a package whose claims carry no lane field. The one reader for
     the seams that key a claim by its lane:
-    :func:`~analysis_service.critic.finding_key` and the grounds count in
+    :func:`~analysis_service.claim_identity.finding_key` and the grounds count in
     ``evals/harness/grounds.py``. A reference record carries its lane in the
     same declared field, which ``evals/verify_corpus.py`` reads. The scorer
     keys a claim's identity by its lane too, and the corpus records one action

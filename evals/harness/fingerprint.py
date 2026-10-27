@@ -162,9 +162,9 @@ class Components:
     #: another. Every version refuses an empty one.
     scope: str = ""
     #: The controls the claim's grounds say are unstated or missing, sorted,
-    #: from :func:`~analysis_service.critic.grounded_mechanism`. **Not part of
+    #: from :func:`~analysis_service.claim_identity.grounded_mechanism`. **Not part of
     #: the fingerprint**: it tells apart two findings that share one key, by
-    #: :func:`~analysis_service.critic.distinct_mechanisms`, and a vote stored
+    #: :func:`~analysis_service.claim_identity.distinct_mechanisms`, and a vote stored
     #: without it reads as empty, which binds as before (ADR 0060).
     mechanism: tuple[str, ...] = ()
 

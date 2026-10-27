@@ -48,10 +48,11 @@ from typing import Any, TypeVar
 from analysis_service.actions import VerbError
 from analysis_service.assertions import CatalogProposal
 from analysis_service.certification import CertificationError, CertifyResult, certify
+from analysis_service.claim_identity import report_rows
 from analysis_service.claims import (
     FrameworkName,
 )
-from analysis_service.critic import CriticOutputError, row_controls
+from analysis_service.critic import CriticOutputError
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Pipeline
@@ -708,7 +709,7 @@ def _score_runs(
         drafts = runs[case.id].merged_drafts
         produced = stride_threats(runs[case.id].report)
         report = runs[case.id].report
-        rows = row_controls(report.assertions.catalog if report.assertions else None)
+        rows = report_rows(report)
         entry = score_case_with_yield(
             case, drafts, produced, matcher, votes, block, rows
         )

@@ -91,6 +91,7 @@ from analysis_service.system_model import (
     SystemModel,
     TrustBoundary,
     ZonedElement,
+    make_element_id,
     normalize_name,
 )
 from analysis_service.validation import validate
@@ -1158,7 +1159,7 @@ def subject_id(subject_type: str, name: str) -> str:
     typed, _, rest = name.partition(":")
     if rest and typed.strip().lower() == prefix:
         name = rest
-    return f"{prefix}:{normalize_name(name)}"
+    return make_element_id(prefix, name)
 
 
 def assertion_id(assertion: Assertion) -> str:
