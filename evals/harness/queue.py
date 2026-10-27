@@ -46,11 +46,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from analysis_service.claims import Claim, FrameworkName
-from analysis_service.critic import (
+from analysis_service.claim_identity import (
     NO_ROWS,
     grounded_mechanism,
 )
+from analysis_service.claims import Claim, FrameworkName
 from evals.harness import content as digests
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
@@ -88,7 +88,7 @@ class Finding:
     seen_in: int = 1
     runs: int = 1
     #: The controls the claim's grounds say are unstated or missing, sorted,
-    #: from :func:`~analysis_service.critic.grounded_mechanism`. Two findings
+    #: from :func:`~analysis_service.claim_identity.grounded_mechanism`. Two findings
     #: under one fingerprint are two questions where these are distinct.
     mechanism: tuple[str, ...] = ()
 

@@ -43,8 +43,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from analysis_service.claim_identity import NO_ROWS
 from analysis_service.claims import FrameworkAnalysis
-from analysis_service.critic import NO_ROWS
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from evals.harness.identity import Matcher
 from evals.harness.ledger import Ledger

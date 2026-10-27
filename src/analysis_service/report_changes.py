@@ -4,8 +4,8 @@ A report's follow-up runs again on the owner's answers (ADR 0054). Its reader
 needs to know what those answers did: which findings the run confirmed,
 which it ruled out, which are new and which it no longer raised (#561).
 
-A finding is matched by :func:`~analysis_service.critic.finding_key` and,
-under one key, by :func:`~analysis_service.critic.distinct_mechanisms`: two
+A finding is matched by :func:`~analysis_service.claim_identity.finding_key` and,
+under one key, by :func:`~analysis_service.claim_identity.distinct_mechanisms`: two
 claims are one finding where their keys agree and their grounded controls are
 not disjoint. The comparison reads no prose and makes no model call. Rejected drafts take part on both sides, because a draft the
 earlier report rejected and the follow-up confirmed is a change a reader has to
@@ -24,14 +24,14 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Literal
 
-from analysis_service.claims import RuledClaim
-from analysis_service.critic import (
+from analysis_service.claim_identity import (
     FindingKey,
     distinct_mechanisms,
     finding_key,
     mechanism_of,
-    row_controls,
+    report_rows,
 )
+from analysis_service.claims import RuledClaim
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex
 
@@ -69,7 +69,7 @@ def _findings(
     report: Report,
 ) -> Iterator[tuple[FindingKey, frozenset[str], RuledClaim]]:
     flows = ModelIndex.of(report.system_model).flow_endpoints
-    rows = row_controls(report.assertions.catalog if report.assertions else None)
+    rows = report_rows(report)
     for block in report.analyses:
         for claim in (*block.claims, *block.rejected_claims):
             yield finding_key(claim, flows), mechanism_of(claim, flows, rows), claim

@@ -35,7 +35,7 @@ import itertools
 
 import pytest
 
-from analysis_service.critic import endpoint_targets
+from analysis_service.claim_identity import endpoint_targets
 from analysis_service.system_model import ModelIndex, TrustBoundary
 from evals import verify_corpus
 from evals.harness.fingerprint import key_claim
@@ -200,7 +200,7 @@ def test_the_exemption_list_does_not_rot(collisions):
 class TestTheFourReadersOfOnePlace:
     """Code folds a claim's citations into "one place in the graph" in one function.
 
-    ``critic.endpoint_targets`` is the fold, and ``identity.endpoint_form``,
+    ``claim_identity.endpoint_targets`` is the fold, and ``identity.endpoint_form``,
     which the scorer and ``fingerprint.components_for`` read, calls it. The
     test below still compares the two on every corpus citation, so a second
     implementation cannot creep back in unnoticed.
@@ -209,7 +209,8 @@ class TestTheFourReadersOfOnePlace:
     which is why this asserts the implications between them rather than
     equality:
 
-    - ``critic.finding_key`` — exact folded targets and one verb, within a lane.
+    - ``claim_identity.finding_key`` — exact folded targets and one verb,
+      within a lane.
     - ``SubsetVerbIdentity`` — folded targets by **subset** and one action,
       within a lane.
     - ``fingerprint`` — exact folded targets, one verb, one lane, one case.
@@ -232,7 +233,7 @@ class TestTheFourReadersOfOnePlace:
                     )
 
         assert disagreements == [], (
-            "analysis_service.critic.endpoint_targets and"
+            "analysis_service.claim_identity.endpoint_targets and"
             " evals.harness.identity.endpoint_form fold one claim's citations"
             f" into two different places: {disagreements}. They are one rule"
             " with two readers, so the service would call two claims one finding"
@@ -401,7 +402,7 @@ class TestTwoSiblingFlowsAreTwoPlaces:
     """Case 13's REST requests and WebSocket run between one pair (ADR 0061)."""
 
     def test_only_a_flow_with_a_sibling_is_a_channel(self):
-        from analysis_service.critic import cited_channels
+        from analysis_service.claim_identity import cited_channels
 
         assert cited_channels(ON_REST, SIBLING_FLOWS) == {
             "flow:process:console>process:api>requests"
@@ -439,7 +440,7 @@ class TestTwoSiblingFlowsAreTwoPlaces:
         )
 
     def test_one_shared_control_does_not_join_two_channels(self):
-        from analysis_service.critic import distinct_mechanisms
+        from analysis_service.claim_identity import distinct_mechanisms
 
         rest = {"authentication", "flow:process:console>process:api>requests"}
         socket = {"authentication", "flow:process:console>process:api>status"}

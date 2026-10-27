@@ -42,18 +42,31 @@ fold alone they would be one label. Under the guard, the reference matches two
 known spellings, resolves to neither, and is left for the caller's check exactly
 as an unresolvable reference is.
 
-Two further rungs are refused, for the reason ``grounding`` refuses
-punctuation-blindness: a rung nobody has measured is a precision cost nobody has
-priced.
+This module refuses two further rungs. Its readers are the draft references a
+lane emits, the ruling references a critic emits, and an element's source
+label. It refuses them for the reason ``grounding`` refuses
+punctuation-blindness: a rung nobody has measured is a precision cost nobody
+has priced. Two other readers take one rung each, in their own code, for a
+reason each one states.
 
 * Bare slug — reading ``store:web-app`` as ``process:web-app`` because only one
-  element has that slug. The referent is unambiguous, but the prefix is not
-  spelling. An agent that filed a process as a data store reasoned about a
-  different kind of thing, and a threat's meaning turns on which it was.
+  element has that slug. A lane or critic reference does not take it, because
+  the prefix is not spelling there. An agent that filed a process as a data
+  store reasoned about a different kind of thing, and a threat's meaning turns
+  on which it was. A flow endpoint at extraction takes it, through
+  :func:`~analysis_service.system_model.follow_by_slug` (ADR 0089,
+  ``docs/adr/0089-a-mistyped-flow-endpoint-follows-the-one-element-with-its-slug.md``).
+  There the model named the element and mistyped its prefix, and an endpoint
+  can only be an entity, a process or a store.
 * Name to ID — turning ``"Web App"`` into ``process:web-app`` through
-  ``normalize_name``. It is plausible, and every element in the prompt is
-  already spelled as its ID, so nothing has shown a model doing this. It is the
-  rung to add first if a real run ever produces one.
+  ``normalize_name``. A lane or critic reference does not take it, because the
+  lane and critic prompts spell every element as its ID. The assertion pass
+  takes it for a graph-bound subject, through
+  :func:`~analysis_service.assertions._named`. There the model writes a subject
+  as a name, such as ``core services`` for ``boundary:core-services``, and an
+  **Element ID** is the slug of the element's name. ``_named`` reads only the
+  element types that the subject type accepts, and it refuses a slug that two
+  such elements share.
 """
 
 from __future__ import annotations

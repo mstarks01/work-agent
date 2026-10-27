@@ -29,10 +29,10 @@ each pair would only move the problem to the next pair.
 
 **A claim's mechanism is the set of controls its own grounds say are unstated
 or missing**: the attribute of each unknown-attribute and absent-attribute
-ground (`critic.grounded_mechanism`). It is read from fields, never prose.
+ground (`claim_identity.grounded_mechanism`). It is read from fields, never prose.
 
 **Two claims under one key are two findings where both mechanisms name
-something and they do not overlap** (`critic.distinct_mechanisms`). Overlap
+something and they do not overlap** (`claim_identity.distinct_mechanisms`). Overlap
 rather than equality, because one finding cites a slightly different set from
 run to run. Ledger row `QA-2026-10-03-02-E7`:
 

@@ -46,11 +46,11 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from analysis_service.claim_identity import NO_ROWS, mechanism_of, report_rows
 from analysis_service.claims import (
     Claim,
     FrameworkName,
 )
-from analysis_service.critic import NO_ROWS, mechanism_of, row_controls
 from analysis_service.report import Report
 from analysis_service.system_model import ModelIndex
 from evals.harness.content import prose as prose_digest
@@ -187,7 +187,7 @@ def measure(
         if report is None:
             continue
         flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
-        held = row_controls(report.assertions.catalog if report.assertions else None)
+        held = report_rows(report)
         rows += [
             measure_case(case.id, block.framework, block.claims, flows, votes, held)
             for block in report.analyses

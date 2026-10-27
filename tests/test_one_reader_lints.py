@@ -14,6 +14,7 @@ import ast
 import re
 from collections.abc import Callable, Iterator
 from functools import partial
+from itertools import pairwise
 from typing import TypeGuard
 
 from tests.source_tree import REPO_ROOT, parse, source_files
@@ -228,7 +229,20 @@ def test_a_flow_map_names_its_siblings_once():
     assert _sites(lambda node: _calls(node, "sibling_flows")) == [
         ("evals/harness/identity.py", "of_graph"),
         ("evals/harness/reference.py", "_case_flows"),
-        ("src/analysis_service/critic.py", "cited_channels"),
+        ("src/analysis_service/claim_identity.py", "cited_channels"),
+    ]
+
+
+def test_a_reports_rows_have_one_reader():
+    """Only ``report_rows`` reads the row controls of a **Report**.
+
+    ``row_controls`` takes a catalog, and a caller that holds a Report reads
+    its rows through ``report_rows``. ``absent_rows`` is the one other caller,
+    because it holds a catalog and no Report.
+    """
+    assert _sites(lambda node: _calls(node, "row_controls")) == [
+        ("src/analysis_service/claim_identity.py", "report_rows"),
+        ("src/analysis_service/fixes.py", "absent_rows"),
     ]
 
 
@@ -585,6 +599,10 @@ ID_DERIVERS: dict[Site, str] = {
         "it builds a flow ID at the identity version of the ID it relabels,"
         " which ``derive_element_id`` does not take"
     ),
+    ("src/analysis_service/assertions.py", "subject_id"): (
+        "a non-graph subject is no element, and its ID takes the derivation an"
+        " element ID has from its type prefix and its name"
+    ),
 }
 
 
@@ -596,6 +614,30 @@ def test_an_element_id_has_one_deriver():
     """Only ``derive_element_id`` derives the ID an element's name implies."""
     derivers = set(_sites(_derives_an_id)) - ID_DERIVERS.keys()
     assert derivers == {("src/analysis_service/system_model.py", "derive_element_id")}
+
+
+def _slugs_after_a_prefix(node: ast.AST) -> bool:
+    """Whether ``node`` is an f-string that puts ``normalize_name`` after a colon."""
+    return isinstance(node, ast.JoinedStr) and any(
+        isinstance(before, ast.Constant)
+        and str(before.value).endswith(":")
+        and isinstance(after, ast.FormattedValue)
+        and _calls(after.value, "normalize_name")
+        for before, after in pairwise(node.values)
+    )
+
+
+def test_an_id_slug_is_spelled_only_in_the_system_model():
+    """Only ``system_model`` writes a prefix, a colon and a name's slug.
+
+    ``make_element_id`` writes an element ID and ``_build_v1`` a version 1 flow
+    ID. Every other ID of that shape calls one of them, so the two spellings
+    cannot part.
+    """
+    assert _sites(_slugs_after_a_prefix) == [
+        ("src/analysis_service/system_model.py", "_build_v1"),
+        ("src/analysis_service/system_model.py", "make_element_id"),
+    ]
 
 
 #: Each function that reads a password field, or tests a key for the word

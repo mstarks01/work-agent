@@ -1390,12 +1390,12 @@ class TestACitedRowIsPartOfAClaimsMechanism:
     def test_a_row_and_an_unknown_attribute_are_two_mechanisms(self):
         """Case 01's leaked password rests on stated rows, its offline copy on
         an unstated attribute: two findings under one key."""
-        from analysis_service.claims import Ground
-        from analysis_service.critic import (
+        from analysis_service.claim_identity import (
             distinct_mechanisms,
             grounded_mechanism,
             row_controls,
         )
+        from analysis_service.claims import Ground
 
         held = assertions(row())
         stated = evidence_catalog(valid_model(), held)[assertion_id(row())]
@@ -1416,7 +1416,7 @@ class TestACitedRowIsPartOfAClaimsMechanism:
 
     def test_a_row_names_the_attribute_its_predicate_projects_into(self):
         """A row and an attribute ground about one control read alike."""
-        from analysis_service.critic import row_controls
+        from analysis_service.claim_identity import row_controls
 
         exposed = row(
             subject=LOGIN_FLOW,
@@ -1430,6 +1430,23 @@ class TestACitedRowIsPartOfAClaimsMechanism:
 
     def test_a_job_with_no_catalog_reads_no_row(self):
         """The layer off: no row is cited and the mechanism is the attributes."""
-        from analysis_service.critic import NO_ROWS, row_controls
+        from analysis_service.claim_identity import NO_ROWS, row_controls
 
         assert row_controls(None) is NO_ROWS
+
+    def test_a_report_reads_the_rows_of_its_own_catalog(self):
+        """A Report with no assertion record reads no row, and one with a
+        record reads its catalog's rows."""
+        from analysis_service.assertions import AssertionRecord
+        from analysis_service.claim_identity import NO_ROWS, report_rows, row_controls
+        from tests.factories import sample_report
+
+        held = assertions(row())
+        report = sample_report([])
+        recorded = report.model_copy(
+            update={"assertions": AssertionRecord(proposed=1, catalog=held)}
+        )
+
+        assert report_rows(report) is NO_ROWS
+        assert report_rows(recorded) == row_controls(held)
+        assert report_rows(recorded) == {assertion_id(row()): "mfa-requirement"}

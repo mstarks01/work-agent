@@ -210,7 +210,7 @@ class DraftThreat(Claim):
         """A threat that names only trust zones, with the zones it names.
 
         A zone is the context a threat sits in, so the threat's targets drop it
-        (:func:`~analysis_service.critic.endpoint_targets`). A threat naming
+        (:func:`~analysis_service.claim_identity.endpoint_targets`). A threat naming
         only zones has an empty target set, and two of them at different zones
         are then one finding (ADR 0097). An empty list is ``min_length``'s
         refusal, so it is not repeated here.
