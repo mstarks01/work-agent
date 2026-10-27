@@ -1803,8 +1803,8 @@ class UnresolvedMention(BaseModel):
     accuracy.
 
     The most valuable thing it catches is not a typo. The analyze prompt is
-    built around one worked exemplar system, and it spends a whole section
-    telling the agent never to cite that system's IDs. A description arguing
+    built around one worked exemplar system, and it gives a whole section to
+    tell the agent never to cite that system's IDs. A description arguing
     about ``process:web-api`` in a job whose model has no such element is that
     contamination, in the one field where it reads as ordinary analysis.
     """

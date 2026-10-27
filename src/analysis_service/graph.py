@@ -2158,7 +2158,7 @@ def assemble_report(
     Refusing the later triggers as well as the earlier ones is what makes it
     exactly one. Once every framework is finished, every remaining trigger would
     compose the same blocks from the same parked artifacts, so a second pass
-    can only spend the time again — and :data:`STATE_ANALYSIS`, already written,
+    can only use the time again — and :data:`STATE_ANALYSIS`, already written,
     is what says the pass happened.
 
     **Two triggers that run at once are not serialized, and need not be.**

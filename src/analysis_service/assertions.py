@@ -1271,7 +1271,7 @@ class SpanSource:
 
     A catalog carries many quotes and a job carries few sources, so the fold
     belongs to the source rather than to the quote: :func:`index_source` reads
-    every character of the submission, and doing it per quote spends the whole
+    every character of the submission, and doing it per quote reads the whole
     submission once for each row. A body building spans prepares each source
     once and hands this to :func:`spans_for`.
 
@@ -1304,7 +1304,7 @@ def support_span(quote: str, source_label: str, source_text: str) -> SupportSpan
     the whole source to answer, exactly as
     :meth:`~analysis_service.system_model.SystemModel.get` builds a whole index
     to answer one ID. A caller taking several quotes from one source calls
-    :func:`span_source` first, or it spends the submission once per quote.
+    :func:`span_source` first, or it reads the submission once per quote.
 
     A quote marking a cut with ``…`` covers several spans. This answers the
     first, and :func:`spans_for` answers each.

@@ -854,7 +854,7 @@ def _ruling_view(
     :class:`~analysis_service.claims.Ground`. That model is one flat object
     rather than a discriminated union — a deliberate choice, for provider
     schema-compiler reasons it documents itself — so four of its six fields are
-    the empty string on any given ground, and rendering them spends a line each
+    the empty string on any given ground, and rendering them uses a line each
     on a field whose own validator forbids it carrying anything.
 
     THE HAZARD THIS BUYS, stated rather than left to be discovered: a field

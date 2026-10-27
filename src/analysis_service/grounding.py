@@ -47,7 +47,7 @@ nothing. They stay only because each is a real permission the prompt grants or a
 real substitution models make, and nobody should believe they are load-bearing.
 
 Punctuation-blindness is refused. It recovers nothing the markdown rung does
-not, so it is a concession that buys no precision and spends real precision. The
+not, so it is a concession that gains no precision and loses real precision. The
 ladder stops at ``+markdown``, where the measured false-rejection rate is 0 in
 206, with one true rejection. That rejection was a quote that excised a span and
 stitched a subject onto a predicate, unmarked, producing a sentence the source
@@ -665,9 +665,9 @@ def repair_prepared(
     window 26,445 -- and scanning to the end is what the bound exists to stop.
     Returning nothing is right only when nothing reached the threshold. It does not discard that answer: the
     budget exists to bound the time, and throwing away a match already above
-    :data:`REPAIR_THRESHOLD` spends the time and buys nothing. A truncated scan
+    :data:`REPAIR_THRESHOLD` uses the time and gains nothing. A truncated scan
     can return a match that is merely good rather than the best one, which is
-    the honest cost of the bound.
+    the limit of the bound.
 
     Finding nothing still answers ``None``, which is what the threshold already
     answers when no window is close enough, and the caller already handles it:

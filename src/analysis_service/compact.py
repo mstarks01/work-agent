@@ -34,8 +34,8 @@ fewer elements out of nothing.
 
 There is a mechanism to test rather than a cause to state. The full route writes
 ``"id": "process:scheduling-web-app"`` beside ``"name": "Scheduling web app"``,
-and ``prompts/extract.md`` rule 3 spends its longest passage on what that slug
-costs — an abbreviated ID is replaced by the name's slug, and one word added to
+and ``prompts/extract.md`` rule 3 gives its longest passage to what that slug
+does — an abbreviated ID is replaced by the name's slug, and one word added to
 an element renames every flow through it. This route removes that field, which
 is exactly where the saving comes from. The remedy, if the mechanism holds, is
 to restate rule 3's discipline in the delta where the ref is introduced.

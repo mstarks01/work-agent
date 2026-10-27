@@ -97,7 +97,7 @@ def lane_scope(
     should be able to mean *examined and cleared* rather than *never looked*,
     and an agent cannot say that about a system whose size it was never told.
     An agent that files a claim per element to make a number go up has
-    misread it, which is why the prompt spends a sentence saying so.
+    misread it, which is why the prompt gives a sentence to say so.
 
     **The job's options ride here** because this is the one per-lane block the
     graph writes per job. A framework whose options select which requirements

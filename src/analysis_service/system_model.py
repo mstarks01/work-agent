@@ -386,12 +386,12 @@ def flow_label(flow_id: str) -> str:
 #:
 #: It bounds an ID a model emitted before the gate compares that ID with
 #: :func:`derive_element_id`. The field also carries a 300-character bound, and
-#: version 2 spends 9 to 13 characters of it: the two endpoint prefixes, their
-#: colons and the third delimiter, less the four ``-to-`` costs. Measured over
-#: the corpus the longest derived flow ID is 83 characters, so the headroom is
-#: unchanged in practice — but a flow between two long names that fitted under
-#: version 1 can now fail the gate as ``schema``, which is a refusal rather
-#: than a silent truncation.
+#: version 2 uses 9 to 13 characters of it: the two endpoint prefixes, their
+#: colons and the third delimiter, less the four characters of ``-to-``.
+#: Measured over the corpus the longest derived flow ID is 83 characters, so the
+#: headroom is unchanged in practice — but a flow between two long names that
+#: fitted under version 1 can now fail the gate as ``schema``, which is a
+#: refusal rather than a silent truncation.
 ELEMENT_ID = "^(?:{})$".format(
     "|".join([_PLAIN_ID, *(rule.pattern for _, rule in sorted(FLOW_ID_RULES.items()))])
 )

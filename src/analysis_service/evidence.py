@@ -672,7 +672,7 @@ def _gloss(
     and an agent that conflates them cites the wrong one. *Never stated* against
     *stated absent* is the sharpest of those distinctions and the cheapest to
     render: it is the difference between a question and an answer, and the
-    prompt spends a whole procedure step on it.
+    prompt gives a whole procedure step to it.
 
     An assertion row is the one entry whose left column is a digest, so its
     gloss carries what the others leave to the ID: the subject, spelled as

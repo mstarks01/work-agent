@@ -79,7 +79,7 @@ class CandidateSet(BaseModel):
     """One lane's candidates, plus the questions their rules put.
 
     The questions ride beside the candidates rather than inside each one: a
-    rule that fires eight times would otherwise spend its sentence eight
+    rule that fires eight times would otherwise repeat its sentence eight
     times, and the agent reads the question once per rule either way.
     """
 
