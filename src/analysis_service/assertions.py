@@ -2161,7 +2161,7 @@ class AssertionProposal(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     subject_type: SubjectType
-    subject: str = Field(min_length=1, max_length=ELEMENT_ID_MAX_CHARS)
+    subject: str = Field(min_length=1, max_length=300)
     # The registry's own names, on the rule :class:`Assumption` follows: a model
     # asked for a bounded string eventually writes prose into it, and the gate
     # that reads this field checks it against ``REGISTRY`` a layer later. The

@@ -417,8 +417,8 @@ EXCERPT_MAX_CHARS = 1000
 #: The longest value a control attribute holds. The element field, each
 #: record that keeps the field's raw text
 #: (:class:`~analysis_service.analysis.UnknownControl`,
-#: :class:`~analysis_service.basis.StatedControl`) and each assertion value
-#: that projects into the field read this one bound.
+#: :class:`~analysis_service.basis.StatedControl`), and each assertion value
+#: and scope qualifier that projects into the field, read this one bound.
 CONTROL_VALUE_MAX_CHARS = 200
 
 #: The tier field as a model fills it. The set is a schema fact and not a
@@ -824,9 +824,11 @@ class BoundaryCrossing(BaseModel):
     destination_zone: str
     #: False when either zone is :data:`UNKNOWN`. Read it rather than comparing
     #: the zones again, so the three outcomes have one reader.
-    #: :meth:`_decide` derives it from the zones, and refuses a stated value
-    #: that disagrees.
-    decided: bool
+    #: :meth:`_decide` writes it from the zones on each load and each
+    #: construction, and refuses a stated value that disagrees. So no writer
+    #: passes it, and the default only keeps it out of the constructor's
+    #: required arguments.
+    decided: bool = True
     assumed_endpoints: list[str] = Field(default_factory=list)
 
     @model_validator(mode="before")

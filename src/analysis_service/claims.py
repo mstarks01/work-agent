@@ -331,7 +331,7 @@ class UnknownRef(BaseModel):
         max_length=100,
         json_schema_extra={"enum": ["", *all_attribute_names()]},
     )
-    subject: str = Field(default="", max_length=ELEMENT_ID_MAX_CHARS)
+    subject: str = Field(default="", max_length=300)
     #: The third spelling: one row of the job's **Assertion** catalog that the
     #: sources left open, by its computed identity.
     #:
