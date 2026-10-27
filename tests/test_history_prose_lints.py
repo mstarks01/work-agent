@@ -228,3 +228,51 @@ def test_the_scan_reads_every_kind_of_prose(tmp_path):
     assert HISTORY.search("Version 9 adds a table.")
     assert not HISTORY.search("Version 1 drops the type prefix.")
     assert not HISTORY.search("an earlier reference bumped to a different position")
+
+
+#: The money words the maintainer ruled out for a technical fact. A literal
+#: money word such as "bill" for a provider charge is not here. Case-insensitive.
+MONEY = re.compile(r"\b(debts?|clean bill|ow(e|es|ed|ing))\b", re.IGNORECASE)
+
+#: Every code file of the project and its tests, read whole: comments,
+#: docstrings, strings and identifiers.
+MONEY_SEARCHED = without(
+    source_files(*PYTHON, *TESTS, suffixes=(".py", ".js", ".html", ".css")),
+    {
+        "evals/experiments": (
+            "frozen prose, which records an experiment as it ran and never changes"
+        ),
+        "tests/test_history_prose_lints.py": (
+            "this module states the words the lint refuses, so the lint always"
+            " finds them here"
+        ),
+    },
+)
+
+
+def test_no_code_file_uses_a_ruled_out_money_word():
+    """A money word for a technical fact is a metaphor that a reader must decode.
+
+    The sentence names the concrete fact instead: what the code drops, refuses,
+    runs, needs or gives.
+    """
+    found = [
+        f"{path.relative_to(REPO_ROOT)}:{lineno} {match.group(0)!r}"
+        for path in MONEY_SEARCHED
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        for match in MONEY.finditer(line)
+    ]
+
+    assert not found, (
+        f"these lines use a ruled-out money word: {found}. Say what the code"
+        " drops, refuses, runs, needs or gives."
+    )
+
+
+def test_the_money_words_match_only_the_ruled_out_words():
+    """Positive control: each ruled-out word matches, and a word that holds one
+    of them inside it does not."""
+    for word in ("debt", "Debts", "a clean bill", "owe", "owes", "owed", "owing"):
+        assert MONEY.search(word), word
+    for word in ("bowed", "lower", "billed", "the provider bill", "indebted"):
+        assert not MONEY.search(word), word
