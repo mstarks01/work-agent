@@ -810,8 +810,8 @@ def join_drafts(
     drafts_by_lane: Mapping[str, Sequence[Claim]],
     package: FrameworkPackage,
     system_model: SystemModel,
-    sources: Mapping[str, str] = MappingProxyType({}),
-    assertions: AssertionCatalog | None = None,
+    sources: Mapping[str, str],
+    assertions: AssertionCatalog | None,
 ) -> JoinedDrafts:
     """Merge one framework's lane agents' drafts into the list its critic sees.
 
@@ -857,12 +857,11 @@ def join_drafts(
     of this framework's lanes' drafts, the System Model and the job's sources
     exist together.
 
-    ``sources`` maps each source's label to its text. It defaults to empty for
-    the same reason the validity gate's citation rule takes its label set as a
-    parameter: a hand-authored model driven through the in-process engine has
-    no sources to check against, and inventing a set would fail it on a
-    citation that is not wrong. Empty means the text check does not run — no
-    quote is marked and no claim is dropped on one. ``assertions`` is what
+    ``sources`` maps each source's label to its text. It is empty for a
+    hand-authored model driven through the in-process engine, because that
+    model has no sources to check against, and an invented set would fail it
+    on a citation that is not wrong. Empty means the text check does not run —
+    no quote is marked and no claim is dropped on one. ``assertions`` is what
     :func:`fan_in` was handed, so an assertion ground resolves against the
     same catalog the agent selected from.
     """

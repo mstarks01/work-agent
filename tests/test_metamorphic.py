@@ -281,9 +281,9 @@ def test_lane_order_changes_nothing_the_join_produces():
         "spoofing": [sample_draft("S-01", "spoofing")],
         "tampering": [sample_draft("T-01", "tampering")],
     }
-    forward = join_drafts(by_lane, STRIDE, model, sources)
+    forward = join_drafts(by_lane, STRIDE, model, sources, assertions=None)
     backward = join_drafts(
-        dict(reversed(list(by_lane.items()))), STRIDE, model, sources
+        dict(reversed(list(by_lane.items()))), STRIDE, model, sources, assertions=None
     )
     assert [d.id for d in forward.drafts] == [d.id for d in backward.drafts]
     assert forward.marks == backward.marks

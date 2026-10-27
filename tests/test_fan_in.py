@@ -73,15 +73,19 @@ class TestJoinDrafts:
             },
             STRIDE,
             model,
+            sources={},
+            assertions=None,
         )
         assert [draft.id for draft in merged.drafts] == ["S-01", "T-01", "R-01"]
 
     def test_absent_categories_contribute_nothing(self, model):
-        joined = join_drafts({"spoofing": [sample_draft()]}, STRIDE, model)
+        joined = join_drafts(
+            {"spoofing": [sample_draft()]}, STRIDE, model, sources={}, assertions=None
+        )
         assert joined.drafts == [sample_draft()]
 
     def test_empty_analysis_is_legal(self, model):
-        assert join_drafts({}, STRIDE, model).drafts == []
+        assert join_drafts({}, STRIDE, model, sources={}, assertions=None).drafts == []
 
     def test_an_assertion_ground_resolves_against_the_catalog_the_job_held(self, model):
         """The same catalog ``prepare`` derived the table from, handed in rather
@@ -105,10 +109,14 @@ class TestJoinDrafts:
             grounds=[Ground(kind="assertion", assertion=assertion_id(row))]
         )
 
-        joined = join_drafts({"spoofing": [draft]}, STRIDE, model, assertions=held)
+        joined = join_drafts(
+            {"spoofing": [draft]}, STRIDE, model, assertions=held, sources={}
+        )
         assert joined.drafts == [draft]
         with pytest.raises(DraftJoinError, match="does not offer"):
-            join_drafts({"spoofing": [draft]}, STRIDE, model)
+            join_drafts(
+                {"spoofing": [draft]}, STRIDE, model, sources={}, assertions=None
+            )
 
     def test_a_claim_naming_only_absent_elements_is_dropped_and_marked(self, model):
         """A finding about nothing is not a finding. It drops the claim, never
@@ -117,7 +125,7 @@ class TestJoinDrafts:
             "spoofing": [sample_draft(affected_element_ids=["process:does-not-exist"])]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         assert joined.drafts == []
         (mark,) = joined.marks.dropped_claims
@@ -138,7 +146,7 @@ class TestJoinDrafts:
         )
         drafts = {"spoofing": [draft.model_copy(update={"grounds": draft.grounds[:1]})]}
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         assert joined.drafts == []
         (mark,) = joined.marks.dropped_claims
@@ -155,7 +163,7 @@ class TestJoinDrafts:
             ]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         (draft,) = joined.drafts
         assert draft.affected_element_ids == ["process:web-app"]
@@ -167,7 +175,9 @@ class TestJoinDrafts:
     def test_a_respelled_element_reference_resolves_and_is_canonicalized(self, model):
         """The fold runs before the check, and the report carries the job's ID."""
         drafts = {"spoofing": [sample_draft(affected_element_ids=["Process:Web-App"])]}
-        [joined] = join_drafts(drafts, STRIDE, model).drafts
+        [joined] = join_drafts(
+            drafts, STRIDE, model, sources={}, assertions=None
+        ).drafts
         assert joined.affected_element_ids == ["process:web-app"]
 
     def test_a_duplicate_id_keeps_the_first_draft_and_drops_the_rest(self, model):
@@ -180,7 +190,7 @@ class TestJoinDrafts:
             ]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         assert [draft.title for draft in joined.drafts] == ["first"]
         (mark,) = joined.marks.dropped_claims
@@ -222,7 +232,9 @@ class TestJoinDrafts:
         """
         pair = [self._conditional("D-01", "first"), self._conditional("D-02", "second")]
 
-        joined = join_drafts({"information-disclosure": pair}, STRIDE, model)
+        joined = join_drafts(
+            {"information-disclosure": pair}, STRIDE, model, sources={}, assertions=None
+        )
 
         assert [draft.title for draft in joined.drafts] == ["first", "second"]
         assert joined.marks.dropped_claims == []
@@ -244,7 +256,7 @@ class TestJoinDrafts:
             ]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         assert len(joined.drafts) == 2
         assert joined.marks.dropped_claims == []
@@ -263,7 +275,7 @@ class TestJoinDrafts:
             ]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         assert [draft.title for draft in joined.drafts] == ["first", "second"]
         assert joined.marks.dropped_claims == []
@@ -279,7 +291,12 @@ class TestJoinDrafts:
         """
         drafts = {"spoofing": [sample_draft("T-01", "tampering")]}
 
-        assert join_drafts(drafts, STRIDE, model).drafts[0].category == "tampering"
+        assert (
+            join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
+            .drafts[0]
+            .category
+            == "tampering"
+        )
 
 
 class TestGroundReferences:
@@ -304,7 +321,7 @@ class TestGroundReferences:
             Ground(kind="derived-fact", flow_id=CROSSING),
         )
 
-        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
         (mark,) = joined.marks.unverified_grounds
         assert "not one of this job's sources" in mark.reason
@@ -320,7 +337,7 @@ class TestGroundReferences:
             )
         )
         with pytest.raises(DraftJoinError, match="not in the system model"):
-            join_drafts(drafts, STRIDE, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
     def test_an_attribute_the_element_type_does_not_have(self, model):
         """An ExternalEntity has no ``encryption_at_rest``; naming one is a guess."""
@@ -332,7 +349,7 @@ class TestGroundReferences:
             )
         )
         with pytest.raises(DraftJoinError, match="does not have"):
-            join_drafts(drafts, STRIDE, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
     def test_a_pointer_spelled_attribute_resolves(self, model):
         """A field name arriving as ``/exposure`` is the field ``exposure``.
@@ -356,7 +373,7 @@ class TestGroundReferences:
                 )
             ]
         }
-        assert join_drafts(drafts, STRIDE, model, SOURCES).drafts
+        assert join_drafts(drafts, STRIDE, model, SOURCES, assertions=None).drafts
 
     def test_a_pointer_spelled_attribute_the_element_lacks_still_fails(self, model):
         drafts = self.grounded(
@@ -367,7 +384,7 @@ class TestGroundReferences:
             )
         )
         with pytest.raises(DraftJoinError, match="does not have"):
-            join_drafts(drafts, STRIDE, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
     def test_an_absent_attribute_on_an_element_that_does_not_exist(self, model):
         """The absent branch resolves through the same check as the unknown one
@@ -380,7 +397,7 @@ class TestGroundReferences:
             )
         )
         with pytest.raises(DraftJoinError, match="an absent attribute"):
-            join_drafts(drafts, STRIDE, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
     def test_an_unknown_ground_on_an_attribute_the_model_states_is_refused(self, model):
         """The catalog decided the branch, so the branch is checked against it.
@@ -399,7 +416,7 @@ class TestGroundReferences:
             )
         )
         with pytest.raises(DraftJoinError, match="reads as stated"):
-            join_drafts(drafts, STRIDE, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
     def test_an_absent_ground_on_an_unknown_control_is_refused(self, model):
         """The two attribute branches share their fields and not their state."""
@@ -411,14 +428,14 @@ class TestGroundReferences:
             )
         )
         with pytest.raises(DraftJoinError, match="reads as unverified"):
-            join_drafts(drafts, STRIDE, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
     def test_a_derived_fact_naming_a_flow_that_does_not_cross(self, model):
         drafts = self.grounded(
             Ground(kind="derived-fact", flow_id="flow:not-a:crossing")
         )
         with pytest.raises(DraftJoinError, match="not a decided boundary crossing"):
-            join_drafts(drafts, STRIDE, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
     def test_a_respelled_source_label_resolves_to_the_jobs_label(self, model):
         """A quote whose label differs only in case cites the caller's bytes."""
@@ -429,7 +446,7 @@ class TestGroundReferences:
                 source_label=LABEL.upper(),
             )
         )
-        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
         assert joined.drafts[0].grounds[0].source_label == LABEL
         assert joined.marks.unverified_grounds == []
 
@@ -438,7 +455,7 @@ class TestGroundReferences:
         drafts = self.grounded(
             Ground(kind="quote", text="anything", source_label="Never submitted")
         )
-        assert join_drafts(drafts, STRIDE, model).drafts
+        assert join_drafts(drafts, STRIDE, model, sources={}, assertions=None).drafts
 
 
 class TestUnresolvedMentions:
@@ -449,13 +466,21 @@ class TestUnresolvedMentions:
 
     def test_an_id_the_model_contains_is_not_marked(self, model):
         joined = join_drafts(
-            self.drafted("An attacker reaches process:web-app."), STRIDE, model
+            self.drafted("An attacker reaches process:web-app."),
+            STRIDE,
+            model,
+            sources={},
+            assertions=None,
         )
         assert joined.marks.unresolved_mentions == []
 
     def test_an_id_the_model_lacks_is_marked_and_the_job_survives(self, model):
         joined = join_drafts(
-            self.drafted("It pivots into process:ghost."), STRIDE, model
+            self.drafted("It pivots into process:ghost."),
+            STRIDE,
+            model,
+            sources={},
+            assertions=None,
         )
 
         assert [(m.claim_id, m.mention) for m in joined.marks.unresolved_mentions] == [
@@ -471,6 +496,8 @@ class TestUnresolvedMentions:
             ),
             STRIDE,
             model,
+            sources={},
+            assertions=None,
         )
         assert [m.mention for m in joined.marks.unresolved_mentions] == [
             "process:web-api",
@@ -479,13 +506,21 @@ class TestUnresolvedMentions:
 
     def test_a_respelled_id_resolves_rather_than_being_marked(self, model):
         joined = join_drafts(
-            self.drafted("Reaches Process:Web-App first."), STRIDE, model
+            self.drafted("Reaches Process:Web-App first."),
+            STRIDE,
+            model,
+            sources={},
+            assertions=None,
         )
         assert joined.marks.unresolved_mentions == []
 
     def test_marks_are_per_mention_not_per_threat(self, model):
         joined = join_drafts(
-            self.drafted("From process:ghost through store:phantom."), STRIDE, model
+            self.drafted("From process:ghost through store:phantom."),
+            STRIDE,
+            model,
+            sources={},
+            assertions=None,
         )
         assert [m.mention for m in joined.marks.unresolved_mentions] == [
             "process:ghost",
@@ -503,11 +538,19 @@ class TestMissingMitigations:
         return {"spoofing": [sample_draft("S-01", **fields)]}
 
     def test_a_threat_carrying_a_countermeasure_is_not_marked(self, model):
-        joined = join_drafts(self.drafted(mitigations=[mitigation()]), STRIDE, model)
+        joined = join_drafts(
+            self.drafted(mitigations=[mitigation()]),
+            STRIDE,
+            model,
+            sources={},
+            assertions=None,
+        )
         assert joined.marks.missing_mitigations == []
 
     def test_empty_with_no_unknown_behind_it_is_marked(self, model):
-        joined = join_drafts(self.drafted(mitigations=[]), STRIDE, model)
+        joined = join_drafts(
+            self.drafted(mitigations=[]), STRIDE, model, sources={}, assertions=None
+        )
         assert [m.claim_id for m in joined.marks.missing_mitigations] == ["S-01"]
 
     def test_empty_on_a_threat_conditional_on_an_unknown_is_licensed(self, model):
@@ -525,11 +568,15 @@ class TestMissingMitigations:
             ),
             STRIDE,
             model,
+            sources={},
+            assertions=None,
         )
         assert joined.marks.missing_mitigations == []
 
     def test_the_mark_never_costs_the_finding(self, model):
-        joined = join_drafts(self.drafted(mitigations=[]), STRIDE, model)
+        joined = join_drafts(
+            self.drafted(mitigations=[]), STRIDE, model, sources={}, assertions=None
+        )
         assert [draft.id for draft in joined.drafts] == ["S-01"]
 
 
@@ -582,7 +629,12 @@ class TestNumberingGaps:
     def test_the_ids_are_left_exactly_as_the_agent_wrote_them(self, model):
         """Reported, never renumbered: an ID must not move between two runs."""
         drafts = {"spoofing": [sample_draft("S-01"), sample_draft("S-05")]}
-        assert [d.id for d in join_drafts(drafts, STRIDE, model).drafts] == [
+        assert [
+            d.id
+            for d in join_drafts(
+                drafts, STRIDE, model, sources={}, assertions=None
+            ).drafts
+        ] == [
             "S-01",
             "S-05",
         ]
@@ -597,7 +649,11 @@ class TestQuoteVerification:
 
     def test_a_verifying_quote_is_not_marked(self, model):
         joined = join_drafts(
-            self.quoting("log in to the web app"), STRIDE, model, SOURCES
+            self.quoting("log in to the web app"),
+            STRIDE,
+            model,
+            SOURCES,
+            assertions=None,
         )
         assert joined.marks.unverified_grounds == []
 
@@ -607,7 +663,7 @@ class TestQuoteVerification:
             "a sentence the submitter never wrote",
             extra=[Ground(kind="derived-fact", flow_id=CROSSING)],
         )
-        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
         assert len(joined.drafts) == 1
         assert [(m.claim_id, m.index) for m in joined.marks.unverified_grounds] == [
@@ -640,7 +696,7 @@ class TestQuoteVerification:
         }
         started = time.thread_time()
 
-        joined = join_drafts(drafts, STRIDE, model, {LABEL: source})
+        joined = join_drafts(drafts, STRIDE, model, {LABEL: source}, assertions=None)
 
         assert time.thread_time() - started < 1.5
         assert len(joined.marks.dropped_claims) == 3
@@ -652,7 +708,7 @@ class TestQuoteVerification:
         it alone is not groundless."""
         drafts = self.quoting("Customers log in to the web app which stores orders")
 
-        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
         (draft,) = joined.drafts
         assert draft.grounds[0].text == SOURCES[LABEL]
@@ -676,7 +732,7 @@ class TestQuoteVerification:
             "Customers log in to the web app, which does store orders."
         )
 
-        joined = join_drafts(drafts, STRIDE, model, sources)
+        joined = join_drafts(drafts, STRIDE, model, sources, assertions=None)
 
         (draft,) = joined.drafts
         assert draft.grounds[0].text == sources[LABEL]
@@ -685,7 +741,7 @@ class TestQuoteVerification:
 
     def test_the_critic_is_shown_what_a_repair_moved(self, model):
         drafts = self.quoting("Customers log in to the web app which stores orders")
-        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
         (view,) = critic.critic_view(
             joined.drafts, repaired=joined.marks.repaired_quotes
@@ -715,7 +771,7 @@ class TestQuoteVerification:
             extra=[Ground(kind="derived-fact", flow_id=CROSSING)],
         )
 
-        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
         (view,) = critic.critic_view(
             joined.drafts, unverified=joined.marks.unverified_grounds
@@ -734,7 +790,7 @@ class TestQuoteVerification:
         drafts = self.quoting("a sentence the submitter never wrote")
         drafts["tampering"] = [sample_draft("T-01", "tampering")]
 
-        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
         assert [draft.id for draft in joined.drafts] == ["T-01"]
         (mark,) = joined.marks.dropped_claims
@@ -751,14 +807,20 @@ class TestQuoteVerification:
         drafts = self.quoting("log in to the web app")
         drafts["spoofing"][0].grounds[0].source_label = "no-such-source"
 
-        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
         assert joined.drafts == []
         (mark,) = joined.marks.dropped_claims
         assert "no-such-source" in mark.reason
 
     def test_the_text_check_does_not_run_without_sources(self, model):
-        joined = join_drafts(self.quoting("never written anywhere"), STRIDE, model)
+        joined = join_drafts(
+            self.quoting("never written anywhere"),
+            STRIDE,
+            model,
+            sources={},
+            assertions=None,
+        )
         assert joined.marks.unverified_grounds == []
 
 
@@ -846,7 +908,9 @@ class TestAFreeStringFromAnAgentCannotOverrunAMark:
         model = valid_model()
         draft = sample_draft("S-01", affected_element_ids=["store:orders-db", ""])
 
-        joined = join_drafts({"spoofing": [draft]}, STRIDE, model)
+        joined = join_drafts(
+            {"spoofing": [draft]}, STRIDE, model, sources={}, assertions=None
+        )
 
         assert joined.marks.unresolved_references == []
 
@@ -859,7 +923,9 @@ class TestAFreeStringFromAnAgentCannotOverrunAMark:
             ),
         )
 
-        joined = join_drafts({"spoofing": [draft]}, STRIDE, model)
+        joined = join_drafts(
+            {"spoofing": [draft]}, STRIDE, model, sources={}, assertions=None
+        )
 
         (mark,) = joined.marks.unresolved_mentions
         assert len(mark.mention) == MENTION_MAX_CHARS
@@ -888,7 +954,7 @@ class TestTheGroundsBoundTheCitedElements:
             "spoofing": [sample_draft(affected_element_ids=[CROSSING, REPORTING_JOB])]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         (draft,) = joined.drafts
         assert draft.affected_element_ids == [CROSSING]
@@ -903,7 +969,7 @@ class TestTheGroundsBoundTheCitedElements:
             ]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         (draft,) = joined.drafts
         assert draft.affected_element_ids == [CROSSING, "store:orders-db"]
@@ -928,7 +994,7 @@ class TestTheGroundsBoundTheCitedElements:
             ]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         (draft,) = joined.drafts
         assert draft.affected_element_ids == [CROSSING]
@@ -948,7 +1014,7 @@ class TestTheGroundsBoundTheCitedElements:
             ]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         assert joined.marks.unresolved_references == []
 
@@ -966,7 +1032,7 @@ class TestTheGroundsBoundTheCitedElements:
             ]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         (draft,) = joined.drafts
         assert draft.affected_element_ids == ["entity:customer"]
@@ -974,7 +1040,7 @@ class TestTheGroundsBoundTheCitedElements:
     def test_a_claim_whose_grounds_reach_none_of_its_elements_is_dropped(self, model):
         drafts = {"spoofing": [sample_draft(affected_element_ids=[REPORTING_JOB])]}
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         assert joined.drafts == []
         (dropped,) = joined.marks.dropped_claims
@@ -1004,7 +1070,7 @@ class TestAGroundIsAboutTheClaimsElements:
             ]
         }
 
-        joined = join_drafts(drafts, STRIDE, model)
+        joined = join_drafts(drafts, STRIDE, model, sources={}, assertions=None)
 
         (draft,) = joined.drafts
         assert store not in draft.grounds
@@ -1036,7 +1102,7 @@ class TestAGroundIsAboutTheClaimsElements:
             ]
         }
 
-        joined = join_drafts(drafts, STRIDE, model, assertions=catalog)
+        joined = join_drafts(drafts, STRIDE, model, assertions=catalog, sources={})
 
         assert joined.drafts == []
         (dropped,) = joined.marks.dropped_claims

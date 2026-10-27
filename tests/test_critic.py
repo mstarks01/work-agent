@@ -1074,7 +1074,9 @@ class TestAnAbsenceRidesTheCriticPath:
     def test_it_survives_the_join(self, draft):
         model = valid_model()
 
-        joined = join_drafts({"spoofing": [draft]}, STRIDE, model)
+        joined = join_drafts(
+            {"spoofing": [draft]}, STRIDE, model, sources={}, assertions=None
+        )
 
         assert [claim.id for claim in joined.drafts] == ["S-01"]
         assert joined.drafts[0].grounds[0].term == "ldap"

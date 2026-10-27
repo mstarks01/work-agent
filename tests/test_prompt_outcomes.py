@@ -308,7 +308,9 @@ def a_repeated_threat_id_keeps_the_first_draft_and_drops_the_rest():
         ]
     }
 
-    joined = join_drafts(drafts, PACKAGES["stride"], valid_model())
+    joined = join_drafts(
+        drafts, PACKAGES["stride"], valid_model(), sources={}, assertions=None
+    )
 
     assert [draft.title for draft in joined.drafts] == ["first"]
     (mark,) = joined.marks.dropped_claims
@@ -347,7 +349,13 @@ def a_repeated_requirement_keeps_the_first_draft_and_drops_the_rest():
             direction="question",
         )
 
-    joined = join_drafts({lane: [draft("first"), draft("second")]}, asvs, valid_model())
+    joined = join_drafts(
+        {lane: [draft("first"), draft("second")]},
+        asvs,
+        valid_model(),
+        sources={},
+        assertions=None,
+    )
 
     assert [draft.title for draft in joined.drafts] == ["first"]
     (mark,) = joined.marks.dropped_claims
