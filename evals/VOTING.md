@@ -155,17 +155,17 @@ costs no provider call, and rewrites the artifact in place:
 python -m evals.harness.run score baseline-1.json
 ```
 
-It recomputes only the readings that read the ledger — the standings, the
+It recomputes only the readings that read the ledger — the vote statuses, the
 critic's yield and the writing numbers. Grounds, coverage and provenance are
 facts about the run that no later vote changes, so they stay as the sweep wrote
 them. Pass `--out` to write a second file instead of rewriting the first.
 
-Every finding that matches no reference claim gets one of four standings, and
-the artifact counts them per case:
+Every finding that matches no reference claim gets one of four vote statuses,
+stored under the key `standing`, and the artifact counts them per case:
 
-| Standing | What it means | What it does |
+| Vote status | What it means | What it does |
 | --- | --- | --- |
-| `rejected` | somebody rejected it for a substance reason | The only standing that counts against the tool. It raises `rejected_rate`. |
+| `rejected` | somebody rejected it for a substance reason | The only status that counts against the tool. It raises `rejected_rate`. |
 | `pooled` | somebody says it is real | It joins the reference pool and feeds `unlisted_for_promotion`. |
 | `open` | somebody answered `unsure` or `needs-evidence` | Nothing. It waits for a better sitting. |
 | `unvoted` | nobody answered it | Nothing. It is visible in the counts and never counts against the tool. |
@@ -179,7 +179,7 @@ say *not yet*.
 Two reviewers can disagree, and then `rejected` wins over `pooled`. A tool must
 not score itself on the answer that flatters it most.
 
-Your style rejections land beside the standings, under `writing`:
+Your style rejections land beside the vote statuses, under `writing`:
 
 ```sh
 jq '.writing_aggregate' baseline-1.json
@@ -257,7 +257,7 @@ carries two digests of the claim the reviewer was shown (ADR 0029):
 
 | key | what it covers | what expires when it moves |
 | --- | --- | --- |
-| `content` | the verdict, the catalogued grounds, the package's ratings | your substance answer: the standing reads `stale` and the queue asks you again |
+| `content` | the verdict, the catalogued grounds, the package's ratings | your substance answer: the vote status reads `stale` and the queue asks you again |
 | `prose` | the description and the mitigations | your style answer: the writing instrument counts it `carried` |
 
 They are two values because they move at different rates. A model writes new
@@ -371,7 +371,7 @@ from. A rule change is then arithmetic over the ledger's files.
    the pool, which a re-key never changes. `--yes` rewrites the file through an
    atomic rename, so an interrupted re-key leaves the file as it was.
 
-4. **Re-score the sweeps you still compare against.** Their standings were
+4. **Re-score the sweeps you still compare against.** Their vote statuses were
    computed under the keys before the re-key:
 
    ```sh
@@ -397,7 +397,7 @@ older votes' claim on the current claims, and the queue asks again.
 - **A match is not a validation.** The identity rule recognises a topic and is
   blind to what a claim says: the 2026-09-09 audit rewrote every retained case 01
   finding to assert the opposite of itself and the scorer still returned 12
-  matches. A standing says a person judged *this* argument only while the
+  matches. A vote status says a person judged *this* argument only while the
   `content` digest agrees; otherwise it reads `stale`.
 - **The numbers are relative.** Use them to compare configurations and to track
   movement. Never quote them as absolute scores, and never against another

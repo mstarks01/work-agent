@@ -169,7 +169,7 @@ class Loss:
     #: same way. ``pooled`` means a person read the neighbouring claim and
     #: accepted it, so the lane found something real and wrote it one element
     #: over. ``rejected`` means the lane wrote something a person refused.
-    displaced_standing: VoteStatus | None = None
+    displaced_status: VoteStatus | None = None
     #: For a ``fan-in`` row: the title of the lane's proposal at the place,
     #: what the fan-in did to it, and why, read from the block's own marks —
     #: the ``dropped_claims`` reason for a removal, and one entry per element
@@ -191,7 +191,7 @@ class Loss:
             "place_relation": self.place_relation,
             "re_ask": list(self.re_ask),
             "displaced_draft_id": self.displaced_draft_id,
-            "displaced_standing": self.displaced_standing,
+            "displaced_standing": self.displaced_status,
             "proposal_title": self.proposal_title,
             "fan_in_effect": self.fan_in_effect,
             "fan_in_reasons": list(self.fan_in_reasons),
@@ -440,7 +440,7 @@ def attribute_case(
     # rather than keyed again, for the reason ``misfiled`` above gives: the
     # fingerprint rule has one reader, and a claim the scorer matched to a
     # reference of its own is absent here because nobody was asked about it.
-    standings = {threat.threat_id: threat.standing for threat in score.unlisted}
+    statuses = {threat.threat_id: threat.status for threat in score.unlisted}
     # Keyed by the title as the drop mark cut it, through the mark's own cut,
     # so a long proposal title finds its mark.
     dropped = {mark.title: mark.reason for mark in block.dropped_claims}
@@ -609,8 +609,8 @@ def attribute_case(
                 cause,
                 verb,
                 displaced_draft_id=nearby.id if nearby is not None else None,
-                displaced_standing=(
-                    standings.get(nearby.id) if nearby is not None else None
+                displaced_status=(
+                    statuses.get(nearby.id) if nearby is not None else None
                 ),
             )
         )
@@ -628,8 +628,8 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
     must_find: Counter[str] = Counter()
     re_asked: Counter[str] = Counter()
     displaced: Counter[str] = Counter()
-    displaced_standing: Counter[str] = Counter()
-    displaced_standing_must_find: Counter[str] = Counter()
+    displaced_status: Counter[str] = Counter()
+    displaced_status_must_find: Counter[str] = Counter()
     kinds: Counter[str] = Counter()
     pairs: Counter[tuple[str, str]] = Counter()
     pairs_must_find: Counter[tuple[str, str]] = Counter()
@@ -647,9 +647,9 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
                 kinds.update(loss.re_ask)
             if loss.displaced_draft_id is not None:
                 displaced[loss.cause] += 1
-                standing = loss.displaced_standing or "matched"
-                displaced_standing[standing] += 1
-                displaced_standing_must_find[standing] += loss.must_find
+                status = loss.displaced_status or "matched"
+                displaced_status[status] += 1
+                displaced_status_must_find[status] += loss.must_find
             if loss.cause == "verb" and loss.draft_verb is not None:
                 pair = (loss.reference_verb, loss.draft_verb)
                 pairs[pair] += 1
@@ -692,9 +692,9 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
         # finding, so the lane saw the system and chose another place. The key
         # ``matched`` is the displaced draft that answered a reference of its
         # own, which the ledger was never asked about.
-        "displaced_standing": dict(sorted(displaced_standing.items())),
+        "displaced_standing": dict(sorted(displaced_status.items())),
         "displaced_standing_must_find": dict(
-            sorted(displaced_standing_must_find.items())
+            sorted(displaced_status_must_find.items())
         ),
         "by_re_ask_kind": dict(sorted(kinds.items())),
         # The verb rows by how the two places relate. An ``equal`` row is the
@@ -768,9 +768,9 @@ def render(rows: Sequence[CaseLosses]) -> None:
         print(
             "  what a person said about the draft written instead: "
             + ", ".join(
-                f"{standing} {count} (must-find"
-                f" {totals['displaced_standing_must_find'][standing]})"
-                for standing, count in totals["displaced_standing"].items()
+                f"{status} {count} (must-find"
+                f" {totals['displaced_standing_must_find'][status]})"
+                for status, count in totals["displaced_standing"].items()
             )
             + " — pooled is the lane finding something real at another place"
         )

@@ -142,7 +142,7 @@ def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
     result = scored.critic_yield
 
     assert [entry.threat_id for entry in result.killed] == [junk.id]
-    assert result.killed[0].disposition == "rejected"
+    assert result.killed[0].outcome == "rejected"
     assert result.rejected_killed == 1
     assert result.matched_killed == 0
     assert result.kill_precision == 1.0
@@ -170,7 +170,7 @@ def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
     assert result.matched_killed == 1
     assert result.must_find_killed == 1
     assert result.matched_kill_rate == 1.0
-    assert result.killed[0].disposition == "matched-must-find"
+    assert result.killed[0].outcome == "matched-must-find"
     assert result.must_find_before == 1 and result.must_find_after == 0
 
 
@@ -190,7 +190,7 @@ def test_expected_tier_kills_are_separated_from_must_find(case):
 
     assert result.matched_killed == 1
     assert result.must_find_killed == 0
-    assert result.killed[0].disposition == "matched-expected"
+    assert result.killed[0].outcome == "matched-expected"
 
 
 def test_the_post_critic_score_is_the_scorer_verbatim(case):

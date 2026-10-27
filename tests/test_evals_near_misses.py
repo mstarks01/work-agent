@@ -94,7 +94,7 @@ def test_a_draft_a_person_voted_down_is_not_asked():
         cause="place",
         reference_verb="plant",
         displaced_draft_id="T-01",
-        displaced_standing="rejected",
+        displaced_status="rejected",
     )
     assert _ballot(case, loss, _tampering_draft(case, 3)) == []
 
@@ -116,7 +116,7 @@ def test_a_reading_already_ruled_is_not_asked_again():
         cause="place",
         reference_verb="unattributable",
         displaced_draft_id=draft.id,
-        displaced_standing="pooled",
+        displaced_status="pooled",
     )
     assert _ballot(case, loss, draft) == []
 
@@ -145,7 +145,7 @@ def test_a_ruled_reading_of_one_action_is_not_asked_again():
         cause="place",
         reference_verb="plant",
         displaced_draft_id=draft.id,
-        displaced_standing="pooled",
+        displaced_status="pooled",
     )
 
     assert _ballot(case, loss, draft)
@@ -160,7 +160,7 @@ def _place_loss(case, index, draft):
         cause="place",
         reference_verb=case.stride_claims()[index].verb,
         displaced_draft_id=draft.id,
-        displaced_standing="pooled",
+        displaced_status="pooled",
     )
 
 
