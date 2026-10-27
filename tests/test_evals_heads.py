@@ -53,7 +53,7 @@ def head_pipeline(corpus_case, models: dict[str, ScriptedLlm], **overrides: str)
         frameworks=("stride",),
         deployment=Deployment.from_env(env=env),
         resolve_model=resolve,
-        sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml"),
+        sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml", env={}),
     )
 
 

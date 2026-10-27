@@ -67,7 +67,7 @@ def tier_of(graph_node: str) -> str:
 
 @pytest.fixture
 def sampling():
-    return load_sampling(SAMPLING_PATH)
+    return load_sampling(SAMPLING_PATH, env={})
 
 
 def node_run(

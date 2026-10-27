@@ -322,9 +322,9 @@ class TestEnvOverrides:
             == "ANALYSIS_SAMPLING_STRONG_TEMPERATURE"
         )
 
-    def test_os_environ_is_default_env(self, config_path, monkeypatch):
+    def test_no_env_reads_os_environ(self, config_path, monkeypatch):
         monkeypatch.setenv(env_var_for("strong", "temperature"), "0.9")
-        config = load_sampling(config_path(config_toml()))
+        config = load_sampling(config_path(config_toml()), env=None)
         assert config.for_tier("strong").temperature == 0.9
 
     def test_offered_surface_is_exactly_the_offered_params(self):

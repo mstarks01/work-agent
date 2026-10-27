@@ -420,9 +420,7 @@ def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
         table[param] = _parse_env_value(var, param, value.strip())
 
 
-def load_sampling(
-    path: Path | str, env: Mapping[str, str] | None = None
-) -> SamplingConfig:
+def load_sampling(path: Path | str, env: Mapping[str, str] | None) -> SamplingConfig:
     """Load and validate the per-tier sampling config, applying env overrides.
 
     Overrides are folded in before validation, so an out-of-range value arriving

@@ -203,7 +203,7 @@ def sweep(
         ENTRY_PREPARE,
         frameworks=("stride",),
         resolve_model=resolve,
-        sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml"),
+        sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml", env={}),
     )
     monkeypatch.setattr(modes, "build_eval_pipeline", lambda *a, **k: pipeline)
     second = replace(
