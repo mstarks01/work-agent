@@ -22,7 +22,7 @@ from tests.factories import PROJECT_ROOT, STRONG_MODEL, scripted_pipeline
 from tests.test_execution import drive, happy_replies
 from tests.test_schema_reask import _policy, _Replies
 
-LANE = graph.analyze_node_name("stride", "spoofing")
+LANE = graph.Lane("stride", "spoofing").node_name
 
 ARCHIVED = next((PROJECT_ROOT / "evals" / "baselines").rglob("*.report.json"))
 

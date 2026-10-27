@@ -284,7 +284,7 @@ def _resolves_role(ref: str, module_name: str) -> bool:
     Four ways, in the order an author means them:
 
     * an attribute path from the module the reference was written in, which is
-      what a bare ``repair_quote`` means inside ``grounding``;
+      what a bare ``repair_prepared`` means inside ``grounding``;
     * a member of a class that module defines, which is what a bare method name
       means inside that class's own docstring;
     * a builtin, for ``ValueError`` and ``str.format``;

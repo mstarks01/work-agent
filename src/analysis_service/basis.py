@@ -153,7 +153,6 @@ __all__ = [
     "coverage",
     "dispositions",
     "read_controls",
-    "stated_controls",
     "unbased_controls",
 ]
 
@@ -276,7 +275,7 @@ class StatedControl(NamedTuple):
 
     **The one reader of "which values does this diagnostic measure".** Both
     rungs of the published measurement and the shipped
-    :func:`unbased_controls` walk the model through :func:`stated_controls`, so
+    :func:`unbased_controls` walk the model through :func:`dispositions`, so
     a denominator and a rate can never be computed over two different sets.
     """
 
@@ -349,8 +348,8 @@ def dispositions(
     Walks elements in :meth:`SystemModel.elements` order and attributes in
     :data:`IN_SCOPE` order, so the output is stable and complete.
 
-    **The one walk.** :func:`stated_controls` filters it and :func:`coverage`
-    counts it, so the rate and the denominator cannot be taken over two
+    **The one walk.** :func:`read_controls` scans its ``measurable`` half and
+    counts all of it, so the rate and the denominator cannot be taken over two
     different sets. A control that is not ``stated`` is not here at all: there
     is no assertion to have a basis, which is not the same as an assertion
     nobody could check.
@@ -387,20 +386,6 @@ def dispositions(
                 yield control, "tokenless"
             else:
                 yield control, "measurable"
-
-
-def stated_controls(
-    model: SystemModel, sources: Mapping[str, str]
-) -> Iterator[StatedControl]:
-    """Every control this diagnostic has something to say about.
-
-    The measurable half of :func:`dispositions`. What the other half holds is
-    :func:`coverage`'s to report, and a caller reading this alone is reading a
-    denominator rather than a population.
-    """
-    for control, disposition in dispositions(model, sources):
-        if disposition == "measurable":
-            yield control
 
 
 def read_controls(

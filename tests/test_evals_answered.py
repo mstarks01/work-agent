@@ -18,7 +18,7 @@ from analysis_service.fact_answers import FactAnswer
 from analysis_service.graph import (
     ENTRY_PREPARE,
     STATE_FRAMEWORK_OPTIONS,
-    analyze_node_name,
+    Lane,
 )
 from analysis_service.jobs import Checkpoint, JobRecord, Resumption
 from analysis_service.links import ANSWERS_LABEL
@@ -43,7 +43,7 @@ def test_the_lanes_read_the_answers_and_the_model_holds_them(case):  # noqa: F81
     store = report.system_model.get(STORE)
     assert store is not None and store.encryption_at_rest == "AES-256"
     assert ANSWERS_LABEL in {source.label for source in report.input.sources}
-    spoofing = models[analyze_node_name("stride", "spoofing")].seen[0]
+    spoofing = models[Lane("stride", "spoofing").node_name].seen[0]
     assert "an append-only audit table" in spoofing
 
 

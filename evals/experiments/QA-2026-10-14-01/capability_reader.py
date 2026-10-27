@@ -16,9 +16,10 @@ import os
 import sys
 from pathlib import Path
 
+from analysis_service import model_gate
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.grounding import verify_quote
-from analysis_service.model_gate import completion
+from analysis_service.offline import refuse_live_inference
 from analysis_service.sources import fenced
 from analysis_service.vendors import CredentialMode, vendor_for_route
 
@@ -62,7 +63,8 @@ def description(case: str) -> str:
 def read_once(case: str, model: str, key: str) -> dict:
     text = description(case)
     prompt = f"{PROMPT}{table()}\n\nDescription:\n{fenced(text)}"
-    reply = completion(
+    refuse_live_inference(model)
+    reply = model_gate._litellm.completion(
         model=model,
         api_key=key,
         response_format={"type": "json_object"},

@@ -26,12 +26,17 @@ STRIDE override lost their one caller and passed both earlier lints.
 **Subpackages are in scope.** The scan reads the package recursively, because
 ``frameworks/`` is where a package's own helpers live.
 
-**Public names are in scope outside the service.** A public name in
-``src/analysis_service`` is API: ``__init__`` exports 102 of them and whether an
-integrator calls one is not knowable from this tree. ``evals/`` and ``webapp/``
-have no integrators -- they are a harness and three loopback apps -- so a public
-name there that nothing reaches is as dead as a private one. That is how
-``build_review_docs.model_tables`` and ``asvs.catalog.chapter_for`` survived.
+**Public names are in scope.** The service's API is what its package root
+exports: ``src/analysis_service/__init__.py`` imports each name in its
+``__all__``, and that import is a use, so an exported name is never reported.
+Every other public name is judged like a private one, in the service as in
+``evals/`` and ``webapp/``. A public name in a submodule that only a test
+reaches is not API, because no integrator imports it from the package root.
+:data:`NAMED_BY_A_LIBRARY` holds the files whose names a library reads by name.
+
+**A name is matched by its identifier.** A parameter or an attribute with the
+same name as a dead function counts as a use of it, so the dead function is
+not reported.
 
 **A dead cluster is dead.** ``chapter_for`` was the only reader of
 ``_BY_CHAPTER``, so the map looked referenced -- by code that was itself dead.
@@ -56,14 +61,18 @@ from tests.source_tree import REPO_ROOT, parse, source_files
 # Every directory that may legitimately reach a name, including the tests.
 SEARCHED = ("src", "tests", "evals", "examples", "webapp")
 
-#: Where definitions are looked for, and whether a public name there is API.
-#: The service exports its public names to integrators; the harness and the
-#: loopback apps export nothing, so an unreachable public name there is dead.
-SCOPES: tuple[tuple[str, bool], ...] = (
-    ("src/analysis_service", True),
-    ("evals", False),
-    ("webapp", False),
-)
+#: Where definitions are looked for.
+SCOPES = ("src/analysis_service", "evals", "webapp")
+
+#: Directories under :data:`SCOPES` whose module-level names a library reads by
+#: name, with the reason. No code in the tree calls these names, so the lints
+#: do not judge them.
+NAMED_BY_A_LIBRARY: dict[str, str] = {
+    "src/analysis_service/migrations/scripts/versions/": (
+        "Alembic loads each revision module and reads revision, down_revision,"
+        " branch_labels, depends_on, upgrade and downgrade by name"
+    ),
+}
 
 #: Where a use counts for the second lint: every searched root but the tests.
 PRODUCTION = tuple(root for root in SEARCHED if root != "tests")
@@ -103,6 +112,59 @@ TEST_ONLY: dict[str, str] = {
     "DIRTY_MARKER": (
         "the marker a dirty checkout appends to a configuration label, named"
         " so the test pins the spelling the rule table produces"
+    ),
+    "ARCHIVED_UNRECONCILED_KINDS": (
+        "the unreconciled kinds only an archived report carries, so the test"
+        " that every kind has a producing check can tell a kind no check writes"
+        " on purpose from a hole"
+    ),
+    "COMPOSED_ANALYZE_CAP": (
+        "the cap the prompt lint holds one lane's whole composed instruction"
+        " to, the sum of its three part caps so it cannot bind before a part"
+    ),
+    "COMPOSED_EXTRACT_COMPACT_CAP": (
+        "the cap the prompt lint holds the compact extraction instruction to,"
+        " the sum of its two part caps"
+    ),
+    "covered_assets": (
+        "the walk the skill lint uses to give every registered package file a"
+        " TOKEN_CAPS key, so a file with no cap raises"
+    ),
+    "JOB_VARYING_DIRS": (
+        "the package directories covered_assets leaves out, because their"
+        " files ride in the job-varying block"
+    ),
+    "_package_key": "the TOKEN_CAPS key covered_assets gives one package file",
+    "CONTENT_LICENSE": (
+        "the licence of each package's text, which the licence lints hold"
+        " against PACKAGES, NOTICE and the third-party register"
+    ),
+    "widest_fan_out": (
+        "the lane count one job fires at once, which the fan-out and doc"
+        " figure lints derive from PACKAGES so no stated count goes stale"
+    ),
+    "PROMPT_SECTION_HEADINGS": (
+        "the four H2 sections the prompt lints require of every prompt body"
+    ),
+    "PROMPT_BODY_NAMES": (
+        "the prompt bodies the prompt lints check for sections, size and"
+        " content, and against the files under prompts/"
+    ),
+    "PROMPT_DELTA_NAMES": (
+        "the prompt parts the prompt lints check for size and content but not"
+        " for sections, because a delta has none"
+    ),
+    "REVIEWED_BY": (
+        "who reviewed each ASVS applicability row, which the applicability test"
+        " holds to one entry per row"
+    ),
+    "ROLES": (
+        "every per-framework role, which the graph tests check against the"
+        " declared role constants and the node name each role gives"
+    ),
+    "menu": (
+        "the verb vocabulary as prompt text, which the prompt lint compares"
+        " line by line with the copy in frameworks/stride/output.md"
     ),
     # evals/harness/exemplar_verbs.py, whole: the verbs the exemplars demonstrate
     # against the verbs the corpus grades, which both move often.
@@ -154,22 +216,20 @@ def _definitions() -> dict[str, str]:
     interpreter, which is the same reason methods are out of scope.
     """
     found: dict[str, str] = {}
-    for scope, public_is_api in SCOPES:
-        for path in source_files(scope):
-            for node in parse(path).body:
-                if isinstance(node, _DEFINITIONS):
-                    names = [node.name]
-                elif isinstance(node, _ASSIGNMENTS):
-                    names = _assigned_names(node)
-                else:
-                    continue
-                for name in names:
-                    private = name.startswith("_")
-                    if name.startswith("__"):
-                        continue
-                    if public_is_api and not private:
-                        continue
-                    found[name] = f"{path.relative_to(REPO_ROOT)}:{node.lineno}"
+    for path in source_files(*SCOPES):
+        where = path.relative_to(REPO_ROOT).as_posix()
+        if where.startswith(tuple(NAMED_BY_A_LIBRARY)):
+            continue
+        for node in parse(path).body:
+            if isinstance(node, _DEFINITIONS):
+                names = [node.name]
+            elif isinstance(node, _ASSIGNMENTS):
+                names = _assigned_names(node)
+            else:
+                continue
+            for name in names:
+                if not name.startswith("__"):
+                    found[name] = f"{where}:{node.lineno}"
     return found
 
 
@@ -255,7 +315,8 @@ def test_no_module_level_name_is_unreachable():
         f"{[f'{location} {name}' for name, location in dead.items()]}. A name"
         " nothing reaches is dead -- delete it. If it is a seam something"
         " reaches by string, give it a caller a reader can follow. If it is"
-        " public API outside the service, it belongs behind a scope in SCOPES."
+        " API, export it from the package root's __all__. If a library reads"
+        " it by name, add its directory to NAMED_BY_A_LIBRARY."
     )
 
 
@@ -283,6 +344,15 @@ def test_no_kept_name_outlives_its_reason():
         f"{stale} are in TEST_ONLY but something outside tests/ now reaches them,"
         " or they are gone; drop the entries"
     )
+
+
+def test_a_public_service_name_only_a_test_reaches_is_reported():
+    """Positive control on the scope: a public name in the service that the
+    package root does not export is judged, and one it exports is not."""
+    reported = test_only()
+
+    assert reported["ROLES"].startswith("src/analysis_service/graph.py:")
+    assert "Deployment" in _definitions() and "Deployment" not in reported
 
 
 def test_a_use_in_a_test_is_not_a_production_use():
@@ -358,8 +428,7 @@ def test_no_plain_method_is_unreachable():
     used = _used_names(ignoring=frozenset())
     dead = [
         f"{path.relative_to(REPO_ROOT)}:{line} {name}"
-        for scope, _ in SCOPES
-        for path in source_files(scope)
+        for path in source_files(*SCOPES)
         for name, line in _uncalled_methods(parse(path), used)
     ]
 

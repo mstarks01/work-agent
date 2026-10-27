@@ -155,8 +155,9 @@ def menu() -> str:
     disclosure is three verbs deep looks for which one, where an agent given a
     flat list of twenty picks the first that reads plausibly.
 
-    Built rather than written out in ``frameworks/stride/output.md``, because a
-    verb added above and missing from the prompt is a distinction an agent never
+    ``frameworks/stride/output.md`` carries a copy of this text, and
+    ``tests/test_prompt_lints.py`` compares the two line by line, because a verb
+    added above and missing from the prompt is a distinction an agent never
     learns it has to draw.
     """
     return "\n".join(

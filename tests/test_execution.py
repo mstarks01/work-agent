@@ -79,7 +79,7 @@ def happy_replies() -> dict[str, str]:
     return {
         "extract": emitted(valid_model()),
         # A category agent proposes — the critic's two rulings are not its to make.
-        graph.analyze_node_name("stride", "spoofing"): claims_json(
+        graph.Lane("stride", "spoofing").node_name: claims_json(
             sample_proposal("S-01", "spoofing")
         ),
         CRITIC: claims_json(sample_ruling("S-01")),
@@ -537,7 +537,7 @@ class TestSourceRendering:
         )
         replies = happy_replies() | {
             "extract": emitted(valid_model("Doc")),
-            graph.analyze_node_name("stride", "spoofing"): claims_json(proposal),
+            graph.Lane("stride", "spoofing").node_name: claims_json(proposal),
         }
         pipeline, models = scripted_pipeline(replies)
 
@@ -647,7 +647,7 @@ class TestAGraphThatRaisesCarriesWhatRan:
         return raised.value
 
     def test_the_nodes_before_the_fault_ride_out(self):
-        spoofing = graph.analyze_node_name("stride", "spoofing")
+        spoofing = graph.Lane("stride", "spoofing").node_name
         failed = self.failing(happy_replies() | {spoofing: "not json"})
 
         ran = [run.node for run in failed.node_runs]

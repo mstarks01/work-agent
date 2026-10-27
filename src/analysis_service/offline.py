@@ -5,14 +5,13 @@ check that silently reaches a provider spends money nobody approved. Turn
 :data:`OFFLINE_ENV` on and every call that would leave this process for a
 provider raises :class:`LiveInferenceRefused` first.
 
-**One reader.** Every call site asks :func:`refuse_live_inference`, and the
-two sites are the places a request leaves for a provider:
+**One reader.** The one call site asks :func:`refuse_live_inference` at the
+one place a request leaves for a provider:
 :class:`~analysis_service.provider.InProcessExecutor`, which every graph node,
-every retry attempt and every single-node replay crosses, and
-:func:`~analysis_service.model_gate.completion`.
+every retry attempt and every single-node replay crosses.
 
 A scripted model, an archived response or a transport a test supplies never
-reaches either site, so offline mode admits them unchanged. A replay that has
+reaches that site, so offline mode admits them unchanged. A replay that has
 no recorded response and asks a provider instead is refused: a miss fails
 closed rather than turning into a paid call.
 

@@ -748,8 +748,8 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
     agent would learn the distinction exists. The field would be enforceable and
     unfillable, which is worse than either alone.
 
-    ``actions.menu()``'s docstring claims it is built rather than written out.
-    This is what makes that claim true rather than an intention.
+    ``actions.menu()``'s docstring names this test as what keeps the copy and
+    the vocabulary the same.
 
     **Line by line rather than a substring test.** ``menu() in contract`` passes
     when a verb is *appended* to the last family, because the generated text is

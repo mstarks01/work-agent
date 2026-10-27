@@ -160,7 +160,6 @@ __all__ = [
     "qualified",
     "quarantine",
     "referent_type",
-    "resolve_catalog",
     "settled",
     "snap_subject",
     "span_source",
@@ -272,7 +271,7 @@ ProposedBasis = Literal["stated", "inferred"]
 #: ``unchecked`` and no extractor may move it.
 Assessment = Literal["unchecked", "supported", "unsupported", "unresolved"]
 
-#: Who wrote a row. ``assertion-pass`` is a row :func:`resolve_catalog` builds
+#: Who wrote a row. ``assertion-pass`` is a row :func:`_resolve` builds
 #: from a proposal: the assertion pass's, or a corpus reference's. ``answer`` is
 #: a row code writes from a submitter's answer to a question this service asked.
 Origin = Literal["answer", "assertion-pass"]
@@ -897,7 +896,7 @@ class CatalogIssue(BaseModel):
     subject: str | None = None
     assertion: str | None = None
     #: The index of the proposed row this refusal is about, set by
-    #: :func:`resolve_catalog` and by nothing else. One row can draw several
+    #: :func:`_resolve` and by nothing else. One row can draw several
     #: refusals, so **rows dropped is the count of distinct values here**, and
     #: a count of issues is a count of reasons (#961).
     row: int | None = None
@@ -1413,10 +1412,10 @@ def _identity(entry: Assertion) -> str:
 def merged(
     held: AssertionCatalog, found: AssertionCatalog
 ) -> tuple[AssertionCatalog, list[CatalogIssue]]:
-    """Two catalogs as one, by the rule :func:`resolve_catalog` merges by.
+    """Two catalogs as one, by the rule :func:`_resolve` merges by.
 
     Rows that share an identity become one row carrying both spans, through
-    :func:`_merge`, which :func:`resolve_catalog` also calls, so two catalogs
+    :func:`_merge`, which :func:`_resolve` also calls, so two catalogs
     stating one fact keep both provenances rather than becoming a duplicate the
     gate refuses.
 
@@ -2125,7 +2124,7 @@ def _cycle_issues(
 class QuoteProposal(BaseModel):
     """A span of a source a model proposes, in the model's own spelling.
 
-    No offsets. :func:`resolve_catalog` finds where the quote sits, or refuses
+    No offsets. :func:`_resolve` finds where the quote sits, or refuses
     it, which is what keeps a span from claiming a position the source does not
     hold.
     """
@@ -2192,7 +2191,7 @@ class CatalogProposal(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    #: **No cap on the schema, and the bound is in :func:`resolve_catalog`.**
+    #: **No cap on the schema, and the bound is in :func:`_resolve`.**
     #: A root-level array of objects carrying ``maxItems`` is a shape Google's
     #: structured output refuses — measured, and the only feature separating
     #: this schema from the extraction schema that runs on the same route. A
@@ -2202,12 +2201,16 @@ class CatalogProposal(BaseModel):
     assertions: list[AssertionProposal] = Field(default_factory=list)
 
 
-def resolve_catalog(
+def _resolve(
     proposal: CatalogProposal,
     model: SystemModel,
     sources: Mapping[str, str],
-) -> tuple[AssertionCatalog, list[CatalogIssue]]:
+) -> tuple[AssertionCatalog, list[CatalogIssue], dict[int, str]]:
     """Build the catalog a proposal describes, and say what it cost.
+
+    The third value is the identity each kept proposed row built, by the
+    row's index, which :meth:`AssertionRecord.resolved` reads to say which
+    proposed row the record lost.
 
     **The resolver constructs, so the gate cannot fail.** Every row it keeps is
     one :func:`catalog_issues` raises nothing for, and every row it drops comes
@@ -2234,16 +2237,6 @@ def resolve_catalog(
     where :data:`MAX_ASSERTIONS` is enforced, because the schema cannot carry
     it without costing a vendor.
     """
-    catalog, issues, _ = _resolve(proposal, model, sources)
-    return catalog, issues
-
-
-def _resolve(
-    proposal: CatalogProposal,
-    model: SystemModel,
-    sources: Mapping[str, str],
-) -> tuple[AssertionCatalog, list[CatalogIssue], dict[int, str]]:
-    """:func:`resolve_catalog`, and the identity each kept proposed row built."""
     if len(proposal.assertions) > MAX_ASSERTIONS:
         return (
             AssertionCatalog(),
@@ -2302,7 +2295,7 @@ def _bounded(
     Rows of one identity each passed the bound alone and may cross it
     together. The merged row keeps the first spans and the cut is recorded,
     rather than refusing a fact for being stated too often or keeping eight
-    spans with nothing to say a ninth was cited. :func:`resolve_catalog` and
+    spans with nothing to say a ninth was cited. :func:`_resolve` and
     :func:`merged` both call it. The proposal the emission archive keeps still
     carries every quote.
     """
@@ -2469,7 +2462,7 @@ def snap_subject(
     element a proposed row *would* bind to without resolving the whole
     proposal — the binding replay asks it of the blessed model to name the
     element an extracted graph refused. One reader: it calls what
-    :func:`resolve_catalog` calls.
+    :func:`_resolve` calls.
     """
     element_ids = [element.id for element in model.elements()]
     labels = {element.id: element.name for element in model.elements()}

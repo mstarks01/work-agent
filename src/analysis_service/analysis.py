@@ -64,7 +64,6 @@ __all__ = [
     "control_state",
     "cross_boundary_flows",
     "crossing_facts",
-    "crossing_flow_ids",
     "crossings_by_flow",
     "inbound_flows",
     "internet_exposed_elements",
@@ -314,11 +313,6 @@ def crossings_by_flow(model: SystemModel) -> Mapping[str, BoundaryCrossing]:
     return MappingProxyType(
         {crossing.flow_id: crossing for crossing in cross_boundary_flows(model)}
     )
-
-
-def crossing_flow_ids(model: SystemModel) -> frozenset[str]:
-    """The IDs of the flows that cross a trust boundary."""
-    return frozenset(crossings_by_flow(model))
 
 
 def crossing_facts(crossing: BoundaryCrossing, flow: DataFlow) -> dict[str, str | bool]:

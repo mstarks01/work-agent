@@ -14,15 +14,12 @@ from analysis_service.certification import (
     CertificationGate,
     CertifyResult,
     certify,
+    fingerprints_of,
     load_manifest,
-    report_fingerprints,
 )
 from analysis_service.model_tiers import TierName
-from analysis_service.report import (
-    NodeRun,
-    Report,
-)
-from tests.factories import blessed_manifest, sample_report
+from analysis_service.report import NodeRun
+from tests.factories import blessed_manifest
 
 FP_A = "a" * 64
 INSTRUCTIONS = "1c" * 32
@@ -139,48 +136,41 @@ class TestTheThirdState:
         assert result.unexercised == ("strong",)
 
 
-class TestReportFingerprints:
-    def _report(self, nodes: list[NodeRun]) -> Report:
-        return sample_report().model_copy(update={"nodes": nodes})
-
+class TestFingerprintsOf:
     def test_covers_llm_nodes_only(self):
-        report = self._report(
-            [
-                NodeRun(
-                    node="extract",
-                    model="m",
-                    requested_model="m",
-                    instruction_sha256=INSTRUCTIONS,
-                    execution_fingerprint=FP_A,
-                    duration_ms=1,
-                ),
-                NodeRun(node="validate", model=None, duration_ms=0),
-            ]
-        )
-        assert report_fingerprints(report) == {"extract": frozenset({FP_A})}
+        nodes = [
+            NodeRun(
+                node="extract",
+                model="m",
+                requested_model="m",
+                instruction_sha256=INSTRUCTIONS,
+                execution_fingerprint=FP_A,
+                duration_ms=1,
+            ),
+            NodeRun(node="validate", model=None, duration_ms=0),
+        ]
+        assert fingerprints_of(nodes) == {"extract": frozenset({FP_A})}
 
     def test_a_node_appearing_twice_contributes_both_hashes(self):
-        report = self._report(
-            [
-                NodeRun(
-                    node="critic",
-                    model="m",
-                    requested_model="m",
-                    instruction_sha256=INSTRUCTIONS,
-                    execution_fingerprint=FP_A,
-                    duration_ms=1,
-                ),
-                NodeRun(
-                    node="critic",
-                    model="m2",
-                    requested_model="m",
-                    instruction_sha256=INSTRUCTIONS,
-                    execution_fingerprint=FP_B,
-                    duration_ms=1,
-                ),
-            ]
-        )
-        assert report_fingerprints(report) == {"critic": frozenset({FP_A, FP_B})}
+        nodes = [
+            NodeRun(
+                node="critic",
+                model="m",
+                requested_model="m",
+                instruction_sha256=INSTRUCTIONS,
+                execution_fingerprint=FP_A,
+                duration_ms=1,
+            ),
+            NodeRun(
+                node="critic",
+                model="m2",
+                requested_model="m",
+                instruction_sha256=INSTRUCTIONS,
+                execution_fingerprint=FP_B,
+                duration_ms=1,
+            ),
+        ]
+        assert fingerprints_of(nodes) == {"critic": frozenset({FP_A, FP_B})}
 
 
 class TestManifestLoading:

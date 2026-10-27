@@ -62,7 +62,7 @@ def carried(pipeline) -> set[str]:
 
 
 LANES = {
-    graph.analyze_node_name("stride", category)
+    graph.Lane("stride", category).node_name
     for category in ("spoofing", "tampering", "repudiation")
 }
 

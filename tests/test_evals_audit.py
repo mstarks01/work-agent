@@ -103,7 +103,7 @@ class TestThePhaseTable:
         """A lane node carries its framework and its lane, and still resolves."""
         for name, package in PACKAGES.items():
             for lane in package.lanes:
-                node = graph.analyze_node_name(name, lane)
+                node = graph.Lane(name, lane).node_name
                 assert audit.phase_of(node) == "analysis"
 
     def test_a_per_framework_node_resolves_through_its_role(self):

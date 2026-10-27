@@ -136,9 +136,7 @@ def happy_replies() -> dict[str, str]:
     """Extraction succeeds; spoofing drafts one threat; the critic confirms it."""
     return {
         "extract": emitted(valid_model()),
-        graph.analyze_node_name("stride", "spoofing"): proposal_json(
-            "S-01", "spoofing"
-        ),
+        graph.Lane("stride", "spoofing").node_name: proposal_json("S-01", "spoofing"),
         CRITIC: claims_json(sample_ruling("S-01")),
     }
 
@@ -194,7 +192,7 @@ def test_a_stated_absence_reaches_the_report_as_a_fact_a_claim_rests_on():
                 )
             ]
         ).model_dump_json(),
-        graph.analyze_node_name("stride", "spoofing"): proposal_json(
+        graph.Lane("stride", "spoofing").node_name: proposal_json(
             "S-01", "spoofing", evidence_refs=[assertion_id(row)], quotes=[]
         ),
     }
@@ -241,7 +239,7 @@ def test_a_draft_resting_on_an_unknown_still_reaches_the_critic():
     """
     replies = {
         "extract": emitted(valid_model()),
-        graph.analyze_node_name("stride", "spoofing"): proposal_json(
+        graph.Lane("stride", "spoofing").node_name: proposal_json(
             "S-01",
             "spoofing",
             affected_element_ids=["store:orders-db"],
@@ -302,7 +300,7 @@ def test_an_unfindable_quote_is_marked_on_the_report_and_still_renders():
         evidence_refs=["crossing:flow:entity:customer>process:web-app>login"],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
+        graph.Lane("stride", "spoofing").node_name: claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -332,7 +330,7 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
         " process:web-api, which this model does not contain.",
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
+        graph.Lane("stride", "spoofing").node_name: claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -363,7 +361,7 @@ def test_a_composed_evidence_reference_is_marked_rather_than_fatal():
         ],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
+        graph.Lane("stride", "spoofing").node_name: claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -384,7 +382,7 @@ def test_a_threat_with_no_countermeasure_is_marked_on_the_report():
     """A completeness signal, carried to the reader rather than costing the run."""
     proposal = sample_proposal("S-01", "spoofing", mitigations=[])
     replies = happy_replies() | {
-        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
+        graph.Lane("stride", "spoofing").node_name: claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -433,7 +431,7 @@ def test_a_lane_that_skips_a_number_is_logged_and_not_renumbered(caplog):
     import logging
 
     replies = happy_replies() | {
-        graph.analyze_node_name("stride", "spoofing"): claims_json(
+        graph.Lane("stride", "spoofing").node_name: claims_json(
             sample_proposal("S-01"), sample_proposal("S-05")
         ),
         CRITIC: claims_json(sample_ruling("S-01"), sample_ruling("S-05")),
@@ -463,7 +461,7 @@ def test_a_threat_no_ground_supports_is_dropped_and_the_report_says_so():
         evidence_refs=[],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal),
+        graph.Lane("stride", "spoofing").node_name: claims_json(proposal),
         CRITIC: claims_json(),
     }
     pipeline, _ = build(replies)
@@ -588,7 +586,7 @@ def test_each_agent_gets_its_own_category_and_the_shared_model():
     run(pipeline, job())
 
     for category in STRIDE_CATEGORIES:
-        instruction = models[graph.analyze_node_name("stride", category)].seen[0]
+        instruction = models[graph.Lane("stride", category).node_name].seen[0]
         assert f"**{category}** agent" in instruction
         assert "process:web-app" in instruction  # {system_model} templated in
         assert "{" not in instruction.split("## Procedure")[0].split("```")[-1]
@@ -596,7 +594,7 @@ def test_each_agent_gets_its_own_category_and_the_shared_model():
 
 def test_the_critic_sees_each_category_agents_drafts_once():
     replies = happy_replies()
-    replies[graph.analyze_node_name("stride", "tampering")] = proposal_json(
+    replies[graph.Lane("stride", "tampering").node_name] = proposal_json(
         "T-01", "tampering", verb="alter"
     )
     replies[CRITIC] = claims_json(sample_ruling("S-01"), sample_ruling("T-01"))
@@ -676,7 +674,7 @@ def test_a_hallucinated_element_reference_costs_the_claim_not_the_job():
     """The merge seam drops a draft the System Model cannot account for, and
     the report says which and why."""
     replies = happy_replies()
-    replies[graph.analyze_node_name("stride", "spoofing")] = claims_json(
+    replies[graph.Lane("stride", "spoofing").node_name] = claims_json(
         sample_proposal("S-01", affected_element_ids=["process:invented"])
     )
     replies[CRITIC] = claims_json()
@@ -692,7 +690,7 @@ def test_a_hallucinated_element_reference_costs_the_claim_not_the_job():
 def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
     """The critic drops a draft; the bounded re-ask returns the full set."""
     replies = happy_replies()
-    replies[graph.analyze_node_name("stride", "tampering")] = proposal_json(
+    replies[graph.Lane("stride", "tampering").node_name] = proposal_json(
         "T-01", "tampering", verb="alter"
     )
     both = claims_json(sample_ruling("S-01"), sample_ruling("T-01"))
@@ -1016,7 +1014,7 @@ def test_one_framework_finishing_first_does_not_fail_the_other(first, held, wind
     replies = {"extract": emitted(valid_model())}
     for name in (first, held):
         fixture = SCRIPTED_FRAMEWORKS[name]
-        replies[graph.analyze_node_name(name, fixture.lane)] = fixture.proposal
+        replies[graph.Lane(name, fixture.lane).node_name] = fixture.proposal
         replies[graph.FrameworkNodes(name).node(graph.CRITIC_ROLE)] = fixture.ruling
     if window == "re-ask-still-running":
         replies[held_critic] = EMPTY_CLAIMS
@@ -1065,7 +1063,7 @@ def test_a_lane_with_no_unit_left_calls_no_model():
     assert idle
     replies = {
         "extract": emitted(valid_model()),
-        graph.analyze_node_name("asvs", fixture.lane): fixture.proposal,
+        graph.Lane("asvs", fixture.lane).node_name: fixture.proposal,
         nodes.node(graph.CRITIC_ROLE): fixture.ruling,
     }
     pipeline, models = build(replies, frameworks=("asvs",))
@@ -1091,7 +1089,7 @@ def test_both_review_passes_read_the_submitted_sources(role):
     nodes = graph.FrameworkNodes("stride")
     replies = {
         "extract": emitted(valid_model()),
-        graph.analyze_node_name("stride", fixture.lane): fixture.proposal,
+        graph.Lane("stride", fixture.lane).node_name: fixture.proposal,
         # A first pass that rules on nothing sends the drafts to the re-ask.
         nodes.node(graph.CRITIC_ROLE): (
             EMPTY_CLAIMS if role == graph.RECRITIC_ROLE else fixture.ruling
@@ -1117,7 +1115,7 @@ def test_every_node_s_system_text_starts_with_its_stable_prefix():
     replies = {"extract": emitted(valid_model())}
     for name in PACKAGES:
         fixture = SCRIPTED_FRAMEWORKS[name]
-        replies[graph.analyze_node_name(name, fixture.lane)] = fixture.proposal
+        replies[graph.Lane(name, fixture.lane).node_name] = fixture.proposal
         replies[graph.FrameworkNodes(name).node(graph.CRITIC_ROLE)] = fixture.ruling
     pipeline, models = build(replies, frameworks=tuple(PACKAGES))
     templates = {

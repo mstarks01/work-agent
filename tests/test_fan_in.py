@@ -1046,9 +1046,9 @@ class TestAGroundIsAboutTheClaimsElements:
 class TestASpentBodyDeadlineFoldsNoSource:
     """The bound the fan-in actually runs under.
 
-    ``repair_quote`` has its own guard, but the fan-in does not call it: it
-    prepares each source itself and calls ``repair_prepared``. So the guard that
-    matters is the one at the call site, and this is what holds it there.
+    The fan-in prepares each source itself and calls ``repair_prepared``, so
+    the guard that holds the bound is the one at the call site, and this is what
+    holds it there.
     """
 
     def test_a_body_past_its_deadline_prepares_no_further_source(self, monkeypatch):

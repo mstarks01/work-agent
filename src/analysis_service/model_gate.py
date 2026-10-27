@@ -41,7 +41,6 @@ from functools import cache
 from typing import Any, Literal
 
 from analysis_service.errors import ConfigError
-from analysis_service.offline import refuse_live_inference
 from analysis_service.vendors import SchemaRule, Vendor, VendorName, vendor_for
 
 
@@ -425,23 +424,6 @@ def _tool_name(tool: Any) -> str | None:
     if isinstance(nested, dict) and "name" in nested:
         return nested["name"]
     return tool.get("name")
-
-
-def completion(**kwargs: Any) -> Any:
-    """Issue one request through the same pinned ``litellm`` the gate checks.
-
-    A thin passthrough, and the point is the *sameness*: a gate that validates
-    against one copy of the library while the request goes out through another
-    proves nothing. Everything that issues a request goes through here, so the
-    hermetic model-cost map and the exact version pin cover the call as well as
-    the check.
-
-    Deliberately not wrapped in retry or error translation — callers own their
-    own failure semantics, and ``num_retries`` rides the kwargs like any other
-    provider parameter.
-    """
-    refuse_live_inference(str(kwargs.get("model")))
-    return _litellm.completion(**kwargs)
 
 
 def assert_kwarg_supported(name: str) -> None:

@@ -93,9 +93,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
     and that is a question the resolver can answer.
     """
     replies = {
-        graph.analyze_node_name("stride", "spoofing"): proposal_json(
-            "S-01", "spoofing"
-        ),
+        graph.Lane("stride", "spoofing").node_name: proposal_json("S-01", "spoofing"),
         CRITIC: claims_json(sample_ruling("S-01")),
     }
 

@@ -60,7 +60,7 @@ threshold a person would pick by intuition, such as 0.90 or 0.95, accepts the
 fabricated stitch. A deterministic ladder is also explainable to a submitter —
 "this word is not in your document" — and a threshold is not.
 
-The repair rung is a different thing. :func:`repair_quote` runs only after the
+The repair rung is a different thing. :func:`repair_prepared` runs only after the
 ladder refused a quote, and it does not accept the quote. It finds the source's
 own span nearest to it and hands that span back, so the report carries the
 submitter's words and never the model's. The agent's words survive beside it as
@@ -547,10 +547,10 @@ def deadline_spent(deadline: float | None) -> bool:
     """Has the body's shared deadline passed?
 
     One reader, because three sites ask it and each asks to avoid a different
-    cost: :func:`repair_quote` and :func:`~analysis_service.fan_in._verify_quotes`
-    ask before they prepare a source, and :func:`repair_prepared` asks before it
-    scans one. ``None`` is a caller that set no body bound, which is every
-    caller outside the fan-in.
+    cost: :func:`~analysis_service.fan_in._verify_quotes` and
+    :func:`~analysis_service.validation.repair_excerpts` ask before they prepare
+    a source, and :func:`repair_prepared` asks before it scans one. ``None`` is
+    a caller that set no body bound.
     """
     return deadline is not None and time.thread_time() > deadline
 
@@ -571,28 +571,6 @@ def _needle_of(quote: str) -> str:
     if len(needle) > MAX_REPAIR_QUOTE_CHARS:
         return ""
     return needle
-
-
-def repair_quote(
-    quote: str, source: str, deadline: float | None = None
-) -> Repair | None:
-    """The raw-text form of :func:`repair_prepared`, for a caller holding text.
-
-    A caller scanning the same source for many refused quotes should call
-    :func:`prepare_source` once and :func:`repair_prepared` per quote — the
-    split and the per-word folding are the same answer for every quote, and
-    this form pays for them again on each call.
-
-    **Nothing here folds a source to reach an answer it already has.** Both
-    refusals that need no source are taken first: a quote the rung will not scan
-    at all, and a body whose ``deadline`` has passed. Folding the quote twice —
-    once here and once in the scan — costs microseconds against a whole
-    submission, because a quote is bounded by :data:`MAX_REPAIR_QUOTE_CHARS` and
-    a source is not.
-    """
-    if not _needle_of(quote) or deadline_spent(deadline):
-        return None
-    return repair_prepared(quote, prepare_source(source), deadline)
 
 
 #: What a repair can move between the agent's words and the source's span.

@@ -506,11 +506,6 @@ class FrameworkNodes:
         }
 
 
-def analyze_node_name(framework: FrameworkName, lane: str) -> str:
-    """One lane agent's graph node name, for a caller holding the pair."""
-    return Lane(framework, lane).node_name
-
-
 def tier_node_by_graph_node(
     frameworks: Sequence[FrameworkName],
 ) -> dict[str, str]:
@@ -726,7 +721,7 @@ STATE_EXTRACTED_MODEL = "extracted_model"
 STATE_FIRST_PASS = "first_pass"
 # What ``assert`` emits: a ``CatalogProposal``, before code resolves its rows
 # into a catalog. Structured, because a driver reads it back and resolves it —
-# see :func:`~analysis_service.assertions.resolve_catalog`.
+# see :meth:`~analysis_service.assertions.AssertionRecord.of`.
 STATE_ASSERTION_PROPOSAL = "assertion_proposal"
 # What ``capabilities`` emits: a ``CapabilityReading``, before code checks its
 # rows and writes them into the valid model (ADR 0086).

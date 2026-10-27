@@ -13,7 +13,6 @@ import asyncio
 import pytest
 from google.genai import types
 
-from analysis_service import model_gate
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import schemas_for
 from analysis_service.graph import CRITIC_ROLE, FrameworkNodes
@@ -76,8 +75,3 @@ def test_offline_mode_refuses_a_single_node_replay():
 
     with pytest.raises(LiveInferenceRefused):
         asyncio.run(call("rule on these", turn))
-
-
-def test_offline_mode_refuses_the_direct_completion():
-    with pytest.raises(LiveInferenceRefused, match="openai/gpt-4o"):
-        model_gate.completion(model="openai/gpt-4o", messages=[])
