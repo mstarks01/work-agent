@@ -1516,7 +1516,7 @@ def _drawn(browser, report):
     page = browser.new_page()
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    html = render_report(report, report_state(report)).html
+    html = render_report(report, report_state(report), previous=None, parent=None).html
     page.route(
         "http://report.test/report/r1",
         lambda route: route.fulfill(body=html, content_type="text/html"),

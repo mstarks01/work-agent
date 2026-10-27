@@ -87,7 +87,7 @@ def payloads_of(html: str) -> dict[str, str]:
 def page_script() -> str:
     """The report page's whole client script, as a rendered page carries it."""
     report = sample_report()
-    html = render_report(report, report_state(report)).html
+    html = render_report(report, report_state(report), previous=None, parent=None).html
     (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
     return script
 
@@ -136,6 +136,8 @@ def page(answered=(), shown=(), final=False, skipped=()):
         report_state(
             report, answered=answered, final=final, shown=shown, skipped=skipped
         ),
+        previous=None,
+        parent=None,
     ).html
 
 
@@ -189,7 +191,7 @@ def two_findings():
         update={"id": "S-02", "title": "Cookies cross the network in clear"}
     )
     report = sample_report([sample_threat(), waiting])
-    return render_report(report, report_state(report)).html
+    return render_report(report, report_state(report), previous=None, parent=None).html
 
 
 def test_the_summary_counts_the_confirmed_and_the_waiting_findings():
@@ -240,7 +242,9 @@ def test_findings_that_rest_on_one_missing_control_share_a_group(monkeypatch):
         ),
     ]
     report = sample_report(threats)
-    text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
+    text = run_report_page(
+        render_report(report, report_state(report), previous=None, parent=None).html
+    )["analyses"]
     assert (
         "One shared action addresses 2 findings: Add encryption in transit to"
         " the connection initiated by Web App to Orders DB. T-01 · I-01"
@@ -259,7 +263,9 @@ def test_conditional_and_dismissed_findings_each_keep_their_own_row():
         verdict=Verdict(status="rejected", reason="The source states HTTPS."),
     )
     report = sample_report([asking_threat(ASKED)], [rejected])
-    text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
+    text = run_report_page(
+        render_report(report, report_state(report), previous=None, parent=None).html
+    )["analyses"]
     assert "Conditional findings · 1" in text
     assert "Dismissed findings · 1HighAdmin traffic is readableDismissedI-01" in text
     assert "Why dismissedThe source states HTTPS." in text
@@ -308,6 +314,8 @@ def test_a_corrected_finding_is_marked_on_its_card():
             final=True,
             corrections=[FactAnswer(key=ASKED.key, value="unknown")],
         ),
+        previous=None,
+        parent=None,
     ).html
     assert "Corrected after this report" in run_report_page(html)["analyses"]
 
@@ -323,7 +331,9 @@ def test_an_owner_s_answer_is_marked_as_unchecked():
     quote = Ground(kind="quote", text=fact_line(answer), source_label=ANSWERS_LABEL)
     derived = sample_threat().grounds[1]
     report = sample_report([sample_threat(grounds=[quote, derived])])
-    html = render_report(report, report_state(report, answered=[answer])).html
+    html = render_report(
+        report, report_state(report, answered=[answer]), previous=None, parent=None
+    ).html
     text = run_report_page(html)["analyses"]
     assert "your answer; the service did not check it" in text
     assert f"— {ANSWERS_LABEL}" not in text
@@ -413,7 +423,9 @@ def test_a_description_names_an_element_by_its_name():
         description=f"`{flow.source}` sends `{flow.id}` with `encryption_in_transit` unknown."
     )
     report = sample_report([described])
-    text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
+    text = run_report_page(
+        render_report(report, report_state(report), previous=None, parent=None).html
+    )["analyses"]
 
     endpoints = f"{by_id[flow.source]} → {by_id[flow.destination]}"
     assert (
@@ -453,7 +465,9 @@ def test_a_description_names_an_evidence_reference_by_its_label():
     crosses = crossing_evidence_ref(crossing.id)
     described = sample_threat(description=f"It rests on `{unstated}` and `{crosses}`.")
     report = sample_report([described])
-    text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
+    text = run_report_page(
+        render_report(report, report_state(report), previous=None, parent=None).html
+    )["analyses"]
 
     def endpoints(f):
         return f"{by_id[f.source]} → {by_id[f.destination]}"
@@ -534,7 +548,9 @@ def test_a_follow_up_says_how_each_finding_moved():
         [asking_threat(ASKED), sample_threat("S-02", verb="impersonate", title="Lost")]
     )
     after = sample_report([sample_threat()])
-    html = render_report(after, report_state(after, final=True), before).html
+    html = render_report(
+        after, report_state(after, final=True), before, parent=None
+    ).html
     text = run_report_page(html)["analyses"]
 
     assert (
@@ -602,7 +618,9 @@ def test_every_ground_kind_renders_its_label_and_its_reference():
             }
         )
     )
-    text = run_report_page(render_report(report, report_state(report)).html)["analyses"]
+    text = run_report_page(
+        render_report(report, report_state(report), previous=None, parent=None).html
+    )["analyses"]
 
     assert "undefined" not in text
     for cited in ("directory service", "row-stated", "row-open"):
@@ -715,7 +733,9 @@ def test_a_count_of_one_reads_in_the_singular():
             )
         ],
     )
-    parts = run_report_page(render_report(report, report_state(report)).html)
+    parts = run_report_page(
+        render_report(report, report_state(report), previous=None, parent=None).html
+    )
     assert "1 confirmed finding: 1 high." in parts["analyses"]
     assert "1 was dismissed." in parts["analyses"]
     assert "1 unit with no claim raised" in parts["framework-notes"]
@@ -747,6 +767,8 @@ def test_the_export_lists_the_link_answers_and_the_corrections_the_page_shows():
         report_state(
             report, links=[LinkAnswer(principal="batch loader", element="none")]
         ),
+        previous=None,
+        parent=None,
     ).html
     printed = run_report_page(follow_up)["export-questions"]
     assert "Answers this report readbatch loaderAnswer: none of these" in printed
@@ -759,6 +781,8 @@ def test_the_export_lists_the_link_answers_and_the_corrections_the_page_shows():
             final=True,
             corrections=[FactAnswer(key=ASKED.key, value="unknown")],
         ),
+        previous=None,
+        parent=None,
     ).html
     printed = run_report_page(final)["export-questions"]
     assert "Answer: I don't know" in printed
@@ -770,7 +794,7 @@ def test_the_page_carries_the_zones_the_service_assumed():
     report = sample_report([sample_threat()])
     (assumed,) = re.findall(
         r'id="assumed_zones"[^>]*>(.*?)</script>',
-        render_report(report, report_state(report)).html,
+        render_report(report, report_state(report), previous=None, parent=None).html,
     )
     assert json.loads(assumed) == sorted(report.system_model.assumed_zone_elements())
 
@@ -829,7 +853,9 @@ def test_the_pipeline_shows_each_fingerprint_once_with_its_steps():
             + [NodeRun(node="assemble", duration_ms=20)]
         }
     )
-    nodes = run_report_page(render_report(report, report_state(report)).html)["nodes"]
+    nodes = run_report_page(
+        render_report(report, report_state(report), previous=None, parent=None).html
+    )["nodes"]
     assert "StepModelTime" in nodes
     assert "analyze_agemini-2.5-pro14.5 s" in nodes
     assert nodes.count(fingerprint) == 1

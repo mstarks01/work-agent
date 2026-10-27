@@ -1101,7 +1101,7 @@ def _report_payloads(payloads: dict) -> dict:
 
     sample = sample_report()
     served = test_report_page.payloads_of(
-        render_report(sample, report_state(sample)).html
+        render_report(sample, report_state(sample), previous=None, parent=None).html
     )
     merged = {name: json.loads(text) for name, text in served.items()}
     for name, value in payloads.items():
