@@ -19,6 +19,7 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
+from analysis_service.frameworks import LANE_SKILL_DOC
 from analysis_service.frameworks.asvs.catalog import CHAPTERS, REQUIREMENTS
 
 __all__ = ["ROSTER_HEADING", "replace_roster", "roster_block", "write_rosters"]
@@ -107,7 +108,7 @@ def write_rosters(lanes_dir: Path) -> list[str]:
     """Rewrite every chapter's roster in place. Returns the lanes that changed."""
     changed = []
     for chapter in CHAPTERS:
-        path = lanes_dir / chapter.lane / "skill.md"
+        path = lanes_dir / chapter.lane / f"{LANE_SKILL_DOC}.md"
         before = path.read_text(encoding="utf-8")
         after = replace_roster(before, roster_block(chapter.lane))
         if after != before:

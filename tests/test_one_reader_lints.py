@@ -11,6 +11,7 @@ reason, and a second test fails when the declaration stops being live.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import re
 from collections.abc import Callable, Iterable, Iterator
 from functools import partial
@@ -21,6 +22,8 @@ from typing import TypeGuard
 import pytest
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES
+from analysis_service.claims import Ruling
+from evals.harness.prices import UnitPrices
 from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
 
 pytestmark = pytest.mark.lint
@@ -1035,6 +1038,71 @@ def test_a_source_digest_has_one_writer():
     """Only ``sources.text_digest`` hashes a Source's text, so a report's
     source ref and a support span pin one text to one digest."""
     assert _sites(_digests_a_source_text) == []
+
+
+def _spells_a_lane_doc(node: ast.AST) -> bool:
+    """Whether ``node`` spells the name or the file of a lane's skill or its
+    exemplars."""
+    return (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and " " not in node.value
+        and (
+            node.value in ("skill", "exemplars")
+            or node.value.endswith(("/skill", "/exemplars", "skill.md", "exemplars.md"))
+        )
+    )
+
+
+#: Each function that spells ``skill`` for another meaning, and the meaning.
+NOT_A_LANE_DOC: dict[Site, str] = {
+    ("evals/harness/audit.py", "<module>"): (
+        "a finding's owner: the skill text as one of the places a fix belongs"
+    ),
+}
+
+
+def test_a_lane_doc_name_is_spelled_once():
+    """Only ``frameworks`` spells a lane's two file names; the loader names,
+    the package gate and the roster writer read the declarations."""
+    assert set(_sites(_spells_a_lane_doc)) - NOT_A_LANE_DOC.keys() == {
+        ("src/analysis_service/frameworks/__init__.py", "<module>")
+    }
+
+
+def test_each_declared_site_still_spells_skill():
+    assert NOT_A_LANE_DOC.keys() <= set(_sites(_spells_a_lane_doc))
+
+
+def _lists_the_ruling_fields(node: ast.AST) -> bool:
+    """Whether ``node`` is a literal collection of the base ruling's fields."""
+    return isinstance(node, ast.Tuple | ast.List | ast.Set) and {
+        element.value for element in node.elts if isinstance(element, ast.Constant)
+    } == set(Ruling.model_fields)
+
+
+def test_the_base_ruling_fields_are_read_from_the_model():
+    """Assembly and its replay read ``Ruling.model_fields``, so a field added
+    to the base ruling reaches both."""
+    assert _sites(_lists_the_ruling_fields) == []
+
+
+#: The rate names of a unit price, from the dataclass that declares them.
+_RATE_NAMES = frozenset(
+    field.name for field in dataclasses.fields(UnitPrices) if field.name != "model"
+)
+
+
+def _spells_a_rate_name(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and node.value in _RATE_NAMES
+
+
+def test_a_unit_price_rate_name_is_spelled_only_where_it_is_declared():
+    """The Baseline shape check reads the rates from ``UnitPrices``, so a rate
+    added there is a rate the check asks for."""
+    assert {path for path, _ in _sites(_spells_a_rate_name)} == {
+        "evals/harness/prices.py"
+    }
 
 
 #: A module path under the service package, and a prompt path: the two halves

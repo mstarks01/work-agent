@@ -24,6 +24,8 @@ from pathlib import Path
 from analysis_service.frameworks import (
     CRITIC_DOC,
     LANE_CLOSING_DOC,
+    LANE_EXEMPLARS_DOC,
+    LANE_SKILL_DOC,
     OUTPUT_DOC,
     SEVERITY_RUBRIC_DOC,
 )
@@ -104,7 +106,7 @@ PROMPTS: tuple[str, ...] = (
             *sorted({doc for doc in LANE_CLOSING_DOC.values() if doc}),
         )
     ),
-    "frameworks/*/lanes/*/*.md",
+    *(f"frameworks/*/lanes/*/{doc}.md" for doc in (LANE_SKILL_DOC, LANE_EXEMPLARS_DOC)),
 )
 
 #: The Markdown that is not a guide, by file or tree, with the reason. Every

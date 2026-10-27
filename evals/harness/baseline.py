@@ -62,9 +62,9 @@ import math
 import re
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, get_args, get_type_hints
 
 from analysis_service.model_tiers import TierName
 from analysis_service.parsing import non_negative, strings
@@ -840,6 +840,16 @@ def default_base_ref(root: Path) -> str:
     return "main"
 
 
+#: Each rate a ``unit_prices`` entry states: every field of
+#: :class:`~evals.harness.prices.UnitPrices` but the model.
+_RATES = tuple(field.name for field in fields(UnitPrices) if field.name != "model")
+
+#: The rates an entry may hold as ``None``, because their field holds ``None``.
+_OPTIONAL_RATES = frozenset(
+    name for name in _RATES if type(None) in get_args(get_type_hints(UnitPrices)[name])
+)
+
+
 def _rates(entry: object) -> bool:
     """Whether one ``unit_prices`` entry names a model and states numbers."""
     return (
@@ -847,11 +857,8 @@ def _rates(entry: object) -> bool:
         and isinstance(entry.get("model"), str)
         and all(
             non_negative(entry.get(rate))
-            for rate in ("input_per_token", "output_per_token")
-        )
-        and all(
-            entry.get(rate) is None or non_negative(entry[rate])
-            for rate in ("cache_read_per_token", "cache_write_per_token")
+            or (entry.get(rate) is None and rate in _OPTIONAL_RATES)
+            for rate in _RATES
         )
     )
 

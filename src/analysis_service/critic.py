@@ -741,7 +741,7 @@ def _ruled(draft: Claim, ruling: Ruling, ruled_record: type[RuledClaim]) -> Rule
     """
     overrides = {
         field: value
-        for field, value in ruling.model_dump(exclude={"id", "verdict"}).items()
+        for field, value in ruling.model_dump(exclude=set(Ruling.model_fields)).items()
         if value is not None
     }
     return ruled_record(
