@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import compose_extract_prompt, compose_repair_prompt
 from analysis_service.sources import (
@@ -276,14 +277,18 @@ class TestComposedPromptFencing:
     def test_input_text_prompts_keep_caller_text_fenced(self):
         loader = MarkdownLoader(_REPO_PROMPTS)
         rendered = self._rendered()
-        for compose in (compose_extract_prompt, compose_repair_prompt):
-            composed = compose(loader).replace("{input_text}", rendered)
+        for name, prompt in (
+            ("full extract", compose_extract_prompt(loader, FULL_FORMAT)),
+            ("compact extract", compose_extract_prompt(loader, COMPACT_FORMAT)),
+            ("repair", compose_repair_prompt(loader)),
+        ):
+            composed = prompt.replace("{input_text}", rendered)
             escaped = [
                 line
                 for line in lines_outside_fences(composed)
                 if "SYSTEM OVERRIDE" in line
             ]
-            assert not escaped, f"{compose.__name__} let caller text escape"
+            assert not escaped, f"the {name} prompt let caller text escape"
 
     def test_a_lane_prompt_leaves_no_block_open(self):
         """`analyze.md` carries `{input_text}` too, and is not in the loop

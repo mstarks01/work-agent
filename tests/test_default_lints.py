@@ -38,11 +38,17 @@ from collections import defaultdict
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from functools import cache
-from pathlib import Path
 
 import pytest
 
-from tests.source_tree import PYTHON, REPO_ROOT, SHORTEST_REASON, parse, source_files
+from tests.source_tree import (
+    PYTHON,
+    REPO_ROOT,
+    SHORTEST_REASON,
+    module_name,
+    parse,
+    source_files,
+)
 
 pytestmark = pytest.mark.lint
 
@@ -146,16 +152,6 @@ class Call:
             and parameter.index is not None
             and self.positional > parameter.index
         )
-
-
-def module_name(path: Path) -> str:
-    """The dotted name that an import gives the module at ``path``."""
-    parts = list(path.relative_to(REPO_ROOT).with_suffix("").parts)
-    if parts[0] == "src":
-        parts = parts[1:]
-    if parts[-1] == "__init__":
-        parts = parts[:-1]
-    return ".".join(parts)
 
 
 @cache
