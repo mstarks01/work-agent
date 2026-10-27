@@ -455,7 +455,7 @@ class ThreatProposals(ProposalBatch):
     its findings: one shared
     ``analyze.md`` asks every registered framework's lane agents for the same
     object, and a second framework filing "threats" would be answering in a word
-    its own claims are not. The rename changes one line in that prompt and is
+    its own claims are not. The rename costs one line in that prompt and is
     inside the ``schema_version`` 3.0 break either way.
     """
 
