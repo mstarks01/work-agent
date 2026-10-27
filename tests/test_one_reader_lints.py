@@ -1110,11 +1110,14 @@ def test_a_unit_price_rate_name_is_spelled_only_where_it_is_declared():
 #: module that declares it. A second module that declares the name gives one
 #: name two meanings.
 _ONE_MEANING: dict[str, str] = {
+    "Candidate": "src/analysis_service/candidates.py",
     "Capability": "src/analysis_service/capabilities.py",
     "Disposition": "",
     "Revision": "src/analysis_service/answer_state.py",
+    "Report": "src/analysis_service/report.py",
     "Source": "src/analysis_service/sources.py",
     "Standing": "evals/harness/roster.py",
+    "Verdict": "src/analysis_service/claims.py",
     "fold": "src/analysis_service/references.py",
 }
 

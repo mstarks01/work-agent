@@ -146,7 +146,7 @@ BASELINE_RUN = (
 )
 
 Unit = Literal["ratio", "count", "sd"]
-Verdict = Literal["pass", "fail", "inconclusive"]
+GateResult = Literal["pass", "fail", "inconclusive"]
 
 
 # Each reader returns ``None`` where the artifact does not carry the figure at
@@ -559,7 +559,7 @@ class Reading:
     """One gate, read against one pair of runs."""
 
     gate: str
-    verdict: Verdict
+    verdict: GateResult
     #: What the treatment run measured, or ``None`` where the artifact carries
     #: no such figure.
     measured: float | None

@@ -207,11 +207,11 @@ to ask a new package, not tests that will ask them for you.
 
 ## It runs every way, not just outward from STRIDE
 
-An ASVS-first change owes STRIDE and every other package the same question, and
-a LINDDUN-first change will owe both of them. ASVS's closed catalog and its 17
+An ASVS-first change must answer the same question for STRIDE and every other
+package, and a LINDDUN-first change must answer it for both of them. ASVS's closed catalog and its 17
 chapters make some work natural there and awkward for an open claim set;
 LINDDUN's unit of analysis is the interaction rather than the element (#170), so
-work that assumes per-element lanes owes it an answer too. "The others get this
+work that assumes per-element lanes must answer for it too. "The others get this
 for free" is a claim to check, never one to assume.
 
 ## Where this is enforced

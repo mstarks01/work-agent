@@ -176,7 +176,7 @@ class TestTheRowAndItsFieldsAreOneList:
                 exposure="built by an agent that had read the case-01 misses",
                 stage="analysis",
             ),
-            candidate=audit.Candidate(
+            candidate=audit.TriedChange(
                 branch="qa/x",
                 commit="1" * 40,
                 verdict="reverted",

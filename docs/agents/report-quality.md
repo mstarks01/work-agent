@@ -45,7 +45,7 @@ offline evidence: a reproduction, a regression test through the production
 function, and its affected consumers. Its effect on these figures stays
 unmeasured until a run that a decision needs, and the report says so. A paid
 item in the open work below is an option with a price, not a step that every
-fix owes. See "Offline completion and paid runs" in `AGENTS.md`.
+fix must take. See "Offline completion and paid runs" in `AGENTS.md`.
 
 ## Current figures
 

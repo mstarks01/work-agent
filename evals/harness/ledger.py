@@ -114,7 +114,7 @@ GITHUB_LOGIN = re.compile(r"(?=.{1,39}\Z)[A-Za-z0-9](?:-?[A-Za-z0-9])*\Z")
 #: holds only for the sitting it was cast in: a later sitting asks again, over
 #: whatever evidence exists by then. That is what makes it different from
 #: ``unsure``, which is a final answer like any other.
-Verdict = Literal["up", "down", "unsure", "needs-evidence"]
+VoteChoice = Literal["up", "down", "unsure", "needs-evidence"]
 
 #: Reasons that speak to whether the finding is *right*. A ``down`` carrying one
 #: of these counts against the configuration that produced it.
@@ -207,7 +207,7 @@ class Vote:
     #: every run and structure does not.
     prose: str
     case: str
-    verdict: Verdict
+    verdict: VoteChoice
     voter: str
     recorded: str
     reason: str | None = None
@@ -228,7 +228,7 @@ class Vote:
                 raise LedgerError(
                     f"vote {name} {getattr(self, name)!r} is not a string"
                 )
-        if self.verdict not in get_args(Verdict):
+        if self.verdict not in get_args(VoteChoice):
             raise LedgerError(f"{self.verdict!r} is not a verdict")
         if not self.voter.strip():
             raise LedgerError("a vote carries no voter; this ledger is never anonymous")
@@ -419,7 +419,7 @@ class Vote:
 def cast(
     components: Components,
     case: str,
-    verdict: Verdict,
+    verdict: VoteChoice,
     voter: str,
     *,
     content: str,
