@@ -385,12 +385,12 @@ ESCALATE, ABUSE_GRANT = FAMILIES["authorization"]
 #: at one. Read by :func:`_escalate_leads`, matched case-insensitively at a word
 #: boundary against the claim sentence.
 #:
-#: **A word nobody listed costs one lead and never a claim.** That is the whole
-#: difference between this table and the two ADR 27 deleted: those read a model
-#: and ruled a requirement out of a job, so a miss lost the finding silently.
-#: This one raises a question a person answers in :data:`ESCALATE_DECLARED`, so
-#: a miss leaves a claim exactly as unexamined as it is today, and a false
-#: raise costs one line of prose.
+#: **A word nobody listed misses one lead and never drops a claim.** That is the
+#: whole difference between this table and the two ADR 27 deleted: those read a
+#: model and ruled a requirement out of a job, so a miss lost the finding
+#: silently. This one raises a question a person answers in
+#: :data:`ESCALATE_DECLARED`, so a miss leaves a claim exactly as unexamined as
+#: it is today, and a false raise adds one line of prose.
 FOOTHOLD_WORDS: tuple[str, ...] = (
     "compromises",
     "compromising",

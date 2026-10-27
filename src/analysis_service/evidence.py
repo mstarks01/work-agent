@@ -828,10 +828,10 @@ def _grounds_of(
     in the model names it, and is dropped as unresolved when something does.
     An agent claiming a system has no directory service, in a model whose store
     is called "LDAP directory", has asserted an absence the model contradicts,
-    and this is where that costs its entry. A term longer than
+    and this is where the service drops its entry. A term longer than
     :data:`~analysis_service.claims.GROUND_TERM_MAX_CHARS` leaves the same way:
     the field holds one term, an agent that wrote a sentence named no term, and
-    the entry is what that costs — never the run. A blank one leaves with no
+    the service drops the entry — never the run. A blank one leaves with no
     mark at all, because an empty string names nothing for a mark to be about.
     """
     grounds = [
@@ -914,12 +914,12 @@ def resolve_proposals(
     itself does not: it is what the ID was composed *from*, and the gate has
     already refused a record that declares it.
 
-    **A reference that names nothing costs its entry, not the job.** Agents
-    compose well-formed references to facts the catalog does not hold — correct
-    grammar, plausible element IDs — and failing the whole analysis over one
-    discards every lane's work to punish a citation error (#138). So an
-    unresolvable reference is dropped and marked, and the claim stands on
-    whatever else it cited.
+    **A reference that names nothing loses its entry and does not fail the
+    job.** Agents compose well-formed references to facts the catalog does not
+    hold — correct grammar, plausible element IDs — and failing the whole
+    analysis over one discards every lane's work to punish a citation error
+    (#138). So an unresolvable reference is dropped and marked, and the claim
+    stands on whatever else it cited.
 
     A claim whose every ground evaporates has nothing supporting it, and a
     finding with empty ``grounds`` is the one thing this schema refuses to
@@ -1007,7 +1007,7 @@ def known_proposals(
     builder walks the catalog and never met the key (#659).
 
     Dropped and marked on the #138 rule: an agent composing a well-formed
-    reference to something absent costs its entry, never the run. A package
+    reference to something absent loses its entry, never the run. A package
     that mints its own IDs answers ``True`` for every key, so its list of
     marks stays empty by construction.
     """
@@ -1032,7 +1032,7 @@ def invalid_proposal_marks(
 ) -> AnalysisMarks:
     """The marks for the proposals a lane's batch could not validate.
 
-    A schema fault is a fault in one entry, so it costs that entry: the batch
+    A schema fault is a fault in one entry, so only that entry goes: the batch
     already dropped it (:class:`~analysis_service.claims.ProposalBatch`), and
     this records it as a :class:`~analysis_service.claims.DroppedClaim` with
     the first error pydantic reported. The ID is composed from the package's

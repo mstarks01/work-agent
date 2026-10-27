@@ -1362,7 +1362,7 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
     def test_the_bound_cuts_rather_than_raises(self):
         """Every sentence composes below the bound today, so this is the
         fail-safe: a producer that quotes more agent text than the eight do
-        must not cost the job the report this mark annotates."""
+        must not fail the job, with no report for this mark to annotate."""
         from analysis_service.claims import (
             UNRECONCILED_MESSAGE_MAX_CHARS,
             UnreconciledRuling,

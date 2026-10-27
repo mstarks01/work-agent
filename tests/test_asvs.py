@@ -410,7 +410,7 @@ def test_which_lanes_carry_no_candidate_rule_is_pinned():
 
 
 def test_a_claim_naming_an_unpublished_requirement_is_dropped_and_marked():
-    """An invented requirement number costs its entry, never the run (#138's rule).
+    """An invented requirement number loses its entry, never the run (#138's rule).
 
     ``99.99`` is as well-formed as ``2.1``: both match the key pattern, and the
     service composes ``v5.0.0-6.99.99`` from either. Only the catalog knows
@@ -466,8 +466,8 @@ def test_a_claims_id_and_its_chapter_field_must_agree():
     """The service composes both from one lane, so a disagreement is its own defect.
 
     Fatal rather than dropped, which is the split this package's two new checks
-    sit either side of: an agent can invent a requirement number, so that costs
-    the entry; an agent cannot separate the ID from the chapter, so this costs
+    sit either side of: an agent can invent a requirement number, so that drops
+    the entry; an agent cannot separate the ID from the chapter, so this fails
     the run and says so.
     """
     crossed = _block(1, [sample_asvs_claim("v5.0.0-11.1.1", "authentication")])
@@ -838,9 +838,9 @@ def test_a_level_that_moves_moves_the_scope_list_with_it():
 
 
 def test_a_claim_outside_the_level_does_not_fail_the_report():
-    """An agent's slip costs its entry, never the run.
+    """An agent's slip loses its entry, never the run.
 
-    A block issue raises out of the report validator and costs the whole job,
+    A block issue raises out of the report validator and fails the whole job,
     after 23 `strong`-tier calls have been paid for. So the only checks on that
     list are ones the *service* can fail — and a claim naming a requirement one
     level further out is the one thing on this block a lane agent can get wrong

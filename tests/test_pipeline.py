@@ -319,7 +319,7 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
 
     ``affected_element_ids`` naming a missing element kills the job; the same
     ID written into the *description* is marked instead. The fan-in has no
-    re-ask path, so a mistyped ID in prose must not cost six lanes of analysis
+    re-ask path, so a mistyped ID in prose must not discard six lanes of analysis
     — but a reader still has to be told the argument cites a system this
     report does not describe.
     """

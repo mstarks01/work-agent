@@ -993,8 +993,8 @@ CROSS_LANE_VERBS: dict[tuple[str, str], str] = {
 def test_a_lane_skill_does_not_invite_a_verb_its_lane_refuses(lane, verb):
     """A skill asking for an action its own lane cannot file.
 
-    ``DraftThreat.misfiled`` rejects such a draft before any judgement is
-    spent on it, so a skill that invites one costs the lane a finding and
+    ``DraftThreat.misfiled`` rejects such a draft before any judgement runs
+    on it, so a skill that invites one drops a finding from the lane and
     tells nobody. The repudiation skill asked for ``flood`` for a year.
 
     A deliberate mention declares its reason in :data:`CROSS_LANE_VERBS`,

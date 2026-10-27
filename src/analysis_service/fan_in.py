@@ -28,8 +28,8 @@ Every check fails closed or marks, and the split is the whole policy of this
 seam. A check that decides whether a finding *means* anything fails closed
 (:class:`DraftJoinError`); a check that describes how complete it is records a
 mark for a reader. The fan-in has no re-ask path, so the second kind never
-costs a report, and ADR 0019 rules that a fault in one entry of one claim never
-costs the job.
+fails a report, and ADR 0019 rules that a fault in one entry of one claim never
+fails the job.
 
 Model output is untrusted input (OWASP LLM05), and the service validates it
 here before anything reaches the critic or the report.
@@ -323,7 +323,7 @@ class JoinedDrafts(NamedTuple):
     None of the marks is fatal, and that is the whole policy of this seam:
     checks that decide whether a finding *means* anything fail closed, and
     checks that describe how complete it is are recorded for a reader. The
-    fan-in has no re-ask path, so the second kind must never cost a report.
+    fan-in has no re-ask path, so the second kind must never fail a report.
     """
 
     drafts: list[Claim]
@@ -410,7 +410,7 @@ def _resolve_element_references(
     """Drop every element reference the model does not contain, and mark it.
 
     The rule every other citation already has. A reference an agent composed
-    — well-formed, plausible, absent — costs itself, and the claim stands on
+    — well-formed, plausible, absent — is dropped, and the claim stands on
     the elements that resolved. A claim that named elements and lost every one
     is dropped: a finding about nothing is not a finding. A claim that named
     none is a package's own business (ASVS leaves the list empty on a claim
@@ -698,7 +698,7 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     membership, so a claim can only lose every ground if every one of them is a
     quote and every quote is bad — which is the common shape of a claim in a
     framework whose catalog rarely holds the fact a requirement turns on, and
-    the reason the drop costs the claim rather than the job.
+    the reason the service drops the claim and the job goes on.
 
     Returns the drafts as they now read — a repaired ground is a new ground —
     with the groundless ones already removed.

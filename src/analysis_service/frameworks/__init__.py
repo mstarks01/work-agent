@@ -277,8 +277,8 @@ class IdRule:
         package restating a catalog it did not author answers from that catalog,
         privately, in its own module.
 
-        The predicate does not raise and does not explain. A false answer costs
-        the claim its place and earns a
+        The predicate does not raise and does not explain. A false answer drops
+        the claim and records a
         :class:`~analysis_service.claims.UnknownClaimIdentity` mark; see
         :func:`~analysis_service.evidence.resolve_proposals`.
     """

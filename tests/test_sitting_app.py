@@ -1728,7 +1728,7 @@ class TestTheTextMovedUnderTheRead:
 
 
 class TestADraftTheAppCannotRead:
-    """Fail closed, name the file, change nothing, and cost one case.
+    """Fail closed, name the file, change nothing, and lose one case.
 
     Two alternatives are rejected. To treat it as absent throws the reader's
     own list away and re-arms the gate, so they retype a list they already
@@ -1753,7 +1753,7 @@ class TestADraftTheAppCannotRead:
         assert row["pressable"] is False
 
     def test_every_other_case_still_walks(self, tree):
-        """One bad file never costs the reader the other twelve cases."""
+        """One bad file never hides the other twelve cases from the reader."""
         self.spoil(tree)
         app = browser(session_for(tree, "ada"))
         assert self.rows(app)[OTHER]["pressable"] is True

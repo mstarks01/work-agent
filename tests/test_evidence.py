@@ -517,8 +517,8 @@ class TestRenderCatalog:
     Agents composed well-formed references to facts the catalog did not hold.
     A JSON array of IDs reads as a specimen of the format; these pin the
     properties that make the rendering a menu instead. The shape is the half of
-    the fix that stops the reference being composed — dropping it costs its
-    entry rather than the job (:class:`~analysis_service.claims.UnresolvedEvidence`) once it has been.
+    the fix that stops the reference being composed — once it is, the drop
+    loses its entry and not the job (:class:`~analysis_service.claims.UnresolvedEvidence`).
     """
 
     def test_every_entry_appears_as_its_own_row(self):
@@ -771,7 +771,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
     def test_a_threat_left_with_no_grounds_at_all_is_dropped_and_marked(self):
         """``grounds`` is ``min_length=1``: a finding resting on nothing is the
         one thing this schema refuses to represent, and no critic could rule
-        on it. It costs its entry, and the mark names the title and every
+        on it. It loses its entry, and the mark names the title and every
         reference it cited, so the drop is visible rather than silent.
         """
         catalog = evidence_catalog(valid_model())
@@ -1161,7 +1161,7 @@ class TestAnAbsenceIsAGround:
         ``absent_elements`` is a free list the model fills, and the ground it
         builds is bounded. An over-long entry leaves the way a contradicted one
         does — as a mark — because the alternative is a raise in the merge node
-        that costs the run every lane it already paid for.
+        that fails the run and discards every lane it already paid for.
         """
         catalog = evidence_catalog(valid_model())
         sentence = "no directory service " * 10

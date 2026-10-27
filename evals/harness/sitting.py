@@ -339,7 +339,7 @@ def draft_states(root: Path, login: str) -> dict[str, DraftStatus]:
     """Every draft this reader holds, keyed by case id.
 
     A file that will not read reports :data:`UNREADABLE` and stops nothing
-    else, so one bad draft costs its own case and no other. Nothing here
+    else, so one bad draft loses its own case and no other. Nothing here
     writes, so a survey of the store changes nothing on disk.
     """
     folder = root / login

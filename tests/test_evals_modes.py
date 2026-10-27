@@ -1449,7 +1449,7 @@ class TestTheInitiatorReadingOfAnExtraction:
 
 
 class TestASweepSurvivesARefusedModel:
-    """One case's model being refused costs that case, not the sweep (#303).
+    """A refused model for one case loses that case, not the sweep (#303).
 
     A live `--mode end-to-end` run died on case 09 and produced no artifact,
     losing the eight cases that had already run:

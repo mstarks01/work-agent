@@ -488,7 +488,7 @@ def name_unknown(ref: UnknownRef) -> str:
 # How long an absent-element term may be. Exported because the producer must
 # check it: ``absent_elements`` is a free list the model fills, and the prompt
 # asks for one lowercase term, so an agent writing a sentence instead would fail
-# validation here and cost the job the whole report. One name, so the bound the
+# validation here and fail the job with no report. One name, so the bound the
 # producer tests and the bound this field accepts cannot drift apart.
 GROUND_TERM_MAX_CHARS = 100
 
@@ -1422,7 +1422,7 @@ class Proposal(BaseModel):
     # and ``minItems`` no more reliably than ``pattern``, so an agent can still
     # exceed one. The schema re-ask (ADR 0058) gives the lane one more answer
     # with the error named. A second answer over the cap fails at the node
-    # boundary, where it costs the lane and its siblings.
+    # boundary, where it fails the lane and its siblings.
     #
     # There is no "select rather than construct" form of an over-long
     # description, so it cannot be made unrepresentable. Truncation infers what
@@ -1534,7 +1534,7 @@ class ProposalBatch(BaseModel):
     **A batch validates by salvaging.** The node validates its emission against
     this model before anything else runs, so one proposal carrying a verb
     outside the closed set, a severity value the enum does not hold, or
-    neither a reference nor a quote would otherwise cost the node and the job.
+    neither a reference nor a quote would otherwise fail the node and the job.
     The wrap validator validates each item on its own: the ones that pass fill
     ``claims``, and the ones that fail fill ``invalid``, keyed enough to name
     the claim the agent meant. ``invalid`` is kept out of the JSON schema, so
@@ -1817,8 +1817,8 @@ class UnresolvedMention(BaseModel):
 
 # How much of an agent-supplied evidence reference a mark carries. Exported
 # because the producer must truncate to it: `evidence_refs` is a free string
-# the model fills, so an over-long one would fail validation here and cost the
-# job the very report this mark exists to preserve. One name, so the bound the
+# the model fills, so an over-long one would fail validation here and fail the
+# job, with no report for this mark to preserve. One name, so the bound the
 # producer cuts at and the bound this field accepts cannot drift apart.
 REFERENCE_MAX_CHARS = 300
 
@@ -1867,8 +1867,8 @@ class UnknownClaimIdentity(BaseModel):
     a claim citing a *fact* the job's catalog does not hold; this one records a
     claim naming a *requirement* its framework's catalog does not hold. Both are
     the same failure — an agent composing a well-formed reference to something
-    that does not exist — and #138 already settled what it costs: the entry, not
-    the run.
+    that does not exist — and #138 settled what happens: the service drops the
+    entry, and the run goes on.
 
     **Only a framework that owns a catalog can produce one.** A package whose
     identifiers are its own to mint — STRIDE's ``S-01`` is a lane and a counter
@@ -1936,7 +1936,7 @@ class DroppedClaim(BaseModel):
       earlier draft's, or its only grounds are quotes the source it names does
       not contain (:func:`~analysis_service.fan_in.join_drafts`).
 
-    Each of these costs one entry and never the job. The case against a drop
+    Each of these drops one entry, and the job goes on. The case against a drop
     is that a finding deleted for a reason recorded in a list is a silent
     removal, and that a dead job at least tells somebody. It does not hold
     here: :class:`UnknownClaimIdentity` drops a claim on the same terms, the
@@ -1961,8 +1961,8 @@ class DroppedClaim(BaseModel):
 
         **The only way one is built.** All three values are agent text bounded
         by their own fields upstream, or composed here from one — and a
-        producer that raised while recording a drop would cost the job the very
-        report the mark exists to preserve. So the cut belongs beside the
+        producer that raised while recording a drop would fail the job, with no
+        report for the mark to preserve. So the cut belongs beside the
         bound, once, rather than at each place a claim is dropped.
 
         An empty title becomes :data:`UNTITLED`. A proposal that failed its own
@@ -2104,7 +2104,7 @@ class UnreconciledRuling(BaseModel):
         **The only way one is built.** A critic names its own claim IDs and the
         attributes it hangs a question on, and both reach the sentence, so a
         model that answers with a paragraph where an attribute belongs would
-        cost the job the report this mark exists to annotate. The cut sits
+        fail the job, with no report for this mark to annotate. The cut sits
         beside the bound, once, rather than at each of the eight places a
         problem is found.
 
