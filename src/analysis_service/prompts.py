@@ -181,9 +181,7 @@ def compose_recritic_prompt(loader: MarkdownLoader) -> str:
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
-def compose_extract_prompt(
-    loader: MarkdownLoader, extraction_format: str = FULL_FORMAT
-) -> str:
+def compose_extract_prompt(loader: MarkdownLoader, extraction_format: str) -> str:
     """The extraction prompt: semi-structured input text to a System Model.
 
     One body for both transports. ``extract.md`` says what to read and what to

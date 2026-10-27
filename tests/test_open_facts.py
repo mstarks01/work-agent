@@ -121,7 +121,7 @@ def test_every_asset_tag_has_its_words():
 def test_an_attribute_a_model_names_reads_as_words():
     model = valid_model()
     flow = model.data_flows[0]
-    labels = reference_labels(model)
+    labels = reference_labels(model, assertions=None)
     assert labels["encryption_in_transit"] == "encryption in transit"
     assert labels["pii"] == "personal data"
     name = element_names(model)[flow.id]

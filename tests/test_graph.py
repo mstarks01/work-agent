@@ -2092,7 +2092,12 @@ def test_the_re_ask_reads_one_view_of_a_draft_and_not_a_second():
     state = _revise(drafts, [sample_ruling("S-01")])
 
     (dropped,) = fenced(state[NODES.key("unreconciled_drafts")])
-    assert dropped == critic._ruling_view([drafts[1]])[0]
+    assert (
+        dropped
+        == critic._ruling_view(
+            [drafts[1]], repaired=(), unverified=(), assertions=None
+        )[0]
+    )
 
 
 def test_a_critic_that_emitted_nothing_routes_to_the_re_ask():

@@ -335,7 +335,7 @@ class Engine:
         *,
         system_name: str | None,
         caller: str,
-        ask_questions: bool = False,
+        ask_questions: bool,
     ) -> JobRecord:
         """Shape a submission into a job, or refuse it before any model runs.
 

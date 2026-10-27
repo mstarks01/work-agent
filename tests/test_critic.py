@@ -1117,7 +1117,7 @@ def test_ruling_view_keeps_every_field_the_critic_rules_on():
     """
     draft = sample_draft("S-01", "spoofing")
 
-    (view,) = critic._ruling_view([draft])
+    (view,) = critic._ruling_view([draft], repaired=(), unverified=(), assertions=None)
 
     for field in ("id", "category", "description", "affected_element_ids"):
         assert field in view, f"the critic rules on {field!r}"
@@ -1132,7 +1132,7 @@ def test_ruling_view_drops_a_grounds_empty_branches_and_nothing_else():
     """The empty branches go; every field a verdict is reached from stays."""
     draft = sample_draft("S-01", "spoofing")
 
-    (view,) = critic._ruling_view([draft])
+    (view,) = critic._ruling_view([draft], repaired=(), unverified=(), assertions=None)
 
     # A quote carries text and source_label; the other four fields are the
     # empty string its own validator requires them to be.
@@ -1151,7 +1151,7 @@ def test_the_critic_is_shown_the_recommendations_it_now_rules_on():
     draft = sample_draft("S-01", "spoofing")
     assert draft.mitigations, "the fixture must carry one for this to prove anything"
 
-    (view,) = critic._ruling_view([draft])
+    (view,) = critic._ruling_view([draft], repaired=(), unverified=(), assertions=None)
 
     assert view["mitigations"]
     assert view["mitigations"][0]["summary"] == draft.mitigations[0].summary
@@ -1159,8 +1159,15 @@ def test_the_critic_is_shown_the_recommendations_it_now_rules_on():
 
 def test_ruling_view_says_when_a_verb_belongs_to_another_lane():
     """#442: the critic reads a settled lane error rather than judging it."""
-    (view,) = critic._ruling_view([sample_draft("S-01", verb="flood")])
-    (clean,) = critic._ruling_view([sample_draft("S-01")])
+    (view,) = critic._ruling_view(
+        [sample_draft("S-01", verb="flood")],
+        repaired=(),
+        unverified=(),
+        assertions=None,
+    )
+    (clean,) = critic._ruling_view(
+        [sample_draft("S-01")], repaired=(), unverified=(), assertions=None
+    )
 
     assert "denial-of-service" in view["filed_in_wrong_lane"]
     assert "filed_in_wrong_lane" not in clean
@@ -1238,7 +1245,9 @@ def test_ruling_view_carries_the_unit_text_a_package_supplies():
     from analysis_service.frameworks.asvs.catalog import requirement_text
     from analysis_service.frameworks.asvs.record import RequirementRuling
 
-    (stride_view,) = critic._ruling_view([sample_draft("S-01", "spoofing")])
+    (stride_view,) = critic._ruling_view(
+        [sample_draft("S-01", "spoofing")], repaired=(), unverified=(), assertions=None
+    )
     asvs = RequirementRuling(
         id="v5.0.0-6.2.1",
         framework="asvs",
@@ -1255,7 +1264,9 @@ def test_ruling_view_carries_the_unit_text_a_package_supplies():
         ],
         verdict=Verdict(status="confirmed"),
     )
-    (asvs_view,) = critic._ruling_view([asvs])
+    (asvs_view,) = critic._ruling_view(
+        [asvs], repaired=(), unverified=(), assertions=None
+    )
 
     assert "unit_text" not in stride_view
     assert asvs_view["unit_text"] == requirement_text("V6.2.1")

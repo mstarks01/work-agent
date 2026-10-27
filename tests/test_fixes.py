@@ -48,7 +48,9 @@ def report(request):
 
 def _fixes(report):
     return [
-        fix for block in report.analyses for fix in fixes(block, report.system_model)
+        fix
+        for block in report.analyses
+        for fix in fixes(block, report.system_model, assertions=None)
     ]
 
 
@@ -58,7 +60,11 @@ def test_the_archive_is_there_to_read():
 
 def test_each_confirmed_finding_is_placed_at_most_once(report):
     for block in report.analyses:
-        placed = [i for fix in fixes(block, report.system_model) for i in fix.placed]
+        placed = [
+            i
+            for fix in fixes(block, report.system_model, assertions=None)
+            for i in fix.placed
+        ]
         confirmed = {c.id for c in block.claims if c.verdict.status == "confirmed"}
         assert len(placed) == len(set(placed))
         assert set(placed) <= confirmed
@@ -73,7 +79,9 @@ def test_a_group_is_a_control_two_findings_rest_on(report):
 
 def test_the_order_puts_the_control_most_findings_rest_on_first(report):
     for block in report.analyses:
-        counts = [len(fix.rests) for fix in fixes(block, report.system_model)]
+        counts = [
+            len(fix.rests) for fix in fixes(block, report.system_model, assertions=None)
+        ]
         assert counts == sorted(counts, reverse=True)
 
 
@@ -133,7 +141,7 @@ def test_an_unknown_control_is_not_a_missing_one():
 
 
 def test_the_page_payload_is_json_per_framework(report):
-    payload = fixes_by_framework(report.analyses, report.system_model)
+    payload = fixes_by_framework(report.analyses, report.system_model, assertions=None)
     assert set(payload) == {block.framework for block in report.analyses}
     for entries in payload.values():
         for entry in entries:

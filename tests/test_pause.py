@@ -239,7 +239,12 @@ class TestTheRoutes:
         from tests.test_api import SEEDING_BUDGET
 
         admission = asyncio.run(
-            store.reserve(record, ceiling=min(store_ceiling, 1), budget=SEEDING_BUDGET)
+            store.reserve(
+                record,
+                ceiling=min(store_ceiling, 1),
+                budget=SEEDING_BUDGET,
+                principal=None,
+            )
         )
         assert admission.outcome == "admitted"
 

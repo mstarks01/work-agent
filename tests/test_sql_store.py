@@ -796,7 +796,9 @@ class TestAStoredValueThisServiceDoesNotList:
             sources=[Source.description("a web app storing orders")],
             frameworks=sample_selection(),
         )
-        admission = asyncio.run(store.reserve(record, ceiling=1, budget=SEEDING_BUDGET))
+        admission = asyncio.run(
+            store.reserve(record, ceiling=1, budget=SEEDING_BUDGET, principal=None)
+        )
         assert admission.outcome == "admitted"
 
     @pytest.mark.parametrize(("case", "status"), UNREADABLE_IN_FLIGHT)

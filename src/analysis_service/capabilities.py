@@ -89,7 +89,7 @@ class Capability:
 
 
 def _row(
-    meaning: str, question: str, parent: str = "", reviewed_by: str | None = None
+    meaning: str, question: str, parent: str = "", *, reviewed_by: str | None
 ) -> Capability:
     return Capability(
         meaning=meaning, question=question, parent=parent, reviewed_by=reviewed_by

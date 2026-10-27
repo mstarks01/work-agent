@@ -638,7 +638,9 @@ def test_a_corrected_link_answer_leaves_no_issue_from_the_earlier_run():
 
 def resume_links(checkpoint, links, earlier=()):
     """One resumed job with link answers, on the real graph from ``prepare``."""
-    sources, merged, facts = resumed_sources([DESCRIPTION], earlier, links)
+    sources, merged, facts = resumed_sources(
+        [DESCRIPTION], earlier, links, parent_facts=(), facts=()
+    )
     job = JobRecord.create(
         owner_id="idp|user-1",
         sources=sources,

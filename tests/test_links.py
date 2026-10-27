@@ -427,6 +427,7 @@ class TestTheEntryPoints:
                 [DESCRIPTION, forged],
                 system_name=None,
                 caller="me",
+                ask_questions=False,
             )
 
 

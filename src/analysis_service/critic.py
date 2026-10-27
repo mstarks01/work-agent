@@ -826,9 +826,9 @@ _DRAFT_UNRULED_FIELDS: frozenset[str] = frozenset()
 
 def _ruling_view(
     drafts: Sequence[Claim],
-    repaired: Sequence[RepairedQuote] = (),
-    unverified: Sequence[UnverifiedGround] = (),
-    assertions: AssertionCatalog | None = None,
+    repaired: Sequence[RepairedQuote],
+    unverified: Sequence[UnverifiedGround],
+    assertions: AssertionCatalog | None,
 ) -> list[dict]:
     """The drafts as a critic reads them, with no empty branches.
 

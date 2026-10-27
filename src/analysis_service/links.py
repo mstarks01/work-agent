@@ -225,8 +225,8 @@ def resumed_sources(
     parent_sources: Sequence[Source],
     parent_links: Sequence[LinkAnswer],
     links: Sequence[LinkAnswer],
-    parent_facts: Sequence[FactAnswer] = (),
-    facts: Sequence[FactAnswer] = (),
+    parent_facts: Sequence[FactAnswer],
+    facts: Sequence[FactAnswer],
 ) -> tuple[list[Source], list[LinkAnswer], list[FactAnswer]]:
     """A resumed job's sources and answers, from its parent's and the new ones.
 

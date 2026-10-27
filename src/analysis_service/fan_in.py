@@ -117,7 +117,7 @@ def fan_in(
     batches: Mapping[str, ProposalBatch],
     package: FrameworkPackage,
     model: SystemModel,
-    sources: Mapping[str, str] = _NO_TEXTS,
+    sources: Mapping[str, str],
     ruled_out: Mapping[str, str] = _NO_TEXTS,
     assertions: AssertionCatalog | None = None,
     ruled_in: Mapping[str, str] = _NO_TEXTS,

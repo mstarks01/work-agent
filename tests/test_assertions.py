@@ -79,6 +79,9 @@ from analysis_service.system_model import (
     EXCERPT_MAX_CHARS,
     UNKNOWN,
     CapabilityStatement,
+    DataFlow,
+    ExternalEntity,
+    Process,
     SystemModel,
     all_attribute_names,
 )
@@ -108,6 +111,98 @@ REPEATED_SOURCES = {REPEATED_LABEL: REPEATED}
 
 FLOW = "flow:entity:shopper>process:storefront-api>place-order"
 WEBHOOK = "flow:entity:card-processor>process:settlement-webhook>post-settlement"
+
+
+def shop_model():
+    """The model the fixture flow sits in: a shopper and the storefront API."""
+    return SystemModel.model_validate(
+        {
+            "external_entities": [
+                {
+                    "id": "entity:shopper",
+                    "name": "shopper",
+                    "kind": "human",
+                    "trust_zone": "boundary:internet",
+                }
+            ],
+            "processes": [
+                {
+                    "id": "process:storefront-api",
+                    "name": "storefront API",
+                    "technology": "web",
+                    "trust_zone": "boundary:app",
+                    "exposure": "internet-facing",
+                    "interface_kind": "web",
+                }
+            ],
+            "trust_boundaries": [
+                {"id": "boundary:internet", "name": "internet", "kind": "network"},
+                {"id": "boundary:app", "name": "app", "kind": "network"},
+            ],
+            "data_flows": [
+                {
+                    "id": FLOW,
+                    "name": "place order",
+                    "source": "entity:shopper",
+                    "destination": "process:storefront-api",
+                    "protocol": "https",
+                    "authentication": "session cookie",
+                    "data_description": "an order",
+                    "encryption_in_transit": "TLS",
+                }
+            ],
+        }
+    )
+
+
+def gate_model():
+    """:func:`shop_model` with the card processor's settlement webhook beside it."""
+    shop = shop_model()
+    return shop.model_copy(
+        update={
+            "external_entities": [
+                *shop.external_entities,
+                ExternalEntity(
+                    id="entity:card-processor",
+                    name="card processor",
+                    kind="external-system",
+                    trust_zone="boundary:internet",
+                ),
+            ],
+            "processes": [
+                *shop.processes,
+                Process(
+                    id="process:settlement-webhook",
+                    name="settlement webhook",
+                    technology="web",
+                    trust_zone="boundary:app",
+                    exposure="internet-facing",
+                    interface_kind="web",
+                ),
+            ],
+            "data_flows": [
+                *shop.data_flows,
+                DataFlow(
+                    id=WEBHOOK,
+                    name="post settlement",
+                    source="entity:card-processor",
+                    destination="process:settlement-webhook",
+                    protocol="https",
+                    authentication=UNKNOWN,
+                    data_description="a settlement",
+                    encryption_in_transit="TLS",
+                ),
+            ],
+        }
+    )
+
+
+def gated(held, **reads):
+    """The gate as production runs it, with a model and the job's sources.
+
+    A keyword in ``reads`` replaces the model or the sources for one test.
+    """
+    return catalog_issues(held, **{"model": gate_model(), "sources": SOURCES, **reads})
 
 
 def span_for(quote):
@@ -696,13 +791,13 @@ class TestWhatTheGateRefuses:
     @pytest.mark.parametrize("code", sorted(REFUSALS))
     def test_the_gate_raises_it(self, code):
         why, held, reads = REFUSALS[code]
-        assert code in codes(catalog_issues(held, **reads)), why
+        assert code in codes(gated(held, **reads)), why
 
     @pytest.mark.parametrize("value", ["`", "**", "_ _", "   "])
     def test_a_qualifier_with_no_folded_form_is_an_illegal_value(self, value):
         """``"`"`` and ``"**"`` fold to one empty scope key, so neither is a scope."""
         held = catalog([stated(scope=[Qualifier(kind="principal", value=value)])])
-        assert "illegal-value" in codes(catalog_issues(held, sources=SOURCES))
+        assert "illegal-value" in codes(gated(held))
 
     def test_every_refusal_code_has_a_fixture(self):
         """The table answers every code the gate raises, with nothing left over.
@@ -728,14 +823,14 @@ class TestWhatTheGateRefuses:
     def test_the_refusals_that_return_alone(self, code):
         """A catalog nobody can read reports that, rather than its rows."""
         _, held, reads = REFUSALS[code]
-        assert codes(catalog_issues(held, **reads)) == [code]
+        assert codes(gated(held, **reads)) == [code]
 
     def test_a_well_formed_catalog_raises_nothing(self):
-        assert catalog_issues(catalog([stated()]), sources=SOURCES) == []
+        assert gated(catalog([stated()])) == []
 
     def test_an_issue_names_the_row_it_is_about(self):
         """An issue a reader cannot trace back to a row is a message, not a fault."""
-        (issue,) = catalog_issues(catalog([stated(support=[])]))
+        (issue,) = gated(catalog([stated(support=[])]))
         assert issue.assertion == assertion_id(stated())
 
     def test_an_unknown_needs_no_span(self):
@@ -748,11 +843,11 @@ class TestWhatTheGateRefuses:
             origin="assertion-pass",
             reason="silent",
         )
-        assert catalog_issues(catalog([row]), sources=SOURCES) == []
+        assert gated(catalog([row])) == []
 
     def test_a_binding_goes_unchecked_without_a_model(self):
         """A check that cannot be made is never a check that passed."""
-        assert catalog_issues(catalog([stated()]), sources=SOURCES) == []
+        assert gated(catalog([stated()])) == []
 
 
 class TestConflictsAreDerived:
@@ -836,7 +931,7 @@ class TestTheAuditProbes:
         """
         reversed_row = self.stated(value="required")
         assert reversed_row.assessment == "unchecked"
-        assert catalog_issues(catalog([reversed_row]), sources=SOURCES) == []
+        assert gated(catalog([reversed_row])) == []
 
     def test_a_control_on_one_interaction_leaves_another_alone(self):
         """Borrowing the receipt path's control cannot remove the webhook's row.
@@ -867,11 +962,11 @@ class TestTheAuditProbes:
             support=span_for("with its own\nservice account"),
         )
         held = catalog([unknown, borrowed], rows=rows)
-        assert catalog_issues(held, sources=SOURCES) == []
+        assert gated(held) == []
         assert any(entry.subject == WEBHOOK for entry in held.entries)
 
     def test_a_blank_citation_cannot_make_a_supported_model(self):
-        assert codes(catalog_issues(catalog([self.stated(support=[])]))) == [
+        assert codes(gated(catalog([self.stated(support=[])]))) == [
             "unsupported-assertion"
         ]
 
@@ -1143,44 +1238,7 @@ class TestResolvingAProposal:
     """
 
     def model(self):
-        return SystemModel.model_validate(
-            {
-                "external_entities": [
-                    {
-                        "id": "entity:shopper",
-                        "name": "shopper",
-                        "kind": "human",
-                        "trust_zone": "boundary:internet",
-                    }
-                ],
-                "processes": [
-                    {
-                        "id": "process:storefront-api",
-                        "name": "storefront API",
-                        "technology": "web",
-                        "trust_zone": "boundary:app",
-                        "exposure": "internet-facing",
-                        "interface_kind": "web",
-                    }
-                ],
-                "trust_boundaries": [
-                    {"id": "boundary:internet", "name": "internet", "kind": "network"},
-                    {"id": "boundary:app", "name": "app", "kind": "network"},
-                ],
-                "data_flows": [
-                    {
-                        "id": FLOW,
-                        "name": "place order",
-                        "source": "entity:shopper",
-                        "destination": "process:storefront-api",
-                        "protocol": "https",
-                        "authentication": "session cookie",
-                        "data_description": "an order",
-                        "encryption_in_transit": "TLS",
-                    }
-                ],
-            }
-        )
+        return shop_model()
 
     def row(self, **overrides):
         fields = {
@@ -1904,7 +1962,7 @@ class TestTheOneReaderOfAReferentType:
             origin="assertion-pass",
             explanation="x",
         )
-        assert codes(catalog_issues(catalog([row]))) == ["illegal-value"]
+        assert codes(gated(catalog([row]))) == ["illegal-value"]
         assert referent_type(REGISTRY[row.predicate]) is None
 
 
@@ -2360,7 +2418,7 @@ class TestTheImplementationAudit:
     @pytest.mark.parametrize("code", sorted(CATALOG_REFUSALS))
     def test_a_refused_catalog_keeps_nothing(self, code):
         _, held, reads = REFUSALS[code]
-        kept, _ = quarantine(held, catalog_issues(held, **reads))
+        kept, _ = quarantine(held, gated(held, **reads))
         assert kept.entries == []
 
     def test_a_refused_subject_counts_every_row_it_takes(self):
@@ -2477,7 +2535,7 @@ class TestTheImplementationAudit:
         (entry,) = joined.entries
         assert len(entry.support) == MAX_SPANS
         assert codes(cut) == ["support-truncated"]
-        assert catalog_issues(joined) == []
+        assert gated(joined, sources={"test": text}) == []
 
 
 @pytest.mark.parametrize("reason", ["unmeasured", "truncated"])

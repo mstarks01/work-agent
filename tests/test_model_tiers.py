@@ -1,6 +1,7 @@
 """Tests for model-tier config loading, env overrides, and pin validation."""
 
 import dataclasses
+import os
 import tempfile
 from pathlib import Path
 from typing import ClassVar
@@ -893,9 +894,9 @@ class TestFileValidation:
         with pytest.raises(ValidationError):
             config.version = 2
 
-    def test_os_environ_is_default_env(self, config_path, monkeypatch):
+    def test_os_environ_overrides_apply(self, config_path, monkeypatch):
         monkeypatch.setenv("ANALYSIS_MODEL_STRONG_MODEL", "gemini-3.0-pro")
-        config = load_model_tiers(config_path(config_toml()))
+        config = load_model_tiers(config_path(config_toml()), env=os.environ)
         assert config.resolve_model("critic/stride").model == "gemini-3.0-pro"
 
 

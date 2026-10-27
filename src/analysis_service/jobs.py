@@ -749,7 +749,7 @@ class JobStore(Protocol):
         *,
         ceiling: int,
         budget: BudgetPolicy,
-        principal: Principal | None = None,
+        principal: Principal | None,
     ) -> Admission: ...
 
     async def principal(self, identity: Identity) -> Principal | None: ...
@@ -1045,7 +1045,7 @@ class InMemoryJobStore:
         *,
         ceiling: int,
         budget: BudgetPolicy,
-        principal: Principal | None = None,
+        principal: Principal | None,
     ) -> Admission:
         """Check every admission bound and insert, as one step.
 
