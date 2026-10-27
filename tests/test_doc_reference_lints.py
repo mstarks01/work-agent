@@ -72,9 +72,18 @@ from pathlib import Path
 
 import pytest
 
-from tests.source_tree import FROZEN_PROSE, held_files, source_files
+from tests.source_tree import (
+    FROZEN_PROSE,
+    PYTHON,
+    REPO_ROOT,
+    TESTS,
+    WHOLE_TREE,
+    held_files,
+    source_files,
+    without,
+)
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.lint
 
 #: A backticked repository path. Anchored on a known extension rather than on
 #: a slash, so a bare ``BLESSING.md`` is checked and an ordinary hyphenated
@@ -99,10 +108,19 @@ ROLE_REF = re.compile(
     r":(?:func|data|class|meth|attr|exc|mod|obj|const):`~?([A-Za-z_][A-Za-z0-9_.]*)`"
 )
 
-#: Trees whose Python carries rationale worth holding to the same rule. Tests
-#: are in: a lint's own docstring explains why it exists, and naming a symbol
-#: that has moved makes the explanation harder to follow rather than wrong.
-CODE_TREES: tuple[str, ...] = ("src", "evals", "webapp", "tests", "examples")
+#: The Python whose rationale is worth holding to the same rule. Tests are in: a
+#: lint's own docstring explains why it exists, and naming a symbol that has
+#: moved makes the explanation harder to follow rather than wrong.
+CODE_FILES = source_files(*PYTHON, *TESTS)
+
+#: The parts of :data:`CODE_FILES` whose roles are not resolved, with the
+#: reason.
+ROLES_LEFT_OUT: dict[str, str] = {
+    ".github/scripts": (
+        "a CI script is not on the import path, so a role in it has no module"
+        " to resolve from"
+    ),
+}
 
 #: ``(document, reference)`` pairs that name something absent on purpose, each
 #: with the reason. Not an exemption list to grow past its reasons — a stale
@@ -150,7 +168,7 @@ def _sources() -> list[Path]:
     """
     return [
         path
-        for path in source_files(".", suffixes=(".md", ".py"))
+        for path in source_files(*WHOLE_TREE, suffixes=(".md", ".py"))
         if not _relative(path).startswith(FROZEN_PROSE)
     ]
 
@@ -159,7 +177,7 @@ SOURCES = _sources()
 #: Every file in the tree, as a repository-relative posix path. Built once,
 #: because the suffix reading below is a scan. It is the only answer to "does
 #: this file exist": the disk also holds the files the walk skips.
-TREE: frozenset[str] = frozenset(_relative(path) for path in held_files("."))
+TREE: frozenset[str] = frozenset(_relative(path) for path in held_files(*WHOLE_TREE))
 
 
 def _resolves(source: Path, ref: str) -> bool:
@@ -238,7 +256,7 @@ def test_every_named_symbol_imports(source):
 
 
 def _module_name(source: Path) -> str:
-    """The importable name of a file in one of :data:`CODE_TREES`."""
+    """The importable name of a file in one of :data:`CODE_FILES`."""
     relative = source.relative_to(REPO_ROOT)
     parts = list(relative.with_suffix("").parts)
     if parts[0] == "src":
@@ -323,7 +341,7 @@ def _resolves_role(ref: str, module_name: str) -> bool:
 
 
 def _code_files() -> list[Path]:
-    return sorted(source_files(*CODE_TREES))
+    return without(CODE_FILES, ROLES_LEFT_OUT)
 
 
 @pytest.mark.parametrize("source", _code_files(), ids=_relative)

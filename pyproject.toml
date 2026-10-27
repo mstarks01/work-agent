@@ -249,4 +249,5 @@ testpaths = ["tests"]
 pythonpath = ["."]
 markers = [
     "postgres: needs a PostgreSQL server; runs in the PostgreSQL lane of CI (see tests/sql_stores.py)",
+    "lint: the module asserts a property of the repository's own files; tests/source_tree.py lint_modules reads it",
 ]

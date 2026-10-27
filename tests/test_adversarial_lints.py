@@ -29,6 +29,8 @@ from evals.adversarial.model import (
 from evals.adversarial.score import citation_failures, score_case
 from tests.factories import sample_report
 
+pytestmark = pytest.mark.lint
+
 CORPUS = load_corpus()
 
 

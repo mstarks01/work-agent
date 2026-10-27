@@ -1,8 +1,8 @@
 """Rules that one function reads, and the lints that find a second reader.
 
-Each lint walks ``src``, ``webapp``, ``evals/harness`` and
-``evals/critic_review`` for the expression
-that applies a rule, and names each function that holds it. Every function but
+Each lint walks the Python the project runs, the named set
+:data:`tests.source_tree.PYTHON`, for the expression that applies a rule, and
+names each function that holds it. Every function but
 the one reader calls that reader (``docs/agents/one-rule-one-reader.md``). A
 function that applies the rule for another reason is declared with that
 reason, and a second test fails when the declaration stops being live.
@@ -12,30 +12,44 @@ from __future__ import annotations
 
 import ast
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from functools import partial
 from itertools import pairwise
+from pathlib import Path
 from typing import TypeGuard
 
-from tests.source_tree import REPO_ROOT, parse, source_files
+import pytest
+
+from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
+
+pytestmark = pytest.mark.lint
 
 #: A site: the file, relative to the repository root, and the enclosing
 #: function, or ``<module>``.
 Site = tuple[str, str]
 
 
-#: The trees each lint walks.
-ROOTS = ("src", "webapp", "evals/harness", "evals/critic_review")
+#: The parts of :data:`~tests.source_tree.PYTHON` no lint here walks, with
+#: the reason.
+LEFT_OUT: dict[str, str] = {
+    "evals/experiments": (
+        "an audit script there runs one experiment as it ran on its day, so it"
+        " records the rule of that day and no live code calls it"
+    ),
+}
+
+#: The files each lint walks.
+FILES = without(source_files(*PYTHON), LEFT_OUT)
 
 
 def _sites(
-    match: Callable[[ast.AST], bool], roots: tuple[str, ...] = ROOTS
+    match: Callable[[ast.AST], bool], files: Iterable[Path] = FILES
 ) -> list[Site]:
-    """Each site in ``roots`` that holds a node ``match`` accepts, once."""
+    """Each site in ``files`` that holds a node ``match`` accepts, once."""
     return sorted(
         {
             (path.relative_to(REPO_ROOT).as_posix(), function)
-            for path in source_files(*roots)
+            for path in files
             for node, function in _walk(parse(path), "<module>")
             if match(node)
         }
@@ -559,7 +573,7 @@ def test_each_refusal_has_one_status_row():
     driver adds only its own rows.
     """
     rows: dict[str, list[Site]] = {}
-    for path in source_files(*ROOTS):
+    for path in FILES:
         for node, function in _walk(parse(path), "<module>"):
             if not isinstance(node, ast.Dict):
                 continue
@@ -603,6 +617,11 @@ ID_DERIVERS: dict[Site, str] = {
         "a non-graph subject is no element, and its ID takes the derivation an"
         " element ID has from its type prefix and its name"
     ),
+    ("evals/verify_corpus.py", "_check_aliases"): (
+        "an alias is a name and the type of the element it names, not an"
+        " element, and the corpus check asks for the ID that name derives, a"
+        " flow's with the endpoints of the flow it names"
+    ),
 }
 
 
@@ -627,6 +646,17 @@ def _slugs_after_a_prefix(node: ast.AST) -> bool:
     )
 
 
+#: Each function that writes a prefix, a colon and a name's slug for a value
+#: that is no ID the service derives, and why.
+NOT_AN_ID_SLUG: dict[Site, str] = {
+    ("evals/bench/deterministic.py", "as_compact"): (
+        "it writes a compact-transport ref the way a model writes one, a"
+        " ``REF_TAGS`` tag before the name's slug, and the expansion derives"
+        " every ID from the name and never from the ref"
+    ),
+}
+
+
 def test_an_id_slug_is_spelled_only_in_the_system_model():
     """Only ``system_model`` writes a prefix, a colon and a name's slug.
 
@@ -634,7 +664,9 @@ def test_an_id_slug_is_spelled_only_in_the_system_model():
     ID. Every other ID of that shape calls one of them, so the two spellings
     cannot part.
     """
-    assert _sites(_slugs_after_a_prefix) == [
+    sites = _sites(_slugs_after_a_prefix)
+    assert NOT_AN_ID_SLUG.keys() <= set(sites)
+    assert [site for site in sites if site not in NOT_AN_ID_SLUG] == [
         ("src/analysis_service/system_model.py", "_build_v1"),
         ("src/analysis_service/system_model.py", "make_element_id"),
     ]
@@ -940,7 +972,4 @@ def _pairs_a_module_with_a_prompt(node: ast.AST) -> bool:
 def test_a_module_to_prompt_pairing_is_written_only_in_the_table():
     """The prompt read's map derives from the table, and the outcome tests read
     the same rows, so no Python holds a second copy of a pair."""
-    assert (
-        _sites(_pairs_a_module_with_a_prompt, (*ROOTS, "tests", ".github/scripts"))
-        == []
-    )
+    assert _sites(_pairs_a_module_with_a_prompt, (*FILES, *source_files(*TESTS))) == []

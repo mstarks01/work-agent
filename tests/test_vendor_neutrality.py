@@ -81,10 +81,11 @@ from analysis_service.vendors import (
     Vendor,
     VendorName,
 )
-from tests.source_tree import parse, source_files
+from tests.source_tree import PYTHON, REPO_ROOT, guide_files, parse, source_files
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-SEARCHED = ("src", "evals", "webapp")
+pytestmark = pytest.mark.lint
+
+SEARCHED = source_files(*PYTHON)
 
 #: The closed vocabularies a table may be keyed by. Both are per-vendor
 #: alphabets: a vendor's name, and the credential mechanisms a vendor row can
@@ -548,9 +549,8 @@ def _named_identifiers(tree: ast.AST) -> set[str]:
 def _searched_files():
     """Every file the two scans below read, from the one enumerator every lint
     shares — so a local run's artifacts cannot fail this suite (#942)."""
-    for root in SEARCHED:
-        for path in source_files(root):
-            yield path.relative_to(REPO_ROOT).as_posix(), path
+    for path in SEARCHED:
+        yield path.relative_to(REPO_ROOT).as_posix(), path
 
 
 def vendor_literals() -> dict[str, list[tuple[int, str]]]:
@@ -692,22 +692,20 @@ VENDOR_TALLY = re.compile(
     re.IGNORECASE,
 )
 
-#: What both rules read: everything a new vendor row would have to update, and
-#: nothing frozen. ``docs/research/`` is evidence dated to its own run, so it
-#: keeps whatever was true when it was written and is not swept here.
-PROSE = tuple(
-    path
-    for path in [REPO_ROOT / "README.md", REPO_ROOT / "GLOSSARY.md"]
-    + sorted((REPO_ROOT / "docs").glob("*.md"))
-    if path.is_file()
-)
+#: What the prose rules read: every guide, which is everything a new vendor row
+#: would have to update. A frozen record such as ``docs/research/`` is not a
+#: guide (:data:`~tests.source_tree.NOT_GUIDES`), so it keeps whatever was true
+#: when it was written.
+PROSE = tuple(guide_files())
 
 
 def _fenced_spans(path: Path) -> list[str]:
     return EVERY_VENDOR_SPAN.findall(path.read_text(encoding="utf-8"))
 
 
-@pytest.mark.parametrize("path", PROSE, ids=lambda p: p.name)
+@pytest.mark.parametrize(
+    "path", PROSE, ids=lambda p: p.relative_to(REPO_ROOT).as_posix()
+)
 def test_a_fenced_list_names_every_vendor(path):
     """A fenced list answers for the whole registry, including tomorrow's row."""
     for span in _fenced_spans(path):
@@ -730,7 +728,9 @@ def test_the_fence_scan_is_not_vacuously_empty():
     )
 
 
-@pytest.mark.parametrize("path", PROSE, ids=lambda p: p.name)
+@pytest.mark.parametrize(
+    "path", PROSE, ids=lambda p: p.relative_to(REPO_ROOT).as_posix()
+)
 def test_no_document_counts_the_registry(path):
     """Write "every registered vendor". A number is a table entry nobody maintains."""
     text = path.read_text(encoding="utf-8")
@@ -754,7 +754,9 @@ GROUND_TALLY = re.compile(
 )
 
 
-@pytest.mark.parametrize("path", PROSE, ids=lambda p: p.name)
+@pytest.mark.parametrize(
+    "path", PROSE, ids=lambda p: p.relative_to(REPO_ROOT).as_posix()
+)
 def test_no_document_counts_the_ground_kinds(path):
     """Name the ground kinds, or write "each kind". Never write how many."""
     paragraphs = re.split(r"\n\s*\n", path.read_text(encoding="utf-8"))
@@ -839,8 +841,8 @@ def test_every_node_s_output_schema_is_one_the_enumerator_reaches():
     A vendor refuses a shape, not a node, so a scan that misses one schema
     reports a portability the tree does not have.
     """
-    graph = source_files("src")
-    (path,) = [one for one in graph if one.name == "graph.py"]
+    path = REPO_ROOT / "src" / "analysis_service" / "graph.py"
+    assert path in SEARCHED
     passed = {
         ast.unparse(keyword.value)
         for node in ast.walk(parse(path))

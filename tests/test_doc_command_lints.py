@@ -34,22 +34,17 @@ from pathlib import Path
 import pytest
 
 from evals.harness.run import COMMANDS
-from tests.source_tree import FROZEN_PROSE, source_files
+from tests.source_tree import REPO_ROOT, guide_files
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.lint
 
-#: Where a reader finds a command to type. The harness's own guides first,
-#: because those are the procedures. ``.claude/skills`` is in for the same
-#: reason and one more: a skill is a procedure an *agent* follows, so a command
-#: that has moved is not a typo there either, and nobody is standing by to
-#: notice that the line failed.
-SEARCHED = ("evals", "docs", "README.md", ".claude/skills")
-
-#: The frozen prose trees, plus ``docs/adr``: an ADR prints the commands that
-#: produced its evidence on the day, and a command removed since is part of
-#: that record rather than a broken step. Its paths and symbols stay live, so
-#: the reference lint does not freeze it.
-FROZEN: tuple[str, ...] = (*FROZEN_PROSE, "docs/adr")
+#: Where a reader finds a command to type: every guide. A skill under
+#: ``.claude/skills`` is a guide too, and a procedure an *agent* follows, so a
+#: command that has moved is not a typo there either, and nobody is standing by
+#: to notice that the line failed. An ADR is not a guide: it prints the commands
+#: that produced its evidence on the day, and a command removed since is part of
+#: that record rather than a broken step.
+SEARCHED = guide_files()
 
 #: The module whose commands this lint knows how to check. Others are named in
 #: the prose too -- ``python -m analysis_service.smoke`` and friends -- and are
@@ -86,19 +81,13 @@ def _options(parser: argparse.ArgumentParser) -> set[str]:
 def _documented() -> list[tuple[Path, int, str]]:
     """Every ``python -m evals.harness.run`` invocation the prose prints."""
     found: list[tuple[Path, int, str]] = []
-    for entry in SEARCHED:
-        base = REPO_ROOT / entry
-        paths = [base] if base.is_file() else source_files(entry, suffixes=(".md",))
-        for path in paths:
-            if any(path.is_relative_to(REPO_ROOT / tree) for tree in FROZEN):
-                continue
-            for number, line in enumerate(
-                path.read_text(encoding="utf-8").splitlines(), start=1
-            ):
-                found.extend(
-                    (path, number, match.group(1))
-                    for match in _INVOCATION.finditer(line)
-                )
+    for path in SEARCHED:
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            found.extend(
+                (path, number, match.group(1)) for match in _INVOCATION.finditer(line)
+            )
     return found
 
 

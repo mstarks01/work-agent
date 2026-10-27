@@ -23,6 +23,8 @@ from analysis_service.validation import parse_and_validate, validate
 from evals import build_review_docs, verify_corpus
 from tests.factories import valid_model
 
+pytestmark = pytest.mark.lint
+
 
 @pytest.mark.parametrize(
     "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name

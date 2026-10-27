@@ -44,10 +44,18 @@ from analysis_service.frameworks import CONTENT_LICENSE, PACKAGES, SCHEMAS
 from evals.harness.calibration import IDENTITY_VALIDATION
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
 from tests.factories import SCRIPTED_FRAMEWORKS
-from tests.source_tree import source_files
+from tests.source_tree import (
+    MODEL_TEXT,
+    PYTHON,
+    REPO_ROOT,
+    lint_modules,
+    source_files,
+    without,
+)
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-SEARCHED = ("src", "evals", "webapp")
+pytestmark = pytest.mark.lint
+
+SEARCHED = source_files(*PYTHON)
 
 #: A string literal naming a framework. Import paths and module names are not
 #: matched — ``analysis_service`` is this distribution's name, not a package
@@ -98,6 +106,16 @@ DECLARED: dict[str, str] = {
     "src/analysis_service/engine.py": (
         "A module-level demo entry point selecting one framework to run, the"
         " way a caller does. Not a code path any job takes."
+    ),
+    "examples/embed.py": (
+        "An example caller's own entry point, which selects one framework to"
+        " run in its `__main__` block the way a caller does. Not a code path"
+        " any job takes."
+    ),
+    "examples/embed_sync.py": (
+        "An example caller's own entry point, which selects one framework to"
+        " run in its `__main__` block the way a caller does. Not a code path"
+        " any job takes."
     ),
     "evals/calibration_labels/build_pairs.py": (
         "This code is that framework's. Labelled candidate pairs exist only for"
@@ -361,20 +379,20 @@ def _framework_named_words(source: Path) -> set[str]:
 def framework_named_identifiers() -> dict[str, set[str]]:
     """Every framework-named name or value outside a package, by file."""
     found: dict[str, set[str]] = {}
-    for root in SEARCHED:
-        for path in source_files(root):
-            relative = path.relative_to(REPO_ROOT).as_posix()
-            if any(f"/frameworks/{name}/" in relative for name in PACKAGES):
-                continue
-            words = _framework_named_words(path)
-            if words:
-                found[relative] = words
+    for path in SEARCHED:
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        if any(f"/frameworks/{name}/" in relative for name in PACKAGES):
+            continue
+        words = _framework_named_words(path)
+        if words:
+            found[relative] = words
     return found
 
 
-#: Where a browser gets its words from. Markup assigned to a module-level name,
-#: the ``title=`` an app is constructed with, and the standalone templates.
-PAGES = ("webapp",)
+#: The tree of :data:`~tests.source_tree.PYTHON` a browser gets its words from:
+#: markup assigned to a module-level name, the ``title=`` an app is constructed
+#: with, and the standalone templates.
+PAGES = "webapp"
 
 #: A comment inside a page's own script or style. Skipped for the reason the
 #: Python scan skips ``#`` lines: a comment comparing two packages explains the
@@ -396,13 +414,15 @@ def page_text() -> dict[str, list[tuple[int, str]]]:
     reviewer answers, say — is a table keyed by framework, read per finding.
     """
     found: dict[str, list[tuple[int, str]]] = {}
-    for root in PAGES:
-        for path in source_files(root):
+    for path in source_files(*PYTHON, suffixes=(".py", ".html")):
+        if not path.is_relative_to(REPO_ROOT / PAGES):
+            continue
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        if path.suffix == ".py":
             lines = _rendered_lines(path)
             if lines:
-                found[path.relative_to(REPO_ROOT).as_posix()] = lines
-        for path in source_files(root, suffixes=(".html",)):
-            relative = path.relative_to(REPO_ROOT).as_posix()
+                found[relative] = lines
+        else:
             found[relative] = list(
                 enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
             )
@@ -437,20 +457,19 @@ def _rendered_lines(source: Path) -> list[tuple[int, str]]:
 def framework_literals() -> dict[str, list[tuple[int, str]]]:
     """Every non-test, non-package-local framework literal, by file."""
     found: dict[str, list[tuple[int, str]]] = {}
-    for root in SEARCHED:
-        for path in source_files(root):
-            relative = path.relative_to(REPO_ROOT).as_posix()
-            if "/frameworks/stride/" in relative or "/frameworks/asvs/" in relative:
-                continue
-            hits = [
-                (number, line.strip())
-                for number, line in enumerate(
-                    path.read_text(encoding="utf-8").splitlines(), 1
-                )
-                if LITERAL.search(line) and not line.strip().startswith("#")
-            ]
-            if hits:
-                found[relative] = hits
+    for path in SEARCHED:
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        if "/frameworks/stride/" in relative or "/frameworks/asvs/" in relative:
+            continue
+        hits = [
+            (number, line.strip())
+            for number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), 1
+            )
+            if LITERAL.search(line) and not line.strip().startswith("#")
+        ]
+        if hits:
+            found[relative] = hits
     return found
 
 
@@ -467,14 +486,13 @@ def package_importers() -> dict[str, list[str]]:
     rather than grepped, for the reason given there.
     """
     found: dict[str, list[str]] = {}
-    for root in SEARCHED:
-        for path in source_files(root):
-            relative = path.relative_to(REPO_ROOT).as_posix()
-            if any(f"/frameworks/{name}/" in relative for name in PACKAGES):
-                continue
-            imports = _package_imports(path)
-            if imports:
-                found[relative] = imports
+    for path in SEARCHED:
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        if any(f"/frameworks/{name}/" in relative for name in PACKAGES):
+            continue
+        imports = _package_imports(path)
+        if imports:
+            found[relative] = imports
     return found
 
 
@@ -763,14 +781,10 @@ def test_no_scorer_names_a_package_this_build_does_not_carry():
 # above sees only a directory path. So this asks
 # a different question of a smaller set of files, and asks it of the syntax tree
 # rather than the text, because a docstring naming a framework is prose.
-LINT_MODULES = sorted(
-    [
-        *(REPO_ROOT / "tests").glob("test_*lints*.py"),
-        # Each outcome row pins shipped prompt text, so the file is a lint
-        # whatever its name says.
-        REPO_ROOT / "tests" / "test_prompt_outcomes.py",
-    ]
-)
+#
+# A module is a lint when it declares itself one with the ``lint`` marker, read
+# by :func:`tests.source_tree.lint_modules`, and never by its file name.
+LINT_MODULES = lint_modules()
 
 #: A lint importing one package's own module, and why that is right.
 #:
@@ -821,7 +835,7 @@ def _package_imports(source: Path) -> list[str]:
 
 
 def test_there_are_lint_modules_to_check():
-    """Guards the guard: a glob that matches nothing agrees with anything."""
+    """Guards the guard: a set that holds nothing agrees with anything."""
     assert len(LINT_MODULES) >= 5
 
 
@@ -1029,7 +1043,15 @@ def test_the_hook_table_reads_both_neutral_classes():
 # neither may name one. ``frameworks/<name>/`` is that package's own text and is
 # exempt for the same reason its modules are.
 
-SHARED_MARKDOWN = ("prompts", "domains")
+SHARED_MARKDOWN = without(
+    source_files(*MODEL_TEXT, suffixes=(".md",)),
+    {
+        "frameworks": (
+            "each package's own text, which names its own framework for the"
+            " reason its modules may"
+        )
+    },
+)
 
 #: A word that turns a mention into a classification. A pack may say what a
 #: technology does; it may not file the result under somebody's lane.
@@ -1057,11 +1079,7 @@ COUNTED_UNIT = r"(?:lane|agent|categor|chapter)"
 
 def shared_markdown() -> list[Path]:
     """Every shared instruction file: one copy, read by every framework."""
-    found = [
-        path
-        for root in SHARED_MARKDOWN
-        for path in source_files(root, suffixes=(".md",))
-    ]
+    found = SHARED_MARKDOWN
     assert found, "the shared-markdown scan found no files, so it proves nothing"
     return found
 

@@ -24,7 +24,7 @@ A **Case Sitting** binds the same way and splits the name in two: the entry's
 reader who takes part on no name of their own. Only the first grants anything.
 
 `voters.toml` is the roster: every voter's line, holding their **standing**
-(`maintainer` or `contributor`) and, after a rename, the old login in
+(`maintainer` or `contributor`) and, after a rename, each earlier login in
 `aliases`. Standing lives only here — never on a vote row — so a promotion is
 one edit that re-classes a voter's whole history. `evals/harness/roster.py`
 is the reader, and it fails closed on anything it does not recognise.

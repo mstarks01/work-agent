@@ -44,6 +44,8 @@ import pytest
 
 from analysis_service.frameworks import CONTENT_LICENSE
 
+pytestmark = pytest.mark.lint
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 

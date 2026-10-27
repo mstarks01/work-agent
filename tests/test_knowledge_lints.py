@@ -33,6 +33,8 @@ from analysis_service.markdown_loader import (
     split_sections,
 )
 
+pytestmark = pytest.mark.lint
+
 FRAMEWORKS_DIR = Path(__file__).resolve().parents[1] / "frameworks"
 
 # A note's three fixed H2 sections, in order — the same three a domain pack

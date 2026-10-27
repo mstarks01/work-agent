@@ -22,8 +22,10 @@ from analysis_service.frameworks import (
     SEVERITY_RUBRIC_DOC,
 )
 from evals.harness.submit import run_command
-from tests.source_tree import REPO_ROOT
+from tests.source_tree import REPO_ROOT, prompt_files
 from tests.test_workflow_lints import FILTERED_WORKFLOWS, _filter_paths
+
+pytestmark = pytest.mark.lint
 
 SCRIPT = REPO_ROOT / ".github" / "scripts" / "five_class_read.py"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "five-class.yml"
@@ -245,19 +247,6 @@ def test_the_check_reruns_when_the_body_is_edited():
     assert "PR_BODY: ${{ github.event.pull_request.body }}" in text
 
 
-#: Every prompt a model reads, as ``glob`` patterns from the repository root:
-#: the shared bodies, each package's own parts, and each lane's files. A
-#: package's ``disclaimer.md`` goes to the report, and its ``cases`` and
-#: ``notes`` are retrieved material, so none of them states an outcome.
-PROMPT_FILES = (
-    "prompts/*.md",
-    "frameworks/*/critic.md",
-    "frameworks/*/output.md",
-    "frameworks/*/severity_rubric.md",
-    "frameworks/*/lane_closing.md",
-    "frameworks/*/lanes/*/*.md",
-)
-
 #: The table that pairs each prompt with the modules that decide it, read once
 #: for every test here and for ``tests/test_prompt_outcomes.py``.
 TABLE = tomllib.loads(check.TABLE.read_text(encoding="utf-8"))
@@ -383,11 +372,7 @@ def test_a_package_text_the_package_lacks_is_not_asked_for():
 
 @pytest.mark.parametrize(
     "prompt",
-    sorted(
-        str(path.relative_to(REPO_ROOT))
-        for pattern in PROMPT_FILES
-        for path in REPO_ROOT.glob(pattern)
-    ),
+    [path.relative_to(REPO_ROOT).as_posix() for path in prompt_files()],
 )
 def test_each_prompt_has_a_module_that_decides_its_outcomes(prompt):
     named = {

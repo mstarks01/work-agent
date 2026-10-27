@@ -29,32 +29,48 @@ import re
 import tokenize
 from pathlib import Path
 
-from tests.source_tree import REPO_ROOT, parse, source_files
+import pytest
 
-SEARCHED = ("src", "evals", "webapp", "tests")
+from tests.source_tree import (
+    CONFIG,
+    PYTHON,
+    REPO_ROOT,
+    TESTS,
+    WORKFLOWS,
+    guide_files,
+    parse,
+    prompt_files,
+    source_files,
+    without,
+)
+
+pytestmark = pytest.mark.lint
+
+SEARCHED = source_files(*PYTHON, *TESTS)
 
 #: The page scripts whose comments are read.
-SCRIPTS = ("webapp/static",)
+SCRIPTS = source_files(*PYTHON, suffixes=(".js",))
 
 #: The guides a reader follows as a statement of the current state, and the
-#: prompts a model reads as its instructions. The lane skills under
-#: ``frameworks/`` are not read: their passive "used" phrases read as history
-#: to this scan, and the ASVS ones carry a governed licence
-#: (``docs/agents/licensing.md``).
+#: prompts a model reads as its instructions.
 GUIDES: tuple[Path, ...] = (
-    REPO_ROOT / "README.md",
-    REPO_ROOT / "AGENTS.md",
-    *sorted((REPO_ROOT / "docs").glob("*.md")),
-    *sorted((REPO_ROOT / "docs" / "agents").glob("*.md")),
-    *sorted((REPO_ROOT / "evals").glob("*.md")),
-    *sorted((REPO_ROOT / "examples").glob("*.md")),
-    *sorted((REPO_ROOT / "prompts").rglob("*.md")),
+    *guide_files(),
+    *without(
+        prompt_files(),
+        {
+            "frameworks": (
+                "a lane skill's passive 'used' phrases read as history to this"
+                " scan, and the ASVS ones carry a governed licence"
+                " (docs/agents/licensing.md)"
+            ),
+        },
+    ),
 )
 
 #: The config files and workflows whose full-line ``#`` comments are read.
 HASH_COMMENTED: tuple[Path, ...] = (
-    *sorted((REPO_ROOT / "config").glob("*.toml")),
-    *sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")),
+    *source_files(*CONFIG, suffixes=(".toml",)),
+    *source_files(*WORKFLOWS, suffixes=(".yml",)),
 )
 
 #: Each phrase names an earlier state of the code. Case-insensitive.
@@ -152,12 +168,8 @@ def _hits(path: Path, texts: list[tuple[int, str]]) -> list[str]:
 def history() -> list[str]:
     """Every prose text that narrates an earlier state, as ``path:line phrase``."""
     return [
-        *(hit for path in source_files(*SEARCHED) for hit in _hits(path, _prose(path))),
-        *(
-            hit
-            for path in source_files(*SCRIPTS, suffixes=(".js",))
-            for hit in _hits(path, _script_prose(path))
-        ),
+        *(hit for path in SEARCHED for hit in _hits(path, _prose(path))),
+        *(hit for path in SCRIPTS for hit in _hits(path, _script_prose(path))),
         *(hit for path in HASH_COMMENTED for hit in _hits(path, _hash_prose(path))),
         *(hit for path in GUIDES for hit in _hits(path, _guide_prose(path))),
     ]
