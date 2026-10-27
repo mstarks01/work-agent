@@ -171,7 +171,7 @@ def test_a_metered_reask_is_not_charged_again_as_a_retry():
 
 def test_a_graph_run_survives_one_bad_lane_answer():
     """One STRIDE lane answers outside its schema, then inside it."""
-    lane = graph.analyze_node_name("stride", "spoofing")
+    lane = graph.Lane("stride", "spoofing").node_name
     replies = happy_replies()
     pipeline, _ = scripted_pipeline(replies)
     agents = {

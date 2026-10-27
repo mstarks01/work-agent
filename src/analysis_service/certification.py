@@ -63,10 +63,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from analysis_service.config_files import read_toml
 from analysis_service.model_tiers import TIER_NAMES, TierName
 from analysis_service.parsing import is_version
-from analysis_service.report import (
-    NodeRun,
-    Report,
-)
+from analysis_service.report import NodeRun
 
 # The manifest schema version. Keyed by tier, with no compatibility shim for
 # older files.
@@ -240,8 +237,8 @@ def fingerprints_of(nodes: Iterable[NodeRun]) -> dict[str, frozenset[str]]:
     Takes the node runs rather than a report because the two callers hold
     different things: the service certifies a finished report, while a sweep
     certifies runs that may produce no report at all — the extraction mode
-    scores an emission, not a :class:`Report`, and its ``extract``
-    execution is no less an observed execution identity for that.
+    scores an emission, not a :class:`~analysis_service.report.Report`, and its
+    ``extract`` execution is no less an observed execution identity for that.
     """
     observations: dict[str, set[str]] = {}
     for node in nodes:
@@ -249,11 +246,6 @@ def fingerprints_of(nodes: Iterable[NodeRun]) -> dict[str, frozenset[str]]:
             continue
         observations.setdefault(node.node, set()).add(node.execution_fingerprint)
     return {node: frozenset(prints) for node, prints in observations.items()}
-
-
-def report_fingerprints(report: Report) -> dict[str, frozenset[str]]:
-    """The node -> fingerprint sets a finished report presents, ready to certify."""
-    return fingerprints_of(report.nodes)
 
 
 def load_manifest(path: Path | str) -> BlessedManifest:

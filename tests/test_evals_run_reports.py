@@ -30,7 +30,6 @@ from analysis_service.assertions import (
     CatalogProposal,
     Quarantined,
     QuoteProposal,
-    resolve_catalog,
 )
 from analysis_service.deployment import Deployment
 from analysis_service.graph import ENTRY_EXTRACT
@@ -328,13 +327,10 @@ class TestTheAssertionsBesideTheArtifact:
                 ),
             ]
         )
-        catalog, issues = resolve_catalog(proposal, case.model, sources)
         return AssertionResult(
             case_id=case.id,
             proposal=proposal.model_dump(mode="json"),
-            record=AssertionRecord(
-                proposed=len(proposal.assertions), catalog=catalog, issues=issues
-            ),
+            record=AssertionRecord.of(proposal, case.model, sources),
         )
 
     def written(self, case, tmp_path):

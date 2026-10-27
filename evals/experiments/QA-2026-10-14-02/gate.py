@@ -17,12 +17,13 @@ import os
 import sys
 from pathlib import Path
 
+from analysis_service import model_gate
 from analysis_service.capability_reader import (
     CapabilityReading,
     with_stated_capabilities,
 )
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.model_gate import completion
+from analysis_service.offline import refuse_live_inference
 from analysis_service.prompts import compose_capabilities_prompt
 from analysis_service.sources import Source, render_sources
 from analysis_service.system_model import SystemModel
@@ -33,7 +34,8 @@ def read_case(case: str, model: str, key: str) -> dict:
     sources = [Source.description(Path("evals/corpus", case, "source.md").read_text())]
     instruction = compose_capabilities_prompt(MarkdownLoader(Path("prompts")))
     prompt = instruction.replace("{input_text}", render_sources(sources))
-    reply = completion(
+    refuse_live_inference(model)
+    reply = model_gate._litellm.completion(
         model=model,
         api_key=key,
         response_format={"type": "json_object"},

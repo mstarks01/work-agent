@@ -252,7 +252,7 @@ Stage = Literal["catalog"]
 #: How a ``reference`` predicate's value is spelled, per stage that renders the
 #: table, so each stage states its spelling: the catalog stage takes the
 #: subject's ID or its name, and
-#: :func:`~analysis_service.assertions.resolve_catalog` resolves either one to
+#: :meth:`~analysis_service.assertions.AssertionRecord.of` resolves either one to
 #: the same subject.
 #:
 #: Keyed by the composer that renders it, so a stage added tomorrow raises here

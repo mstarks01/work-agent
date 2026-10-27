@@ -30,7 +30,7 @@ from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.graph import (
     ENTRY_PREPARE,
     STATE_INPUT_TEXT,
-    analyze_node_name,
+    Lane,
     tier_node_by_graph_node,
 )
 from analysis_service.retry import RefusedCompletionError
@@ -232,7 +232,7 @@ def _reply_for(case, graph_node: str) -> str:
             }
         )
     for category in STRIDE_CATEGORIES:
-        if graph_node == analyze_node_name("stride", category):
+        if graph_node == Lane("stride", category).node_name:
             return json.dumps(
                 {"claims": [proposal(case, category, sound_evidence(case, category))]}
             )
@@ -259,7 +259,7 @@ def _critic_first(case, graph_node: str, first: dict[str, Any] | None) -> list[s
 def _lane_replies(case, graph_node: str) -> dict[str, str]:
     """The clean per-lane emissions, for the adapter every lane agent shares."""
     if graph_node not in {
-        analyze_node_name("stride", category) for category in STRIDE_CATEGORIES
+        Lane("stride", category).node_name for category in STRIDE_CATEGORIES
     }:
         return {}
     return {
@@ -275,7 +275,7 @@ def _queued_for(
 ) -> dict[str, list[str]]:
     """The spoofing agent's first emission, when the test wants it broken."""
     if first is None or graph_node not in {
-        analyze_node_name("stride", category) for category in STRIDE_CATEGORIES
+        Lane("stride", category).node_name for category in STRIDE_CATEGORIES
     }:
         return {}
     return {"spoofing": [json.dumps({"claims": [proposal(case, "spoofing", first)]})]}

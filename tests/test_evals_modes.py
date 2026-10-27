@@ -48,8 +48,8 @@ from analysis_service.graph import (
     ENTRY_PREPARE,
     EXTRACT_NODE,
     Analysis,
+    Lane,
     Pipeline,
-    analyze_node_name,
     tier_node_by_graph_node,
 )
 from analysis_service.grounding import verify_quote
@@ -246,7 +246,7 @@ def build(case, entry, models: dict[str, ScriptedLlm]) -> Pipeline:
 def _lane_replies(case, graph_node: str) -> dict[str, str]:
     """Per-lane emissions, for the one adapter every lane agent shares."""
     if graph_node not in {
-        analyze_node_name("stride", category) for category in STRIDE_CATEGORIES
+        Lane("stride", category).node_name for category in STRIDE_CATEGORIES
     }:
         return {}
     return {
@@ -310,7 +310,7 @@ def _reply_for(case, graph_node: str) -> str:
             }
         )
     for category in STRIDE_CATEGORIES:
-        if graph_node == analyze_node_name("stride", category):
+        if graph_node == Lane("stride", category).node_name:
             return json.dumps({"claims": [scripted_proposal(case, category)]})
     return '{"claims": []}'
 
@@ -325,7 +325,7 @@ def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
     # whole point of the mode.
     assert "extract" not in models
     assert report.system_model == case.model
-    spoofing = models[analyze_node_name("stride", "spoofing")].seen[0]
+    spoofing = models[Lane("stride", "spoofing").node_name].seen[0]
     assert "flow:entity:shopper>process:storefront-api>place-order" in spoofing
 
 
@@ -564,13 +564,12 @@ class TestAProjectionIsComparedTheWayItsFieldSays:
     CASE = "01-payments-checkout"
 
     def resolved(self, golden, rows):
-        from analysis_service.assertions import CatalogProposal, resolve_catalog
+        from analysis_service.assertions import AssertionRecord, CatalogProposal
 
         sources = {source.label: source.text for source in golden.sources}
-        catalog, _ = resolve_catalog(
+        return AssertionRecord.of(
             CatalogProposal(assertions=rows), golden.model, sources
-        )
-        return catalog
+        ).catalog
 
     def quoted(self, golden, subject_id):
         element = next(e for e in golden.model.elements() if e.id == subject_id)
@@ -1531,7 +1530,7 @@ def test_a_node_that_raises_mid_graph_still_hands_the_sweep_what_ran(case, monke
         asyncio.run(modes.run_analysis(case, pipeline))
 
     ran = {run.node: run for run in raised.value.node_runs}
-    lanes = {analyze_node_name("stride", category) for category in STRIDE_CATEGORIES}
+    lanes = {Lane("stride", category).node_name for category in STRIDE_CATEGORIES}
     assert "prepare" in ran, "the nodes before the fault are what the provider billed"
     # ADK tags its error event with the failed node's path, so a lane that
     # raised rides out too, with nothing metered on it: the floor the type

@@ -501,7 +501,7 @@ class RepairedQuote:
 ```
 
 The ladder refused what the agent wrote, and the repair rung
-(`analysis_service.grounding.repair_quote`) found a window of the named source
+(`analysis_service.grounding.repair_prepared`) found a window of the named source
 near enough to hand back. The ground now carries that window — the submitter's
 words, whitespace collapsed — and this mark carries the agent's, so the
 substitution is on the record. A repaired quote verifies, so an entry here is

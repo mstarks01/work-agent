@@ -25,8 +25,8 @@ normalization policy the service does not run.
 Two more readings:
 
 * The repair rung. Read :attr:`CaseGrounds.repaired_count`, which is the quotes
-  the ladder refused and :func:`~analysis_service.grounding.repair_quote` then
-  rewrote to the source's nearest span. That is the number that moves
+  the ladder refused and :func:`~analysis_service.grounding.repair_prepared`
+  then rewrote to the source's nearest span. That is the number that moves
   :data:`~analysis_service.grounding.REPAIR_THRESHOLD`.
 * A claim that lost every ground. Read :attr:`CaseGrounds.dropped_count`, which
   is the claims the service dropped and marked because nothing they cited held:

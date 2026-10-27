@@ -66,7 +66,6 @@ from analysis_service.assertions import (
     quarantine,
     read_assertion_id,
     referent_type,
-    resolve_catalog,
     settled,
     span_source,
     spans_for,
@@ -1199,11 +1198,12 @@ class TestResolvingAProposal:
         return AssertionProposal(**{**fields, **overrides})
 
     def resolve(self, *rows, sources=None):
-        return resolve_catalog(
+        record = AssertionRecord.of(
             CatalogProposal(assertions=list(rows)),
             self.model(),
             SOURCES if sources is None else sources,
         )
+        return record.catalog, record.issues
 
     def quoting(self, quote):
         """One row quoting ``quote`` from :data:`REPEATED`, the twice-told source."""
@@ -1777,9 +1777,10 @@ class TestWhatTheFirstLiveRunFound:
         return TestResolvingAProposal().model()
 
     def resolve(self, *rows):
-        return resolve_catalog(
+        record = AssertionRecord.of(
             CatalogProposal(assertions=list(rows)), self.model(), SOURCES
         )
+        return record.catalog, record.issues
 
     def test_a_reference_written_as_a_name_resolves(self):
         """The live run wrote ``core services`` where the zone is ``boundary:...``.

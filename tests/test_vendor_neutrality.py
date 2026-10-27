@@ -796,7 +796,7 @@ def test_no_document_counts_the_ground_kinds(path):
 #: **Empty, and meant to stay that way** (#942). A bound on what a model may
 #: emit belongs where code reads the output —
 #: :func:`~analysis_service.fan_in.fan_in` carries the lane-emission cap, and
-#: :func:`~analysis_service.assertions.resolve_catalog` carries the catalog's.
+#: :meth:`~analysis_service.assertions.AssertionRecord.of` carries the catalog's.
 #: An entry here is a node that has lost a vendor, so this declaration is where
 #: the trade has to be argued.
 ROOT_CAPPED_SCHEMAS: dict[str, str] = {}

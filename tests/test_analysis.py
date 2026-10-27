@@ -18,7 +18,6 @@ from analysis_service.analysis import (
     control_state,
     cross_boundary_flows,
     crossing_facts,
-    crossing_flow_ids,
     crossings_by_flow,
     inbound_flows,
     internet_exposed_elements,
@@ -205,13 +204,11 @@ class TestStructuralFacts:
     def test_cross_boundary_flows_matches_the_models_own_derivation(self, chain):
         assert cross_boundary_flows(chain) == chain.boundary_crossings()
 
-    def test_crossing_flow_ids_names_every_crossing(self, chain):
-        assert crossing_flow_ids(chain) == frozenset(
-            {
-                "flow:entity:user>process:edge>browse",
-                "flow:process:edge>process:worker>dispatch",
-            }
-        )
+    def test_crossings_by_flow_names_every_crossing(self, chain):
+        assert set(crossings_by_flow(chain)) == {
+            "flow:entity:user>process:edge>browse",
+            "flow:process:edge>process:worker>dispatch",
+        }
 
     def test_internet_exposed_excludes_unknown_exposure(self):
         model = valid_model()
@@ -424,12 +421,6 @@ class TestACrossingSaysWhichZoneWasAssumed:
 
         assert facts["source_zone_assumed"] is True
         assert facts["destination_zone_assumed"] is True
-
-    def test_the_two_readers_of_which_flows_cross_agree(self) -> None:
-        """``crossing_flow_ids`` reads the mapping rather than deriving again."""
-        model = valid_model()
-
-        assert crossing_flow_ids(model) == frozenset(crossings_by_flow(model))
 
 
 class TestACrossingHasThreeOutcomes:

@@ -3,7 +3,7 @@
 ``evals/corpus/<case>/facts.json`` holds what a reader says a case's sources
 state, in the shape the assertion node proposes: a subject, a predicate, a
 value, a scope, a basis and the quotes that carry it. :func:`reference_catalog`
-resolves those rows through :func:`analysis_service.assertions.resolve_catalog`,
+resolves those rows through :meth:`analysis_service.assertions.AssertionRecord.of`,
 the one reader of what a proposed row means, so a reference row is held to
 every rule a produced row is — its quote is located in the source, its subject
 snaps to the blessed model, its value is one the predicate admits — and a row

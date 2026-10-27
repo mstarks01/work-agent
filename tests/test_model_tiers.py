@@ -12,7 +12,7 @@ from analysis_service.charges import records_reported_charge
 from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.deployment import DEFAULT_FRAMEWORKS_DIR
 from analysis_service.frameworks import FrameworkPackageError, validate_packages
-from analysis_service.graph import FrameworkNodes, analyze_node_name
+from analysis_service.graph import FrameworkNodes, Lane
 from analysis_service.model_tiers import (
     FRAMEWORK_NODES,
     LLM_NODES,
@@ -1201,7 +1201,7 @@ class TestLaneKeys:
     def test_the_graph_runs_the_lane_on_its_own_key(self):
         assert (
             FrameworkNodes("stride").tier_nodes[
-                analyze_node_name("stride", "denial-of-service")
+                Lane("stride", "denial-of-service").node_name
             ]
             == self.DOS
         )
