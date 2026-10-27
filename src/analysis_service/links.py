@@ -368,11 +368,11 @@ def check_answers(
     model: SystemModel,
     catalog: AssertionCatalog | None,
     asked: Collection[UnknownKey],
-    earlier: Sequence[FactAnswer] = (),
+    earlier: Sequence[FactAnswer],
     *,
-    asked_links: Collection[str] = (),
-    earlier_links: Sequence[LinkAnswer] = (),
-    reopen: bool = False,
+    asked_links: Collection[str],
+    earlier_links: Sequence[LinkAnswer],
+    reopen: bool,
 ) -> None:
     """Refuse an answer that would place nothing, before a resumed run is admitted.
 

@@ -127,6 +127,7 @@ class TestTheRepairRung:
         repair = repair_prepared(
             "a single shared password from an environment variable",
             prepare_source(SOURCE),
+            deadline=repair_deadline(),
         )
 
         assert repair is not None
@@ -139,12 +140,18 @@ class TestTheRepairRung:
         """Six characters on forty-six are inside the threshold. The same drop
         on a quote half as long is not — a short quote has less slack."""
         repair = repair_prepared(
-            "and that account has full read/write on table", prepare_source(SOURCE)
+            "and that account has full read/write on table",
+            prepare_source(SOURCE),
+            deadline=repair_deadline(),
         )
         assert repair is not None
         assert repair[0] == "and that account has full read/write on every table."
         assert (
-            repair_prepared("has full read/write on table", prepare_source(SOURCE))
+            repair_prepared(
+                "has full read/write on table",
+                prepare_source(SOURCE),
+                deadline=repair_deadline(),
+            )
             is None
         )
 
@@ -154,7 +161,9 @@ class TestTheRepairRung:
         no candidate window comes near it."""
         assert (
             repair_prepared(
-                "a single shared password on every table", prepare_source(SOURCE)
+                "a single shared password on every table",
+                prepare_source(SOURCE),
+                deadline=repair_deadline(),
             )
             is None
         )
@@ -163,20 +172,29 @@ class TestTheRepairRung:
         """Each fragment is its own span; one nearest window for the whole is a
         span the quote never claimed."""
         assert (
-            repair_prepared("a single shared … every tables", prepare_source(SOURCE))
+            repair_prepared(
+                "a single shared … every tables",
+                prepare_source(SOURCE),
+                deadline=repair_deadline(),
+            )
             is None
         )
 
     def test_a_different_sentence_is_refused(self):
         assert (
             repair_prepared(
-                "the accounts database is encrypted at rest", prepare_source(SOURCE)
+                "the accounts database is encrypted at rest",
+                prepare_source(SOURCE),
+                deadline=repair_deadline(),
             )
             is None
         )
 
     def test_an_empty_quote_is_refused(self):
-        assert repair_prepared("   ", prepare_source(SOURCE)) is None
+        assert (
+            repair_prepared("   ", prepare_source(SOURCE), deadline=repair_deadline())
+            is None
+        )
 
     def test_a_scan_over_the_bound_stops_rather_than_running(self):
         """Both terms come from the submitted text, so the rung's cost is the
@@ -198,7 +216,12 @@ class TestTheRepairRung:
         quote = " ".join(["dorw"] * width)
 
         started = time.process_time()
-        assert repair_prepared(quote, prepare_source(" ".join(words))) is None
+        assert (
+            repair_prepared(
+                quote, prepare_source(" ".join(words)), deadline=repair_deadline()
+            )
+            is None
+        )
         assert time.process_time() - started < 5.0
 
     def test_the_bound_leaves_a_median_quote_on_the_largest_source(self):
@@ -216,7 +239,11 @@ class TestTheRepairRung:
         quote = source[9000:9080].strip()
 
         assert (
-            repair_prepared(quote.replace("quick", "quikc"), prepare_source(source))
+            repair_prepared(
+                quote.replace("quick", "quikc"),
+                prepare_source(source),
+                deadline=repair_deadline(),
+            )
             is not None
         )
 
@@ -238,7 +265,10 @@ class TestTheRepairRung:
         source = " ".join(["ba"] * 341)
 
         started = time.process_time()
-        assert repair_prepared(quote, prepare_source(source)) is None
+        assert (
+            repair_prepared(quote, prepare_source(source), deadline=repair_deadline())
+            is None
+        )
         assert time.process_time() - started < 3.0
 
     @pytest.mark.parametrize(
@@ -269,7 +299,9 @@ class TestTheRepairRung:
         else:
             quote = true.replace(",", "").replace(".", "")
 
-        repair = repair_prepared(quote, prepare_source(source))
+        repair = repair_prepared(
+            quote, prepare_source(source), deadline=repair_deadline()
+        )
 
         assert repair is not None
         assert repair[1] >= REPAIR_THRESHOLD
@@ -291,7 +323,10 @@ class TestTheRepairRung:
 
         assert len(quote) > MAX_REPAIR_QUOTE_CHARS
         started = time.process_time()
-        assert repair_prepared(quote, prepare_source(source)) is None
+        assert (
+            repair_prepared(quote, prepare_source(source), deadline=repair_deadline())
+            is None
+        )
         assert time.process_time() - started < 0.5
 
     def test_a_pruned_window_is_charged_for_the_work_it_took_to_prune(self):
@@ -313,7 +348,10 @@ class TestTheRepairRung:
         quote = " ".join(["ab"] * 333)
 
         started = time.process_time()
-        assert repair_prepared(quote, prepare_source(source)) is None
+        assert (
+            repair_prepared(quote, prepare_source(source), deadline=repair_deadline())
+            is None
+        )
         assert time.process_time() - started < 3.0
 
     def test_a_truncated_scan_returns_the_match_it_already_found(self):
@@ -332,7 +370,9 @@ class TestTheRepairRung:
         words = source.split()
         quote = " ".join(words[1500:1516]).replace("quick", "quikc")
 
-        repair = repair_prepared(quote, prepare_source(source))
+        repair = repair_prepared(
+            quote, prepare_source(source), deadline=repair_deadline()
+        )
 
         assert repair is not None
         assert repair[1] >= REPAIR_THRESHOLD
@@ -351,7 +391,9 @@ class TestTheRepairRung:
         words = source.split()
         quote = " ".join(words[-40:-24]).replace("lazy", "lzay")
 
-        repair = repair_prepared(quote, prepare_source(source))
+        repair = repair_prepared(
+            quote, prepare_source(source), deadline=repair_deadline()
+        )
 
         assert repair is not None
         assert repair[1] >= REPAIR_THRESHOLD
@@ -367,7 +409,12 @@ class TestTheRepairRung:
         long_words = " ".join(["x" * 500] * 200)
         quote = " ".join(["y" * 500] * 2)
 
-        assert repair_prepared(quote, prepare_source(long_words)) is None
+        assert (
+            repair_prepared(
+                quote, prepare_source(long_words), deadline=repair_deadline()
+            )
+            is None
+        )
 
     def test_a_scan_that_starts_after_the_body_deadline_does_not_scan(self):
         """Every scan of one body shares one deadline, and a scan that begins
@@ -418,8 +465,12 @@ class TestPreparingASourceOnce:
         prepared = prepare_source(SOURCE)
         quotes = ["with a single shared passwrd", "has full read/write on evry table"]
 
-        assert [repair_prepared(quote, prepared) for quote in quotes] == [
-            repair_prepared(quote, prepare_source(SOURCE)) for quote in quotes
+        assert [
+            repair_prepared(quote, prepared, deadline=repair_deadline())
+            for quote in quotes
+        ] == [
+            repair_prepared(quote, prepare_source(SOURCE), deadline=repair_deadline())
+            for quote in quotes
         ]
 
 
@@ -434,7 +485,9 @@ class TestWhatARepairMoved:
     def test_a_dropped_not_is_a_moved_negation(self):
         source = "The service does not encrypt the backups at rest."
         quote = "The service does encrypt the backups at rest."
-        repair = repair_prepared(quote, prepare_source(source))
+        repair = repair_prepared(
+            quote, prepare_source(source), deadline=repair_deadline()
+        )
 
         assert repair is not None
         assert repair.span == source
@@ -474,7 +527,9 @@ class TestATruncatedScanSaysSo:
         # rank the thousands after it.
         monkeypatch.setattr("analysis_service.grounding.MAX_REPAIR_WORK", 400_000)
 
-        repair = repair_prepared(quote, prepare_source(source))
+        repair = repair_prepared(
+            quote, prepare_source(source), deadline=repair_deadline()
+        )
 
         assert repair is not None
         assert repair.similarity >= REPAIR_THRESHOLD
@@ -487,7 +542,9 @@ class TestATruncatedScanSaysSo:
         words = source.split()
         quote = " ".join(words[-16:]).replace("lazy", "lzay")
 
-        repair = repair_prepared(quote, prepare_source(source))
+        repair = repair_prepared(
+            quote, prepare_source(source), deadline=repair_deadline()
+        )
 
         assert repair is not None
         assert repair.complete

@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 import pytest
 
 from analysis_service import graph
+from analysis_service.compact import FULL_FORMAT
 from analysis_service.protocol_defaults import PROTOCOL_DEFAULTS, with_protocol_defaults
 from analysis_service.system_model import UNKNOWN, Assumption
 from analysis_service.validation import validate
@@ -111,7 +112,9 @@ def test_the_gate_publishes_the_model_with_its_protocol_defaults():
     flow.protocol, flow.encryption_in_transit = "SFTP", UNKNOWN
     payload = emitted.model_dump(mode="json")
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, KEYS, payload)
+    event = graph.validate_extraction(
+        ctx, KEYS, payload, source_texts=None, extraction_format=FULL_FORMAT
+    )
     assert event.actions.route == graph.ROUTE_VALID
     published = {f["id"]: f for f in ctx.state[graph.STATE_VALID_MODEL]["data_flows"]}
     assert (

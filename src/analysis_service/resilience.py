@@ -244,7 +244,7 @@ class ResilienceConfig(BaseModel):
             budget=RetryBudget(capacity=budget_capacity, ratio=self.retry_budget_ratio),
         )
 
-    def deadline_seconds(self, upstreams: Iterable[str] = ()) -> float:
+    def deadline_seconds(self, upstreams: Iterable[str]) -> float:
         """The job deadline as ``asyncio`` wants it: seconds, not milliseconds.
 
         ``upstreams`` is everything the deployment's bound tiers are pinned
@@ -287,7 +287,7 @@ class ResilienceConfig(BaseModel):
             max_total_bytes=self.max_source_bytes, max_sources=self.max_sources
         )
 
-    def request_timeout_seconds(self, upstreams: Iterable[str] = ()) -> float:
+    def request_timeout_seconds(self, upstreams: Iterable[str]) -> float:
         """The per-request timeout as LiteLLM wants it: seconds, not milliseconds.
 
         ``upstreams`` is what the tier's request is pinned to, from the tiers

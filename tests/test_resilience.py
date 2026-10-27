@@ -90,8 +90,8 @@ def test_the_shipped_config_loads_with_the_decided_values():
 
 def test_the_deadline_converts_to_the_seconds_asyncio_wants():
     """The file is in milliseconds beside timeout_ms; asyncio takes seconds."""
-    assert config(job_deadline_ms=900000).deadline_seconds() == 900.0
-    assert config(job_deadline_ms=1500).deadline_seconds() == 1.5
+    assert config(job_deadline_ms=900000).deadline_seconds(upstreams=()) == 900.0
+    assert config(job_deadline_ms=1500).deadline_seconds(upstreams=()) == 1.5
 
 
 def test_a_job_deadline_is_required_rather_than_defaulted():
@@ -152,8 +152,8 @@ def test_the_request_timeout_converts_like_the_deadline_does():
     five-minute bound as 300000 seconds.
     """
     loaded = config()
-    assert loaded.request_timeout_seconds() == 300.0
-    assert loaded.deadline_seconds() == 900.0
+    assert loaded.request_timeout_seconds(upstreams=()) == 300.0
+    assert loaded.deadline_seconds(upstreams=()) == 900.0
 
 
 class TestBoundsKeyedByUpstream:
@@ -176,8 +176,8 @@ class TestBoundsKeyedByUpstream:
         assert loaded.deadline_seconds(("openai/flex",)) == 1800.0
 
     def test_an_unpinned_request_and_job_read_the_base_bounds(self):
-        assert config().request_timeout_seconds() == 300.0
-        assert config().deadline_seconds() == 900.0
+        assert config().request_timeout_seconds(upstreams=()) == 300.0
+        assert config().deadline_seconds(upstreams=()) == 900.0
         assert config().request_timeout_seconds(()) == 300.0
         assert config().deadline_seconds(()) == 900.0
 
@@ -208,8 +208,8 @@ class TestBoundsKeyedByUpstream:
             write(tmp_path, VALID),
             env={TIMEOUT_MS_VAR: "60000", JOB_DEADLINE_MS_VAR: "120000"},
         )
-        assert loaded.request_timeout_seconds() == 60.0
-        assert loaded.deadline_seconds() == 120.0
+        assert loaded.request_timeout_seconds(upstreams=()) == 60.0
+        assert loaded.deadline_seconds(upstreams=()) == 120.0
         assert loaded.request_timeout_seconds(("openai/flex",)) == 1800.0
         assert loaded.deadline_seconds(("openai/flex",)) == 1800.0
 
@@ -249,7 +249,7 @@ def test_a_sub_second_timeout_survives_the_conversion():
     any ``timeout_ms`` below 1000 into a validation error at graph build time
     rather than into a short bound. LiteLLM's kwarg takes a float.
     """
-    assert config(timeout_ms=500).request_timeout_seconds() == 0.5
+    assert config(timeout_ms=500).request_timeout_seconds(upstreams=()) == 0.5
 
 
 def test_the_timeout_reaching_litellm_is_the_one_the_file_states(
@@ -312,7 +312,7 @@ def test_the_timeout_reaching_litellm_is_the_one_the_file_states(
     with pytest.raises(_StopBeforeTheRequest):
         asyncio.run(drive())
 
-    assert received["timeout"] == resilience.request_timeout_seconds()
+    assert received["timeout"] == resilience.request_timeout_seconds(upstreams=())
     # Stated as the wall-clock bound an operator set, so the assertion fails
     # with the number they would recognise rather than with a bare ratio.
     assert received["timeout"] == 300.0
@@ -415,7 +415,7 @@ def test_env_overrides_the_job_deadline(tmp_path):
     path = write(tmp_path, VALID)
     loaded = load_resilience(path, env={JOB_DEADLINE_MS_VAR: "120000"})
     assert loaded.job_deadline_ms == 120000
-    assert loaded.deadline_seconds() == 120.0
+    assert loaded.deadline_seconds(upstreams=()) == 120.0
 
 
 def test_an_env_override_is_validated_like_a_file_value(tmp_path):

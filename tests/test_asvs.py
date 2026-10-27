@@ -1481,6 +1481,9 @@ class TestTheScopeLineNamesTheUnitsAtTheLevel:
             None,
             {"level": 1},
             units=ASVS.record.units_for({"level": 1}, "authentication"),
+            ruled_out=(),
+            ruled_in=(),
+            applicability=(),
         )
 
         assert "on no other" in line
@@ -1533,7 +1536,17 @@ class TestTheScopeLineNamesTheUnitsAtTheLevel:
         code_flow = CAPABILITIES["client-code-flow"].question
         assert opened.count(code_flow) == 1
         assert "V10.2.1" in opened.split(code_flow, 1)[1].split(")", 1)[0]
-        assert "is open" not in lane_scope("spoofing", STRIDE, model, None)
+        assert "is open" not in lane_scope(
+            "spoofing",
+            STRIDE,
+            model,
+            None,
+            options={},
+            units=(),
+            ruled_out=(),
+            ruled_in=(),
+            applicability=(),
+        )
 
 
 class TestAnUndecidedPreconditionIsItsOwnScopeState:
@@ -1692,7 +1705,9 @@ class TestADraftStatesItsDirection:
         )
         (draft,) = resolution.drafts
         assert draft.direction == "excluded"
-        (view,) = critic_view([draft])
+        (view,) = critic_view(
+            [draft], only=None, repaired=(), unverified=(), assertions=None
+        )
         assert view["direction"] == "excluded"
 
     def test_a_claim_read_back_from_an_older_report_carries_no_direction(self):

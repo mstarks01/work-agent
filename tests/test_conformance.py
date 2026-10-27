@@ -41,6 +41,7 @@ import pytest
 from google.adk.models.base_llm import BaseLlm
 
 from analysis_service.binding import NodeBinding, build_tier_adapters
+from analysis_service.compact import FULL_FORMAT
 from analysis_service.conformance import (
     PROBED_PARAMS,
     REFERENCE_MODELS,
@@ -51,7 +52,7 @@ from analysis_service.conformance import (
     render_markdown,
 )
 from analysis_service.frameworks.stride.record import ThreatProposals, ThreatRulings
-from analysis_service.graph import Pipeline, build_pipeline
+from analysis_service.graph import ENTRY_EXTRACT, Pipeline, build_pipeline
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_gate import ModelGateError
 from analysis_service.resilience import load_resilience
@@ -186,6 +187,10 @@ def _pipeline_for(vendor: VendorName) -> Pipeline:
         package_loaders=repo_package_loaders(),
         binding=NodeBinding.from_configs(tiers, sampling, resolve),
         frameworks=DEFAULT_FRAMEWORKS,
+        entry=ENTRY_EXTRACT,
+        extraction_format=FULL_FORMAT,
+        assertions=False,
+        capability_reader=False,
     )
 
 

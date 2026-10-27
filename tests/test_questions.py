@@ -800,12 +800,30 @@ class TestTheAdmissionCheck:
     def test_a_link_that_would_place_nothing_is_refused(self, link):
         with pytest.raises(ValueError):
             check_answers(
-                [link], [], valid_model(), open_catalog(), (), asked_links=ASKED
+                [link],
+                [],
+                valid_model(),
+                open_catalog(),
+                (),
+                asked_links=ASKED,
+                earlier=(),
+                earlier_links=(),
+                reopen=False,
             )
 
     def test_a_link_that_places_is_admitted(self):
         link = LinkAnswer(principal="customer accounts", element="entity:customer")
-        check_answers([link], [], valid_model(), open_catalog(), (), asked_links=ASKED)
+        check_answers(
+            [link],
+            [],
+            valid_model(),
+            open_catalog(),
+            (),
+            asked_links=ASKED,
+            earlier=(),
+            earlier_links=(),
+            reopen=False,
+        )
 
     def test_a_link_to_a_principal_nobody_asked_about_is_refused(self):
         """An answer to no question cannot replace a stated link (#1289, F3)."""
@@ -841,7 +859,15 @@ class TestTheAdmissionCheck:
         earlier = LinkAnswer(principal="customer accounts", element="entity:customer")
         again = LinkAnswer(principal="customer account", element="none")
         check_answers(
-            [again], [], valid_model(), open_catalog(), (), earlier_links=[earlier]
+            [again],
+            [],
+            valid_model(),
+            open_catalog(),
+            (),
+            earlier_links=[earlier],
+            earlier=(),
+            asked_links=(),
+            reopen=False,
         )
 
 

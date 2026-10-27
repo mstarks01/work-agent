@@ -81,7 +81,6 @@ rather than leaning on the label check to do it.
 from __future__ import annotations
 
 import bisect
-import math
 import re
 import time
 import unicodedata
@@ -543,16 +542,15 @@ def prepare_source(source: str) -> PreparedSource:
     return PreparedSource(tuple(words), tuple(normalize(word) for word in words))
 
 
-def deadline_spent(deadline: float | None) -> bool:
+def deadline_spent(deadline: float) -> bool:
     """Has the body's shared deadline passed?
 
     One reader, because three sites ask it and each asks to avoid a different
     cost: :func:`~analysis_service.fan_in._verify_quotes` and
     :func:`~analysis_service.validation.repair_excerpts` ask before they prepare
-    a source, and :func:`repair_prepared` asks before it scans one. ``None`` is
-    a caller that set no body bound.
+    a source, and :func:`repair_prepared` asks before it scans one.
     """
-    return deadline is not None and time.thread_time() > deadline
+    return time.thread_time() > deadline
 
 
 def _needle_of(quote: str) -> str:
@@ -635,7 +633,7 @@ def _numbers(tokens: list[str]) -> list[str]:
 
 
 def repair_prepared(
-    quote: str, source: PreparedSource, deadline: float | None = None
+    quote: str, source: PreparedSource, deadline: float
 ) -> Repair | None:
     """The source's own span nearest a refused quote, or ``None``.
 
@@ -688,7 +686,7 @@ def repair_prepared(
     best: Repair | None = None
     budget = MAX_REPAIR_WORK
     matcher = SequenceMatcher(autojunk=False)
-    deadline = min(time.thread_time() + _REPAIR_DEADLINE_SECONDS, deadline or math.inf)
+    deadline = min(time.thread_time() + _REPAIR_DEADLINE_SECONDS, deadline)
     matcher.set_seq2(needle)
     for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
         for start in range(len(words) - count + 1):

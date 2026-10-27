@@ -834,8 +834,8 @@ def unit_rows(report: Report) -> dict[str, list[dict[str, str]]]:
 def render_report(
     report: Report,
     state: AnswerState,
-    previous: Report | None = None,
-    parent: str | None = None,
+    previous: Report | None,
+    parent: str | None,
 ) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 

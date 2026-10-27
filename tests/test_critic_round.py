@@ -133,7 +133,9 @@ class TestTheFirstLook:
     def test_the_view_is_the_critic_views_over_the_rounds_marks(self):
         drafts = two_drafts()
 
-        assert round_over(*drafts).view() == critic.critic_view(drafts)
+        assert round_over(*drafts).view() == critic.critic_view(
+            drafts, only=None, repaired=(), unverified=(), assertions=None
+        )
 
 
 class TestTheSecondLook:

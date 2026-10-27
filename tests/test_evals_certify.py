@@ -98,7 +98,7 @@ def _build_fingerprints(sampling, served="vertex_ai/fake-model-001"):
 
 
 def test_a_pro_override_reprints_only_pro_nodes():
-    default = load_sampling(SAMPLING_PATH)
+    default = load_sampling(SAMPLING_PATH, env={})
     overridden = load_sampling(
         SAMPLING_PATH, env={"ANALYSIS_SAMPLING_STRONG_TEMPERATURE": "0.9"}
     )
@@ -113,7 +113,7 @@ def test_a_pro_override_reprints_only_pro_nodes():
 
 
 def test_certify_flags_an_override_drifted_run():
-    default = load_sampling(SAMPLING_PATH)
+    default = load_sampling(SAMPLING_PATH, env={})
     overridden = load_sampling(
         SAMPLING_PATH, env={"ANALYSIS_SAMPLING_STRONG_TEMPERATURE": "0.9"}
     )
@@ -137,7 +137,7 @@ def test_certify_flags_an_override_drifted_run():
 
 
 def test_certify_flags_a_served_build_drifted_run():
-    default = load_sampling(SAMPLING_PATH)
+    default = load_sampling(SAMPLING_PATH, env={})
     manifest = _blessed_from(_build_fingerprints(default, "vertex_ai/build-001"))
 
     # Same sampling, a different served build — every tier's hash moves.
@@ -165,7 +165,7 @@ def _promote_setup(tmp_path):
 
 def test_promote_reprints_values_in_place_and_writes_the_manifest(tmp_path):
     sampling_copy, manifest_copy = _promote_setup(tmp_path)
-    winner = load_sampling(SAMPLING_PATH)
+    winner = load_sampling(SAMPLING_PATH, env={})
     # A param the file pins, since those are the only ones promotion may
     # rewrite: an unset one raises rather than being quietly uncommented.
     roomier = winner.for_tier("base").model_copy(update={"max_output_tokens": 12288})
@@ -201,7 +201,7 @@ def test_promoting_a_param_the_file_leaves_unset_raises(tmp_path):
     instead of uncommenting the line.
     """
     sampling_copy, manifest_copy = _promote_setup(tmp_path)
-    winner = load_sampling(SAMPLING_PATH)
+    winner = load_sampling(SAMPLING_PATH, env={})
     hot = winner.for_tier("strong").model_copy(update={"temperature": 0.7})
     winner = winner.model_copy(update={"tiers": {**winner.tiers, "strong": hot}})
     before = sampling_copy.read_text(encoding="utf-8")
@@ -222,7 +222,7 @@ def test_promoting_a_param_the_file_leaves_unset_raises(tmp_path):
 
 def test_promoting_one_tier_leaves_the_other_unblessed(tmp_path):
     sampling_copy, manifest_copy = _promote_setup(tmp_path)
-    winner = load_sampling(SAMPLING_PATH)
+    winner = load_sampling(SAMPLING_PATH, env={})
 
     manifest = promote(
         winner,
@@ -240,7 +240,7 @@ def test_promote_rejects_an_unknown_tier(tmp_path):
     sampling_copy, manifest_copy = _promote_setup(tmp_path)
     with pytest.raises(CertificationError, match="unknown tier"):
         promote(
-            load_sampling(SAMPLING_PATH),
+            load_sampling(SAMPLING_PATH, env={}),
             keys(extract="vertex_ai/build-001"),  # a node name, not a tier
             build=build_identity(),
             sampling_path=sampling_copy,
@@ -250,7 +250,7 @@ def test_promote_rejects_an_unknown_tier(tmp_path):
 
 def test_promote_accumulates_blessed_builds(tmp_path):
     sampling_copy, manifest_copy = _promote_setup(tmp_path)
-    winner = load_sampling(SAMPLING_PATH)
+    winner = load_sampling(SAMPLING_PATH, env={})
 
     promote(
         winner,
@@ -273,7 +273,7 @@ def test_promote_accumulates_blessed_builds(tmp_path):
 
 def test_promote_refuses_to_pin_a_previously_unset_param(tmp_path):
     sampling_copy, manifest_copy = _promote_setup(tmp_path)
-    winner = load_sampling(SAMPLING_PATH)
+    winner = load_sampling(SAMPLING_PATH, env={})
     tuned = winner.for_tier("strong").model_copy(update={"top_p": 0.9})
     winner = winner.model_copy(update={"tiers": {**winner.tiers, "strong": tuned}})
 

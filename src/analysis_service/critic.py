@@ -944,10 +944,10 @@ def _assertion_rows(draft: Claim, assertions: AssertionCatalog | None) -> list[d
 def critic_view(
     drafts: Sequence[Claim],
     *,
-    only: Collection[str] | None = None,
-    repaired: Sequence[RepairedQuote] = (),
-    unverified: Sequence[UnverifiedGround] = (),
-    assertions: AssertionCatalog | None = None,
+    only: Collection[str] | None,
+    repaired: Sequence[RepairedQuote],
+    unverified: Sequence[UnverifiedGround],
+    assertions: AssertionCatalog | None,
 ) -> list[dict]:
     """The drafts a critic is shown, with everything computed for it already.
 

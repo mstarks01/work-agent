@@ -377,7 +377,6 @@ def test_the_deadline_comes_from_the_deployments_resilience_config():
 
     # The shipped number, not one this test picked: an engine that invented its
     # own bound would be the defect the deadline exists to prevent.
-    assert (
-        engine._deadline_seconds
-        == load_resilience(DEFAULT_RESILIENCE_PATH).deadline_seconds()
-    )
+    assert engine._deadline_seconds == load_resilience(
+        DEFAULT_RESILIENCE_PATH
+    ).deadline_seconds(upstreams=())
