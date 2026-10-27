@@ -1,8 +1,11 @@
 """A save on the Settings page of the first-run app, and the live swap
-(#1776, ADR 0092, ADR 0093), at the HTTP surface.
+(#1776, ADR 0092, ADR 0093).
 
-Each test builds the app on a settings directory in ``tmp_path`` with a
-process environment of its own. The build checks each mapping with the real
+:class:`TestTheSaveOperation` calls :func:`~webapp.settings_save.apply_save`
+on a settings directory in ``tmp_path``, with no app, for the order of the
+steps and each failure before the commit. Each other test builds the app on
+a settings directory in ``tmp_path`` with a process environment of its own,
+and reads the HTTP surface. The build checks each mapping with the real
 loaders and the real runner, which makes no provider call, and then runs each
 job on a stub runner, so a test reads which Deployment ran a job.
 """
@@ -12,9 +15,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import stat
-import subprocess
-import sys
 import threading
 import time
 from dataclasses import replace
@@ -40,10 +42,16 @@ from tests.test_webapp import LOOPBACK, SAME_ORIGIN, posted, run_to_completion
 from tests.test_webapp_cell import Recording
 from tests.test_webapp_questions import PausingRunner, shown_list, start
 from tests.test_webapp_settings import page_data, rows_of
-from webapp import main, settings_save
+from webapp import settings_save
 from webapp.main import Startup, build_startup, create_app
-from webapp.settings_save import _KEY_FILE_NAME as KEY_FILE
-from webapp.settings_save import MAX_SAVE_BYTES, new_key_file
+from webapp.settings_save import (
+    MAX_SAVE_BYTES,
+    Save,
+    SaveConflict,
+    Saved,
+    SaveRefused,
+    apply_save,
+)
 
 BASE_MODEL = TEST_TIER_ENV["ANALYSIS_MODEL_BASE_MODEL"]
 
@@ -444,23 +452,6 @@ class TestAStaleSave:
         assert stale.status_code == 409
         assert "ANALYSIS_TIMEOUT_MS=7000" in settings_text(tmp_path)
 
-    def test_a_hand_edit_while_the_check_runs_is_a_409(self, tmp_path):
-        builds = Builds()
-
-        def edits(env) -> Startup:
-            built = builds(env)
-            if len(builds.models) > 1:
-                write_settings(tmp_path, hand_written(ANALYSIS_TIMEOUT_MS="7000"))
-            return built
-
-        write_settings(tmp_path, hand_written())
-        client = settings_client(tmp_path, build=edits)
-
-        stale = save(client, {"resilience.attempts": "2"})
-
-        assert stale.status_code == 409
-        assert "ANALYSIS_RETRY_ATTEMPTS" not in settings_text(tmp_path)
-
     def test_two_saves_at_the_same_time_do_not_interleave(self, tmp_path):
         """The second save waits for the first, then reads its revision as
         stale."""
@@ -521,6 +512,11 @@ class TestAStoreChange:
         assert saved.json()["restart"] == []
 
 
+#: The name of a key file that a save writes, as the module docstring of
+#: :mod:`webapp.settings_save` states it: the stem of its variable, a dot and
+#: 16 hexadecimal characters.
+KEY_FILE = re.compile(r"(?P<stem>[a-z0-9_]+)\.[0-9a-f]{16}")
+
 #: A key that no fixture holds, so a text that carries it leaked the key.
 KEY = "sk-saved-from-the-page-never-shown"
 ANTHROPIC_KEY = "credentials.anthropic.api_key"
@@ -552,12 +548,6 @@ def stems(tmp_path) -> list[str]:
         f"{match['stem']}.*" if (match := KEY_FILE.fullmatch(p.name)) else p.name
         for p in tmp_path.iterdir()
     )
-
-
-def test_the_key_file_rule_reads_each_name_that_new_key_file_writes(tmp_path):
-    path = new_key_file(tmp_path, "ANALYSIS_ANTHROPIC_API_KEY_FILE")
-
-    assert KEY_FILE.fullmatch(path.name)["stem"] == "anthropic_api_key"
 
 
 def failing(path, values):
@@ -664,105 +654,17 @@ class TestAKeySave:
         assert settings_text(tmp_path) == before
         assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
 
-    def test_a_loader_refusal_leaves_no_key_file(self, tmp_path):
-        client, _ = app_on(tmp_path, hand_written())
-
-        refused = save(client, {ANTHROPIC_KEY: KEY, "resilience.timeout_ms": "0"})
-
-        assert refused.status_code == 422, refused.text
-        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
-
-    def test_a_hand_edit_while_the_check_runs_leaves_no_key_file(
+    def test_a_failed_replace_of_settings_env_is_a_500_that_keeps_the_cell(
         self, tmp_path, monkeypatch
     ):
-        client, _ = app_on(tmp_path, hand_written())
-        check = main.check_saved
-
-        def editing(env, build):
-            with (tmp_path / "settings.env").open("a", encoding="utf-8") as file:
-                file.write("ANALYSIS_TIMEOUT_MS=5000\n")
-            return check(env, build)
-
-        monkeypatch.setattr(main, "check_saved", editing)
-
-        stale = save(client, {ANTHROPIC_KEY: KEY})
-
-        assert stale.status_code == 409, stale.text
-        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
-
-    def test_the_key_files_come_first_and_the_deletion_last(
-        self, tmp_path, monkeypatch
-    ):
-        old_key = key_on_disk(tmp_path)
-        client, _ = app_on(
-            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
-        )
-        seen = []
-        write = main.write_settings_env
-
-        def recording(path, values):
-            seen.append(stems(tmp_path))
-            write(path, values)
-
-        monkeypatch.setattr(main, "write_settings_env", recording)
-
-        saved = save(
-            client,
-            {
-                "tiers.review.vendor": "openai",
-                "tiers.review.model": OTHER_MODEL,
-                "credentials.openai.api_key": KEY,
-            },
-        )
-
-        assert saved.status_code == 200, saved.text
-        assert seen == [["anthropic_api_key.*", "openai_api_key.*", "settings.env"]]
-        assert stems(tmp_path) == ["openai_api_key.*", "settings.env"]
-        assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" not in settings_text(tmp_path)
-
-    def test_a_failed_write_of_settings_env_keeps_the_old_file_and_key(
-        self, tmp_path, monkeypatch
-    ):
-        old_key = key_on_disk(tmp_path)
-        client, builds = app_on(
-            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
-        )
-        before = settings_text(tmp_path)
-        monkeypatch.setattr(main, "write_settings_env", failing)
-
-        failed = save(
-            client,
-            {
-                ANTHROPIC_KEY: KEY,
-                "tiers.review.vendor": "openai",
-                "tiers.review.model": OTHER_MODEL,
-            },
-        )
-        run_to_completion(client)
-
-        assert failed.status_code == 500, failed.text
-        assert settings_text(tmp_path) == before
-        assert Path(old_key).read_text(encoding="utf-8") == OLD_KEY
-        assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]
-        assert builds.runners[0].jobs and not builds.runners[1].jobs
-
-    def test_a_failed_replace_of_settings_env_keeps_the_old_state(
-        self, tmp_path, monkeypatch
-    ):
-        old_key = key_on_disk(tmp_path)
-        client, builds = app_on(
-            tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key)
-        )
-        before = settings_text(tmp_path)
+        client, builds = app_on(tmp_path, hand_written())
         monkeypatch.setattr(config_files.os, "replace", failing)
 
         failed = save(client, {ANTHROPIC_KEY: KEY})
         run_to_completion(client)
 
         assert failed.status_code == 500, failed.text
-        assert settings_text(tmp_path) == before
-        assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]
-        assert Path(old_key).read_text(encoding="utf-8") == OLD_KEY
+        assert "No space left on device" in failed.json()["message"]
         assert builds.runners[0].jobs and not builds.runners[1].jobs
 
     def test_a_failed_directory_fsync_after_the_replace_keeps_the_save(
@@ -785,24 +687,6 @@ class TestAKeySave:
         assert not Path(old_key).exists()
         assert builds.runners[1].jobs and not builds.runners[0].jobs
         assert "fsync" in caplog.text
-
-    def test_a_failed_key_write_leaves_no_key_file(self, tmp_path, monkeypatch):
-        client, _ = app_on(tmp_path, hand_written())
-        create = settings_save.create_private
-        calls = []
-
-        def second_fails(path, data):
-            calls.append(path)
-            if len(calls) == 2:
-                raise OSError(28, "No space left on device")
-            create(path, data)
-
-        monkeypatch.setattr(settings_save, "create_private", second_fails)
-
-        failed = save(client, {ANTHROPIC_KEY: KEY, "credentials.openai.api_key": KEY})
-
-        assert failed.status_code == 500, failed.text
-        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
 
     def test_a_save_deletes_only_unnamed_files_of_the_key_name_form(self, tmp_path):
         # A save that stops before the swap, such as in a crash, can leave a
@@ -874,20 +758,214 @@ class TestAFirstRun:
         assert named_key(tmp_path).read_text(encoding="utf-8") == KEY
 
 
-def test_new_lines_refuse_a_setting_with_no_variable_under_optimize():
-    """``python -O`` removes an ``assert``, so the refusal must be a raise."""
-    script = (
-        "from webapp.settings_save import Save, saved_lines\n"
-        "saved_lines({}, Save('r', {'tiers.review_independence': 'x'}, ()), {})\n"
-    )
-    result = subprocess.run(
-        [sys.executable, "-O", "-c", script],
-        cwd=Path(__file__).resolve().parents[1],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
+def applied(
+    tmp_path,
+    changes=None,
+    *,
+    build=build_startup,
+    swap=lambda built: None,
+    rev: str | None = None,
+):
+    """The outcome of one :func:`apply_save` on the ``settings.env`` of
+    ``tmp_path``, at the revision of the file unless ``rev`` names one."""
+    path = tmp_path / "settings.env"
+    loaded = config_files.read_settings(path).revision if rev is None else rev
+    return asyncio.run(
+        apply_save(
+            asyncio.Lock(),
+            path,
+            Save(loaded, dict(changes or {}), ()),
+            env_in(tmp_path),
+            build,
+            swap,
+        )
     )
 
-    assert result.returncode != 0
-    assert "ValueError: tiers.review_independence" in result.stderr
+
+class TestTheSaveOperation:
+    def test_a_save_writes_settings_env_and_the_new_key_file(self, tmp_path):
+        write_settings(tmp_path, hand_written())
+        swapped: list[Startup] = []
+
+        outcome = applied(
+            tmp_path,
+            {ANTHROPIC_KEY: KEY, "resilience.timeout_ms": "5000"},
+            swap=swapped.append,
+        )
+
+        assert isinstance(outcome, Saved), outcome
+        path = named_key(tmp_path)
+        assert outcome.env["ANALYSIS_ANTHROPIC_API_KEY_FILE"] == str(path)
+        assert outcome.env["ANALYSIS_TIMEOUT_MS"] == "5000"
+        assert "ANALYSIS_TIMEOUT_MS=5000" in settings_text(tmp_path).splitlines()
+        assert KEY_FILE.fullmatch(path.name)["stem"] == "anthropic_api_key"
+        assert path.read_text(encoding="utf-8") == KEY
+        assert path.stat().st_mode & 0o777 == 0o600
+        assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]
+        [built] = swapped
+        assert built.error is None
+
+    def test_a_rule_refusal_writes_nothing(self, tmp_path):
+        write_settings(tmp_path, hand_written())
+        before = settings_text(tmp_path)
+        swapped: list[Startup] = []
+
+        outcome = applied(
+            tmp_path,
+            {ANTHROPIC_KEY: " sk-padded", "resilience.timeout_ms": " 5000"},
+            swap=swapped.append,
+        )
+
+        assert isinstance(outcome, SaveRefused), outcome
+        assert [refusal.key for refusal in outcome.refusals] == [
+            ANTHROPIC_KEY,
+            "resilience.timeout_ms",
+        ]
+        assert settings_text(tmp_path) == before
+        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
+        assert swapped == []
+
+    def test_a_check_refusal_deletes_the_new_key_files(self, tmp_path):
+        old_key = key_on_disk(tmp_path)
+        write_settings(tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key))
+        before = settings_text(tmp_path)
+        swapped: list[Startup] = []
+
+        outcome = applied(
+            tmp_path,
+            {ANTHROPIC_KEY: KEY, "resilience.timeout_ms": "0"},
+            swap=swapped.append,
+        )
+
+        assert isinstance(outcome, SaveRefused), outcome
+        [refusal] = outcome.refusals
+        assert "timeout_ms" in refusal.message
+        assert settings_text(tmp_path) == before
+        assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]
+        assert Path(old_key).read_text(encoding="utf-8") == OLD_KEY
+        assert swapped == []
+
+    def test_a_failed_replace_of_settings_env_deletes_the_new_key_files(
+        self, tmp_path, monkeypatch
+    ):
+        old_key = key_on_disk(tmp_path)
+        write_settings(tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key))
+        before = settings_text(tmp_path)
+        monkeypatch.setattr(config_files.os, "replace", failing)
+        swapped: list[Startup] = []
+
+        with pytest.raises(OSError, match="No space left on device"):
+            applied(
+                tmp_path,
+                {
+                    ANTHROPIC_KEY: KEY,
+                    "tiers.review.vendor": "openai",
+                    "tiers.review.model": OTHER_MODEL,
+                },
+                swap=swapped.append,
+            )
+
+        assert settings_text(tmp_path) == before
+        assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]
+        assert Path(old_key).read_text(encoding="utf-8") == OLD_KEY
+        assert swapped == []
+
+    def test_a_failed_key_write_leaves_no_key_file(self, tmp_path, monkeypatch):
+        write_settings(tmp_path, hand_written())
+        create = settings_save.create_private
+        calls = []
+
+        def second_fails(path, data):
+            calls.append(path)
+            if len(calls) == 2:
+                raise OSError(28, "No space left on device")
+            create(path, data)
+
+        monkeypatch.setattr(settings_save, "create_private", second_fails)
+
+        with pytest.raises(OSError, match="No space left on device"):
+            applied(tmp_path, {ANTHROPIC_KEY: KEY, "credentials.openai.api_key": KEY})
+
+        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
+
+    def test_a_revision_that_moved_before_the_save_is_a_conflict(self, tmp_path):
+        write_settings(tmp_path, hand_written())
+        before = settings_text(tmp_path)
+
+        outcome = applied(tmp_path, {ANTHROPIC_KEY: KEY}, rev="0" * 64)
+
+        assert outcome == SaveConflict()
+        assert settings_text(tmp_path) == before
+        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
+
+    def test_a_hand_edit_while_the_check_runs_is_a_conflict(self, tmp_path):
+        write_settings(tmp_path, hand_written())
+        swapped: list[Startup] = []
+
+        def editing(env) -> Startup:
+            with (tmp_path / "settings.env").open("a", encoding="utf-8") as file:
+                file.write("ANALYSIS_TIMEOUT_MS=7000\n")
+            return build_startup(env)
+
+        outcome = applied(
+            tmp_path,
+            {ANTHROPIC_KEY: KEY, "resilience.attempts": "2"},
+            build=editing,
+            swap=swapped.append,
+        )
+
+        assert outcome == SaveConflict()
+        assert "ANALYSIS_TIMEOUT_MS=7000" in settings_text(tmp_path)
+        assert "ANALYSIS_RETRY_ATTEMPTS" not in settings_text(tmp_path)
+        assert [p.name for p in tmp_path.iterdir()] == ["settings.env"]
+        assert swapped == []
+
+    def test_a_settings_env_that_the_rule_refuses_refuses_the_whole_save(
+        self, tmp_path
+    ):
+        write_settings(tmp_path, hand_written()).chmod(0o620)
+
+        outcome = applied(tmp_path, {"resilience.timeout_ms": "5000"}, rev="r")
+
+        assert isinstance(outcome, SaveRefused), outcome
+        [refusal] = outcome.refusals
+        assert refusal.key is None
+        assert "lets the group or other users write it" in refusal.message
+
+    def test_the_key_files_come_first_and_the_deletion_last(self, tmp_path):
+        old_key = key_on_disk(tmp_path)
+        write_settings(tmp_path, hand_written(ANALYSIS_ANTHROPIC_API_KEY_FILE=old_key))
+        seen = []
+
+        def recording(env) -> Startup:
+            seen.append(("check", stems(tmp_path)))
+            return build_startup(env)
+
+        outcome = applied(
+            tmp_path,
+            {
+                "tiers.review.vendor": "openai",
+                "tiers.review.model": OTHER_MODEL,
+                "credentials.openai.api_key": KEY,
+            },
+            build=recording,
+            swap=lambda built: seen.append(("swap", stems(tmp_path))),
+        )
+
+        assert isinstance(outcome, Saved), outcome
+        both = ["anthropic_api_key.*", "openai_api_key.*", "settings.env"]
+        assert seen == [("check", both), ("swap", both)]
+        assert stems(tmp_path) == ["openai_api_key.*", "settings.env"]
+        assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" not in settings_text(tmp_path)
+        assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" not in outcome.env
+
+    def test_a_second_key_save_deletes_the_key_file_of_the_first(self, tmp_path):
+        write_settings(tmp_path, hand_written())
+        assert isinstance(applied(tmp_path, {ANTHROPIC_KEY: OLD_KEY}), Saved)
+        first = named_key(tmp_path)
+
+        assert isinstance(applied(tmp_path, {ANTHROPIC_KEY: KEY}), Saved)
+
+        assert not first.exists()
+        assert named_key(tmp_path).read_text(encoding="utf-8") == KEY
+        assert stems(tmp_path) == ["anthropic_api_key.*", "settings.env"]

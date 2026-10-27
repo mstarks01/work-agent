@@ -167,9 +167,7 @@ from analysis_service.claims import UnknownKey
 from analysis_service.config_files import (
     SETTINGS_FILE,
     SettingsFileError,
-    read_settings,
     settings_dir,
-    write_settings_env,
 )
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
@@ -216,7 +214,6 @@ from analysis_service.links import (
     components,
     fold,
 )
-from analysis_service.model_gate import NoThinkingLevel
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import (
     gaps,
@@ -227,7 +224,7 @@ from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
 from analysis_service.selection import SelectionError
-from analysis_service.settings_variables import deployment_env, merged_env
+from analysis_service.settings_variables import deployment_env
 from analysis_service.sources import (
     ANSWERS_LABEL,
     MAX_SYSTEM_NAME_CHARS,
@@ -237,10 +234,8 @@ from analysis_service.sources import (
 from analysis_service.store_backends import (
     audited_delete,
     build_store,
-    retention_days,
     store_lifespan,
 )
-from analysis_service.store_settings import StoreConfigError
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -260,19 +255,15 @@ from webapp.page import (
     response,
     script_json,
 )
-from webapp.settings_page import CHANGED_SAMPLING, sampling_key
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
     Refusal,
-    delete_files,
+    SaveConflict,
+    Saved,
+    SaveRefused,
+    apply_save,
     parse_save,
-    refusals,
     restart_keys,
-    saved_keys,
-    saved_lines,
-    unused_key_files,
-    unused_keys,
-    write_keys,
 )
 from webapp.settings_view import settings_view, with_store_defaults
 
@@ -1137,37 +1128,6 @@ async def _cell_empty(request: Request, exc: CellEmpty) -> Response:
     return exc.response
 
 
-def check_saved(
-    env: Mapping[str, str], build: Callable[[Mapping[str, str]], Startup]
-) -> tuple[Startup, list[Refusal]]:
-    """The check of the mapping that a save gives: the Startup that ``build``
-    makes from it, and a refusal for each loader that refuses it. A thinking
-    level on a model that takes none is refused on its own row.
-
-    ``build`` builds the test Deployment and its runner, and the store check
-    runs :func:`~analysis_service.store_backends.build_store` and the
-    retention rule. No step calls a provider.
-    """
-    startup = build(env)
-    found = [] if startup.error is None else [_refusal_of(startup.error)]
-    try:
-        build_store(with_store_defaults(env))
-        retention_days(env)
-    except (StoreConfigError, ImportError) as exc:
-        found.append(Refusal(None, str(exc)))
-    return startup, found
-
-
-def _refusal_of(error: ConfigError) -> Refusal:
-    """The refusal of a build error, on the row that it names where one does."""
-    key = (
-        sampling_key(error.tier, CHANGED_SAMPLING)
-        if isinstance(error, NoThinkingLevel)
-        else None
-    )
-    return Refusal(key, str(error))
-
-
 def _refused_save(found: Sequence[Refusal]) -> JSONResponse:
     return JSONResponse(
         {
@@ -1325,18 +1285,12 @@ def create_app(
     async def save_settings(request: Request) -> Response:
         """Check a save, write it and swap the cell (ADR 0092, ADR 0093).
 
-        One save at a time holds the lock from the revision check to the
-        swap. A save that the value rule, the secret rule, the test
-        Deployment or the store check refuses changes nothing, and its 422
-        holds one message for each refusal. A save writes each new key to a
-        new key file first, and the check builds the Deployment on those
-        paths. The replace of ``settings.env`` is the one step that commits
-        the save: before it, a refusal or a failure deletes the new key
-        files, so the old ``settings.env`` and its key files stay in force.
-        After it, the save swaps the cell to the Deployment that the check
-        built, and deletes each key file that no variable names. The
-        response holds the new page data and the keys of each store setting
-        that takes effect after a restart.
+        :func:`~webapp.settings_save.apply_save` runs the save under the lock
+        and swaps the cell to the Deployment that its check built. A refused
+        save is a 422 that holds one message for each refusal, a revision
+        that moved is a 409, and a write that fails is a 500; each of them
+        changes nothing. The response holds the new page data and the keys
+        of each store setting that takes effect after a restart.
         """
         if not is_same_origin(request):
             logger.warning("refused a POST /settings that was not same-origin")
@@ -1356,60 +1310,32 @@ def create_app(
                 " a 'remove' list.",
             )
         path = settings_dir(process_env) / SETTINGS_FILE
-        directory = path.parent
-        async with save_lock:
-            try:
-                revision, lines = read_settings(path)
-            except SettingsFileError as exc:
-                return _refused_save([Refusal(None, str(exc))])
-            if save.revision != revision:
-                return _message(409, _RELOAD_MESSAGE)
-            if found := refusals(save, process_env, lines):
-                return _refused_save(found)
-            written: dict[str, Path] = {}
-            committed = False
-            try:
-                written = write_keys(directory, saved_keys(save))
-                saved_env = merged_env(
-                    process_env, saved_lines(lines, save, written), path
-                )
-                built, found = await asyncio.to_thread(check_saved, saved_env, build)
-                if found:
-                    return _refused_save(found)
-                # A hand edit while the check ran is not written over.
-                if read_settings(path).revision != revision:
-                    return _message(409, _RELOAD_MESSAGE)
-                saved = saved_lines(lines, save, written, unused_keys(built.tiers))
-                saved_env = merged_env(process_env, saved, path)
-                write_settings_env(
-                    path, {var: line.value for var, line in saved.items()}
-                )
-                committed = True
-            except SettingsFileError as exc:
-                return _refused_save([Refusal(None, str(exc))])
-            except OSError as exc:
-                logger.error("the settings could not be written: %s", exc)
-                return _message(
-                    500, f"The settings could not be written: {exc.strerror}"
-                )
-            finally:
-                if not committed:
-                    delete_files(written.values())
+
+        def swap(built: Startup) -> None:
             cell.current = built.current(workspace.store)
-            try:
-                delete_files(unused_key_files(directory, saved_env))
-            except OSError as exc:
-                # The next save deletes each key file that this one left.
-                logger.warning("a key file that no variable names stays: %s", exc)
-            logger.info("settings saved: %s", ", ".join([*save.changes, *save.remove]))
-        return JSONResponse(
-            {
-                "settings": settings_view(process_env, None),
-                "restart": restart_keys(
-                    with_store_defaults(env), with_store_defaults(saved_env)
-                ),
-            }
-        )
+
+        try:
+            outcome = await apply_save(save_lock, path, save, process_env, build, swap)
+        except OSError as exc:
+            logger.error("the settings could not be written: %s", exc)
+            return _message(500, f"The settings could not be written: {exc.strerror}")
+        match outcome:
+            case SaveConflict():
+                return _message(409, _RELOAD_MESSAGE)
+            case SaveRefused(found):
+                return _refused_save(found)
+            case Saved(saved_env):
+                logger.info(
+                    "settings saved: %s", ", ".join([*save.changes, *save.remove])
+                )
+                return JSONResponse(
+                    {
+                        "settings": settings_view(process_env, None),
+                        "restart": restart_keys(
+                            with_store_defaults(env), with_store_defaults(saved_env)
+                        ),
+                    }
+                )
 
     @app.get("/example", response_class=PlainTextResponse)
     async def example() -> Response:
