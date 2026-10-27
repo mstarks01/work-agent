@@ -211,11 +211,8 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
 # cannot answer that question without answering a different one.
 #
 # The pool is derived from votes, and this queue skips what is already
-# answered. In an unnamed queue "answered" is every fingerprint anybody voted
-# on, and the pool is a subset of that, so nothing pooled survives to be
-# ranked and such a row would fire on everything. In a queue built for a named
-# voter "answered" is only that voter's, so a pooled finding that survives was
-# pooled by *somebody else* -- and the row's weight, its position in the order
+# answered. "Answered" is only this queue's voter's, so a pooled finding that
+# survives was pooled by *somebody else* -- and the row's weight, its position in the order
 # and the reason printed beside it would tell this reviewer how another
 # reviewer voted. The second-opinion pass is the one place that must not be
 # told.
@@ -272,10 +269,9 @@ def answered(
     answers an item is :meth:`~evals.harness.ledger.Ledger.verdicts_for`'s
     rule (ADR 0060).
 
-    The re-argued clause reads a **named** reviewer's votes only. In a queue
-    built for nobody, ``voter`` is empty and anybody's answer skips: re-offering
-    the finding there would tell this reviewer that another reviewer had
-    answered the earlier version.
+    Only ``voter``'s own votes count, so another reviewer's answer never takes
+    an item out of this queue. An empty ``voter`` raises :class:`ValueError`:
+    a queue is built for one named reviewer.
 
     **Public because the app re-asks the same question per request.** It builds
     the queue once and filters it again on every serve. The app calls this
@@ -283,16 +279,16 @@ def answered(
     `needs-evidence` answer as answered and drop what this re-offers. One rule
     needs one reader.
     """
+    if not voter:
+        raise ValueError("a review queue is built for one named voter")
     live = ledger.current()
     skipped = set()
     for identity, content in contents.items():
-        found = ledger.verdicts_for(*identity, live)
-        if voter:
-            found = {voter: found[voter]} if voter in found else {}
-        if any(
-            (vote.verdict != "needs-evidence" or vote.sitting == sitting)
-            and (not voter or vote.answers_for(content))
-            for vote in found.values()
+        vote = ledger.verdicts_for(*identity, live).get(voter)
+        if (
+            vote is not None
+            and (vote.verdict != "needs-evidence" or vote.sitting == sitting)
+            and vote.answers_for(content)
         ):
             skipped.add(identity)
     return frozenset(skipped)
@@ -315,10 +311,7 @@ def restated(
     both narrow to the named reviewer's own votes for the reason
     :func:`answered` gives.
 
-    Empty for an unnamed queue, which is what keeps that queue blind.
     """
-    if not voter:
-        return {}
     return {
         identity: _said(vote)
         for identity, content in contents.items()
@@ -341,9 +334,9 @@ def build(
 ) -> list[QueueItem]:
     """The queue: unanswered findings, most informative first.
 
-    ``voter`` narrows "already answered" to *this* reviewer, which is what makes
-    a second opinion possible: leaving it empty skips everything anybody
-    answered, and naming a reviewer skips only what they answered themselves.
+    ``voter`` is the reviewer the queue is for, and "already answered" means
+    answered by them, which is what makes a second opinion possible.
+    :func:`answered` refuses an empty ``voter``.
     ``sitting`` is this session's id, which decides how long a ``needs-evidence``
     answer holds -- see :func:`answered`.
 
