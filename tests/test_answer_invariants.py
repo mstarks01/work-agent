@@ -273,10 +273,10 @@ def test_i_do_not_know_changes_nothing_the_catalog_says(reason):
 
 # --- The pause reads the model the lanes will read ---------------------------
 #
-# A paused checkpoint holds the model before prepare projects the catalog. Read
-# there, a fact the catalog states still looked open: the early list offered it,
-# the check admitted an answer, and the answer then superseded what the sources
-# stated. The lists and the check now read ``prepared_model``.
+# A paused checkpoint holds the model before prepare projects the catalog, so
+# the lists and the check read ``prepared_model``. Read before the projection,
+# a fact the catalog states would look open, and an answer to it would
+# supersede what the sources stated.
 
 PRIOR = prior_of({"DataFlow": {attribute: 1.0 for attribute in ANSWERS}})
 

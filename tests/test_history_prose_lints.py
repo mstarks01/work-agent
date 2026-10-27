@@ -83,7 +83,8 @@ HISTORY = re.compile(
     r"|an earlier version of this (note|module|page)"
     r"|version \d+ (adds|added|makes|made|renames|renamed|removed)"
     r"|bumped (to|from) (version |v)?\d+|bumped nothing"
-    r"|hard cutover from|no v\d+ shim|(was|were) (migrated|re-?sealed))\b",
+    r"|hard cutover from|no v\d+ shim|(was|were) (migrated|re-?sealed)"
+    r"|(was|were) once|once did)\b",
     re.IGNORECASE,
 )
 

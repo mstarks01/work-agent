@@ -1,7 +1,7 @@
 """A new analysis carries the answers of an earlier job (ADR 0079).
 
-An owner who analyses a system again answered the same questions again. A
-submission now names one earlier job of its owner, and the new job carries
+An owner who analyses a system again would otherwise answer the same
+questions again. So a submission names one earlier job of its owner, and the new job carries
 every answer that job holds. Its own questions take each answer they still
 ask, as an amended job's questions do (ADR 0072).
 """

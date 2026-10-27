@@ -195,9 +195,8 @@ def test_two_packages_ask_what_three_ask_for_them(third):
 
 def test_another_package_s_bands_do_not_move_a_framework_s_floor(third):
     """With ASVS level 1 alone, 24 capability questions that only ASVS asks sit
-    under the floor. Before ADR 0071, selecting this package with its three
-    bands moved every one of them over it. Each framework's bands are now read
-    apart."""
+    under the floor. Each framework's bands are read apart (ADR 0071), so
+    selecting this package with its three bands moves none of them over it."""
 
     def under(asked):
         return {

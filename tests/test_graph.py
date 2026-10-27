@@ -3493,10 +3493,9 @@ def test_a_fenced_value_and_a_fenced_source_share_one_layout():
 
 
 def test_merge_marks_an_invented_key_before_the_deferral_split():
-    """#659: a deferred proposal naming a requirement the catalog does not hold
-    reached the deferred map, where the scope builder silently dropped it. The
-    identity check now runs on the whole batch, so the mark is written and the
-    deferred map never carries the key."""
+    """#659: the identity check runs on the whole batch before the deferral
+    split, so the mark is written and the deferred map never carries a key the
+    catalog does not hold. The scope builder would drop such a key silently."""
     from analysis_service.frameworks import PACKAGES
     from analysis_service.frameworks.asvs.record import RequirementProposal
 

@@ -30,9 +30,8 @@ bargain: it says *this is a reference* rather than leaving the lint to infer it
 from backticks, so an unqualified name is checkable against the module it was
 written in, exactly as Sphinx would resolve it.
 
-The docstring half was added after a constant deleted for having no reader left
-two references behind in the module that defined it, and nothing failed. The
-lint read prose files and Python was not one.
+The docstring half exists because a deleted constant can leave references
+behind in its own module, and the prose half does not read Python.
 
 Three other layers cover what this one cannot, and none replaces another:
 

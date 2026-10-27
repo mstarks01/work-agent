@@ -712,9 +712,9 @@ class TestABadReferenceCostsItsEntryNotTheJob:
     """The policy #138 narrowed, and the groundless drop that finished it.
 
     Agents compose well-formed references to facts the catalog does not hold,
-    and failing the whole analysis over one discarded six lanes of work to
-    punish a citation error — 2 of 12 jobs on a live sweep. The rule is now the
-    one unverified quotes have: marked per entry, dropped per claim.
+    and failing the whole analysis over one would discard six lanes of work to
+    punish a citation error (2 of 12 jobs on a live sweep). So a bad reference
+    is marked per entry and dropped per claim, as an unverified quote is.
     """
 
     def test_a_threat_survives_on_the_references_that_did_resolve(self):

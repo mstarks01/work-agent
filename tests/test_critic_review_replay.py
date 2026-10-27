@@ -415,7 +415,7 @@ def test_a_constant_reading_no_longer_scores_full_marks(fixtures, model):
     the whole denominator. While every one of them expected the same answer, a
     critic replying ``sound: true`` without opening the block scored full
     marks — the failure ``unsupported_removed`` and ``valid_preserved`` were
-    split apart to avoid. One survivor now carries advice the reader ruled
+    split apart to avoid. One survivor carries advice the reader ruled
     unsound, so the constant is wrong about exactly that row.
     """
     payload = {"claims": []}
@@ -445,7 +445,7 @@ def test_an_anchor_matches_the_word_form_the_critic_actually_wrote():
     killing the right draft for the wrong reason.
 
     ``singular`` is the rule this repository already measured for plural drift,
-    and it is now the only reader of that question.
+    and it is the only reader of that question.
     """
     reason = (
         "The model does not state that process:order-service queues failed "

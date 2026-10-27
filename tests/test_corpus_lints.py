@@ -890,8 +890,8 @@ class TestTheTwoReadersOfTheIdRule:
 #: The eight claims that prompted #1125, as a case, the two elements the
 #: blessed model already joins, and a sentence in the shape each one used. The
 #: Case Sitting of 2026-09-21 ruled out every one, seven as ``reject`` and one
-#: as ``duplicate``, and #1123 dropped them — so the corpus cannot hold this
-#: regression any more and the test carries it instead.
+#: as ``duplicate``. The corpus does not hold these claims (#1123), so this
+#: test carries them.
 #:
 #: The sentences are written here rather than copied, because a lint that
 #: stored the corpus's own prose would be a second reader of it. What is real

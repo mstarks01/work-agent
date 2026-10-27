@@ -146,8 +146,8 @@ def test_every_block_issue_names_its_framework():
 
 def test_gate_fires_on_a_report_mutated_after_construction():
     # The point of re-asserting rather than delegating to the model validator:
-    # the gate checks the object in front of it, not the object that was once
-    # validated. A report edited in place still fails.
+    # the gate checks the object in front of it, not the object the validator
+    # saw at construction. A report edited in place still fails.
     report = sample_report()
     report.boundary_crossings = []
 

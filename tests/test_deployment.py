@@ -63,8 +63,8 @@ from tests.factories import (
 _STRIDE = FrameworkNodes("stride")
 CRITIC_NODE = _STRIDE.node(graph.CRITIC_ROLE)
 #: This graph's node -> tier map, built for the selection above. Not a module
-#: constant any more: which nodes exist is a function of which frameworks the
-#: graph was built for.
+#: constant: which nodes exist depends on the frameworks the graph is built
+#: for.
 TIER_NODES = graph.tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 RECRITIC_NODE = _STRIDE.node(graph.RECRITIC_ROLE)
 

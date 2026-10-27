@@ -338,8 +338,8 @@ def classify_failure(case_id: str, error: Exception) -> GroundsFailure:
     """Name what the fan-in rejected, without pattern-matching its prose.
 
     Structural signals only, all type checks or ``loc`` shapes rather than
-    message prose. A claim that lost every ground is not a failure any more —
-    it is dropped and marked, and :func:`measure_grounds` counts it.
+    message prose. A claim that lost every ground is not a failure: it is
+    dropped and marked, and :func:`measure_grounds` counts it.
 
     **Raises rather than classifies** on a mis-shaped ``Ground``, recognised as
     a :class:`pydantic.ValidationError` whose ``loc`` **ends** in
