@@ -136,7 +136,7 @@ NOT_GUIDES: dict[str, str] = {
 LINT_MARKER = "pytest.mark.lint"
 
 #: A reason shorter than this says nothing a reader can check.
-_SHORTEST_REASON = 40
+SHORTEST_REASON = 40
 
 
 def source_files(*roots: str, suffixes: tuple[str, ...] = (".py",)) -> list[Path]:
@@ -198,7 +198,7 @@ def without(paths: Iterable[Path], left_out: Mapping[str, str]) -> list[Path]:
     that leaves out no file is stale, and a short reason says nothing, so either
     raises. A file added later under a named set is read unless a key names it.
     """
-    thin = [key for key, reason in left_out.items() if len(reason) < _SHORTEST_REASON]
+    thin = [key for key, reason in left_out.items() if len(reason) < SHORTEST_REASON]
     if thin:
         raise ValueError(f"state a reason for leaving out {thin}")
     kept: list[Path] = []
