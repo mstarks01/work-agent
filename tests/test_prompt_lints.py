@@ -770,6 +770,36 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
     )
 
 
+#: The opening words of each verb rule that ``frameworks/stride/output.md``
+#: says holds in every lane, in order.
+VERB_RULES = (
+    "A credential the attacker holds and presents",
+    "Reading a store that holds credentials",
+    "Between the two authorization verbs",
+    "Between the integrity verbs",
+    "Between the disclosure verbs",
+)
+_RULE_COUNT = re.compile(r"^(\w+) rules hold in every lane", re.MULTILINE)
+_NUMBER_WORDS = ("One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight")
+
+
+def test_the_verb_rule_count_is_the_number_of_rules():
+    """The count the output contract states is the number of rules it gives.
+
+    A rule spelled "Between the ... verbs" outside :data:`VERB_RULES` fails, so
+    a new rule in that shape cannot leave the count behind.
+    """
+    contract = STRIDE_OUTPUT_DOC.read_text(encoding="utf-8")
+    (count,) = _RULE_COUNT.findall(contract)
+    rules = contract[contract.index(f"{count} rules hold") :]
+    rules = rules[: rules.index("\n\n- ")]
+    assert _NUMBER_WORDS.index(count) + 1 == len(VERB_RULES)
+    assert [rules.index(rule) for rule in VERB_RULES] == sorted(
+        rules.index(rule) for rule in VERB_RULES
+    )
+    assert set(re.findall(r"Between the [\w ]+? verbs", rules)) <= set(VERB_RULES)
+
+
 # ---------------------------------------------------------------------------
 # `unknown` is a value some attributes hold, not a word for uncertainty.
 #

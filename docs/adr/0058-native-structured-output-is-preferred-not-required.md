@@ -102,9 +102,11 @@ a failure, and so does a refusal on the last rung.
 **`auto` stays the default.** A paired run measured the forced tool against
 native on one model: `claude-haiku-4-5` with no thinking, case 01, STRIDE
 (`QA-2026-10-21-02`). A finished tool run scored inside the native spread. The
-tool path failed more jobs, on causes that #1880 and #1882 then fixed or
-reduced, and the maintainer ruled on #1413 that `auto` stays. The offered tool,
-which a thinking model takes, is not measured.
+tool path failed more jobs, and the maintainer ruled on #1413 that `auto`
+stays. #1880 and #1882 changed the critic on two causes of those failures. In
+a second tool arm after #1880, no run failed the schema on `confidence`. No
+ledger row measures #1882. The offered tool, which a thinking model takes, is not
+measured.
 
 **The runtime matcher rests on documentation.** Bedrock does not document the
 error for an unsupported model, and no rule was confirmed by a live call. A

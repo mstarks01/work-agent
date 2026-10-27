@@ -1023,7 +1023,10 @@ def _draft_payload(state: AnswerState) -> dict[str, object]:
     """A report's follow-up draft and the revision a save names (ADR 0070)."""
     return {
         "draft": {
-            "links": [link.model_dump(mode="json") for link in state.draft.links],
+            "links": [
+                link.model_dump(mode="json") | {"key": fold_principal(link.principal)}
+                for link in state.draft.links
+            ],
             "facts": [fact.model_dump(mode="json") for fact in state.draft.facts],
         },
         "revision": state.revision,

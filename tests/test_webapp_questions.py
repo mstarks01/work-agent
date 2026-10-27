@@ -13,6 +13,7 @@ import json
 import re
 import shutil
 import subprocess
+from dataclasses import replace
 from types import MappingProxyType
 
 import pytest
@@ -34,7 +35,7 @@ from analysis_service.fact_answers import (
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
-from analysis_service.links import NONE_OF_THESE
+from analysis_service.links import NONE_OF_THESE, LinkAnswer, fold_principal
 from analysis_service.open_facts import group_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.selection import SelectionError, resolve_names
@@ -1339,6 +1340,60 @@ await button.listeners.click();
         }
     ]
     assert seen["href"] == "/?follow=r2"
+
+
+def test_the_served_draft_keys_each_link_by_its_fold():
+    from tests import test_report_page
+    from tests.factories import report_state
+    from webapp.main import render_report
+
+    report = sample_report()
+    link = LinkAnswer(principal="Customer Account", element="entity:customer")
+    state = replace(report_state(report), draft=AnswerSet(links=(link,)))
+    served = test_report_page.payloads_of(
+        render_report(report, state, previous=None, parent=None).html
+    )
+
+    (drafted,) = json.loads(served["earlier"])["draft"]["links"]
+    assert drafted["key"] == fold_principal("Customer Account")
+
+
+def test_a_draft_link_starts_the_question_that_folds_to_its_principal():
+    """The draft keys a link by :func:`fold_principal`, as every other link map."""
+    payloads = {
+        "report": {"system_model": valid_model().model_dump(mode="json")},
+        "link_questions": [
+            {
+                "key": fold_principal("customer accounts"),
+                "principal": "customer accounts",
+                "rows": 1,
+                "options": ["entity:customer"],
+            }
+        ],
+        "fact_questions": [],
+        "earlier": {
+            "answers": [],
+            "links": [],
+            "draft": {
+                "links": [
+                    {
+                        "principal": "Customer Account",
+                        "element": "entity:customer",
+                        "key": fold_principal("Customer Account"),
+                    }
+                ],
+                "facts": [],
+            },
+            "revision": 1,
+        },
+    }
+    steps = """
+const [link] = box.all("select");
+calls.push({ value: link.value });
+"""
+    (seen,) = _run_answer_block(payloads, steps)["calls"]
+
+    assert seen == {"value": "entity:customer"}
 
 
 def tallies(
