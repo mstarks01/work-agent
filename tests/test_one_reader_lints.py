@@ -1225,3 +1225,22 @@ def test_a_module_to_prompt_pairing_is_written_only_in_the_table():
     """The prompt read's map derives from the table, and the outcome tests read
     the same rows, so no Python holds a second copy of a pair."""
     assert _sites(_pairs_a_module_with_a_prompt, (*FILES, *source_files(*TESTS))) == []
+
+
+_PATH_PARSE = re.compile(r"location\.pathname\??\.(?:split|match)\(")
+
+
+def test_a_page_parses_its_own_path_once():
+    """``RUN`` in ``report_view.js`` reads the run ID from the page's path.
+
+    Each other site reads ``RUN``, so a route change is one edit.
+    """
+    sites = [
+        (script.name, number)
+        for script in sorted((REPO_ROOT / "webapp/static").glob("*.js"))
+        for number, line in enumerate(
+            script.read_text(encoding="utf-8").splitlines(), 1
+        )
+        if _PATH_PARSE.search(line)
+    ]
+    assert [name for name, _ in sites] == ["report_view.js"], sites

@@ -49,7 +49,8 @@
   // run has read yet. Every editor starts from its draft answer.
   const DRAFT = EARLIER.draft || { links: [], facts: [] };
   const DRAFT_FACTS = new Map(DRAFT.facts.map(a => [questionKey(a.key), a]));
-  const DRAFT_LINKS = new Map(DRAFT.links.map(a => [a.principal, a.element]));
+  // Keyed by the principal's fold, as every other link map.
+  const DRAFT_LINKS = new Map(DRAFT.links.map(a => [a.key, a.element]));
   // An answer to start an editor from: the draft's, over a kept answer's.
   const startFrom = (kept, key) => {
     const drafted = DRAFT_FACTS.get(questionKey(key));
@@ -280,10 +281,12 @@
   };
   const svar = (lvl) => `var(${SEV[lvl][1]})`;
 
+  // The run ID of a served report: this page's own path, /report/{run}.
+  // Undefined for an exported page.
+  const RUN = location.pathname?.match(/^\/report\/([A-Za-z0-9_-]+)$/)?.[1];
   // The served report links to its analysis's description and report list.
-  const reportRoute = location.pathname?.match(/^\/report\/([A-Za-z0-9_-]+)$/);
-  if (reportRoute) {
-    const analysis = "/?run=" + encodeURIComponent(reportRoute[1]);
+  if (RUN) {
+    const analysis = "/?run=" + encodeURIComponent(RUN);
     $("description-tab").href = analysis + "&view=description";
     $("reports-tab").href = analysis + "&view=reports";
     $("analysis-tabs").hidden = false;
@@ -850,7 +853,7 @@
   };
   // The answers a row starts from: the draft's, over a kept answer's.
   const startOf = (row) => (row.kind === "link"
-    ? (DRAFT_LINKS.has(row.q.principal) ? { principal: row.q.principal, element: DRAFT_LINKS.get(row.q.principal) } : null)
+    ? (DRAFT_LINKS.has(row.q.key) ? { principal: row.q.principal, element: DRAFT_LINKS.get(row.q.key) } : null)
     : startFrom(RETAINED.get(questionKey(row.q.key)), row.q.key));
 
   // Select one group of the list: its box shows, open, and every other box
@@ -930,10 +933,10 @@
       ...EARLIER_LINKS.map(a => ({
         q: { ...linkQuestion(a), ...EARLIER_GROUP },
         kind: "link",
-        saved: DRAFT_LINKS.has(a.principal)
-          ? { principal: a.principal, element: DRAFT_LINKS.get(a.principal) }
+        saved: DRAFT_LINKS.has(a.key)
+          ? { principal: a.principal, element: DRAFT_LINKS.get(a.key) }
           : { principal: a.principal, element: a.answer.element },
-        compact: !DRAFT_LINKS.has(a.principal),
+        compact: !DRAFT_LINKS.has(a.key),
       })),
       ...EARLIER_FACTS.map(a => ({
         q: earlierFact(a),
@@ -1010,7 +1013,7 @@
         saving = save.disabled = true;
         status.textContent = "Saving…";
         try {
-          const saved = await fetch("/correct/" + encodeURIComponent(location.pathname.split("/").pop()), {
+          const saved = await fetch("/correct/" + encodeURIComponent(RUN), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ facts, revision: CORRECTIONS.revision }),
@@ -1104,13 +1107,11 @@
       },
     });
 
-    // The run id is this page's own path: /report/{run}.
-    const run = location.pathname.split("/").pop();
     const post = async (body) => {
       let response;
       let reply;
       try {
-        response = await fetch("/answer/" + encodeURIComponent(run), {
+        response = await fetch("/answer/" + encodeURIComponent(RUN), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -1147,7 +1148,7 @@
       }
       edited.forEach(({ row, answer }) => {
         row.start = row.read();
-        if (row.kind === "link") DRAFT_LINKS.set(answer.principal, answer.element);
+        if (row.kind === "link") DRAFT_LINKS.set(row.q.key, answer.element);
         else DRAFT_FACTS.set(questionKey(answer.key), answer);
       });
     };
