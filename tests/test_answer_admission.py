@@ -20,7 +20,7 @@ from pydantic import ValidationError
 from analysis_service.answer_forms import answer_choices, answer_limit
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
 from analysis_service.answer_state import question_set
-from analysis_service.assertions import MAX_QUOTE_CHARS, AssertionCatalog
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.capabilities import lineage
 from analysis_service.claims import _KIND_ORDER
 from analysis_service.early_questions import early_questions
@@ -43,7 +43,7 @@ from analysis_service.links import (
 )
 from analysis_service.open_facts import open_attribute
 from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.system_model import attribute_names
+from analysis_service.system_model import EXCERPT_MAX_CHARS, attribute_names
 from tests import test_webapp
 from tests.factories import valid_model
 from tests.test_api import auth
@@ -85,7 +85,7 @@ class TestTheLineAnAnswerWrites:
         """
         model = open_description()
         answer = widest(key, model)
-        assert len(fact_line(answer)) == MAX_QUOTE_CHARS
+        assert len(fact_line(answer)) == EXCERPT_MAX_CHARS
         check_fact_answers([answer], model, None)
         apply_answers(AssertionCatalog(subjects=[], entries=[]), model, [], [answer])
 

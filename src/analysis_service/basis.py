@@ -134,11 +134,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
-    CONTROL_VALUE_MAX_CHARS,
     control_state,
     matches_term,
 )
-from analysis_service.system_model import SystemModel
+from analysis_service.sources import MAX_LABEL_CHARS
+from analysis_service.system_model import (
+    CONTROL_VALUE_MAX_CHARS,
+    ELEMENT_ID_MAX_CHARS,
+    SystemModel,
+)
 
 __all__ = [
     "CONTROL_SCOPE",
@@ -236,10 +240,10 @@ class UnbasedControl(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    element_id: str = Field(min_length=1, max_length=300)
+    element_id: str = Field(min_length=1, max_length=ELEMENT_ID_MAX_CHARS)
     attribute: str = Field(min_length=1, max_length=100)
     value: str = Field(min_length=1, max_length=CONTROL_VALUE_MAX_CHARS)
-    source_label: str = Field(min_length=1, max_length=200)
+    source_label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
     tokens: tuple[str, ...]
 
     def __str__(self) -> str:

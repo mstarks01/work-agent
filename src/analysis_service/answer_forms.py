@@ -15,7 +15,6 @@ from pydantic import BaseModel
 
 from analysis_service.assertions import (
     ABSENT,
-    MAX_QUOTE_CHARS,
     REGISTRY,
     UNKNOWN,
     AssertionCatalog,
@@ -31,7 +30,7 @@ from analysis_service.fact_answers import (
     key_ref,
 )
 from analysis_service.question_kinds import QUESTION_KINDS, Facet
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import EXCERPT_MAX_CHARS, SystemModel
 
 __all__ = [
     "CONTROL_SUGGESTIONS",
@@ -189,7 +188,7 @@ def answer_limit(key: UnknownKey, model: SystemModel) -> int:
     widest = FactAnswer(key=key, value="x", detail="x" * MAX_DETAIL_CHARS)
     bounds = [
         _max_length(FactAnswer, "value"),
-        MAX_QUOTE_CHARS - (len(fact_line(widest)) - 1),
+        EXCERPT_MAX_CHARS - (len(fact_line(widest)) - 1),
     ]
     ref = key_ref(key)
     element = model.get(ref.element_id) if fact_kind(key) == "attribute" else None

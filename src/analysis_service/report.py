@@ -52,7 +52,7 @@ from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import block_type_for
 from analysis_service.ladder import SchemaPath, SchemaRefusal
 from analysis_service.model_tiers import ReviewIndependence
-from analysis_service.sources import Source, clean_system_name
+from analysis_service.sources import MAX_LABEL_CHARS, Source, clean_system_name
 from analysis_service.system_model import (
     BoundaryCrossing,
     SystemModel,
@@ -684,7 +684,7 @@ class SourceRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: str = Field(min_length=1, max_length=50)
-    label: str = Field(min_length=1, max_length=200)
+    label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 

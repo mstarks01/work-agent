@@ -20,6 +20,7 @@ from typing import TypeGuard
 
 import pytest
 
+from analysis_service.analysis import CONTROL_ATTRIBUTES
 from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
 
 pytestmark = pytest.mark.lint
@@ -937,6 +938,70 @@ def test_a_new_job_is_created_and_admitted_in_job_answers():
         ("src/analysis_service/job_answers.py", "answer"),
         ("src/analysis_service/job_answers.py", "submit"),
     ]
+
+
+#: Each field name that holds one shared bound, and the constant that states
+#: the bound. A field of one of these names reads its constant, so no model
+#: admits a value that a sibling model refuses.
+_SHARED_BOUNDS: dict[str, str] = {
+    "source_label": "MAX_LABEL_CHARS",
+    "source_excerpt": "EXCERPT_MAX_CHARS",
+    "element_id": "ELEMENT_ID_MAX_CHARS",
+    "flow_id": "ELEMENT_ID_MAX_CHARS",
+    **dict.fromkeys(CONTROL_ATTRIBUTES, "CONTROL_VALUE_MAX_CHARS"),
+}
+
+#: Each field of a :data:`_SHARED_BOUNDS` name that holds another bound, and
+#: why.
+OTHER_BOUND: dict[tuple[str, str], str] = {
+    ("src/analysis_service/claims.py", "element_id"): (
+        "an unresolved element mark keeps the reference as the model wrote it,"
+        " which names no Element ID; the producer cuts it at"
+        " ELEMENT_REF_MAX_CHARS"
+    ),
+}
+
+
+def _bound_sites() -> Iterator[tuple[str, str, str | None]]:
+    """Each ``Field`` with a ``max_length`` that a :data:`_SHARED_BOUNDS`
+    field name or an ``ELEMENT_ID`` pattern asks for: the file, the field and
+    the name of the bound it reads, or ``None`` for a literal."""
+    for path in FILES:
+        for node in ast.walk(parse(path)):
+            if not (
+                isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Name)
+                and node.value is not None
+                and _calls(node.value, "Field")
+            ):
+                continue
+            keywords = {keyword.arg: keyword.value for keyword in node.value.keywords}
+            bound = keywords.get("max_length")
+            asked = node.target.id in _SHARED_BOUNDS or _is_name(
+                keywords.get("pattern", ast.Constant(None)), "ELEMENT_ID"
+            )
+            if asked and bound is not None:
+                name = bound.id if isinstance(bound, ast.Name) else None
+                yield path.relative_to(REPO_ROOT).as_posix(), node.target.id, name
+
+
+def _expected_bound(field: str) -> str:
+    return _SHARED_BOUNDS.get(field, "ELEMENT_ID_MAX_CHARS")
+
+
+def test_a_shared_bound_is_read_by_its_name():
+    """A source label, an excerpt, an Element ID and a control value each have
+    one bound, and every field that holds one reads the constant."""
+    assert [
+        site
+        for site in _bound_sites()
+        if site[2] != _expected_bound(site[1]) and site[:2] not in OTHER_BOUND
+    ] == []
+
+
+def test_each_declared_field_still_holds_another_bound():
+    held = {site[:2] for site in _bound_sites() if site[2] != _expected_bound(site[1])}
+    assert OTHER_BOUND.keys() <= held
 
 
 #: A module path under the service package, and a prompt path: the two halves

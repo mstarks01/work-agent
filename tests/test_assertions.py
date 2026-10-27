@@ -23,7 +23,6 @@ from analysis_service.assertions import (
     GATE_REFUSALS,
     GRAPH_BOUND,
     MAX_ASSERTIONS,
-    MAX_QUOTE_CHARS,
     MAX_SPANS,
     MAX_SUBJECTS,
     PROJECTION_EFFECT,
@@ -77,6 +76,7 @@ from analysis_service.deployment import DEFAULT_PROMPTS_DIR
 from analysis_service.evidence import evidence_catalog, unknown_evidence_ref
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import (
+    EXCERPT_MAX_CHARS,
     UNKNOWN,
     CapabilityStatement,
     SystemModel,
@@ -424,7 +424,7 @@ class TestASpanIsLocatedByCode:
 
     def test_a_quote_past_the_bound_takes_no_span(self):
         """Refused rather than cut: a cut quote beside whole offsets is a lie."""
-        assert support_span("x" * (MAX_QUOTE_CHARS + 1), SOURCE_LABEL, SOURCE) is None
+        assert support_span("x" * (EXCERPT_MAX_CHARS + 1), SOURCE_LABEL, SOURCE) is None
 
     def test_the_digest_pins_the_text_the_span_was_taken_from(self):
         span = support_span("session", SOURCE_LABEL, SOURCE)

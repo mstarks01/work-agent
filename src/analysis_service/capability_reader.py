@@ -35,8 +35,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.grounding import verify_quote
 from analysis_service.references import canonical
-from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import CapabilityStatement, SystemModel
+from analysis_service.sources import ANSWERS_LABEL, MAX_LABEL_CHARS
+from analysis_service.system_model import (
+    EXCERPT_MAX_CHARS,
+    CapabilityStatement,
+    SystemModel,
+)
 
 
 class CapabilityRow(BaseModel):
@@ -49,8 +53,8 @@ class CapabilityRow(BaseModel):
         max_length=60,
         json_schema_extra={"enum": [*sorted(CAPABILITIES)]},
     )
-    source_label: str = Field(min_length=1, max_length=200)
-    quote: str = Field(min_length=1, max_length=1000)
+    source_label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
+    quote: str = Field(min_length=1, max_length=EXCERPT_MAX_CHARS)
 
 
 class CapabilityReading(BaseModel):

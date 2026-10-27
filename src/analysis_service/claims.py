@@ -53,7 +53,9 @@ from analysis_service.capabilities import (
 )
 from analysis_service.grounding import MovedKind, meaning_moved
 from analysis_service.question_kinds import ALL_FACET_IDS, MAX_FACETS, QUESTION_KINDS
+from analysis_service.sources import MAX_LABEL_CHARS
 from analysis_service.system_model import (
+    ELEMENT_ID_MAX_CHARS,
     SystemModel,
     all_attribute_names,
 )
@@ -317,7 +319,7 @@ class UnknownRef(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    element_id: str = Field(default="", max_length=300)
+    element_id: str = Field(default="", max_length=ELEMENT_ID_MAX_CHARS)
     # The provider-facing schema lists the legal names, so a constrained
     # critic cannot spell ``description`` or ``notes`` here: the live critic
     # did so 132 times in six runs and every one fired the bounded re-ask.
@@ -329,7 +331,7 @@ class UnknownRef(BaseModel):
         max_length=100,
         json_schema_extra={"enum": ["", *all_attribute_names()]},
     )
-    subject: str = Field(default="", max_length=300)
+    subject: str = Field(default="", max_length=ELEMENT_ID_MAX_CHARS)
     #: The third spelling: one row of the job's **Assertion** catalog that the
     #: sources left open, by its computed identity.
     #:
@@ -488,6 +490,11 @@ def name_unknown(ref: UnknownRef) -> str:
 # producer tests and the bound this field accepts cannot drift apart.
 GROUND_TERM_MAX_CHARS = 100
 
+#: The longest quote a ground carries. A quote candidate and a quote repair
+#: hold the same bound, so a candidate that validates resolves into a ground
+#: that validates.
+GROUND_TEXT_MAX_CHARS = 1000
+
 
 # How long the lists a model fills may get (OWASP LLM10). Every scalar a lane
 # emits already carries a bound; these are the counts, and without them the only
@@ -621,9 +628,10 @@ class Ground(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: GroundKind
-    text: str = Field(default="", max_length=1000)  # quote
-    source_label: str = Field(default="", max_length=200)  # quote
-    element_id: str = Field(default="", max_length=300)  # both attribute branches
+    text: str = Field(default="", max_length=GROUND_TEXT_MAX_CHARS)  # quote
+    source_label: str = Field(default="", max_length=MAX_LABEL_CHARS)  # quote
+    # both attribute branches
+    element_id: str = Field(default="", max_length=ELEMENT_ID_MAX_CHARS)
     # The same enum its sibling above carries. Both Ground shapes carry the
     # enum, so a critic cannot spell ``description`` on either.
     attribute: AttributeName = Field(
@@ -631,7 +639,7 @@ class Ground(BaseModel):
         max_length=100,
         json_schema_extra={"enum": ["", *all_attribute_names()]},
     )  # both attribute branches
-    flow_id: str = Field(default="", max_length=300)  # derived-fact
+    flow_id: str = Field(default="", max_length=ELEMENT_ID_MAX_CHARS)  # derived-fact
     term: str = Field(default="", max_length=GROUND_TERM_MAX_CHARS)  # absent-element
     assertion: str = Field(default="", max_length=600)  # assertion
 
@@ -1352,8 +1360,8 @@ class QuoteCandidate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    text: str = Field(min_length=1, max_length=1000)
-    source_label: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1, max_length=GROUND_TEXT_MAX_CHARS)
+    source_label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
 
 
 class Proposal(BaseModel):
@@ -1721,7 +1729,7 @@ class RepairedQuote(BaseModel):
 
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
     index: int = Field(ge=0)
-    written: str = Field(min_length=1, max_length=1000)  # Ground.text's bound
+    written: str = Field(min_length=1, max_length=GROUND_TEXT_MAX_CHARS)
     similarity: float = Field(ge=0.0, le=1.0)
     moved: list[MovedKind]
     scan_complete: bool | None = None

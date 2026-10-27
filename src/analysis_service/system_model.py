@@ -36,7 +36,7 @@ from analysis_service.capabilities import (
     StatedPresence,
 )
 from analysis_service.references import canonical
-from analysis_service.sources import check_answer_quotes
+from analysis_service.sources import MAX_LABEL_CHARS, check_answer_quotes
 
 UNKNOWN = "unknown"
 
@@ -396,6 +396,9 @@ ELEMENT_ID = "^(?:{})$".format(
     "|".join([_PLAIN_ID, *(rule.pattern for _, rule in sorted(FLOW_ID_RULES.items()))])
 )
 
+#: The longest **Element ID** a field holds, wherever the field holds one.
+ELEMENT_ID_MAX_CHARS = 300
+
 
 #: The closed sets of the element fields a model fills. Named once, so the
 #: compact transport (:mod:`analysis_service.compact`) states the same sets.
@@ -406,15 +409,24 @@ Operations = Literal["read", "write", "read-write", "unknown"]
 #: A store's sensitivity tier, never a list of what it holds.
 DataClassification = Literal["public", "internal", "confidential", "unknown"]
 
+#: The longest ``source_excerpt`` an element or a statement carries, and so
+#: the longest excerpt the extraction gate replaces and the longest quote a
+#: support span or a capability row holds.
+EXCERPT_MAX_CHARS = 1000
+
+#: The longest value a control attribute holds. The element field, each
+#: record that keeps the field's raw text
+#: (:class:`~analysis_service.analysis.UnknownControl`,
+#: :class:`~analysis_service.basis.StatedControl`) and each assertion value
+#: that projects into the field read this one bound.
+CONTROL_VALUE_MAX_CHARS = 200
+
 #: The tier field as a model fills it. The set is a schema fact and not a
 #: validator: a provider reads the enum, and code may still write a
 #: projected value here (``unknown; <why>: <tier>``).
-#: The longest ``source_excerpt`` an element or a statement carries, and so
-#: the longest excerpt the extraction gate replaces.
-EXCERPT_MAX_CHARS = 1000
-
 DATA_CLASSIFICATION_FIELD = Field(
-    max_length=200, json_schema_extra={"enum": [*get_args(DataClassification)]}
+    max_length=CONTROL_VALUE_MAX_CHARS,
+    json_schema_extra={"enum": [*get_args(DataClassification)]},
 )
 BoundaryKind = Literal["network", "privilege", "tenant", "other"]
 
@@ -424,7 +436,7 @@ class _Element(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(max_length=300, pattern=ELEMENT_ID)
+    id: str = Field(max_length=ELEMENT_ID_MAX_CHARS, pattern=ELEMENT_ID)
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
     assets: list[str] = assets_field()
@@ -435,7 +447,7 @@ class _Element(BaseModel):
     # the pairing unstated. An element drawing on several sources records that
     # in ``notes``. Gate-enforced against the job's labels: see
     # :func:`~analysis_service.validation.validate`.
-    source_label: str = Field(default="", max_length=200)
+    source_label: str = Field(default="", max_length=MAX_LABEL_CHARS)
     # Who spoke the quote, where the text attributes it. Provenance on a quote,
     # never a role and never a claim a category agent weighs. It exists to be
     # *strippable*: a participant name inside a verbatim excerpt is unreachable,
@@ -488,7 +500,7 @@ class DataStore(_Element):
     technology: str = Field(max_length=200)
     trust_zone: str
     data_classification: str = DATA_CLASSIFICATION_FIELD
-    encryption_at_rest: str = Field(max_length=200)
+    encryption_at_rest: str = Field(max_length=CONTROL_VALUE_MAX_CHARS)
 
 
 class DataFlow(_Element):
@@ -499,9 +511,9 @@ class DataFlow(_Element):
     source: str
     destination: str
     protocol: str = Field(max_length=200)
-    authentication: str = Field(max_length=200)
+    authentication: str = Field(max_length=CONTROL_VALUE_MAX_CHARS)
     data_description: str = Field(max_length=1000)
-    encryption_in_transit: str = Field(max_length=200)
+    encryption_in_transit: str = Field(max_length=CONTROL_VALUE_MAX_CHARS)
     #: What the initiator does at the destination — the fact ``direction`` does
     #: **not** carry. A service reading a database and a service writing one are
     #: the same shape without this, so a rule about writes fired on both and told
@@ -698,7 +710,7 @@ class Assumption(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     assumption: str = Field(min_length=1, max_length=1000)
-    element_id: str = Field(max_length=300)
+    element_id: str = Field(max_length=ELEMENT_ID_MAX_CHARS)
     # The provider-facing schema lists the legal names, on the rule
     # :class:`~analysis_service.claims.Ground` already follows: a model asked
     # for a bounded string writes prose into it, and one wrote a 100-character
@@ -750,7 +762,7 @@ class CapabilityStatement(BaseModel):
     )
     state: StatedPresence
     source_excerpt: str = Field(min_length=1, max_length=EXCERPT_MAX_CHARS)
-    source_label: str = Field(min_length=1, max_length=200)
+    source_label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
     origin: StatementOrigin
     #: The element and the rule that prove a ``field`` statement. A statement
     #: of another origin carries none.
