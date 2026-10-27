@@ -148,6 +148,12 @@ DECLARED: dict[str, str] = {
         "This code is that framework's: it prints the matches `e8_count.py`"
         " counts, beside their drafts, through the same identity."
     ),
+    "evals/experiments/QA-2026-10-27-01/price.py": (
+        "This code is that framework's. It prices trial lead rules against the"
+        " lanes that read them, which exists only for a package whose leads"
+        " point a lane at a place. A package whose claims carry a catalog"
+        " identifier is led by requirement, so a new place leads it to nothing."
+    ),
     "evals/experiments/QA-2026-10-14-01/count_on_reference_models.py": (
         "This code is that framework's. It counts the units that an applicability"
         " rule over capabilities settles, which exists only for a package whose"
