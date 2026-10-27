@@ -123,8 +123,8 @@ def test_the_deadline_bounds_what_the_per_call_knobs_cannot():
 
 
 def test_the_policy_carries_attempts_as_a_total():
-    # attempts is a *total* count, and with LiteLLM's layer off it is now
-    # literally the request count per node rather than half of a product.
+    # attempts is a *total* count: with LiteLLM's layer off, it is the request
+    # count per node.
     policy = config().retry_policy(budget_capacity=10)
     assert policy.attempts == 3
     assert config(attempts=1).retry_policy(budget_capacity=10).attempts == 1

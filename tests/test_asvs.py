@@ -517,7 +517,7 @@ def test_the_agent_supplies_a_key_and_never_a_chapter():
         ("01-payments-checkout", "satisfied"),
         ("10-cookbook-generic-cms", "satisfied"),
         # Named a web app in its own prose, and every flow's protocol unstated.
-        # This case is why the precondition stopped reading transport (#219).
+        # The precondition reads no transport (#219) because of this case.
         ("11-sparse-shift-scheduling", "satisfied"),
         ("12-overclaiming-supplier-portal", "satisfied"),
         # Airflow and Spark: the model states what both processes present, and
@@ -1563,9 +1563,9 @@ class TestAnUndecidedPreconditionIsItsOwnScopeState:
 
 
 def test_an_invented_key_is_marked_even_when_its_evidence_kind_would_defer_it():
-    """#659: the identity check ran after the deferral split, so a deferred
-    proposal naming ``99.99`` vanished — the scope builder walks the catalog and
-    never met the key. It is now checked on the whole batch first."""
+    """#659: the identity check runs on the whole batch before the deferral
+    split. The scope builder walks the catalog and never meets an invented key,
+    so a deferred proposal naming ``99.99`` must be marked before the split."""
     proposals = [
         RequirementProposal(
             requirement="99.99",

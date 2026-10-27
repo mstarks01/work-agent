@@ -1240,7 +1240,7 @@ def report_with_markup_everywhere():
 
     Grounds included: a quote's ``text`` is submitter prose copied verbatim by
     rule, and its ``source_label`` is a caller-chosen string, so the grounds
-    rail is now the newest place on the page where untrusted text lands. An
+    rail is one more place on the page where untrusted text lands. An
     attribute ground carries no prose: its two fields are references the
     report refuses unless they resolve in the embedded model's catalog.
     """
@@ -1759,7 +1759,7 @@ def test_a_row_rule_is_defined_once_and_read_by_both_pages(rule):
     """A row's key and whether two answers are one answer have one definition.
 
     question_list.js holds it, and the report page and the first-run page call
-    it: two copies drift, as a link row's key once did between them.
+    it, because two copies drift.
     """
     name = rule.removeprefix("const ").strip(" =")
     definitions = [page for page in ANSWER_PAGES if rule in page_javascript(page)]

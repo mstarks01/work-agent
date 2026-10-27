@@ -597,9 +597,9 @@ def hold(
     turns into a written artifact rather than a lost one.
 
     **The re-prompt offers the whole sweep, never the sunk spend.** Accepting
-    what is already spent puts the run over its own figure again on the very
-    next case, so a single overrun became a prompt at every remaining case
-    boundary. What the contributor is asked for instead is the projection —
+    what is already spent would put the run over its own figure again on the
+    very next case, so a single overrun would become a prompt at every
+    remaining case boundary. What the contributor is asked for instead is the projection —
     the spend so far, plus the same per-case rate over the cases still to run
     — so one overrun costs one prompt and the next one means the rate moved
     again. ``ran`` is how many cases produced ``executions``, which is what

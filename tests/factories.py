@@ -977,8 +977,8 @@ def claims_json(*claims: BaseModel) -> str:
     """A lane-agent or critic node's emission: the list inside its ``claims`` key.
 
     The wrapper is the node's output-schema shape, not the domain's, so tests
-    build it here rather than each spelling it out — a bare array is what these
-    nodes emitted before the schema had to be convertible, and is now invalid.
+    build it here rather than each spelling it out. A bare array is invalid,
+    because the output schema must be convertible.
 
     The key is ``claims`` rather than ``threats`` because one shared
     ``prompts/analyze.md`` serves every registered framework's lane agents; see
@@ -1353,8 +1353,8 @@ def scripted_pipeline(
     about. A node with no scripted reply emits an empty claim list, and the
     capability reader an empty reading.
 
-    ``frameworks`` is the selection the graph is built for, since a graph is now
-    built for one (:func:`~analysis_service.graph.build_pipeline`). The returned
+    ``frameworks`` is the selection the graph is built for, because a graph is
+    built for one selection (:func:`~analysis_service.graph.build_pipeline`). The returned
     map covers whatever LLM nodes that selection produced.
 
     ``sampling`` substitutes another *legal* deployment's decoding params for

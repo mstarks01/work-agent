@@ -38,8 +38,8 @@ reaches is not API, because no integrator imports it from the package root.
 same name as a dead function counts as a use of it, so the dead function is
 not reported.
 
-**A dead cluster is dead.** ``chapter_for`` was the only reader of
-``_BY_CHAPTER``, so the map looked referenced -- by code that was itself dead.
+**A dead cluster is dead.** A map that only a dead function reads looks
+referenced, but the code that reads it is itself dead.
 One pass cannot see that, so the scan iterates: it drops what it has already
 proved dead and asks again, until the answer stops changing. A chain of any
 length falls in that many passes.

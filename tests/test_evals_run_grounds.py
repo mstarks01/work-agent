@@ -139,8 +139,8 @@ FABRICATED = {
 # The successor to the mis-shaped ``Ground``. An agent selects from a closed
 # set, so the only way its evidence can fail is by naming something outside it.
 INVENTED = {"evidence_refs": ["crossing:flow:not-a-flow-in-this-model"]}
-# A sentinel for the one way a case still dies: the fan-in raising on a fault
-# no agent can produce any more. ``sweep`` makes the first join raise it.
+# A sentinel for the one way a case dies: the fan-in raising on a fault no
+# agent can produce. ``sweep`` makes the first join raise it.
 DEAD: dict[str, Any] = {"dead": True}
 
 

@@ -312,7 +312,7 @@ def sign(tree, case, reviewer, own_list=("a spoofed shopper checks out as anothe
 def rendered_document(session, case=CASE):
     """The reading document this reader's draft renders, as the app shows it.
 
-    Nothing is written beside the case any more, so the document is a
+    Nothing is written beside the case, so the document is a
     rendering of the draft rather than a file to open.
     """
     held = session.draft(case)
@@ -1118,7 +1118,7 @@ class TestTheOwnListCarriesThePageToken:
     def test_the_refused_post_leaves_the_case_blind(self, tree):
         """The refusal is the whole point: the sets stay shut behind it.
 
-        Asked through the page's own client, because the sets now take the
+        Asked through the page's own client, because the sets take the
         token too. What is measured is that the refused own list wrote no
         draft — so a reader who holds the token still finds the sets closed.
         """
@@ -1451,7 +1451,7 @@ class TestTheDraftSurvivesTheProcess:
 
     def test_the_gate_stays_open_across_the_restart(self, tree):
         """The gate asks whether the case has an own list, and the draft is
-        where that answer now lives — so a restart re-arms nothing."""
+        where that answer lives — so a restart re-arms nothing."""
         first = browser(session_for(tree, "ada"))
         first.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         again = browser(session_for(tree, "ada"))
@@ -2223,14 +2223,14 @@ class TestACorpusThatDoesNotLoad:
     """A ``case.json`` the loader refuses stops the session with one line.
 
     A sitting is one JSON file under ``evals/review/submissions`` and nothing
-    else, so ``reviews`` is a field ``case.json`` no longer has. A tree still
-    carrying one is refused rather than read past — the reader meets it at the
+    else, so ``case.json`` has no ``reviews`` field. A tree that carries one
+    is refused rather than read past — the reader meets it at the
     next launch rather than at a commit, and the line prints the case and the
     field it stopped on rather than a pydantic frame.
     """
 
     def stale(self, tree):
-        """Give one case the case-local record the loader no longer accepts."""
+        """Give one case a case-local record, which the loader refuses."""
         path = tree / "evals" / "corpus" / OTHER / "case.json"
         meta = json.loads(path.read_text(encoding="utf-8"))
         meta["reviews"] = [

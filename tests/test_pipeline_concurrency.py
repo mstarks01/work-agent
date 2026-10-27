@@ -88,7 +88,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
     The stand-ins are named by walking the built graph rather than by inverting
     the tier map, for the reason :func:`tests.factories.scripted_pipeline`
     documents: six lane agents share one ``analyze/<framework>`` key, so a tier
-    name no longer identifies a node. What the *tier* still decides is the
+    name does not identify a node. What the *tier* still decides is the
     class — ``extract`` is the only node that has to read the job's marker —
     and that is a question the resolver can answer.
     """

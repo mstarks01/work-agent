@@ -1,7 +1,7 @@
 """Driving the real graph and stamping what each node execution presented.
 
 These test :class:`~analysis_service.execution.GraphExecutor` at its own
-interface, because that is where stamping now lives and both drivers — the
+interface, because that is where stamping lives and both drivers — the
 service and the eval harness — cross it. No Vertex endpoint is involved: each
 LLM node is bound to a scripted stand-in that reports a ``model_version`` the
 way a real provider does, so the served-build and execution-identity paths are

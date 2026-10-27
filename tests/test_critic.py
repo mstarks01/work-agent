@@ -1076,7 +1076,7 @@ class TestAnAbsenceRidesTheCriticPath:
         assert claim.grounds == [Ground(kind="absent-element", term="ldap")]
 
     def test_it_names_no_place(self):
-        """The property four seams now read, rather than four ``or`` chains."""
+        """The property four seams read."""
         assert Ground(kind="absent-element", term="ldap").place == ""
         assert Ground(kind="quote", text="t", source_label="s").place == ""
         assert (

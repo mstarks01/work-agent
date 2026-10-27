@@ -1,8 +1,8 @@
-"""Sweep promotion: the write half of certification (the pure check moved).
+"""Sweep promotion: the write half of certification.
 
 Zero provider calls. ``promote`` re-pins ``sampling.toml`` in place and records
 the fingerprints that pinning implies; the check those fingerprints are later
-tested against now lives in ``tests/test_certification.py``.
+tested against is in ``tests/test_certification.py``.
 """
 
 from __future__ import annotations
@@ -122,7 +122,7 @@ def test_certify_flags_an_override_drifted_run():
     assert certify(_build_fingerprints(default), manifest, tier_of, ALL_NODES).certified
     drifted = certify(_build_fingerprints(overridden), manifest, tier_of, ALL_NODES)
     assert not drifted.certified
-    # Every strong node, which is now per framework: one critic, one re-ask
+    # Every strong node, one set per framework: one critic, one re-ask
     # and one lane agent per lane, all named for the package they belong to.
     assert {n.node for n in drifted.uncertified} == {
         "critic_stride",
@@ -291,8 +291,8 @@ def test_promote_refuses_to_pin_a_previously_unset_param(tmp_path):
 
 
 def test_the_manifest_lives_with_the_service_config_not_under_evals():
-    # It moved to config/ when the service became what certifies: evals/ does
-    # not ship, so a manifest under it was unreachable from the production image.
+    # The service certifies, and evals/ does not ship, so the manifest sits
+    # under config/, where the production image can read it.
     paths = promotion_paths()
     assert (
         paths.blessed_fingerprints == REPO_ROOT / "config" / "blessed-fingerprints.toml"
