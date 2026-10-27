@@ -134,6 +134,7 @@ __all__ = [
     "CatalogIssue",
     "CatalogIssueCode",
     "CatalogProposal",
+    "CatalogStatus",
     "Conflict",
     "Contradiction",
     "Origin",
@@ -146,7 +147,6 @@ __all__ = [
     "QuoteProposal",
     "Refusal",
     "SpanSource",
-    "Standing",
     "Subject",
     "SubjectType",
     "SupportSpan",
@@ -1324,10 +1324,10 @@ def spans_for(quote: str, prepared: SpanSource) -> tuple[SupportSpan, ...]:
     so the two readers cannot silently drift apart.
 
     **A quote past
-    :data:`~analysis_service.system_model.EXCERPT_MAX_CHARS` takes no span.** Refused rather than
-    cut: a truncated quote beside the offsets of the whole one is a span that
-    does not hold what it says it holds, and a citation is bounded but never
-    rewritten — the rule a **Source**'s label already follows.
+    :data:`~analysis_service.system_model.EXCERPT_MAX_CHARS` takes no span.**
+    Refused rather than cut: a truncated quote beside the offsets of the whole
+    one is a span that does not hold what it says it holds, and a citation is
+    bounded but never rewritten — the rule a **Source**'s label already follows.
     """
     if len(quote) > EXCERPT_MAX_CHARS:
         return ()
@@ -1562,7 +1562,7 @@ def projection_fields() -> Mapping[str, str]:
 #: no row at all; ``unknown`` is rows that all read :data:`UNKNOWN`;
 #: ``conflicting`` is a disagreement and nothing settled beside it;
 #: ``answered`` is at least one row a consumer may rest on.
-Standing = Literal["unasked", "answered", "unknown", "conflicting"]
+CatalogStatus = Literal["unasked", "answered", "unknown", "conflicting"]
 
 
 @dataclass(frozen=True)
@@ -1586,7 +1586,7 @@ class Answer:
     conflicts: tuple[Conflict, ...]
 
     @property
-    def standing(self) -> Standing:
+    def status(self) -> CatalogStatus:
         if self.settled:
             return "answered"
         if self.conflicts:

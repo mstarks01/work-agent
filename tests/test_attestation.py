@@ -86,12 +86,12 @@ class TestSigningAndVerifying:
     def test_a_signed_report_verifies(self):
         report = report_json()
         result = verify(report, sign(report, KEY, key_id=KEY_ID), keyring())
-        assert result.verdict == "verified"
+        assert result.outcome == "verified"
         assert result.key_id == KEY_ID
         assert result.trustworthy
 
     def test_the_pass_says_what_it_is_not(self):
-        # The one verdict a reader is tempted to over-read.
+        # The one outcome a reader is tempted to over-read.
         report = report_json()
         result = verify(report, sign(report, KEY, key_id=KEY_ID), keyring())
         assert "whether the findings are" in result.detail
@@ -105,7 +105,7 @@ class TestSigningAndVerifying:
         attestation = sign(report, KEY, key_id=KEY_ID)
         tampered = {**report, field: "tampered"}
         result = verify(tampered, attestation, keyring())
-        assert result.verdict == "invalid"
+        assert result.outcome == "invalid"
         assert "moved" in result.detail
 
     def test_adding_a_field_invalidates_too(self):
@@ -115,14 +115,14 @@ class TestSigningAndVerifying:
         report = report_json()
         attestation = sign(report, KEY, key_id=KEY_ID)
         assert (
-            verify({**report, "extra": 1}, attestation, keyring()).verdict == "invalid"
+            verify({**report, "extra": 1}, attestation, keyring()).outcome == "invalid"
         )
 
     def test_another_key_does_not_verify(self):
         report = report_json()
         attestation = sign(report, OTHER_KEY, key_id=KEY_ID)
         result = verify(report, attestation, keyring())
-        assert result.verdict == "invalid"
+        assert result.outcome == "invalid"
         assert "does not check out" in result.detail
 
     def test_a_signature_cannot_be_re_attributed_to_another_key_id(self):
@@ -132,26 +132,26 @@ class TestSigningAndVerifying:
         attestation = sign(report, KEY, key_id=KEY_ID)
         relabelled = attestation.model_copy(update={"key_id": "someone-else"})
         ring = keyring(key_id="someone-else")
-        assert verify(report, relabelled, ring).verdict == "invalid"
+        assert verify(report, relabelled, ring).outcome == "invalid"
 
     def test_a_signature_cannot_be_replayed_under_another_canonicalization(self):
         report = report_json()
         attestation = sign(report, KEY, key_id=KEY_ID)
         moved = attestation.model_copy(update={"canonical_version": 2})
-        assert verify(report, moved, keyring()).verdict == "unsupported"
+        assert verify(report, moved, keyring()).outcome == "unsupported"
 
     def test_a_malformed_signature_is_invalid_not_a_crash(self):
         report = report_json()
         attestation = sign(report, KEY, key_id=KEY_ID)
         for bad in ("not base64!!", base64.b64encode(b"short").decode()):
             broken = attestation.model_copy(update={"signature": bad})
-            assert verify(report, broken, keyring()).verdict == "invalid"
+            assert verify(report, broken, keyring()).outcome == "invalid"
 
 
 class TestTheStatesThatAreNotPassOrFail:
     def test_an_unsigned_report_is_unsigned_never_trusted(self):
         result = verify(report_json(), None, keyring())
-        assert result.verdict == "unsigned"
+        assert result.outcome == "unsigned"
         assert not result.trustworthy
         assert "nothing here establishes" in result.detail
 
@@ -159,7 +159,7 @@ class TestTheStatesThatAreNotPassOrFail:
         report = report_json()
         attestation = sign(report, KEY, key_id="a-key-we-do-not-hold")
         result = verify(report, attestation, keyring())
-        assert result.verdict == "unknown-key"
+        assert result.outcome == "unknown-key"
         assert not result.trustworthy
 
     def test_an_unsupported_version_fails_clearly_rather_than_guessing(self):
@@ -168,7 +168,7 @@ class TestTheStatesThatAreNotPassOrFail:
             update={"canonical_version": CANONICAL_VERSION + 1}
         )
         result = verify(report, attestation, keyring())
-        assert result.verdict == "unsupported"
+        assert result.outcome == "unsupported"
         assert "will not guess" in result.detail
 
     def test_an_unexpected_payload_type_is_refused(self):
@@ -176,7 +176,7 @@ class TestTheStatesThatAreNotPassOrFail:
         attestation = sign(report, KEY, key_id=KEY_ID).model_copy(
             update={"payload_type": "text/plain"}
         )
-        assert verify(report, attestation, keyring()).verdict == "unsupported"
+        assert verify(report, attestation, keyring()).outcome == "unsupported"
 
 
 class TestRotationAndRevocation:
@@ -187,7 +187,7 @@ class TestRotationAndRevocation:
         attestation = sign(report, KEY, key_id=KEY_ID)
         later = datetime.now(UTC) + timedelta(days=1)
         result = verify(report, attestation, keyring("retired", retired_at=later))
-        assert result.verdict == "verified"
+        assert result.outcome == "verified"
         assert result.signer_status == "retired"
 
     def test_a_retired_key_does_not_verify_a_signature_claiming_a_later_time(self):
@@ -195,7 +195,7 @@ class TestRotationAndRevocation:
         attestation = sign(report, KEY, key_id=KEY_ID)
         earlier = datetime.now(UTC) - timedelta(days=1)
         result = verify(report, attestation, keyring("retired", retired_at=earlier))
-        assert result.verdict == "invalid"
+        assert result.outcome == "invalid"
         assert "retired at" in result.detail
 
     def test_a_backdated_signing_time_breaks_the_signature(self):
@@ -208,7 +208,7 @@ class TestRotationAndRevocation:
             update={"signed_at": retired_at - timedelta(days=1)}
         )
         result = verify(report, backdated, keyring("retired", retired_at=retired_at))
-        assert result.verdict == "invalid"
+        assert result.outcome == "invalid"
         assert "retired at" not in result.detail
 
     def test_a_revoked_key_is_refused_even_where_the_signature_is_good(self):
@@ -217,7 +217,7 @@ class TestRotationAndRevocation:
         report = report_json()
         attestation = sign(report, KEY, key_id=KEY_ID)
         result = verify(report, attestation, keyring("revoked"))
-        assert result.verdict == "revoked"
+        assert result.outcome == "revoked"
         assert not result.trustworthy
         assert "including signatures that predate" in result.detail
 
@@ -227,7 +227,7 @@ class TestRotationAndRevocation:
         # different incidents.
         report = report_json()
         forged = sign(report, OTHER_KEY, key_id=KEY_ID)
-        assert verify(report, forged, keyring("revoked")).verdict == "invalid"
+        assert verify(report, forged, keyring("revoked")).outcome == "invalid"
 
     def test_a_retired_key_without_a_date_is_refused_at_load(self):
         with pytest.raises(ValueError, match="retired_at"):
@@ -351,7 +351,7 @@ class TestTheStandaloneVerifier:
         assert codes["verified"] == 0
         assert len(set(codes.values())) == len(codes)
         assert all(
-            code != 0 for verdict, code in codes.items() if verdict != "verified"
+            code != 0 for outcome, code in codes.items() if outcome != "verified"
         )
 
     def test_an_omitted_attestation_exits_unsigned_not_zero(self, tmp_path):
@@ -381,7 +381,7 @@ class TestTheStandaloneVerifier:
         assert self.run(tmp_path, "--attestation", str(tmp_path / "sig.json")) == 2
         assert KEY_ID in capsys.readouterr().err
 
-    def test_an_unusable_keyring_is_a_usage_error_not_a_verdict(self, tmp_path):
+    def test_an_unusable_keyring_is_a_usage_error_not_an_outcome(self, tmp_path):
         self.files(tmp_path)
         (tmp_path / "keyring.toml").write_text("bad = = toml", encoding="utf-8")
         assert self.run(tmp_path, "--attestation", str(tmp_path / "sig.json")) == 2

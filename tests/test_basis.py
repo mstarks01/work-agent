@@ -14,8 +14,8 @@ from analysis_service.basis import (
     IN_SCOPE,
     MAX_SCAN_WORK,
     content_tokens,
+    control_measurability,
     coverage,
-    dispositions,
     read_controls,
     unbased_controls,
 )
@@ -181,7 +181,7 @@ def test_an_erased_citation_is_counted_as_unread_not_as_clean(caplog):
     assert read.flagged == 0
 
 
-def test_every_stated_control_lands_in_exactly_one_disposition():
+def test_every_stated_control_has_exactly_one_measurability():
     """The walk partitions, so no value leaves the denominator unaccounted.
 
     Counted from the corpus rather than a fixture: a value the walk dropped
@@ -191,7 +191,7 @@ def test_every_stated_control_lands_in_exactly_one_disposition():
     for case_dir in verify_corpus.case_dirs():
         case = load_case(case_dir)
         sources = {source.label: source.text for source in case.sources}
-        walked = list(dispositions(case.model, sources))
+        walked = list(control_measurability(case.model, sources))
         read = coverage(case.model, sources)
 
         assert len(walked) == read.stated
@@ -246,7 +246,7 @@ def _corpus_values() -> list[tuple[str, tuple[str, ...], str]]:
 
     One row per value: the case, the value's content tokens, and the lowered
     text of the source it cites. Walked through the ``measurable`` half of
-    :func:`~analysis_service.basis.dispositions`, which is the same walk
+    :func:`~analysis_service.basis.control_measurability`, which is the same walk
     :func:`~analysis_service.basis.unbased_controls` scans, so the published
     denominator and the published rates cannot be computed over two different
     sets of values. Only the rung differs between them: ``any`` here, ``all``
@@ -257,8 +257,8 @@ def _corpus_values() -> list[tuple[str, tuple[str, ...], str]]:
         case = load_case(case_dir)
         sources = {source.label: source.text for source in case.sources}
         lowered = {label: text.lower() for label, text in sources.items()}
-        for control, disposition in dispositions(case.model, sources):
-            if disposition == "measurable":
+        for control, measurability in control_measurability(case.model, sources):
+            if measurability == "measurable":
                 rows.append((case.id, control.tokens, lowered[control.source_label]))
     return rows
 
@@ -355,8 +355,8 @@ def test_the_corpus_spends_a_fraction_of_the_scan_budget():
         sources = {source.label: source.text for source in case.sources}
         scans = {
             (token, control.source_label)
-            for control, disposition in dispositions(case.model, sources)
-            if disposition == "measurable"
+            for control, measurability in control_measurability(case.model, sources)
+            if measurability == "measurable"
             for token in control.tokens
         }
         worst = max(worst, sum(len(sources[label]) for _, label in scans))

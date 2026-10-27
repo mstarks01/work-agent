@@ -7,7 +7,7 @@ producing service" means. A report from a build whose schema has since moved
 still verifies, and somebody can write a verifier in another language from
 :mod:`analysis_service.attestation`'s docstring alone.
 
-The exit code is the verdict, and there are six of them. Zero means the origin
+The exit code is the outcome, and there are six of them. Zero means the origin
 is established. Every other state gets its own non-zero code, so a script can
 tell an unsigned report from a revoked one without parsing prose. Collapsing
 them into 0 and 1 would make "we do not sign" and "this key was compromised" the
@@ -25,16 +25,17 @@ from analysis_service.attestation import (
     Attestation,
     DuplicateKeyError,
     KeyringError,
-    Verdict,
     Verification,
+    VerificationOutcome,
     load_keyring,
     load_report,
     verify,
 )
 
-#: Verdict -> process exit code. A table because a script keys on it, and
-#: because a missing entry raises here rather than silently returning success.
-EXIT_CODES: dict[Verdict, int] = {
+#: VerificationOutcome -> process exit code. A table because a script keys on
+#: it, and because a missing entry raises here rather than silently returning
+#: success.
+EXIT_CODES: dict[VerificationOutcome, int] = {
     "verified": 0,
     "unsigned": 10,
     "unknown-key": 11,
@@ -51,8 +52,8 @@ def render(result: Verification) -> str:
     read as a failure; a pass is the one a reader is tempted to over-read, and
     a verifier that printed a bare "OK" would be inviting exactly that.
     """
-    head = f"{result.verdict}: {result.detail}"
-    if result.verdict != "verified":
+    head = f"{result.outcome}: {result.detail}"
+    if result.outcome != "verified":
         return head
     return (
         f"{head}\n"
@@ -71,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         "--attestation",
         type=Path,
         help="the detached signature. Omit it to be told the report is unsigned"
-        " -- which is a distinct verdict, never a pass.",
+        " -- which is a distinct outcome, never a pass.",
     )
     args = parser.parse_args(argv)
 
@@ -99,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
 
     result = verify(report, attestation, keyring)
     print(render(result))
-    return EXIT_CODES[result.verdict]
+    return EXIT_CODES[result.outcome]
 
 
 if __name__ == "__main__":

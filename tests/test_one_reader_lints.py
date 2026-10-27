@@ -1105,6 +1105,46 @@ def test_a_unit_price_rate_name_is_spelled_only_where_it_is_declared():
     }
 
 
+#: Each name that GLOSSARY.md defines, or that one module owns, and the one
+#: module that declares it. A second module that declares the name gives one
+#: name two meanings.
+_ONE_MEANING: dict[str, str] = {
+    "Capability": "src/analysis_service/capabilities.py",
+    "Disposition": "",
+    "Revision": "src/analysis_service/answer_state.py",
+    "Source": "src/analysis_service/sources.py",
+    "Standing": "evals/harness/roster.py",
+    "fold": "src/analysis_service/references.py",
+}
+
+
+def _module_names(tree: ast.Module) -> Iterator[str]:
+    """Each name a module's own top level declares."""
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+            yield node.name
+        elif isinstance(node, ast.Assign):
+            yield from (
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            )
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            yield node.target.id
+
+
+def test_a_defined_name_has_one_declaration():
+    """A glossary term names one type, so a reader of the name reads one
+    meaning. ``Disposition`` names ``reference.AsvsDisposition``, so no module
+    declares the bare name."""
+    declared: dict[str, set[str]] = {name: set() for name in _ONE_MEANING}
+    for path in FILES:
+        for name in _module_names(parse(path)):
+            if name in declared:
+                declared[name].add(path.relative_to(REPO_ROOT).as_posix())
+    assert declared == {
+        name: {owner} if owner else set() for name, owner in _ONE_MEANING.items()
+    }
+
+
 #: A module path under the service package, and a prompt path: the two halves
 #: of a pairing that only ``.github/scripts/prompt_outcomes.toml`` states.
 _MODULE_PATH = re.compile(r"^src/analysis_service/")

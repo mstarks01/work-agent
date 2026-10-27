@@ -271,14 +271,14 @@ class TestAnAuthorisedExtensionResumesTheAudit:
             written.write_text(json.dumps(step.to_json()), "utf-8")
             audit.record(written)
 
-        held = audit.standing("A", audit.load(tmp_path), audit.load_grants("A"))
+        held = audit.audit_state("A", audit.load(tmp_path), audit.load_grants("A"))
         assert held.open_blockers == ()
         assert dict(held.resolved) == {"A-E1": ("A-E2", ("A-E3",))}
         assert audit.command_experiments(_arguments(audit="A")) == 0
         assert "resolved:  A-E1 by A-E2; resumed by A-E3" in capsys.readouterr().out
 
     def test_an_open_blocker_is_listed_until_resolved(self):
-        held = audit.standing("A", [_blocked()], ())
+        held = audit.audit_state("A", [_blocked()], ())
 
         assert held.open_blockers == ("A-E1",)
 

@@ -53,7 +53,7 @@ from analysis_service.model_gate import (
 from analysis_service.vendors import REASONING_KWARG, Vendor, vendor_for
 
 
-class Capability(StrEnum):
+class ProviderCapability(StrEnum):
     """Whether a provider will accept one thing, including "nobody knows"."""
 
     SUPPORTED = "supported"
@@ -229,7 +229,7 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
 class ProviderProfile:
     """One ``(vendor, model)`` pair's capabilities, as this deployment sees them.
 
-    ``params`` carries one :class:`Capability` per entry in
+    ``params`` carries one :class:`ProviderCapability` per entry in
     :data:`PROBED_PARAMS`. ``structured_output`` is separate because it is not
     the same question: ``response_format`` is an accepted parameter everywhere,
     and what varies is whether the provider honours it as a schema natively or
@@ -246,8 +246,8 @@ class ProviderProfile:
     vendor: str
     model: str
     known: bool
-    params: dict[str, Capability]
-    structured_output: Capability
+    params: dict[str, ProviderCapability]
+    structured_output: ProviderCapability
     output_ceiling: int | None
 
     def to_json(self) -> dict[str, Any]:
@@ -273,14 +273,16 @@ class ProviderProfile:
         unanswered = [
             name
             for name, capability in self.params.items()
-            if capability is Capability.UNKNOWN
+            if capability is ProviderCapability.UNKNOWN
         ]
-        if self.structured_output is Capability.UNKNOWN:
+        if self.structured_output is ProviderCapability.UNKNOWN:
             unanswered.append("structured_output")
         return tuple(sorted(unanswered))
 
 
-def _probe_param(vendor: Vendor, model: str, name: str, value: Any) -> Capability:
+def _probe_param(
+    vendor: Vendor, model: str, name: str, value: Any
+) -> ProviderCapability:
     """Whether this provider would accept one param at one value.
 
     Reuses :func:`~analysis_service.model_gate.check_supported` rather than
@@ -299,11 +301,11 @@ def _probe_param(vendor: Vendor, model: str, name: str, value: Any) -> Capabilit
     try:
         check_supported(vendor, model, {name: value}, source="conformance probe")
     except ModelGateError:
-        return Capability.UNSUPPORTED
-    return Capability.SUPPORTED
+        return ProviderCapability.UNSUPPORTED
+    return ProviderCapability.SUPPORTED
 
 
-def _probe_structured_output(vendor: Vendor, model: str) -> Capability:
+def _probe_structured_output(vendor: Vendor, model: str) -> ProviderCapability:
     """Whether schema-constrained output reaches this model *natively*.
 
     ``UNSUPPORTED`` covers both ways a model is known to fail to get it: the
@@ -327,8 +329,8 @@ def _probe_structured_output(vendor: Vendor, model: str) -> Capability:
     """
     native = native_structured_output(vendor, model)
     if native is None:
-        return Capability.UNKNOWN
-    return Capability.SUPPORTED if native else Capability.UNSUPPORTED
+        return ProviderCapability.UNKNOWN
+    return ProviderCapability.SUPPORTED if native else ProviderCapability.UNSUPPORTED
 
 
 def profile(vendor: Vendor, model: str) -> ProviderProfile:
@@ -346,8 +348,8 @@ def profile(vendor: Vendor, model: str) -> ProviderProfile:
             vendor=vendor.name,
             model=model,
             known=False,
-            params=dict.fromkeys(PROBED_PARAMS, Capability.UNKNOWN),
-            structured_output=Capability.UNKNOWN,
+            params=dict.fromkeys(PROBED_PARAMS, ProviderCapability.UNKNOWN),
+            structured_output=ProviderCapability.UNKNOWN,
             output_ceiling=None,
         )
     return ProviderProfile(

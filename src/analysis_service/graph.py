@@ -167,7 +167,7 @@ from analysis_service.critic_round import (
     CriticRound,
     Failed,
     FirstPass,
-    Revision,
+    Reask,
     critic_instruction,
     recritic_instruction,
 )
@@ -1963,7 +1963,7 @@ def route_review(
     malformed. The whole judgement is the
     :class:`~analysis_service.critic_round.CriticRound`'s: it returns an
     :class:`~analysis_service.critic_round.Accepted`, a
-    :class:`~analysis_service.critic_round.Revision` or a
+    :class:`~analysis_service.critic_round.Reask` or a
     :class:`~analysis_service.critic_round.Failed`, and this function parks
     what the value carries and routes on which one it got. Clean output routes
     to ``accept``; a critic that dropped, invented or duplicated a ruling, or
@@ -2013,7 +2013,7 @@ def route_review(
     recorded = list(critic_round.marks.unreconciled_rulings)
     first = state.get(nodes.key("first_review"))
     if first is None:
-        outcome: Accepted | Revision | Failed = critic_round.first(emitted)
+        outcome: Accepted | Reask | Failed = critic_round.first(emitted)
     else:
         merged, drift = critic_round.merge(
             FirstPass(first, state.get(nodes.key("repairable")) or []), emitted
@@ -2021,7 +2021,7 @@ def route_review(
         state.put(nodes.key("reviewed"), {"claims": merged})
         recorded += drift
         outcome = critic_round.outcome(merged)
-    if isinstance(outcome, Revision):
+    if isinstance(outcome, Reask):
         # ``previous_review`` is the emission itself rather than anything
         # recomputed, because what the re-ask must reconcile with is the bytes
         # the critic actually returned. ``first_review`` is the same rulings

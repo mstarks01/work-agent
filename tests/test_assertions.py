@@ -899,14 +899,14 @@ class TestWhatAConsumerMayRestOn:
     def test_a_predicate_nobody_asked_about_is_unasked(self):
         held = catalog([self.row()])
 
-        assert answer(held, FLOW, "credential-rotation").standing == "unasked"
-        assert answer(held, WEBHOOK, "mfa-requirement").standing == "unasked"
+        assert answer(held, FLOW, "credential-rotation").status == "unasked"
+        assert answer(held, WEBHOOK, "mfa-requirement").status == "unasked"
 
     def test_a_stated_absence_is_answered_and_held(self):
         held = catalog([self.row()])
         found = answer(held, FLOW, "mfa-requirement")
 
-        assert found.standing == "answered"
+        assert found.status == "answered"
         assert found.holding(ABSENT) == (self.row(),)
         assert settled(held) == (self.row(),)
 
@@ -915,8 +915,8 @@ class TestWhatAConsumerMayRestOn:
         leaves every other predicate on that flow unasked."""
         held = catalog([stated()])
 
-        assert answer(held, FLOW, "mfa-requirement").standing == "unasked"
-        assert answer(held, FLOW, "authorization-grant").standing == "unasked"
+        assert answer(held, FLOW, "mfa-requirement").status == "unasked"
+        assert answer(held, FLOW, "authorization-grant").status == "unasked"
 
     def test_a_control_on_one_interaction_leaves_anothers_unknown_alone(self):
         rows = (
@@ -933,8 +933,8 @@ class TestWhatAConsumerMayRestOn:
         )
         held = catalog([self.row(value="required"), unknown], rows=rows)
 
-        assert answer(held, FLOW, "mfa-requirement").standing == "answered"
-        assert answer(held, WEBHOOK, "mfa-requirement").standing == "unknown"
+        assert answer(held, FLOW, "mfa-requirement").status == "answered"
+        assert answer(held, WEBHOOK, "mfa-requirement").status == "unknown"
         assert unknown not in settled(held)
 
     def test_an_unsupported_row_is_set_aside_rather_than_read_as_a_fact(self):
@@ -943,13 +943,13 @@ class TestWhatAConsumerMayRestOn:
 
         assert found.rows == (judged,)
         assert found.settled == ()
-        assert found.standing == "unknown"
+        assert found.status == "unknown"
 
     def test_a_conflict_settles_nothing_and_stays_visible(self):
         held = catalog([self.row(), self.row(value="required")])
         found = answer(held, FLOW, "mfa-requirement")
 
-        assert found.standing == "conflicting"
+        assert found.status == "conflicting"
         assert found.settled == ()
         assert len(found.conflicts) == 1
         assert settled(held) == ()
@@ -962,7 +962,7 @@ class TestWhatAConsumerMayRestOn:
         held = catalog([self.row(), admins])
         found = answer(held, FLOW, "mfa-requirement")
 
-        assert found.standing == "answered"
+        assert found.status == "answered"
         assert found.settled == (self.row(), admins)
         assert found.holding(ABSENT) == (self.row(),)
         assert not found.holding(ABSENT)[0].scope

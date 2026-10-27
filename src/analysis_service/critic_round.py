@@ -10,7 +10,7 @@ returns, builds what the re-ask reads, merges the re-ask onto the first pass
 and turns an accepted set into claims.
 
 The round ends in one of three outcomes. :class:`Accepted` carries the claims
-and the rejected claims the block holds. :class:`Revision` carries what the
+and the rejected claims the block holds. :class:`Reask` carries what the
 re-ask reads: the problems, the roster, the drafts it must read and the first
 pass it is merged onto. :class:`Failed` carries the problems a second look
 still did not reconcile. The graph node parks what an outcome carries and
@@ -146,7 +146,7 @@ class Unreconciled:
 
 
 @dataclass(frozen=True)
-class Revision(Unreconciled):
+class Reask(Unreconciled):
     """One first pass that did not reconcile, and everything the re-ask needs.
 
     Built in one place so the prompt and the check cannot disagree about which
@@ -240,7 +240,7 @@ class CriticRound:
         """The same emission in the ruling model's own spelling, one per ruling."""
         return [ruling.model_dump(mode="json") for ruling in self.rulings(emitted)]
 
-    def first(self, emitted: Sequence[Any]) -> Accepted | Revision:
+    def first(self, emitted: Sequence[Any]) -> Accepted | Reask:
         """Rule on the first pass: the claims, or what the re-ask must read.
 
         The re-ask sees a roster of IDs plus the few it must read, not the
@@ -251,7 +251,7 @@ class CriticRound:
         rulings, problems = self._checked(emitted)
         if not problems:
             return self._assembled(rulings)
-        return Revision(
+        return Reask(
             problems=list(problems.problems),
             roster=[draft.id for draft in self.drafts],
             unreconciled=self.view(only=problems.implicated),

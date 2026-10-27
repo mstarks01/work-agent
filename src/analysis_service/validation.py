@@ -511,7 +511,7 @@ def _citation_issues(
     rather than refusing it makes erasure the cheapest way through the whole
     gate — quieter than a wrong citation, because a rule that only inspects the
     citations it is given says nothing about the ones nobody wrote. It also
-    takes :func:`~analysis_service.basis.dispositions` with it, since that
+    takes :func:`~analysis_service.basis.control_measurability` with it, since that
     diagnostic does not measure an element whose label resolves to nothing *on
     the stated grounds that this rule refuses that shape* (#925).
 

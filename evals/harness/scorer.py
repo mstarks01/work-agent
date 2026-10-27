@@ -14,7 +14,7 @@ It is mechanical everywhere, and a human answers the one question code cannot:
 3. One-to-one assignment, mechanical. This is deterministic maximum bipartite
    matching, so each produced threat consumes at most one reference. Without it,
    recall is inflatable and stops meaning anything.
-4. Standing of the unmatched, voted. Unmatched is not a false positive.
+4. The vote status of the unmatched, voted. Unmatched is not a false positive.
    References are non-exhaustive by construction, so that rule would punish
    finding real threats and push every tuning cycle toward under-reporting. The
    scorer keys each unmatched threat by its fingerprint and looks it up in the
@@ -166,7 +166,7 @@ class MatchedPair:
 #: different argument; the vote stands in the ledger and the queue asks its
 #: voter again. This is what stops an identity match reading as a human
 #: validation of what this run says.
-Standing = Literal["rejected", "pooled", "open", "unvoted", "stale"]
+VoteStatus = Literal["rejected", "pooled", "open", "unvoted", "stale"]
 
 
 @dataclass(frozen=True)
@@ -188,7 +188,7 @@ class UnlistedThreat:
     category: StrideCategory
     claim: str
     fingerprint: str
-    standing: Standing
+    standing: VoteStatus
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -320,7 +320,7 @@ class CaseScore:
     @property
     def standing_counts(self) -> dict[str, int]:
         counts = Counter(entry.standing for entry in self.unlisted)
-        return {standing: counts.get(standing, 0) for standing in _STANDINGS}
+        return {standing: counts.get(standing, 0) for standing in _VOTE_STATUSES}
 
     @property
     def eligible_count(self) -> int:
@@ -430,7 +430,7 @@ class CaseScore:
         }
 
 
-_STANDINGS: tuple[Standing, ...] = (
+_VOTE_STATUSES: tuple[VoteStatus, ...] = (
     "rejected",
     "pooled",
     "open",
@@ -768,13 +768,13 @@ def _standing_of_unmatched(
                 category=threat.category,
                 claim=candidate_claim(threat),
                 fingerprint=value,
-                standing=_standing(current, structural(threat)),
+                standing=_vote_status(current, structural(threat)),
             )
         )
     return tuple(unlisted), tuple(foreign)
 
 
-def _standing(current: Sequence[Vote], content: str) -> Standing:
+def _vote_status(current: Sequence[Vote], content: str) -> VoteStatus:
     """One fingerprint's standing against the claim this run produced.
 
     ``content`` is that claim's structural digest. A vote answers only while its

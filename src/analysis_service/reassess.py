@@ -57,7 +57,7 @@ class ReviewError(ValueError):
 
 
 @dataclass(frozen=True)
-class Verdict:
+class ReviewerAssessment:
     """One reviewer's assessment of one assertion."""
 
     assessment: Assessment
@@ -89,7 +89,7 @@ class Reassessment:
 
 
 def reviewed(
-    catalog: AssertionCatalog, verdicts: Mapping[str, Verdict]
+    catalog: AssertionCatalog, verdicts: Mapping[str, ReviewerAssessment]
 ) -> AssertionCatalog:
     """``catalog`` with each verdict written onto the row it names.
 
@@ -126,7 +126,9 @@ def reviewed(
     )
 
 
-def reassess(report: Report, verdicts: Mapping[str, Verdict]) -> Reassessment:
+def reassess(
+    report: Report, verdicts: Mapping[str, ReviewerAssessment]
+) -> Reassessment:
     """Recompute what ``report``'s analysis may rest on, under ``verdicts``."""
     if report.assertions is None:
         raise ReviewError("the report ran no assertion pass, so nothing is reviewed")

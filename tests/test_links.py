@@ -34,7 +34,7 @@ from analysis_service.links import (
     NONE_OF_THESE,
     LinkAnswer,
     apply_answers,
-    fold,
+    fold_principal,
     link_questions,
     with_link_answers,
 )
@@ -79,13 +79,13 @@ def answered(links):
 
 class TestTheFold:
     def test_spelling_variants_are_one_principal(self):
-        assert fold("Calling teams") == fold("calling team")
-        assert fold("model server's service account") == fold(
+        assert fold_principal("Calling teams") == fold_principal("calling team")
+        assert fold_principal("model server's service account") == fold_principal(
             "Model server service account"
         )
 
     def test_different_principals_stay_apart(self):
-        assert fold("store manager") != fold("store managers group")
+        assert fold_principal("store manager") != fold_principal("store managers group")
 
 
 class TestTheAnswerShape:
@@ -219,7 +219,7 @@ class TestTheQuestions:
     def test_the_one_element_whose_name_folds_to_the_principal_is_suggested(
         self, model
     ):
-        """Case and a plural are one spelling, as :func:`fold` reads them."""
+        """Case and a plural are one spelling, as :func:`fold_principal` reads them."""
         (question,) = link_questions(catalog(label="customers"), model)
         assert question.suggested == "entity:customer"
         assert question.to_json()["suggested"] == "entity:customer"

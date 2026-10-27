@@ -266,7 +266,7 @@ function notes(row) {
   ];
 }
 
-// One entry for each source that settings_view.Source names.
+// One entry for each source that settings_view.ValueOrigin names.
 const sources = {
   "process": (row) => [h("span", { class: "tag outside" }, "process environment"), hint(h("code", {}, row.variable))],
   "page": () => h("span", { class: "tag" }, "this page"),

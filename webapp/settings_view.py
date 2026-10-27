@@ -92,7 +92,7 @@ STORE_DEFAULTS = {JOB_STORE_VAR: "memory"}
 
 #: Where a row's value comes from. ``refused`` is a file the loader refuses,
 #: which a row shows in place of a value. ``settings.js`` shows each one.
-Source = Literal["process", "page", "file", "refused", "default"]
+ValueOrigin = Literal["process", "page", "file", "refused", "default"]
 
 
 def with_store_defaults(env: Mapping[str, str]) -> dict[str, str]:
@@ -316,7 +316,9 @@ def _base(setting: Setting, files: _Files) -> dict:
     return _sourced("default", default)
 
 
-def _sourced(source: Source, value: str | None, **detail: str | None) -> dict[str, Any]:
+def _sourced(
+    source: ValueOrigin, value: str | None, **detail: str | None
+) -> dict[str, Any]:
     """A row's value, where it comes from, and the detail that source shows."""
     return {"value": value, "source": source, **detail}
 

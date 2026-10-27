@@ -121,7 +121,7 @@ MAX_HELD_FACTS = 5 * MAX_FACT_ANSWERS
 MAX_DETAIL_CHARS = 300
 
 #: What a save skips for now: an early question's fact key, or a link
-#: question's key, the :func:`~analysis_service.links.fold` of its principal.
+#: question's key, the :func:`~analysis_service.links.fold_principal` of its principal.
 #: A skip of a link places nothing and never means "none of these".
 SkipKey = UnknownKey | Annotated[str, StringConstraints(min_length=1, max_length=200)]
 

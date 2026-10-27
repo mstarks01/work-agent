@@ -143,7 +143,7 @@ class CheckResult(StrEnum):
     carrying no served build, so there is no identity to fingerprint. It is not
     a soft failure and does not set the exit status: the application did what it
     should with what it was given, and reporting that as a defect would be
-    inventing one. See :class:`~analysis_service.conformance.Capability`, which
+    inventing one. See :class:`~analysis_service.conformance.ProviderCapability`, which
     draws the same line for the same reason.
     """
 

@@ -382,10 +382,10 @@ class TestAModelThatRefusesTheParameterAtAll:
         assert rungs_for(vendor, model, native, "tiers.strong") == ("native",)
 
     def test_the_matrix_renders_a_cell_rather_than_failing(self):
-        from analysis_service.conformance import Capability, profile
+        from analysis_service.conformance import ProviderCapability, profile
 
         entry = profile(vendor_for("bedrock"), self.REFUSING)
-        assert entry.structured_output is Capability.UNSUPPORTED
+        assert entry.structured_output is ProviderCapability.UNSUPPORTED
         assert "structured_output" not in entry.unknowns
 
     def test_no_mapped_model_under_any_vendor_prefix_can_crash_the_report(self):
