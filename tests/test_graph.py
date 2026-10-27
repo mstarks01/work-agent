@@ -215,6 +215,10 @@ def pipeline(
         package_loaders=package_loaders,
         frameworks=FRAMEWORKS,
         binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
+        entry=graph.ENTRY_EXTRACT,
+        extraction_format=FULL_FORMAT,
+        assertions=False,
+        capability_reader=False,
     )
 
 
@@ -344,6 +348,7 @@ def prepare(ctx, model, domain_loader, package_loaders) -> Any:
         FRAMEWORKS,
         domain_loader,
         package_loaders,
+        assertions=False,
     ).output
 
 
@@ -381,6 +386,9 @@ def assertion_pipeline(prompt_loader, domain_loader, package_loaders):
         frameworks=FRAMEWORKS,
         binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
         assertions=True,
+        entry=graph.ENTRY_EXTRACT,
+        extraction_format=FULL_FORMAT,
+        capability_reader=False,
     )
 
 
@@ -464,6 +472,8 @@ def test_a_seeded_graph_carries_the_pass_too(
         binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
         entry=graph.ENTRY_PREPARE,
         assertions=True,
+        extraction_format=FULL_FORMAT,
+        capability_reader=False,
     )
     edges = [
         (edge.from_node.name, edge.to_node.name) for edge in seeded.workflow.graph.edges
@@ -488,6 +498,8 @@ def test_an_entry_that_never_prepares_refuses_the_pass(
             binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
             entry=entry,
             assertions=True,
+            extraction_format=FULL_FORMAT,
+            capability_reader=False,
         )
 
 
@@ -640,7 +652,9 @@ def test_merge_resolves_an_assertion_ground_against_the_parked_record():
         ),
         **{graph.STATE_ASSERTION_CATALOG: record.model_dump(mode="json")},
     )
-    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
+    )
 
     (draft,) = ctx.state[NODES.key("drafts")]
     (ground,) = draft["grounds"]
@@ -760,6 +774,10 @@ def _pipeline_with_sampling(
         package_loaders=package_loaders,
         frameworks=FRAMEWORKS,
         binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
+        entry=graph.ENTRY_EXTRACT,
+        extraction_format=FULL_FORMAT,
+        assertions=False,
+        capability_reader=False,
     )
 
 
@@ -1205,7 +1223,13 @@ class TestReadingAFinishedRun:
 
 def test_validate_routes_valid_and_publishes_the_model():
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, KEYS, valid_model().model_dump(mode="json"))
+    event = graph.validate_extraction(
+        ctx,
+        KEYS,
+        valid_model().model_dump(mode="json"),
+        source_texts=None,
+        extraction_format=FULL_FORMAT,
+    )
     assert event.actions.route == graph.ROUTE_VALID
     assert ctx.state[graph.STATE_VALID_MODEL]["processes"][0]["id"] == "process:web-app"
 
@@ -1226,6 +1250,7 @@ def test_validate_logs_a_stated_control_its_source_never_mentions(caplog):
             KEYS,
             valid_model().model_dump(mode="json"),
             {DEFAULT_DESCRIPTION_LABEL: DESCRIPTION_TEXT},
+            extraction_format=FULL_FORMAT,
         )
 
     assert event.actions.route == graph.ROUTE_VALID
@@ -1247,14 +1272,22 @@ def test_the_repair_prompt_states_its_scope():
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     ctx = FakeContext()
-    graph.validate_extraction(ctx, KEYS, broken)
+    graph.validate_extraction(
+        ctx, KEYS, broken, source_texts=None, extraction_format=FULL_FORMAT
+    )
 
     scope = ctx.state[graph.STATE_REPAIR_SCOPE]
     assert scope.startswith("`elements`")
     assert broken["data_flows"][0]["id"].split(">")[0] in scope
 
     whole = FakeContext()
-    graph.validate_extraction(whole, KEYS, {"not": "a model"})
+    graph.validate_extraction(
+        whole,
+        KEYS,
+        {"not": "a model"},
+        source_texts=None,
+        extraction_format=FULL_FORMAT,
+    )
 
     assert whole.state[graph.STATE_REPAIR_SCOPE] == "`whole`"
 
@@ -1263,7 +1296,9 @@ def test_validate_routes_invalid_and_feeds_the_repair_prompt():
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, KEYS, broken)
+    event = graph.validate_extraction(
+        ctx, KEYS, broken, source_texts=None, extraction_format=FULL_FORMAT
+    )
 
     assert event.actions.route == graph.ROUTE_INVALID
     assert "process:does-not-exist" in ctx.state[graph.STATE_PREVIOUS_MODEL]
@@ -1336,7 +1371,9 @@ def test_validate_derives_ids_rather_than_spending_the_repair_pass():
     abbreviated = valid_model().model_dump(mode="json")
     abbreviated["processes"][0]["name"] = "Web App Frontend Service"
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, KEYS, abbreviated)
+    event = graph.validate_extraction(
+        ctx, KEYS, abbreviated, source_texts=None, extraction_format=FULL_FORMAT
+    )
 
     assert event.actions.route == graph.ROUTE_VALID
     published = ctx.state[graph.STATE_VALID_MODEL]
@@ -1352,7 +1389,9 @@ def test_validate_parks_the_normalized_model_the_issues_cite():
     broken["processes"][0]["name"] = "Web App Frontend Service"
     broken["data_flows"][0]["source"] = "entity:does-not-exist"
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, KEYS, broken)
+    event = graph.validate_extraction(
+        ctx, KEYS, broken, source_texts=None, extraction_format=FULL_FORMAT
+    )
 
     assert event.actions.route == graph.ROUTE_INVALID
     assert "process:web-app-frontend-service" in ctx.state[graph.STATE_PREVIOUS_MODEL]
@@ -1364,9 +1403,9 @@ def test_revalidate_puts_every_uncited_element_back_and_records_it():
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     ctx = FakeContext()
-    assert graph.validate_extraction(ctx, KEYS, broken).actions.route == (
-        graph.ROUTE_INVALID
-    )
+    assert graph.validate_extraction(
+        ctx, KEYS, broken, source_texts=None, extraction_format=FULL_FORMAT
+    ).actions.route == (graph.ROUTE_INVALID)
     baseline = ctx.state[graph.STATE_REPAIR_BASELINE]
     assert baseline["scope"] == "elements"
     # The flow's ID is derived from its endpoints, so the issue names the
@@ -1378,7 +1417,9 @@ def test_revalidate_puts_every_uncited_element_back_and_records_it():
 
     repaired = valid_model().model_dump(mode="json")
     repaired["processes"][0]["technology"] = "rewritten while I was here"
-    event = graph.validate_extraction(ctx, KEYS, repaired)
+    event = graph.validate_extraction(
+        ctx, KEYS, repaired, source_texts=None, extraction_format=FULL_FORMAT
+    )
 
     assert event.actions.route == graph.ROUTE_VALID
     published = ctx.state[graph.STATE_VALID_MODEL]
@@ -1400,11 +1441,15 @@ def test_the_first_gate_keeps_the_emission_and_the_repair_does_not_write_over_it
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     ctx = FakeContext()
-    graph.validate_extraction(ctx, KEYS, broken)
+    graph.validate_extraction(
+        ctx, KEYS, broken, source_texts=None, extraction_format=FULL_FORMAT
+    )
     assert ctx.state[graph.STATE_FIRST_PASS] == broken
 
     repaired = valid_model().model_dump(mode="json")
-    event = graph.validate_extraction(ctx, KEYS, repaired)
+    event = graph.validate_extraction(
+        ctx, KEYS, repaired, source_texts=None, extraction_format=FULL_FORMAT
+    )
 
     assert event.actions.route == graph.ROUTE_VALID
     assert ctx.state[graph.STATE_FIRST_PASS] == broken
@@ -1414,7 +1459,9 @@ def test_a_valid_first_pass_is_kept_the_same_way():
     """One key whichever route the gate took, so a driver has one place to read."""
     emitted = valid_model().model_dump(mode="json")
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, KEYS, emitted)
+    event = graph.validate_extraction(
+        ctx, KEYS, emitted, source_texts=None, extraction_format=FULL_FORMAT
+    )
 
     assert event.actions.route == graph.ROUTE_VALID
     assert ctx.state[graph.STATE_FIRST_PASS] == emitted
@@ -1425,12 +1472,16 @@ def test_revalidate_leaves_a_whole_model_repair_alone():
     broken = valid_model().model_dump(mode="json")
     broken["trust_boundaries"] = []
     ctx = FakeContext()
-    graph.validate_extraction(ctx, KEYS, broken)
+    graph.validate_extraction(
+        ctx, KEYS, broken, source_texts=None, extraction_format=FULL_FORMAT
+    )
     assert ctx.state[graph.STATE_REPAIR_BASELINE]["scope"] == "whole"
 
     repaired = valid_model().model_dump(mode="json")
     repaired["processes"][0]["technology"] = "rewritten"
-    event = graph.validate_extraction(ctx, KEYS, repaired)
+    event = graph.validate_extraction(
+        ctx, KEYS, repaired, source_texts=None, extraction_format=FULL_FORMAT
+    )
 
     assert event.actions.route == graph.ROUTE_VALID
     assert ctx.state[graph.STATE_VALID_MODEL]["processes"][0]["technology"] == (
@@ -1445,7 +1496,13 @@ def test_revalidate_leaves_a_whole_model_repair_alone():
 
 def test_validate_routes_invalid_on_unparseable_output():
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, KEYS, {"processes": "not a list"})
+    event = graph.validate_extraction(
+        ctx,
+        KEYS,
+        {"processes": "not a list"},
+        source_texts=None,
+        extraction_format=FULL_FORMAT,
+    )
     assert event.actions.route == graph.ROUTE_INVALID
     assert graph.STATE_VALID_MODEL not in ctx.state
 
@@ -1468,7 +1525,13 @@ def test_validate_names_a_silent_extraction_rather_than_binding_against_it():
     ctx = FakeContext()
 
     with pytest.raises(graph.SilentNodeError) as excinfo:
-        graph.validate_extraction(ctx, KEYS)
+        graph.validate_extraction(
+            ctx,
+            KEYS,
+            extracted_model=None,
+            source_texts=None,
+            extraction_format=FULL_FORMAT,
+        )
 
     message = str(excinfo.value)
     assert graph.STATE_EXTRACTED_MODEL in message
@@ -1540,6 +1603,7 @@ def test_prepare_shows_the_agents_the_evidence_catalog_as_references(
         FRAMEWORKS,
         domain_loader,
         package_loaders,
+        assertions=False,
     )
 
     rendered = ctx.state[graph.STATE_EVIDENCE_CATALOG]
@@ -1564,7 +1628,9 @@ def test_prepare_strips_the_source_fields_from_the_rendered_model(
     assert excerpt, "the fixture must carry an excerpt for this to prove anything"
     ctx = FakeContext()
 
-    graph.prepare_analysis(valid, ctx, KEYS, FRAMEWORKS, domain_loader, package_loaders)
+    graph.prepare_analysis(
+        valid, ctx, KEYS, FRAMEWORKS, domain_loader, package_loaders, assertions=False
+    )
 
     rendered = ctx.state[graph.STATE_SYSTEM_MODEL]
     assert excerpt not in rendered
@@ -1584,7 +1650,9 @@ def test_merge_joins_drafts_in_canonical_order():
             tampering=[sample_proposal("T-01", "tampering")],
         )
     )
-    event = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    event = graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
+    )
 
     # The fan-in names its own framework: a run carries one of these per
     # selection, and a trace that did not say which would read as one merge.
@@ -1623,7 +1691,9 @@ def test_merge_parks_every_mark_kind_under_one_key():
     """
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
-    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
+    )
 
     parked = ctx.state[NODES.key("marks")]
     marks = AnalysisMarks.model_validate(parked)
@@ -1650,7 +1720,9 @@ def test_a_mark_never_outlives_the_draft_it_annotates():
         )
     )
 
-    graph.merge_drafts(three_hop_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    graph.merge_drafts(
+        three_hop_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
+    )
 
     surviving = {draft["id"] for draft in ctx.state[NODES.key("drafts")]}
     marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
@@ -1698,7 +1770,9 @@ def test_merge_shows_the_critic_the_mitigations_it_rules_on():
     """
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
-    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
+    )
 
     assert "Set HttpOnly" in ctx.state[NODES.key("draft_view")]
     assert ctx.state[NODES.key("drafts")][0]["mitigations"] == [
@@ -1711,7 +1785,7 @@ def test_merge_accepts_a_lane_that_ran_and_found_nothing():
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
     output = graph.merge_drafts(
-        valid_model().model_dump(mode="json"), ctx, KEYS, NODES
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
     ).output
 
     assert output == {
@@ -1739,7 +1813,9 @@ def test_merge_fails_closed_when_a_category_agent_emitted_nothing():
     ctx = FakeContext(**state)
 
     with pytest.raises(graph.SilentNodeError) as excinfo:
-        graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+        graph.merge_drafts(
+            valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
+        )
 
     message = str(excinfo.value)
     assert "1 of 6 stride lane agents wrote nothing" in message
@@ -1753,7 +1829,7 @@ def test_merge_drops_and_marks_a_claim_about_a_hallucinated_element():
     ctx = FakeContext(**analyze_state(spoofing=[proposal]))
 
     output = graph.merge_drafts(
-        valid_model().model_dump(mode="json"), ctx, KEYS, NODES
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
     ).output
 
     assert output["draft_count"] == 0
@@ -1772,7 +1848,7 @@ def test_merge_refuses_a_draft_on_a_unit_the_rules_ruled_out(monkeypatch):
     ctx.state[NODES.key("ruled_out")] = {"S-01": "ruled out in code by a test"}
 
     output = graph.merge_drafts(
-        valid_model().model_dump(mode="json"), ctx, KEYS, NODES
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
     ).output
 
     assert output["draft_count"] == 0
@@ -1793,7 +1869,7 @@ def test_merge_drops_and_marks_a_proposal_that_fails_its_schema():
     ctx = FakeContext(**state)
 
     output = graph.merge_drafts(
-        valid_model().model_dump(mode="json"), ctx, KEYS, NODES
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
     ).output
 
     assert output["draft_count"] == 1
@@ -2121,6 +2197,7 @@ def test_prepare_parks_each_lanes_candidates_under_its_own_key(
         FRAMEWORKS,
         domain_loader,
         package_loaders,
+        assertions=False,
     )
 
     for category in STRIDE_CATEGORIES:
@@ -2145,6 +2222,7 @@ def test_prepare_gives_each_lane_its_own_denominators(domain_loader, package_loa
         FRAMEWORKS,
         domain_loader,
         package_loaders,
+        assertions=False,
     )
 
     for category in STRIDE_CATEGORIES:
@@ -2163,6 +2241,7 @@ def test_prepare_fences_candidate_facts(domain_loader, package_loaders):
         FRAMEWORKS,
         domain_loader,
         package_loaders,
+        assertions=False,
     )
 
     parked = ctx.state[graph.Lane("stride", "information-disclosure").key("candidates")]
@@ -2196,6 +2275,7 @@ def test_prepare_renders_no_pack_block_when_none_is_earned(
         FRAMEWORKS,
         domain_loader,
         package_loaders,
+        assertions=False,
     )
 
     assert ctx.state[graph.STATE_DOMAIN_SKILLS] == ""
@@ -2270,7 +2350,9 @@ class TestALane:
 def test_merge_accounts_for_coverage_over_the_drafts():
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
-    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES, source_texts=None
+    )
 
     rows = ctx.state[NODES.key("coverage")]
     assert [row["lane"] for row in rows] == list(STRIDE_CATEGORIES)
@@ -2350,6 +2432,7 @@ def test_prepare_records_the_packs_and_rules_the_agents_were_given(
         FRAMEWORKS,
         domain_loader,
         package_loaders,
+        assertions=False,
     )
 
     assert ctx.state[graph.STATE_DOMAIN_PACKS] == ["http-api", "databases"]
@@ -2371,6 +2454,7 @@ def test_prepare_measures_no_catalog_leads_where_it_holds_no_catalog(
         FRAMEWORKS,
         domain_loader,
         package_loaders,
+        assertions=False,
     )
 
     assert ctx.state[NODES.key("retrieved")]["catalog_leads"] is None
@@ -2417,6 +2501,7 @@ def _prepare_over(monkeypatch, result, domain_loader, package_loaders):
         FRAMEWORKS,
         domain_loader,
         package_loaders,
+        assertions=False,
     )
     return ctx, event
 
@@ -2490,7 +2575,12 @@ def test_a_refused_framework_still_produces_a_block_that_states_the_reason(
     ctx = FakeContext(**{NODES.key("precondition"): "refuted"})
 
     graph.assemble_report(
-        valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        DISCLAIMERS,
+        domain_packs=None,
     )
     block = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS]).analyses[0]
 
@@ -2528,7 +2618,12 @@ def test_the_two_refusing_states_state_different_reasons(monkeypatch):
         carrying(monkeypatch, package_answering(result))
         ctx = FakeContext(**{NODES.key("precondition"): result})
         graph.assemble_report(
-            valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
+            valid_model().model_dump(mode="json"),
+            ctx,
+            KEYS,
+            FRAMEWORKS,
+            DISCLAIMERS,
+            domain_packs=None,
         )
         analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
         entries[result] = analysis.analyses[0].scope[0]
@@ -2594,6 +2689,10 @@ def test_a_two_framework_graph_builds(prompt_loader, domain_loader):
         package_loaders=repo_package_loaders(BOTH),
         frameworks=BOTH,
         binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
+        entry=graph.ENTRY_EXTRACT,
+        extraction_format=FULL_FORMAT,
+        assertions=False,
+        capability_reader=False,
     )
 
     names = set(nodes_by_name(pipeline))
@@ -2617,6 +2716,7 @@ def test_one_framework_s_refusal_routes_only_its_own_half_past_the_lanes(
         BOTH,
         domain_loader,
         repo_package_loaders(BOTH),
+        assertions=False,
     )
 
     assert set(event.actions.route) == {
@@ -2638,14 +2738,22 @@ def test_a_refusal_does_not_cost_the_other_framework_its_answer(domain_loader):
     model = non_web_model().model_dump(mode="json")
     ctx = FakeContext(**ASVS_OPTIONS)
     graph.prepare_analysis(
-        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+        model,
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+        assertions=False,
     )
     _park(
         ctx,
         [sample_draft("S-01").model_dump(mode="json")],
         {"claims": [sample_ruling("S-01").model_dump(mode="json")]},
     )
-    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
 
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
     asvs_block, stride_block = analysis.analyses
@@ -2668,10 +2776,18 @@ def test_the_refused_block_records_the_level_the_job_asked_for(domain_loader):
     model = non_web_model().model_dump(mode="json")
     ctx = FakeContext(**{graph.STATE_FRAMEWORK_OPTIONS: {"asvs": {"level": 2}}})
     graph.prepare_analysis(
-        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+        model,
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+        assertions=False,
     )
     finish(ctx, BOTH)
-    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
 
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
 
@@ -2694,12 +2810,20 @@ def test_assemble_is_triggered_per_framework_and_builds_on_the_last_trigger(
     model = valid_model().model_dump(mode="json")
     ctx = FakeContext(**ASVS_OPTIONS)
     graph.prepare_analysis(
-        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+        model,
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+        assertions=False,
     )
     ctx.state[graph.FrameworkNodes("asvs").key("accepted")] = True
 
     # The first trigger: ASVS's half has landed, STRIDE's has not.
-    early = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    early = graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
 
     assert early == {"assembled": False, "pending_frameworks": ["stride"]}
     assert graph.STATE_ANALYSIS not in ctx.state
@@ -2710,7 +2834,9 @@ def test_assemble_is_triggered_per_framework_and_builds_on_the_last_trigger(
         ctx,
         reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
     )
-    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
     final = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
 
     assert [block.framework for block in final.analyses] == list(BOTH)
@@ -2728,10 +2854,18 @@ def test_a_refused_framework_is_finished_and_never_waited_for(domain_loader):
     model = non_web_model().model_dump(mode="json")
     ctx = FakeContext(**ASVS_OPTIONS)
     graph.prepare_analysis(
-        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+        model,
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+        assertions=False,
     )
 
-    early = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    early = graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
 
     assert early == {"assembled": False, "pending_frameworks": ["stride"]}
 
@@ -2740,7 +2874,9 @@ def test_a_refused_framework_is_finished_and_never_waited_for(domain_loader):
         [sample_draft("S-01").model_dump(mode="json")],
         {"claims": [sample_ruling("S-01").model_dump(mode="json")]},
     )
-    final = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    final = graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
 
     assert final["framework_count"] == 2
 
@@ -2756,7 +2892,12 @@ def test_a_job_every_framework_refuses_assembles_on_its_one_trigger(monkeypatch)
     ctx = FakeContext(**{NODES.key("precondition"): "refuted"})
 
     output = graph.assemble_report(
-        valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        DISCLAIMERS,
+        domain_packs=None,
     )
 
     assert output["framework_count"] == 1
@@ -2774,7 +2915,13 @@ def test_a_trigger_after_the_report_is_built_builds_it_no_second_time(domain_loa
     model = valid_model().model_dump(mode="json")
     ctx = FakeContext(**ASVS_OPTIONS)
     graph.prepare_analysis(
-        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+        model,
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+        assertions=False,
     )
     _park(
         ctx,
@@ -2783,9 +2930,13 @@ def test_a_trigger_after_the_report_is_built_builds_it_no_second_time(domain_loa
     )
     finish(ctx, BOTH)
 
-    first = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    first = graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
     built = ctx.state[graph.STATE_ANALYSIS]
-    second = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    second = graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
 
     assert first["framework_count"] == 2
     assert second == {"assembled": False, "pending_frameworks": []}
@@ -2815,14 +2966,22 @@ def test_an_early_assemble_run_waits_for_an_unaccepted_framework(
     model = valid_model().model_dump(mode="json")
     ctx = FakeContext(**ASVS_OPTIONS)
     graph.prepare_analysis(
-        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+        model,
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+        assertions=False,
     )
     ctx.state[graph.FrameworkNodes("asvs").key("accepted")] = True
     ctx.state[NODES.key("drafts")] = [sample_draft("S-01").model_dump(mode="json")]
     if reviewed is not None:
         ctx.state[NODES.key("reviewed")] = reviewed
 
-    early = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    early = graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
 
     assert early["pending_frameworks"] == ["stride"]
     assert graph.STATE_ANALYSIS not in ctx.state
@@ -2831,7 +2990,9 @@ def test_an_early_assemble_run_waits_for_an_unaccepted_framework(
         model, None, ctx, {"claims": [sample_ruling("S-01").model_dump(mode="json")]}
     )
     assert event.actions.route == graph.ROUTE_ACCEPT
-    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
     final = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
     assert [claim.id for claim in final.analyses[1].claims] == ["S-01"]
 
@@ -2895,6 +3056,7 @@ def test_the_key_writer_table_covers_every_framework_structured_key(domain_loade
         BOTH,
         domain_loader,
         repo_package_loaders(BOTH),
+        assertions=False,
     )
     prepared = {
         artifact
@@ -2921,14 +3083,22 @@ def test_assemble_survives_every_partial_state_a_framework_can_be_seen_in(
     model = valid_model().model_dump(mode="json")
     ctx = FakeContext(**ASVS_OPTIONS)
     graph.prepare_analysis(
-        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+        model,
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+        assertions=False,
     )
     ctx.state[graph.FrameworkNodes("asvs").key("accepted")] = True
     for _, keys in FRAMEWORK_KEY_WRITERS[:finished]:
         for artifact, value in keys.items():
             ctx.state[NODES.key(artifact)] = value
 
-    output = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    output = graph.assemble_report(
+        model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS, domain_packs=None
+    )
 
     if finished != len(FRAMEWORK_KEY_WRITERS):
         assert output == {"assembled": False, "pending_frameworks": ["stride"]}
@@ -2953,6 +3123,7 @@ def test_prepare_refuses_a_selection_whose_options_are_missing(domain_loader):
             BOTH,
             domain_loader,
             repo_package_loaders(BOTH),
+            assertions=False,
         )
 
     assert "asvs: level" in str(caught.value)
@@ -2974,6 +3145,7 @@ def test_a_driver_that_seeds_no_options_is_told_which_framework_needs_what():
             BOTH_KEYS,
             BOTH,
             BOTH_DISCLAIMERS,
+            domain_packs=None,
         )
 
     message = str(caught.value)
@@ -2996,7 +3168,12 @@ def test_a_framework_needing_no_options_needs_nothing_seeded():
     ctx = finish(FakeContext())
 
     graph.assemble_report(
-        valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        DISCLAIMERS,
+        domain_packs=None,
     )
 
     assert graph.STATE_ANALYSIS in ctx.state
@@ -3016,6 +3193,7 @@ def test_a_lane_agent_is_told_which_level_its_job_asked_for(domain_loader):
         BOTH,
         domain_loader,
         repo_package_loaders(BOTH),
+        assertions=False,
     )
 
     asvs_scope = ctx.state[graph.Lane("asvs", "cryptography").key("scope")]
@@ -3035,6 +3213,7 @@ def test_a_lane_agent_is_told_what_the_applicability_rule_decided(domain_loader)
         BOTH,
         domain_loader,
         repo_package_loaders(BOTH),
+        assertions=False,
     )
 
     asvs_scope = ctx.state[graph.Lane("asvs", "encoding-and-sanitization").key("scope")]
@@ -3056,7 +3235,12 @@ def test_a_graph_entered_past_the_gate_reports_nothing_out_of_scope():
     ctx = finish(FakeContext())
 
     graph.assemble_report(
-        valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        DISCLAIMERS,
+        domain_packs=None,
     )
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
 
@@ -3249,6 +3433,10 @@ class TestTheInstructionDigest:
                 load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={}),
                 _route_resolver(tiers),
             ),
+            entry=graph.ENTRY_EXTRACT,
+            extraction_format=FULL_FORMAT,
+            assertions=False,
+            capability_reader=False,
         )
         assert rebuilt.instruction_sha256 == pipeline.instruction_sha256
 
@@ -3520,7 +3708,11 @@ def test_merge_marks_an_invented_key_before_the_deferral_split():
     ctx = FakeContext(**state)
 
     event = graph.merge_drafts(
-        valid_model().model_dump(mode="json"), ctx, asvs_keys, asvs_nodes
+        valid_model().model_dump(mode="json"),
+        ctx,
+        asvs_keys,
+        asvs_nodes,
+        source_texts=None,
     )
 
     assert event.output["draft_count"] == 0
@@ -3568,7 +3760,11 @@ def test_merge_drops_a_gap_that_rests_on_absence_alone():
     ctx = FakeContext(**state)
 
     event = graph.merge_drafts(
-        valid_model().model_dump(mode="json"), ctx, asvs_keys, asvs_nodes
+        valid_model().model_dump(mode="json"),
+        ctx,
+        asvs_keys,
+        asvs_nodes,
+        source_texts=None,
     )
 
     assert event.output["draft_count"] == 1

@@ -1299,9 +1299,9 @@ def after_gate(model: SystemModel) -> SystemModel:
 def validate_extraction(
     ctx,
     keys: GraphKeys,
-    extracted_model: dict | None = None,
-    source_texts: dict | None = None,
-    extraction_format: str = FULL_FORMAT,
+    extracted_model: dict | None,
+    source_texts: dict | None,
+    extraction_format: str,
 ) -> Event:
     """Run the mechanical validity gate and route on the result.
 
@@ -1327,9 +1327,10 @@ def validate_extraction(
     which is also what the eval harness calls, so no run is graded against a
     gate production never applied.
 
-    ``extracted_model`` defaults so that a silent extraction is named rather
+    ``extracted_model`` is ``None`` when the extraction wrote nothing. The
+    node function defaults it, so that a silent extraction is named rather
     than hitting ADK's parameter binding, which would report a missing argument
-    to *this* function and read as a graph defect. It raises rather than routing
+    to the node and read as a graph defect. It raises rather than routing
     to ``repair``: an absent model is not an invalid one, ``repair`` is a
     transcriber given issues to fix and there are none, and it sits on the same
     tier under the same cap — so the pass most likely to truncate would be
@@ -1516,7 +1517,7 @@ def prepare_analysis(
     frameworks: Sequence[FrameworkName],
     domain_loader: MarkdownLoader,
     package_loaders: Mapping[FrameworkName, MarkdownLoader],
-    assertions: CatalogRead = False,
+    assertions: CatalogRead,
 ) -> Event:
     """Run each framework's precondition, then derive what its lane agents read.
 
@@ -1872,7 +1873,7 @@ def merge_drafts(
     ctx,
     keys: GraphKeys,
     nodes: FrameworkNodes,
-    source_texts: dict | None = None,
+    source_texts: dict | None,
 ) -> Event:
     """Park one framework's fan-in and route on what is left for the critic.
 
@@ -1885,9 +1886,9 @@ def merge_drafts(
     ``settled`` when there is none, so a critic is never called to read an
     empty view (:data:`ROUTE_REVIEW`).
 
-    ``source_texts`` defaults to ``None`` so the in-process engine, which drives
-    a hand-authored model with no job behind it, is not failed on a citation
-    that is not wrong.
+    ``source_texts`` is ``None`` for the in-process engine, which drives a
+    hand-authored model with no job behind it. The node function defaults it,
+    so that engine is not failed on a citation that is not wrong.
 
     An agent that emitted **nothing** fails the job here, before any of that. A
     framework's lanes are what make its output that framework's method rather
@@ -2115,7 +2116,7 @@ def assemble_report(
     keys: GraphKeys,
     frameworks: Sequence[FrameworkName],
     disclaimers: Mapping[FrameworkName, str],
-    domain_packs: list | None = None,
+    domain_packs: list | None,
 ) -> dict[str, Any]:
     """Build the report body deterministically from every critic's rulings.
 
@@ -2983,10 +2984,10 @@ def build_pipeline(
     package_loaders: Mapping[FrameworkName, MarkdownLoader],
     binding: NodeBinding,
     frameworks: Sequence[FrameworkName],
-    entry: Entry = ENTRY_EXTRACT,
-    extraction_format: ExtractionFormat = FULL_FORMAT,
-    assertions: bool = False,
-    capability_reader: bool = False,
+    entry: Entry,
+    extraction_format: ExtractionFormat,
+    assertions: bool,
+    capability_reader: bool,
 ) -> Pipeline:
     """Wire the whole graph: prompts, skills, and models onto the topology.
 

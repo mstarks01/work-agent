@@ -25,6 +25,7 @@ from google.genai import types
 
 from analysis_service import graph
 from analysis_service.binding import NodeBinding
+from analysis_service.compact import FULL_FORMAT
 from analysis_service.jobs import JobRecord, PipelineCompleted
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.pipeline import AdkPipelineRunner
@@ -111,6 +112,10 @@ def _build_shared_pipeline() -> graph.Pipeline:
         package_loaders=repo_package_loaders(),
         binding=NodeBinding.from_configs(tiers, sampling, resolve),
         frameworks=DEFAULT_FRAMEWORKS,
+        entry=graph.ENTRY_EXTRACT,
+        extraction_format=FULL_FORMAT,
+        assertions=False,
+        capability_reader=False,
     )
     # Scripted per node rather than per tier: six lanes share one
     # ``analyze/stride`` tier key, so the resolver above cannot tell them apart

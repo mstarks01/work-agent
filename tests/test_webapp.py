@@ -36,6 +36,7 @@ from analysis_service import (
 )
 from analysis_service.api import JOB_REFUSAL_STATUS
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.compact import FULL_FORMAT
 from analysis_service.deployment import Deployment
 from analysis_service.jobs import JOB_ID_PATTERN, AdmissionOutcome, JobRecord
 from analysis_service.principals import LOCAL_ISSUER
@@ -975,6 +976,7 @@ def _graph_node_names() -> set[str]:
             entry=entry,
             assertions=assertions,
             capability_reader=capability_reader,
+            extraction_format=FULL_FORMAT,
         ).workflow.graph
         assert built is not None
         names |= {node.name for node in built.nodes}
