@@ -1151,14 +1151,14 @@ class InMemoryJobStore:
         resumption are also nearly all of a record's weight.
         Copying them is work no caller asked for, and a read carries none of
         the bounds admission does — no ceiling, no rate, no budget — so a caller
-        who polls a job pays each of them per request and the process pays it
-        on the event loop. A route that needs one of them asks for it by name:
+        who polls a job makes the process copy each of them per request, on
+        the event loop. A route that needs one of them asks for it by name:
         :meth:`report_json`, :meth:`report`, :meth:`checkpoint`.
 
-        Ownership is checked before anything is copied, so a foreign job costs
-        what a missing one costs. Answering the same ``None`` for both is what
-        keeps a job id from being probed for existence, and answering it at the
-        same *speed* is the other half of that.
+        Ownership is checked before anything is copied, so a foreign job takes
+        the same work as a missing one. Answering the same ``None`` for both is
+        what keeps a job id from being probed for existence, and answering it at
+        the same *speed* is the other half of that.
         """
         record = self._records.get(job_id)
         if record is None or record.owner_id != owner_id:

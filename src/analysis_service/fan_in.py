@@ -715,8 +715,8 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     # the rung with none of its work.
     #
     # What it holds for the length of the body is two tuples of words per source
-    # a refused quote named, and that is the retention reuse costs: a fold
-    # nobody keeps is a fold the next quote pays for again.
+    # a refused quote named, and that is the memory that reuse needs: a fold
+    # nobody keeps is a fold the next quote must compute again.
     #
     # Measured at 18x the source bytes, flat from 1,000 words to 50,000 -- one
     # Python ``str`` per word, twice, is almost all of it, and

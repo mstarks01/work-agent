@@ -102,9 +102,9 @@ _CANONICAL_ALGORITHMS = {name.upper(): name for name in ALLOWED_ALGORITHMS}
 # How long a JWKS fetch may hold a request before verification gives up.
 # PyJWKClient's own default is 30s, which is a request-path stall an unreachable
 # or slow identity provider can impose on every unverified token at once — the
-# keys are cached, so this is paid on a cold cache and on every rotation. Stated
-# rather than inherited: the number belongs to this service's latency budget,
-# not to the library's.
+# keys are cached, so this stall happens on a cold cache and on every rotation.
+# Stated rather than inherited: the number belongs to this service's latency
+# budget, not to the library's.
 JWKS_TIMEOUT_SECONDS = 5.0
 
 # The shortest interval between two JWKS re-fetches. PyJWKClient re-fetches the

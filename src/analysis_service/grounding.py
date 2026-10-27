@@ -291,7 +291,7 @@ def verify_quote(quote: str, source: str) -> bool:
     many quotes against the same few sources should normalize each source once
     and call :func:`verify_normalized` instead — the ladder folds every
     character of the haystack, so re-folding a whole submission per quote is
-    the same answer paid for repeatedly.
+    the same answer computed repeatedly.
     """
     return verify_normalized(quote, normalize(source))
 

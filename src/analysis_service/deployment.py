@@ -34,7 +34,7 @@ instruction digest are all functions of that selection;
 therefore takes the selection and memoizes on it. An install that carries two
 frameworks serves three selections and builds at most three graphs, each
 composed the first time a job asks for it rather than all of them at startup.
-The expensive shared-prefix composition is still paid once per selection rather
+The expensive shared-prefix composition still runs once per selection rather
 than once per job, which is the property the memo exists for.
 
 There is one manifest and one gate. :meth:`gate` is memoized across every
@@ -452,7 +452,7 @@ class Deployment:
 
         Not memoized, because ``entry`` varies: the eval harness builds three
         graphs from one deployment. :meth:`runner` memoizes the production
-        entry, which is the one a job pays for twice.
+        entry, which is the graph each job would otherwise compose again.
         """
         selection = self.selection(frameworks)
         extracts = entry in EXTRACTING_ENTRIES

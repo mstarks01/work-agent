@@ -408,7 +408,7 @@ class TestTheRepairRung:
 
 class TestPreparingASourceOnce:
     """The split and the per-word folding do not depend on the quote, so a body
-    scanning one source for many refused quotes pays for them once.
+    scanning one source for many refused quotes does that work once.
     """
 
     def test_one_prepared_source_serves_every_quote(self):
