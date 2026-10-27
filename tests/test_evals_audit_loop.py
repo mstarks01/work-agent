@@ -141,13 +141,27 @@ class TestARerunSaysWhy:
     def test_a_current_conclusion_of_another_audit_needs_a_reason(self):
         earlier = _one(experiment_id="B-E1", audit_id="B", outcome="refuted")
         with pytest.raises(audit.ExperimentError, match="B-E1.*rerun_reason"):
-            audit.admit(_one(), [earlier], (), [_lookup(earlier, "current")])
+            audit.admit(
+                _one(),
+                [earlier],
+                (),
+                [_lookup(earlier, "current")],
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_the_reason_admits_the_rerun(self):
         earlier = _one(experiment_id="B-E1", audit_id="B", outcome="refuted")
         rerun = _one(rerun_reason="the critic prompt changed in #1600")
 
-        audit.admit(rerun, [earlier], (), [_lookup(earlier, "current")])
+        audit.admit(
+            rerun,
+            [earlier],
+            (),
+            [_lookup(earlier, "current")],
+            holdouts=audit.holdout_cases(),
+            tracked=frozenset(),
+        )
 
     @pytest.mark.parametrize(
         ("state", "superseded", "audit_id"),
@@ -158,12 +172,21 @@ class TestARerunSaysWhy:
         """A stale or corrected row answers nothing, and an audit's own series is not a rerun."""
         earlier = _one(experiment_id="B-E1", audit_id=audit_id)
 
-        audit.admit(_one(), [earlier], (), [_lookup(earlier, state, superseded)])
+        audit.admit(
+            _one(),
+            [earlier],
+            (),
+            [_lookup(earlier, state, superseded)],
+            holdouts=audit.holdout_cases(),
+            tracked=frozenset(),
+        )
 
     def test_a_resume_reads_one_audit_whole(self):
         rows = [_one(), _one(experiment_id="B-E1", audit_id="B", signature="other")]
 
-        found = audit.relevant(rows, audit_id="A")
+        found = audit.relevant(
+            rows, audit_id="A", signature="", phase=None, framework=None
+        )
         assert [one.experiment_id for one in found] == ["A-E1"]
 
 
@@ -172,7 +195,14 @@ class TestABlockedAuditWritesItsTicket:
 
     def test_a_blocked_row_without_a_ticket_is_refused(self):
         with pytest.raises(audit.ExperimentError, match="extension ticket"):
-            audit.admit(_one(outcome="blocked"), [], ())
+            audit.admit(
+                _one(outcome="blocked"),
+                [],
+                (),
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     @pytest.mark.parametrize(
         "name", [one.name for one in dataclasses.fields(audit.Ticket)]
@@ -309,6 +339,8 @@ class TestNothingExpandsSilently:
                 ledger,
                 [_grant(mode="extend")],
                 tracked=REGRESSED,
+                prior=(),
+                holdouts=audit.holdout_cases(),
             )
 
     def test_a_blocker_is_resolved_once(self):
@@ -318,6 +350,8 @@ class TestNothingExpandsSilently:
                 [_blocked(), _extension()],
                 [_grant(mode="extend")],
                 tracked=REGRESSED,
+                prior=(),
+                holdouts=audit.holdout_cases(),
             )
 
     @pytest.mark.parametrize(
@@ -328,14 +362,24 @@ class TestNothingExpandsSilently:
     def test_an_extension_resolves_a_blocked_row(self, ledger):
         with pytest.raises(audit.ExperimentError, match="not a blocked row"):
             audit.admit(
-                _extension(), ledger, [_grant(mode="extend")], tracked=REGRESSED
+                _extension(),
+                ledger,
+                [_grant(mode="extend")],
+                tracked=REGRESSED,
+                prior=(),
+                holdouts=audit.holdout_cases(),
             )
 
     def test_an_extension_resolves_its_own_audits_blocker(self):
         other = _one(audit_id="B", outcome="blocked", ticket=_ticket())
         with pytest.raises(audit.ExperimentError, match="not a blocked row of A"):
             audit.admit(
-                _extension(), [other], [_grant(mode="extend")], tracked=REGRESSED
+                _extension(),
+                [other],
+                [_grant(mode="extend")],
+                tracked=REGRESSED,
+                prior=(),
+                holdouts=audit.holdout_cases(),
             )
 
     # Budgets.
@@ -346,11 +390,21 @@ class TestNothingExpandsSilently:
                 _one(experiment_id="A-E2", actual_usd=1.5),
                 [_one(actual_usd=4.0)],
                 [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
             )
 
     def test_an_estimate_with_no_actual_is_reserved(self):
         with pytest.raises(audit.ExperimentError, match="would spend"):
-            audit.admit(_one(estimated_usd=6.0), [], [_grant()])
+            audit.admit(
+                _one(estimated_usd=6.0),
+                [],
+                [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_extension_spend_counts_against_the_same_grant(self):
         with pytest.raises(audit.ExperimentError, match="would spend"):
@@ -358,6 +412,9 @@ class TestNothingExpandsSilently:
                 _extension(actual_usd=0.5),
                 [_blocked(), _one(experiment_id="A-E0", actual_usd=4.75)],
                 [_grant(mode="extend")],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
             )
 
     @pytest.mark.parametrize("value", [-1.0, float("nan"), True, "0.5"])
@@ -367,14 +424,26 @@ class TestNothingExpandsSilently:
 
     def test_no_grant_is_a_budget_of_nothing(self):
         with pytest.raises(audit.ExperimentError, match=r"of \$0\.0000"):
-            audit.admit(_one(actual_usd=0.01), [], ())
+            audit.admit(
+                _one(actual_usd=0.01),
+                [],
+                (),
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_a_new_grant_widens_the_budget(self):
         """A resume buys more by a second grant in the user's words, never an edit."""
         grants = [_grant(), _grant(words="another $2 for the repeat", budget_usd=2)]
 
         audit.admit(
-            _one(experiment_id="A-E2", actual_usd=2.5), [_one(actual_usd=4.0)], grants
+            _one(experiment_id="A-E2", actual_usd=2.5),
+            [_one(actual_usd=4.0)],
+            grants,
+            prior=(),
+            holdouts=audit.holdout_cases(),
+            tracked=frozenset(),
         )
 
     @pytest.mark.parametrize(
@@ -405,11 +474,25 @@ class TestNothingExpandsSilently:
 
     def test_a_candidate_needs_an_implement_grant(self):
         with pytest.raises(audit.ExperimentError, match="needs an 'implement'"):
-            audit.admit(_one(outcome="refuted", candidate=_candidate()), [], ())
+            audit.admit(
+                _one(outcome="refuted", candidate=_candidate()),
+                [],
+                (),
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_an_extension_needs_an_extend_grant(self):
         with pytest.raises(audit.ExperimentError, match="needs an 'extend'"):
-            audit.admit(_extension(), [_blocked()], [_grant()])
+            audit.admit(
+                _extension(),
+                [_blocked()],
+                [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_attempts_stop_at_the_grant(self):
         ledger = [
@@ -421,6 +504,9 @@ class TestNothingExpandsSilently:
                 _one(experiment_id="A-E9", outcome="refuted", candidate=_candidate()),
                 ledger,
                 [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
             )
 
     def test_an_extension_is_not_an_improvement_attempt(self):
@@ -429,6 +515,8 @@ class TestNothingExpandsSilently:
             [_blocked()],
             [_grant(mode="extend", attempts=0)],
             tracked=REGRESSED,
+            prior=(),
+            holdouts=audit.holdout_cases(),
         )
 
     # References and quality criteria.
@@ -449,7 +537,14 @@ class TestNothingExpandsSilently:
     def test_a_candidate_may_not_touch_a_reference_or_a_gate(self, path):
         candidate = _candidate(paths=[path])
         with pytest.raises(audit.ExperimentError, match="touches"):
-            audit.admit(_one(outcome="refuted", candidate=candidate), [], [_grant()])
+            audit.admit(
+                _one(outcome="refuted", candidate=candidate),
+                [],
+                [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_every_protected_path_exists(self):
         """A protected prefix that names nothing protects nothing."""
@@ -521,14 +616,28 @@ class TestARuleIsARow:
     def test_a_rule_rests_on_experiments_on_record(self):
         rule = _one(experiment_id="A-E2", rule=self._rule(supporting=["Z-E9"]))
         with pytest.raises(audit.ExperimentError, match="Z-E9"):
-            audit.admit(rule, [_one()], ())
+            audit.admit(
+                rule,
+                [_one()],
+                (),
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_a_rule_names_its_support(self):
         with pytest.raises(audit.ExperimentError, match="no supporting"):
             _one(rule=self._rule(supporting=[]))
 
     def test_a_well_formed_rule_is_admitted(self):
-        audit.admit(_one(experiment_id="A-E2", rule=self._rule()), [_one()], ())
+        audit.admit(
+            _one(experiment_id="A-E2", rule=self._rule()),
+            [_one()],
+            (),
+            prior=(),
+            holdouts=audit.holdout_cases(),
+            tracked=frozenset(),
+        )
 
 
 class TestAKeptChangeNamesItsRegressions:
@@ -538,7 +647,14 @@ class TestAKeptChangeNamesItsRegressions:
     def test_a_kept_change_with_no_regressions_is_refused(self, ran):
         kept = _candidate(verdict="kept", reason="", regressions=ran)
         with pytest.raises(audit.ExperimentError, match="regressions"):
-            audit.admit(_one(outcome="supported", candidate=kept), [], [_grant()])
+            audit.admit(
+                _one(outcome="supported", candidate=kept),
+                [],
+                [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_the_regressions_survive_a_write_and_a_read(self, tmp_path):
         ran = ["tests/test_evals_audit_loop.py"]
@@ -546,7 +662,14 @@ class TestAKeptChangeNamesItsRegressions:
             outcome="supported",
             candidate=_candidate(verdict="kept", reason="", regressions=ran),
         )
-        audit.admit(kept, [], [_grant()], tracked=frozenset(ran))
+        audit.admit(
+            kept,
+            [],
+            [_grant()],
+            tracked=frozenset(ran),
+            prior=(),
+            holdouts=audit.holdout_cases(),
+        )
         audit.append(kept, tmp_path)
 
         (loaded,) = audit.load(tmp_path)
@@ -554,7 +677,14 @@ class TestAKeptChangeNamesItsRegressions:
         assert loaded.candidate.regressions == tuple(ran)
 
     def test_a_reverted_change_owes_none(self):
-        audit.admit(_one(outcome="refuted", candidate=_candidate()), [], [_grant()])
+        audit.admit(
+            _one(outcome="refuted", candidate=_candidate()),
+            [],
+            [_grant()],
+            prior=(),
+            holdouts=audit.holdout_cases(),
+            tracked=frozenset(),
+        )
 
     @pytest.mark.parametrize(
         "named",
@@ -570,6 +700,8 @@ class TestAKeptChangeNamesItsRegressions:
                 [],
                 [_grant()],
                 tracked=frozenset({"tests/test_evals_audit_loop.py"}),
+                prior=(),
+                holdouts=audit.holdout_cases(),
             )
 
     def test_a_node_id_is_read_by_its_path(self):
@@ -580,6 +712,8 @@ class TestAKeptChangeNamesItsRegressions:
             [],
             [_grant()],
             tracked=frozenset({"tests/test_evals_audit_loop.py"}),
+            prior=(),
+            holdouts=audit.holdout_cases(),
         )
 
     def test_the_files_are_read_at_the_candidate_commit(self):
@@ -609,13 +743,27 @@ class TestASharedChangeAnswersForEveryPackage:
         with pytest.raises(
             audit.ExperimentError, match=f"no parity answer for {missing}"
         ):
-            audit.admit(_one(outcome="refuted", candidate=held), [], [_grant()])
+            audit.admit(
+                _one(outcome="refuted", candidate=held),
+                [],
+                [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_a_package_not_in_packages_is_refused(self):
         held = _candidate()
         held["parity"]["strdie"] = "nothing"
         with pytest.raises(audit.ExperimentError, match="strdie"):
-            audit.admit(_one(outcome="refuted", candidate=held), [], [_grant()])
+            audit.admit(
+                _one(outcome="refuted", candidate=held),
+                [],
+                [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_a_blank_answer_is_not_an_answer(self):
         held = _candidate()
@@ -645,12 +793,26 @@ class TestAHoldoutIsReadAFixedNumberOfTimes:
     def test_the_last_permitted_read_is_admitted(self):
         ledger = [_reader(n) for n in range(audit.HOLDOUT_READS - 1)]
 
-        audit.admit(_reader(9), ledger, (), holdouts=frozenset({HOLDOUT}))
+        audit.admit(
+            _reader(9),
+            ledger,
+            (),
+            holdouts=frozenset({HOLDOUT}),
+            prior=(),
+            tracked=frozenset(),
+        )
 
     def test_a_read_past_the_limit_is_refused(self):
         ledger = [_reader(n) for n in range(audit.HOLDOUT_READS)]
         with pytest.raises(audit.ExperimentError, match="no longer unseen"):
-            audit.admit(_reader(9), ledger, (), holdouts=frozenset({HOLDOUT}))
+            audit.admit(
+                _reader(9),
+                ledger,
+                (),
+                holdouts=frozenset({HOLDOUT}),
+                prior=(),
+                tracked=frozenset(),
+            )
 
     def test_a_development_case_is_not_a_holdout_read(self):
         with pytest.raises(audit.ExperimentError, match="not a holdout case"):
@@ -659,6 +821,8 @@ class TestAHoldoutIsReadAFixedNumberOfTimes:
                 [],
                 (),
                 holdouts=frozenset({HOLDOUT}),
+                prior=(),
+                tracked=frozenset(),
             )
 
     def test_the_corpus_names_its_holdouts(self):
@@ -690,20 +854,48 @@ class TestAReplayIsNotARepeat:
         return _one(**held)
 
     def test_a_repeat_with_a_paid_call_is_admitted(self):
-        audit.admit(self._repeat(), [_one()], [_grant()])
+        audit.admit(
+            self._repeat(),
+            [_one()],
+            [_grant()],
+            prior=(),
+            holdouts=audit.holdout_cases(),
+            tracked=frozenset(),
+        )
 
     @pytest.mark.parametrize("actual", [None, 0.0])
     def test_a_replay_naming_a_repeat_is_refused(self, actual):
         with pytest.raises(audit.ExperimentError, match="a replay is not a repeat"):
-            audit.admit(self._repeat(actual_usd=actual), [_one()], [_grant()])
+            audit.admit(
+                self._repeat(actual_usd=actual),
+                [_one()],
+                [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_a_repeat_names_an_experiment_on_record(self):
         with pytest.raises(audit.ExperimentError, match="not an earlier experiment"):
-            audit.admit(self._repeat(replicates="Z-E9"), [_one()], [_grant()])
+            audit.admit(
+                self._repeat(replicates="Z-E9"),
+                [_one()],
+                [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_an_experiment_does_not_repeat_itself(self):
         with pytest.raises(audit.ExperimentError, match="not an earlier experiment"):
-            audit.admit(self._repeat(experiment_id="A-E1"), [_one()], [_grant()])
+            audit.admit(
+                self._repeat(experiment_id="A-E1"),
+                [_one()],
+                [_grant()],
+                prior=(),
+                holdouts=audit.holdout_cases(),
+                tracked=frozenset(),
+            )
 
     def test_the_repeats_are_counted_and_printed(self, tmp_path):
         audit.append(_one(), tmp_path)
@@ -711,7 +903,9 @@ class TestAReplayIsNotARepeat:
         audit.append(self._repeat(experiment_id="A-E3"), tmp_path)
 
         assert audit.repeats(audit.load(tmp_path)) == {"A-E1": ("A-E2", "A-E3")}
-        found = audit.lookup(audit_id="A", directory=tmp_path, root=tmp_path)
+        found = audit.lookup(
+            audit_id="A", directory=tmp_path, root=tmp_path, signature=""
+        )
         printed = str(audit.render(found))
         assert "repeated:  2 independent repeat(s): A-E2, A-E3" in printed
         assert "repeats:   A-E1" in printed

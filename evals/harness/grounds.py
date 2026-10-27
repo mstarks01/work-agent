@@ -289,8 +289,8 @@ def measure_grounds(
     framework: FrameworkName,
     drafts: Sequence[Claim],
     unverified: Iterable[UnverifiedGround],
-    dropped: Iterable[DroppedClaim] = (),
-    repaired: Iterable[RepairedQuote] = (),
+    dropped: Iterable[DroppedClaim],
+    repaired: Iterable[RepairedQuote],
 ) -> CaseGrounds:
     """Fold one framework's drafts and its unverified marks into one measurement.
 

@@ -68,6 +68,8 @@ def vote_on(case, threat, verdict, reason=None, content=None):
         tuple(threat.affected_element_ids),
         flows,
         verb=threat.verb,
+        identifier=None,
+        scope=case.id,
     )
     return cast(
         components,
@@ -412,6 +414,8 @@ def test_a_rejection_wins_over_a_second_reviewers_pool_vote(case):
                     tuple(produced[0].affected_element_ids),
                     {},
                     verb=produced[0].verb,
+                    identifier=None,
+                    scope=case.id,
                 ),
                 case.id,
                 "down",

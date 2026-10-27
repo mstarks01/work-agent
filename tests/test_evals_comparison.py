@@ -316,7 +316,10 @@ class TestTheStalenessGate:
 
     def test_a_directory_with_no_manifest_is_not_a_row(self, tmp_path):
         (tmp_path / "evals" / "baselines" / "junk").mkdir(parents=True)
-        assert read_baseline(tmp_path / "evals" / "baselines" / "junk") is None
+        assert (
+            read_baseline(tmp_path / "evals" / "baselines" / "junk", root=tmp_path)
+            is None
+        )
         assert "No Baseline is merged yet" in build(tmp_path)
 
 

@@ -88,7 +88,7 @@ class Roster:
         return self.resolve(voter) in self.standings
 
 
-def load(path: Path | str = DEFAULT_ROSTER_PATH) -> Roster:
+def load(path: Path | str) -> Roster:
     """Read the roster, refusing anything it does not recognise."""
     path = Path(path)
     try:

@@ -714,7 +714,7 @@ def _standing_of_unmatched(
     votes: Ledger,
     unmatched_positions: Sequence[int],
     misfiled: set[str],
-    rows: Mapping[str, str] = NO_ROWS,
+    rows: Mapping[str, str],
 ) -> tuple[tuple[UnlistedThreat, ...], tuple[str, ...]]:
     """Step 4: each unmatched threat's fingerprint, looked up in the ledger.
 

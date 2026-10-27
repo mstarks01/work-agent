@@ -83,7 +83,7 @@ def flow_id_version_of_graph(raw: Mapping[str, Any]) -> int:
 
 
 def table_between(
-    raw: Mapping[str, Any], from_version: int, to_version: int = FLOW_ID_VERSION
+    raw: Mapping[str, Any], from_version: int, to_version: int
 ) -> dict[str, str]:
     """Each flow's ID under one version against its ID under another.
 

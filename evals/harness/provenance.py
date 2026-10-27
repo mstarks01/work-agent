@@ -458,7 +458,7 @@ def provenance_of(
     sampling: SamplingConfig,
     tiers_config_version: int,
     build: Mapping[str, str],
-    tree: str = "",
+    tree: str,
 ) -> RunProvenance:
     """Build the record from the node runs a sweep performed.
 

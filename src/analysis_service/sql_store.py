@@ -1042,7 +1042,7 @@ class SqlJobStore:
         *,
         ceiling: int,
         budget: BudgetPolicy,
-        principal: Principal | None = None,
+        principal: Principal | None,
     ) -> Admission:
         """Check every admission bound and insert, in one write transaction.
 

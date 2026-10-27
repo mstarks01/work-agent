@@ -528,7 +528,9 @@ class TestReserve:
         async def scenario():
             await admit(store, new_record())
             refused = new_record()
-            outcome = await store.reserve(refused, ceiling=1, budget=SEEDING_BUDGET)
+            outcome = await store.reserve(
+                refused, ceiling=1, budget=SEEDING_BUDGET, principal=None
+            )
             return outcome, await store.get(refused.id)
 
         outcome, stored = asyncio.run(scenario())
@@ -542,7 +544,7 @@ class TestReserve:
             await admit(store, new_record())
             record = new_record()
             return await store.reserve(
-                record, ceiling=2, budget=SEEDING_BUDGET
+                record, ceiling=2, budget=SEEDING_BUDGET, principal=None
             ), await store.get(record.id)
 
         outcome, stored = asyncio.run(scenario())
@@ -569,7 +571,9 @@ class TestReserve:
         async def scenario():
             record = new_record()
             await admit(store, record)
-            return await store.reserve(record, ceiling=2, budget=SEEDING_BUDGET)
+            return await store.reserve(
+                record, ceiling=2, budget=SEEDING_BUDGET, principal=None
+            )
 
         assert asyncio.run(scenario()).outcome == "duplicate"
 
@@ -580,7 +584,9 @@ class TestReserve:
         async def scenario():
             record = new_record()
             await admit(store, record)
-            return await store.reserve(record, ceiling=1, budget=SEEDING_BUDGET)
+            return await store.reserve(
+                record, ceiling=1, budget=SEEDING_BUDGET, principal=None
+            )
 
         assert asyncio.run(scenario()).outcome == "duplicate"
 
@@ -596,7 +602,7 @@ class TestReserve:
             async def contend():
                 await start.wait()
                 return await store.reserve(
-                    new_record(), ceiling=2, budget=SEEDING_BUDGET
+                    new_record(), ceiling=2, budget=SEEDING_BUDGET, principal=None
                 )
 
             racers = [asyncio.create_task(contend()) for _ in range(20)]
@@ -614,7 +620,9 @@ class TestReserve:
         async def scenario():
             async def contend():
                 record = new_record()
-                outcome = await store.reserve(record, ceiling=3, budget=SEEDING_BUDGET)
+                outcome = await store.reserve(
+                    record, ceiling=3, budget=SEEDING_BUDGET, principal=None
+                )
                 return record.id, outcome.outcome
 
             results = await asyncio.gather(
@@ -755,7 +763,7 @@ class TestOrderingAndAtomicity:
             async def contend():
                 await start.wait()
                 return await store.reserve(
-                    new_record(reserved=400), ceiling=100, budget=POLICY
+                    new_record(reserved=400), ceiling=100, budget=POLICY, principal=None
                 )
 
             racers = [asyncio.create_task(contend()) for _ in range(20)]
@@ -968,7 +976,9 @@ class TestADeletedJobLeavesAUsageRow:
         job = completed(store)
         asyncio.run(store.delete(job, "alice"))
         reused = new_record().model_copy(update={"id": job})
-        admission = asyncio.run(store.reserve(reused, ceiling=100, budget=POLICY))
+        admission = asyncio.run(
+            store.reserve(reused, ceiling=100, budget=POLICY, principal=None)
+        )
         assert admission.outcome == "duplicate"
         assert asyncio.run(store.get(job)) is None
 
@@ -991,7 +1001,9 @@ class TestADeletedJobLeavesAUsageRow:
             global_max_tokens_per_window=10**9,
         )
         admission = asyncio.run(
-            store.reserve(new_record(), ceiling=100, budget=one_a_window)
+            store.reserve(
+                new_record(), ceiling=100, budget=one_a_window, principal=None
+            )
         )
         assert admission.outcome == "over_rate"
 
@@ -1275,7 +1287,9 @@ class TestAFailedObjectDelete:
         objects.failing = {object_key("alice", job, "sources.json")}
         asyncio.run(store.delete(job, "alice"))
         admission = asyncio.run(
-            store.reserve(new_record(), ceiling=100, budget=ONE_A_WINDOW)
+            store.reserve(
+                new_record(), ceiling=100, budget=ONE_A_WINDOW, principal=None
+            )
         )
         assert admission.outcome == "over_rate"
 
@@ -1323,7 +1337,7 @@ class TestAFailedObjectDelete:
         objects.failing = {sources}
         objects.error = error
         admission = asyncio.run(
-            store.reserve(refused, ceiling=100, budget=ONE_A_WINDOW)
+            store.reserve(refused, ceiling=100, budget=ONE_A_WINDOW, principal=None)
         )
         assert admission.outcome == "over_rate"
         assert asyncio.run(objects.get(sources)) is not None
@@ -1345,7 +1359,9 @@ class TestAFailedObjectDelete:
         stranger = new_record("mallory")
         objects.failing = {object_key("mallory", stranger.id, "sources.json")}
         with pytest.raises(ValueError, match="holds no principal"):
-            asyncio.run(store.reserve(stranger, ceiling=100, budget=POLICY))
+            asyncio.run(
+                store.reserve(stranger, ceiling=100, budget=POLICY, principal=None)
+            )
 
 
 class TestADeleteDuringARead:
@@ -1885,13 +1901,19 @@ class TestPrincipals:
         principal = Principal.new(self.identity())
         self.first(store, principal)
         later = new_record(principal.owner_id)
-        admission = asyncio.run(store.reserve(later, ceiling=100, budget=POLICY))
+        admission = asyncio.run(
+            store.reserve(later, ceiling=100, budget=POLICY, principal=None)
+        )
         assert admission.outcome == "admitted"
         assert asyncio.run(store.principal(self.identity())) == principal
 
     def test_a_job_whose_owner_holds_no_principal_is_a_defect(self, store):
         with pytest.raises(ValueError, match="holds no principal"):
-            asyncio.run(store.reserve(new_record("nobody"), ceiling=100, budget=POLICY))
+            asyncio.run(
+                store.reserve(
+                    new_record("nobody"), ceiling=100, budget=POLICY, principal=None
+                )
+            )
 
     def test_a_job_of_another_owner_than_its_principal_is_a_defect(self, store):
         principal = Principal.new(self.identity())

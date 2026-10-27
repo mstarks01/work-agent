@@ -430,7 +430,9 @@ def queued_run(store) -> str:
             sources=[Source.description("a web app storing orders")],
             frameworks=sample_selection(),
         )
-        admission = await store.reserve(record, ceiling=1, budget=SEEDING_BUDGET)
+        admission = await store.reserve(
+            record, ceiling=1, budget=SEEDING_BUDGET, principal=None
+        )
         assert admission.outcome == "admitted", admission
         return record.id
 

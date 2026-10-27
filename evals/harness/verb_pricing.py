@@ -238,7 +238,7 @@ def price(
     corpus: Sequence[GoldenCase],
     flows_by_case: Mapping[str, CaseFlows],
     pairs: Sequence[LabelledPair],
-    produced: Mapping[str, Sequence[Any]] | None = None,
+    produced: Mapping[str, Sequence[Any]] | None,
 ) -> VerbPrice:
     """One candidate table on the three axes, and its gain over ``produced``.
 

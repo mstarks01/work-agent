@@ -552,26 +552,26 @@ class TestTheScriptFlag:
         return Estimate(label="estimated", amount_usd=amount, lines=())
 
     def test_a_number_at_or_over_the_estimate_proceeds(self):
-        assert gate(self.stated(), "5") == pytest.approx(5.0)
-        assert gate(self.stated(), "4.80") == pytest.approx(4.80)
+        assert gate(self.stated(), "5", ask=None) == pytest.approx(5.0)
+        assert gate(self.stated(), "4.80", ask=None) == pytest.approx(4.80)
 
     def test_a_number_under_the_estimate_refuses(self):
         with pytest.raises(Refused, match="raise --accept-cost"):
-            gate(self.stated(), "1.00")
+            gate(self.stated(), "1.00", ask=None)
 
     def test_unknown_does_not_answer_a_stated_estimate(self):
         with pytest.raises(Refused, match="does not answer"):
-            gate(self.stated(), UNKNOWN)
+            gate(self.stated(), UNKNOWN, ask=None)
 
     def test_a_number_does_not_answer_an_unpriced_estimate(self):
         estimate = Estimate(label="unpriced", amount_usd=None, lines=())
         with pytest.raises(Refused, match="answers nothing"):
-            gate(estimate, "50")
-        assert gate(estimate, UNKNOWN) is None
+            gate(estimate, "50", ask=None)
+        assert gate(estimate, UNKNOWN, ask=None) is None
 
     def test_a_value_that_is_neither_refuses(self):
         with pytest.raises(Refused, match="neither a number"):
-            gate(self.stated(), "cheap")
+            gate(self.stated(), "cheap", ask=None)
 
 
 class TestTheHold:
@@ -673,7 +673,7 @@ class TestADirtyTreeIsNamedBeforeTheSpend:
             estimate = replace(
                 estimate, lines=(*estimate.lines, "never contributed as a Baseline")
             )
-        gate(estimate, "1.00")
+        gate(estimate, "1.00", ask=None)
         return capsys.readouterr().out
 
     def test_a_dirty_tree_says_so_in_the_accepted_block(self, capsys):
@@ -718,6 +718,7 @@ class TestAStoppedSweepSaysSo:
             sweep=Sweep(run=run),
             commit=ARTIFACT_COMMIT,
             corpus="d" * 64,
+            series=None,
         )
 
     def test_a_finished_sweep_stopped_nothing(self):
@@ -840,6 +841,10 @@ class TestTheSweepLoopPassesTheCasesThatRan:
                     deployment=SimpleNamespace(),
                     accepted=0.0001,
                     ask=ask,
+                    only=(),
+                    in_flight=1,
+                    signed=None,
+                    answers=None,
                 )
             )
         return float(prompts[-1].split("(")[1].split(")")[0])
@@ -910,6 +915,9 @@ class TestTheSweepLoopPassesTheCasesThatRan:
                     accepted=0.0001,
                     ask=ask,
                     in_flight=in_flight,
+                    only=(),
+                    signed=None,
+                    answers=None,
                 )
             )
         assert prompts, "the hold never fired"

@@ -1,10 +1,12 @@
 """Tests for prompt composition and the shared Markdown loader."""
 
+from functools import partial
 from typing import get_args
 
 import pytest
 
 from analysis_service.assertions import REGISTRY
+from analysis_service.compact import FULL_FORMAT
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.markdown_loader import (
     MarkdownLoader,
@@ -139,7 +141,7 @@ class TestComposePeerPrompts:
         ("compose", "name"),
         [
             (compose_critic_prompt, "critic"),
-            (compose_extract_prompt, "extract"),
+            (partial(compose_extract_prompt, extraction_format=FULL_FORMAT), "extract"),
             (compose_repair_prompt, "repair"),
         ],
     )

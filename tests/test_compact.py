@@ -171,7 +171,7 @@ def compact_fixture() -> dict:
 class TestTheTransportCarriesTheSameFacts:
     def test_a_compact_payload_expands_into_the_expected_full_model(self):
         """The whole claim of the transport, against a model written by hand."""
-        model, issues = parse_extraction(compact_fixture(), COMPACT_FORMAT)
+        model, issues = parse_extraction(compact_fixture(), COMPACT_FORMAT, sources={})
 
         assert issues == []
         assert model == normalize_element_ids(valid_model())
@@ -186,8 +186,10 @@ class TestTheTransportCarriesTheSameFacts:
         excerpts.
         """
         blessed = json.loads(path.read_text(encoding="utf-8"))
-        expected, _ = parse_extraction(blessed, FULL_FORMAT)
-        through_the_wire, issues = parse_extraction(as_compact(blessed), COMPACT_FORMAT)
+        expected, _ = parse_extraction(blessed, FULL_FORMAT, sources={})
+        through_the_wire, issues = parse_extraction(
+            as_compact(blessed), COMPACT_FORMAT, sources={}
+        )
 
         assert codes(issues) == []
         # Assumptions come back in element order rather than the blessed file's,
@@ -222,7 +224,7 @@ class TestTheTransportCarriesTheSameFacts:
         second["operations"] = "read"
         payload["data_flows"].append(second)
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert codes(issues) == []
         assert [flow.id for flow in model.data_flows] == [
@@ -240,7 +242,7 @@ class TestIdentityIsDerivedAndNeverInvented:
         provisional ID surviving into a validated model would mean the rewrite
         missed a reference.
         """
-        model, _ = parse_extraction(compact_fixture(), COMPACT_FORMAT)
+        model, _ = parse_extraction(compact_fixture(), COMPACT_FORMAT, sources={})
         rendered = json.dumps(model.model_dump(mode="json"))
 
         assert PROVISIONAL_PREFIX not in rendered
@@ -259,7 +261,7 @@ class TestIdentityIsDerivedAndNeverInvented:
 
     def test_a_ref_never_reaches_the_model_as_a_name_or_a_description(self):
         """A ref is transport and nothing else: it names no element downstream."""
-        model, _ = parse_extraction(compact_fixture(), COMPACT_FORMAT)
+        model, _ = parse_extraction(compact_fixture(), COMPACT_FORMAT, sources={})
 
         assert [element.name for element in model.elements()] == [
             "Customer",
@@ -278,7 +280,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         payload = compact_fixture()
         payload["data_flows"][0]["destination"] = "p:nowhere"
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert model is not None
         assert codes(issues) == ["invalid-reference"]
@@ -294,7 +296,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         payload = compact_fixture()
         payload["data_stores"][0]["trust_zone"] = "p:app"
 
-        _, issues = parse_extraction(payload, COMPACT_FORMAT)
+        _, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert codes(issues) == ["invalid-reference"]
         assert "process:web-app" in issues[0].message
@@ -316,7 +318,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         payload["external_entities"][0]["trust_zone"] = "b:cust"
         payload["external_entities"][0]["ref"] = "e:cust"
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert codes(issues) == []
         assert model.external_entities[0].id == "entity:customer"
@@ -332,7 +334,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         payload = compact_fixture()
         payload["processes"].append(dict(payload["processes"][0], ref="p:app"))
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert model is not None
         assert "duplicate-ref" in codes(issues)
@@ -348,7 +350,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         payload = compact_fixture()
         payload["processes"].append(dict(payload["processes"][0], ref="p:app"))
 
-        _, issues = parse_extraction(payload, COMPACT_FORMAT)
+        _, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
         scope, implicated = repair_scope(issues, payload)
 
         assert (scope, implicated) == ("whole", [])
@@ -373,7 +375,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
             }
         )
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert codes(issues) == []
         assert [(a.element_id, a.attribute) for a in model.assumptions] == [
@@ -386,7 +388,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         payload = compact_fixture()
         payload["assumptions"][0]["element"] = "s:gone"
 
-        _, issues = parse_extraction(payload, COMPACT_FORMAT)
+        _, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert "invalid-reference" in codes(issues)
 
@@ -396,7 +398,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         payload = compact_fixture()
         payload["data_flows"][0]["source"] = "p:cust"
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert codes(issues) == []
         assert model.data_flows[0].source == "entity:customer"
@@ -442,7 +444,7 @@ class TestBothRoutesFollowAnEndpointByOneRule:
 
     @staticmethod
     def _resolved(payload: dict, extraction_format: str) -> tuple[str | None, bool]:
-        model, issues = parse_extraction(payload, extraction_format)
+        model, issues = parse_extraction(payload, extraction_format, sources={})
         assert model is not None
         source = model.data_flows[0].source
         named = {element.id for element in model.elements()}
@@ -484,7 +486,7 @@ class TestBothRoutesFollowAnEndpointByOneRule:
         compact["processes"][0]["name"] = name
 
         results = [
-            parse_extraction(payload, extraction_format)
+            parse_extraction(payload, extraction_format, sources={})
             for payload, extraction_format in (
                 (full, FULL_FORMAT),
                 (compact, COMPACT_FORMAT),
@@ -518,7 +520,7 @@ class TestMalformedOutputFailsExplicitly:
         payload = compact_fixture()
         del payload["data_flows"][0]["operations"]
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert model is None
         assert codes(issues) == ["schema"]
@@ -528,7 +530,7 @@ class TestMalformedOutputFailsExplicitly:
         payload = compact_fixture()
         payload["processes"][0]["exposure"] = "sort of"
 
-        _, issues = parse_extraction(payload, COMPACT_FORMAT)
+        _, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert issues[0].message.startswith("processes.0.exposure")
 
@@ -537,7 +539,7 @@ class TestMalformedOutputFailsExplicitly:
         payload = compact_fixture()
         payload["processes"][0]["name"] = "!!!"
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert model is not None
         assert codes(issues) == ["empty-slug"]
@@ -552,7 +554,7 @@ class TestMalformedOutputFailsExplicitly:
         payload = compact_fixture()
         payload["data_flows"][0]["source"] = "a\n```"
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert model is None
         assert codes(issues) == ["schema"]
@@ -570,7 +572,7 @@ class TestMalformedOutputFailsExplicitly:
         payload = compact_fixture()
         payload["data_stores"][0]["trust_zone"] = UNKNOWN
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert issues == []
         assert model is not None
@@ -587,7 +589,7 @@ class TestMalformedOutputFailsExplicitly:
             payload = compact_fixture()
             payload["data_stores"][0]["trust_zone"] = written
 
-            model, issues = parse_extraction(payload, COMPACT_FORMAT)
+            model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
             refused = model is None and codes(issues) == ["schema"]
             assert refused is (written != "b:corp"), written
@@ -610,7 +612,7 @@ class TestMalformedOutputFailsExplicitly:
         payload = compact_fixture()
         payload["processes"][0]["trust_zone"] = "b:corp\n"
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert model is None
         assert codes(issues) == ["schema"]
@@ -630,7 +632,7 @@ class TestMalformedOutputFailsExplicitly:
         payload = compact_fixture()
         payload["processes"][0]["runtime"] = "python"
 
-        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
         assert model is None
         assert codes(issues) == ["schema"]
@@ -757,7 +759,7 @@ class TestTheTablesAnswerTheirRegistries:
         loader = MarkdownLoader(PROJECT_ROOT / "prompts")
 
         with pytest.raises(ValueError, match="unknown extraction format"):
-            parse_extraction(compact_fixture(), "compact-v9")
+            parse_extraction(compact_fixture(), "compact-v9", sources={})
         with pytest.raises(ValueError, match="unknown extraction format"):
             compose_extract_prompt(loader, "compact-v9")
 
@@ -766,7 +768,7 @@ class TestTheFullRouteIsUntouched:
     def test_the_full_route_is_the_gate_it_always_was(self):
         """Turning the flag off restores the existing route exactly."""
         model, issues = parse_extraction(
-            valid_model().model_dump(mode="json"), FULL_FORMAT
+            valid_model().model_dump(mode="json"), FULL_FORMAT, sources={}
         )
 
         assert issues == []
@@ -781,10 +783,12 @@ class TestTheFullRouteIsUntouched:
         """
         loader = MarkdownLoader(PROJECT_ROOT / "prompts")
 
-        assert compose_extract_prompt(loader) == (
+        assert compose_extract_prompt(loader, extraction_format=FULL_FORMAT) == (
             loader.load(EXTRACT_PROMPT_NAME).strip() + "\n"
         )
-        assert EXTRACT_COMPACT_PROMPT_NAME not in compose_extract_prompt(loader)
+        assert EXTRACT_COMPACT_PROMPT_NAME not in compose_extract_prompt(
+            loader, extraction_format=FULL_FORMAT
+        )
 
     def test_a_full_payload_is_not_silently_read_as_compact(self):
         """The route is a fact of the build, never a guess about what parsed."""

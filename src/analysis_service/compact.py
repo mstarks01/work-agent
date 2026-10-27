@@ -427,7 +427,7 @@ def parse_extraction(
     payload: object,
     extraction_format: str,
     *,
-    sources: Mapping[str, str] = MappingProxyType({}),
+    sources: Mapping[str, str],
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """The one reader of "what extraction emitted" against "a validated model".
 

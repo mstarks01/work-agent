@@ -1206,7 +1206,7 @@ def test_one_reader_bounds_every_package_s_emission():
         assert len(batch.invalid) == emitted, name
         lane = package.lanes[0]
         with pytest.raises(DraftJoinError, match=f"{lane} emitted {emitted}"):
-            fan_in({lane: batch}, package, model)
+            fan_in({lane: batch}, package, model, sources={})
 
 
 def test_no_package_s_lane_may_write_the_list_code_fills():

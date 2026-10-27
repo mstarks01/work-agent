@@ -97,7 +97,13 @@ def test_a_replay_parses_the_answer_under_the_package_schema(recorded, case):  #
 
     batch = asyncio.run(
         lane_replay.replay(
-            material, "stride", "spoofing", call, PACKAGE_LOADER, PROMPT_LOADER
+            material,
+            "stride",
+            "spoofing",
+            call,
+            PACKAGE_LOADER,
+            PROMPT_LOADER,
+            appended=None,
         )
     )
 
@@ -145,7 +151,13 @@ def test_an_answer_outside_the_schema_is_refused(recorded, case):  # noqa: F811
     with pytest.raises(ValueError):
         asyncio.run(
             lane_replay.replay(
-                material, "stride", "spoofing", call, PACKAGE_LOADER, PROMPT_LOADER
+                material,
+                "stride",
+                "spoofing",
+                call,
+                PACKAGE_LOADER,
+                PROMPT_LOADER,
+                appended=None,
             )
         )
 

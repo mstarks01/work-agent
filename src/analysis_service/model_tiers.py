@@ -39,7 +39,6 @@ fallback and no compatibility shim for other schema versions.
 
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal, Self, get_args
@@ -946,7 +945,7 @@ def _require_selected_tiers(
 
 def load_model_tiers(
     path: Path | str,
-    env: Mapping[str, str] | None = None,
+    env: Mapping[str, str],
 ) -> ModelTierConfig:
     """Load and validate the tier config, applying env-var overrides.
 
@@ -954,8 +953,6 @@ def load_model_tiers(
     via the environment is rejected exactly like one in the file. Every failure
     path raises :class:`ModelConfigError`.
     """
-    if env is None:
-        env = os.environ
     raw = read_toml(path, ModelConfigError)
 
     _apply_env_overrides(raw, env)

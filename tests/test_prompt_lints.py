@@ -56,6 +56,7 @@ from analysis_service.claims import (
 )
 from analysis_service.compact import (
     COMPACT_FORMAT,
+    FULL_FORMAT,
     OMITTABLE_FIELDS,
     REFERENCE_FIELDS,
 )
@@ -435,7 +436,7 @@ def test_the_composed_compact_extract_prompt_is_the_body_plus_the_delta():
     ``extract.md`` would move the full route's instruction digest and make
     every run before it incomparable.
     """
-    body = compose_extract_prompt(loader)
+    body = compose_extract_prompt(loader, extraction_format=FULL_FORMAT)
     composed = compose_extract_prompt(loader, COMPACT_FORMAT)
 
     assert body == loader.load(EXTRACT_PROMPT_NAME).strip() + "\n"

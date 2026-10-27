@@ -623,9 +623,15 @@ def test_an_item_whose_mechanism_names_long_flows_can_take_a_vote():
     """
     from dataclasses import replace
 
-    from tests.test_evals_queue import FLOWS, finding
+    from tests.test_evals_queue import FLOWS, SITTING, VOTER, finding
 
     flows = tuple(f"flow:process:{'a' * 300}>process:b>{label}" for label in "xy")
-    item = review_queue.build([replace(finding(), mechanism=flows)], FLOWS, Ledger())[0]
+    item = review_queue.build(
+        [replace(finding(), mechanism=flows)],
+        FLOWS,
+        Ledger(),
+        voter=VOTER,
+        sitting=SITTING,
+    )[0]
 
     assert VoteBody(fingerprint=item.key, verdict="up").fingerprint == item.key

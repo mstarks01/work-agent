@@ -153,13 +153,12 @@ def flagged_cases(blocks: Mapping[str, Any]) -> frozenset[str]:
 
 
 def held_out_cases(
-    blocks: Mapping[str, Any], ledger: Sequence[audit.Experiment] | None = None
+    blocks: Mapping[str, Any], ledger: Sequence[audit.Experiment]
 ) -> frozenset[str]:
     """The flagged cases of a sweep that are still held out today.
 
     A flagged case the ledger exhausted counts as a development case
-    (:func:`~evals.harness.audit.held_out`). ``None`` reads the ledger on
-    record.
+    (:func:`~evals.harness.audit.held_out`).
     """
     return audit.still_held_out(flagged_cases(blocks), ledger)
 
@@ -187,7 +186,7 @@ def _columns_for(framework: FrameworkName) -> list[Column]:
     ]
 
 
-def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
+def read_baseline(directory: Path, root: Path) -> Row | None:
     """One Baseline directory as a row, or None when it carries no manifest."""
     manifest_path = directory / "baseline.json"
     if not manifest_path.is_file():
@@ -335,7 +334,7 @@ contributed sweep starts this table — see [`../BASELINES.md`](../BASELINES.md)
 """
 
 
-def build(root: Path = REPO_ROOT) -> str:
+def build(root: Path) -> str:
     """The whole file, from the merged Baselines and nothing else."""
     directory = root / "evals" / "baselines"
     rows = []
@@ -530,7 +529,7 @@ def is_stale(root: Path = REPO_ROOT) -> bool:
     return current != build(root)
 
 
-def write(root: Path = REPO_ROOT) -> Path:
+def write(root: Path) -> Path:
     """Rebuild the file. What ``submit baseline`` and the command both call."""
     path = root / TABLE_REL
     path.parent.mkdir(parents=True, exist_ok=True)

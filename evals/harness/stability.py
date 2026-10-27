@@ -527,8 +527,8 @@ def _floor(fates: Mapping[tuple[Scope, str], tuple[int, int]]) -> float:
 
 def band(
     runs: Sequence[ScoredRun],
-    calibration: Sequence[Sequence[ScoredRun]] = (),
-    rows: Collection[tuple[str, str]] = (),
+    calibration: Sequence[Sequence[ScoredRun]],
+    rows: Collection[tuple[str, str]],
 ) -> Band:
     """The spread of the must-find total over ``runs``, off their fates.
 

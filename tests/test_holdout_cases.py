@@ -391,7 +391,9 @@ class TestEverySiteAsksTheOneReader:
             ]
         }
 
-        assert comparison.held_out_cases(blocks) == frozenset({"c"})
+        assert comparison.held_out_cases(blocks, ledger=audit.load()) == frozenset(
+            {"c"}
+        )
 
     def test_a_paired_reading_opens_an_exhausted_case(self, exhausted, tmp_path):
         """``paired`` skips a held-out report unopened; an exhausted one is read."""

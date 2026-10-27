@@ -168,6 +168,11 @@ TEST_ONLY: dict[str, str] = {
         "every per-framework role, which the graph tests check against the"
         " declared role constants and the node name each role gives"
     ),
+    "default_base_ref": (
+        "the ref the repo-wide Baseline walk measures ancestry against:"
+        " origin/main where the clone has a remote, as in CI, and main where it"
+        " has none"
+    ),
     "menu": (
         "the verb vocabulary as prompt text, which the prompt lint compares"
         " line by line with the copy in frameworks/stride/output.md"

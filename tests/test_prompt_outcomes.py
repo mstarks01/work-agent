@@ -162,7 +162,7 @@ def a_ref_two_elements_claim_binds_to_neither():
     payload = compact_fixture()
     payload["processes"].append(dict(payload["processes"][0], ref="p:app"))
 
-    _, issues = parse_extraction(payload, COMPACT_FORMAT)
+    _, issues = parse_extraction(payload, COMPACT_FORMAT, sources={})
 
     assert "duplicate-ref" in codes(issues)
     assert "invalid-reference" in codes(issues)

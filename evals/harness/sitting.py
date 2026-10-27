@@ -478,9 +478,9 @@ class Row:
 
 def rail(
     corpus_dir: Path,
-    signatures: Mapping[str, str] | None = None,
-    drafts: Mapping[str, DraftStatus] | None = None,
-    partial: Mapping[str, str] | None = None,
+    signatures: Mapping[str, str],
+    drafts: Mapping[str, DraftStatus],
+    partial: Mapping[str, str],
 ) -> tuple[Row, ...]:
     """Every case in the corpus, in corpus order, with the status a reader reads.
 
@@ -501,18 +501,14 @@ def rail(
     reader their own finished work was never done.
 
     ``drafts`` is what the reader's own store says, from
-    :func:`draft_states`. A caller that passes none gets the rail of a reader
-    who holds no drafts, which is what the corpus alone can say.
+    :func:`draft_states`.
     """
-    signed = signatures or {}
-    part = partial or {}
-    held = drafts or {}
     return tuple(
         _row(
             case,
-            signed.get(case.meta.id),
-            held.get(case.meta.id),
-            part.get(case.meta.id),
+            signatures.get(case.meta.id),
+            drafts.get(case.meta.id),
+            partial.get(case.meta.id),
         )
         for case in load_corpus(corpus_dir)
     )
@@ -535,7 +531,7 @@ def _row(
     case: GoldenCase,
     signature: str | None,
     draft: DraftStatus | None,
-    partial: str | None = None,
+    partial: str | None,
 ) -> Row:
     status, state, pressable = _standing(signature, draft, partial)
     return Row(
@@ -549,7 +545,7 @@ def _row(
 
 
 def _standing(
-    signature: str | None, draft: DraftStatus | None, partial: str | None = None
+    signature: str | None, draft: DraftStatus | None, partial: str | None
 ) -> tuple[str, RowState, bool]:
     """What one case is waiting for, out of the two things that can be true of it.
 
@@ -1057,7 +1053,7 @@ def sitting_problems(
     own_list: Sequence[str],
     opened_digests: Mapping[str, str],
     marks: Mapping[str, Mark],
-    name: MarkName = mark_position,
+    name: MarkName,
 ) -> list[str]:
     """Everything wrong with what one sitting claims to have read.
 

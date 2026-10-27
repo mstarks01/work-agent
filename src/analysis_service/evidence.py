@@ -331,7 +331,7 @@ def prepared_view(
 
 
 def lead_topics(
-    evidence: EvidenceCatalog, assertions: AssertionCatalog | None = None
+    evidence: EvidenceCatalog, assertions: AssertionCatalog | None
 ) -> frozenset[str]:
     """What this evidence offers a lane as an open question or an absence.
 
@@ -402,7 +402,7 @@ def _attribute_entry(element: Element, attribute: str) -> tuple[str, Ground] | N
 def ground_issues(
     claims: Iterable[Claim],
     model: SystemModel,
-    assertions: AssertionCatalog | None = None,
+    assertions: AssertionCatalog | None,
 ) -> list[str]:
     """Every catalogued ground these claims carry that ``model`` does not derive.
 

@@ -40,12 +40,11 @@ from __future__ import annotations
 
 import ast
 import importlib
-from pathlib import Path
 from typing import get_args
 
 import pytest
 
-from tests.source_tree import PYTHON, REPO_ROOT, parse, source_files
+from tests.source_tree import PYTHON, module_name, parse, source_files
 
 pytestmark = pytest.mark.lint
 
@@ -110,16 +109,6 @@ PARTIAL: dict[tuple[str, str], str] = {
 }
 
 
-def _module_name(path: Path) -> str:
-    """The import name for one source file under the repository root."""
-    parts = list(path.relative_to(REPO_ROOT).with_suffix("").parts)
-    if parts[0] == "src":
-        parts = parts[1:]
-    if parts[-1] == "__init__":
-        parts = parts[:-1]
-    return ".".join(parts)
-
-
 def _annotated_vocabularies() -> list[tuple[str, str, str]]:
     """Every ``NAME: container[TheType, ...]`` at a module's top level.
 
@@ -146,7 +135,7 @@ def _annotated_vocabularies() -> list[tuple[str, str, str]]:
             first = inside.elts[0] if isinstance(inside, ast.Tuple) else inside
             name = getattr(first, "id", "")
             if name and name[0].isupper():
-                found.append((_module_name(path), node.target.id, name))
+                found.append((module_name(path), node.target.id, name))
     return found
 
 
@@ -158,8 +147,8 @@ def _pairs() -> list[tuple[str, str, str, frozenset[str], frozenset[str]]]:
     ``Literal`` of strings is not one of these and is dropped here.
     """
     resolved = []
-    for module_name, constant, type_name in _annotated_vocabularies():
-        module = importlib.import_module(module_name)
+    for dotted, constant, type_name in _annotated_vocabularies():
+        module = importlib.import_module(dotted)
         if not hasattr(module, constant) or not hasattr(module, type_name):
             continue
         members = get_args(getattr(module, type_name))
@@ -167,7 +156,7 @@ def _pairs() -> list[tuple[str, str, str, frozenset[str], frozenset[str]]]:
             continue
         resolved.append(
             (
-                module_name,
+                dotted,
                 constant,
                 type_name,
                 frozenset(getattr(module, constant)),

@@ -614,7 +614,7 @@ class Ledger:
         return tuple(sorted(key for key, who in by_finding.items() if len(who) > 1))
 
 
-def load(path: Path | str = DEFAULT_LEDGER_PATH) -> Ledger:
+def load(path: Path | str) -> Ledger:
     """Read every voter's file in filename order, failing closed on any row.
 
     ``path`` is the ledger *directory*, one ``<login>.jsonl`` per voter. A
@@ -667,7 +667,7 @@ def _read_voter_file(path: Path) -> list[Vote]:
     return votes
 
 
-def append(vote: Vote, path: Path | str = DEFAULT_LEDGER_PATH) -> Vote:
+def append(vote: Vote, path: Path | str) -> Vote:
     """Add one vote to the end of its voter's file, and never touch what is there.
 
     ``path`` is the ledger directory; the vote routes to

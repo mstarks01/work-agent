@@ -82,7 +82,7 @@ _GROUND_STATE = {"unknown-attribute": "unstated", "absent-attribute": "stated ab
 
 
 def reference_labels(
-    model: SystemModel, assertions: AssertionCatalog | None = None
+    model: SystemModel, assertions: AssertionCatalog | None
 ) -> Mapping[str, str]:
     """A display label for each element ID, each evidence reference, and each
     other name a model writes in backticks.

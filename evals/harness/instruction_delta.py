@@ -142,7 +142,7 @@ def node_deltas(before: EvalArtifact, after: EvalArtifact) -> list[NodeDelta]:
     return rows
 
 
-def _numbers(value: Any, prefix: str = "") -> Iterable[tuple[str, float]]:
+def _numbers(value: Any, prefix: str) -> Iterable[tuple[str, float]]:
     """Every numeric leaf of one artifact block, with its path.
 
     Generic because an aggregate's shape is the instrument's own business. A

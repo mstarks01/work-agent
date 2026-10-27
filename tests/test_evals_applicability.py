@@ -898,14 +898,24 @@ class TestTheCarriedPolicyDecidesWhatSatisfies:
     """``CARRIED_EVIDENCE_KINDS`` is read, never assumed."""
 
     def test_an_uncarried_kind_must_arrive_as_a_deferral_naming_it(self):
-        assert satisfies("needs-code", Observation("deferred", "code"), ("prose",))
+        assert satisfies(
+            "needs-code",
+            Observation("deferred", "code"),
+            ("prose",),
+            also_acceptable=(),
+        )
         assert not satisfies(
-            "needs-code", Observation("deferred", "config"), ("prose",)
+            "needs-code",
+            Observation("deferred", "config"),
+            ("prose",),
+            also_acceptable=(),
         )
 
     def test_asking_for_more_prose_does_not_satisfy_a_need_for_code(self):
         """The false prose request, at the level of one comparison."""
-        assert not satisfies("needs-code", Observation("needs-info"), ("prose",))
+        assert not satisfies(
+            "needs-code", Observation("needs-info"), ("prose",), also_acceptable=()
+        )
 
     def test_a_carried_kind_is_satisfied_by_the_claim_path_instead(self):
         """A job that carried source would rule a ``needs-code`` proposal.
@@ -915,16 +925,34 @@ class TestTheCarriedPolicyDecidesWhatSatisfies:
         """
         carried = ("prose", "code")
 
-        assert satisfies("needs-code", Observation("needs-info"), carried)
-        assert not satisfies("needs-code", Observation("deferred", "code"), carried)
+        assert satisfies(
+            "needs-code", Observation("needs-info"), carried, also_acceptable=()
+        )
+        assert not satisfies(
+            "needs-code", Observation("deferred", "code"), carried, also_acceptable=()
+        )
 
     def test_more_prose_is_the_claim_path_because_prose_is_carried(self):
-        assert satisfies("needs-more-prose", Observation("needs-info"), ("prose",))
+        assert satisfies(
+            "needs-more-prose",
+            Observation("needs-info"),
+            ("prose",),
+            also_acceptable=(),
+        )
 
     def test_a_rejection_and_a_not_applicable_entry_both_rule_it_out(self):
-        assert satisfies("not-applicable", Observation("rejected"), ("prose",))
-        assert satisfies("not-applicable", Observation("not-applicable"), ("prose",))
-        assert not satisfies("not-applicable", Observation("confirmed"), ("prose",))
+        assert satisfies(
+            "not-applicable", Observation("rejected"), ("prose",), also_acceptable=()
+        )
+        assert satisfies(
+            "not-applicable",
+            Observation("not-applicable"),
+            ("prose",),
+            also_acceptable=(),
+        )
+        assert not satisfies(
+            "not-applicable", Observation("confirmed"), ("prose",), also_acceptable=()
+        )
 
 
 class TestTheRoutingFailures:
@@ -1111,7 +1139,12 @@ class TestARecordMayAcceptASecondRoute:
     """
 
     def test_the_alternate_route_scores_correct(self):
-        assert satisfies("needs-config", deferred_as("code"), ("prose",)) is False
+        assert (
+            satisfies(
+                "needs-config", deferred_as("code"), ("prose",), also_acceptable=()
+            )
+            is False
+        )
         assert (
             satisfies("needs-config", deferred_as("code"), ("prose",), ("needs-code",))
             is True

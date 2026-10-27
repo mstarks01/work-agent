@@ -688,7 +688,7 @@ class TestAPrincipalReachesAnElementOnlyWhenTheSourcesSaySo:
         held = self.catalog(self.absence(), identified=False)
         assert fired(model, RULE, held) == []
 
-    def test_an_inferred_identification_is_refused_by_the_gate(self):
+    def test_an_inferred_identification_is_refused_by_the_gate(self, model):
         """So a wrong lead needs a source that states the wrong thing."""
         guessed = Assertion(
             subject=self.PRINCIPAL,
@@ -698,7 +698,11 @@ class TestAPrincipalReachesAnElementOnlyWhenTheSourcesSaySo:
             origin="assertion-pass",
             explanation="the names look alike",
         )
-        issues = catalog_issues(self.catalog(guessed, identified=False))
+        issues = catalog_issues(
+            self.catalog(guessed, identified=False),
+            model=model,
+            sources={SOURCE_LABEL: SOURCE},
+        )
         assert "inference-refused" in {issue.code for issue in issues}
 
 

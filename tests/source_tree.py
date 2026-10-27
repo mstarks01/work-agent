@@ -136,7 +136,7 @@ NOT_GUIDES: dict[str, str] = {
 LINT_MARKER = "pytest.mark.lint"
 
 #: A reason shorter than this says nothing a reader can check.
-_SHORTEST_REASON = 40
+SHORTEST_REASON = 40
 
 
 def source_files(*roots: str, suffixes: tuple[str, ...] = (".py",)) -> list[Path]:
@@ -171,6 +171,16 @@ def _skipped(directory: Path) -> bool:
     return bool(_SKIPPED & set(relative.parts)) or relative.as_posix() in _SKIPPED_PATHS
 
 
+def module_name(path: Path) -> str:
+    """The dotted name that an import gives the source file at ``path``."""
+    parts = list(path.relative_to(REPO_ROOT).with_suffix("").parts)
+    if parts[0] == "src":
+        parts = parts[1:]
+    if parts[-1] == "__init__":
+        parts = parts[:-1]
+    return ".".join(parts)
+
+
 @cache
 def parse(path: Path) -> ast.Module:
     """The parsed module at ``path``, read once per session. Walk it; never edit it."""
@@ -198,7 +208,7 @@ def without(paths: Iterable[Path], left_out: Mapping[str, str]) -> list[Path]:
     that leaves out no file is stale, and a short reason says nothing, so either
     raises. A file added later under a named set is read unless a key names it.
     """
-    thin = [key for key, reason in left_out.items() if len(reason) < _SHORTEST_REASON]
+    thin = [key for key, reason in left_out.items() if len(reason) < SHORTEST_REASON]
     if thin:
         raise ValueError(f"state a reason for leaving out {thin}")
     kept: list[Path] = []

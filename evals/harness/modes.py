@@ -1267,7 +1267,7 @@ def case_framework_options(case: GoldenCase) -> dict[str, dict[str, Any]]:
 
 
 def select_frameworks(
-    case: GoldenCase, only: Sequence[FrameworkName] = ()
+    case: GoldenCase, only: Sequence[FrameworkName]
 ) -> tuple[FrameworkName, ...]:
     """This case's frameworks, narrowed to ``only`` when a sweep asks for it.
 
@@ -1339,7 +1339,7 @@ def build_eval_pipeline(
     entry: Entry,
     *,
     frameworks: Sequence[FrameworkName],
-    deployment: Deployment | None = None,
+    deployment: Deployment,
     resolve_model: ModelResolver | None = None,
     sampling: SamplingConfig | None = None,
 ) -> Pipeline:
@@ -1358,7 +1358,6 @@ def build_eval_pipeline(
     models has no credentials to pass and no provider to call. ``sampling``
     overrides the deployment's for a sweep varying the per-tier params.
     """
-    deployment = deployment or Deployment.from_env()
     if entry == ENTRY_HEAD_ONLY and not deployment.carries_catalog:
         # The service pauses on such a head; the heads mode scores a catalog,
         # so it refuses before the first node is paid for.

@@ -391,7 +391,7 @@ def _borrow(
     baselines: Sequence[tuple[Path, dict[str, Any]]],
     routes: dict[str, str],
     identity: dict[str, Any],
-    cases: int | None = None,
+    cases: int | None,
 ) -> Borrowed | None:
     """The most comparable Baseline's recorded token counts, at this run's prices.
 
@@ -511,7 +511,7 @@ def _render(estimate: Estimate) -> str:
 def gate(
     estimate: Estimate,
     accept_cost: str | None,
-    ask: Callable[[str], str] | None = None,
+    ask: Callable[[str], str] | None,
 ) -> float | None:
     """Take consent, or raise :class:`Refused`. Returns the accepted amount.
 

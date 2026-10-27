@@ -109,6 +109,7 @@ def provenance(sampling, executions=None):
         sampling=sampling,
         tiers_config_version=TIERS_VERSION,
         build=build_identity(),
+        tree="",
     )
 
 
@@ -415,7 +416,7 @@ class TestLoadingFailsClosed:
 
 class TestPromotionPlan:
     def test_the_plan_recomputes_every_fingerprint_it_will_bless(self, sampling):
-        plan = plan_promotion(provenance(sampling))
+        plan = plan_promotion(provenance(sampling), chosen={})
 
         by_tier = {entry.tier: entry for entry in plan.tiers}
         assert by_tier["base"].fingerprints == (
@@ -430,7 +431,7 @@ class TestPromotionPlan:
         )
 
     def test_the_plan_blesses_the_served_build_never_the_requested_one(self, sampling):
-        plan = plan_promotion(provenance(sampling))
+        plan = plan_promotion(provenance(sampling), chosen={})
 
         assert {tier: keys[0].served for tier, keys in plan.keys.items()} == {
             "base": BASE_SERVED,
@@ -446,7 +447,7 @@ class TestPromotionPlan:
 
     def test_a_sweep_that_observed_nothing_cannot_be_promoted(self, sampling):
         with pytest.raises(ProvenanceError, match="nothing to bless"):
-            plan_promotion(provenance(sampling, []))
+            plan_promotion(provenance(sampling, []), chosen={})
 
     def test_two_served_builds_on_one_tier_are_not_silently_collapsed(self, sampling):
         """Both builds produced numbers in the same aggregate; neither wins by order."""
@@ -456,7 +457,7 @@ class TestPromotionPlan:
         ]
 
         with pytest.raises(ProvenanceError, match="answered by 2 different"):
-            plan_promotion(provenance(sampling, executions))
+            plan_promotion(provenance(sampling, executions), chosen={})
 
     def test_an_explicit_choice_resolves_the_ambiguity(self, sampling):
         executions = [
@@ -491,7 +492,7 @@ class TestPromotionPlan:
     def test_a_tier_the_sweep_never_ran_is_left_out_of_the_plan(self, sampling):
         executions = [node_run("extract", BASE_REQUESTED, BASE_SERVED, sampling)]
 
-        plan = plan_promotion(provenance(sampling, executions))
+        plan = plan_promotion(provenance(sampling, executions), chosen={})
 
         assert set(plan.keys) == {"base"}
 

@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.claim_identity import NO_ROWS
 from analysis_service.claims import Verdict
 from evals.harness import critic_yield
 from evals.harness.content import structural
@@ -65,6 +66,8 @@ def _rejecting(case, *drafts):
                     tuple(draft.affected_element_ids),
                     flows,
                     verb=draft.verb,
+                    identifier=None,
+                    scope=case.id,
                 ),
                 case.id,
                 "down",
@@ -128,7 +131,13 @@ def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
     votes = _rejecting(case, junk)
 
     scored = score_case_with_yield(
-        case, [kept, junk], [promote(kept)], _identity_matcher([kept]), votes
+        case,
+        [kept, junk],
+        [promote(kept)],
+        _identity_matcher([kept]),
+        votes,
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
     )
     result = scored.critic_yield
 
@@ -145,7 +154,13 @@ def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
     killed = _draft_for(reference, 1)
 
     scored = score_case_with_yield(
-        case, [killed], [], _identity_matcher([killed]), Ledger()
+        case,
+        [killed],
+        [],
+        _identity_matcher([killed]),
+        Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
     )
     result = scored.critic_yield
 
@@ -164,7 +179,13 @@ def test_expected_tier_kills_are_separated_from_must_find(case):
     killed = _draft_for(reference, 1)
 
     result = score_case_with_yield(
-        case, [killed], [], _identity_matcher([killed]), Ledger()
+        case,
+        [killed],
+        [],
+        _identity_matcher([killed]),
+        Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
     ).critic_yield
 
     assert result.matched_killed == 1
@@ -181,7 +202,13 @@ def test_the_post_critic_score_is_the_scorer_verbatim(case):
     threats = [promote(kept)]
 
     with_yield = score_case_with_yield(
-        case, [kept, junk], threats, _identity_matcher([kept]), Ledger()
+        case,
+        [kept, junk],
+        threats,
+        _identity_matcher([kept]),
+        Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
     ).score
     alone = score_case(case, threats, _identity_matcher([kept]), Ledger())
 
@@ -195,7 +222,15 @@ def test_the_scored_claim_is_the_same_string_on_both_sides(case):
     draft = _draft_for(reference, 1)
     matcher = _identity_matcher([draft])
 
-    score_case_with_yield(case, [draft], [promote(draft)], matcher, Ledger())
+    score_case_with_yield(
+        case,
+        [draft],
+        [promote(draft)],
+        matcher,
+        Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
+    )
 
     asked = {pair.candidate_claim for pair in matcher.claim_calls}
     assert asked == {reference.claim}
@@ -210,7 +245,15 @@ def test_a_critic_edit_to_the_title_is_a_real_second_question(case):
     reworded = promote(draft.model_copy(update={"title": "Reworded by the critic."}))
     matcher = _identity_matcher([draft])
 
-    score_case_with_yield(case, [draft], [reworded], matcher, Ledger())
+    score_case_with_yield(
+        case,
+        [draft],
+        [reworded],
+        matcher,
+        Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
+    )
 
     assert "Reworded by the critic." in {
         pair.candidate_claim for pair in matcher.claim_calls
@@ -230,9 +273,17 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
         [promote(kept)],
         _identity_matcher([kept]),
         _rejecting(case, junk),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
     ).critic_yield
     small = score_case_with_yield(
-        case, [kept], [promote(kept)], _identity_matcher([kept]), Ledger()
+        case,
+        [kept],
+        [promote(kept)],
+        _identity_matcher([kept]),
+        Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
     )
 
     totals = aggregate_yield([big, small.critic_yield])
@@ -388,7 +439,13 @@ def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
     draft = _draft_for(_must_find(case), 1)
 
     result = score_case_with_yield(
-        case, [draft], [promote(draft)], _identity_matcher([draft]), Ledger()
+        case,
+        [draft],
+        [promote(draft)],
+        _identity_matcher([draft]),
+        Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
     ).critic_yield
 
     assert result.killed == ()
@@ -409,6 +466,8 @@ def test_a_kill_another_draft_made_good_is_gross_but_not_lost(case):
         [promote(second)],
         _identity_matcher([first, second]),
         Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
     ).critic_yield
 
     assert result.kill_count == 1
@@ -422,7 +481,13 @@ def test_a_kill_nothing_made_good_is_lost(case):
     reference = _must_find(case)
     killed = _draft_for(reference, 1)
     result = score_case_with_yield(
-        case, [killed], [], _identity_matcher([killed]), Ledger()
+        case,
+        [killed],
+        [],
+        _identity_matcher([killed]),
+        Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
     ).critic_yield
 
     assert (result.matched_killed, result.matched_lost) == (1, 1)
@@ -445,7 +510,7 @@ def test_the_critic_stated_cause_rides_on_the_kill(case):
         .model_copy(update={"rejected_claims": [rejected]})
     )
     result = score_case_with_yield(
-        case, [killed], [], _identity_matcher([killed]), Ledger(), block
+        case, [killed], [], _identity_matcher([killed]), Ledger(), block, rows=NO_ROWS
     ).critic_yield
 
     assert result.killed[0].cause == "lane"
@@ -455,7 +520,13 @@ def test_the_critic_stated_cause_rides_on_the_kill(case):
     assert aggregate_yield([result])["killed_by_cause"]["lane"]["must_find"] == 1
 
     without = score_case_with_yield(
-        case, [killed], [], _identity_matcher([killed]), Ledger()
+        case,
+        [killed],
+        [],
+        _identity_matcher([killed]),
+        Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
     ).critic_yield
     assert without.killed_by_cause == {
         "unstated": {"killed": 1, "matched": 1, "must_find": 1}
@@ -475,7 +546,15 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
     flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
     matcher = SubsetVerbIdentity({case.id: flows})
     produced = [promote(saved)]
-    scored = score_case_with_yield(case, [killed, saved], produced, matcher, Ledger())
+    scored = score_case_with_yield(
+        case,
+        [killed, saved],
+        produced,
+        matcher,
+        Ledger(),
+        rows=NO_ROWS,
+        block=_report_with(case, []).analyses[0],
+    )
     charged = attribute_case(
         case,
         scored.score,

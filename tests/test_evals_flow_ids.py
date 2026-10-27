@@ -188,7 +188,7 @@ class TestTheArchiveKeepsItsOwnVersion:
         """
         case = CORPUS / "01-payments-checkout"
         raw = json.loads((case / "model.json").read_text(encoding="utf-8"))
-        table = table_between(raw, 1)
+        table = table_between(raw, 1, to_version=FLOW_ID_VERSION)
         old = next(iter(table))
 
         lifted = lift_value({"subject": old}, table)
@@ -200,7 +200,7 @@ def test_the_generated_reading_documents_carry_no_earlier_id():
     """The generator's output, after it was re-run. Not migrated — regenerated."""
     for case in CASES:
         raw = json.loads((case / "model.json").read_text(encoding="utf-8"))
-        earlier = set(table_between(raw, 1))
+        earlier = set(table_between(raw, 1, to_version=FLOW_ID_VERSION))
         document = case / "REVIEW.md"
         if not document.is_file():
             continue

@@ -97,7 +97,7 @@ def label_of(key: ControlKey, names: Mapping[str, str], model: SystemModel) -> s
 def fixes(
     block: FrameworkAnalysis,
     model: SystemModel,
-    assertions: AssertionCatalog | None = None,
+    assertions: AssertionCatalog | None,
 ) -> tuple[Fix, ...]:
     """Every missing control two or more confirmed findings rest on, most first."""
     rows = absent_rows(assertions)
@@ -136,7 +136,7 @@ def fixes(
 def fixes_by_framework(
     analyses: Sequence[FrameworkAnalysis],
     model: SystemModel,
-    assertions: AssertionCatalog | None = None,
+    assertions: AssertionCatalog | None,
 ) -> dict[str, list[dict[str, object]]]:
     """:func:`fixes` for each block, as the JSON a page is handed."""
     return {

@@ -190,7 +190,7 @@ class TestEvidenceCatalog:
             ]
         )
 
-        issues = ground_issues([claim], model)
+        issues = ground_issues([claim], model, assertions=None)
 
         assert issues and "not a decided boundary crossing" in issues[0]
 
@@ -717,7 +717,7 @@ class TestAnAssertionGroundIsHeldToTheCatalog:
 
         (issue,) = ground_issues([draft], valid_model(), assertions())
         assert "does not offer" in issue
-        (issue,) = ground_issues([draft], valid_model())
+        (issue,) = ground_issues([draft], valid_model(), assertions=None)
         assert "does not offer" in issue
 
 
@@ -1341,7 +1341,7 @@ def test_lead_topics_without_a_catalog_skips_an_assertion_ground():
         "assertion:x": Ground(kind="unknown-assertion", assertion="assertion:x"),
     }
 
-    assert lead_topics(evidence) == frozenset()
+    assert lead_topics(evidence, assertions=None) == frozenset()
 
 
 class TestWhichElementsAGroundIsAbout:

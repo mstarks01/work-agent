@@ -43,7 +43,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from analysis_service.claim_identity import NO_ROWS
 from analysis_service.claims import FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from evals.harness.identity import Matcher
@@ -274,8 +273,8 @@ def score_case_with_yield(
     produced: Sequence[DraftThreat],
     matcher: Matcher,
     votes: Ledger,
-    block: FrameworkAnalysis | None = None,
-    rows: Mapping[str, str] = NO_ROWS,
+    block: FrameworkAnalysis,
+    rows: Mapping[str, str],
 ) -> ScoredCase:
     """Score both sides of the critic through one matcher and one ledger.
 
@@ -285,7 +284,7 @@ def score_case_with_yield(
 
     ``block`` is the report's own framework block, read for the one fact the
     drafts do not carry: the step the critic said it rejected each killed draft
-    at. Without it every kill is ``unstated``.
+    at.
     """
     pre = score_case(case, drafts, matcher, votes, rows)
     post = score_case(case, produced, matcher, votes, rows)
@@ -300,15 +299,13 @@ def score_case_with_yield(
 UNSTATED = "unstated"
 
 
-def rejection_steps(block: FrameworkAnalysis | None) -> dict[str, str]:
+def rejection_steps(block: FrameworkAnalysis) -> dict[str, str]:
     """Each rejected claim's stated step, keyed by claim ID, off the block's verdicts.
 
     The one reader of ``rejected_because`` for this instrument. A rejected
     claim whose verdict names no step is absent here, so its kill reads
     :data:`UNSTATED` rather than a step the critic never wrote.
     """
-    if block is None:
-        return {}
     return {
         claim.id: claim.verdict.rejected_because
         for claim in block.rejected_claims
@@ -320,7 +317,7 @@ def _yield(
     pre: CaseScore,
     post: CaseScore,
     drafts: Sequence[DraftThreat],
-    steps: Mapping[str, str] | None = None,
+    steps: Mapping[str, str] | None,
 ) -> CriticYield:
     steps = steps or {}
     surviving = set(post.produced_ids)

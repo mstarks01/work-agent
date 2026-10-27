@@ -204,6 +204,7 @@ def sweep(
         frameworks=("stride",),
         resolve_model=resolve,
         sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml", env={}),
+        deployment=Deployment.from_env(),
     )
     monkeypatch.setattr(modes, "build_eval_pipeline", lambda *a, **k: pipeline)
     second = replace(
@@ -218,7 +219,17 @@ def sweep(
     # come from the deployment rather than from the graph.
     deployment = Deployment.from_env(env=TEST_TIER_ENV)
     return asyncio.run(
-        _run_mode([case, second, *later], "analysis", deployment, in_flight=in_flight)
+        _run_mode(
+            [case, second, *later],
+            "analysis",
+            deployment,
+            in_flight=in_flight,
+            only=(),
+            accepted=None,
+            ask=None,
+            signed=None,
+            answers=None,
+        )
     )
 
 

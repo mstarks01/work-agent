@@ -236,7 +236,7 @@ class Session:
 def build_session(
     runs: Sequence[Sequence[review_queue.Finding]],
     voter: str,
-    ledger_path: Path = DEFAULT_LEDGER_PATH,
+    ledger_path: Path,
     configs: Mapping[str, str] | None = None,
 ) -> Session:
     """Resolve the corpus once, build the queue, and hold it for the sitting.

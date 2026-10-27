@@ -1711,17 +1711,15 @@ def answer(catalog: AssertionCatalog, subject: str, predicate: str) -> Answer:
 def catalog_issues(
     catalog: AssertionCatalog,
     *,
-    model: SystemModel | None = None,
-    sources: Mapping[str, str] = MappingProxyType({}),
+    model: SystemModel,
+    sources: Mapping[str, str],
 ) -> list[CatalogIssue]:
     """Every way this catalog is malformed; an empty result means it is ready.
 
-    ``model`` and ``sources`` are optional in the shape
-    :func:`~analysis_service.validation.validate` already uses: a caller that
-    has them gets the checks that need them, and a caller that does not is told
-    what can be decided from the catalog alone. **A check that cannot be made
-    is never a check that passed** — a graph binding goes unresolved without a
-    model, and this says so in the docstring rather than in silence.
+    ``model`` is the model each graph binding must resolve in. ``sources`` is
+    the text each span must name. **A check that cannot be made is never a
+    check that passed**: with no sources, the span checks do not run, and
+    :func:`_span_issues` says so.
 
     The version and the counts are checked first and return alone. A catalog
     keyed by another registry says nothing this one can read, and a catalog too
@@ -1780,12 +1778,12 @@ def catalog_issues(
 
 
 def _subject_issues(
-    catalog: AssertionCatalog, model: SystemModel | None
+    catalog: AssertionCatalog, model: SystemModel
 ) -> list[CatalogIssue]:
     """Repeated subjects, mistyped IDs, and bindings the model does not hold."""
     issues = []
     seen: set[str] = set()
-    element_ids = {element.id for element in model.elements()} if model else None
+    element_ids = {element.id for element in model.elements()}
     for subject in catalog.subjects:
         if subject.id in seen:
             issues.append(
@@ -1807,11 +1805,7 @@ def _subject_issues(
                     subject=subject.id,
                 )
             )
-        elif (
-            element_ids is not None
-            and subject.type in GRAPH_BOUND
-            and subject.id not in element_ids
-        ):
+        elif subject.type in GRAPH_BOUND and subject.id not in element_ids:
             issues.append(
                 CatalogIssue(
                     code="dangling-binding",
