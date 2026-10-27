@@ -3,7 +3,7 @@
 A flow that names SFTP is encrypted, and one that names WireGuard
 authenticates its peers, because the standard defines no other way to speak
 the protocol. A description that names it has said the property, so asking
-the owner about it again only spends an answer (ADR 0082). Each row cites the
+the owner about it again only wastes an answer (ADR 0082). Each row cites the
 standard that defines it, and standards of this kind change seldom.
 
 **Only a property the standard makes inherent is a row.** A property a

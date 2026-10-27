@@ -22,7 +22,7 @@ about partner extracts keys identically to case 12's about a supplier extract.
 Each version refuses an empty scope.
 
 Version 4 reads the action verb as written beside the place, because place
-alone has a measured cost. ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
+alone has a measured drawback. ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
 agreement alone at 12 false splits of 169, 69 false merges of 92 candidate
 negatives, and the reference merges the frontier table in
 ``docs/agents/claim-identity.md`` carries. That table is the one reader of the

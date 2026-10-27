@@ -5,13 +5,13 @@
 The token caps over the static instruction are drift alarms (ADR 0016). They say
 how far the text has moved, and claim nothing about how well it works. This
 instrument records each node's instruction size and digest, so a sweep can tell
-a raise that improved findings from a deletion that cost them.
+a raise that improved findings from a deletion that lost them.
 
 This is the instrument that makes the comparison possible. It records, beside
 the scores in the same artifact, what each node was told: the size of its
 composed instruction, and that instruction's own digest. Two artifacts either
 side of a prompt edit answer which node's instruction moved, by how much,
-and what the scores did. That is what a raise costs, as against a deletion.
+and what the scores did. That is what a raise does, as against a deletion.
 
 ## What it does not do
 

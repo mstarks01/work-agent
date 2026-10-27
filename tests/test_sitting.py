@@ -8,7 +8,7 @@ tests hold — a stray byte left under a case directory puts that case in the pu
 request.
 
 Held here rather than through the app, because neither direction is a web fact.
-``tests/test_sitting_app.py`` still holds what the app owes a browser: the
+``tests/test_sitting_app.py`` still holds what the app must give a browser: the
 refusals, the token, and the shape of each reply.
 """
 

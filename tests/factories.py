@@ -1240,7 +1240,7 @@ class SilentLlm(ScriptedLlm):
 
     It still reports usage, which is the point of keeping the two apart: a
     token count is a fact about the call whether or not the provider also named
-    the build that served it, so the missing build must cost the fingerprint
+    the build that served it, so the missing build must affect the fingerprint
     and nothing else.
     """
 

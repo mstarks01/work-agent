@@ -1,6 +1,6 @@
 """The eval modes over one corpus, and the three the split exists for.
 
-:data:`MODE_ENTRIES` holds every mode. Two artifacts per case buy the three
+:data:`MODE_ENTRIES` holds every mode. Two artifacts per case give the three
 below, and the point of the split is attribution. An end-to-end-only fixture cannot say whether a recall miss was a
 category-agent failure or an element ``extract`` never produced.
 
@@ -848,7 +848,7 @@ class ExtractionScore:
 
         So the graph is read as a directed multigraph: for each endpoint pair,
         how many of the reference's interactions the extraction kept, capped at
-        the reference's count so duplicates cannot pay for a miss elsewhere.
+        the reference's count so duplicates cannot make up for a miss elsewhere.
         A pair the extraction named differently still counts, exactly as
         ``endpoint_recall`` intends — this charges the *number* of interactions
         and never their labels.
@@ -897,7 +897,7 @@ class ExtractionScore:
 
         :func:`~evals.harness.identity.comparable_elements` drops every
         ``boundary:`` ID before any claim comparison, so a zone the extraction
-        named differently cannot cost a single match downstream. Counting one
+        named differently cannot lose a single match downstream. Counting one
         as a miss depressed this figure by eleven points — 0.642 against 0.755
         on the sweep of 2026-09-13 — over 24 elements a run that no reader
         consumes. Whether the zone structure itself is right is a real
@@ -1840,7 +1840,7 @@ def _projection_counts(case: GoldenCase, catalog: AssertionCatalog) -> dict[str,
     Agreement is split by what was agreed about. A projection landing on an
     attribute the blessed model states, one landing on an absence it states,
     and one landing where it states nothing are three counts, because the
-    third costs a model nothing to get right and the second is the fact the
+    third is trivial for a model to get right and the second is the fact the
     layer exists for.
     """
     index = ModelIndex.of(case.model)

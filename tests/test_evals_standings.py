@@ -26,7 +26,7 @@ from tests.eval_factories import cast
 
 
 def test_every_standing_reaches_a_series():
-    """The table against its registry, which is what a table buys over a branch.
+    """The table against its registry, which is what a table gives over a branch.
 
     ``SERIES`` is written out rather than derived, because its order is
     published — the artifact carries it and ``evals/baselines/README.md`` is

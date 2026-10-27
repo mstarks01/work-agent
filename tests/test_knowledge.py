@@ -98,8 +98,8 @@ class TestSelection:
         """``seen`` is a tie-break and never a re-ranking.
 
         Deprioritising a well-matched document because another lane's agent saw
-        it would spend this lane's slot on worse material. Match count decides
-        first, and only a tie reads what the job has spent.
+        it would fill this lane's slot with worse material. Match count decides
+        first, and only a tie reads what the job has already sent.
         """
         fired = {
             "spoofing-unverified-boundary-auth",
@@ -113,7 +113,7 @@ class TestSelection:
         )
 
     def test_a_tie_goes_to_material_the_job_has_not_sent(self):
-        """The whole of what ``seen`` buys.
+        """The whole of what ``seen`` gives.
 
         Over the blessed corpus every selection is a tie at one matched rule.
         Declaration order alone would choose all 39 and send every one to the
@@ -142,8 +142,8 @@ class TestSelection:
         assert run == [
             ("unknown-is-not-absent",),
             ("stated-control-outside-the-model",),
-            # Both are spent, so the tie falls back to declaration order and the
-            # third lane repeats rather than receiving nothing.
+            # Both are already sent, so the tie falls back to declaration order
+            # and the third lane repeats rather than receiving nothing.
             ("unknown-is-not-absent",),
         ]
         assert run == select_per_lane(CASES, [boundary] * 3, MAX_CASES)

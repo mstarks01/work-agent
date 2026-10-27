@@ -106,7 +106,7 @@ class Engine:
 
     Build once with :meth:`from_config`, naming the frameworks to analyse under,
     and reuse: the pipeline composes its cacheable shared prefix at
-    construction, so a fresh engine per call would pay that cost every time.
+    construction, so a fresh engine per call would run that composition every time.
     Each :meth:`analyze` call is independent, so one engine is safe to share
     across concurrent tasks. The only state a call leaves is the principal of
     its caller, which the next call of that caller names again.

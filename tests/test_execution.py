@@ -178,7 +178,7 @@ def test_a_deterministic_node_costs_nothing_and_records_nothing(graph_run):
 
 
 def test_usage_is_recorded_even_when_the_served_build_is_not():
-    """The two are independent: a missing build costs the fingerprint only."""
+    """The two are independent: a missing build affects the fingerprint only."""
     pipeline, _ = scripted_pipeline(happy_replies(), llm_class=SilentLlm)
     extract = by_node(drive(pipeline))[graph.EXTRACT_NODE]
 
@@ -444,7 +444,7 @@ class TestARefusedFramework:
 
     **Tested here rather than as a function.** Driving ``prepare`` alone proves
     the predicate; only a drive proves the *topology*, which is the part that can
-    drop a block or spend a lane agent the gate meant to stop. Every test swaps
+    drop a block or run a lane agent the gate meant to stop. Every test swaps
     STRIDE's total precondition for one that refuses, because a gate whose only
     exerciser always answers ``satisfied`` proves nothing.
     """

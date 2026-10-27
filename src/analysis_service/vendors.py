@@ -445,7 +445,7 @@ _ENDPOINT_VARIANTS: dict[str, str] = {
 #: as it resolves an ARN, so every refusal here is this service's own and
 #: nothing upstream makes it.
 #:
-#: This costs the ability to address a tuned or privately deployed model, on
+#: This loses the ability to address a tuned or privately deployed model, on
 #: every cloud equally. That is the trade the ARN entry already made: a
 #: provisioned-throughput ARN is likewise the only way to name its resource, and
 #: it is refused because what it names is not a build.
@@ -635,8 +635,8 @@ _BEDROCK_CLAUDE_ID = re.compile(
 # so a rule that lives in the Claude shape would leave a Nova ARN accepted.
 #
 # * **The ``@date`` spelling.** It is Vertex's, it appears on one key against
-#   148, and a second syntax for one generation costs every later reader a
-#   branch.
+#   148, and a second syntax for one generation gives every later reader one
+#   more branch.
 # * **The 2023 names** ``claude-v1``, ``claude-v2:1`` and ``claude-instant-v1``.
 #   The shape requires a family name and a generation, because those two
 #   segments are what a later reader keys on, and these three predate that
@@ -754,7 +754,7 @@ def _every_model(rule: SchemaRule) -> _SchemaRuleFor:
 #
 # The minor separator is the **union** here, and that is the one place it may
 # be: this is a parse rather than a shape gate, so reading ``4.6`` and ``4-6``
-# as one generation costs nothing, while a per-vendor parse would have to key
+# as one generation does no harm, while a per-vendor parse would have to key
 # on the vendor the docstring below refuses to key on.
 _CLAUDE_GENERATION = re.compile(
     rf"(?:^|\.)claude-(?:{_claude_modern('[-.]')}|{_claude_legacy('[-.]')})"
@@ -852,8 +852,8 @@ def openai_reasoning_model(model: str) -> bool:
 
     Open at the top on purpose. An unrecognised ``gpt-6`` reads as reasoning
     and a config pinning ``temperature = 0.0`` for it fails the build. That is
-    the safe direction to be wrong in: a false positive costs one clear error
-    at startup, while a false negative costs node one of a paid-for job.
+    the safe direction to be wrong in: a false positive gives one clear error
+    at startup, while a false negative fails node one of a paid-for job.
 
     Read through :func:`family_identifier` for the same reason
     :func:`claude_generation` is: ``openai/gpt-5.6`` is the same family behind
@@ -1666,7 +1666,7 @@ def require_sdk(name: VendorName) -> None:
     """Fail closed when a selected vendor's client library is absent.
 
     Once per bound tier, beside the credential check and for the same reason: a
-    tier nothing runs on costs no SDK, exactly as it costs no credential.
+    tier nothing runs on needs no SDK, exactly as it needs no credential.
     """
     sdk = missing_sdk(name)
     if sdk is not None:

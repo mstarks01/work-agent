@@ -368,7 +368,7 @@ class TestTheAssetVocabularyNamesWhatAnElementHolds:
 
 
 class TestACrossingSaysWhichZoneWasAssumed:
-    """#1052: a rule keyed on a crossing owes its reader the inference behind it.
+    """#1052: a rule keyed on a crossing must give its reader the inference behind it.
 
     A **Boundary Crossing** is derived from two zones and either may be a
     placement this service inferred rather than read. Over the thirteen corpus

@@ -202,7 +202,7 @@ class Draft(BaseModel):
     signed, and it is what lets a surface tell the reader the text moved under
     a read in progress and refuse to record until it is served again.
 
-    **A hand-edited draft costs nothing this project can price, and nothing
+    **A hand-edited draft does no harm this project can measure, and nothing
     notices it.** A reader who types their own list into this file by hand
     wrote a list, which is the whole of what the filled document claims. A
     timestamp pair is rejected for the same reason: the reader owns the file,
@@ -339,7 +339,7 @@ def draft_states(root: Path, login: str) -> dict[str, DraftStatus]:
     """Every draft this reader holds, keyed by case id.
 
     A file that will not read reports :data:`UNREADABLE` and stops nothing
-    else, so one bad draft costs its own case and no other. Nothing here
+    else, so one bad draft loses its own case and no other. Nothing here
     writes, so a survey of the store changes nothing on disk.
     """
     folder = root / login
@@ -471,7 +471,7 @@ class Row:
     #: so no surface parses a sentence to colour a dot.
     state: RowState
     #: Whether the reader may open this case. A row that does not press is
-    #: also off the offered list, so the refusal a signed case needs costs no
+    #: also off the offered list, so the refusal a signed case needs has no
     #: code of its own.
     pressable: bool
 
@@ -920,14 +920,14 @@ def check_every_finding_marked(
     sitting that filled fewer recorded less than the shell beside it.
 
     **Every** finding rather than some of them, because a fraction is a number
-    nobody can defend. The cost is small where the cost actually falls: the
+    nobody can defend. The extra work is small where it actually falls: the
     hour goes on reading the sets, and the mark is a press the reader makes
     while they read.
 
     ``frameworks`` names the sets this sitting read, and the rule holds inside
     each one. A **Framework** that arrives after a reader finished is not their
-    unfinished work, so a message that counted across both would name a debt
-    the reader does not owe.
+    unfinished work, so a message that counted across both would count work
+    that is not the reader's.
     """
     marks = current_marks(prepared, marks)
     for framework in frameworks:

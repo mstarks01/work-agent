@@ -279,7 +279,7 @@ def render_predicates(stage: Stage) -> str:
     A ``stated_only`` predicate says so in the same row. That is a registry
     field the gate reads — it refuses an ``inferred`` basis on a predicate
     whose value *identifies* rather than describes — and a row that did not
-    carry it cost the model the whole fact with no way to have known.
+    carry it made the model lose the whole fact with no way to have known.
     """
     rows = [
         "## The predicates",

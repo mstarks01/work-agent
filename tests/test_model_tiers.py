@@ -123,7 +123,7 @@ class TestNodeInventory:
         can spell rather than what an install runs. So a deployment carrying
         STRIDE alone still has to name ASVS's three keys, and a file that omits
         them fails the completeness check by name. That message is the fix, and
-        it is the stated cost of adding a framework without moving the schema
+        it is the stated drawback of adding a framework without moving the schema
         version.
         """
         assert {name.split("/", 1)[1] for name in FRAMEWORK_NODES} == set(
@@ -538,7 +538,7 @@ class TestDeclaredUpstreams:
     """A deployment may pin which upstreams a gateway request reaches.
 
     Optional where the credential and charge tables are required: an analysis
-    is an analysis whichever upstream answers, and what a pin buys is a
+    is an analysis whichever upstream answers, and what a pin gives is a
     Baseline. Both halves read ``Vendor.upstream_pin``, so the rule follows the
     registry.
     """
@@ -731,7 +731,7 @@ class TestDeclaredCredentialMode:
         The rule this class already stated — "a multi-mode vendor nobody calls
         needs no identity" — while the code read every tier and so demanded one.
         The shipped node map points nothing at ``review``, so a ``review`` tier
-        naming Bedrock costs no credential, no SDK and no declaration; the
+        naming Bedrock needs no credential, no SDK and no declaration; the
         loader refused to start without one anyway.
 
         Both readers are :attr:`ModelTierConfig.bound_vendors` now, so the

@@ -942,7 +942,7 @@ class TestTheRail:
 
 
 class TestEveryEndpointResolvesItsCase:
-    """Decision 34, and the refusal decision 40 says costs no code of its own.
+    """Decision 34, and the refusal decision 40 says needs no code of its own.
 
     A case id that arrives in a request is resolved against the offered list —
     the rail's pressable rows. So a signed case, a case somebody guessed and a
@@ -1327,7 +1327,7 @@ class TestTheDraftSurvivesTheProcess:
     The property here is that the page holds no copy of what the reader
     wrote. Every word of it is in the **Draft Sitting** the moment they write
     it, so a second process over the same store answers the same as the
-    first — which is what a reader who closes a laptop is owed.
+    first — which is what a reader who closes a laptop must get.
     """
 
     def test_opening_a_case_writes_nothing(self, tree):
@@ -1728,7 +1728,7 @@ class TestTheTextMovedUnderTheRead:
 
 
 class TestADraftTheAppCannotRead:
-    """Fail closed, name the file, change nothing, and cost one case.
+    """Fail closed, name the file, change nothing, and lose one case.
 
     Two alternatives are rejected. To treat it as absent throws the reader's
     own list away and re-arms the gate, so they retype a list they already
@@ -1753,7 +1753,7 @@ class TestADraftTheAppCannotRead:
         assert row["pressable"] is False
 
     def test_every_other_case_still_walks(self, tree):
-        """One bad file never costs the reader the other twelve cases."""
+        """One bad file never hides the other twelve cases from the reader."""
         self.spoil(tree)
         app = browser(session_for(tree, "ada"))
         assert self.rows(app)[OTHER]["pressable"] is True
@@ -2449,7 +2449,7 @@ class TestAFrameworkArrivingOnAReadCase:
     under them when it is simply new, an unmarked count spanning both
     frameworks and naming neither, and an own list coming back empty.
 
-    That last one is not a cost, it is a corruption. The method's one rule is
+    That last one is not a drawback, it is a corruption. The method's one rule is
     that the list is written before the sets open. A reader who has already
     read the earlier sets cannot write a blind list a second time, so a fresh box
     asks them for evidence of an order that did not happen.

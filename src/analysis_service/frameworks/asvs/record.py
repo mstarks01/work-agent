@@ -670,11 +670,11 @@ class AsvsAnalysis(FrameworkAnalysis):
         block alone, because ``level`` is on the block.
 
         **Every issue here is fatal, so every issue here must be the service's
-        own.** An issue on this list raises out of the report validator and costs
+        own.** An issue on this list raises out of the report validator and fails
         the whole job — after every node has been paid for — so a check that an
-        *agent* can trip does not belong on it. That is the line ADR 0009 drew
-        for a bad evidence reference and the one STRIDE's lane numbering already
-        sits behind: an agent's slip costs its entry, never the run. See
+        *agent* can trip does not belong on it. That is the line ADR 0009 drew for
+        a bad evidence reference and the one STRIDE's lane numbering already sits
+        behind: an agent's slip loses its entry and never fails the run. See
         :meth:`_level_coverage_issues` for the one this rules out.
         """
         return [

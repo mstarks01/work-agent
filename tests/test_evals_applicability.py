@@ -359,7 +359,7 @@ def test_a_requirement_outside_the_level_is_its_own_cell(read_case):
 
     assert score.off_catalog == (beyond,)
     assert score.over_applied == ()
-    # It still costs precision: a reader has to read the claim either way.
+    # It still lowers precision: a reader has to read the claim either way.
     assert score.precision == 0.0
 
 
@@ -496,7 +496,7 @@ def test_grounds_reads_a_lane_without_naming_any_framework_s_field():
 
 
 def test_coverage_reports_every_lane_of_every_framework_that_ran():
-    """The row count a two-framework sweep owes, against a one-framework sweep.
+    """The row count a two-framework sweep must give, against a one-framework sweep.
 
     The sweep collects the coverage of every framework, so ASVS's 17 lanes
     reach the table (#213). The framework list is what was *built*, so a package
@@ -743,9 +743,9 @@ class TestADeferredRequirementApplies:
     """A ``needs-other-evidence`` scope entry says the requirement applies (#454).
 
     A lane raised it and the service withheld the claim for want of the right
-    kind of evidence. That is a match on applicability, and a policy cost
-    `CARRIED_EVIDENCE_KINDS` sets on the report; a requirement nobody raised is
-    the miss. The first sweep carrying deferral withheld 45 of 57 expected
+    kind of evidence. That is a match on applicability, and a limit the policy
+    in `CARRIED_EVIDENCE_KINDS` sets on the report; a requirement nobody raised
+    is the miss. The first sweep carrying deferral withheld 45 of 57 expected
     requirements, and the scorer read all 45 as misses.
     """
 

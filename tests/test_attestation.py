@@ -411,9 +411,10 @@ class TestTwoParsersCannotDisagreeAboutTheFile:
     """A signature covers the canonical form of the *parsed* document.
 
     That is what lets a verifier check a report without this project's models,
-    and it is the right trade. Its cost is that parsing is where two readers can
-    disagree: ``json`` keeps the last of a repeated key and other parsers keep
-    the first, so one file can say two things and verify as the harmless one.
+    and it is the right trade. Its drawback is that parsing is where two readers
+    can disagree: ``json`` keeps the last of a repeated key and other parsers
+    keep the first, so one file can say two things and verify as the harmless
+    one.
     """
 
     def test_a_repeated_key_is_refused_rather_than_resolved(self):

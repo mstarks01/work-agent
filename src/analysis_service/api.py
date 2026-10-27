@@ -185,8 +185,8 @@ class BodyLimitMiddleware:
     app pulls it, because a guard that raises out of ``receive`` does not get to
     write the response: FastAPI wraps any exception escaping its body parse in a
     400 ``There was an error parsing the body``, so the refusal would arrive as
-    the wrong status with the cap unmentioned. Draining costs nothing a POST route
-    does not already pay — the JSON body is buffered whole to be parsed — and
+    the wrong status with the cap unmentioned. Draining does no work a POST route
+    does not already do — the JSON body is buffered whole to be parsed — and
     the buffer is bounded by the cap it enforces.
 
     The cap is the deployment's byte budget with slack, not the budget itself:

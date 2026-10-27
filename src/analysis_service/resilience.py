@@ -30,9 +30,9 @@ budgets are not a per-caller budget, and the unbounded-consumption half of OWASP
 LLM10 is the second one.
 
 ``max_active_jobs`` bounds jobs in flight rather than jobs per interval. A
-ceiling on concurrency is self-clearing, because finishing a job is what buys
-the next one. It therefore needs no window, no timer and no state beyond the
-records the store already holds, and it bounds the thing that costs money:
+ceiling on concurrency is self-clearing, because the end of one job is what
+admits the next one. It therefore needs no window, no timer and no state beyond
+the records the store already holds, and it bounds the thing that costs money:
 simultaneous provider calls. A submission rate says nothing about that on its
 own.
 

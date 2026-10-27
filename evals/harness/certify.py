@@ -136,7 +136,7 @@ def promote(
     Re-pinning is a value update **in place**, preserving the file's comments
     (the "why-absent" record is the point of the file). Promoting a param the
     file leaves *unset* raises: turning an unverified param into a pinned one is
-    a human decision that owes a rationale, not a silent sweep write.
+    a human decision that must state a rationale, not a silent sweep write.
 
     Both paths default to this deployment's — see :func:`promotion_paths` — and
     stay explicit parameters so a caller holding a deployment, or a test, can

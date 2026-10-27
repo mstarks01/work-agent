@@ -21,10 +21,10 @@ other way under the same test: it reads the **Valid System Model**'s own
 technology fields, which one extraction fills for every framework, so its key
 is neutral and it stays in one shared root.
 
-The cost of that split is that a second package re-authors any note it wants.
-That cost is smaller than it looks. A note's "What to look for" questions are
-written for one framework's reading of the condition, and 7 of the 10 notes here
-end by assigning a STRIDE lane.
+The drawback of that split is that a second package re-authors any note it
+wants. That drawback is smaller than it looks. A note's "What to look for"
+questions are written for one framework's reading of the condition, and 7 of the
+10 notes here end by assigning a STRIDE lane.
 
 Retrieval is by fired rule, and that is the whole mechanism. A lane agent's
 leads are the deterministic candidates whose rules matched this model, and the

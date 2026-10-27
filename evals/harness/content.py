@@ -3,7 +3,7 @@
 A **Claim**'s fingerprint names the topic: this lane, this action, this place.
 It is deliberately blind to everything a claim says, because a topic has to be
 recognisable in a later run whose wording moves
-(:mod:`evals.harness.fingerprint`). That blindness has a cost, and the
+(:mod:`evals.harness.fingerprint`). That blindness has a drawback, and the
 2026-09-09 audit measured it: every retained case 01 title and explanation was
 replaced with text asserting that no attacker action exists, and the scorer
 still returned 12 matches. A vote keyed by the topic alone outlives a rewrite of
@@ -165,7 +165,7 @@ def structural(claim: Claim) -> str:
     Sixteen hex characters for the reason a fingerprint uses them: the
     population is a corpus rather than a namespace, and a value a person can
     read out loud beside a ledger row is worth more than the collision margin it
-    spends.
+    loses.
     """
     parts: list[str] = []
     for ground in claim.grounds:

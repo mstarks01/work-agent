@@ -145,7 +145,7 @@ class TestTheIndexAndTheFilesAgree:
         is a different statement from having missed one, so it is skipped rather
         than failed. Adding one document to such a package removes it from that
         set and puts every one of its rules under this check at once — which is
-        the intended cost of starting a corpus.
+        the intended effect of starting a corpus.
         """
         if framework in EMPTY_CORPUS:
             pytest.skip(f"{framework} ships no corpus; the tables are empty by design")

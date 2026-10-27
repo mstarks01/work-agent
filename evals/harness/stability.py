@@ -127,7 +127,7 @@ class ScoredRun:
     #: This run's must-find fates per scope: which the run matched, and which
     #: it named as missed. Both packages answer, out of their own block, and
     #: the missed half is empty for a package whose record names only the
-    #: matched ones — see :func:`band` for why that costs the reading nothing.
+    #: matched ones — see :func:`band` for why the reading loses nothing there.
     must_find: dict[Scope, MustFindFate] = field(default_factory=dict)
 
     @property
@@ -391,9 +391,9 @@ class Band:
 
     **The number every "is this fix worth a run" judgement rests on**, and the
     expensive way to get it is to sweep one configuration five times and take
-    the sample deviation of five totals. That buys a deviation on four degrees
+    the sample deviation of five totals. That gives a deviation on four degrees
     of freedom, whose own 95% interval runs from about 0.6 to 2.9 times the
-    truth — a wide answer for the price of five sweeps.
+    truth — a wide answer for five paid sweeps.
 
     This reads it off the fates instead. Each must-find reference is matched or
     missed in each run, so a reference matched in ``m`` of ``k`` runs

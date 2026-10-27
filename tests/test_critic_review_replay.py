@@ -136,7 +136,7 @@ def test_the_prompt_carries_the_package_skills_and_the_shared_steps(fixtures, mo
 
 
 def test_every_signed_draft_reaches_the_critic(fixtures, model):
-    """What the review change bought, stated over the set a reader signed.
+    """What the review change gained, stated over the set a reader signed.
 
     Seven of these eight carry an unknown ground. Under the rule that settled
     such a draft in code, one reached the critic — so the nonsense arguments,
@@ -361,7 +361,7 @@ def test_the_advice_is_scored_apart_from_the_fate(fixtures, model):
     agreed, of_read = score.recommendation_agreed
     assert of_read == len(survivors(fixtures))
     assert agreed == of_read
-    # Every rejected draft owes no reading, so none is counted unread.
+    # A rejected draft needs no reading, so none is counted unread.
     assert score.recommendation_unread == ()
 
 
@@ -409,7 +409,7 @@ def test_a_critic_disagreeing_about_the_advice_does_not_move_the_fate(fixtures, 
 
 
 def test_a_constant_reading_no_longer_scores_full_marks(fixtures, model):
-    """What the ninth fixture buys, as a property rather than a count.
+    """What the ninth fixture gives, as a property rather than a count.
 
     A critic emits a reading on the drafts it lets survive, so those rows are
     the whole denominator. While every one of them expected the same answer, a

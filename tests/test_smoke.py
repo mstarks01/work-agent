@@ -429,7 +429,7 @@ class TestDrivingTheEngine:
     def test_a_framework_it_could_not_select_is_named_on_a_completed_run(
         self, monkeypatch
     ):
-        """The cost is stated rather than hidden: three tier keys stay untested."""
+        """The drawback is stated rather than hidden: three tier keys stay untested."""
         monkeypatch.setattr(
             smoke, "unexercised_frameworks", lambda _deployment: ("asvs",)
         )

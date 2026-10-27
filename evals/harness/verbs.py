@@ -64,7 +64,7 @@ __all__ = [
 #: five reference rows and two lane drafts, and ``run.py price-verbs`` measured
 #: the merge at zero new false merges over the labelled pairs and zero new
 #: reference merges over the corpus, for four more matched references (#730). A
-#: merge that costs nothing on either error axis is the one this mechanism
+#: merge that adds no error on either axis is the one this mechanism
 #: exists for.
 #:
 #: The fingerprint reads a verb through :func:`canonical` at the version

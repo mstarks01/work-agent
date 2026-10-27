@@ -111,7 +111,7 @@ class TestJoinDrafts:
             join_drafts({"spoofing": [draft]}, STRIDE, model)
 
     def test_a_claim_naming_only_absent_elements_is_dropped_and_marked(self, model):
-        """A finding about nothing is not a finding. It costs the claim, never
+        """A finding about nothing is not a finding. It drops the claim, never
         the job, and the mark names what was cited."""
         drafts = {
             "spoofing": [sample_draft(affected_element_ids=["process:does-not-exist"])]
@@ -442,7 +442,7 @@ class TestGroundReferences:
 
 
 class TestUnresolvedMentions:
-    """Marked, never fatal: the fan-in has no re-ask path to spend on prose."""
+    """Marked, never fatal: the fan-in has no re-ask path to use on prose."""
 
     def drafted(self, description, threat_id="S-01"):
         return {"spoofing": [sample_draft(threat_id, description=description)]}
@@ -839,7 +839,7 @@ class TestAFreeStringFromAnAgentCannotOverrunAMark:
 
     Both writers below read a list or a description the model filled, so
     neither has a length of its own. A raise here lands in the merge node,
-    where it costs the run every lane that already answered.
+    where it fails the run and discards every lane that already answered.
     """
 
     def test_a_blank_element_id_is_skipped_rather_than_marked(self):

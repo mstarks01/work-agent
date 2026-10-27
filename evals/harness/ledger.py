@@ -113,7 +113,7 @@ GITHUB_LOGIN = re.compile(r"(?=.{1,39}\Z)[A-Za-z0-9](?:-?[A-Za-z0-9])*\Z")
 #: reviewer cannot answer from what they were shown. It moves no number, and it
 #: holds only for the sitting it was cast in: a later sitting asks again, over
 #: whatever evidence exists by then. That is what makes it different from
-#: ``unsure``, which is a spent answer like any other.
+#: ``unsure``, which is a final answer like any other.
 Verdict = Literal["up", "down", "unsure", "needs-evidence"]
 
 #: Reasons that speak to whether the finding is *right*. A ``down`` carrying one
@@ -500,7 +500,7 @@ class Ledger:
     """Every vote ever cast, in the order it was cast.
 
     Loaded whole. At a corpus of thirteen cases and a few hundred findings the
-    files are small enough that streaming would buy nothing and cost the
+    files are small enough that streaming would gain nothing and lose the
     ability to answer a question about the whole history in one pass. When
     they stop being small the answer is a different store, not a lazier
     reader.

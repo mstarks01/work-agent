@@ -24,18 +24,18 @@ the whole request at 6,116 prompt tokens against 6,098 for the full route on the
 same case — **18 tokens**, where the prompt text alone would have predicted a
 few hundred.
 
-**What the saving costs is element naming, and not the facts.** Five corpus
-sweeps per route, 2026-09-15: every figure reading an *attribute* is unmoved at
-two decimal places of a standard deviation — control-state agreement +0.02 sd,
-scored-field agreement −0.05 sd — while every figure reading an *identity* moves
-2 to 4 sd against, and rename candidates rise 5.7 sd. The compact route finds
-the same system and names its parts differently more often. It also invents
-fewer elements out of nothing.
+**The saving loses element naming, and not the facts.** Five corpus sweeps per
+route, 2026-09-15: every figure reading an *attribute* is unmoved at two decimal
+places of a standard deviation — control-state agreement +0.02 sd, scored-field
+agreement −0.05 sd — while every figure reading an *identity* moves 2 to 4 sd
+against, and rename candidates rise 5.7 sd. The compact route finds the same
+system and names its parts differently more often. It also invents fewer
+elements out of nothing.
 
 There is a mechanism to test rather than a cause to state. The full route writes
 ``"id": "process:scheduling-web-app"`` beside ``"name": "Scheduling web app"``,
-and ``prompts/extract.md`` rule 3 spends its longest passage on what that slug
-costs — an abbreviated ID is replaced by the name's slug, and one word added to
+and ``prompts/extract.md`` rule 3 gives its longest passage to what that slug
+does — an abbreviated ID is replaced by the name's slug, and one word added to
 an element renames every flow through it. This route removes that field, which
 is exactly where the saving comes from. The remedy, if the mechanism holds, is
 to restate rule 3's discipline in the delta where the ref is introduced.
@@ -178,11 +178,12 @@ REF_TAGS: Mapping[str, str] = MappingProxyType(
 #: lowercase slug — ``p:api``, ``s:orders-db``.
 #:
 #: **The tag is what a full-model ID's prefix always was**, and leaving it out
-#: is what cost versions 1 and 2. An element and its own trust zone share a name
-#: routinely, and ``entity:card-processor`` and ``boundary:card-processor`` are
-#: two IDs; two untyped refs spelled ``card-processor`` are one handle naming
-#: neither. Measured at 1.1 percentage points of the saving — 10.1% of the
-#: corpus emission against 9.2% — which is what the type is worth.
+#: is the defect that versions 1 and 2 had. An element and its own trust zone
+#: share a name routinely, and ``entity:card-processor`` and
+#: ``boundary:card-processor`` are two IDs; two untyped refs spelled
+#: ``card-processor`` are one handle naming neither. Measured at 1.1 percentage
+#: points of the saving — 10.1% of the corpus emission against 9.2% — which is
+#: what the type is worth.
 #:
 #: The pattern is also the bound, not a tidiness rule, and it is on **every
 #: field that holds a ref** rather than only on the declaration. An unresolved
@@ -528,8 +529,8 @@ def _claims(
 
     A typed ref names one element, so this is a plain map and resolution is a
     lookup. A ref two elements claim can only be two elements of one *type* —
-    the tag rules out the cross-type case that cost versions 1 and 2 — and that
-    is a genuine ambiguity: it binds to neither, and the gate reports the
+    the tag rules out the cross-type case that versions 1 and 2 got wrong — and
+    that is a genuine ambiguity: it binds to neither, and the gate reports the
     dangling reference beside the ``duplicate-ref`` that explains it.
     """
     claims: dict[str, str] = {}

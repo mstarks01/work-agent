@@ -155,7 +155,7 @@ def test_a_ruling_names_who_made_it(drafted):
 
 
 def test_every_dispute_names_a_value_the_model_still_holds(drafted):
-    """An entry the model no longer matches is spent: delete it."""
+    """An entry the model no longer matches is obsolete: delete it."""
     case, facts, _ = drafted
     by_id = {element.id: element for element in case.model.elements()}
 

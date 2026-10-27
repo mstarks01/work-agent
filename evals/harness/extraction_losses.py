@@ -10,12 +10,12 @@ side by side do not say which.
 This instrument reads one end-to-end run and one analysis-mode run of the same
 corpus on the same coordinates and gives every reference one of four fates:
 
-* ``both``: matched in both runs. Extraction did not cost it.
+* ``both``: matched in both runs. Extraction did not lose it.
 * ``downstream``: missed in both. The lanes lose it on the blessed model too,
   so :mod:`evals.harness.losses` already charges it to a cause.
 * ``extraction``: matched on the blessed model and missed end to end. The
   only difference between the two runs is the model the lanes read, so this
-  is the reference extraction cost — up to the run-to-run band, which the
+  is the reference extraction lost — up to the run-to-run band, which the
   analysis-mode spread measures and this does not.
 * ``recovered``: missed on the blessed model and matched end to end. Noise,
   or an extraction that read the source better than the corpus did; either

@@ -34,7 +34,7 @@ def _hypergeometric_probability(
 
 
 def test_review_02_manifests_still_verify_against_themselves():
-    """What a superseded reading still owes: its own arithmetic.
+    """What a superseded reading must still give: its own arithmetic.
 
     The draw cannot be repeated. The Case Sitting of 2026-09-21 deleted 41
     reference claims, and a fixture is labelled against a claim by its place, so
@@ -119,7 +119,7 @@ def test_the_record_says_its_place_derived_ids_stopped_resolving():
     id in this record is a handle on today's fixtures and no digest comparison
     over them means anything.
 
-    The record owes one thing in that state: to say so. That is what this
+    The record must do one thing in that state: say so. That is what this
     asserts. The manifests stay as the record of what a person read.
     """
     review = json.loads(REVIEW_PATH.read_text())

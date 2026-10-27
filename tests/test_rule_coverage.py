@@ -14,10 +14,10 @@ The second half asks the mirror question one layer up: which knowledge
 **documents** does any lane of any blessed model actually receive? A document
 registered against rules that fire can still reach nobody, because selection
 ranks by match count and keeps one case and two notes per lane — so a broader
-document wins every lane they share and a narrower one is unreachable at full
-maintenance cost. The package gate holds that a document exists and its rule IDs
-resolve, and neither it nor ``test_knowledge_lints`` asks whether the material
-is ever selected.
+document wins every lane they share and a narrower one is unreachable but still
+needs full maintenance. The package gate holds that a document exists and its
+rule IDs resolve, and neither it nor ``test_knowledge_lints`` asks whether the
+material is ever selected.
 
 Deterministic over the blessed ``model.json`` and free of provider calls, which
 is why it gates on every PR rather than waiting for a sweep.
@@ -167,7 +167,7 @@ def test_every_exempted_rule_is_a_rule_some_package_declares(models):
 #: Over the whole corpus every selection is a tie at one matched rule, and
 #: declaration order alone would send all 39 to the first-declared document.
 #: The tie-break reads what the job has already sent, so a lane that
-#: ties spends its slot on material the job has not.
+#: ties fills its slot with material the job has not sent.
 UNSELECTED: dict[str, str] = {
     "asvs:real-time-media-and-signalling": (
         "The other reading, and a corpus gap rather than a selection one: its"
@@ -224,7 +224,7 @@ def registered_documents() -> set[str]:
 
 
 def test_no_document_is_unreachable_without_a_stated_reason(models):
-    """Material nobody receives is material that cannot help, at full cost.
+    """Material nobody receives cannot help, and it still needs full maintenance.
 
     A document registered against rules that fire still reaches no agent when a
     broader document outranks it in every lane they share — the ranking is
@@ -262,10 +262,10 @@ def test_every_unselected_entry_names_a_registered_document():
 class TestEveryCrossingKeyedRuleNamesItsInference:
     """#1052, stated as a property so a package written tomorrow answers it.
 
-    A rule that fires *because* two zones differ owes its reader both zones and
-    which of them this service assumed. The rule is a property of a **Boundary
-    Crossing** rather than of a package, so this drives every package's rules
-    over the corpus and asks the same thing of each.
+    A rule that fires *because* two zones differ must give its reader both zones
+    and say which of them this service assumed. The rule is a property of a
+    **Boundary Crossing** rather than of a package, so this drives every
+    package's rules over the corpus and asks the same thing of each.
     """
 
     def leads(self):

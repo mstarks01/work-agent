@@ -19,7 +19,7 @@ arrives without a review fails.
 :data:`UNREVIEWED` says what each unread case leaves unchecked. It is not the
 count of unread cases — :func:`~evals.review_submission.unreviewed_cases`
 derives that from the corpus and the submissions, so no list can disagree with
-it. An entry for a case a merged submission clears is spent. No test fails
+it. An entry for a case a merged submission clears is obsolete. No test fails
 on it, because a sitting pull request carries its one file and cannot
 delete the entry, so a maintainer deletes it in the next pull request.
 
@@ -59,7 +59,7 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: 2026-10-03 read the two holdout cases #744 added. The table is derived, never maintained —
 #: :func:`~evals.review_submission.unreviewed_cases` reads the corpus and the
 #: merged submissions — so an entry here only ever says what an unread case
-#: leaves unchecked, and an entry for a case a submission clears is spent.
+#: leaves unchecked, and an entry for a case a submission clears is obsolete.
 UNREVIEWED: dict[str, str] = {
     "16-library-lending-interview": (
         "the member's flow to the lending API now runs through the library app"

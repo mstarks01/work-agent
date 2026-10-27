@@ -5,7 +5,7 @@ This module answers one question mechanically, and it is the companion to
 really in the source it names. This one decides whether an identifier a model
 emitted is really one the job already holds. Both exist because a model asked to
 echo a string back does not always echo it byte for byte, and neither difference
-is a judgement anybody should spend a prompt on.
+is a judgement anybody should use a prompt on.
 
 It is a leaf, and imports nothing from this package, because both the validity
 gate and the critic's seams need it and the gate runs long before a threat
@@ -19,8 +19,8 @@ recognizes the one it already names, under a spelling the job's own construction
 rules make equivalent. A reference that names nothing comes back empty, and the
 caller's check reports it exactly as before.
 
-The fold is two rungs, case and whitespace. The quote ladder's rungs are
-concessions bought with measured precision. These two are almost always free,
+The fold is two rungs, case and whitespace. Each rung of the quote ladder is a
+concession that loses some measured precision. These two almost never lose any,
 and the uniqueness guard, rather than the argument for why, is what makes them
 safe.
 

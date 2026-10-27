@@ -140,7 +140,7 @@ def test_security_headers_and_a_policy_ride_on_every_page(client):
 
 
 def test_the_volatile_finding_is_served_first(client):
-    """The queue spends the reviewer's first click on the best question."""
+    """The queue serves the best question for the reviewer's first click."""
     app, _ = client
     item = app.get("/api/next").json()
     assert item["title"] == "Order price rewritten in the database"

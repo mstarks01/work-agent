@@ -400,7 +400,7 @@ class TestModelsCanBeBound:
         every vendor: Claude 4.7 and later reject the param, and OpenAI's
         reasoning families take only their own default. With the value unset,
         one shipped file binds all three. The test below keeps the
-        incompatibility itself pinned, as the cost of *stating* a value.
+        incompatibility itself pinned, as the drawback of *stating* a value.
         """
         adapters = build_tier_adapters(
             tiers_for(vendor),
@@ -540,7 +540,7 @@ class TestUnsupportedParamsAreHandledClearly:
     """ "unsupported parameters are handled clearly" — as a build error, per tier."""
 
     def test_an_unsupported_param_names_the_tier_that_asked_for_it(self):
-        """Anthropic and ``seed``: the capability difference with a real cost.
+        """Anthropic and ``seed``: the capability difference with a real effect.
 
         The matrix says ``UNSUPPORTED``; this says what the application does
         about it. Failing at build time with the tier named is the behaviour
@@ -904,7 +904,7 @@ class TestProfileShape:
 
 
 def test_a_stated_temperature_cannot_bind_openais_strong_reference_model(tmp_path):
-    """The incompatibility, pinned so it stays known, as an opt-in cost.
+    """The incompatibility, pinned so it stays known, as an opt-in drawback.
 
     OpenAI's reference strong model serves ``temperature`` only at its own
     default of 1, so a deployment that states 0.0 cannot run it. Without this
@@ -1257,7 +1257,7 @@ def test_every_bedrock_reference_model_names_an_inference_profile():
     pair would have died on a ValidationException at the first live request —
     which is the answer
     [#626](https://github.com/mstarks01/work-agent/issues/626) asked for and
-    could not buy, because nobody has provisioned ``ANALYSIS_BEDROCK_API_KEY``.
+    could not get, because nobody has provisioned ``ANALYSIS_BEDROCK_API_KEY``.
 
     Named for one vendor because the fact is one vendor's, and the property is
     general: **a vendor may serve a model under an identifier its price table

@@ -1,15 +1,15 @@
-"""#926's falsification fixtures: what a corrupted reading costs the instruments.
+"""#926's falsification fixtures: what a corrupted reading does to the instruments.
 
 A recall figure says how much of a signed reference a run recovered. It does
 not say that the figure would move if the run were wrong, and a denominator
 nobody has tried to cheat measures nothing. These probes try to cheat it.
 
-**Each probe corrupts a perfect reading and states what the corruption must
-cost.** The perfect reading is the case's signed reference played back as its
+**Each probe corrupts a perfect reading and states what the corruption must take
+away.** The perfect reading is the case's signed reference played back as its
 own produced catalog, which every instrument scores as a clean run. One
 corruption is applied to it — a fact flipped, a control copied onto another
-subject, a flow relabelled, a span removed — and the probe declares what the
-two instruments must then say:
+subject, a flow relabelled, a span removed — and the probe declares what the two
+instruments must then say:
 
 * **the gate** (:meth:`~analysis_service.assertions.AssertionRecord.over`,
   the one reader of "does this catalog pass") refuses the row, by code, in
@@ -18,10 +18,10 @@ two instruments must then say:
   the one reader of required-fact recall) stops counting the row, and the
   matcher's fate says why.
 
-A falsification probe that costs nothing at either instrument is a hole in the
-measurement, and :data:`PROBES` is written so that the suite fails when one
-appears. A **positive control** costs nothing by design and is declared with
-``loses=0`` and no refusal, so the two are never confused.
+A falsification probe that takes nothing away at either instrument is a hole in
+the measurement, and :data:`PROBES` is written so that the suite fails when one
+appears. A **positive control** takes nothing away by design and is declared
+with ``loses=0`` and no refusal, so the two are never confused.
 
 **A criterion nothing probes says why**, in :data:`UNPROBED`. #926's acceptance
 list is the registry this table answers to, and a line with neither a probe nor
@@ -199,7 +199,7 @@ class Corruption:
 
 @dataclass(frozen=True)
 class Probe:
-    """One corruption and what it must cost.
+    """One corruption and what it must take away.
 
     ``loses`` is how many of the case's required rows the corruption must stop
     the endpoint counting, and ``fates`` is what the matcher must say about the
@@ -230,18 +230,18 @@ class Probe:
 
     @property
     def control(self) -> bool:
-        """Whether this probe declares a reading that costs nothing anywhere.
+        """Whether this probe declares a reading that takes nothing away anywhere.
 
-        A positive control, and the only kind of probe allowed to cost nothing:
-        no required row lost, no gate refusal, no element missing, and every
-        touched row still answered.
+        A positive control, and the only kind of probe allowed to take nothing
+        away: no required row lost, no gate refusal, no element missing, and
+        every touched row still answered.
         """
         costs = self.loses or self.refuses or self.elements
         return not costs and set(self.fates) <= {"found"}
 
     @property
     def endpoint_blind(self) -> bool:
-        """Whether a real corruption costs every instrument but required-fact recall.
+        """Whether a real corruption lowers every instrument but required-fact recall.
 
         **The measurement's own limit, named rather than left to be noticed.**
         A corruption of a fact the reference rules ``unknown`` moves no recall,
@@ -682,7 +682,7 @@ PROBES: Mapping[str, Probe] = MappingProxyType(
 
 @dataclass(frozen=True)
 class Outcome:
-    """What one probe's corruption actually cost, beside what it must cost."""
+    """What one probe's corruption took away, beside what it must take away."""
 
     probe: str
     case_id: str

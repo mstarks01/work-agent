@@ -119,7 +119,7 @@ LANE_SECTION_HEADINGS: tuple[str, ...] = (
 
 #: The text a package carries under its root, by **convention rather than
 #: declaration**. A declared path would let a package name a file freely and
-#: buys nothing; a convention plus a checked rule gives the same guarantee with
+#: gains nothing; a convention plus a checked rule gives the same guarantee with
 #: fewer members to get wrong.
 #:
 #: Per lane: ``lanes/<lane>/skill.md`` and ``lanes/<lane>/exemplars.md``.
@@ -277,8 +277,8 @@ class IdRule:
         package restating a catalog it did not author answers from that catalog,
         privately, in its own module.
 
-        The predicate does not raise and does not explain. A false answer costs
-        the claim its place and earns a
+        The predicate does not raise and does not explain. A false answer drops
+        the claim and records a
         :class:`~analysis_service.claims.UnknownClaimIdentity` mark; see
         :func:`~analysis_service.evidence.resolve_proposals`.
     """
@@ -683,10 +683,10 @@ def run_precondition(
     of package code is wrapped, because an unwrapped one says nothing about whose
     code it came from.
 
-    The honest cost: this runs after extraction, so a defective package costs one
-    extraction. That is the right side to be wrong on — the check exists for a
-    build defect that should never reach a deployment, and the alternative loses
-    a framework's whole output quietly.
+    The drawback: this runs after extraction, so a defective package wastes one
+    paid extraction. That is the right side to be wrong on — the check exists
+    for a build defect that should never reach a deployment, and the alternative
+    loses a framework's whole output quietly.
 
     Every caller runs it through here: the graph's run-time gate, and the eval
     corpus verifier that checks a case's declaration against the predicate.

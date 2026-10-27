@@ -29,8 +29,8 @@ refuse a sweep of reports the service serves happily, and
 **Every fault runs against every package.** The rules under test read
 :class:`~analysis_service.claims.Claim` and nothing a package declares, so they
 are neutral — and a neutral-looking rule that diverged for one package is
-exactly what cost the first ASVS corpus sweep eleven correctly shaped claims.
-:data:`BLOCKS` is therefore a table keyed by framework, checked against
+exactly what dropped eleven correctly shaped claims from the first ASVS corpus
+sweep. :data:`BLOCKS` is therefore a table keyed by framework, checked against
 ``PACKAGES``, and a fault a package cannot spell says so as a property of the
 package rather than as its name.
 """

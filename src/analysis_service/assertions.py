@@ -1271,7 +1271,7 @@ class SpanSource:
 
     A catalog carries many quotes and a job carries few sources, so the fold
     belongs to the source rather than to the quote: :func:`index_source` reads
-    every character of the submission, and doing it per quote spends the whole
+    every character of the submission, and doing it per quote reads the whole
     submission once for each row. A body building spans prepares each source
     once and hands this to :func:`spans_for`.
 
@@ -1304,7 +1304,7 @@ def support_span(quote: str, source_label: str, source_text: str) -> SupportSpan
     the whole source to answer, exactly as
     :meth:`~analysis_service.system_model.SystemModel.get` builds a whole index
     to answer one ID. A caller taking several quotes from one source calls
-    :func:`span_source` first, or it spends the submission once per quote.
+    :func:`span_source` first, or it reads the submission once per quote.
 
     A quote marking a cut with ``…`` covers several spans. This answers the
     first, and :func:`spans_for` answers each.
@@ -1902,7 +1902,7 @@ def _entry_issues(
     # An inference says what it rests on, in words a person reads and, where
     # code made it, in rows. **Not in rows alone**: an assertion's identity is
     # computed, so a model writing a premise ID would be writing a key it
-    # cannot compute, and demanding one buys a fabricated reference rather
+    # cannot compute, and demanding one gets a fabricated reference rather
     # than a basis. The words are required; the rows are optional and checked
     # where they are given.
     if entry.basis in ("inferred", "derived") and not entry.explanation:
@@ -2199,9 +2199,9 @@ class CatalogProposal(BaseModel):
     #: A root-level array of objects carrying ``maxItems`` is a shape Google's
     #: structured output refuses — measured, and the only feature separating
     #: this schema from the extraction schema that runs on the same route. A
-    #: model's output schema is a vendor-neutral surface, so a bound that costs
-    #: a vendor belongs where code enforces it rather than where a provider has
-    #: to accept it.
+    #: model's output schema is a vendor-neutral surface, so a bound that a
+    #: vendor refuses belongs where code enforces it rather than where a
+    #: provider has to accept it.
     assertions: list[AssertionProposal] = Field(default_factory=list)
 
 
@@ -2575,7 +2575,7 @@ def _merge_rank(entry: Assertion) -> tuple[int, str]:
 
 
 #: Why a projected value reads the way it does. Closed, because the whole point
-#: of projecting is to say what the one string cost: a reader comparing a
+#: of projecting is to say what the one string lost: a reader comparing a
 #: projection to the attribute beside it needs to know whether the value is the
 #: catalog's answer or the catalog refusing to answer in one word.
 ProjectionReason = Literal[

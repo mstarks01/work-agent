@@ -38,8 +38,8 @@ The IDs are stable and mean something: ``unknown:<element-id>:<attribute>``,
 ``absent:<element-id>:<attribute>`` and ``crossing:<flow-id>``. All three are
 built from IDs the model already carries, so the same System Model yields the
 same catalog on every run, and a ref in a log or a diff is readable without a
-lookup. Opaque IDs would cost that for nothing, because there is no secret here.
-There are only facts the agent is being shown anyway.
+lookup. Opaque IDs would lose that and gain nothing, because there is no secret
+here. There are only facts the agent is being shown anyway.
 
 A fourth family arrives with the job's **Assertion** catalog, where the job ran
 one. ``assertion:<predicate>~<subject>~<scope>~<value>`` is the row's own
@@ -624,7 +624,7 @@ def render_element_roster(model: SystemModel) -> str:
 
     **The gloss is type and place, never the attributes.** Those are in the
     System Model already and this table is paid for on every lane agent of every
-    framework; repeating them would buy nothing and cost the most expensive
+    framework; repeating them would gain nothing and enlarge the most expensive
     block in the job-varying half. What a row has to carry is enough for an
     agent to recognise the element it means without reconstructing the ID —
     which is what the left column is for.
@@ -672,7 +672,7 @@ def _gloss(
     and an agent that conflates them cites the wrong one. *Never stated* against
     *stated absent* is the sharpest of those distinctions and the cheapest to
     render: it is the difference between a question and an answer, and the
-    prompt spends a whole procedure step on it.
+    prompt gives a whole procedure step to it.
 
     An assertion row is the one entry whose left column is a digest, so its
     gloss carries what the others leave to the ID: the subject, spelled as
@@ -828,10 +828,10 @@ def _grounds_of(
     in the model names it, and is dropped as unresolved when something does.
     An agent claiming a system has no directory service, in a model whose store
     is called "LDAP directory", has asserted an absence the model contradicts,
-    and this is where that costs its entry. A term longer than
+    and this is where the service drops its entry. A term longer than
     :data:`~analysis_service.claims.GROUND_TERM_MAX_CHARS` leaves the same way:
     the field holds one term, an agent that wrote a sentence named no term, and
-    the entry is what that costs — never the run. A blank one leaves with no
+    the service drops the entry — never the run. A blank one leaves with no
     mark at all, because an empty string names nothing for a mark to be about.
     """
     grounds = [
@@ -914,12 +914,12 @@ def resolve_proposals(
     itself does not: it is what the ID was composed *from*, and the gate has
     already refused a record that declares it.
 
-    **A reference that names nothing costs its entry, not the job.** Agents
-    compose well-formed references to facts the catalog does not hold — correct
-    grammar, plausible element IDs — and failing the whole analysis over one
-    discards every lane's work to punish a citation error (#138). So an
-    unresolvable reference is dropped and marked, and the claim stands on
-    whatever else it cited.
+    **A reference that names nothing loses its entry and does not fail the
+    job.** Agents compose well-formed references to facts the catalog does not
+    hold — correct grammar, plausible element IDs — and failing the whole
+    analysis over one discards every lane's work to punish a citation error
+    (#138). So an unresolvable reference is dropped and marked, and the claim
+    stands on whatever else it cited.
 
     A claim whose every ground evaporates has nothing supporting it, and a
     finding with empty ``grounds`` is the one thing this schema refuses to
@@ -1007,7 +1007,7 @@ def known_proposals(
     builder walks the catalog and never met the key (#659).
 
     Dropped and marked on the #138 rule: an agent composing a well-formed
-    reference to something absent costs its entry, never the run. A package
+    reference to something absent loses its entry, never the run. A package
     that mints its own IDs answers ``True`` for every key, so its list of
     marks stays empty by construction.
     """
@@ -1032,7 +1032,7 @@ def invalid_proposal_marks(
 ) -> AnalysisMarks:
     """The marks for the proposals a lane's batch could not validate.
 
-    A schema fault is a fault in one entry, so it costs that entry: the batch
+    A schema fault is a fault in one entry, so only that entry goes: the batch
     already dropped it (:class:`~analysis_service.claims.ProposalBatch`), and
     this records it as a :class:`~analysis_service.claims.DroppedClaim` with
     the first error pydantic reported. The ID is composed from the package's

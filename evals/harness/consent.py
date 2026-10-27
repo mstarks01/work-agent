@@ -601,7 +601,7 @@ def hold(
     very next case, so a single overrun would become a prompt at every
     remaining case boundary. What the contributor is asked for instead is the projection —
     the spend so far, plus the same per-case rate over the cases still to run
-    — so one overrun costs one prompt and the next one means the rate moved
+    — so one overrun adds one prompt and the next one means the rate moved
     again. ``ran`` is how many cases produced ``executions``, which is what
     turns a total into a rate.
     """

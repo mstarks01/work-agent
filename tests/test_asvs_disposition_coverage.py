@@ -138,7 +138,7 @@ def test_the_corpus_exercises_the_alternate_route():
 
     Widening is per record and each one is a judgement, so this asserts the
     corpus uses the field at all rather than pinning which records do. The
-    label read that #226 owes may add more.
+    label read that #226 asks for may add more.
     """
     widened = {
         f"{case_id}:{record.requirement}": record.also_acceptable

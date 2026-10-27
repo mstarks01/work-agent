@@ -207,7 +207,7 @@ def test_the_shipped_fixtures_cause_no_matcher_refusals(pairs):
 
 
 def test_a_refusal_is_reported_and_never_scored(tmp_path, pairs):
-    """A matcher that cannot read a scored pair must not buy accuracy with it."""
+    """A matcher that cannot read a scored pair must not gain accuracy from it."""
     path = tmp_path / "pairs.json"
     path.write_text(
         json.dumps(
@@ -441,7 +441,7 @@ def test_every_package_answers_the_collision_question(corpus_and_flows):
     """Runs every way rather than outward from STRIDE.
 
     A package cannot ship without a collision measurement: the identity a
-    claim composes differs per package, and the cost of keying two distinct
+    claim composes differs per package, and the effect of keying two distinct
     claims alike does not. Any collision must be recorded in that package's
     own exception table with a reason.
     """

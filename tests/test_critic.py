@@ -757,7 +757,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         """``immaterial_unknowns`` is a statement about this draft's own grounds.
 
         A near-miss spelling — the right element with a neighbouring attribute
-        — dismisses nothing, so code removes it rather than spending the re-ask
+        — dismisses nothing, so code removes it and does not use the re-ask
         on it. The real pair stays open, and the ruling reads ``needs-info``.
         """
         draft = sample_draft(
@@ -1142,7 +1142,7 @@ def test_the_critic_is_shown_the_recommendations_it_now_rules_on():
     A mitigation is copied into the report from this same draft and no other
     seam looks at it, so a recommendation that is well formed and irrelevant
     to its claim reached an operator unread. It is the largest block in this
-    prompt, and that is the cost of the only review it gets.
+    prompt, and that size is the drawback of the only review it gets.
     """
     draft = sample_draft("S-01", "spoofing")
     assert draft.mitigations, "the fixture must carry one for this to prove anything"
@@ -1362,7 +1362,7 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
     def test_the_bound_cuts_rather_than_raises(self):
         """Every sentence composes below the bound today, so this is the
         fail-safe: a producer that quotes more agent text than the eight do
-        must not cost the job the report this mark annotates."""
+        must not fail the job, with no report for this mark to annotate."""
         from analysis_service.claims import (
             UNRECONCILED_MESSAGE_MAX_CHARS,
             UnreconciledRuling,

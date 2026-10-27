@@ -2,9 +2,9 @@
 
 A cap here is a drift alarm rather than a budget. It rations nothing. It makes a
 size change visible in review, and it fails the lint when one file grows past
-what the alarm allows. Raising a cap costs a one-line edit and needs no
-argument, because no measurement in this repository says a shorter instruction
-finds more threats. ADR 0016 holds that reasoning.
+what the alarm allows. Raising a cap needs a one-line edit and no argument,
+because no measurement in this repository says a shorter instruction finds more
+threats. ADR 0016 holds that reasoning.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def alarm_at(largest: int) -> int:
     """The cap a kind whose largest asset is ``largest`` tokens gets.
 
     Call this when the lint fails, write the answer into :data:`TOKEN_CAPS`,
-    and say in the commit message what the new text buys. Nothing has to leave
+    and say in the commit message what the new text gives. Nothing has to leave
     to make room for it.
     """
     return math.ceil(largest * (1 + HEADROOM_FRACTION) / 100) * 100
@@ -125,7 +125,7 @@ TOKEN_CAPS: dict[str, int] = {
     #
     # It says that a `name` needs an ASCII letter or digit (ADR 0096). A name
     # with neither has no ID, and the gate refuses it as `empty-slug` and
-    # spends the repair pass; the rule tells the model how to name such a thing.
+    # uses the repair pass; the rule tells the model how to name such a thing.
     "prompts/extract": 4700,
     # The compact transport's delta, appended after the body above. It is the
     # whole cost of the route on the input side, paid on every extraction call

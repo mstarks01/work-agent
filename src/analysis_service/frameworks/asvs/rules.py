@@ -156,7 +156,7 @@ def _rule_of(test: PresenceTest) -> Rule:
 #: documents", a user "imports a CSV", a member "sets an avatar". **These raise
 #: a candidate and rule nothing out** (#659): a word nobody listed is a lead
 #: this lane never gets, which the lane agent can still find for itself, and
-#: which is the whole of what a vocabulary can honestly cost.
+#: which is the whole of what a vocabulary can lose.
 #:
 #: **Two are anchored, because a prefix match made them nearly always true.**
 #: A term matches at the start of a word, so bare ``document`` answered for

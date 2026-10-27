@@ -10,7 +10,7 @@ vendor is privileged.
 ``review`` is a place rather than a policy. Which nodes sit on it is the node
 map's business, and the shipped map puts ``critic/<name>`` and
 ``recritic/<name>`` on ``strong``. That is the same domain as the analysis,
-which is cheaper and is what most deployments want. What the tier buys is that a
+which is cheaper and is what most deployments want. What the tier gives is that a
 deployment can move them, and ``review_independence`` in the config file is
 where it says how far apart they have to be. Without ``review``, the only way
 to make criticism distinct is to run it on ``base``, which is a re-ask on a
@@ -90,13 +90,13 @@ TIER_NAMES: tuple[TierName, ...] = ("base", "strong", "review")
 #
 # * ``shared`` requires nothing. Criticism may run on the very model it checks,
 #   which is the shipped configuration: a critic on one model still catches
-#   inconsistency and unsupported claims, and it costs one tier rather than two.
+#   inconsistency and unsupported claims, and it needs one tier rather than two.
 # * ``distinct_model`` requires a different model. It removes a single build's
 #   blind spots, and leaves the provider's. Compared by the identifier with any
 #   gateway segment stripped, because a slug pins the build whichever route
 #   carries it.
 # * ``distinct_provider`` requires a different serving organisation. It removes
-#   a provider's blind spots too, at the cost of a second credential and a
+#   a provider's blind spots too, but it needs a second credential and a
 #   second quota — and it cannot be satisfied by a gateway route at all, since
 #   an aggregator picks the upstream per call.
 #
@@ -322,7 +322,7 @@ class ModelTierConfig(BaseModel):
     #: vendor with nothing to choose is an error, and a missing key for a vendor
     #: with a choice is an error.
     #:
-    #: Empty in every shipped file. What the declaration buys is a recorded
+    #: Empty in every shipped file. What the declaration gives is a recorded
     #: figure that means one thing:
     #: :func:`analysis_service.charges.records_reported_charge` records a
     #: vendor's reported charge only where the declared arrangement says the
@@ -333,7 +333,7 @@ class ModelTierConfig(BaseModel):
     #: Which upstream providers a request on each gateway vendor may reach.
     #: Keyed by vendor for the same reason :attr:`charges` is. Optional where
     #: the other two tables are required, because an analysis is an analysis
-    #: whichever upstream answers; what a pin buys is a **Baseline**, which is
+    #: whichever upstream answers; what a pin gives is a **Baseline**, which is
     #: named after the one upstream the record says served it, and a run that
     #: may land on two upstreams cannot be one. A key for a vendor whose
     #: :attr:`~analysis_service.vendors.Vendor.upstream_pin` is ``None`` is an
@@ -352,7 +352,7 @@ class ModelTierConfig(BaseModel):
         """The tiers this deployment runs something on.
 
         **The one reader of "is this tier bound".** The node map is what says
-        so. A tier with a selection that no node points at costs no adapter, no
+        so. A tier with a selection that no node points at needs no adapter, no
         credential and no SDK. Every site that decides what a deployment needs
         reads this set, and not the wider set in ``self.tiers``. The loader asks
         the same question of the raw node map before validation, through
@@ -480,7 +480,7 @@ class ModelTierConfig(BaseModel):
         key describing an arrangement with such a vendor describes nothing.
 
         Only vendors a **bound** tier selects are required to declare, exactly
-        as with credentials. An undeclared arrangement costs nothing until a
+        as with credentials. An undeclared arrangement does no harm until a
         call is made, and no call is made on a tier no node points at.
         """
         problems = []
@@ -887,8 +887,8 @@ def _apply_upstream_overrides(raw: dict[str, object], env: Mapping[str, str]) ->
 def tiers_in_use(nodes_raw: object) -> set[str]:
     """The tiers the node map actually runs something on.
 
-    A tier is a place a node can sit, and an empty place costs nothing to leave
-    empty: :func:`~analysis_service.binding.build_tier_adapters` already skips a tier nothing is bound to, so
+    A tier is a place a node can sit, and an empty place does no harm when it
+    stays empty: :func:`~analysis_service.binding.build_tier_adapters` already skips a tier nothing is bound to, so
     a selection for one is a pair no request ever reaches. A tier that no node
     uses needs no selection.
 

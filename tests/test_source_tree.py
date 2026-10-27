@@ -6,7 +6,7 @@ and the lints in this suite read :mod:`tests.source_tree`. One rule, three
 readers, so the tests below check them against each other rather than each
 against its own expectation.
 
-The cost of a disagreement is concrete: ``evals/runs`` holds run artifacts the
+The effect of a disagreement is concrete: ``evals/runs`` holds run artifacts the
 repository does not track, a live run leaves its probe scripts beside them, and
 a reader that judges that directory fails on a file the tree does not hold
 (#942).

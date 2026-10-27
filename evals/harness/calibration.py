@@ -1,7 +1,7 @@
 """Rule-vs-label agreement over the recorded fixtures.
 
 The two error directions are the measurement, and the ratio is the door. A false
-split is an equivalent finding the rule calls distinct, and it costs a reviewer
+split is an equivalent finding the rule calls distinct, and it gives a reviewer
 one unmatched finding. A false merge is two distinct findings the rule calls
 one, and it destroys a finding and inflates recall, where no reviewer sees it
 happen. The consequences differ, so this module reports the counts apart and
@@ -37,7 +37,7 @@ A rule may refuse a pair, and a refusal is not a miss. The identity rule refuses
 a pair it cannot read — one with no candidate element IDs, or no verb — rather
 than grading half of itself. This module counts refused pairs and reports them
 beside the agreement, never inside it. Folding them in either direction would
-let a rule buy accuracy by refusing the hard pairs.
+let a rule gain accuracy by refusing the hard pairs.
 
 A label may decline too. Three dispositions carry no answer an identity rule can
 be graded against, and each sits outside the agreement for the reason a refusal
@@ -253,7 +253,7 @@ class CalibrationResult:
     disposition kept out of the score, keyed by the label that did it. All of
     them sit outside the agreement, because neither the rule nor the label can
     be wrong about a question nobody asked it. Every count is always reported
-    beside the bar, so a rule cannot buy accuracy by refusing the hard pairs
+    beside the bar, so a rule cannot gain accuracy by refusing the hard pairs
     unseen.
 
     ``set_aside`` is keyed rather than one field per disposition: a new
@@ -261,7 +261,7 @@ class CalibrationResult:
 
     ``false_non_matches`` is the **false split** direction and
     ``false_matches`` the **false merge** direction over these labels. Read
-    them apart: a split costs a reviewer one unmatched finding, a merge
+    them apart: a split gives a reviewer one unmatched finding, a merge
     destroys a finding silently.
     """
 
@@ -374,7 +374,7 @@ def measure_agreement(
     """Run the matcher over every labelled pair and compare with the label.
 
     A refusal (:class:`~evals.harness.identity.IdentityError`) is counted and
-    set aside, never scored, so a rule cannot buy agreement by refusing a hard
+    set aside, never scored, so a rule cannot gain agreement by refusing a hard
     pair. A label that carries no
     answer — ``unclear``, ``unsupported`` or ``invalid-claim`` — is set aside
     the same way and counted under its own key, because a rule cannot disagree with an answer
@@ -613,7 +613,7 @@ def measure_direction(
     Each tuple is ``(new false splits, candidate merges recovered)`` over those
     merged pairs. A split is a labelled ``match`` the direction would break; a
     recovered merge is a labelled ``no-match`` it would break, which is the
-    only thing a direction could buy.
+    only thing a direction could gain.
     """
     cited: Counter[int] = Counter()
     for case in corpus:

@@ -296,7 +296,7 @@ class TestGround:
 
     The union would forbid a nonsense combination in the schema itself; the
     flat object is the portable shape across six independently-vendored
-    ``strong``-tier agents, and this validator is what buys back the guarantee
+    ``strong``-tier agents, and this validator is what restores the guarantee
     — on arrival rather than at generation time.
     """
 
@@ -899,8 +899,8 @@ class TestDroppedClaim:
 
     A drop is recorded from four places in three modules, and every value on
     the mark is agent text or composed from it. A producer that raised while
-    recording a drop would cost the job the report the mark exists to preserve,
-    so the cut sits beside the bound rather than at each producer.
+    recording a drop would fail the job, with no report for the mark to
+    preserve, so the cut sits beside the bound rather than at each producer.
     """
 
     def test_an_over_long_reason_is_cut(self):

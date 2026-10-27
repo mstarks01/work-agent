@@ -292,7 +292,7 @@ def score_applicability(
     # because settling it needs evidence the job does not carry (#417). The
     # matrix here is over applicability, so the entry counts as applied beside
     # a ``confirmed`` or ``needs-info`` claim (#454). It is listed apart because
-    # the report carries no claim for it — that is the policy cost
+    # the report carries no claim for it — that is the limit the policy in
     # `CARRIED_EVIDENCE_KINDS` sets.
     deferred_units = {
         entry.unit for entry in block.scope if entry.state == "needs-other-evidence"
@@ -453,7 +453,7 @@ def satisfies(
     silently the day that tuple grows, and would fail a run for doing the newly
     correct thing.
 
-    The cost of reading the policy is that two carried kinds are
+    The drawback of reading the policy is that two carried kinds are
     indistinguishable in the report — both arrive as ``needs-info``, because the
     field that told them apart is stripped before the payload. With one carried
     kind, which is what ships, there is nothing to confuse.
@@ -991,7 +991,7 @@ def over_applied_for_promotion(
 
 @dataclass(frozen=True)
 class ApplicabilityYield:
-    """What one case's ASVS critic pass cost and bought.
+    """What one case's ASVS critic pass removed, and what it gained.
 
     The same two-sided instrument :mod:`evals.harness.critic_yield` is for, over
     the only destructive move this package's **Critic** has. STRIDE's critic

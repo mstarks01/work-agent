@@ -1,4 +1,4 @@
-"""The object stores: what each row of ``OBJECT_STORES`` owes, and the ``s3`` row.
+"""The object stores: what each row of ``OBJECT_STORES`` must give, and the ``s3`` row.
 
 ``tests/test_job_store.py`` runs the whole store contract on each object store.
 This module holds what that contract cannot say: the bytes, the missing key and

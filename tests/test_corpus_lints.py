@@ -397,7 +397,7 @@ def test_the_gate_and_the_corpus_lint_refuse_the_same_citation_shapes(
     ``verify_corpus._check_citations`` deliberately does not call
     :func:`~analysis_service.validation.validate`: a check that would weaken
     the moment somebody relaxed the shipped gate is not a check. That decision
-    buys independence and costs agreement, and agreement is what this pays for.
+    gains independence and loses agreement, and this test checks the agreement.
     Two readers can each pass an element that carries no excerpt, each with a
     test that agrees with it (#925).
     """

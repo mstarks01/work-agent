@@ -6,8 +6,8 @@ hold two properties rather than one. The round trip has to *work* — a reader
 who spends an hour must not lose it to a schema quibble — and the import has
 to refuse everything that would put words nobody read into the record.
 
-``tests/test_offline_sitting.py`` holds what the page owes the reader. This
-holds what the tree owes the operator.
+``tests/test_offline_sitting.py`` holds what the page must give the reader. This
+holds what the tree must give the operator.
 """
 
 from __future__ import annotations

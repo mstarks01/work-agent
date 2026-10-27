@@ -108,7 +108,7 @@ class KilledDraft:
 
 @dataclass(frozen=True)
 class CriticYield:
-    """What one case's critic pass cost and bought."""
+    """What one case's critic pass removed, and what it gained."""
 
     case_id: str
     drafts_in: int
@@ -177,7 +177,7 @@ class CriticYield:
 
     @property
     def killed_by_cause(self) -> dict[str, dict[str, int]]:
-        """Every kill by the step the critic named, and what each step cost.
+        """Every kill by the step the critic named, and what each step removed.
 
         The critic states why it rejected a draft, and nothing counted it: the
         second Baseline's four must-find kills were three ``reasoning`` and one
@@ -414,7 +414,7 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
         "matched_kill_rate": round(ratio(matched_killed, matched_before), 3),
         "kill_precision": round(ratio(rejected_killed, killed), 3),
         # Every kill by the step the critic named, pooled; the per-step
-        # ``matched`` and ``must_find`` are what a step cost.
+        # ``matched`` and ``must_find`` are what a step removed.
         "killed_by_cause": {
             cause: dict(counts) for cause, counts in sorted(by_cause.items())
         },

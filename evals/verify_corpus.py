@@ -106,7 +106,7 @@ CALIBRATION_PATH = Path(__file__).resolve().parent / "calibration_labels" / "pai
 # telemetry normalizer" — rather than hiding it in a flow's `protocol` string,
 # and case 13 models the host that serves its console. Both cases describe the
 # system they always described; what grew is how much of it the reference
-# admits, and refusing that would hold the corpus at a size bought by leaving
+# admits, and refusing that would hold the corpus at a size reached by leaving
 # named components out. 22 leaves one slot, on the reasoning
 # `analysis_service.token_caps.alarm_at` states: nothing has to leave to make
 # room for it.
@@ -385,12 +385,12 @@ ESCALATE, ABUSE_GRANT = FAMILIES["authorization"]
 #: at one. Read by :func:`_escalate_leads`, matched case-insensitively at a word
 #: boundary against the claim sentence.
 #:
-#: **A word nobody listed costs one lead and never a claim.** That is the whole
-#: difference between this table and the two ADR 27 deleted: those read a model
-#: and ruled a requirement out of a job, so a miss lost the finding silently.
-#: This one raises a question a person answers in :data:`ESCALATE_DECLARED`, so
-#: a miss leaves a claim exactly as unexamined as it is today, and a false
-#: raise costs one line of prose.
+#: **A word nobody listed misses one lead and never drops a claim.** That is the
+#: whole difference between this table and the two ADR 27 deleted: those read a
+#: model and ruled a requirement out of a job, so a miss lost the finding
+#: silently. This one raises a question a person answers in
+#: :data:`ESCALATE_DECLARED`, so a miss leaves a claim exactly as unexamined as
+#: it is today, and a false raise adds one line of prose.
 FOOTHOLD_WORDS: tuple[str, ...] = (
     "compromises",
     "compromising",
@@ -472,7 +472,7 @@ def _escalate_leads(
             f"{source} -> {destination}" for source, destination in joined
         )
         # Every raise, declared or not. One reader of the condition: the caller
-        # that reports and the check that finds a spent declaration read the
+        # that reports and the check that finds an obsolete declaration read the
         # same keys, so a declaration cannot answer for a claim nothing raises.
         yield (
             (case_id, tuple(sorted(cited))),

@@ -10,8 +10,8 @@ be about a system nobody submitted.
 Selection is structural and keyword-based, and it is deliberately shallow. A
 detector reads a handful of the model's own free-text fields for terms that name
 a technology, and that is all it does. It decides nothing about security. It
-decides which reference material is on the desk. A false positive costs tokens,
-and a false negative costs a sharper prompt. Neither can produce, suppress or
+decides which reference material is on the desk. A false positive adds tokens,
+and a false negative loses a sharper prompt. Neither can produce, suppress or
 ground a finding, because the pack text is repo-authored and identical for every
 job that selects it.
 

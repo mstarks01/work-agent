@@ -47,7 +47,7 @@ nothing. They stay only because each is a real permission the prompt grants or a
 real substitution models make, and nobody should believe they are load-bearing.
 
 Punctuation-blindness is refused. It recovers nothing the markdown rung does
-not, so it is a concession that buys no precision and spends real precision. The
+not, so it is a concession that gains no precision and loses real precision. The
 ladder stops at ``+markdown``, where the measured false-rejection rate is 0 in
 206, with one true rejection. That rejection was a quote that excised a span and
 stitched a subject onto a predicate, unmarked, producing a sentence the source
@@ -291,7 +291,7 @@ def verify_quote(quote: str, source: str) -> bool:
     many quotes against the same few sources should normalize each source once
     and call :func:`verify_normalized` instead — the ladder folds every
     character of the haystack, so re-folding a whole submission per quote is
-    the same answer paid for repeatedly.
+    the same answer computed repeatedly.
     """
     return verify_normalized(quote, normalize(source))
 
@@ -381,8 +381,8 @@ def placements(quote: str, haystack: str, *, limit: int = 2) -> int:
 
     Measured on 2026-09-16 over every quote this repository holds: **0 of the
     79 signed corpus quotes and 0 of the 829 archived model-proposed quotes
-    sit in more than one place.** So the refusal built on this costs nothing
-    today, and it is the silent wrong citation it prevents that earns it.
+    sit in more than one place.** So the refusal built on this refuses no quote
+    today, and the silent wrong citation it prevents is the reason for it.
     """
     seen = 0
     cursor = 0
@@ -646,7 +646,7 @@ def repair_prepared(
 
     Candidates are every run of whole words whose count is the quote's, up to
     ``_REPAIR_WIDTH_SLACK`` more, compared under :func:`normalize` on
-    both sides so the rungs the ladder already forgives cost nothing here. The
+    both sides so the rungs the ladder already forgives lower no score here. The
     best candidate wins if it reaches :data:`REPAIR_THRESHOLD`.
 
     ``source`` is a :class:`PreparedSource` from :func:`prepare_source`, whose
@@ -665,9 +665,9 @@ def repair_prepared(
     window 26,445 -- and scanning to the end is what the bound exists to stop.
     Returning nothing is right only when nothing reached the threshold. It does not discard that answer: the
     budget exists to bound the time, and throwing away a match already above
-    :data:`REPAIR_THRESHOLD` spends the time and buys nothing. A truncated scan
+    :data:`REPAIR_THRESHOLD` uses the time and gains nothing. A truncated scan
     can return a match that is merely good rather than the best one, which is
-    the honest cost of the bound.
+    the limit of the bound.
 
     Finding nothing still answers ``None``, which is what the threshold already
     answers when no window is close enough, and the caller already handles it:

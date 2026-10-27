@@ -1449,7 +1449,7 @@ class TestTheInitiatorReadingOfAnExtraction:
 
 
 class TestASweepSurvivesARefusedModel:
-    """One case's model being refused costs that case, not the sweep (#303).
+    """A refused model for one case loses that case, not the sweep (#303).
 
     A live `--mode end-to-end` run died on case 09 and produced no artifact,
     losing the eight cases that had already run:
@@ -1543,7 +1543,7 @@ class TestZonesAreScoredApartFromCitableElements:
     """A trust zone reaches no claim, so it is not counted as extraction recall.
 
     ``identity.comparable_elements`` drops every ``boundary:`` ID before any
-    claim comparison, so a zone the extraction named differently costs no match
+    claim comparison, so a zone the extraction named differently loses no match
     downstream. Counting one as a miss depressed endpoint recall by eleven
     points over the sweep of 2026-09-13. The zones still get a number, because
     the crossings derive from them.
@@ -1574,7 +1574,7 @@ def _rename_one_boundary(case):
 
     A rename rather than a deletion: a model missing a zone its elements point
     at is invalid, and the question here is what a *differently named* zone
-    costs, which is the only thing extraction actually does to them.
+    does, which is the only thing extraction actually does to them.
     """
     raw = case.model.model_dump()
     old = raw["trust_boundaries"][0]["id"]
@@ -2105,7 +2105,7 @@ class TestTheFalsificationFixtures:
         assert score.crossings_match is False
 
     def test_renaming_the_hard_elements_no_longer_buys_agreement(self):
-        """Agreement cannot be bought by renaming the facts that are hard to get right.
+        """Renaming the facts that are hard to get right cannot raise agreement.
 
         ``_check_attributes`` joins on the alignment. Without rule 6,
         renaming case 01's five flows takes all 25 of their scored fields out

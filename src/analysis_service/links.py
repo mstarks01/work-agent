@@ -379,7 +379,7 @@ def check_answers(
     **The one admission check of a submission's answers.** Its caller is
     :meth:`~analysis_service.answer_state.QuestionSet.admit`. A link answer is
     written by :func:`apply_answers` here, and each issue it would raise is a
-    refusal, so a wrong link costs nothing. A link answer with no catalog to
+    refusal, so a wrong link writes nothing. A link answer with no catalog to
     write it into raises :class:`NoCatalogError`. ``asked`` is the facts the
     job's questions name, and ``asked_links`` the :func:`fold_principal` keys of the
     principals they ask about; ``earlier`` and ``earlier_links`` are the

@@ -348,7 +348,7 @@ class TestOneProducedRowAnswersOneReferenceRow:
         """Two rows differ only in scope, and the run answers the second.
 
         Reading the reference array once and taking each row's best available
-        candidate spends the exact answer on the first row as a ``rescoped``
+        candidate gives the exact answer to the first row as a ``rescoped``
         one, so the score turns on the order the reference lists its rows.
         """
         one, two = fact(scope=self.scoped("one")), fact(scope=self.scoped("two"))

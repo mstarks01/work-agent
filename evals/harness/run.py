@@ -211,7 +211,8 @@ REFUSED: tuple[type[Exception], ...] = (modes.EvalRunError, CriticOutputError)
 #: One tuple rather than a test at each site, because ``_run_mode`` asks this
 #: question twice: once of a bare exception and once of the cause inside a
 #: :class:`~evals.harness.modes.CaseFailure`. Two readers of one rule would
-#: eventually disagree about which faults cost a sweep its artifact.
+#: eventually disagree about which faults stop a sweep before it writes its
+#: artifact.
 MEASURED: tuple[type[Exception], ...] = (*REFUSED, *CAUGHT)
 
 

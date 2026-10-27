@@ -66,7 +66,7 @@ FIXED_FAN_OUT = re.compile(
 #: A claim about the registry: "STRIDE declares 6". Narrow on purpose. A general
 #: "any number near a package name" rule reads ``the other 16 lanes' work`` in
 #: ``asvs/record.py`` as a defect, and that sentence is correct — it is about
-#: what one failing lane costs the rest, not about how many ship.
+#: what one failing lane does to the rest, not about how many ship.
 DECLARES = re.compile(
     r"\b(" + "|".join(PACKAGES) + r")\s+declares\s+(\d+)\b", re.IGNORECASE
 )

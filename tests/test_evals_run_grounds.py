@@ -317,7 +317,7 @@ def test_the_measurement_rides_in_the_case_payload(monkeypatch, case):
 def test_a_claim_that_lost_every_ground_is_dropped_and_the_case_still_measures(
     monkeypatch, case, broken
 ):
-    """A fabricated quote and an invented reference both cost the claim, never
+    """A fabricated quote and an invented reference both drop the claim, never
     the case: the report is built, the drop is counted, and the sweep goes on."""
     run = sweep(monkeypatch, case, broken)
 

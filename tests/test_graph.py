@@ -873,12 +873,12 @@ def test_six_category_agents_fan_out_from_prepare_and_join(pipeline):
 
 
 def test_one_repair_pass_then_rejection(pipeline):
-    """Invalid twice ends at reject: the graph cannot spend a second repair.
+    """Invalid twice ends at reject: the graph cannot run a second repair.
 
     ``validate`` carries a third edge and ``revalidate`` does not.
     ``unconvertible`` is the compact transport's own refusal — an emission that
     is not a compact model in any shape ``repair`` could read — and it goes
-    straight to the rejection rather than spending the one repair pass on a
+    straight to the rejection and does not use the one repair pass on a
     format conversion. ``repair`` writes a full System Model whichever transport
     extraction used, so the second gate can never raise it.
     """
@@ -1287,9 +1287,9 @@ def test_validate_expands_a_compact_emission_before_the_gate():
 def test_validate_sends_an_expanded_model_that_fails_the_gate_to_repair():
     """Expansion succeeding and the gate failing is the ordinary invalid path.
 
-    The repair pass is spent on a full System Model with resolvable issues,
-    exactly as on the full route — the transport does not cost the route its
-    one repair.
+    The repair pass runs on a full System Model with resolvable issues,
+    exactly as on the full route — the transport does not take the route's
+    one repair away.
     """
     payload = compact_fixture()
     payload["data_flows"][0]["destination"] = "p:nowhere"
@@ -1303,7 +1303,7 @@ def test_validate_sends_an_expanded_model_that_fails_the_gate_to_repair():
 
 @pytest.mark.parametrize("extraction_format", [FULL_FORMAT, COMPACT_FORMAT])
 def test_validate_sends_a_name_that_slugs_to_empty_to_repair(extraction_format):
-    """Both routes refuse the name at the gate, so both spend the repair pass."""
+    """Both routes refuse the name at the gate, so both use the repair pass."""
     full = valid_model().model_dump(mode="json")
     payload = as_compact(full) if extraction_format == COMPACT_FORMAT else full
     payload["processes"][0]["name"] = "!!!"
@@ -1784,7 +1784,7 @@ def test_merge_refuses_a_draft_on_a_unit_the_rules_ruled_out(monkeypatch):
 
 
 def test_merge_drops_and_marks_a_proposal_that_fails_its_schema():
-    """The node's own schema salvages: a verb outside the closed set costs
+    """The node's own schema salvages: a verb outside the closed set drops
     that proposal, and the mark names the claim the agent meant."""
     state = analyze_state(spoofing=[sample_proposal("S-01"), sample_proposal("S-02")])
     state[graph.Lane("stride", "spoofing").drafts_key]["claims"][0]["verb"] = (
@@ -2216,7 +2216,7 @@ class TestALane:
 
     The claim worth testing is not the spelling of any one key. It is that the
     key a lane *writes* and the key its instruction *reads* are the same key,
-    for every artifact — which is what putting both behind one declaration buys.
+    for every artifact — which is what putting both behind one declaration gives.
     """
 
     def test_what_a_lane_writes_is_what_its_prompt_reads(self):
@@ -2469,7 +2469,7 @@ def test_a_precondition_the_contract_cannot_read_fails_the_run(
 
     Refusing the framework here would drop the whole analysis the caller asked
     for and leave them no sign of it, so the gate raises instead — after one
-    extraction, which is the honest cost of a check that cannot run earlier.
+    extraction, which is the drawback of a check that cannot run earlier.
     """
     with pytest.raises(PreconditionError) as caught:
         _prepare_over(monkeypatch, "maybe", domain_loader, package_loaders)
@@ -2629,7 +2629,7 @@ def test_one_framework_s_refusal_routes_only_its_own_half_past_the_lanes(
 
 
 def test_a_refusal_does_not_cost_the_other_framework_its_answer(domain_loader):
-    """One framework's precondition does not spend another framework's judgement.
+    """One framework's precondition does not block another framework's judgement.
 
     The whole point of the gate sitting before the fan-out rather than inside
     it: a job naming both against a non-web system still gets its STRIDE

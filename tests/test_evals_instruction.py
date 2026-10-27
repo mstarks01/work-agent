@@ -4,7 +4,7 @@
 
 ADR 0016 made the token caps drift alarms and said plainly what it left open:
 nothing measured prompt size, so a raise that improved findings and a deletion
-that cost them looked alike to a sweep. This instrument is the answer, and what
+that lost them looked alike to a sweep. This instrument is the answer, and what
 makes it worth having is that the number is **the built instruction's**, not a
 recomposition that could drift from it.
 

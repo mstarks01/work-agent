@@ -488,7 +488,7 @@ def name_unknown(ref: UnknownRef) -> str:
 # How long an absent-element term may be. Exported because the producer must
 # check it: ``absent_elements`` is a free list the model fills, and the prompt
 # asks for one lowercase term, so an agent writing a sentence instead would fail
-# validation here and cost the job the whole report. One name, so the bound the
+# validation here and fail the job with no report. One name, so the bound the
 # producer tests and the bound this field accepts cannot drift apart.
 GROUND_TERM_MAX_CHARS = 100
 
@@ -516,7 +516,7 @@ GROUND_TEXT_MAX_CHARS = 1000
 # :data:`MAX_CLAIMS_PER_BATCH` bounds the root array and is carried by
 # :func:`~analysis_service.fan_in.fan_in` instead: a root-level array of objects
 # with ``maxItems`` is a shape at least one vendor's structured output refuses
-# outright, at every value from 8 to 500 (#942). A bound that costs a vendor
+# outright, at every value from 8 to 500 (#942). A bound that a vendor refuses
 # belongs where code reads the output.
 MAX_CLAIMS_PER_BATCH = 400
 MAX_GROUNDS_PER_CLAIM = 60
@@ -542,7 +542,7 @@ class Ground(BaseModel):
     is not expressible in a JSON schema a provider will reliably compile —
     ``oneOf`` has the thinnest, least uniform support across the vendors a
     category agent may be routed to, and ``config/sampling.toml`` records what
-    an uncompilable grammar costs: one vendor rejects ``SystemModel``'s as "too
+    an uncompilable grammar does: one vendor rejects ``SystemModel``'s as "too
     large", and ``constrain_output = false`` is no answer, because
     unconstrained the model fences its JSON and omits required fields. A dead
     run, not a degraded one. The only writer is
@@ -916,7 +916,7 @@ class Claim(BaseModel):
     ``affected_element_ids`` **may be empty here**, where STRIDE narrows it to
     ``min_length=1`` in its own record. A framework whose requirements address a
     coding practice rather than anything in the graph has nothing legal to put
-    there, and the alternative — a whole-application pseudo-element — buys a
+    there, and the alternative — a whole-application pseudo-element — gets a
     legal value by putting a lie in the model. The referential check still runs
     over whatever IDs are present.
 
@@ -1127,7 +1127,7 @@ class Claim(BaseModel):
 
         A framework whose claims carry an action verb can say from a table
         which lanes that action may be filed in; a draft outside them is a lane
-        error the review seam rejects before any judgement is spent on it
+        error the review seam rejects before any judgement runs on it
         (#442). The neutral answer is that every lane is legal, which is what a
         framework with no verb, or no lane grammar over its verbs, inherits.
         """
@@ -1422,7 +1422,7 @@ class Proposal(BaseModel):
     # and ``minItems`` no more reliably than ``pattern``, so an agent can still
     # exceed one. The schema re-ask (ADR 0058) gives the lane one more answer
     # with the error named. A second answer over the cap fails at the node
-    # boundary, where it costs the lane and its siblings.
+    # boundary, where it fails the lane and its siblings.
     #
     # There is no "select rather than construct" form of an over-long
     # description, so it cannot be made unrepresentable. Truncation infers what
@@ -1534,7 +1534,7 @@ class ProposalBatch(BaseModel):
     **A batch validates by salvaging.** The node validates its emission against
     this model before anything else runs, so one proposal carrying a verb
     outside the closed set, a severity value the enum does not hold, or
-    neither a reference nor a quote would otherwise cost the node and the job.
+    neither a reference nor a quote would otherwise fail the node and the job.
     The wrap validator validates each item on its own: the ones that pass fill
     ``claims``, and the ones that fail fill ``invalid``, keyed enough to name
     the claim the agent meant. ``invalid`` is kept out of the JSON schema, so
@@ -1552,11 +1552,11 @@ class ProposalBatch(BaseModel):
     an omission. :data:`MAX_CLAIMS_PER_BATCH` still holds, enforced by
     :func:`~analysis_service.fan_in.fan_in` before it reads a row: a root-level
     array of objects carrying ``maxItems`` is refused outright by at least one
-    vendor's structured output, so the field would cost every lane agent of
-    every framework that route (#942). One shared reader also answers the parity
-    question a field cannot: a package narrowing ``claims`` drops the base's
-    constraints in silence, so a field-borne bound is a line each package has to
-    remember to write.
+    vendor's structured output, so the field would close that route to every
+    lane agent of every framework (#942). One shared reader also answers the
+    parity question a field cannot: a package narrowing ``claims`` drops the
+    base's constraints in silence, so a field-borne bound is a line each package
+    has to remember to write.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1616,8 +1616,8 @@ class Ruling(BaseModel):
 
     WHY THE CRITIC DOES NOT RE-EMIT THE DRAFT. The service holds the drafts —
     they are the same bytes it put in the critic's prompt — so a transcription
-    would buy nothing and cost the run's largest block of output tokens. It
-    would also cost correctness: re-emitting a description is a chance to alter
+    would gain nothing and add the run's largest block of output tokens. It
+    would also harm correctness: re-emitting a description is a chance to alter
     it. Under this schema the critic cannot, and a ruling carries no element
     references to check.
 
@@ -1803,8 +1803,8 @@ class UnresolvedMention(BaseModel):
     accuracy.
 
     The most valuable thing it catches is not a typo. The analyze prompt is
-    built around one worked exemplar system, and it spends a whole section
-    telling the agent never to cite that system's IDs. A description arguing
+    built around one worked exemplar system, and it gives a whole section to
+    tell the agent never to cite that system's IDs. A description arguing
     about ``process:web-api`` in a job whose model has no such element is that
     contamination, in the one field where it reads as ordinary analysis.
     """
@@ -1817,8 +1817,8 @@ class UnresolvedMention(BaseModel):
 
 # How much of an agent-supplied evidence reference a mark carries. Exported
 # because the producer must truncate to it: `evidence_refs` is a free string
-# the model fills, so an over-long one would fail validation here and cost the
-# job the very report this mark exists to preserve. One name, so the bound the
+# the model fills, so an over-long one would fail validation here and fail the
+# job, with no report for this mark to preserve. One name, so the bound the
 # producer cuts at and the bound this field accepts cannot drift apart.
 REFERENCE_MAX_CHARS = 300
 
@@ -1867,8 +1867,8 @@ class UnknownClaimIdentity(BaseModel):
     a claim citing a *fact* the job's catalog does not hold; this one records a
     claim naming a *requirement* its framework's catalog does not hold. Both are
     the same failure — an agent composing a well-formed reference to something
-    that does not exist — and #138 already settled what it costs: the entry, not
-    the run.
+    that does not exist — and #138 settled what happens: the service drops the
+    entry, and the run goes on.
 
     **Only a framework that owns a catalog can produce one.** A package whose
     identifiers are its own to mint — STRIDE's ``S-01`` is a lane and a counter
@@ -1936,7 +1936,7 @@ class DroppedClaim(BaseModel):
       earlier draft's, or its only grounds are quotes the source it names does
       not contain (:func:`~analysis_service.fan_in.join_drafts`).
 
-    Each of these costs one entry and never the job. The case against a drop
+    Each of these drops one entry, and the job goes on. The case against a drop
     is that a finding deleted for a reason recorded in a list is a silent
     removal, and that a dead job at least tells somebody. It does not hold
     here: :class:`UnknownClaimIdentity` drops a claim on the same terms, the
@@ -1961,8 +1961,8 @@ class DroppedClaim(BaseModel):
 
         **The only way one is built.** All three values are agent text bounded
         by their own fields upstream, or composed here from one — and a
-        producer that raised while recording a drop would cost the job the very
-        report the mark exists to preserve. So the cut belongs beside the
+        producer that raised while recording a drop would fail the job, with no
+        report for the mark to preserve. So the cut belongs beside the
         bound, once, rather than at each place a claim is dropped.
 
         An empty title becomes :data:`UNTITLED`. A proposal that failed its own
@@ -2104,7 +2104,7 @@ class UnreconciledRuling(BaseModel):
         **The only way one is built.** A critic names its own claim IDs and the
         attributes it hangs a question on, and both reach the sentence, so a
         model that answers with a paragraph where an attribute belongs would
-        cost the job the report this mark exists to annotate. The cut sits
+        fail the job, with no report for this mark to annotate. The cut sits
         beside the bound, once, rather than at each of the eight places a
         problem is found.
 
@@ -2162,14 +2162,14 @@ class SharedElementName(BaseModel):
     :func:`~analysis_service.graph.validate_extraction` routes on — and a shared
     name does not deserve that, because it is not always wrong. A system can
     legitimately run a process and keep a store of the same name, and failing
-    extraction on the pair would reject a valid model *and* spend ``repair``'s
-    single pass telling a transcriber to rename something correct. So the
+    extraction on the pair would reject a valid model *and* use ``repair``'s
+    single pass to tell a transcriber to rename something correct. So the
     finding lands here instead, beside the other service-owned marks, and the
     gate is left with the one severity it has.
 
     A mark for a human, and pointedly not for ``repair``: that prompt is told
     to change nothing the issues do not cite, and a maybe is the worst thing to
-    spend its one pass on. This is the first mark about the *model* rather than
+    use its one pass on. This is the first mark about the *model* rather than
     about the threats — :class:`UnverifiedGround`, :class:`UnresolvedMention`
     and :class:`MissingMitigation` all annotate findings — which is why it
     holds element IDs rather than a ``threat_id``.

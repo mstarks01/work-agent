@@ -66,8 +66,8 @@ from analysis_service.claims import (
 from analysis_service.fan_in import DraftJoinError
 from analysis_service.frameworks import lane_of
 
-# Why the fan-in killed a case. A claim that loses every ground costs its own
-# entry rather than the case: it is dropped and marked, and
+# Why the fan-in killed a case. A claim that loses every ground loses its own
+# entry and not the case: it is dropped and marked, and
 # :attr:`CaseGrounds.dropped_count` reads it off the report. So one kind is
 # left, ``other``: every way the fan-in still rejects a set of drafts (a
 # dangling element reference, a duplicate ID, an unresolvable label). It is

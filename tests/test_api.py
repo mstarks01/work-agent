@@ -1118,8 +1118,8 @@ class TestConcurrencyCeiling:
         assert response.status_code == 201
 
     def test_terminal_jobs_do_not_hold_a_slot(self):
-        # The ceiling is self-clearing: finishing a job is what buys the next
-        # one, which is why it needs no window and no timer.
+        # The ceiling is self-clearing: the end of one job is what admits the
+        # next one, which is why it needs no window and no timer.
         store = InMemoryJobStore()
         for _ in range(5):
             seed(store, "alice", "completed")
@@ -1149,7 +1149,7 @@ class TestConcurrencyCeiling:
         assert response.status_code == 400
 
     def test_a_well_formed_submission_at_the_ceiling_is_still_429(self):
-        # The ordering above costs nothing for a caller who sent a valid
+        # The ordering above does no harm to a caller who sent a valid
         # request: past the ladder, the ceiling is the only thing left to
         # refuse them, and it does.
         store = InMemoryJobStore()

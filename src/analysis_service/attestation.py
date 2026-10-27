@@ -95,14 +95,14 @@ def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     """``object_pairs_hook`` that refuses an object naming a key twice.
 
     A signature covers the canonical form of the *parsed* document, which is
-    what lets a verifier check a report without this project's models. The cost
-    is that parsing is where two readers can disagree: ``json`` keeps the last
-    of a repeated key, other parsers keep the first, and a file carrying both
-    ``"summary": "critical"`` and ``"summary": "none"`` verifies here while
-    reading the other way somewhere else.
+    what lets a verifier check a report without this project's models. The
+    drawback is that parsing is where two readers can disagree: ``json`` keeps
+    the last of a repeated key, other parsers keep the first, and a file
+    carrying both ``"summary": "critical"`` and ``"summary": "none"`` verifies
+    here while reading the other way somewhere else.
 
-    Nothing this service produces has a repeated key, so refusing one costs a
-    real report nothing and takes the disagreement away.
+    Nothing this service produces has a repeated key, so refusing one does no
+    harm to a real report and takes the disagreement away.
     """
     seen: dict[str, Any] = {}
     for key, value in pairs:

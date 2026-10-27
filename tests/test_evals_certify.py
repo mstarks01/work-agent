@@ -196,7 +196,7 @@ def test_promoting_a_param_the_file_leaves_unset_raises(tmp_path):
     """The workflow a temperature sweep now lands on.
 
     ``temperature`` is unset in the shipped file, so a sweep that measured one
-    is asking to *pin* a param rather than to re-pin it. That owes a rationale
+    is asking to *pin* a param rather than to re-pin it. That needs a rationale
     in the file, which a sweep cannot write, so promotion stops and says so
     instead of uncommenting the line.
     """

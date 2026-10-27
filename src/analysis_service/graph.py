@@ -255,7 +255,7 @@ from analysis_service.validation import (
 )
 
 if TYPE_CHECKING:
-    # Type-only, so composing a graph costs no provider-library import and the
+    # Type-only, so composing a graph needs no provider-library import and the
     # binding <-> graph reference stays one-directional at run time.
     from analysis_service.binding import NodeBinding
 
@@ -339,7 +339,7 @@ ROLES: tuple[str, ...] = (
 # One key per artifact per ``(framework, lane)`` rather than one, for the reason
 # ``{lane}`` is substituted at build time: the lane agents run in parallel
 # against a single session state, which cannot hold N values for one key.
-# Handing every agent every lane's material would also spend most of the block on
+# Handing every agent every lane's material would also fill most of the block with
 # other people's leads, and the material genuinely differs per lane — the candidate
 # rules that selected the corpus documents fired per lane, and the rule counts
 # behind the scope differ per category.
@@ -1236,7 +1236,7 @@ def unfence(rendered: str) -> str:
 #: also what `require_identity` verifies a bearer token through, and a graph that
 #: could fill it would make every arriving caller wait for a node body.
 #:
-#: Small because a node body is CPU-bound, so more threads than cores buys
+#: Small because a node body is CPU-bound, so more threads than cores gives
 #: queueing rather than throughput, and because the point of the bound is to
 #: leave the default limiter's slots for the request path.
 _NODE_THREADS = anyio.CapacityLimiter(8)
@@ -1306,7 +1306,7 @@ def validate_extraction(
     """Run the mechanical validity gate and route on the result.
 
     Element IDs are derived here rather than demanded of the model (ticket
-    037), so ``repair``'s one pass is never spent reconciling an ID with its
+    037), so ``repair``'s one pass never goes to reconcile an ID with its
     own name.
 
     On failure, parks the rejected model and the issues where the repair
@@ -1481,7 +1481,7 @@ def _without_source_fields(valid_model: dict) -> dict:
     ``excerpt_repairs`` goes too, for the first reason: it holds what an
     extraction wrote before the gate put the source's span in its place.
 
-    The honest cost: the bytes an agent saw are no longer the bytes the report
+    The drawback: the bytes an agent saw are no longer the bytes the report
     carries.
     """
     stripped = _without_excerpt_repairs(valid_model)
@@ -1557,7 +1557,7 @@ def prepare_analysis(
     they are repo paths, not facts about the job, and ADK binds a FunctionNode's
     parameters from session state. So is ``assertions``: whether an ``assert``
     node sits ahead of this one is a fact about the built graph, and it says
-    whether a proposal is owed. Where it is, this node resolves it through
+    whether a proposal is required. Where it is, this node resolves it through
     :meth:`~analysis_service.assertions.AssertionRecord.of` — once, here,
     because every later reader takes the record off
     :data:`STATE_ASSERTION_CATALOG` rather than resolving again — and the
@@ -1580,8 +1580,8 @@ def prepare_analysis(
     earns the framework's artifacts and its ``run`` route; ``refuted`` and
     ``undecidable`` both take its ``skip`` route straight to ``assemble``, where
     the framework still produces a block. Nothing is derived for a refused
-    framework, so its candidates, its retrieval and its lane prompts cost
-    nothing.
+    framework, so its candidates, its retrieval and its lane prompts are never
+    built.
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
@@ -2158,17 +2158,17 @@ def assemble_report(
     Refusing the later triggers as well as the earlier ones is what makes it
     exactly one. Once every framework is finished, every remaining trigger would
     compose the same blocks from the same parked artifacts, so a second pass
-    can only spend the time again — and :data:`STATE_ANALYSIS`, already written,
+    can only use the time again — and :data:`STATE_ANALYSIS`, already written,
     is what says the pass happened.
 
-    **Two triggers that run at once are not serialized, and need not be.**
-    Node bodies run on the worker pool, and the gate is a read of the session
-    state followed by a write, so two triggers that both find every framework
+    **Two triggers that run at once are not serialized, and need not be.** Node
+    bodies run on the worker pool, and the gate is a read of the session state
+    followed by a write, so two triggers that both find every framework
     finished before either writes both assemble. What keeps that safe is the
     assembly, not the gate: it is a pure function of the parked artifacts, so
-    both passes write the same value and the second costs time and nothing
-    else. A lock here would buy one assembly instead of two identical ones,
-    at the price of a lock on the one node every framework's route ends at.
+    both passes write the same value and the second uses time and does no other
+    harm. A lock here would give one assembly instead of two identical ones,
+    but it would put a lock on the one node every framework's route ends at.
 
     **A join node is the wrong fix here**, and the run-time gate is why. ADK's
     ``JoinNode`` waits for *all* predecessors to complete, and a refused

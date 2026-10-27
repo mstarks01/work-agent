@@ -13,8 +13,8 @@ cannot disagree about what a critic sees.
 The checks that run *before* a critic reads anything — element references,
 unique IDs, grounds that resolve, quotes that are in the source they name —
 are the fan-in's, in :mod:`analysis_service.fan_in`. A package's critic prompt
-names those as already done, so its judgement is spent on evidence, lanes
-and whatever else that framework grades. For grounds, it is spent on
+names those as already done, so its judgement goes to evidence, lanes
+and whatever else that framework grades. For grounds, it goes to
 the one question code cannot answer: whether a quote that is verbatim actually
 supports the finding it was filed under.
 
@@ -104,7 +104,7 @@ def snap_rulings(
     does not re-emit drafts — except inside a ``needs-info``
     verdict's ``related_unknowns``, which points at the unknown that has to be
     answered. Unresolvable there is not fatal on the first look: it routes to
-    the bounded ``recritic``. Snapping it means a re-ask is spent on a critic
+    the bounded ``recritic``. Snapping it means a re-ask goes to a critic
     that pointed somewhere real rather than on one that mis-typed a slug.
 
     An entry that names one fact in two forms keeps the one form
@@ -514,8 +514,8 @@ def complete_rulings(
         ruling = _without_stray_dismissals(ruling, by_id.get(ruling.id, []))
         if ruling.id in misfiled:
             # A lane error is a table lookup, so the ruling is the table's
-            # whatever the critic said (#442). The reason names the lanes the
-            # verb belongs to, which is what the audit array owes a reader, and
+            # whatever the critic said (#442). The reason names the lanes the verb
+            # belongs to, which is what the audit array must give a reader, and
             # the step is `lane` by construction: the table is the lane check.
             verdict = ruling.verdict.model_copy(
                 update={
@@ -649,7 +649,7 @@ def review_issues(
     # invented ID implicates none either — there is no draft behind it to show.
     #
     # Every per-ruling problem does implicate one. Naming the unknown a
-    # needs-info hangs on, or writing the reason a rejection owes a reader,
+    # needs-info hangs on, or writing the reason a rejection must give a reader,
     # cannot be done from an ID — both are assertions about a specific claim,
     # and a re-ask that cannot read it would have to invent one.
     implicated = set(dropped) | {
@@ -854,10 +854,10 @@ def _ruling_view(
     :class:`~analysis_service.claims.Ground`. That model is one flat object
     rather than a discriminated union — a deliberate choice, for provider
     schema-compiler reasons it documents itself — so four of its six fields are
-    the empty string on any given ground, and rendering them spends a line each
+    the empty string on any given ground, and rendering them uses a line each
     on a field whose own validator forbids it carrying anything.
 
-    THE HAZARD THIS BUYS, stated rather than left to be discovered: a field
+    THE HAZARD THIS ADDS, stated rather than left to be discovered: a field
     added to a package's record with a default disappears from that
     framework's critic's view whenever it holds that default, silently and with
     nothing downstream able to see it. Every field a critic rules on is required
@@ -909,7 +909,7 @@ def _ruling_view(
             view["assertion_facts"] = rows
         # Also computed: the package's own table says this draft's action is not
         # one its lane files. The ruling is settled in code; the key tells the
-        # critic not to spend a judgement on it.
+        # critic not to make a judgement on it.
         if reason := type(draft).misfiled(draft):
             view["filed_in_wrong_lane"] = reason
         # The framework's own words for the unit this draft rules on, so the

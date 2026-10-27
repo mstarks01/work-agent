@@ -7,7 +7,7 @@ object graph.
 
 ## What is under test
 
-ADR 0016 said a raise that improves findings and a deletion that costs them look
+ADR 0016 said a raise that improves findings and a deletion that loses them look
 alike to a sweep. #279 recorded the independent variable; this is the reading
 that puts it beside the dependent ones. So the assertions below are about
 **joining** two sweeps correctly — which nodes moved, which numbers moved, and

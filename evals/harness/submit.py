@@ -221,7 +221,7 @@ def changed_paths(root: Path) -> list[str]:
     """Everything different from BASE_REF, tracked or not, repo-relative.
 
     The caller fetched once already; fetching here would make every check
-    that reads the delta pay a network round trip.
+    that reads the delta make a network round trip.
     """
     cached = _DELTA.get(root)
     if cached is not None:

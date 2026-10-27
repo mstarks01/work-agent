@@ -1,4 +1,4 @@
-"""The queue spends a reviewer's attention, so what it spends it on is tested.
+"""The queue directs a reviewer's attention, so these tests check where it goes.
 
 Three properties carry the design: it never asks twice, it asks the most
 informative question first, and it cannot leak which configuration produced a
@@ -383,7 +383,7 @@ class TestNeedsEvidenceIsNotAnAnswer:
         assert [item.finding.title for item in queue] == ["Cannot judge this"]
 
     def test_a_real_answer_still_never_comes_back(self):
-        """The economics the fingerprint buys: a vote is spent once and kept."""
+        """What the fingerprint gives: a vote is cast once and kept."""
         answered = finding(title="Judged", target="process:b")
         led = Ledger()
         led.votes.append(
@@ -451,7 +451,7 @@ class TestARewrittenFindingIsAskedAgain:
 
     def test_a_rewording_alone_does_not_come_back(self):
         """A model writes new prose every run, and re-asking on that would
-        spend a whole sitting on paraphrases."""
+        fill a whole sitting with paraphrases."""
         answered_before = finding()
         led = self._ledger(answered_before)
         reworded = finding(title="Said another way", prose="p1:1111111111111111")
@@ -469,8 +469,8 @@ class TestARewrittenFindingIsAskedAgain:
         assert queue[0].previously == "down (too-vague)"
 
     def test_a_re_argument_ranks_below_a_finding_nobody_has_answered(self):
-        """The topic already has an answer, which buys less than one nobody
-        has answered at all."""
+        """The topic already has an answer, which gives less information than
+        one nobody has answered at all."""
         answered_before = finding()
         led = self._ledger(answered_before)
         reargued = finding(title="Re-argued since", content=other_content())

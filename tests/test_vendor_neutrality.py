@@ -792,8 +792,8 @@ def test_no_document_counts_the_ground_kinds(path):
 # reading of a third party's surface has one home; what this module holds is the
 # rule the tree is checked against.
 
-#: Model-facing schemas that cap a root-level array of objects, with what it
-#: costs. Each would be a node that cannot run on a vendor refusing the shape.
+#: Model-facing schemas that cap a root-level array of objects, with the effect
+#: of each. Each would be a node that cannot run on a vendor refusing the shape.
 #:
 #: **Empty, and meant to stay that way** (#942). A bound on what a model may
 #: emit belongs where code reads the output —

@@ -425,7 +425,7 @@ def test_picking_both_frameworks_returns_one_report_with_both_blocks(client):
 
 @pytest.mark.parametrize("name", CARRIED)
 def test_picking_one_framework_runs_only_that_one(client, name):
-    """Unticking a box costs its nodes, so it must actually leave it out."""
+    """Unticking a box drops its nodes, so it must actually leave it out."""
     body = posted("A web app talks to a database.", frameworks=[name])
     assert frameworks_of(client, body) == [name]
 

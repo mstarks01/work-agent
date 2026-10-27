@@ -9,8 +9,8 @@ consult. And it must carry the payload safely: the corpus is prose that
 describes attacks, so a case sentence spelling ``</script>`` would end the
 block and the rest of the file would parse as HTML.
 
-``tests/test_envelope.py`` holds what the tree owes the operator when the file
-comes back.
+``tests/test_envelope.py`` holds what the tree must give the operator when the
+file comes back.
 """
 
 from __future__ import annotations
