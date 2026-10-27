@@ -2494,7 +2494,9 @@ class TestAFrameworkArrivingOnAReadCase:
         sign(tree, CASE, "sam")
         self.arrives(tree, meta, later)
 
-        assert review_submissions.waiting(tree, CASE) == [later[0]["name"]]
+        assert review_submissions.waiting(
+            tree, CASE, covered=review_submissions.current_reviews(tree)
+        ) == [later[0]["name"]]
         assert CASE in review_submissions.unreviewed_cases(tree), "the gate agrees"
 
     def test_the_rail_names_what_waits_rather_than_saying_to_do(self, tree):
@@ -2568,6 +2570,7 @@ class TestAFrameworkArrivingOnAReadCase:
             own_list=held["own_list"],
             opened_digests=held["opened_digests"],
             marks=held["marks"],
+            name=sittings.mark_position,
         )
         assert problems == []
 
@@ -2700,6 +2703,7 @@ class TestACorpusEditUnderAMergedSitting:
                 own_list=held["own_list"],
                 opened_digests=held["opened_digests"],
                 marks=held["marks"],
+                name=sittings.mark_position,
             )
             == []
         )
@@ -2742,6 +2746,7 @@ class TestARecordSignsWhatWasServed:
             own_list=held["own_list"],
             opened_digests=held["opened_digests"],
             marks=held["marks"],
+            name=sittings.mark_position,
         )
 
     def test_serving_the_sets_re_pins_the_set_that_moved(self, tree):

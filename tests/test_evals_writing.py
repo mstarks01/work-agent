@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import pytest
 
+from analysis_service.claim_identity import NO_ROWS
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks.stride.record import StrideCategory
 from evals.harness import writing
@@ -118,7 +119,12 @@ def stride_report(count: int = 1):
 def measure(report, votes: Ledger) -> writing.CaseWriting:
     block = report.analyses[0]
     return writing.measure_case(
-        "01-payments-checkout", block.framework, block.claims, FLOWS, votes
+        "01-payments-checkout",
+        block.framework,
+        block.claims,
+        FLOWS,
+        votes,
+        rows=NO_ROWS,
     )
 
 
@@ -226,7 +232,12 @@ class TestEveryPackageIsGradedOnItsProse:
         )
         rows = [
             writing.measure_case(
-                "01-payments-checkout", block.framework, block.claims, FLOWS, Ledger()
+                "01-payments-checkout",
+                block.framework,
+                block.claims,
+                FLOWS,
+                Ledger(),
+                rows=NO_ROWS,
             )
             for block in report.analyses
         ]

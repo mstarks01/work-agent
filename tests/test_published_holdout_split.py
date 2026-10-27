@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness import applicability, scorer, writing
+from evals.harness import applicability, audit, scorer, writing
 from evals.harness.comparison import build, held_out_cases
 from evals.harness.instruments import Cases
 from evals.harness.provenance import REPO_ROOT
@@ -180,7 +180,7 @@ class TestTheRowReadersAgreeWithTheSweepsOwnAggregates:
 
     @pytest.mark.parametrize("raw", _sealed(), ids=lambda raw: raw.get("run_id", "?"))
     def test_writing_objections(self, raw):
-        assert not held_out_cases(raw)
+        assert not held_out_cases(raw, ledger=audit.load())
         everything = Cases(frozenset(), holdout=False)
         for framework, totals in raw["writing_aggregate"]["by_framework"].items():
             assert writing.published(raw, framework, everything) == float(
@@ -190,7 +190,7 @@ class TestTheRowReadersAgreeWithTheSweepsOwnAggregates:
     def test_the_sealed_baselines_hold_no_held_out_case(self):
         """The page's sentence for these rows rests on this."""
         assert _sealed()
-        assert all(not held_out_cases(raw) for raw in _sealed())
+        assert all(not held_out_cases(raw, ledger=audit.load()) for raw in _sealed())
 
     def test_the_pooled_figures_have_one_rule(self):
         """``pooled`` is ``pooled_rows`` over the rows it would write."""

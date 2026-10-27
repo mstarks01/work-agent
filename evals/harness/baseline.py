@@ -77,7 +77,6 @@ _NAMING_TIER: TierName = "strong"
 from analysis_service.report import TokenUsage
 from evals.harness.archive import archive_bytes
 from evals.harness.artifact import (
-    REPO_ROOT,
     EvalArtifact,
     ProvenanceError,
     _ungraded,
@@ -791,7 +790,7 @@ def _git(root: Path, *args: str) -> str | None:
         return None
 
 
-def corpus_digest_at(commit: str, root: Path = REPO_ROOT) -> str | None:
+def corpus_digest_at(commit: str, root: Path) -> str | None:
     """The corpus digest recomputed from a commit's tree, not the checkout's.
 
     Mirrors :func:`evals.harness.artifact.corpus_digest` byte for byte —
@@ -899,9 +898,7 @@ def manifest_problems(manifest: object) -> list[str]:
     return problems
 
 
-def verify(
-    directory: Path, root: Path = REPO_ROOT, base_ref: str | None = None
-) -> list[str]:
+def verify(directory: Path, root: Path, base_ref: str) -> list[str]:
     """Every #323 check that needs no PR context, as a list of problems.
 
     The submit preflight and the repo-wide test both run this, so a
@@ -911,7 +908,6 @@ def verify(
     skips them rather than failing honest work it cannot see.
     """
     problems: list[str] = []
-    base_ref = base_ref or default_base_ref(root)
     manifest_path = directory / "baseline.json"
     if not manifest_path.is_file():
         return [f"{directory.name}: carries no baseline.json"]

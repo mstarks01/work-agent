@@ -157,7 +157,7 @@ def rendered(body: str) -> list[str]:
     return lines
 
 
-def section(body: str, heading: str = HEADING) -> str | None:
+def section(body: str, heading: str) -> str | None:
     """The rendered text under ``heading`` up to the next heading of its
     level, or None."""
     lines = rendered(body)

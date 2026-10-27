@@ -46,7 +46,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from analysis_service.claim_identity import NO_ROWS, mechanism_of, report_rows
+from analysis_service.claim_identity import mechanism_of, report_rows
 from analysis_service.claims import (
     Claim,
     FrameworkName,
@@ -102,7 +102,7 @@ def measure_case(
     claims: Iterable[Claim],
     flows: CaseFlows,
     votes: Ledger,
-    rows: Mapping[str, str] = NO_ROWS,
+    rows: Mapping[str, str],
 ) -> CaseWriting:
     """Every claim of one block, looked up by its fingerprint and its words.
 

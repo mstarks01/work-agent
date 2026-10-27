@@ -30,7 +30,7 @@ pytestmark = pytest.mark.lint
     "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
 )
 def test_case_passes_every_mechanical_check(case_dir):
-    assert verify_corpus.check_case(case_dir) == []
+    assert verify_corpus.check_case(case_dir, raised=set()) == []
 
 
 class TestAPlacementsBasisAgreesOnBothSides:
@@ -53,7 +53,7 @@ class TestAPlacementsBasisAgreesOnBothSides:
         (case_dir / "model.json").write_text(json.dumps(model), encoding="utf-8")
 
     def test_the_corpus_case_agrees(self, case_dir):
-        assert verify_corpus.check_case(case_dir) == []
+        assert verify_corpus.check_case(case_dir, raised=set()) == []
 
     @pytest.mark.parametrize(
         "subject", ["entity:customer", "process:web-api"], ids=["inferred", "unknown"]
@@ -70,7 +70,7 @@ class TestAPlacementsBasisAgreesOnBothSides:
         ]
         self._write(case_dir, model)
 
-        assert verify_corpus.check_case(case_dir) == [
+        assert verify_corpus.check_case(case_dir, raised=set()) == [
             (
                 f"facts.json: the source does not place {subject}, and model.json"
                 " records no trust_zone assumption for it"
@@ -90,7 +90,7 @@ class TestAPlacementsBasisAgreesOnBothSides:
         )
         self._write(case_dir, model)
 
-        assert verify_corpus.check_case(case_dir) == [
+        assert verify_corpus.check_case(case_dir, raised=set()) == [
             (
                 "model.json records a trust_zone assumption for"
                 " process:catalogue-spreadsheet, and facts.json states its placement"

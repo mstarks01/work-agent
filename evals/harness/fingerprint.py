@@ -270,9 +270,9 @@ def components_for(
     lane: str,
     element_ids: Iterable[str],
     flows: CaseFlows,
-    verb: str | None = None,
-    identifier: str | None = None,
-    scope: str = "",
+    verb: str | None,
+    identifier: str | None,
+    scope: str,
     mechanism: Iterable[str] = (),
 ) -> Components:
     """Build the components for one claim, resolving its elements once.
@@ -350,7 +350,7 @@ def key_claim(
     lane: str,
     element_ids: Iterable[str],
     flows: CaseFlows,
-    verb: str | None = None,
+    verb: str | None,
     identifier: str | None = None,
     mechanism: Iterable[str] = (),
 ) -> tuple[str, Components]:

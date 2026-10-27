@@ -285,7 +285,19 @@ class TestAnExtractionSweepKeepsItsModels:
         monkeypatch.setattr(modes, "build_eval_pipeline", lambda *a, **k: pipeline)
         deployment = Deployment.from_env(env=TEST_TIER_ENV)
 
-        run = asyncio.run(_run_mode([case], "end-to-end", deployment))
+        run = asyncio.run(
+            _run_mode(
+                [case],
+                "end-to-end",
+                deployment,
+                only=(),
+                accepted=None,
+                ask=None,
+                in_flight=1,
+                signed=None,
+                answers=None,
+            )
+        )
 
         assert run.runs == {}
         assert any("rejected the model" in failure for failure in run.failures)

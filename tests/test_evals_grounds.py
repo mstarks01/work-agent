@@ -86,6 +86,8 @@ class TestMeasureGrounds:
             "stride",
             [grounded(1, quote(), unknown()), grounded(2, absent(), derived())],
             [],
+            dropped=(),
+            repaired=(),
         )
 
         assert measurement.threat_count == 2
@@ -108,7 +110,9 @@ class TestMeasureGrounds:
 
         from analysis_service.claims import GroundKind
 
-        measurement = measure_grounds("case-a", "stride", [], [])
+        measurement = measure_grounds(
+            "case-a", "stride", [], [], dropped=(), repaired=()
+        )
 
         assert tuple(measurement.kind_counts) == get_args(GroundKind)
 
@@ -116,7 +120,12 @@ class TestMeasureGrounds:
         """The branch rule predicts these: an unknown or a crossing was the
         trigger, so there was never a span to quote."""
         measurement = measure_grounds(
-            "case-a", "stride", [grounded(1, unknown()), grounded(2, quote())], []
+            "case-a",
+            "stride",
+            [grounded(1, unknown()), grounded(2, quote())],
+            [],
+            dropped=(),
+            repaired=(),
         )
 
         assert measurement.quoteless_count == 1
@@ -130,6 +139,8 @@ class TestMeasureGrounds:
             "stride",
             [grounded(1, quote("bad"), unknown()), grounded(2, quote())],
             [UnverifiedGround(claim_id="S-01", index=0, reason="not found")],
+            dropped=(),
+            repaired=(),
         )
 
         assert measurement.quote_count == 2
@@ -145,6 +156,8 @@ class TestMeasureGrounds:
                 UnverifiedGround(claim_id="S-01", index=0, reason="not found"),
                 UnverifiedGround(claim_id="S-01", index=1, reason="not found"),
             ],
+            dropped=(),
+            repaired=(),
         )
 
         by_id = {entry.threat_id: entry for entry in measurement.threats}
@@ -152,7 +165,9 @@ class TestMeasureGrounds:
         assert by_id["S-02"].unverified == ()
 
     def test_an_empty_case_reports_zeros_rather_than_dividing_by_none(self):
-        measurement = measure_grounds("case-a", "stride", [], [])
+        measurement = measure_grounds(
+            "case-a", "stride", [], [], dropped=(), repaired=()
+        )
 
         assert measurement.grounds_per_threat == 0.0
         assert measurement.unverified_rate == 0.0
@@ -166,7 +181,7 @@ class TestDroppedClaims:
         dropped = DroppedClaim(claim_id="S-02", title="t", reason="r")
 
         measurement = measure_grounds(
-            "case-a", "stride", [grounded(1, quote())], [], [dropped]
+            "case-a", "stride", [grounded(1, quote())], [], [dropped], repaired=()
         )
 
         assert measurement.threat_count == 1
@@ -278,18 +293,24 @@ class TestAggregate:
     def test_pools_rather_than_averaging_over_cases(self):
         """A case that drafted one threat must not outweigh one that drafted
         three, which is what a mean of per-case rates would do."""
-        small = measure_grounds("small", "stride", [grounded(1, quote("bad"))], [])
+        small = measure_grounds(
+            "small", "stride", [grounded(1, quote("bad"))], [], dropped=(), repaired=()
+        )
         large = measure_grounds(
             "large",
             "stride",
             [grounded(1, quote()), grounded(2, quote()), grounded(3, quote())],
             [],
+            dropped=(),
+            repaired=(),
         )
         marked = measure_grounds(
             "small",
             "stride",
             [grounded(1, quote("bad"))],
             [UnverifiedGround(claim_id="S-01", index=0, reason="not found")],
+            dropped=(),
+            repaired=(),
         )
 
         totals = aggregate_grounds([marked, large], [])
@@ -311,8 +332,12 @@ class TestAggregate:
 
     def test_dropped_claims_pool_into_one_rate(self):
         dropped = DroppedClaim(claim_id="S-02", title="t", reason="r")
-        kept = measure_grounds("a", "stride", [grounded(1, quote())], [], [dropped])
-        clean = measure_grounds("b", "stride", [grounded(1, quote())], [])
+        kept = measure_grounds(
+            "a", "stride", [grounded(1, quote())], [], [dropped], repaired=()
+        )
+        clean = measure_grounds(
+            "b", "stride", [grounded(1, quote())], [], dropped=(), repaired=()
+        )
 
         totals = aggregate_grounds([kept, clean], [])
 

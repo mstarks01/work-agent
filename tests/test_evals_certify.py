@@ -23,7 +23,7 @@ from analysis_service.identity import build_identity
 from analysis_service.model_tiers import TierName
 from analysis_service.sampling import load_sampling
 from evals.harness import modes
-from evals.harness.certify import TierIdentityKey, promote, promotion_paths
+from evals.harness.certify import TierIdentityKey, promote
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     SAMPLE_INSTRUCTIONS,
@@ -90,6 +90,7 @@ def _build_fingerprints(sampling, served="vertex_ai/fake-model-001"):
         frameworks=("stride",),
         resolve_model=lambda _tier_node: served,
         sampling=sampling,
+        deployment=Deployment.from_env(),
     )
     return {
         node: frozenset({sample_fingerprint(served, node_sampling)})
@@ -293,7 +294,7 @@ def test_promote_refuses_to_pin_a_previously_unset_param(tmp_path):
 def test_the_manifest_lives_with_the_service_config_not_under_evals():
     # The service certifies, and evals/ does not ship, so the manifest sits
     # under config/, where the production image can read it.
-    paths = promotion_paths()
+    paths = Deployment.from_env().paths
     assert (
         paths.blessed_fingerprints == REPO_ROOT / "config" / "blessed-fingerprints.toml"
     )
@@ -304,8 +305,8 @@ def test_a_promotion_re_pins_the_file_the_sweep_actually_measured(tmp_path):
     redirected = tmp_path / "sampling.toml"
     redirected.write_text(SAMPLING_PATH.read_text(), encoding="utf-8")
 
-    paths = promotion_paths(
-        Deployment.from_env(env=TEST_TIER_ENV | {SAMPLING_VAR: str(redirected)})
-    )
+    paths = Deployment.from_env(
+        env=TEST_TIER_ENV | {SAMPLING_VAR: str(redirected)}
+    ).paths
 
     assert paths.sampling == redirected

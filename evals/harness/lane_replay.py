@@ -243,7 +243,7 @@ async def replay(
     call: NodeCall,
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
-    appended: str | None = None,
+    appended: str | None,
 ) -> BaseModel:
     """One lane's request sent again, with ``appended`` as a last user part."""
     instruction, turn = await compose(

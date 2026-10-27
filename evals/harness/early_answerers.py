@@ -423,7 +423,7 @@ def _readings_of(job: tuple[str, str, Mapping[str, Selection]]) -> list[dict[str
 
 
 def jobs(
-    root: Path, selections: Collection[str] = ("alone", "all")
+    root: Path, selections: Collection[str]
 ) -> list[tuple[str, str, Mapping[str, Selection]]]:
     """Every :func:`~evals.harness.early_policies.paired` report, with the
     named selections, for a worker process."""
@@ -434,7 +434,7 @@ def jobs(
 
 
 def sweep(
-    root: Path, workers: int, selections: Collection[str] = ("alone", "all")
+    root: Path, workers: int, selections: Collection[str]
 ) -> list[dict[str, Any]]:
     """Every reading over the archive, read in ``workers`` processes."""
     found: list[dict[str, Any]] = []

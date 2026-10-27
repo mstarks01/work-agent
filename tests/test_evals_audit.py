@@ -368,7 +368,9 @@ class TestRetrieval:
             ),
         )
 
-        found = audit.relevant(rows, signature=rows[0].signature)
+        found = audit.relevant(
+            rows, signature=rows[0].signature, phase=None, framework=None, audit_id=""
+        )
         assert [one.experiment_id for one in found] == ["E-001"]
 
     def test_a_shared_phase_matches_a_different_signature(self):
@@ -380,7 +382,9 @@ class TestRetrieval:
             ),
         )
 
-        found = audit.relevant(rows, phase="criticism")
+        found = audit.relevant(
+            rows, phase="criticism", signature="", framework=None, audit_id=""
+        )
         assert [one.experiment_id for one in found] == ["E-001"]
 
     def test_a_framework_neutral_row_answers_for_every_package(self):
@@ -392,18 +396,28 @@ class TestRetrieval:
         )
 
         for name in PACKAGES:
-            found = audit.relevant(rows, framework=name)
+            found = audit.relevant(
+                rows, framework=name, signature="", phase=None, audit_id=""
+            )
             assert "E-001" in {one.experiment_id for one in found}
 
     def test_a_row_for_one_package_does_not_answer_for_another(self):
         rows = (audit.parse(_record(framework="stride"), source="test"),)
 
-        assert audit.relevant(rows, framework="asvs") == ()
+        assert (
+            audit.relevant(
+                rows, framework="asvs", signature="", phase=None, audit_id=""
+            )
+            == ()
+        )
 
     def test_no_argument_returns_the_whole_ledger(self):
         rows = (audit.parse(_record(), source="test"),)
 
-        assert audit.relevant(rows) == rows
+        assert (
+            audit.relevant(rows, signature="", phase=None, framework=None, audit_id="")
+            == rows
+        )
 
     def test_a_superseded_row_is_marked_and_never_dropped(self):
         """A correction says what was wrong; dropping the row loses that."""
@@ -415,7 +429,18 @@ class TestRetrieval:
         )
 
         assert audit.superseded(rows) == frozenset({"E-001"})
-        assert len(audit.relevant(rows, signature=rows[0].signature)) == 2
+        assert (
+            len(
+                audit.relevant(
+                    rows,
+                    signature=rows[0].signature,
+                    phase=None,
+                    framework=None,
+                    audit_id="",
+                )
+            )
+            == 2
+        )
 
 
 class TestStaleness:
@@ -445,7 +470,7 @@ class TestStaleness:
     def test_an_unreachable_revision_reads_undecidable_end_to_end(self, tmp_path: Path):
         audit.append(audit.parse(_record(reads=["README.md"]), source="test"), tmp_path)
 
-        found = audit.lookup(directory=tmp_path, root=tmp_path)
+        found = audit.lookup(directory=tmp_path, root=tmp_path, signature="")
         assert [one.staleness.state for one in found] == ["undecidable"]
 
     def test_changed_since_returns_nothing_where_git_cannot_answer(

@@ -60,6 +60,7 @@ def test_a_flow_and_its_endpoints_fingerprint_alike():
         FLOWS,
         verb="replay",
         scope="01",
+        identifier=None,
     )
     as_endpoints = components_for(
         "stride",
@@ -68,6 +69,7 @@ def test_a_flow_and_its_endpoints_fingerprint_alike():
         FLOWS,
         verb="replay",
         scope="01",
+        identifier=None,
     )
     assert fingerprint(as_flow, version=4) == fingerprint(as_endpoints, version=4)
 
@@ -81,9 +83,16 @@ def test_a_trust_boundary_citation_is_dropped():
         FLOWS,
         verb="read",
         scope="01",
+        identifier=None,
     )
     without = components_for(
-        "stride", "spoofing", ["process:a"], FLOWS, verb="read", scope="01"
+        "stride",
+        "spoofing",
+        ["process:a"],
+        FLOWS,
+        verb="read",
+        scope="01",
+        identifier=None,
     )
     assert fingerprint(with_zone, version=4) == fingerprint(without, version=4)
 
@@ -329,7 +338,15 @@ def test_an_unknown_version_raises_rather_than_falling_back():
 
 def test_an_unknown_verb_fails_where_the_claim_is_built():
     with pytest.raises(VerbError):
-        components_for("stride", "spoofing", ["process:a"], FLOWS, verb="exfiltrate")
+        components_for(
+            "stride",
+            "spoofing",
+            ["process:a"],
+            FLOWS,
+            verb="exfiltrate",
+            identifier=None,
+            scope="01",
+        )
 
 
 def test_components_round_trip_so_a_version_bump_is_a_recompute():

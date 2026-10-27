@@ -458,7 +458,7 @@ def build(
     sweep: Sweep,
     commit: RepoCommit,
     corpus: str,
-    series: Mapping[str, Any] | None = None,
+    series: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     """The whole artifact: the sweep's envelope, plus every instrument's keys.
 

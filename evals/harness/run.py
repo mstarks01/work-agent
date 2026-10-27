@@ -277,12 +277,12 @@ async def _run_mode(
     cases: Sequence[GoldenCase],
     mode: str,
     deployment: Deployment,
-    only: Sequence[FrameworkName] = (),
-    accepted: float | None = None,
-    ask: Callable[[str], str] | None = None,
-    in_flight: int = 1,
-    signed: Mapping[str, CatalogProposal] | None = None,
-    answers: Mapping[str, AnswerFile] | None = None,
+    only: Sequence[FrameworkName],
+    accepted: float | None,
+    ask: Callable[[str], str] | None,
+    in_flight: int,
+    signed: Mapping[str, CatalogProposal] | None,
+    answers: Mapping[str, AnswerFile] | None,
 ) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
@@ -322,7 +322,7 @@ async def _run_mode(
     fires.
 
     ``in_flight`` is how many cases run at once, and it is what a batch is. At
-    ``1`` — the default — a batch is one case and every guarantee above reads
+    ``1``, the ``--cases-in-flight`` default, a batch is one case and every guarantee above reads
     as it always has. Above it the hold's guarantee weakens by exactly that
     factor: it may overspend by a batch rather than by a case, because a batch
     that has started has committed its spend the same way one case has. So the

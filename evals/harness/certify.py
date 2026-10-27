@@ -44,7 +44,6 @@ from analysis_service.certification import (
     CertificationError,
     load_manifest,
 )
-from analysis_service.deployment import ConfigPaths, Deployment
 from analysis_service.identity import execution_fingerprint
 from analysis_service.model_tiers import TIER_NAMES, TierName
 from analysis_service.sampling import SamplingConfig, TierSampling
@@ -70,21 +69,6 @@ class TierIdentityKey:
     requested: str
     served: str
     instruction_sha256: str
-
-
-def promotion_paths(deployment: Deployment | None = None) -> ConfigPaths:
-    """Which ``sampling.toml`` and manifest a promotion re-pins.
-
-    The deployment's, not the repo's. A sweep measures whatever
-    ``ANALYSIS_SAMPLING`` names, so promoting its winner has to re-pin that same
-    file — re-pinning the checked-in copy instead would bless a fingerprint
-    describing params the measured configuration never held. The manifest is
-    deployment-local by design and follows for the same reason.
-
-    Both are resolved through the deployment rather than from ``REPO_ROOT``, so
-    this module is not a second opinion on where config lives.
-    """
-    return (deployment or Deployment.from_env()).paths
 
 
 # The file keys a sweep may re-pin in place, and how each serializes back to
@@ -120,8 +104,8 @@ def promote(
     keys: Mapping[str, Sequence[TierIdentityKey]],
     *,
     build: Mapping[str, str],
-    sampling_path: Path | str | None = None,
-    manifest_path: Path | str | None = None,
+    sampling_path: Path | str,
+    manifest_path: Path | str,
 ) -> BlessedManifest:
     """Promote a sweep winner: re-pin ``sampling.toml`` and bless its fingerprints.
 
@@ -138,18 +122,15 @@ def promote(
     file leaves *unset* raises: turning an unverified param into a pinned one is
     a human decision that must state a rationale, not a silent sweep write.
 
-    Both paths default to this deployment's — see :func:`promotion_paths` — and
-    stay explicit parameters so a caller holding a deployment, or a test, can
-    name them directly.
+    Both paths are the deployment's, not the repo's. A sweep measures whatever
+    ``ANALYSIS_SAMPLING`` names, so promoting its winner has to re-pin that same
+    file — re-pinning the checked-in copy instead would bless a fingerprint
+    describing params the measured configuration never held. The manifest is
+    deployment-local by design and follows for the same reason.
     """
     unknown = sorted(set(keys) - set(TIER_NAMES))
     if unknown:
         raise CertificationError(f"unknown tier(s) in served builds: {unknown}")
-
-    if sampling_path is None or manifest_path is None:
-        paths = promotion_paths()
-        sampling_path = sampling_path or paths.sampling
-        manifest_path = manifest_path or paths.blessed_fingerprints
 
     sampling_path = Path(sampling_path)
     rewritten = _rewrite_sampling_values(
@@ -229,7 +210,7 @@ class PromotionPlan:
 
 
 def plan_promotion(
-    provenance: RunProvenance, chosen: Mapping[str, str] | None = None
+    provenance: RunProvenance, chosen: Mapping[str, str]
 ) -> PromotionPlan:
     """Resolve an artifact into the exact set of identities a promotion blesses.
 
@@ -252,7 +233,7 @@ def plan_promotion(
             " observed no served build, so there is nothing to bless"
         )
 
-    chosen = dict(chosen or {})
+    chosen = dict(chosen)
     unknown = sorted(set(chosen) - set(identities))
     if unknown:
         raise ProvenanceError(

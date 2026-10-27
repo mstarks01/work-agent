@@ -431,8 +431,8 @@ def observe(
 def satisfies(
     disposition: str,
     observation: Observation,
-    carried: Collection[str] = CARRIED_EVIDENCE_KINDS,
-    also_acceptable: Collection[str] = (),
+    carried: Collection[str],
+    also_acceptable: Collection[str],
 ) -> bool:
     """Whether one run's answer is one this case accepts.
 

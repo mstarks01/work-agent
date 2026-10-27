@@ -93,7 +93,7 @@ def replay_case(
     case: GoldenCase,
     report: Report,
     proposals: Mapping[str, Any],
-    injected: Mapping[str, Sequence[Mapping[str, Any]]] = {},
+    injected: Mapping[str, Sequence[Mapping[str, Any]]],
 ) -> Replayed:
     """The fan-in run again over ``proposals`` plus ``injected``, then scored."""
     block = next(block for block in report.analyses if block.framework == FRAMEWORK)
@@ -181,7 +181,7 @@ def lane_must_finds(
 def replay_artifact(
     artifact: EvalArtifact,
     cases: Sequence[GoldenCase],
-    injected: Mapping[str, Mapping[str, Sequence[Mapping[str, Any]]]] = {},
+    injected: Mapping[str, Mapping[str, Sequence[Mapping[str, Any]]]],
 ) -> list[Replayed]:
     """Every finished case of a sweep, replayed from its archived proposals.
 

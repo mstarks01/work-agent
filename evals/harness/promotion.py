@@ -688,7 +688,7 @@ def read_gate(
     artifact: Mapping[str, Any],
     report: Mapping[str, Any],
     *,
-    spread: float | None = None,
+    spread: float | None,
 ) -> Reading:
     """One gate against one treatment run, or why it cannot be read.
 
@@ -738,8 +738,8 @@ def decide(
     artifact: Mapping[str, Any],
     report: Mapping[str, Any],
     *,
-    spread: Mapping[str, float] = MappingProxyType({}),
-    recall: Sequence[Sequence[Path]] = (),
+    spread: Mapping[str, float],
+    recall: Sequence[Sequence[Path]],
 ) -> tuple[Reading, ...]:
     """Every gate, read, then every :data:`PENDING` gate as unread.
 

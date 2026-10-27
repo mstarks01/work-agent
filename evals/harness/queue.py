@@ -47,7 +47,6 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.claim_identity import (
-    NO_ROWS,
     grounded_mechanism,
 )
 from analysis_service.claims import Claim, FrameworkName
@@ -225,7 +224,7 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
 # answer the question honestly.
 
 
-def priority_of(finding: Finding, restated: bool = False) -> tuple[int, str]:
+def priority_of(finding: Finding, restated: bool) -> tuple[int, str]:
     """The first reason that applies, with its weight — never the sum.
 
     Summing would rank a finding that is merely new above a volatile one, and
@@ -337,8 +336,8 @@ def build(
     findings: Iterable[Finding],
     flows_by_case: Mapping[str, CaseFlows],
     ledger: Ledger,
-    voter: str = "",
-    sitting: str = "",
+    voter: str,
+    sitting: str,
 ) -> list[QueueItem]:
     """The queue: unanswered findings, most informative first.
 
@@ -436,7 +435,7 @@ def from_claim(
     claim: Claim,
     lane: str,
     identifier: str | None,
-    rows: Mapping[str, str] = NO_ROWS,
+    rows: Mapping[str, str],
 ) -> Finding:
     """One produced claim as the queue's shape, digests and all.
 

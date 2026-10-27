@@ -288,6 +288,7 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
             sweep=Sweep(run=run),
             commit=RepoCommit(commit="0" * 40, clean=True),
             corpus="0" * 64,
+            series=None,
         )
         assert set(artifact) == DECLARED_KEYS - set(RESCORED_KEYS)
 
@@ -313,6 +314,7 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
             sweep=Sweep(run=run),
             commit=RepoCommit(commit="0" * 40, clean=True),
             corpus="0" * 64,
+            series=None,
         )
         assert artifact["node_charges"] == {"extract": 0.003}
 

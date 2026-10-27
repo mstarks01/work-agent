@@ -1459,7 +1459,7 @@ def pooled_bindings(sweeps: Sequence[BindingSweep]) -> dict[str, Any]:
     }
 
 
-def render_bindings(sweeps: Sequence[BindingSweep], targets: int = 10) -> None:
+def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
     """The pooled binding table, one per proposal arm."""
     grouped: dict[Arm, list[BindingSweep]] = defaultdict(list)
     for sweep in sweeps:
@@ -1526,7 +1526,7 @@ TREE_STATE: Mapping[bool | None, str] = {
 }
 
 
-def render(sweeps: Sequence[SweepReplay], targets: int = 10) -> None:
+def render(sweeps: Sequence[SweepReplay], targets: int) -> None:
     """The pooled tables, one per arm, with the elements a change would aim at."""
     for arm, arm_sweeps in by_arm(sweeps).items():
         print(f"\n== {arm.label}: {len(arm_sweeps)} sweep(s)")

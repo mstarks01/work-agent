@@ -227,7 +227,7 @@ def exposure(ledger: Iterable[Experiment]) -> dict[str, tuple[str, ...]]:
     return {case: tuple(ids) for case, ids in reads.items()}
 
 
-def exhausted(ledger: Sequence[Experiment] | None = None) -> dict[str, int]:
+def exhausted(ledger: Sequence[Experiment] | None) -> dict[str, int]:
     """Each case read :data:`HOLDOUT_READS` times or more, with how often.
 
     ``None`` reads the ledger on record. The corpus keeps its ``holdout`` flag:
@@ -895,10 +895,10 @@ def superseded(experiments: Iterable[Experiment]) -> frozenset[str]:
 def relevant(
     experiments: Sequence[Experiment],
     *,
-    signature: str = "",
-    phase: Phase | None = None,
-    framework: FrameworkName | None = None,
-    audit_id: str = "",
+    signature: str,
+    phase: Phase | None,
+    framework: FrameworkName | None,
+    audit_id: str,
 ) -> tuple[Experiment, ...]:
     """The prior experiments an audit must read before it proposes anything.
 
@@ -962,7 +962,7 @@ def staleness(experiment: Experiment, changed: Iterable[str]) -> Staleness:
     return Staleness(changed=tuple(path for path in experiment.reads if path in moved))
 
 
-def changed_since(revision: str, root: Path | None = None) -> tuple[str, ...] | None:
+def changed_since(revision: str, root: Path | None) -> tuple[str, ...] | None:
     """Every tracked path that differs between ``revision`` and the tree now.
 
     A revision a history rewrite renamed is read at its new ID, so a row keeps
@@ -1043,7 +1043,7 @@ class Lookup:
 
 def lookup(
     *,
-    signature: str = "",
+    signature: str,
     phase: Phase | None = None,
     framework: FrameworkName | None = None,
     audit_id: str = "",
@@ -1222,9 +1222,9 @@ def admit(
     new: Experiment,
     ledger: Sequence[Experiment],
     grants: Sequence[Grant],
-    prior: Sequence[Lookup] = (),
-    holdouts: frozenset[str] = frozenset(),
-    tracked: frozenset[str] = frozenset(),
+    prior: Sequence[Lookup],
+    holdouts: frozenset[str],
+    tracked: frozenset[str],
 ) -> None:
     """Refuse a new row that widens what the audit was granted, or hides a rerun.
 

@@ -18,6 +18,7 @@ import pytest
 from google.adk.models.base_llm import BaseLlm
 from pydantic import Field
 
+from analysis_service.deployment import Deployment
 from evals.harness import modes
 from evals.harness.alignment import Alignment, Pair
 from evals.harness.reference import load_case, load_corpus
@@ -240,6 +241,7 @@ def build(case, entry, models: dict[str, ScriptedLlm]) -> Pipeline:
         frameworks=("stride",),
         resolve_model=resolve,
         sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml", env={}),
+        deployment=Deployment.from_env(),
     )
 
 
@@ -1129,7 +1131,7 @@ class TestNarrowingASweepToOneFramework:
         """The default is every framework the case declares."""
         case = load_case(CORPUS / "01-payments-checkout")
 
-        assert modes.select_frameworks(case) == modes.case_frameworks(case)
+        assert modes.select_frameworks(case, only=()) == modes.case_frameworks(case)
 
     def test_narrowing_keeps_only_what_was_asked_for(self):
         case = load_case(CORPUS / "01-payments-checkout")

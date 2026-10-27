@@ -73,7 +73,7 @@ def produced(corpus):
 
 def test_the_shipped_rule_prices_as_the_frontier_pins_it(corpus, flows, pairs):
     """One reader for the three numbers, or the two drift apart unseen."""
-    shipped = price(None, corpus, flows, pairs)
+    shipped = price(None, corpus, flows, pairs, produced=None)
     pinned = FRONTIER["endpoint subset + verb"]
     assert shipped.false_splits == pinned["splits"]
     assert shipped.false_merges == pinned["candidate_merges"]
@@ -116,7 +116,9 @@ def test_the_shipped_group_carries_its_gain_and_a_repeat_adds_nothing(
 def test_a_merge_with_a_price_names_what_it_would_merge(corpus, flows, pairs):
     """`read` = `recover-credential` merges case 01's two disclosure findings,
     the vocabulary's own example of two actions, and the row says which."""
-    candidate = price(parse_groups(["read=recover-credential"]), corpus, flows, pairs)
+    candidate = price(
+        parse_groups(["read=recover-credential"]), corpus, flows, pairs, produced=None
+    )
 
     assert len(candidate.new_reference_merges) == 1
     merge = candidate.new_reference_merges[0]
@@ -125,7 +127,7 @@ def test_a_merge_with_a_price_names_what_it_would_merge(corpus, flows, pairs):
 
 
 def test_the_gain_is_absent_without_a_sweep(corpus, flows, pairs):
-    assert price(None, corpus, flows, pairs).matched is None
+    assert price(None, corpus, flows, pairs, produced=None).matched is None
 
 
 def test_a_group_names_two_verbs_the_vocabulary_carries():

@@ -66,7 +66,7 @@ class TestEveryGateReadsARealArtifact:
     @pytest.mark.parametrize("name", sorted(promotion.GATES))
     def test_a_gate_reads_without_raising(self, name, sealed) -> None:
         artifact, report = sealed
-        assert promotion.read_gate(name, artifact, report).gate == name
+        assert promotion.read_gate(name, artifact, report, spread=None).gate == name
 
     @pytest.mark.parametrize("name", sorted(promotion.GATES))
     def test_a_gate_states_why_its_limit_is_that(self, name) -> None:
@@ -108,15 +108,15 @@ class TestTheTwoKindsOfGate:
 
     def test_a_charge_inside_the_budget_passes(self) -> None:
         held = self.artifact(promotion.BASELINE["charge_usd"], 0.5)
-        assert promotion.read_gate("charge", held, {}).verdict == "pass"
+        assert promotion.read_gate("charge", held, {}, spread=None).verdict == "pass"
 
     def test_a_charge_over_the_budget_fails(self) -> None:
         held = self.artifact(promotion.BASELINE["charge_usd"] * 2, 0.5)
-        assert promotion.read_gate("charge", held, {}).verdict == "fail"
+        assert promotion.read_gate("charge", held, {}, spread=None).verdict == "fail"
 
     def test_a_quality_gate_without_a_spread_is_unread(self) -> None:
         held = self.artifact(0.1, 0.0)
-        reading = promotion.read_gate("must-find-coverage", held, {})
+        reading = promotion.read_gate("must-find-coverage", held, {}, spread=None)
 
         assert reading.verdict == "inconclusive"
         assert reading.measured == 0.0
@@ -144,7 +144,7 @@ class TestTheTwoKindsOfGate:
         assert lower.verdict == "fail"
 
     def test_the_decision_reads_every_gate(self) -> None:
-        readings = promotion.decide(self.artifact(0.1, 0.5), {})
+        readings = promotion.decide(self.artifact(0.1, 0.5), {}, spread={}, recall=())
         assert {row.gate for row in readings} == {*promotion.GATES, *promotion.PENDING}
 
 
@@ -154,7 +154,7 @@ class TestAnAbsentFigureIsNotAZero:
     def test_an_artifact_without_the_backing_field_is_unread(self, sealed) -> None:
         """The sealed Baseline predates `AssertionBacking`, so it backs nothing."""
         artifact, report = sealed
-        reading = promotion.read_gate("backs-claims", artifact, report)
+        reading = promotion.read_gate("backs-claims", artifact, report, spread=None)
 
         assert reading.verdict == "inconclusive"
         assert reading.measured is None
@@ -162,7 +162,7 @@ class TestAnAbsentFigureIsNotAZero:
     @pytest.mark.parametrize("gate", ["structural-refusals"])
     def test_a_report_that_ran_no_assertion_pass_is_unread(self, sealed, gate) -> None:
         artifact, _ = sealed
-        reading = promotion.read_gate(gate, artifact, {})
+        reading = promotion.read_gate(gate, artifact, {}, spread=None)
 
         assert reading.verdict == "inconclusive"
 
@@ -171,7 +171,10 @@ class TestAnAbsentFigureIsNotAZero:
         artifact, _ = sealed
         report = _report(_row(), proposed=1)
         report["assertions"]["written_by_an_older_tree"] = True
-        readings = {row.gate: row for row in promotion.decide(artifact, report)}
+        readings = {
+            row.gate: row
+            for row in promotion.decide(artifact, report, spread={}, recall=())
+        }
 
         assert readings["structural-refusals"].verdict == "inconclusive"
         assert "does not validate" in readings["structural-refusals"].why
@@ -210,7 +213,7 @@ class TestSupportIsNotSpanValidity:
         ]
         issues.append(CatalogIssue(code="graph-contradiction", message=""))
         reading = promotion.read_gate(
-            "structural-refusals", {}, _report(proposed=4, issues=issues)
+            "structural-refusals", {}, _report(proposed=4, issues=issues), spread=None
         )
 
         assert reading.measured == 0.25
@@ -250,14 +253,19 @@ class TestTheDesignIsDeclaredBeforeItIsMeasured:
 
     def test_a_pending_gate_is_read_as_unread(self, sealed) -> None:
         artifact, report = sealed
-        readings = {row.gate: row for row in promotion.decide(artifact, report)}
+        readings = {
+            row.gate: row
+            for row in promotion.decide(artifact, report, spread={}, recall=())
+        }
 
         for name in promotion.PENDING:
             assert readings[name].verdict == "inconclusive"
 
     def test_the_rendered_table_names_every_pending_gate(self, sealed) -> None:
         artifact, report = sealed
-        printed = promotion.render(promotion.decide(artifact, report))
+        printed = promotion.render(
+            promotion.decide(artifact, report, spread={}, recall=())
+        )
 
         for name in promotion.PENDING:
             assert f"`{name}` unread" in printed
@@ -300,7 +308,10 @@ class TestRecallIsReadOffTheReport:
         is read in assertion mode, from ``--recall``."""
         report = self.report(lambda reference: reference.entries)
         artifact = TestTheTwoKindsOfGate().artifact(0.1, 0.5)
-        readings = {row.gate: row for row in promotion.decide(artifact, report)}
+        readings = {
+            row.gate: row
+            for row in promotion.decide(artifact, report, spread={}, recall=())
+        }
 
         assert readings["required-fact-recall"].verdict == "inconclusive"
         assert readings["required-fact-recall"].measured is None

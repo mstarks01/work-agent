@@ -242,16 +242,13 @@ def declared(root: Path, case_id: str) -> list[str]:
 def waiting(
     root: Path,
     case_id: str,
-    covered: Mapping[str, Mapping[str, MergedReview]] | None = None,
+    covered: Mapping[str, Mapping[str, MergedReview]],
 ) -> list[str]:
     """The frameworks of one case that no current sitting covers.
 
-    ``covered`` is :func:`current_reviews` already read, for a caller that
-    walks every case; a caller asking about one case leaves it out and the
-    read happens here.
+    ``covered`` is :func:`current_reviews` already read, so a caller that
+    walks every case reads the merged submissions once.
     """
-    if covered is None:
-        covered = current_reviews(root)
     have = covered.get(case_id, {})
     return [name for name in declared(root, case_id) if name not in have]
 

@@ -56,14 +56,14 @@ def proposal_for(case, reference, title):  # noqa: F811
 
 
 def test_the_archive_replays_to_itself(archive, case):  # noqa: F811
-    (row,) = descendants.replay_artifact(load_artifact(archive), [case])
+    (row,) = descendants.replay_artifact(load_artifact(archive), [case], injected={})
 
     assert row.lower == row.archived == row.upper
     assert row.unruled == ()
 
 
 def test_an_injected_finding_is_left_for_a_critic_to_decide(archive, case):  # noqa: F811
-    (plain,) = descendants.replay_artifact(load_artifact(archive), [case])
+    (plain,) = descendants.replay_artifact(load_artifact(archive), [case], injected={})
     index, reference = unmatched_reference(case, plain)
     injected = {
         case.id: {
@@ -79,7 +79,7 @@ def test_an_injected_finding_is_left_for_a_critic_to_decide(archive, case):  # n
 
 
 def test_an_injected_finding_the_fan_in_removes_says_why(archive, case):  # noqa: F811
-    (plain,) = descendants.replay_artifact(load_artifact(archive), [case])
+    (plain,) = descendants.replay_artifact(load_artifact(archive), [case], injected={})
     index, reference = unmatched_reference(case, plain)
     broken = proposal_for(case, reference, "names nothing real")
     broken["affected_element_ids"] = ["process:not-in-the-model"]
@@ -101,7 +101,7 @@ def test_a_flow_the_extraction_named_resolves_as_the_scorer_resolves_it(
     The extraction labels a matched flow its own way, and the claim names the
     flow and both of its ends, as a lane writes one.
     """
-    (plain,) = descendants.replay_artifact(load_artifact(archive), [case])
+    (plain,) = descendants.replay_artifact(load_artifact(archive), [case], injected={})
     references = case.stride_claims()
     flow = next(
         element
@@ -124,7 +124,9 @@ def test_a_flow_the_extraction_named_resolves_as_the_scorer_resolves_it(
         case, stride_threats(report), SubsetVerbIdentity(flows), Ledger()
     )
 
-    (renamed,) = descendants.replay_artifact(load_artifact(archive), [case])
+    (renamed,) = descendants.replay_artifact(
+        load_artifact(archive), [case], injected={}
+    )
 
     assert renamed.archived == {pair.reference_index for pair in scored.matched}
 
@@ -133,7 +135,7 @@ def test_a_finished_case_with_a_lost_proposals_file_is_refused(archive, case):  
     (reports_dir(archive) / f"{case.id}.proposals.json").unlink()
 
     with pytest.raises(descendants.EvalRunError, match="holds no proposals file"):
-        descendants.replay_artifact(load_artifact(archive), [case])
+        descendants.replay_artifact(load_artifact(archive), [case], injected={})
 
 
 def test_a_finished_case_with_no_report_is_named(archive, case):  # noqa: F811
@@ -141,7 +143,7 @@ def test_a_finished_case_with_no_report_is_named(archive, case):  # noqa: F811
     (reports_dir(archive) / f"{case.id}.report.json").unlink()
 
     with pytest.raises(descendants.EvalRunError, match=f"{case.id}: .* no report"):
-        descendants.replay_artifact(load_artifact(archive), [case])
+        descendants.replay_artifact(load_artifact(archive), [case], injected={})
 
 
 def test_a_case_the_artifact_does_not_list_is_named(archive, case):  # noqa: F811
@@ -151,7 +153,7 @@ def test_a_case_the_artifact_does_not_list_is_named(archive, case):  # noqa: F81
     archive.write_text(json.dumps(raw), encoding="utf-8")
 
     with pytest.raises(descendants.EvalRunError, match=f"{case.id}: .* not list"):
-        descendants.replay_artifact(load_artifact(archive), [case])
+        descendants.replay_artifact(load_artifact(archive), [case], injected={})
 
 
 @pytest.mark.parametrize(

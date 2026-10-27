@@ -219,6 +219,7 @@ def test_a_sitting_keyed_under_an_older_version_still_covers_its_case(tmp_path):
             flows,
             verb=claim.verb,
             scope=case.id,
+            identifier=None,
         )
         now = fingerprint(full, version=current)
         if now in envelope.cases[CASE].marks:

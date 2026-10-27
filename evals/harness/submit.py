@@ -1194,8 +1194,8 @@ def submission(
     root: Path,
     kind_name: str,
     *,
-    dry_run: bool = False,
-    args: argparse.Namespace | None = None,
+    dry_run: bool,
+    args: argparse.Namespace | None,
 ) -> Outcome:
     """The spine: bind, register, prepare, check, and open unless asked not to.
 

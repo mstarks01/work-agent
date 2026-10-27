@@ -184,7 +184,7 @@ def answers_within_saves(
     case: GoldenCase,
     answer_file: AnswerFile,
     saves: int,
-    only: tuple[FrameworkName, ...] = (),
+    only: tuple[FrameworkName, ...],
 ) -> tuple[FactAnswer, ...]:
     """The signed answers whose questions the pause asks in its first ``saves`` saves.
 

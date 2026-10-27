@@ -651,7 +651,11 @@ class TestTheBandIsReadOffTheFates:
         sampling,  # noqa: F811
     ):
         """Nothing moved, so nothing can be attributed to movement."""
-        measured = band(self.runs(tmp_path, sampling, [[0, 1], [0, 1]], {0, 1}))
+        measured = band(
+            self.runs(tmp_path, sampling, [[0, 1], [0, 1]], {0, 1}),
+            calibration=(),
+            rows=(),
+        )
 
         assert measured.volatile == 0
         assert measured.floor_variance == 0.0
@@ -664,7 +668,11 @@ class TestTheBandIsReadOffTheFates:
     ):
         """``m(k-m)/(k(k-1))`` at k=2, m=1. Two runs are enough because the sum
         runs over the references rather than over the runs."""
-        measured = band(self.runs(tmp_path, sampling, [[0, 1], [0]], {0, 1}))
+        measured = band(
+            self.runs(tmp_path, sampling, [[0, 1], [0]], {0, 1}),
+            calibration=(),
+            rows=(),
+        )
 
         assert (measured.references, measured.volatile) == (2, 1)
         assert measured.floor_variance == pytest.approx(0.5)
@@ -676,7 +684,9 @@ class TestTheBandIsReadOffTheFates:
         sampling,  # noqa: F811
     ):
         """The gate is on the must-find tier, so the band is over that tier."""
-        measured = band(self.runs(tmp_path, sampling, [[0, 1], [0]], {0}))
+        measured = band(
+            self.runs(tmp_path, sampling, [[0, 1], [0]], {0}), calibration=(), rows=()
+        )
 
         assert measured.references == 1
         assert measured.floor_variance == 0.0
@@ -694,7 +704,7 @@ class TestTheBandIsReadOffTheFates:
             [[0, 1], [0, 1], [0, 1], [0], [0]],
             {0, 1},
         )
-        measured = band(runs)
+        measured = band(runs, calibration=(), rows=())
 
         assert measured.floor_variance == pytest.approx(0.3)
 
@@ -712,7 +722,7 @@ class TestTheBandIsReadOffTheFates:
         inflation is exactly 2.
         """
         runs = self.runs(tmp_path, sampling, [[0, 1], [0, 1], []], {0, 1})
-        measured = band(runs, calibration=[runs])
+        measured = band(runs, calibration=[runs], rows=())
 
         assert measured.floor_variance == pytest.approx(2 / 3)
         assert measured.observed_variance == pytest.approx(4 / 3)
@@ -724,7 +734,7 @@ class TestTheBandIsReadOffTheFates:
         """Two runs give a variance on one degree of freedom, which says
         nothing. Ignored rather than counted as agreement."""
         runs = self.runs(tmp_path, sampling, [[0, 1], [0]], {0, 1})
-        measured = band(runs, calibration=[runs])
+        measured = band(runs, calibration=[runs], rows=())
 
         assert measured.inflation is None
         assert measured.calibration_freedom == 0
@@ -738,8 +748,8 @@ class TestTheBandIsReadOffTheFates:
         """What the guide asks for: a fix that targets known references is
         measured on them, because the corpus total is the noisiest reading."""
         runs = self.runs(tmp_path, sampling, [[0, 1, 2], [0]], {0, 1, 2})
-        whole = band(runs)
-        narrowed = band(runs, rows={(self.CASE, "1")})
+        whole = band(runs, calibration=(), rows=())
+        narrowed = band(runs, rows={(self.CASE, "1")}, calibration=())
 
         assert whole.floor_variance == pytest.approx(1.0)
         assert narrowed.references == 1
@@ -782,7 +792,7 @@ class TestTheBandIsReadOffTheFates:
                 write_run(tmp_path, "c.json", record, [score("01", 4, [0, 1], {0, 1})]),
             ]
         )
-        measured = band(runs, calibration=[runs])
+        measured = band(runs, calibration=[runs], rows=())
 
         # Only case 01's two must-finds are in the population.
         assert measured.references == 2
@@ -801,11 +811,11 @@ class TestTheBandIsReadOffTheFates:
         )
 
         with pytest.raises(ValueError, match="share no scored case"):
-            band(runs)
+            band(runs, calibration=(), rows=())
 
     def test_a_lone_run_is_refused(self, tmp_path, sampling):  # noqa: F811
         with pytest.raises(ValueError, match="two runs or more"):
-            band(self.runs(tmp_path, sampling, [[0]], {0}))
+            band(self.runs(tmp_path, sampling, [[0]], {0}), calibration=(), rows=())
 
     @pytest.mark.parametrize(
         ("variance", "effect", "expected"),
@@ -847,7 +857,7 @@ class TestBothPackagesAnswerTheBand:
             ]
         )
 
-        assert band(runs).floor_variance == pytest.approx(0.5)
+        assert band(runs, calibration=(), rows=()).floor_variance == pytest.approx(0.5)
 
     def test_a_package_that_names_the_missed_ones_answers(
         self,
@@ -877,7 +887,7 @@ class TestBothPackagesAnswerTheBand:
                 ),
             ]
         )
-        measured = band(runs)
+        measured = band(runs, calibration=(), rows=())
 
         # V2.1.1 matched in both and is never named a must-find, so it is not
         # in the population; V1.2.4 is, and it moved.

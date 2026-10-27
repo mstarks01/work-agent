@@ -57,7 +57,7 @@ def test_no_corpus_case_feeds_an_answer_to_generation() -> None:
     leaks = [
         problem
         for case_dir in case_dirs()
-        for problem in check_case(case_dir)
+        for problem in check_case(case_dir, raised=set())
         if ": carries " in problem
     ]
 
@@ -74,4 +74,7 @@ def test_the_corpus_lint_reports_a_planted_leak(tmp_path) -> None:
     model["processes"][0]["notes"] = claims[0]["claim"]
     (case / "model.json").write_text(json.dumps(model))
 
-    assert any("model.json: carries a reference claim" in p for p in check_case(case))
+    assert any(
+        "model.json: carries a reference claim" in p
+        for p in check_case(case, raised=set())
+    )

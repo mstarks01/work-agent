@@ -25,6 +25,13 @@ from evals.harness.queue import (
 )
 from tests.eval_factories import SAMPLE_CONTENT, SAMPLE_PROSE, cast, other_content
 
+#: The reviewer of a test that names none: no ledger here holds a vote of
+#: theirs. Production always names the reviewer.
+VOTER = "reviewer"
+
+#: A sitting ID of the shape the review app mints for each session.
+SITTING = "web-00000000"
+
 FLOWS = {
     "01": CaseFlows.of_graph(
         {"flow:process:a>process:b>call": ("process:a", "process:b")}
@@ -72,6 +79,7 @@ def value_of(item):
         FLOWS["01"],
         verb=item.verb,
         scope=item.case,
+        identifier=None,
     )
 
 
@@ -82,7 +90,7 @@ def test_an_answered_finding_never_comes_back():
         votes=[cast(value_of(known), "01", "up", "sam", content=known.content)]
     )
 
-    assert build([known], FLOWS, ledger) == []
+    assert build([known], FLOWS, ledger, voter="", sitting=SITTING) == []
 
 
 def test_naming_a_voter_asks_only_what_that_voter_has_not_answered():
@@ -92,13 +100,13 @@ def test_naming_a_voter_asks_only_what_that_voter_has_not_answered():
         votes=[cast(value_of(known), "01", "up", "sam", content=known.content)]
     )
 
-    assert build([known], FLOWS, ledger, voter="sam") == []
-    assert len(build([known], FLOWS, ledger, voter="ada")) == 1
+    assert build([known], FLOWS, ledger, voter="sam", sitting=SITTING) == []
+    assert len(build([known], FLOWS, ledger, voter="ada", sitting=SITTING)) == 1
 
 
 def test_one_finding_in_two_runs_is_one_question():
     """Deduplicated by fingerprint; two runs agreeing is not two questions."""
-    items = build([finding(), finding()], FLOWS, Ledger())
+    items = build([finding(), finding()], FLOWS, Ledger(), voter=VOTER, sitting=SITTING)
     assert len(items) == 1
 
 
@@ -126,7 +134,10 @@ def test_a_flow_and_its_endpoints_are_one_question():
         content=SAMPLE_CONTENT,
         prose=SAMPLE_PROSE,
     )
-    assert len(build([as_flow, as_ends], FLOWS, Ledger())) == 1
+    assert (
+        len(build([as_flow, as_ends], FLOWS, Ledger(), voter=VOTER, sitting=SITTING))
+        == 1
+    )
 
 
 def test_a_volatile_finding_outranks_an_unmatched_one():
@@ -134,7 +145,7 @@ def test_a_volatile_finding_outranks_an_unmatched_one():
     volatile = finding(title="Sometimes found", target="process:v", seen_in=2, runs=5)
     unmatched = finding(title="Always found", target="process:u")
 
-    items = build([unmatched, volatile], FLOWS, Ledger())
+    items = build([unmatched, volatile], FLOWS, Ledger(), voter=VOTER, sitting=SITTING)
     assert [item.finding.title for item in items] == [
         "Sometimes found",
         "Always found",
@@ -162,7 +173,7 @@ def test_a_second_voter_is_not_told_how_the_first_one_voted():
         cast(value_of(pooled), pooled.case, "up", "ada", content=pooled.content)
     )
 
-    items = build([pooled, untouched], FLOWS, ledger, voter="bob")
+    items = build([pooled, untouched], FLOWS, ledger, voter="bob", sitting=SITTING)
 
     assert {item.finding.title for item in items} == {"Ada said yes", "Nobody voted"}
     assert len({item.priority for item in items}) == 1, (
@@ -176,7 +187,7 @@ def test_a_second_voter_is_not_told_how_the_first_one_voted():
 def test_the_first_reason_wins_rather_than_the_sum():
     """Summing would rank new-and-unmatched above volatile, which is wrong."""
     volatile = finding(seen_in=1, runs=3)
-    weight, why = priority_of(volatile)
+    weight, why = priority_of(volatile, restated=False)
     assert weight == 30
     assert "some runs and not others" in why
 
@@ -190,14 +201,22 @@ def test_every_priority_row_carries_a_reason_a_reviewer_can_read():
 def test_the_order_is_stable_across_rebuilds():
     """A reviewer who steps away comes back to the same queue."""
     findings = [finding(title=f"Threat {n}", target=f"process:{n}") for n in range(8)]
-    first = [item.fingerprint for item in build(findings, FLOWS, Ledger())]
-    second = [item.fingerprint for item in build(reversed(findings), FLOWS, Ledger())]
+    first = [
+        item.fingerprint
+        for item in build(findings, FLOWS, Ledger(), voter=VOTER, sitting=SITTING)
+    ]
+    second = [
+        item.fingerprint
+        for item in build(
+            reversed(findings), FLOWS, Ledger(), voter=VOTER, sitting=SITTING
+        )
+    ]
     assert first == second
 
 
 def test_a_queue_item_carries_no_configuration():
     """Blind by construction: there is no field for a model name to sit in."""
-    item = build([finding()], FLOWS, Ledger())[0]
+    item = build([finding()], FLOWS, Ledger(), voter=VOTER, sitting=SITTING)[0]
     payload = item.to_json()
 
     forbidden = {"config", "model", "vendor", "tier", "temperature", "run"}
@@ -207,7 +226,7 @@ def test_a_queue_item_carries_no_configuration():
 
 def test_a_case_with_no_flow_map_still_queues():
     """A case the caller did not resolve flows for is not a crash."""
-    items = build([finding(case="99")], {}, Ledger())
+    items = build([finding(case="99")], {}, Ledger(), voter=VOTER, sitting=SITTING)
     assert len(items) == 1
 
 
@@ -228,6 +247,8 @@ def test_the_summary_counts_what_a_reviewer_decides_from(tmp_path):
         [finding(target="process:a"), finding(case="02", target="process:b")],
         FLOWS,
         ledger,
+        voter=VOTER,
+        sitting=SITTING,
     )
     summary = summarise(items, ledger)
 
@@ -240,7 +261,7 @@ def test_the_summary_counts_what_a_reviewer_decides_from(tmp_path):
 def test_a_stride_finding_with_no_verb_fails_closed():
     """Never a silent fall back to the weaker rule for a package that has one."""
     with pytest.raises(Exception, match="verb"):
-        build([finding(verb=None)], FLOWS, Ledger())
+        build([finding(verb=None)], FLOWS, Ledger(), voter=VOTER, sitting=SITTING)
 
 
 def test_each_framework_is_keyed_by_its_own_rule():
@@ -265,7 +286,8 @@ def test_each_framework_is_keyed_by_its_own_rule():
         prose=SAMPLE_PROSE,
     )
     items = {
-        item.finding.framework: item for item in build([stride, asvs], FLOWS, Ledger())
+        item.finding.framework: item
+        for item in build([stride, asvs], FLOWS, Ledger(), voter=VOTER, sitting=SITTING)
     }
 
     assert items["stride"].fingerprint.startswith(f"v{version_for('stride')}:")
@@ -288,7 +310,13 @@ def test_two_requirements_in_one_chapter_are_two_questions():
             prose=SAMPLE_PROSE,
         )
 
-    items = build([ruling("V6.2.1"), ruling("V6.2.2")], FLOWS, Ledger())
+    items = build(
+        [ruling("V6.2.1"), ruling("V6.2.2")],
+        FLOWS,
+        Ledger(),
+        voter=VOTER,
+        sitting=SITTING,
+    )
 
     assert len({item.fingerprint for item in items}) == 2
 
@@ -315,7 +343,10 @@ class TestTheRunCountsComeFromTheRuns:
         merged = merge_runs([[finding()]], FLOWS)
 
         assert (merged[0].seen_in, merged[0].runs) == (1, 1)
-        assert build(merged, FLOWS, Ledger())[0].volatile is False
+        assert (
+            build(merged, FLOWS, Ledger(), voter=VOTER, sitting=SITTING)[0].volatile
+            is False
+        )
 
     def test_a_run_naming_one_identity_twice_counts_once_for_that_run(self):
         """The denominator is runs, so a repeated lane is a different question."""
@@ -331,7 +362,10 @@ class TestTheRunCountsComeFromTheRuns:
         sometimes = finding(title="Sometimes", target="process:b")
         merged = merge_runs([[sometimes], [finding()]], FLOWS)
 
-        items = {item.finding.title: item for item in build(merged, FLOWS, Ledger())}
+        items = {
+            item.finding.title: item
+            for item in build(merged, FLOWS, Ledger(), voter=VOTER, sitting=SITTING)
+        }
 
         assert items["Sometimes"].volatile is True
         assert "some runs and not others" in items["Sometimes"].why
@@ -437,14 +471,14 @@ class TestARewrittenFindingIsAskedAgain:
         known = finding()
         led = self._ledger(known)
 
-        assert build([known], FLOWS, led, voter="sam") == []
+        assert build([known], FLOWS, led, voter="sam", sitting=SITTING) == []
 
     def test_a_re_argued_finding_comes_back_to_its_voter(self):
         answered_before = finding()
         led = self._ledger(answered_before)
         reargued = finding(content=other_content())
 
-        queue = build([reargued], FLOWS, led, voter="sam")
+        queue = build([reargued], FLOWS, led, voter="sam", sitting=SITTING)
 
         assert len(queue) == 1
         assert "re-argued" in queue[0].why
@@ -456,7 +490,7 @@ class TestARewrittenFindingIsAskedAgain:
         led = self._ledger(answered_before)
         reworded = finding(title="Said another way", prose="p1:1111111111111111")
 
-        assert build([reworded], FLOWS, led, voter="sam") == []
+        assert build([reworded], FLOWS, led, voter="sam", sitting=SITTING) == []
 
     def test_the_reader_sees_their_own_earlier_answer(self):
         """What makes the second look a re-read rather than a fresh question."""
@@ -464,7 +498,7 @@ class TestARewrittenFindingIsAskedAgain:
         led = self._ledger(answered_before, verdict="down", reason="too-vague")
         reargued = finding(content=other_content())
 
-        queue = build([reargued], FLOWS, led, voter="sam")
+        queue = build([reargued], FLOWS, led, voter="sam", sitting=SITTING)
 
         assert queue[0].previously == "down (too-vague)"
 
@@ -476,7 +510,7 @@ class TestARewrittenFindingIsAskedAgain:
         reargued = finding(title="Re-argued since", content=other_content())
         fresh = finding(target="process:b", title="Never asked")
 
-        queue = build([reargued, fresh], FLOWS, led, voter="sam")
+        queue = build([reargued, fresh], FLOWS, led, voter="sam", sitting=SITTING)
 
         assert [item.finding.title for item in queue] == [
             "Never asked",
@@ -491,8 +525,10 @@ class TestARewrittenFindingIsAskedAgain:
         led = self._ledger(answered_before)
         reargued = finding(content=other_content())
 
-        assert build([reargued], FLOWS, led) == []
-        assert not build([reargued], FLOWS, led, voter="ada")[0].previously
+        assert build([reargued], FLOWS, led, voter="", sitting=SITTING) == []
+        assert not build([reargued], FLOWS, led, voter="ada", sitting=SITTING)[
+            0
+        ].previously
 
     def test_a_needs_evidence_answer_is_not_a_rewrite(self):
         """It comes back because the reviewer asked it to, and the reason has
@@ -506,7 +542,7 @@ class TestARewrittenFindingIsAskedAgain:
         assert "re-argued" not in queue[0].why
 
     def test_the_item_carries_the_digests_a_vote_will_record(self):
-        item = build([finding()], FLOWS, Ledger())[0]
+        item = build([finding()], FLOWS, Ledger(), voter=VOTER, sitting=SITTING)[0]
 
         assert (item.content, item.prose) == (SAMPLE_CONTENT, SAMPLE_PROSE)
 
@@ -521,7 +557,7 @@ def test_two_mechanisms_under_one_fingerprint_are_two_questions():
     server = replace(finding(title="Fake server"), mechanism=("encryption_in_transit",))
     caller = replace(finding(title="Fake caller"), mechanism=("authentication",))
 
-    items = build([server, caller], FLOWS, Ledger())
+    items = build([server, caller], FLOWS, Ledger(), voter=VOTER, sitting=SITTING)
     assert sorted(item.finding.title for item in items) == [
         "Fake caller",
         "Fake server",
@@ -531,9 +567,10 @@ def test_two_mechanisms_under_one_fingerprint_are_two_questions():
 
     voted = replace(value_of(server), mechanism=server.mechanism)
     ledger = Ledger(votes=[cast(voted, "01", "up", "sam", content=server.content)])
-    assert [item.finding.title for item in build([server, caller], FLOWS, ledger)] == [
-        "Fake caller"
-    ]
+    assert [
+        item.finding.title
+        for item in build([server, caller], FLOWS, ledger, voter="sam", sitting=SITTING)
+    ] == ["Fake caller"]
 
 
 def test_one_finding_citing_overlapping_controls_in_two_runs_is_one_question():
@@ -543,7 +580,9 @@ def test_one_finding_citing_overlapping_controls_in_two_runs_is_one_question():
     first = replace(finding(), mechanism=("authentication",))
     second = replace(finding(), mechanism=("authentication", "encryption_in_transit"))
 
-    assert len(build([first, second], FLOWS, Ledger())) == 1
+    assert (
+        len(build([first, second], FLOWS, Ledger(), voter=VOTER, sitting=SITTING)) == 1
+    )
 
 
 def test_a_voters_later_vote_decides_whether_an_item_is_answered():

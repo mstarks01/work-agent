@@ -119,6 +119,8 @@ def down_vote(entry: dict, artifact: Path, case, path: Path) -> None:
         tuple(claim.affected_element_ids),
         flows,
         verb=claim.verb,
+        identifier=None,
+        scope=case.id,
     )
     recorded = cast(
         components,
@@ -311,6 +313,8 @@ class TestAVoteReachesTheNumbersWithoutASweep:
                     tuple(claim.affected_element_ids),
                     flows,
                     verb=claim.verb,
+                    identifier=None,
+                    scope=case.id,
                 ),
                 case=case.id,
                 verdict="down",

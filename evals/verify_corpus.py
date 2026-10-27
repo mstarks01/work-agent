@@ -1096,14 +1096,12 @@ def lane_coverage_issues(must_find_lanes: Mapping[str, set[object]]) -> Iterator
             )
 
 
-def check_case(
-    case_dir: Path, raised: set[tuple[str, tuple[str, ...]]] | None = None
-) -> list[str]:
+def check_case(case_dir: Path, raised: set[tuple[str, tuple[str, ...]]]) -> list[str]:
     """Every mechanical failure in one case, empty if the case is sound.
 
     ``raised`` collects the key of every claim :data:`VERB_LEADS` raised,
     declared or not, so :func:`_stale_escalate_declarations` can find an entry
-    that answers for nothing. A caller with no interest in that passes nothing.
+    that answers for nothing.
     """
     problems: list[str] = [f"missing {name}" for name in missing_case_files(case_dir)]
     if problems:
@@ -1153,8 +1151,7 @@ def check_case(
         if leads is None or not isinstance(records, list):
             continue
         for key, message in leads(case_dir.name, records, model):
-            if raised is not None:
-                raised.add(key)
+            raised.add(key)
             if key not in ESCALATE_DECLARED:
                 problems.append(message)
     # The two files the audit's diagnostic conditions feed to generation.

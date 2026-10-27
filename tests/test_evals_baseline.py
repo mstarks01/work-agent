@@ -19,7 +19,7 @@ import pytest
 from analysis_service.report import TokenUsage
 from analysis_service.vendors import VENDORS, vendor_for
 from evals.harness import baseline, prices
-from evals.harness.artifact import load_artifact
+from evals.harness.artifact import REPO_ROOT, load_artifact
 from evals.harness.baseline import (
     BASELINE_RULES,
     DIRTY_MARKER,
@@ -35,6 +35,7 @@ from evals.harness.baseline import (
 )
 from evals.harness.bundle import FINISHED_KINDS, case_file, reports_dir
 from evals.harness.prices import UnitPrices
+from evals.harness.submit import BASE_REF
 from tests.eval_factories import SWEEP_COMMIT, sweep_document
 
 #: A corpus case, because ``case_file`` refuses a case ID outside the corpus.
@@ -631,7 +632,7 @@ class TestAssembleAndVerify:
         manifest = json.loads((directory / "baseline.json").read_text("utf-8"))
         assert manifest["name"] == directory.name
         assert manifest["sweeps"][0]["submitted_by"] == "ada"
-        assert verify(directory, root=tmp_path) == []
+        assert verify(directory, root=tmp_path, base_ref=BASE_REF) == []
 
     def test_two_contributors_collide_at_one_directory(self, tmp_path, priced):
         first = assemble(
@@ -643,7 +644,7 @@ class TestAssembleAndVerify:
         assert first == second
         manifest = json.loads((first / "baseline.json").read_text("utf-8"))
         assert [entry["submitted_by"] for entry in manifest["sweeps"]] == ["ada", "sam"]
-        assert verify(first, root=tmp_path) == []
+        assert verify(first, root=tmp_path, base_ref=BASE_REF) == []
 
     def test_re_assembling_one_sweep_replaces_it_rather_than_adding_it(
         self, tmp_path, priced
@@ -661,7 +662,7 @@ class TestAssembleAndVerify:
 
         manifest = json.loads((directory / "baseline.json").read_text("utf-8"))
         assert len(manifest["sweeps"]) == 1
-        assert verify(directory, root=tmp_path) == []
+        assert verify(directory, root=tmp_path, base_ref=BASE_REF) == []
 
     def test_a_manifest_naming_one_sweep_twice_is_refused(self, tmp_path, priced):
         """The writer keys them; the verifier still refuses a hand-edited one."""
@@ -671,7 +672,7 @@ class TestAssembleAndVerify:
         manifest["sweeps"] = manifest["sweeps"] * 2
         path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-        problems = verify(directory, root=tmp_path)
+        problems = verify(directory, root=tmp_path, base_ref=BASE_REF)
         assert any("more than one sweep entry" in problem for problem in problems)
 
     @pytest.mark.parametrize(
@@ -694,21 +695,21 @@ class TestAssembleAndVerify:
         change(manifest)
         path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-        problems = verify(directory, root=tmp_path)
+        problems = verify(directory, root=tmp_path, base_ref=BASE_REF)
         assert any(named in problem for problem in problems), problems
 
     def test_a_renamed_directory_is_refused(self, tmp_path, priced):
         directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
         renamed = directory.with_name("7c3a007-hand-typed-00000000")
         directory.rename(renamed)
-        problems = verify(renamed, root=tmp_path)
+        problems = verify(renamed, root=tmp_path, base_ref=BASE_REF)
         assert any("derived, never typed" in problem for problem in problems)
 
     def test_an_edited_report_moves_a_digest(self, tmp_path, priced):
         directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
         report = next(directory.glob("*.reports/*.json"))
         report.write_text('{"claims": ["invented"]}', encoding="utf-8")
-        problems = verify(directory, root=tmp_path)
+        problems = verify(directory, root=tmp_path, base_ref=BASE_REF)
         assert any("digests do not recompute" in problem for problem in problems)
 
     def test_a_tampered_cost_fails_the_arithmetic(self, tmp_path, priced):
@@ -719,7 +720,7 @@ class TestAssembleAndVerify:
         manifest_path.write_text(
             json.dumps(manifest, indent=2, sort_keys=True), "utf-8"
         )
-        problems = verify(directory, root=tmp_path)
+        problems = verify(directory, root=tmp_path, base_ref=BASE_REF)
         assert any("recorded unit prices" in problem for problem in problems)
 
     def test_a_reported_charge_the_artifact_never_recorded_is_refused(
@@ -738,7 +739,7 @@ class TestAssembleAndVerify:
         manifest_path.write_text(
             json.dumps(manifest, indent=2, sort_keys=True), "utf-8"
         )
-        problems = verify(directory, root=tmp_path)
+        problems = verify(directory, root=tmp_path, base_ref=BASE_REF)
         assert any("the artifact records none" in problem for problem in problems)
 
     def test_a_reported_charge_that_does_not_add_up_is_refused(self, tmp_path, priced):
@@ -757,7 +758,7 @@ class TestAssembleAndVerify:
         manifest_path.write_text(
             json.dumps(manifest, indent=2, sort_keys=True), "utf-8"
         )
-        problems = verify(directory, root=tmp_path)
+        problems = verify(directory, root=tmp_path, base_ref=BASE_REF)
         assert any("node charges sum to" in problem for problem in problems)
 
     def test_a_sweep_over_the_cap_is_refused(self, tmp_path, priced, monkeypatch):
@@ -767,13 +768,13 @@ class TestAssembleAndVerify:
             for seed in (1, 2)
         ]
         directory = assemble(tmp_path, "ada", sweeps)
-        problems = verify(directory, root=tmp_path)
+        problems = verify(directory, root=tmp_path, base_ref=BASE_REF)
         assert any("the cap is 1" in problem for problem in problems)
 
     def test_missing_usage_is_an_incomputable_cost(self, tmp_path, priced):
         document = sweep_document(usage_nodes=("extract",))
         directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, document)])
-        problems = verify(directory, root=tmp_path)
+        problems = verify(directory, root=tmp_path, base_ref=BASE_REF)
         assert any("no node_usage" in problem for problem in problems)
 
     def test_disagreeing_artifacts_do_not_assemble(self, tmp_path, priced):
@@ -815,7 +816,7 @@ class TestAssembleAndVerify:
     def test_a_stray_file_is_named(self, tmp_path, priced):
         directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
         (directory / "notes.txt").write_text("hand-written\n", encoding="utf-8")
-        problems = verify(directory, root=tmp_path)
+        problems = verify(directory, root=tmp_path, base_ref=BASE_REF)
         assert any("files no sweep owns" in problem for problem in problems)
 
 
@@ -829,7 +830,13 @@ def test_the_repo_wide_walk_holds_every_merged_baseline():
     failures = {
         directory.name: problems
         for directory in directories
-        if (problems := verify(directory))
+        if (
+            problems := verify(
+                directory,
+                root=REPO_ROOT,
+                base_ref=baseline.default_base_ref(REPO_ROOT),
+            )
+        )
     }
     assert not failures, f"merged Baselines that no longer verify: {failures}"
 
