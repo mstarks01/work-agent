@@ -1783,7 +1783,7 @@ def prepare_node(
     frameworks: Sequence[FrameworkName],
     domain_loader: MarkdownLoader,
     package_loaders: Mapping[FrameworkName, MarkdownLoader],
-    assertions: CatalogRead = False,
+    assertions: CatalogRead,
 ) -> FunctionNode:
     """The ``prepare`` node, with this deployment's Markdown roots bound to it.
 
@@ -2698,7 +2698,7 @@ def _extract_node(
     prompt_loader: MarkdownLoader,
     resolve_model: ModelResolver,
     resolve_sampling: SamplingResolver,
-    extraction_format: str = FULL_FORMAT,
+    extraction_format: str,
 ) -> LlmAgent:
     """The extraction node, shared by the production graph and eval mode 1.
 
@@ -3242,9 +3242,7 @@ def build_pipeline(
     return pipeline(workflow, llm_nodes)
 
 
-def _validate_node_func(
-    keys: GraphKeys, extraction_format: str = FULL_FORMAT
-) -> Callable[..., Any]:
+def _validate_node_func(keys: GraphKeys, extraction_format: str) -> Callable[..., Any]:
     """The validity gate, with this graph's key families bound to it.
 
     ADK binds a FunctionNode's parameters from session state, so ``keys`` — a

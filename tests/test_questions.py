@@ -1021,7 +1021,7 @@ def test_a_dismissed_ground_is_asked_last_and_holds_up_no_finding():
     analyses = _dismissed_ground_analyses()
     model = valid_model()
 
-    card = conditions(analyses, model, [], [])["stride/S-01"]
+    card = conditions(analyses, model, [], [], (), None)["stride/S-01"]
     questions = fact_questions(analyses, model, None)
 
     assert [key for key, _, _ in card] == [NAMED.key]
@@ -1039,7 +1039,7 @@ def test_the_card_and_the_follow_up_name_the_same_facts(path):
     report = Report.model_validate_json(path.read_text(encoding="utf-8"))
     catalog = report.assertions.catalog if report.assertions else None
     questions = fact_questions(report.analyses, report.system_model, catalog)
-    cards = conditions(report.analyses, report.system_model, [], [])
+    cards = conditions(report.analyses, report.system_model, [], [], (), None)
     asked = {question.key for question in questions}
     for finding, rows in cards.items():
         named = {question.key for question in questions if finding in question.findings}
@@ -1231,7 +1231,9 @@ def test_a_fact_answered_in_part_is_not_read_as_dont_know(answer, status):
     asked = UnknownRef(element_id=model.processes[0].id, question="capacity-limits")
     given = FactAnswer.model_validate({"key": asked.key, **answer})
 
-    found = conditions([sample_analysis([asking_threat(asked)])], model, [given], [])
+    found = conditions(
+        [sample_analysis([asking_threat(asked)])], model, [given], [], (), None
+    )
 
     assert [row[2] for rows in found.values() for row in rows] == [status]
 

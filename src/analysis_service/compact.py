@@ -424,7 +424,7 @@ REFERENCE_FIELDS: tuple[str, ...] = ("trust_zone", "source", "destination")
 
 def parse_extraction(
     payload: object,
-    extraction_format: str = FULL_FORMAT,
+    extraction_format: str,
     *,
     sources: Mapping[str, str] = MappingProxyType({}),
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:

@@ -1266,7 +1266,7 @@ def grouped(questions: Sequence[EarlyQuestion]) -> tuple[EarlyQuestion, ...]:
 
 
 def by_turn(
-    questions: Sequence[EarlyQuestion], charged: Mapping[str, int] | None = None
+    questions: Sequence[EarlyQuestion], charged: Mapping[str, int] | None
 ) -> list[EarlyQuestion]:
     """The questions with the selected frameworks taken in turn.
 
@@ -1315,7 +1315,7 @@ def _in_turn(
     *,
     serves: Callable[[_Item], set[str]],
     choices: Callable[[_Item], int],
-    charged: Mapping[str, int] | None = None,
+    charged: Mapping[str, int] | None,
 ) -> list[_Item]:
     """The items with the selected frameworks taking turns.
 

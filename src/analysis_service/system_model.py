@@ -324,7 +324,7 @@ def make_flow_id(
     return flow_id_rule(version).build(source_id, destination_id, label)
 
 
-def parse_flow_id(flow_id: str, version: int = FLOW_ID_VERSION) -> FlowParts:
+def parse_flow_id(flow_id: str, version: int) -> FlowParts:
     """Decode a flow ID back into the three parts it was built from.
 
     The round trip against :func:`make_flow_id` is what makes the encoding

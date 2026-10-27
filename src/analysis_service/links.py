@@ -146,7 +146,7 @@ Spans = tuple[tuple[int, int], ...]
 
 
 def _composed(
-    links: Sequence[LinkAnswer], facts: Sequence[FactAnswer] = ()
+    links: Sequence[LinkAnswer], facts: Sequence[FactAnswer]
 ) -> tuple[str, Spans, Spans]:
     """The answers Source's text, and where each answer's line sits in it."""
     lines = [*map(_line, links), *map(fact_line, facts)]

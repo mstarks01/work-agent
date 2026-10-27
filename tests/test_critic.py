@@ -1063,7 +1063,7 @@ class TestAnAbsenceRidesTheCriticPath:
 
     def test_snapping_leaves_it_alone(self, draft):
         """There is no ID to canonicalise: a term is a word, not a reference."""
-        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        [snapped] = snap_drafts([draft], ELEMENT_IDS, ())
 
         assert snapped.grounds == [Ground(kind="absent-element", term="ldap")]
 

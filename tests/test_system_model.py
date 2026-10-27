@@ -10,6 +10,7 @@ from analysis_service.system_model import (
     ELEMENT_ID,
     FLOW_DELIMITER,
     FLOW_ID_RULES,
+    FLOW_ID_VERSION,
     Assumption,
     DataFlow,
     EmittedSystemModel,
@@ -100,7 +101,7 @@ class TestTheFlowIdentityIsVersioned:
         """What ADR 0037 rule 2 asks for: the ID decodes back to what built it."""
         built = make_flow_id("entity:card-processor", "store:orders-db", "Read Orders")
 
-        parts = parse_flow_id(built)
+        parts = parse_flow_id(built, FLOW_ID_VERSION)
 
         assert (parts.source, parts.destination, parts.label) == (
             "entity:card-processor",
@@ -166,7 +167,7 @@ class TestTheFlowIdentityIsVersioned:
         parts: ``flow:a>b>c`` splits cleanly and names nothing.
         """
         with pytest.raises(FlowIdError, match="is not a version 2 flow ID"):
-            parse_flow_id("flow:a>b>c")
+            parse_flow_id("flow:a>b>c", FLOW_ID_VERSION)
         with pytest.raises(FlowIdError, match="is not a version 1 flow ID"):
             parse_flow_id(make_flow_id("entity:x", "store:y", "read"), version=1)
 

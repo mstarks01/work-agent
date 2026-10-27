@@ -28,7 +28,7 @@ def remembered(
     parts: Sequence[str],
     build: Callable[[], _Built],
     *,
-    held: Sequence[object] = (),
+    held: Sequence[object],
 ) -> _Built:
     """``build()`` once for its content, then the kept value.
 

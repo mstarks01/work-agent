@@ -765,13 +765,13 @@ class TestQuoteVerification:
 class TestSnapDrafts:
     def test_affected_elements_arrive_in_the_jobs_spelling(self):
         draft = sample_draft(affected_element_ids=["Process:Web-App"])
-        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        [snapped] = snap_drafts([draft], ELEMENT_IDS, ())
         assert snapped.affected_element_ids == ["process:web-app"]
 
     def test_an_unresolvable_reference_is_left_as_written(self):
         """The check that reports it can only name what the agent typed."""
         draft = sample_draft(affected_element_ids=["process:ghost"])
-        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        [snapped] = snap_drafts([draft], ELEMENT_IDS, ())
         assert snapped.affected_element_ids == ["process:ghost"]
 
     @pytest.mark.parametrize(
@@ -804,7 +804,7 @@ class TestSnapDrafts:
     )
     def test_each_ground_branch_snaps_its_own_reference(self, ground, field, expected):
         draft = sample_draft(grounds=[ground])
-        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        [snapped] = snap_drafts([draft], ELEMENT_IDS, ())
         assert getattr(snapped.grounds[0], field) == expected
 
     def test_a_quote_label_snaps_to_the_jobs_label(self):
@@ -823,12 +823,12 @@ class TestSnapDrafts:
         draft = sample_draft(
             grounds=[Ground(kind="quote", text="anything", source_label="Whatever")]
         )
-        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        [snapped] = snap_drafts([draft], ELEMENT_IDS, ())
         assert snapped.grounds[0].source_label == "Whatever"
 
     def test_nothing_but_references_changes(self):
         draft = sample_draft(affected_element_ids=["Process:Web-App"])
-        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        [snapped] = snap_drafts([draft], ELEMENT_IDS, ())
         assert snapped.model_dump(exclude={"affected_element_ids"}) == draft.model_dump(
             exclude={"affected_element_ids"}
         )

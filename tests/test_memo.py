@@ -42,7 +42,7 @@ def test_a_held_object_lives_while_its_key_is_kept():
     gc.collect()
     assert alive() is not None
     for n in range(REMEMBERED):
-        remembered(memo, (str(n),), lambda: "newer")
+        remembered(memo, (str(n),), lambda: "newer", held=())
     gc.collect()
     assert alive() is None, "a dropped key releases what it held"
 
@@ -50,7 +50,9 @@ def test_a_held_object_lives_while_its_key_is_kept():
 def test_the_memo_keeps_the_newest_values():
     memo: Memo[int] = OrderedDict()
     for n in range(REMEMBERED + 3):
-        remembered(memo, (str(n),), lambda n=n: n)
+        remembered(memo, (str(n),), lambda n=n: n, held=())
     assert len(memo) == REMEMBERED
-    assert remembered(memo, ("0",), lambda: -1) == -1, "the oldest was dropped"
-    assert remembered(memo, (str(REMEMBERED + 2),), lambda: -1) == REMEMBERED + 2
+    assert remembered(memo, ("0",), lambda: -1, held=()) == -1, "the oldest was dropped"
+    assert (
+        remembered(memo, (str(REMEMBERED + 2),), lambda: -1, held=()) == REMEMBERED + 2
+    )

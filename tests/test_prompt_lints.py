@@ -1115,7 +1115,10 @@ def test_every_flow_id_a_prompt_shows_is_one_the_service_writes(shown_in):
         for one in wrong
         if not {
             end.split(":", 1)[0]
-            for end in (parse_flow_id(one).source, parse_flow_id(one).destination)
+            for end in (
+                parse_flow_id(one, FLOW_ID_VERSION).source,
+                parse_flow_id(one, FLOW_ID_VERSION).destination,
+            )
         }
         <= ENDPOINT_PREFIXES
     )

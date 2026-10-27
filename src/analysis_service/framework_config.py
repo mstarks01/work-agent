@@ -56,7 +56,7 @@ class FrameworkConfigError(ConfigError):
 
 
 def load_frameworks(
-    path: Path, env: Mapping[str, str] | None = None
+    path: Path, env: Mapping[str, str] | None
 ) -> tuple[FrameworkName, ...]:
     """The frameworks this install carries, in file order or in the order of
     :data:`CARRIED_VAR`.

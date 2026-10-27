@@ -187,7 +187,7 @@ async def audited_delete(
 MAX_RETENTION_DAYS = 36_500
 
 
-def retention_days(env: Mapping[str, str] = os.environ) -> int | None:
+def retention_days(env: Mapping[str, str]) -> int | None:
     """The retention period from ``ANALYSIS_RETENTION_DAYS``, in days.
 
     ``None`` where the setting is unset: the service keeps every job (#1530).

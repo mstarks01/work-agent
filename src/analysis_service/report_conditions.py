@@ -38,8 +38,8 @@ def conditions(
     model: SystemModel,
     answered: Sequence[FactAnswer],
     shown: Sequence[UnknownKey],
-    skipped: Sequence[SkipKey] = (),
-    catalog: AssertionCatalog | None = None,
+    skipped: Sequence[SkipKey],
+    catalog: AssertionCatalog | None,
 ) -> dict[str, list[tuple[UnknownKey, str, FactStatus]]]:
     """Each conditional finding's open facts, as ``framework/claim``: key, label and status.
 

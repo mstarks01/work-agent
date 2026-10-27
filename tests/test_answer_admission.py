@@ -1501,12 +1501,12 @@ class TestTheFrameworksTakeTurns:
 
         shared = question("shared", "asvs", "stride")
         asvs, stride = question("a", "asvs"), question("s", "stride")
-        assert [q.key for q in by_turn([shared, asvs, stride])] == [
+        assert [q.key for q in by_turn([shared, asvs, stride], None)] == [
             ("shared",),
             ("a",),
             ("s",),
         ]
-        assert [q.key for q in by_turn([asvs, stride, shared])] == [
+        assert [q.key for q in by_turn([asvs, stride, shared], None)] == [
             ("a",),
             ("s",),
             ("shared",),
