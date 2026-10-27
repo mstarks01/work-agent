@@ -9,7 +9,7 @@ request again, or a changed one.
 
 **The graph's readers, never a second copy.** The instruction is
 :func:`~analysis_service.graph.analyze_instruction`, and
-:func:`~analysis_service.critic_round.node_request` templates it over the
+:func:`~analysis_service.node_requests.node_request` templates it over the
 captured state keys and builds the user turn from ``prepare``'s captured
 output, the way ADK does for the node. The answer parses under the package's own proposal schema.
 ``tests/test_evals_lane_replay.py`` holds the rebuilt request against the one a
@@ -48,7 +48,6 @@ from google.genai import types
 from pydantic import BaseModel
 
 from analysis_service.claims import FrameworkName
-from analysis_service.critic_round import node_request
 from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphRun, seed_state
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
@@ -64,6 +63,7 @@ from analysis_service.graph import (
     prepare_analysis,
 )
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.node_requests import node_request
 from analysis_service.prompts import lane_closing
 from evals.harness.artifact import (
     EvalArtifact,

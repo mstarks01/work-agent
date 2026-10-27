@@ -107,6 +107,7 @@ from analysis_service.system_model import (
     DATA_CLASSIFICATION_FIELD,
     ELEMENT_GROUPS,
     ENDPOINT_PREFIXES,
+    EXCERPT_MAX_CHARS,
     UNKNOWN,
     BoundaryKind,
     DataFlow,
@@ -258,7 +259,7 @@ class _CompactElement(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
     assets: list[str] = assets_field()
-    source_excerpt: str = Field(default="", max_length=1000)
+    source_excerpt: str = Field(default="", max_length=EXCERPT_MAX_CHARS)
     source_label: str = Field(default="", max_length=200)
     source_speaker: str = Field(default="", max_length=200)
     notes: str = Field(default="", max_length=2000)

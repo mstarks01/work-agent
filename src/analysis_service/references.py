@@ -45,8 +45,8 @@ as an unresolvable reference is.
 This module refuses two further rungs. Its readers are the draft references a
 lane emits, the ruling references a critic emits, and an element's source
 label. It refuses them for the reason ``grounding`` refuses
-punctuation-blindness: a rung nobody has measured is a precision cost nobody
-has priced. Two other readers take one rung each, in their own code, for a
+punctuation-blindness: no measurement shows what either rung does to
+precision. Two other readers take one rung each, in their own code, for a
 reason each one states.
 
 * Bare slug — reading ``store:web-app`` as ``process:web-app`` because only one

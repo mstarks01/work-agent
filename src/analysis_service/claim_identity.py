@@ -165,8 +165,9 @@ def distinct_mechanisms(first: Iterable[str], second: Iterable[str]) -> bool:
     A mechanism holds controls and channels: an attribute name, or a sibling
     flow's ID, which carries the flow prefix. Two claims are apart where their
     controls do not overlap at all, or their channels do not. Each side must
-    name something, so a claim that cites no control or no sibling flow, and
-    every record stored before mechanisms were, binds as it did. Overlap
+    name something, so a side that one claim leaves empty sets nothing apart,
+    and a claim with no mechanism is one finding with each claim under its
+    key. Overlap
     rather than equality, because one finding cites a slightly different set
     of controls from one run to the next: equality split 39 of 165 archived
     cross-run pairs of one finding, and non-overlap splits 3 (ledger

@@ -898,12 +898,13 @@ def _spells_a_tier_key(node: ast.AST) -> bool:
 
 
 def test_a_tier_setting_key_is_spelled_once():
-    """Only ``tier_key`` spells the ``tiers.<tier>.<field>`` key of a Deployment
-    Setting; the page and the view call it. The loaders under ``src`` spell the
-    same text as the TOML table path an error names, which is not this key."""
+    """Only ``tier_setting_key`` spells the ``tiers.<tier>.<field>`` key of a
+    Deployment Setting; the page and the view call it. The loaders under ``src``
+    spell the same text as the TOML table path an error names, which is not this
+    key."""
     assert [
         site for site in _sites(_spells_a_tier_key) if site[0].startswith("webapp/")
-    ] == [("webapp/settings_page.py", "tier_key")]
+    ] == [("webapp/settings_page.py", "tier_setting_key")]
 
 
 def _mints_a_job(node: ast.AST) -> bool:

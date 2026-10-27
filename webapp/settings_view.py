@@ -83,7 +83,7 @@ from webapp.settings_page import (
     SETTINGS,
     Setting,
     sampling_key,
-    tier_key,
+    tier_setting_key,
 )
 
 #: The value of each store setting that this app gives where no source sets
@@ -177,7 +177,7 @@ def settings_view(
             for vendor in VENDOR_NAMES
             if (setup := IAM_SETUP[vendor]) is not None
         ],
-        "vendor_rows": [tier_key(tier, "vendor") for tier in TIER_NAMES],
+        "vendor_rows": [tier_setting_key(tier, "vendor") for tier in TIER_NAMES],
         "models": {vendor: list(tool_models(vendor)) for vendor in VENDOR_NAMES},
         "no_thinking": {
             vendor: list(no_thinking_models(vendor)) for vendor in VENDOR_NAMES
@@ -193,7 +193,7 @@ def _controls() -> dict[str, dict[str, Any]]:
     the keys of both, so the page parses no key."""
     flag = ("true", "false")
     choices: dict[str, tuple[str, ...]] = {
-        **{tier_key(tier, "vendor"): VENDOR_NAMES for tier in TIER_NAMES},
+        **{tier_setting_key(tier, "vendor"): VENDOR_NAMES for tier in TIER_NAMES},
         **{
             f"credentials.{vendor}.mode": tuple(VENDORS[vendor].credential_modes)
             for vendor in VENDOR_NAMES
@@ -228,7 +228,9 @@ def _controls() -> dict[str, dict[str, Any]]:
         },
         "frameworks.carried": {"options": list(FRAMEWORK_NAMES), "multiple": True},
         **{
-            tier_key(tier, "model"): {"vendor_key": tier_key(tier, "vendor")}
+            tier_setting_key(tier, "model"): {
+                "vendor_key": tier_setting_key(tier, "vendor")
+            }
             for tier in TIER_NAMES
         },
         **{
@@ -236,8 +238,8 @@ def _controls() -> dict[str, dict[str, Any]]:
                 "options": list(get_args(ReasoningEffort)),
                 "unset": "The model's own level",
                 "tier": tier,
-                "vendor_key": tier_key(tier, "vendor"),
-                "model_key": tier_key(tier, "model"),
+                "vendor_key": tier_setting_key(tier, "vendor"),
+                "model_key": tier_setting_key(tier, "model"),
             }
             for tier in TIER_NAMES
         },

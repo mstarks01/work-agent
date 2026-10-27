@@ -142,7 +142,7 @@ class UnfinishedCompletionError(RuntimeError):
     a submitter's system, and a message reaches logs and the job's error.
     """
 
-    def __init__(self, message: str, fragment: str = "") -> None:
+    def __init__(self, message: str, fragment: str) -> None:
         super().__init__(message)
         self.fragment = fragment
 
@@ -761,7 +761,7 @@ _UNFINISHED: dict[str, tuple[type[UnfinishedCompletionError], str, str]] = {
 }
 
 
-def reject_unfinished(responses: Sequence, model: str, node: str | None = None) -> None:
+def reject_unfinished(responses: Sequence, model: str, node: str | None) -> None:
     """Raise if the provider stopped any of ``responses`` at the cap or the filter.
 
     ``node`` is the graph node that asked, and the message names it first.

@@ -179,7 +179,7 @@ def missing(
     and each name with no text between it and the next entry.
 
     Asterisks are dropped from the section and from each name, because
-    Markdown spends them on bold text and a prompt path spends them on a glob.
+    Markdown uses them for bold text and a prompt path uses them for a glob.
     """
     names = tuple(names)
     text = section(body, heading)

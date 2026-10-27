@@ -409,6 +409,10 @@ DataClassification = Literal["public", "internal", "confidential", "unknown"]
 #: The tier field as a model fills it. The set is a schema fact and not a
 #: validator: a provider reads the enum, and code may still write a
 #: projected value here (``unknown; <why>: <tier>``).
+#: The longest ``source_excerpt`` an element or a statement carries, and so
+#: the longest excerpt the extraction gate replaces.
+EXCERPT_MAX_CHARS = 1000
+
 DATA_CLASSIFICATION_FIELD = Field(
     max_length=200, json_schema_extra={"enum": [*get_args(DataClassification)]}
 )
@@ -424,7 +428,7 @@ class _Element(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
     assets: list[str] = assets_field()
-    source_excerpt: str = Field(default="", max_length=1000)
+    source_excerpt: str = Field(default="", max_length=EXCERPT_MAX_CHARS)
     # Which Source the *excerpt* came from — the quote, not the element. A
     # verbatim quote has exactly one origin by construction, so this field can
     # never be half-true, where a list of labels beside one quote would leave
@@ -745,7 +749,7 @@ class CapabilityStatement(BaseModel):
         json_schema_extra={"enum": [*sorted(CAPABILITIES)]},
     )
     state: StatedPresence
-    source_excerpt: str = Field(min_length=1, max_length=1000)
+    source_excerpt: str = Field(min_length=1, max_length=EXCERPT_MAX_CHARS)
     source_label: str = Field(min_length=1, max_length=200)
     origin: StatementOrigin
     #: The element and the rule that prove a ``field`` statement. A statement
@@ -861,7 +865,7 @@ class ExcerptRepair(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     element_id: str = Field(min_length=1)
-    written: str = Field(min_length=1, max_length=1000)  # source_excerpt's bound
+    written: str = Field(min_length=1, max_length=EXCERPT_MAX_CHARS)
     similarity: float = Field(ge=0.0, le=1.0)
     scan_complete: bool
 

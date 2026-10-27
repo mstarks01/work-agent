@@ -563,7 +563,7 @@ class TestWhatCountsAsTransient:
         assert not _is_transient(ValueError("malformed request"))
 
     def test_a_truncated_completion_is_not_transient(self):
-        assert not _is_transient(TruncatedCompletionError("stopped at the cap"))
+        assert not _is_transient(TruncatedCompletionError("stopped at the cap", ""))
 
 
 class TestTheLadderIsVendorNeutral:
@@ -816,7 +816,7 @@ class TestAFilterStopIsRefused:
         assert base.calls == 1
 
     def test_it_is_not_transient(self):
-        assert not _is_transient(RefusedCompletionError("stopped at the filter"))
+        assert not _is_transient(RefusedCompletionError("stopped at the filter", ""))
 
     def test_the_message_names_the_model_and_the_finish_reason(self):
         base = FakeExecutor(model="anthropic/claude-opus-5-5", outcomes=[refused()])

@@ -35,7 +35,12 @@ from tests.test_settings_env import (
 )
 from tests.test_webapp import LOOPBACK
 from webapp.main import Workspace, create_app
-from webapp.settings_page import CHANGED_SAMPLING, SETTINGS, sampling_key, tier_key
+from webapp.settings_page import (
+    CHANGED_SAMPLING,
+    SETTINGS,
+    sampling_key,
+    tier_setting_key,
+)
 
 #: A key that no fixture holds, so a page that carries it leaked the file.
 KEY = "sk-ant-page-must-never-show-this"
@@ -128,7 +133,9 @@ class TestTheRows:
         parses no key to find them."""
         data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
 
-        assert data["vendor_rows"] == [tier_key(tier, "vendor") for tier in TIER_NAMES]
+        assert data["vendor_rows"] == [
+            tier_setting_key(tier, "vendor") for tier in TIER_NAMES
+        ]
         for tier, key in zip(TIER_NAMES, data["vendor_rows"], strict=True):
             assert SETTINGS[key].variable == env_vars_for(tier)[0]
 

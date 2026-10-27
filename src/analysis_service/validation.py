@@ -535,7 +535,7 @@ def _citation_issues(
     it, with the source still in front of it. A model that arrived from a model
     reaches this rule after :func:`repair_excerpts`, which has already put the
     source's own span in place of an excerpt the ADR 0018 rung could repair, so
-    only what the rung could not repair costs that pass.
+    only an excerpt the rung could not repair goes to that pass.
 
     A **Capability** statement is cited by the same rule, because it asserts a
     fact about the application in a source's words exactly as an element does.

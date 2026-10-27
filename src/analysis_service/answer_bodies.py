@@ -26,7 +26,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import MAX_SKIPS, Answers, Revision
@@ -134,6 +134,9 @@ class BodyRefused(Exception):
         )
 
 
+_UNKNOWN_KEY: TypeAdapter[UnknownKey] = TypeAdapter(UnknownKey)
+
+
 def _question_of(raw: object, error: Mapping[str, Any]) -> UnknownKey | None:
     """The key of the fact answer ``error`` sits in, where it is well formed."""
     loc = error["loc"]
@@ -142,11 +145,10 @@ def _question_of(raw: object, error: Mapping[str, Any]) -> UnknownKey | None:
     facts = raw["facts"] if isinstance(raw, dict) else None
     fact = facts[loc[1]] if isinstance(facts, list) else None
     key = fact.get("key") if isinstance(fact, dict) else None
-    if not isinstance(key, list) or len(key) != 6:
+    try:
+        return _UNKNOWN_KEY.validate_python(key)
+    except ValidationError:
         return None
-    if not all(isinstance(part, str) for part in key):
-        return None
-    return (key[0], key[1], key[2], key[3], key[4], key[5])
 
 
 M = TypeVar("M", bound=BaseModel)

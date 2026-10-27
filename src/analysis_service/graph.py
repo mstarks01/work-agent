@@ -169,7 +169,6 @@ from analysis_service.critic_round import (
     FirstPass,
     Revision,
     critic_instruction,
-    node_instruction,
     recritic_instruction,
 )
 from analysis_service.domains import select_domain_packs
@@ -212,6 +211,7 @@ from analysis_service.model_tiers import (
     lane_key,
     tier_key,
 )
+from analysis_service.node_requests import node_instruction
 from analysis_service.prompt_cache import remember_stable_prefix, stable_prefix
 from analysis_service.prompts import (
     compose_analyze_prompt,
@@ -1385,13 +1385,7 @@ def validate_extraction(
         # model is shown without ``excerpt_repairs``, which the repair schema
         # does not carry: the gate's own record, kept on the baseline for the
         # overlay.
-        shown = (
-            parked
-            if model is None
-            else {
-                key: value for key, value in parked.items() if key != "excerpt_repairs"
-            }
-        )
+        shown = parked if model is None else _without_excerpt_repairs(parked)
         state.prompt(STATE_PREVIOUS_MODEL, render_fenced(shown))
         state.prompt(
             STATE_VALIDATION_ISSUES,
@@ -1454,6 +1448,13 @@ def render_crossings(crossings: Sequence[BoundaryCrossing]) -> str:
     return render_fenced([crossing.model_dump(mode="json") for crossing in crossings])
 
 
+def _without_excerpt_repairs(valid_model: dict) -> dict:
+    """``valid_model`` without ``excerpt_repairs``, the extraction gate's own record."""
+    return {
+        key: value for key, value in valid_model.items() if key != "excerpt_repairs"
+    }
+
+
 def _without_source_fields(valid_model: dict) -> dict:
     """The model as a reasoning view: every element's own quote removed.
 
@@ -1483,9 +1484,7 @@ def _without_source_fields(valid_model: dict) -> dict:
     The honest cost: the bytes an agent saw are no longer the bytes the report
     carries.
     """
-    stripped = {
-        key: value for key, value in valid_model.items() if key != "excerpt_repairs"
-    }
+    stripped = _without_excerpt_repairs(valid_model)
     for collection, entries in stripped.items():
         if collection == "assumptions" or not isinstance(entries, list):
             continue
@@ -2951,9 +2950,7 @@ def _framework_subgraph(
         critic=_llm_node(
             name=nodes.node(CRITIC_ROLE),
             tier_node=tier_nodes[nodes.node(CRITIC_ROLE)],
-            instruction=critic_instruction(
-                package_loader, prompt_loader, package, nodes
-            ),
+            instruction=critic_instruction(package_loader, prompt_loader, nodes),
             output_schema=schemas.rulings,
             output_key=reviewed_key,
             resolve_model=resolve_model,
@@ -2962,9 +2959,7 @@ def _framework_subgraph(
         recritic=_llm_node(
             name=nodes.node(RECRITIC_ROLE),
             tier_node=tier_nodes[nodes.node(RECRITIC_ROLE)],
-            instruction=recritic_instruction(
-                package_loader, prompt_loader, package, nodes
-            ),
+            instruction=recritic_instruction(package_loader, prompt_loader, nodes),
             output_schema=schemas.rulings,
             output_key=reviewed_key,
             resolve_model=resolve_model,

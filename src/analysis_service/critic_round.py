@@ -19,8 +19,7 @@ takes the edge it names, and decides nothing else.
 The module also renders the request a critic node sends, instruction and
 user turn, as ADK renders it from session state. The two critic replays call
 :func:`critic_request`, so neither copies the prompt join, the placeholder
-substitution or the state templating. :func:`node_request` is the same
-scaffold for any LLM node, and the lane replay calls it with its closing.
+substitution or the state templating.
 
 The primitives this module calls, :func:`~analysis_service.critic.critic_view`,
 :func:`~analysis_service.critic.review_issues`,
@@ -33,12 +32,9 @@ from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
-from types import MappingProxyType, SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any
 
-from google.adk.agents.readonly_context import ReadonlyContext
-from google.adk.utils.content_utils import to_user_content
-from google.adk.utils.instructions_utils import inject_session_state
 from google.genai import types
 
 from analysis_service.assertions import AssertionCatalog
@@ -60,11 +56,11 @@ from analysis_service.critic import (
     review_issues,
 )
 from analysis_service.frameworks import (
-    FrameworkPackage,
     FrameworkSchemas,
     schemas_for,
 )
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.node_requests import node_instruction, node_request
 from analysis_service.prompts import compose_critic_prompt, compose_recritic_prompt
 from analysis_service.skills import compose_critic_skills
 from analysis_service.sources import render_fenced
@@ -305,41 +301,15 @@ class CriticRound:
         return Accepted(claims=claims, rejected=rejected)
 
 
-def node_instruction(skills: str, prompt: str) -> str:
-    """Skill text then prompt text: what to know, then what to do with it.
-
-    **The prefix this shares is across jobs for one node, and never across the
-    nodes of one job.** The skill text is a node's own, so the first bytes of
-    two lanes' instructions already differ; what one node repeats from case to
-    case is its skill and its prompt down to the first job-varying placeholder.
-
-    The lanes of one job read one **System Model** and one set of sources
-    between them, and ``analyze.md`` lays those out after ``{scope}``, which
-    the graph's ``LANE_ARTIFACTS`` makes per lane. So the material every lane
-    shares sits behind the first thing that separates them.
-
-    **Moving the shared material first would cost more than it saves** (#1400).
-    The lanes of one job start together from one ``prepare`` route, so none
-    finds another's cache entry written. And the order here is what lets each
-    lane's own prefix, 4,576 to 6,520 tokens of skill and prompt, cache across
-    jobs (:mod:`analysis_service.prompt_cache`); with the job data first, that
-    prefix would shrink to the few tokens of ``analyze.md`` before its title
-    names the lane.
-    """
-    return f"{skills.strip()}\n\n{prompt.strip()}\n"
-
-
 def critic_instruction(
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
-    package: FrameworkPackage,
     nodes: FrameworkNodes,
 ) -> str:
     """One framework's critic instruction, as the graph builds its critic node."""
     return _review_instruction(
         package_loader,
         prompt_loader,
-        package,
         nodes,
         compose_critic_prompt(prompt_loader),
     )
@@ -348,14 +318,12 @@ def critic_instruction(
 def recritic_instruction(
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
-    package: FrameworkPackage,
     nodes: FrameworkNodes,
 ) -> str:
     """One framework's re-ask instruction, as the graph builds its recritic node."""
     return _review_instruction(
         package_loader,
         prompt_loader,
-        package,
         nodes,
         compose_recritic_prompt(prompt_loader),
     )
@@ -364,7 +332,6 @@ def recritic_instruction(
 def _review_instruction(
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
-    package: FrameworkPackage,
     nodes: FrameworkNodes,
     prompt: str,
 ) -> str:
@@ -381,39 +348,8 @@ def _review_instruction(
     """
     for placeholder, artifact in REVIEW_ARTIFACTS.items():
         prompt = prompt.replace(f"{{{placeholder}}}", f"{{{nodes.key(artifact)}}}")
-    return node_instruction(compose_critic_skills(package_loader, package), prompt)
-
-
-async def node_request(
-    template: str,
-    state: Mapping[str, Any],
-    output: Any,
-    closing: str | None,
-) -> tuple[str, types.Content]:
-    """The request one LLM node sends, rebuilt off the graph.
-
-    The instruction is ``template`` with ADK's own ``inject_session_state``
-    run over ``state``, so a placeholder ADK would substitute is substituted
-    the same way here. The user turn is ADK's ``to_user_content`` over
-    ``output``, the way ADK hands a node the node before it returned, and
-    ``closing`` is appended as the turn's last part, as the graph's callback
-    appends it. ``tests/test_evals_lane_replay.py`` and
-    ``tests/test_evals_critic_replay.py`` hold a rebuilt request against the
-    one a real graph run sent, byte for byte.
-    """
-    # ADK reads only ``_invocation_context.session.state`` for a state name,
-    # and the artifact service only for an ``artifact.`` name no prompt here
-    # carries.
-    context = SimpleNamespace(
-        _invocation_context=SimpleNamespace(
-            session=SimpleNamespace(state=dict(state)), artifact_service=None
-        )
-    )
-    instruction = await inject_session_state(template, cast(ReadonlyContext, context))
-    turn = to_user_content(output)
-    if closing:
-        turn.parts = [*(turn.parts or []), types.Part(text=closing)]
-    return instruction, turn
+    skills = compose_critic_skills(package_loader, nodes.package)
+    return node_instruction(skills, prompt)
 
 
 async def critic_request(
@@ -431,5 +367,5 @@ async def critic_request(
     would not have written.
     """
     state = {**shared, nodes.key("draft_view"): render_fenced(critic_round.view())}
-    template = critic_instruction(package_loader, prompt_loader, nodes.package, nodes)
+    template = critic_instruction(package_loader, prompt_loader, nodes)
     return await node_request(template, state, critic_round.summary(), None)
