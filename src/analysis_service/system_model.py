@@ -537,7 +537,7 @@ class DataFlow(_Element):
     #: ``evals/runs/`` predates it — and ``unknown`` is exactly what those
     #: models say about operations: nobody stated them. A live extraction is
     #: still asked for the value by ``prompts/extract.md`` and graded on it by
-    #: the extraction scorer, so omitting it costs an attribute against the
+    #: the extraction scorer, so omitting it loses an attribute against the
     #: blessed model rather than passing unnoticed.
     operations: Operations = "unknown"
 
@@ -855,7 +855,7 @@ class EmittedSystemModel(BaseModel):
     Every field but ``capabilities``, because extraction states no
     capability: an answer states one, code states one that a closed field
     proves, and the capability reader states one a source states. Asking
-    extraction for them costs element identity, up to 3.5 sd in the #1291
+    extraction for them loses element identity, up to 3.5 sd in the #1291
     measurement, so the schema a model fills leaves the list out, and a model
     that writes it anyway is refused.
     """
@@ -1174,8 +1174,8 @@ def mentioned_ids(description: str) -> list[str]:
 
     Deliberately narrow: a token has to open with one of the five real type
     prefixes and a colon, which is a shape ordinary English does not produce —
-    ``"Process: the web app"`` has a space and does not match. The cost of that
-    narrowness is a miss rather than a false alarm, which is the right way
+    ``"Process: the web app"`` has a space and does not match. The drawback of
+    that narrowness is a miss rather than a false alarm, which is the right way
     round for a check whose output annotates a finding a human will read.
 
     Measured over the 18 hand-authored descriptions in STRIDE's own lane

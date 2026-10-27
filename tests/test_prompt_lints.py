@@ -365,8 +365,8 @@ def test_prompt_body_cap_still_alarms(name):
     """The other half of a drift alarm: a cap far above its file catches nothing.
 
     A cap more than twice its body has stopped measuring anything. Shrinking a
-    body therefore costs one line here, which is the price of the alarm staying
-    proportional to what it watches.
+    body therefore needs one line here, so that the alarm stays proportional to
+    what it watches.
     """
     tokens = estimate_tokens(loader.load(name))
     assert TOKEN_CAPS[prompt_key(name)] <= 2 * tokens
@@ -682,7 +682,7 @@ def test_the_exemplar_catalog_is_rendered_the_way_a_real_one_is(name):
 
 
 def test_every_exemplar_system_is_worked_by_some_category():
-    """A second system nobody demonstrates is cost without diversity.
+    """A second system nobody demonstrates adds tokens and no diversity.
 
     The whole point of carrying two is that agents see the method applied to
     both, so a system that ships in the prompt and appears in no draft is
@@ -1033,7 +1033,7 @@ def test_the_prompt_states_the_flow_id_shape_the_service_writes():
     """The stated pattern, filled in, is an ID of the version that ships.
 
     A sentence naming a superseded shape teaches a model an ID the gate then
-    rewrites. That costs nothing while normalization holds — which is what
+    rewrites. That does no harm while normalization holds — which is what
     experiment ``QA-2026-09-22-01-E1`` measured — and the sentence is still
     false, and the next reader of it has no way to know.
     """

@@ -249,7 +249,7 @@ class TestGatePolicy:
 
     def test_unexercised_withholds_unconditionally(self):
         # An assertion, not a measurement: unreachable on any run producing a
-        # report, so its cost is zero and one knob would make it inert.
+        # report, so it has no drawback, and one knob would make it inert.
         result = CertifyResult(certified=True, unexercised=("strong",))
         assert self.gate(require_certified=False).withholds(result)
 

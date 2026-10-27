@@ -2,7 +2,7 @@
 
 So the properties tested here are the ones an auditor would ask about: nothing
 is ever overwritten, a correction is visible as a correction, taste cannot move
-an analysis number, and a better recogniser costs no re-vote.
+an analysis number, and a better recogniser needs no re-vote.
 
 Deterministic and free of provider calls, so it gates on every PR.
 """

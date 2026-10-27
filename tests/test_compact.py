@@ -382,7 +382,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         ]
 
     def test_an_assumption_ref_that_names_nothing_is_the_gate_s_to_report(self):
-        """A named subject can dangle, which is the cost of naming it."""
+        """A named subject can dangle, which is the drawback of naming it."""
         payload = compact_fixture()
         payload["assumptions"][0]["element"] = "s:gone"
 

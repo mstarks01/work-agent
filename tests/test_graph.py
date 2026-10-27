@@ -2469,7 +2469,7 @@ def test_a_precondition_the_contract_cannot_read_fails_the_run(
 
     Refusing the framework here would drop the whole analysis the caller asked
     for and leave them no sign of it, so the gate raises instead — after one
-    extraction, which is the honest cost of a check that cannot run earlier.
+    extraction, which is the drawback of a check that cannot run earlier.
     """
     with pytest.raises(PreconditionError) as caught:
         _prepare_over(monkeypatch, "maybe", domain_loader, package_loaders)

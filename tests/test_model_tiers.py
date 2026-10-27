@@ -123,7 +123,7 @@ class TestNodeInventory:
         can spell rather than what an install runs. So a deployment carrying
         STRIDE alone still has to name ASVS's three keys, and a file that omits
         them fails the completeness check by name. That message is the fix, and
-        it is the stated cost of adding a framework without moving the schema
+        it is the stated drawback of adding a framework without moving the schema
         version.
         """
         assert {name.split("/", 1)[1] for name in FRAMEWORK_NODES} == set(

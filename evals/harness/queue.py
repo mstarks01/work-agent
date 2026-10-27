@@ -99,7 +99,7 @@ class QueueItem:
 
     ``why`` is shown to the reviewer as the reason they are being asked. Telling
     somebody *why* their answer matters is the difference between a queue and a
-    chore, and it costs one string.
+    chore, and it needs one string.
     """
 
     fingerprint: str

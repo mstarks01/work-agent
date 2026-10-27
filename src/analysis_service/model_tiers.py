@@ -96,7 +96,7 @@ TIER_NAMES: tuple[TierName, ...] = ("base", "strong", "review")
 #   gateway segment stripped, because a slug pins the build whichever route
 #   carries it.
 # * ``distinct_provider`` requires a different serving organisation. It removes
-#   a provider's blind spots too, at the cost of a second credential and a
+#   a provider's blind spots too, but it needs a second credential and a
 #   second quota — and it cannot be satisfied by a gateway route at all, since
 #   an aggregator picks the upstream per call.
 #

@@ -129,9 +129,9 @@ def test_a_value_of_function_words_alone_is_not_flagged():
 
     ``FUNCTION_WORDS`` is frozen at the measurement, so it is an ordinary
     English closed-class list and not a complete one: a value whose only
-    content token is a word the list happens to omit is flagged. That costs a
-    diagnostic line on a value that names no mechanism, and it is the price of
-    a list nobody tuned against the sample it reports on.
+    content token is a word the list happens to omit is flagged. That adds a
+    diagnostic line on a value that names no mechanism, and it is the drawback
+    of a list nobody tuned against the sample it reports on.
     """
     model = _model(authentication="it is the same as that")
 

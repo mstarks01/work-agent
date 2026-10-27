@@ -3,7 +3,7 @@
 A **Claim**'s fingerprint names the topic: this lane, this action, this place.
 It is deliberately blind to everything a claim says, because a topic has to be
 recognisable in a later run whose wording moves
-(:mod:`evals.harness.fingerprint`). That blindness has a cost, and the
+(:mod:`evals.harness.fingerprint`). That blindness has a drawback, and the
 2026-09-09 audit measured it: every retained case 01 title and explanation was
 replaced with text asserting that no attacker action exists, and the scorer
 still returned 12 matches. A vote keyed by the topic alone outlives a rewrite of

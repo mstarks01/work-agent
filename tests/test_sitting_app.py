@@ -942,7 +942,7 @@ class TestTheRail:
 
 
 class TestEveryEndpointResolvesItsCase:
-    """Decision 34, and the refusal decision 40 says costs no code of its own.
+    """Decision 34, and the refusal decision 40 says needs no code of its own.
 
     A case id that arrives in a request is resolved against the offered list —
     the rail's pressable rows. So a signed case, a case somebody guessed and a
@@ -2449,7 +2449,7 @@ class TestAFrameworkArrivingOnAReadCase:
     under them when it is simply new, an unmarked count spanning both
     frameworks and naming neither, and an own list coming back empty.
 
-    That last one is not a cost, it is a corruption. The method's one rule is
+    That last one is not a drawback, it is a corruption. The method's one rule is
     that the list is written before the sets open. A reader who has already
     read the earlier sets cannot write a blind list a second time, so a fresh box
     asks them for evidence of an order that did not happen.

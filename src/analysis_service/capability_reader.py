@@ -23,7 +23,7 @@ an answer, a closed field or another statement already names is left as it
 is, and a later answer replaces what this module wrote.
 
 The node runs as a separate pass, never inside extraction: asking extraction
-for capabilities cost element identity (ADR 0051).
+for capabilities lost element identity (ADR 0051).
 """
 
 from __future__ import annotations

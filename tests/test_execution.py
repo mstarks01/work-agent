@@ -178,7 +178,7 @@ def test_a_deterministic_node_costs_nothing_and_records_nothing(graph_run):
 
 
 def test_usage_is_recorded_even_when_the_served_build_is_not():
-    """The two are independent: a missing build costs the fingerprint only."""
+    """The two are independent: a missing build affects the fingerprint only."""
     pipeline, _ = scripted_pipeline(happy_replies(), llm_class=SilentLlm)
     extract = by_node(drive(pipeline))[graph.EXTRACT_NODE]
 

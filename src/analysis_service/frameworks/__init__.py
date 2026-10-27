@@ -683,10 +683,10 @@ def run_precondition(
     of package code is wrapped, because an unwrapped one says nothing about whose
     code it came from.
 
-    The honest cost: this runs after extraction, so a defective package costs one
-    extraction. That is the right side to be wrong on — the check exists for a
-    build defect that should never reach a deployment, and the alternative loses
-    a framework's whole output quietly.
+    The drawback: this runs after extraction, so a defective package wastes one
+    paid extraction. That is the right side to be wrong on — the check exists
+    for a build defect that should never reach a deployment, and the alternative
+    loses a framework's whole output quietly.
 
     Every caller runs it through here: the graph's run-time gate, and the eval
     corpus verifier that checks a case's declaration against the predicate.

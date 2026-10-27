@@ -284,8 +284,8 @@ class CertificationGate:
     * **unexercised** withholds **unconditionally**. It is an *assertion*, not
       a measurement: it is unreachable on any run that produces a report,
       because every tier has a node that always runs and a rejected model
-      returns no report at all. Its cost is therefore zero, and putting it
-      behind the same knob would make the free half inert for every default
+      returns no report at all. It therefore has no drawback, and putting it
+      behind the same knob would make this half inert for every default
       deployment.
 
     Withholding means refusing the *report*, never failing the job: a failed job

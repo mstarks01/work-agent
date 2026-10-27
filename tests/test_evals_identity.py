@@ -56,7 +56,7 @@ from evals.harness.verbs import UNSEPARATED, same_action
 #: **Both halves are assigned** (#511). The ``match`` and the ``no-match``
 #: candidates both carry the fields, so this rule is priced in both
 #: directions. The 111 scored negatives say what element equality really
-#: costs: it merges 22 of them. Every number here is quoted in #201, so moving one means updating the
+#: does: it merges 22 of them. Every number here is quoted in #201, so moving one means updating the
 #: issue.
 MEASURED = {
     "assigned_pairs": 261,
@@ -74,7 +74,7 @@ MEASURED = {
 #: What a **direction** across the boundary is worth, which
 #: [#652](https://github.com/mstarks01/work-agent/issues/652) asks. Nothing in
 #: the identity tuple carries one, so two escalations the opposite way round
-#: fingerprint the same. The question is whether that costs anything.
+#: fingerprint the same. The question is whether that loses anything.
 #:
 #: **A direction is not a field, so it has to be derived, and it is derivable
 #: on two thirds of the corpus.** ``affected_element_ids`` is a list whose order

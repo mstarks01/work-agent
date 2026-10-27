@@ -1481,7 +1481,7 @@ def _without_source_fields(valid_model: dict) -> dict:
     ``excerpt_repairs`` goes too, for the first reason: it holds what an
     extraction wrote before the gate put the source's span in its place.
 
-    The honest cost: the bytes an agent saw are no longer the bytes the report
+    The drawback: the bytes an agent saw are no longer the bytes the report
     carries.
     """
     stripped = _without_excerpt_repairs(valid_model)

@@ -84,7 +84,7 @@ from analysis_service.vendors import ProviderAuthError
 # zones, one flow crossing between them, and two stated unknowns for the
 # category agents to have something to rule on. The corpus cases run 800-2,000
 # characters against a *quality* bar; this one runs against none, so every
-# sentence it does not need is spend on every lane forever.
+# sentence it does not need is spent on every lane forever.
 #
 # Written to be quotable. The validity gate requires each element's citation to
 # appear verbatim in the source, so prose that gestures at a system without
@@ -250,9 +250,9 @@ def _smoke_selection(deployment: Deployment) -> tuple[FrameworkName, ...]:
     :func:`~analysis_service.frameworks.selectable_without_options` gives: a smoke
     run has nobody to ask what ASVS level this install should be measured at.
 
-    The cost is stated by :func:`unexercised_frameworks` rather than hidden: a
-    framework left out is three tier keys nothing exercised, and an operator who
-    wants them exercised runs a job.
+    The drawback is stated by :func:`unexercised_frameworks` rather than hidden:
+    a framework left out is three tier keys nothing exercised, and an operator
+    who wants them exercised runs a job.
     """
     return selectable_without_options(deployment.frameworks)
 

@@ -67,7 +67,7 @@ than dying on node one of a paid-for job:
 
 No vendor is privileged, and every model reaches its provider through
 ``LiteLlm``. ADK emits a warning when a Gemini model runs through LiteLLM. That
-warning is the visible cost of having no privileged default, rather than a
+warning is the visible effect of having no privileged default, rather than a
 misconfiguration.
 """
 

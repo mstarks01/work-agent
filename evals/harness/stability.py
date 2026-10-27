@@ -127,7 +127,7 @@ class ScoredRun:
     #: This run's must-find fates per scope: which the run matched, and which
     #: it named as missed. Both packages answer, out of their own block, and
     #: the missed half is empty for a package whose record names only the
-    #: matched ones — see :func:`band` for why that costs the reading nothing.
+    #: matched ones — see :func:`band` for why the reading loses nothing there.
     must_find: dict[Scope, MustFindFate] = field(default_factory=dict)
 
     @property

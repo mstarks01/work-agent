@@ -117,12 +117,12 @@ class TestVendorSdks:
     def test_the_probe_never_imports_the_library(self, monkeypatch):
         """Asking whether a library is there must not pull it in.
 
-        Two costs, and the first is why the rule exists.
+        Two drawbacks, and the first is why the rule exists.
         ``tests/test_identity.py`` asserts that every module ``src/`` imports is
         declared in ``project.dependencies``, so an ``import boto3`` here would
         turn an optional extra into a hard dependency of the wheel. The second
         is the diagnostic page, which calls this on every render and must not
-        pay a vendor SDK's import for it.
+        run a vendor SDK's import for it.
         """
         monkeypatch.delitem(sys.modules, "boto3", raising=False)
         assert missing_sdk("bedrock") is None

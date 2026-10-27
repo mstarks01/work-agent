@@ -1543,7 +1543,7 @@ class TestZonesAreScoredApartFromCitableElements:
     """A trust zone reaches no claim, so it is not counted as extraction recall.
 
     ``identity.comparable_elements`` drops every ``boundary:`` ID before any
-    claim comparison, so a zone the extraction named differently costs no match
+    claim comparison, so a zone the extraction named differently loses no match
     downstream. Counting one as a miss depressed endpoint recall by eleven
     points over the sweep of 2026-09-13. The zones still get a number, because
     the crossings derive from them.
@@ -1574,7 +1574,7 @@ def _rename_one_boundary(case):
 
     A rename rather than a deletion: a model missing a zone its elements point
     at is invalid, and the question here is what a *differently named* zone
-    costs, which is the only thing extraction actually does to them.
+    does, which is the only thing extraction actually does to them.
     """
     raw = case.model.model_dump()
     old = raw["trust_boundaries"][0]["id"]

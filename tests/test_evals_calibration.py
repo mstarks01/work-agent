@@ -441,7 +441,7 @@ def test_every_package_answers_the_collision_question(corpus_and_flows):
     """Runs every way rather than outward from STRIDE.
 
     A package cannot ship without a collision measurement: the identity a
-    claim composes differs per package, and the cost of keying two distinct
+    claim composes differs per package, and the effect of keying two distinct
     claims alike does not. Any collision must be recorded in that package's
     own exception table with a reason.
     """

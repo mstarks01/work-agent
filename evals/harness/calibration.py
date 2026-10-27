@@ -1,7 +1,7 @@
 """Rule-vs-label agreement over the recorded fixtures.
 
 The two error directions are the measurement, and the ratio is the door. A false
-split is an equivalent finding the rule calls distinct, and it costs a reviewer
+split is an equivalent finding the rule calls distinct, and it gives a reviewer
 one unmatched finding. A false merge is two distinct findings the rule calls
 one, and it destroys a finding and inflates recall, where no reviewer sees it
 happen. The consequences differ, so this module reports the counts apart and
@@ -261,7 +261,7 @@ class CalibrationResult:
 
     ``false_non_matches`` is the **false split** direction and
     ``false_matches`` the **false merge** direction over these labels. Read
-    them apart: a split costs a reviewer one unmatched finding, a merge
+    them apart: a split gives a reviewer one unmatched finding, a merge
     destroys a finding silently.
     """
 

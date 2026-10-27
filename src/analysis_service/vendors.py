@@ -445,7 +445,7 @@ _ENDPOINT_VARIANTS: dict[str, str] = {
 #: as it resolves an ARN, so every refusal here is this service's own and
 #: nothing upstream makes it.
 #:
-#: This costs the ability to address a tuned or privately deployed model, on
+#: This loses the ability to address a tuned or privately deployed model, on
 #: every cloud equally. That is the trade the ARN entry already made: a
 #: provisioned-throughput ARN is likewise the only way to name its resource, and
 #: it is refused because what it names is not a build.
@@ -635,8 +635,8 @@ _BEDROCK_CLAUDE_ID = re.compile(
 # so a rule that lives in the Claude shape would leave a Nova ARN accepted.
 #
 # * **The ``@date`` spelling.** It is Vertex's, it appears on one key against
-#   148, and a second syntax for one generation costs every later reader a
-#   branch.
+#   148, and a second syntax for one generation gives every later reader one
+#   more branch.
 # * **The 2023 names** ``claude-v1``, ``claude-v2:1`` and ``claude-instant-v1``.
 #   The shape requires a family name and a generation, because those two
 #   segments are what a later reader keys on, and these three predate that

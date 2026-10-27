@@ -14,10 +14,10 @@ The second half asks the mirror question one layer up: which knowledge
 **documents** does any lane of any blessed model actually receive? A document
 registered against rules that fire can still reach nobody, because selection
 ranks by match count and keeps one case and two notes per lane — so a broader
-document wins every lane they share and a narrower one is unreachable at full
-maintenance cost. The package gate holds that a document exists and its rule IDs
-resolve, and neither it nor ``test_knowledge_lints`` asks whether the material
-is ever selected.
+document wins every lane they share and a narrower one is unreachable but still
+needs full maintenance. The package gate holds that a document exists and its
+rule IDs resolve, and neither it nor ``test_knowledge_lints`` asks whether the
+material is ever selected.
 
 Deterministic over the blessed ``model.json`` and free of provider calls, which
 is why it gates on every PR rather than waiting for a sweep.
@@ -224,7 +224,7 @@ def registered_documents() -> set[str]:
 
 
 def test_no_document_is_unreachable_without_a_stated_reason(models):
-    """Material nobody receives is material that cannot help, at full cost.
+    """Material nobody receives cannot help, and it still needs full maintenance.
 
     A document registered against rules that fire still reaches no agent when a
     broader document outranks it in every lane they share — the ranking is

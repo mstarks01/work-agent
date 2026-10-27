@@ -130,7 +130,7 @@ def identity_key(case: GoldenCase, claim: ReferenceThreat) -> str:
     The element sets must be **equal**, not merely overlap. Overlap is the
     tempting relaxation — a lane agent naming a flow and a reference naming the
     process at one end of it are describing one thing — and #201's comment
-    records what it costs on this corpus: it merges an order of magnitude more
+    records what it does on this corpus: it merges an order of magnitude more
     reference claims than equality does, every one of them a pair a reviewer
     ruled distinct.
 

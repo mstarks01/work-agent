@@ -309,7 +309,7 @@ DECLARED: dict[str, str] = {
 
 #: A framework's name on a service-wide thing, kept **by decision** rather than
 #: because it is right. Keyed by the name, not by the file, so one decision
-#: costs one row however many modules spell it.
+#: takes one row however many modules spell it.
 #:
 #: **Empty, and that is the state to keep it in.** Nothing outside a package
 #: root carries a framework's name today, so the check below is absolute rather

@@ -71,8 +71,8 @@ def test_the_near_controls_are_outnumbered_by_far_cases(corpus):
 
     A guard on the instrument rather than on the corpus: `far_recall` is what
     the honest question is asked of, and each near control taken out of the far
-    population costs it a case. At two of thirteen that is comfortable; the check
-    exists so a third exemplar system cannot quietly make it not.
+    population removes a case from it. At two of thirteen that is comfortable;
+    the check exists so a third exemplar system cannot quietly make it not.
     """
     near = sum(
         1 for case in corpus if case.declaration("stride").exemplar_proximity == "near"

@@ -66,7 +66,7 @@ __all__ = ["ASVS", "AsvsOptions", "applicability_for"]
 # maintainer edits is a document and what it applies to.
 #
 # **Every rule appears.** Leaving the empty corpus put all 17 under
-# ``test_every_rule_can_retrieve_something``, which is the stated cost of
+# ``test_every_rule_can_retrieve_something``, which is the stated drawback of
 # starting one. A rule with a lead and nothing behind it is a gap.
 NOTES: dict[str, tuple[str, ...]] = {
     "injection-sinks-and-context": (

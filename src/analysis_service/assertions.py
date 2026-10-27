@@ -2199,9 +2199,9 @@ class CatalogProposal(BaseModel):
     #: A root-level array of objects carrying ``maxItems`` is a shape Google's
     #: structured output refuses — measured, and the only feature separating
     #: this schema from the extraction schema that runs on the same route. A
-    #: model's output schema is a vendor-neutral surface, so a bound that costs
-    #: a vendor belongs where code enforces it rather than where a provider has
-    #: to accept it.
+    #: model's output schema is a vendor-neutral surface, so a bound that a
+    #: vendor refuses belongs where code enforces it rather than where a
+    #: provider has to accept it.
     assertions: list[AssertionProposal] = Field(default_factory=list)
 
 
@@ -2575,7 +2575,7 @@ def _merge_rank(entry: Assertion) -> tuple[int, str]:
 
 
 #: Why a projected value reads the way it does. Closed, because the whole point
-#: of projecting is to say what the one string cost: a reader comparing a
+#: of projecting is to say what the one string lost: a reader comparing a
 #: projection to the attribute beside it needs to know whether the value is the
 #: catalog's answer or the catalog refusing to answer in one word.
 ProjectionReason = Literal[

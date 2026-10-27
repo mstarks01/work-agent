@@ -286,7 +286,7 @@ class UnknownRef(BaseModel):
     Five spellings in one flat shape (:attr:`spellings`), which is the answer
     :class:`Ground` and :class:`Verdict` already give to "tagged variant in a
     provider-facing schema". A union here would compile to ``oneOf``, and
-    ``Ground`` records at length what an uncompilable grammar costs. The first
+    ``Ground`` records at length what an uncompilable grammar does. The first
     two are below; the ``assertion``, ``question`` and ``capability`` fields
     state the other three.
 
@@ -516,7 +516,7 @@ GROUND_TEXT_MAX_CHARS = 1000
 # :data:`MAX_CLAIMS_PER_BATCH` bounds the root array and is carried by
 # :func:`~analysis_service.fan_in.fan_in` instead: a root-level array of objects
 # with ``maxItems`` is a shape at least one vendor's structured output refuses
-# outright, at every value from 8 to 500 (#942). A bound that costs a vendor
+# outright, at every value from 8 to 500 (#942). A bound that a vendor refuses
 # belongs where code reads the output.
 MAX_CLAIMS_PER_BATCH = 400
 MAX_GROUNDS_PER_CLAIM = 60
@@ -542,7 +542,7 @@ class Ground(BaseModel):
     is not expressible in a JSON schema a provider will reliably compile —
     ``oneOf`` has the thinnest, least uniform support across the vendors a
     category agent may be routed to, and ``config/sampling.toml`` records what
-    an uncompilable grammar costs: one vendor rejects ``SystemModel``'s as "too
+    an uncompilable grammar does: one vendor rejects ``SystemModel``'s as "too
     large", and ``constrain_output = false`` is no answer, because
     unconstrained the model fences its JSON and omits required fields. A dead
     run, not a degraded one. The only writer is
@@ -1552,11 +1552,11 @@ class ProposalBatch(BaseModel):
     an omission. :data:`MAX_CLAIMS_PER_BATCH` still holds, enforced by
     :func:`~analysis_service.fan_in.fan_in` before it reads a row: a root-level
     array of objects carrying ``maxItems`` is refused outright by at least one
-    vendor's structured output, so the field would cost every lane agent of
-    every framework that route (#942). One shared reader also answers the parity
-    question a field cannot: a package narrowing ``claims`` drops the base's
-    constraints in silence, so a field-borne bound is a line each package has to
-    remember to write.
+    vendor's structured output, so the field would close that route to every
+    lane agent of every framework (#942). One shared reader also answers the
+    parity question a field cannot: a package narrowing ``claims`` drops the
+    base's constraints in silence, so a field-borne bound is a line each package
+    has to remember to write.
     """
 
     model_config = ConfigDict(extra="forbid")

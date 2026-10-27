@@ -38,8 +38,8 @@ The IDs are stable and mean something: ``unknown:<element-id>:<attribute>``,
 ``absent:<element-id>:<attribute>`` and ``crossing:<flow-id>``. All three are
 built from IDs the model already carries, so the same System Model yields the
 same catalog on every run, and a ref in a log or a diff is readable without a
-lookup. Opaque IDs would cost that for nothing, because there is no secret here.
-There are only facts the agent is being shown anyway.
+lookup. Opaque IDs would lose that and gain nothing, because there is no secret
+here. There are only facts the agent is being shown anyway.
 
 A fourth family arrives with the job's **Assertion** catalog, where the job ran
 one. ``assertion:<predicate>~<subject>~<scope>~<value>`` is the row's own

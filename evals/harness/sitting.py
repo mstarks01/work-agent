@@ -202,7 +202,7 @@ class Draft(BaseModel):
     signed, and it is what lets a surface tell the reader the text moved under
     a read in progress and refuse to record until it is served again.
 
-    **A hand-edited draft costs nothing this project can price, and nothing
+    **A hand-edited draft does no harm this project can measure, and nothing
     notices it.** A reader who types their own list into this file by hand
     wrote a list, which is the whole of what the filled document claims. A
     timestamp pair is rejected for the same reason: the reader owns the file,
@@ -471,7 +471,7 @@ class Row:
     #: so no surface parses a sentence to colour a dot.
     state: RowState
     #: Whether the reader may open this case. A row that does not press is
-    #: also off the offered list, so the refusal a signed case needs costs no
+    #: also off the offered list, so the refusal a signed case needs has no
     #: code of its own.
     pressable: bool
 
@@ -920,7 +920,7 @@ def check_every_finding_marked(
     sitting that filled fewer recorded less than the shell beside it.
 
     **Every** finding rather than some of them, because a fraction is a number
-    nobody can defend. The cost is small where the cost actually falls: the
+    nobody can defend. The extra work is small where it actually falls: the
     hour goes on reading the sets, and the mark is a press the reader makes
     while they read.
 

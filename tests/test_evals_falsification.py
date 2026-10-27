@@ -4,9 +4,9 @@ Three groups. The first holds the probe table against the acceptance list it
 answers: every criterion has a probe or a recorded reason, and neither table
 quietly grows an entry the other does not know about. The second runs every
 probe and holds each to what it declared. The third is what the suite exists to
-stop — a falsification probe that costs nothing, and a probe mistaken for an
-arm. The fourth drives every corruption through the job's own gate, projection
-and evidence catalog, unreviewed and reviewed.
+stop — a falsification probe that takes nothing away, and a probe mistaken for
+an arm. The fourth drives every corruption through the job's own gate,
+projection and evidence catalog, unreviewed and reviewed.
 """
 
 from __future__ import annotations

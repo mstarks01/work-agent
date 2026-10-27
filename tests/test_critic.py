@@ -1142,7 +1142,7 @@ def test_the_critic_is_shown_the_recommendations_it_now_rules_on():
     A mitigation is copied into the report from this same draft and no other
     seam looks at it, so a recommendation that is well formed and irrelevant
     to its claim reached an operator unread. It is the largest block in this
-    prompt, and that is the cost of the only review it gets.
+    prompt, and that size is the drawback of the only review it gets.
     """
     draft = sample_draft("S-01", "spoofing")
     assert draft.mitigations, "the fixture must carry one for this to prove anything"

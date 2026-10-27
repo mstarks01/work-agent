@@ -32,10 +32,11 @@ fingerprints for no difference a reader could act on.
 
 A prompt edit, a ``litellm`` bump or a service release moves every hash, so a
 deployment's manifest goes stale and its runs report uncertified until a
-sanctioned sweep blesses the new ones. That is the cost, and it is the point: a
-run on edited prompts is not the run that was sanctioned, so it does not report
-as certified. It is also why the manifest is versioned. A manifest of an older
-version fails closed, rather than certifying against a payload it never saw.
+sanctioned sweep blesses the new ones. That is the drawback, and it is the
+point: a run on edited prompts is not the run that was sanctioned, so it does
+not report as certified. It is also why the manifest is versioned. A manifest of
+an older version fails closed, rather than certifying against a payload it never
+saw.
 """
 
 from __future__ import annotations

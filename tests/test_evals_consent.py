@@ -605,7 +605,7 @@ class TestTheHold:
         assert hold(None, [node(completion=1_000_000)], ["02"], None, ran=1) is None
 
     def test_the_re_prompt_offers_the_whole_sweep_and_not_the_sunk_spend(self, priced):
-        """One overrun costs one prompt, not one at every case that follows.
+        """One overrun adds one prompt, not one at every case that follows.
 
         Accepting what is already spent puts the run over its own figure again
         on the very next case. The offer is the projection instead, so the

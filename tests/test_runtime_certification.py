@@ -170,8 +170,8 @@ class TestUnexercisedWithholdsUnconditionally:
     @pytest.mark.parametrize("require_certified", [False, True])
     def test_an_unexercised_tier_withholds_either_way(self, require_certified):
         # An assertion rather than a measurement: unreachable on any run that
-        # produces a report, so its cost is zero and one shared knob would make
-        # the free half inert for every default deployment.
+        # produces a report, so it has no drawback, and one shared knob would
+        # make this half inert for every default deployment.
         result = CertifyResult(certified=True, unexercised=("strong",))
         response = fetch_report(
             make_client(result, gate(require_certified=require_certified))

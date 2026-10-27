@@ -359,7 +359,7 @@ def test_a_requirement_outside_the_level_is_its_own_cell(read_case):
 
     assert score.off_catalog == (beyond,)
     assert score.over_applied == ()
-    # It still costs precision: a reader has to read the claim either way.
+    # It still lowers precision: a reader has to read the claim either way.
     assert score.precision == 0.0
 
 
@@ -743,9 +743,9 @@ class TestADeferredRequirementApplies:
     """A ``needs-other-evidence`` scope entry says the requirement applies (#454).
 
     A lane raised it and the service withheld the claim for want of the right
-    kind of evidence. That is a match on applicability, and a policy cost
-    `CARRIED_EVIDENCE_KINDS` sets on the report; a requirement nobody raised is
-    the miss. The first sweep carrying deferral withheld 45 of 57 expected
+    kind of evidence. That is a match on applicability, and a limit the policy
+    in `CARRIED_EVIDENCE_KINDS` sets on the report; a requirement nobody raised
+    is the miss. The first sweep carrying deferral withheld 45 of 57 expected
     requirements, and the scorer read all 45 as misses.
     """
 

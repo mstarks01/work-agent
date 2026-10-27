@@ -2,7 +2,7 @@
 
 Prose that says what a function did before the last change is wrong the day
 the next change lands, and nothing fails when it does: a docstring is never
-executed. It also costs every reader a second story to hold beside the code.
+executed. It also gives every reader a second story to hold beside the code.
 The repository's decisions live in ``docs/adr/`` and in the tickets, so prose
 that cites one points there and describes the current rule.
 
