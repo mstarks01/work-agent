@@ -18,6 +18,7 @@ from typing import ClassVar, get_args
 
 import pytest
 
+from analysis_service.config_files import SECRET_FILE_SUFFIX, refused_var
 from analysis_service.vendors import (
     _CATCH_ALL,
     _CLAUDE_MODERN,
@@ -26,7 +27,6 @@ from analysis_service.vendors import (
     MODEL_NAME,
     REASONING_KWARG,
     REGION,
-    SECRET_FILE_SUFFIX,
     VENDOR_NAMES,
     VENDORS,
     CredentialMode,
@@ -38,7 +38,6 @@ from analysis_service.vendors import (
     join_served,
     missing_sdk,
     openai_reasoning_model,
-    refused_var,
     require_sdk,
     vendor_for,
     vendor_for_route,

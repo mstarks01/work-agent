@@ -62,7 +62,7 @@ def secret_vars() -> frozenset[str]:
 
     **The one reader of that fact.** The Settings page and its write-only key
     field call it. Each loader reads the file of one of these variables
-    through :func:`~analysis_service.vendors.read_secret`, which applies the
+    through :func:`~analysis_service.config_files.read_secret`, which applies the
     permission rule of a secret file. It collects the secret
     credential variables of each vendor and mode, the key files of the ``s3``
     object store, and the database password file. A ``_FILE`` suffix does not

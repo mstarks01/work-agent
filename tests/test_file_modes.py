@@ -3,7 +3,7 @@ secret rule (ADR 0092).
 
 The tests make real files with real modes in a temporary directory. The loader
 tests drive :func:`~analysis_service.config_files.private_fd` and
-:func:`~analysis_service.vendors.read_secret`. The app tests drive the
+:func:`~analysis_service.config_files.read_secret`. The app tests drive the
 first-run app and ``/v1``, and read only the HTTP response and the log.
 """
 
@@ -22,11 +22,12 @@ from analysis_service.config_files import (
     MAX_VALUE_CHARS,
     SettingsFileError,
     read_private,
+    read_secret,
     read_settings_env,
 )
 from analysis_service.deployment import Deployment
 from analysis_service.jobs import InMemoryJobStore
-from analysis_service.vendors import ProviderAuthError, read_secret
+from analysis_service.vendors import ProviderAuthError
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 from tests.test_api import FakeVerifier, auth, submission
 from tests.test_settings_env import (
@@ -74,13 +75,13 @@ class TestThePermissionRule:
     def test_a_secret_that_others_can_read_is_refused(self, tmp_path, mode):
         path = private_file(tmp_path / "key", "SECRET", mode)
         with pytest.raises(ProviderAuthError) as refused:
-            read_secret(key_env(path), KEY_VAR)
+            read_secret(key_env(path), KEY_VAR, ProviderAuthError)
         assert str(refused.value) == f"{path}: mode {mode:04o} lets other users read it"
 
     @pytest.mark.parametrize("mode", [0o640, 0o440])
     def test_a_secret_that_the_group_can_read_passes(self, tmp_path, mode):
         path = private_file(tmp_path / "key", "SECRET", mode)
-        assert read_secret(key_env(path), KEY_VAR) == "SECRET"
+        assert read_secret(key_env(path), KEY_VAR, ProviderAuthError) == "SECRET"
 
     def test_a_file_of_another_owner_is_refused(self, tmp_path, monkeypatch):
         path = private_file(tmp_path / "settings.env", "")
@@ -102,7 +103,7 @@ class TestThePermissionRule:
 
         monkeypatch.setattr(config_files.os, "open", open_then_swap)
         with pytest.raises(ProviderAuthError, match="mode 0604"):
-            read_secret(key_env(path), KEY_VAR)
+            read_secret(key_env(path), KEY_VAR, ProviderAuthError)
         assert path.stat().st_mode & 0o777 == 0o600
 
     def test_a_settings_directory_that_others_can_write_is_refused(self, tmp_path):
@@ -116,28 +117,28 @@ class TestThePermissionRule:
 class TestTheSecretRule:
     def test_one_final_newline_is_not_part_of_the_secret(self, tmp_path):
         path = private_file(tmp_path / "key", "SECRET\n")
-        assert read_secret(key_env(path), KEY_VAR) == "SECRET"
+        assert read_secret(key_env(path), KEY_VAR, ProviderAuthError) == "SECRET"
 
     def test_a_password_with_spaces_and_a_backslash_passes(self, tmp_path):
         password = "pass word \\ with $ and 'quotes'"
         path = private_file(tmp_path / "password", password)
-        assert read_secret(key_env(path), KEY_VAR) == password
+        assert read_secret(key_env(path), KEY_VAR, ProviderAuthError) == password
 
     @pytest.mark.parametrize("text", ["", "\n"])
     def test_an_empty_secret_is_refused(self, tmp_path, text):
         path = private_file(tmp_path / "key", text)
         with pytest.raises(ProviderAuthError, match=f"{KEY_VAR} names is empty"):
-            read_secret(key_env(path), KEY_VAR)
+            read_secret(key_env(path), KEY_VAR, ProviderAuthError)
 
     @pytest.mark.parametrize("secret", REFUSED_SECRETS.values(), ids=REFUSED_SECRETS)
     def test_it_refuses_each_form_and_never_repeats_the_secret(self, tmp_path, secret):
         path = private_file(tmp_path / "key", secret)
         with pytest.raises(ProviderAuthError, match=KEY_VAR) as refused:
-            read_secret(key_env(path), KEY_VAR)
+            read_secret(key_env(path), KEY_VAR, ProviderAuthError)
         assert "SECRET" not in str(refused.value)
 
     def test_an_unset_variable_is_no_secret(self):
-        assert read_secret({}, KEY_VAR) == ""
+        assert read_secret({}, KEY_VAR, ProviderAuthError) == ""
 
 
 class TestTheFirstRunApp:

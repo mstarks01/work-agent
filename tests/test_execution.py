@@ -21,20 +21,18 @@ from analysis_service import graph
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun, _NodeFinish
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, DraftThreat
-from analysis_service.report import (
-    InputRef,
-    Job,
-    Report,
-    charges_by_node,
-    latency_by_node,
-    usage_by_node,
-)
+from analysis_service.report import InputRef, Job, Report
 from analysis_service.sampling import (
     TierSampling,
     load_sampling,
 )
 from analysis_service.sources import Source, render_sources
 from analysis_service.system_model import normalize_element_ids
+from evals.harness.instruments import (
+    charges_by_node,
+    latency_by_node,
+    usage_by_node,
+)
 from tests.factories import (
     BASE_MODEL,
     DESCRIPTION_TEXT,

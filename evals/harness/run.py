@@ -59,14 +59,7 @@ from analysis_service.graph import Pipeline
 from analysis_service.identity import build_identity
 from analysis_service.model_tiers import ModelTierConfig, TierSelection
 from analysis_service.questions import question_fallback
-from analysis_service.report import (
-    NodeLatency,
-    NodeRun,
-    TokenUsage,
-    charges_by_node,
-    latency_by_node,
-    usage_by_node,
-)
+from analysis_service.report import NodeRun, TokenUsage
 from analysis_service.retry import UnfinishedCompletionError
 from evals.harness import (
     assembly,
@@ -153,9 +146,13 @@ from evals.harness.identity import CaseFlows, SubsetVerbIdentity
 from evals.harness.instruments import (
     INSTRUMENTS,
     ModeRun,
+    NodeLatency,
     Sweep,
+    charges_by_node,
+    latency_by_node,
     measure_case,
     render_all,
+    usage_by_node,
 )
 from evals.harness.losses import CaseLosses
 from evals.harness.provenance import (

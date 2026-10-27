@@ -91,6 +91,7 @@ from analysis_service.answer_sets import AnswerSet
 from analysis_service.aws_identity import platform_session
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import UnknownKey
+from analysis_service.config_files import read_secret, refused_var
 from analysis_service.fact_answers import STORED, FactAnswer, SkipKey
 from analysis_service.jobs import (
     RESTART_FAILURE_MESSAGE,
@@ -139,12 +140,7 @@ from analysis_service.store_settings import (
     holds_password,
     refuse_unread,
 )
-from analysis_service.vendors import (
-    REGION,
-    ProviderAuthError,
-    read_secret,
-    refused_var,
-)
+from analysis_service.vendors import REGION
 
 logger = logging.getLogger(__name__)
 
@@ -566,10 +562,7 @@ def _password_file(url: URL, env: Mapping[str, str]) -> Password:
 
     This file is the only way to give the password.
     """
-    try:
-        password = read_secret(env, DATABASE_PASSWORD_FILE_VAR)
-    except ProviderAuthError as error:
-        raise StoreConfigError(str(error)) from None
+    password = read_secret(env, DATABASE_PASSWORD_FILE_VAR, StoreConfigError)
     if not password:
         raise StoreConfigError(
             f"set {DATABASE_PASSWORD_FILE_VAR} to a file that holds the database password"

@@ -47,6 +47,7 @@ from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from analysis_service.aws_identity import platform_session
+from analysis_service.config_files import read_secret, refused_var
 from analysis_service.objects import (
     OBJECT_ADDRESSING_VAR,
     OBJECT_BUCKET_VAR,
@@ -62,13 +63,7 @@ from analysis_service.store_settings import (
     closed_setting,
     refuse_unread,
 )
-from analysis_service.vendors import (
-    REGION,
-    CredentialMode,
-    ProviderAuthError,
-    read_secret,
-    refused_var,
-)
+from analysis_service.vendors import REGION, CredentialMode
 
 #: An S3 bucket name: 3 to 63 lower-case letters, digits, dots and hyphens,
 #: with a letter or digit at each end.
@@ -79,10 +74,7 @@ def _key_pair(env: Mapping[str, str]) -> boto3.Session:
     """``api_key``: a session on the static key pair, from the two files only."""
     pair = {}
     for argument, var in S3_KEY_FILES.items():
-        try:
-            value = read_secret(env, var)
-        except ProviderAuthError as error:
-            raise StoreConfigError(str(error)) from None
+        value = read_secret(env, var, StoreConfigError)
         if not value:
             raise StoreConfigError(
                 f"the api_key mode of the s3 object store needs {var}; it is unset"

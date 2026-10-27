@@ -141,7 +141,7 @@ def _strips_file_suffix(node: ast.AST) -> bool:
 def test_the_file_suffix_of_a_key_variable_has_one_reader():
     """Only ``refused_var`` strips the suffix of a key variable."""
     readers = set(_sites(_strips_file_suffix)) - NOT_A_KEY.keys()
-    assert readers == {("src/analysis_service/vendors.py", "refused_var")}
+    assert readers == {("src/analysis_service/config_files.py", "refused_var")}
 
 
 def test_each_declared_site_still_strips():
@@ -1164,6 +1164,26 @@ def test_an_object_digest_is_read_through_its_column_table():
     store = [REPO_ROOT / "src/analysis_service/sql_store.py"]
     assert _sites(_reads_an_object_digest_off_a_row, store) == [
         ("src/analysis_service/sql_store.py", "save")
+    ]
+
+
+def _reads_a_secret_file(node: ast.AST) -> bool:
+    """Whether ``node`` opens a private file under the rule of a secret file.
+    ``read_private`` passes its own ``secret`` on, which is no new read."""
+    return (_calls(node, "read_private") or _calls(node, "private_fd")) and any(
+        keyword.arg == "secret"
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value is True
+        for keyword in node.keywords
+    )
+
+
+def test_a_secret_file_has_one_reader():
+    """Each loader of a key or a password asks ``read_secret`` with its own
+    error class, so the mode rule, the newline rule and the secret rule have
+    one reader."""
+    assert _sites(_reads_a_secret_file) == [
+        ("src/analysis_service/config_files.py", "read_secret")
     ]
 
 

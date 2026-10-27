@@ -45,7 +45,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
-from analysis_service.config_files import read_private, secret_refusal
+from analysis_service.config_files import (
+    SECRET_FILE_SUFFIX,
+    read_secret,
+    refused_var,
+)
 from analysis_service.errors import ConfigError
 
 VendorName = Literal["vertex", "anthropic", "openai", "bedrock", "gemini", "openrouter"]
@@ -91,10 +95,6 @@ SchemaRule = Literal["as_built", "bounds_described"]
 # the half, so this service names the knob once and runs either generation.
 REASONING_KWARG = "reasoning_effort"
 
-# A secret arrives in a file, never in an environment variable: a variable
-# passes to every child process and shows in ``/proc/<pid>/environ``, and a
-# file can have mode ``0400``. The variable holds the file's path.
-SECRET_FILE_SUFFIX = "_FILE"
 _API_KEY_TEMPLATE = "ANALYSIS_{vendor}_API_KEY" + SECRET_FILE_SUFFIX
 
 # Vertex needs a project and a location to address; they are ordinary config,
@@ -261,7 +261,8 @@ class _CredentialVar:
     """One environment variable a ``(vendor, mode)`` pair reads.
 
     ``secret`` is the field that separates this entry's two readers. A secret
-    entry's ``var`` names a file setting, and :func:`read_secret` reads the
+    entry's ``var`` names a file setting, and
+    :func:`~analysis_service.config_files.read_secret` reads the
     value from that file.
     :attr:`Vendor.required_env_vars` reports every entry, because an operator
     has to set every one. :meth:`Vendor.secret_env_vars` reports only the
@@ -1317,7 +1318,7 @@ class Vendor:
                     f"vendor {self.name!r} reads its secret from the file that"
                     f" {entry.var} names; unset {bare}, which this service refuses"
                 )
-            value = read_secret(env, entry.var)
+            value = read_secret(env, entry.var, ProviderAuthError)
         else:
             value = env.get(entry.var, "").strip()
         if not value:
@@ -1331,40 +1332,6 @@ class Vendor:
                 f" {entry.shape.pattern}; it does not"
             )
         return value
-
-
-def refused_var(secret_var: str) -> str:
-    """The variable that would hold the secret itself, which the service refuses.
-
-    **The one reader of the file suffix of a key variable.** A variable
-    without the suffix comes back unchanged.
-    """
-    return secret_var.removesuffix(SECRET_FILE_SUFFIX)
-
-
-def read_secret(env: Mapping[str, str], var: str) -> str:
-    """The secret in the file that ``var`` names, or ``""`` if ``var`` is unset.
-
-    The secret is the content of the file without one final ``\\n``. Raises
-    :class:`ProviderAuthError` when the file cannot be read, when it fails
-    :func:`~analysis_service.config_files.private_fd` for a secret file, or
-    when the secret fails
-    :func:`~analysis_service.config_files.secret_refusal`. The message names
-    the variable or the file, and never the content (OWASP A09).
-    """
-    path = env.get(var, "").strip()
-    if not path:
-        return ""
-    try:
-        content = read_private(path, ProviderAuthError, secret=True)
-        value = content.decode("utf-8").removesuffix("\n")
-    except (OSError, UnicodeDecodeError) as exc:
-        raise ProviderAuthError(
-            f"{var} names a file this service cannot read ({type(exc).__name__})"
-        ) from exc
-    if refusal := secret_refusal(value):
-        raise ProviderAuthError(f"the secret in the file that {var} names {refusal}")
-    return value
 
 
 #: The registry. A missing key raises, which is the point: a table nobody can

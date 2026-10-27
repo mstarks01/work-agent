@@ -337,3 +337,42 @@ def secret_refusal(value: str) -> str | None:
     if value != value.strip():
         return "has whitespace at an end"
     return None
+
+
+# A secret arrives in a file, never in an environment variable: a variable
+# passes to every child process and shows in ``/proc/<pid>/environ``, and a
+# file can have mode ``0400``. The variable holds the file's path.
+SECRET_FILE_SUFFIX = "_FILE"
+
+
+def refused_var(secret_var: str) -> str:
+    """The variable that would hold the secret itself, which the service refuses.
+
+    **The one reader of the file suffix of a key variable.** A variable
+    without the suffix comes back unchanged.
+    """
+    return secret_var.removesuffix(SECRET_FILE_SUFFIX)
+
+
+def read_secret(env: Mapping[str, str], var: str, error: type[Exception]) -> str:
+    """The secret in the file that ``var`` names, or ``""`` if ``var`` is unset.
+
+    The secret is the content of the file without one final ``\\n``. Raises
+    ``error`` when the file cannot be read, when it fails :func:`private_fd`
+    for a secret file, or when the secret fails :func:`secret_refusal`. The
+    message names the variable or the file, and never the content (OWASP
+    A09).
+    """
+    path = env.get(var, "").strip()
+    if not path:
+        return ""
+    try:
+        content = read_private(path, error, secret=True)
+        value = content.decode("utf-8").removesuffix("\n")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise error(
+            f"{var} names a file this service cannot read ({type(exc).__name__})"
+        ) from exc
+    if refusal := secret_refusal(value):
+        raise error(f"the secret in the file that {var} names {refusal}")
+    return value

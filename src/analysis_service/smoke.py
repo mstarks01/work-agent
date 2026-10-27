@@ -51,6 +51,7 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.claims import FrameworkName
+from analysis_service.config_files import read_secret
 from analysis_service.deployment import Deployment
 from analysis_service.engine import Engine
 from analysis_service.errors import ConfigError
@@ -71,7 +72,7 @@ from analysis_service.report import (
 )
 from analysis_service.sampling import TierSampling
 from analysis_service.sources import Source
-from analysis_service.vendors import ProviderAuthError, read_secret
+from analysis_service.vendors import ProviderAuthError
 
 # The fixture, and it is part of the contract rather than a sample: every
 # provider is asked the same question, so a lane that swapped in its own text
@@ -675,7 +676,7 @@ def _redacted(text: str, deployment: Deployment) -> str:
             # A file this process cannot read put no value into a request.
             value = ""
             with contextlib.suppress(ProviderAuthError):
-                value = read_secret(deployment.env, var)
+                value = read_secret(deployment.env, var, ProviderAuthError)
             if value:
                 text = text.replace(value, f"${{{var}}}")
     return text[:MAX_FAILURE_CHARS]

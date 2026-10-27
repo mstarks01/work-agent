@@ -32,6 +32,7 @@ from analysis_service import (
     sampling,
     store_backends,
 )
+from analysis_service.config_files import refused_var
 from analysis_service.model_tiers import (
     TIER_NAMES,
     charges_env_var_for,
@@ -39,7 +40,7 @@ from analysis_service.model_tiers import (
     env_vars_for,
     upstreams_env_var_for,
 )
-from analysis_service.vendors import VENDOR_NAMES, VENDORS, VendorName, refused_var
+from analysis_service.vendors import VENDOR_NAMES, VENDORS, VendorName
 
 #: What the page does with a setting.
 Mark = Literal["changes", "shows", "excluded"]

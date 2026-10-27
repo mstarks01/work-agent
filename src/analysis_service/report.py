@@ -23,7 +23,7 @@ resolves inside one payload.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Annotated, Any, Literal, Self
 
@@ -430,7 +430,8 @@ class NodeRun(BaseModel):
     # ``analysis_service.charges.reported_charge_of`` refuses a non-finite
     # figure on the way in and ``evals.harness.baseline.money`` refuses one in a
     # contributor's file, and this reader admitted what both refuse: an ``inf``
-    # validated, summed to ``inf`` through :func:`charges_by_node`, and
+    # validated, summed to ``inf`` through
+    # :func:`~evals.harness.instruments.charges_by_node`, and
     # re-serialised as ``null`` — so a report read back and re-dumped moved the
     # bytes an attestation seals.
     reported_charge_usd: float | None = Field(
@@ -769,122 +770,6 @@ class InputRef(BaseModel):
             sources=refs,
             source_sha256=cls.aggregate_digest(refs),
         )
-
-
-def charges_by_node(nodes: Iterable[NodeRun]) -> dict[str, float]:
-    """What each node's provider said it charged, summed across its executions.
-
-    The same fold as :func:`usage_by_node`, over the other measurement a node
-    run keeps, and it exists for the same reason: a sweep hands over every
-    case's executions at once, so a per-node total means every caller writing
-    the same loop.
-
-    A node whose provider reported nothing is **absent** rather than zero. The
-    distinction is the one the usage fold already draws: a call nobody priced
-    and a call that cost nothing are different facts, and most vendors report no
-    charge at all, so a zeroed entry would read as a free call on every one of
-    them.
-
-    Summed in USD, which is the unit
-    :attr:`NodeRun.reported_charge_usd` is recorded in. Float addition over a
-    few dozen small values is the same arithmetic the token prices already use,
-    and the figure it produces is a record of what was charged rather than an
-    input to a comparison.
-    """
-    totals: dict[str, float] = {}
-    for node in nodes:
-        if node.reported_charge_usd is None:
-            continue
-        totals[node.node] = totals.get(node.node, 0.0) + node.reported_charge_usd
-    return totals
-
-
-def usage_by_node(nodes: Iterable[NodeRun]) -> dict[str, TokenUsage]:
-    """Total tokens per node name, summed across that node's executions.
-
-    The question this exists to answer is "which node costs the most", and a
-    bare ``nodes`` list does not answer it: a sweep hands over every case's
-    executions at once, so one node contributes one record per case, and
-    reading a per-node total off the list means every caller writing the same
-    fold. Keyed by node name rather than by tier
-    because the tier is already answerable from the node, and the interesting
-    comparison — the critic against one category agent, both on ``strong`` — is
-    the one a tier roll-up destroys.
-
-    Nodes reporting no usage contribute nothing and are absent from the result,
-    rather than present with a zeroed record that reads as a free call.
-    """
-    totals: dict[str, TokenUsage] = {}
-    for node in nodes:
-        if node.usage is None:
-            continue
-        running = totals.get(node.node)
-        if running is None:
-            totals[node.node] = node.usage.model_copy()
-            continue
-        totals[node.node] = TokenUsage(
-            **{
-                field: getattr(running, field) + getattr(node.usage, field)
-                for field in TokenUsage.model_fields
-            }
-        )
-    return totals
-
-
-class NodeLatency(BaseModel):
-    """What one node's executions cost in wall-clock, folded across a sweep.
-
-    The counterpart to :class:`TokenUsage`'s fold, and it differs in one way
-    that matters: **every** execution carries a ``duration_ms``, so a
-    deterministic FunctionNode appears here where it is absent from the usage
-    totals. That is the point — the deterministic derivations are the half of
-    the graph nobody bills for, and the only way to know they stay cheap is to
-    see them beside the nodes that do cost money.
-
-    ``slowest_ms`` is kept alongside the total because the mean is the wrong
-    number for the question latency is usually asked for: a retry budget and a
-    request timeout are both set from the tail, and a node whose mean is
-    comfortable can still be the one that trips them.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    executions: int = Field(ge=1)
-    total_ms: int = Field(ge=0)
-    slowest_ms: int = Field(ge=0)
-
-    @property
-    def mean_ms(self) -> float:
-        return self.total_ms / self.executions
-
-
-def latency_by_node(nodes: Iterable[NodeRun]) -> dict[str, NodeLatency]:
-    """Wall-clock per node name, folded across that node's executions.
-
-    Same fold as :func:`usage_by_node`, over the measurement the report keeps
-    and nothing downstream has ever read back: a sweep's node runs carry
-    ``duration_ms`` per execution, and without this the whole latency record
-    dies with the process that measured it.
-
-    A node absent from the result ran zero times in the sweep, which is a
-    different fact from running fast — hence ``executions`` on every row.
-    """
-    totals: dict[str, NodeLatency] = {}
-    for node in nodes:
-        running = totals.get(node.node)
-        if running is None:
-            totals[node.node] = NodeLatency(
-                executions=1,
-                total_ms=node.duration_ms,
-                slowest_ms=node.duration_ms,
-            )
-            continue
-        totals[node.node] = NodeLatency(
-            executions=running.executions + 1,
-            total_ms=running.total_ms + node.duration_ms,
-            slowest_ms=max(running.slowest_ms, node.duration_ms),
-        )
-    return totals
 
 
 class Report(BaseModel):
