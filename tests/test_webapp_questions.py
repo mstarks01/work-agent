@@ -1622,6 +1622,26 @@ def test_a_paused_run_goes_once_its_resumed_run_has_a_report(tiers):
         assert _listed(client) == {child, another}, "the answered run went first"
 
 
+def test_an_amended_run_that_pauses_again_frees_the_run_it_replaced(tiers):
+    """The amended run pauses and locks the run it replaced, which takes no
+    answers and cannot be needed again, because a paused run never fails.
+    So the replaced run no longer waits, and a new run takes its place."""
+    with _bounded(tiers, PausingRunner(catalog=False), max_jobs=2) as client:
+        paused = _paused(client)
+        amended = client.post(
+            f"/amend/{paused}",
+            json={"text": AMENDMENT, "revision": 0},
+            headers=SAME_ORIGIN,
+        )
+        assert amended.status_code == 200, amended.text
+        child = amended.json()["run"]
+        assert ran(client, child) == "awaiting-answers"
+
+        another = _completed(client)
+
+        assert _listed(client) == {child, another}, "the replaced run went first"
+
+
 def test_the_run_an_answer_continues_is_never_deleted_for_it(tiers):
     """Room for an answer's run comes from other finished runs, never from
     the run the answer continues, however old."""
