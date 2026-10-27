@@ -90,7 +90,7 @@ TIER_NAMES: tuple[TierName, ...] = ("base", "strong", "review")
 #
 # * ``shared`` requires nothing. Criticism may run on the very model it checks,
 #   which is the shipped configuration: a critic on one model still catches
-#   inconsistency and unsupported claims, and it costs one tier rather than two.
+#   inconsistency and unsupported claims, and it needs one tier rather than two.
 # * ``distinct_model`` requires a different model. It removes a single build's
 #   blind spots, and leaves the provider's. Compared by the identifier with any
 #   gateway segment stripped, because a slug pins the build whichever route
@@ -352,7 +352,7 @@ class ModelTierConfig(BaseModel):
         """The tiers this deployment runs something on.
 
         **The one reader of "is this tier bound".** The node map is what says
-        so. A tier with a selection that no node points at costs no adapter, no
+        so. A tier with a selection that no node points at needs no adapter, no
         credential and no SDK. Every site that decides what a deployment needs
         reads this set, and not the wider set in ``self.tiers``. The loader asks
         the same question of the raw node map before validation, through
@@ -480,7 +480,7 @@ class ModelTierConfig(BaseModel):
         key describing an arrangement with such a vendor describes nothing.
 
         Only vendors a **bound** tier selects are required to declare, exactly
-        as with credentials. An undeclared arrangement costs nothing until a
+        as with credentials. An undeclared arrangement does no harm until a
         call is made, and no call is made on a tier no node points at.
         """
         problems = []
@@ -887,8 +887,8 @@ def _apply_upstream_overrides(raw: dict[str, object], env: Mapping[str, str]) ->
 def tiers_in_use(nodes_raw: object) -> set[str]:
     """The tiers the node map actually runs something on.
 
-    A tier is a place a node can sit, and an empty place costs nothing to leave
-    empty: :func:`~analysis_service.binding.build_tier_adapters` already skips a tier nothing is bound to, so
+    A tier is a place a node can sit, and an empty place does no harm when it
+    stays empty: :func:`~analysis_service.binding.build_tier_adapters` already skips a tier nothing is bound to, so
     a selection for one is a pair no request ever reaches. A tier that no node
     uses needs no selection.
 

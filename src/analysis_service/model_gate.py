@@ -66,7 +66,7 @@ class NoThinkingLevel(ModelGateError):
 #: header, and the only integrity check is a non-empty dict with a known
 #: provider key.
 #:
-#: Setting a switch for a feature this service does not use costs nothing, so
+#: Setting a switch for a feature this service does not use does no harm, so
 #: no switch is left to a judgement of which ones matter. ``test_model_gate``
 #: compares this tuple against litellm's own source, so a bump that adds another
 #: fails the offline suite rather than opening a quiet egress.

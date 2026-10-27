@@ -1142,7 +1142,7 @@ def test_the_route_enforces_the_gate_the_runner_certified_with():
     assert app.state.certification is deployment.gate
     # The app holds a *function* from a selection to its runner, not one runner:
     # a graph is built for one selection, so a runner is too, and a selection
-    # nobody has asked for costs nothing.
+    # nobody has asked for builds nothing.
     assert app.state.runner_for(DEFAULT_FRAMEWORKS) is deployment.runner(
         DEFAULT_FRAMEWORKS
     )

@@ -444,8 +444,8 @@ class Deployment:
         things on two installs.
 
         Building the tier adapters runs two build-time gates — the
-        supported-param check and the credential check — so an unusable
-        provider selection costs nothing rather than dying on node one of a
+        supported-param check and the credential check — so an unusable provider
+        selection fails before any paid call rather than dying on node one of a
         paid-for job. ``resolve_model`` short-circuits them deliberately: an
         offline test binding scripted models has no credentials to pass and no
         provider to call.

@@ -94,9 +94,9 @@ def check_fact_answers(
 ) -> None:
     """Refuse an answer that names no open fact here, or a value the fact cannot hold.
 
-    Checked before a resumed run is admitted, against the model and catalog
-    the questions were asked about, so a wrong answer costs nothing. A key
-    names one fact in one of the five spellings, as
+    Checked before a resumed run is admitted, against the model and catalog the
+    questions were asked about, so a wrong answer is refused before any model
+    runs. A key names one fact in one of the five spellings, as
     :attr:`~analysis_service.claims.UnknownRef.spellings` reads them.
 
     ``earlier`` is what the earlier saves answered. An attribute one of them

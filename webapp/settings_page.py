@@ -62,7 +62,7 @@ class Setting:
     #: :data:`~analysis_service.deployment.CONFIG_PATHS` that names the file,
     #: and the path of keys in it. ``None`` where no file holds one.
     file_key: tuple[deployment.ConfigPathName, tuple[str, ...]] | None = None
-    #: What a change costs, for a setting that the page changes. Empty for
+    #: The effect of a change, for a setting that the page changes. Empty for
     #: each other setting.
     note: str = ""
 

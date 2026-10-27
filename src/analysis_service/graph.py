@@ -255,7 +255,7 @@ from analysis_service.validation import (
 )
 
 if TYPE_CHECKING:
-    # Type-only, so composing a graph costs no provider-library import and the
+    # Type-only, so composing a graph needs no provider-library import and the
     # binding <-> graph reference stays one-directional at run time.
     from analysis_service.binding import NodeBinding
 
@@ -1580,8 +1580,8 @@ def prepare_analysis(
     earns the framework's artifacts and its ``run`` route; ``refuted`` and
     ``undecidable`` both take its ``skip`` route straight to ``assemble``, where
     the framework still produces a block. Nothing is derived for a refused
-    framework, so its candidates, its retrieval and its lane prompts cost
-    nothing.
+    framework, so its candidates, its retrieval and its lane prompts are never
+    built.
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)

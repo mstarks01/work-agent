@@ -40,8 +40,8 @@ Constructor kwargs reach ``acompletion`` through ``_additional_args`` before
 ``drop_params``, here or through ``LITELLM_DROP_PARAMS``, because LiteLLM's
 default is fail-closed and the sampling fingerprint's honesty depends on it.
 
-Seven build-time gates fire per tier, so a misconfiguration costs nothing rather
-than dying on node one of a paid-for job:
+Seven build-time gates fire per tier, so a misconfiguration fails before any
+paid call rather than dying on node one of a paid-for job:
 
 * the supported-param check (:mod:`analysis_service.model_gate`);
 * the output-ceiling check below, which the supported-param check cannot make.
@@ -62,8 +62,8 @@ than dying on node one of a paid-for job:
   tier and fails closed under :class:`~analysis_service.vendors.ProviderAuthError`;
 * the vendor-SDK check (:func:`~analysis_service.vendors.require_sdk`), which
   asks whether the client library this vendor's provider needs is in the image.
-  Once per bound tier, so a tier nothing runs on costs no SDK — the same rule
-  that makes it cost no credential.
+  Once per bound tier, so a tier nothing runs on needs no SDK — the same rule
+  that makes it need no credential.
 
 No vendor is privileged, and every model reaches its provider through
 ``LiteLlm``. ADK emits a warning when a Gemini model runs through LiteLLM. That
@@ -412,7 +412,7 @@ def build_tier_adapters(
     if env is None:
         env = os.environ
 
-    # Deferred so that importing this module never costs the ADK LiteLLM import
+    # Deferred so that importing this module never runs the ADK LiteLLM import
     # for callers that only want the helpers; by this point ``model_gate`` has
     # already pinned the cost map, so the ordering guarantee holds either way.
     from google.adk.models.lite_llm import LiteLlm, LiteLLMClient

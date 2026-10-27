@@ -731,7 +731,7 @@ class TestDeclaredCredentialMode:
         The rule this class already stated — "a multi-mode vendor nobody calls
         needs no identity" — while the code read every tier and so demanded one.
         The shipped node map points nothing at ``review``, so a ``review`` tier
-        naming Bedrock costs no credential, no SDK and no declaration; the
+        naming Bedrock needs no credential, no SDK and no declaration; the
         loader refused to start without one anyway.
 
         Both readers are :attr:`ModelTierConfig.bound_vendors` now, so the

@@ -381,8 +381,8 @@ def placements(quote: str, haystack: str, *, limit: int = 2) -> int:
 
     Measured on 2026-09-16 over every quote this repository holds: **0 of the
     79 signed corpus quotes and 0 of the 829 archived model-proposed quotes
-    sit in more than one place.** So the refusal built on this costs nothing
-    today, and it is the silent wrong citation it prevents that earns it.
+    sit in more than one place.** So the refusal built on this refuses no quote
+    today, and the silent wrong citation it prevents is the reason for it.
     """
     seen = 0
     cursor = 0
@@ -646,7 +646,7 @@ def repair_prepared(
 
     Candidates are every run of whole words whose count is the quote's, up to
     ``_REPAIR_WIDTH_SLACK`` more, compared under :func:`normalize` on
-    both sides so the rungs the ladder already forgives cost nothing here. The
+    both sides so the rungs the ladder already forgives lower no score here. The
     best candidate wins if it reaches :data:`REPAIR_THRESHOLD`.
 
     ``source`` is a :class:`PreparedSource` from :func:`prepare_source`, whose

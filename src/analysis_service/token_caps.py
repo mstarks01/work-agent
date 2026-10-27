@@ -2,9 +2,9 @@
 
 A cap here is a drift alarm rather than a budget. It rations nothing. It makes a
 size change visible in review, and it fails the lint when one file grows past
-what the alarm allows. Raising a cap costs a one-line edit and needs no
-argument, because no measurement in this repository says a shorter instruction
-finds more threats. ADR 0016 holds that reasoning.
+what the alarm allows. Raising a cap needs a one-line edit and no argument,
+because no measurement in this repository says a shorter instruction finds more
+threats. ADR 0016 holds that reasoning.
 """
 
 from __future__ import annotations

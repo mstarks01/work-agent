@@ -101,8 +101,8 @@ def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     carrying both ``"summary": "critical"`` and ``"summary": "none"`` verifies
     here while reading the other way somewhere else.
 
-    Nothing this service produces has a repeated key, so refusing one costs a
-    real report nothing and takes the disagreement away.
+    Nothing this service produces has a repeated key, so refusing one does no
+    harm to a real report and takes the disagreement away.
     """
     seen: dict[str, Any] = {}
     for key, value in pairs:

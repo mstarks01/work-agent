@@ -1076,8 +1076,8 @@ class TestOpenAIReasoningFamilies:
     """Which identifiers pin ``temperature`` at their own default.
 
     A family rule rather than a support table, and open at the top: an
-    unrecognised ``gpt-6`` reads as reasoning, because a false positive costs
-    one clear error at startup and a false negative costs node one of a paid
+    unrecognised ``gpt-6`` reads as reasoning, because a false positive gives
+    one clear error at startup and a false negative fails node one of a paid
     job.
     """
 

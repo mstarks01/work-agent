@@ -77,7 +77,7 @@ The security posture is deliberate throughout:
   That is why the viewer carries no ``style=""`` attributes and sets generated
   colours through ``element.style.*``, which is a CSSOM write CSP does not
   govern. No page loads an external resource or carries an ``on*=`` handler, so
-  ``'none'`` costs nothing. Each policy grants what its own page does and
+  ``'none'`` breaks nothing. Each policy grants what its own page does and
   nothing else: the report page reaches only its own origin, to post to
   ``/answer/{run}`` and ``/correct/{run}``, the form page reaches only its own
   origin, through ``connect-src 'self'`` for ``/example``, ``/analyze``,
@@ -1784,8 +1784,8 @@ def _vendor_sections(tiers: ModelTierConfig | None, env: Mapping[str, str]) -> s
     adapter and needs no credential, so listing every tier would show a
     deployment whose unused ``review`` tier names a second vendor that vendor's
     variables marked NOT SET and its client library to install. None of it is
-    needed, and the page is the one surface where being wrong about that costs
-    an operator a detour. ``ModelTierConfig.bound_vendors`` is the reader the
+    needed, and the page is the one surface where being wrong about that sends
+    an operator on a detour. ``ModelTierConfig.bound_vendors`` is the reader the
     build uses, so the two cannot disagree again.
 
     The mode is **reported, never resolved**. Under a mode that passes no
