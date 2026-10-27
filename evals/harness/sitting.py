@@ -926,8 +926,8 @@ def check_every_finding_marked(
 
     ``frameworks`` names the sets this sitting read, and the rule holds inside
     each one. A **Framework** that arrives after a reader finished is not their
-    unfinished work, so a message that counted across both would name a debt
-    the reader does not owe.
+    unfinished work, so a message that counted across both would count work
+    that is not the reader's.
     """
     marks = current_marks(prepared, marks)
     for framework in frameworks:

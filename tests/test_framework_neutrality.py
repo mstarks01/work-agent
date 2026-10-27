@@ -313,9 +313,9 @@ DECLARED: dict[str, str] = {
 #:
 #: **Empty, and that is the state to keep it in.** Nothing outside a package
 #: root carries a framework's name today, so the check below is absolute rather
-#: than a rule with exceptions. A row here buys time for a rename that is bigger
-#: than the pull request finding it — public surface, a recorded identifier — and
-#: it is a debt, not a permission.
+#: than a rule with exceptions. A row here gives time for a rename that is too
+#: large for the pull request that finds it — public surface, a recorded
+#: identifier — and it is open work, not a permission.
 #:
 #: This is not a second exemption list for :data:`DECLARED`. An entry there says
 #: the code genuinely belongs to one framework; an entry here says the code

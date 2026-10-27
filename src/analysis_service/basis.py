@@ -293,7 +293,7 @@ class StatedControl(NamedTuple):
 class Coverage(BaseModel):
     """What this diagnostic read, and what it could not read at all.
 
-    **An empty list of flags is not a clean bill.** Four different things
+    **An empty list of flags does not mean the model is clean.** Four things
     produce one: every value echoed its source, or no value was readable, or
     there were no stated values to read, or the scan budget ran out before
     the values were searched. A caller holding only :func:`unbased_controls`
