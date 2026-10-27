@@ -105,7 +105,7 @@ Trust zones: `boundary:field` (network), `boundary:ingest` (network), `boundary:
 | Flow | Attributes |
 |---|---|
 | `flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry` | MQTT over TLS; operations `write`; `authentication`: one client certificate shared by every device image; payload carries the tenant_id |
-| `flow:process:mqtt-broker>process:stream-processor>consume-topic` | topic subscription; operations `read`; `authentication: unknown`; `encryption_in_transit: unknown`; carries raw device payloads |
+| `flow:process:mqtt-broker>process:stream-processor>consume-topic` | topic subscription; operations `write`; `authentication: unknown`; `encryption_in_transit: unknown`; carries raw device payloads |
 | `flow:process:stream-processor>store:telemetry-store>write-readings` | time-series write API; operations `write`; `authentication`: one service account holding write on every tenant partition; `encryption_in_transit: unknown` |
 
 Its evidence catalog:
