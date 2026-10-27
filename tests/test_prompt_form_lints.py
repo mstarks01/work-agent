@@ -11,9 +11,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from analysis_service.claims import UnknownRef
+import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from analysis_service.claims import UnknownRef
+from tests.source_tree import MODEL_TEXT, REPO_ROOT, source_files
+
+pytestmark = pytest.mark.lint
+
 
 #: Each form names its own field; ``element_id`` goes with two of them, and
 #: ``facets`` narrows the ``question`` form rather than being a form (ADR 0073).
@@ -24,10 +28,9 @@ FORMS = sorted(
 
 def _lists() -> list[tuple[Path, str]]:
     """Every prompt paragraph that names ``element_id`` and two or more forms."""
-    prompts = [*REPO_ROOT.glob("prompts/*.md"), *REPO_ROOT.glob("frameworks/**/*.md")]
     return [
         (path, paragraph)
-        for path in sorted(prompts)
+        for path in source_files(*MODEL_TEXT, suffixes=(".md",))
         for paragraph in path.read_text(encoding="utf-8").split("\n\n")
         if "`element_id`" in paragraph
         and sum(f"`{form}`" in paragraph for form in FORMS) >= 2

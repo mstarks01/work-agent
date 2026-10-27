@@ -29,6 +29,8 @@ from analysis_service.skills import (
 )
 from analysis_service.token_caps import TOKEN_CAPS, covered_assets
 
+pytestmark = pytest.mark.lint
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRAMEWORKS_DIR = PROJECT_ROOT / "frameworks"
 DOMAINS_DIR = PROJECT_ROOT / "domains"

@@ -28,7 +28,9 @@ from evals.harness.reference import (
     load_corpus,
     refuse_holdout,
 )
-from tests.source_tree import source_files
+from tests.source_tree import PYTHON, parse, source_files
+
+pytestmark = pytest.mark.lint
 
 CORPUS = REPO_ROOT / "evals" / "corpus"
 
@@ -51,14 +53,21 @@ HOLDOUT_READERS = {
     "evals/harness/audit.py:holdout_cases": (
         "it reads which cases the corpus flags, to count the reads of each"
     ),
+    "webapp/offline_sitting.py:payload": (
+        "the offline sitting page carries every case, as the envelope it is"
+        " built from does"
+    ),
+    "webapp/review.py:build_session": (
+        "a person votes on the findings of a sweep, and a sweep scores every case"
+    ),
 }
 
 
 def _loaders() -> set[str]:
     """Every call that reaches the golden ``load_corpus`` unfiltered, by site."""
     found = set()
-    for path in source_files("evals"):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+    for path in source_files(*PYTHON):
+        tree = parse(path)
         relative = path.relative_to(REPO_ROOT).as_posix()
         module = None
         for function in ast.walk(tree):

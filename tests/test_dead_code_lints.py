@@ -55,14 +55,20 @@ gains a reader outside the tests, or leaves the tree, fails the table.
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterable
+from pathlib import Path
 
-from tests.source_tree import REPO_ROOT, parse, source_files
+import pytest
 
-# Every directory that may legitimately reach a name, including the tests.
-SEARCHED = ("src", "tests", "evals", "examples", "webapp")
+from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files
 
-#: Where definitions are looked for.
-SCOPES = ("src/analysis_service", "evals", "webapp")
+pytestmark = pytest.mark.lint
+
+#: Every file that may legitimately reach a name, including the tests.
+SEARCHED = source_files(*PYTHON, *TESTS)
+
+#: Where definitions are looked for: the Python the project runs.
+SCOPES = source_files(*PYTHON)
 
 #: Directories under :data:`SCOPES` whose module-level names a library reads by
 #: name, with the reason. No code in the tree calls these names, so the lints
@@ -74,8 +80,8 @@ NAMED_BY_A_LIBRARY: dict[str, str] = {
     ),
 }
 
-#: Where a use counts for the second lint: every searched root but the tests.
-PRODUCTION = tuple(root for root in SEARCHED if root != "tests")
+#: Where a use counts for the second lint: every searched file but the tests.
+PRODUCTION = SCOPES
 
 _PINNED = (
     "a measurement the tests pin, so the figure in the module docstring is"
@@ -216,7 +222,7 @@ def _definitions() -> dict[str, str]:
     interpreter, which is the same reason methods are out of scope.
     """
     found: dict[str, str] = {}
-    for path in source_files(*SCOPES):
+    for path in SCOPES:
         where = path.relative_to(REPO_ROOT).as_posix()
         if where.startswith(tuple(NAMED_BY_A_LIBRARY)):
             continue
@@ -233,10 +239,8 @@ def _definitions() -> dict[str, str]:
     return found
 
 
-def _used_names(
-    ignoring: frozenset[str], roots: tuple[str, ...] = SEARCHED
-) -> set[str]:
-    """Every identifier the files under ``roots`` read, call, decorate with or import.
+def _used_names(ignoring: frozenset[str], files: Iterable[Path] = SEARCHED) -> set[str]:
+    """Every identifier the files in ``files`` read, call, decorate with or import.
 
     A definition contributes nothing: ``ast.FunctionDef`` carries its name as a
     plain string rather than an ``ast.Name``, so a helper that only defines
@@ -271,7 +275,7 @@ def _used_names(
                 used.update(alias.asname or alias.name for alias in child.names)
             walk(child)
 
-    for path in source_files(*roots):
+    for path in files:
         walk(parse(path))
     return used
 
@@ -299,7 +303,7 @@ def test_only() -> dict[str, str]:
     dead = frozenset(unreachable())
     found = dead
     while True:
-        used = _used_names(ignoring=found, roots=PRODUCTION)
+        used = _used_names(ignoring=found, files=PRODUCTION)
         unshipped = frozenset(name for name in definitions if name not in used)
         if unshipped == found:
             return {name: definitions[name] for name in sorted(unshipped - dead)}
@@ -359,7 +363,7 @@ def test_a_use_in_a_test_is_not_a_production_use():
     """Positive control on the roots: a name only this file calls is seen by the
     full walk and not by the production walk."""
     everywhere = _used_names(ignoring=frozenset())
-    shipped = _used_names(ignoring=frozenset(), roots=PRODUCTION)
+    shipped = _used_names(ignoring=frozenset(), files=PRODUCTION)
 
     assert shipped <= everywhere
     assert "unreachable" in everywhere and "unreachable" not in shipped
@@ -428,7 +432,7 @@ def test_no_plain_method_is_unreachable():
     used = _used_names(ignoring=frozenset())
     dead = [
         f"{path.relative_to(REPO_ROOT)}:{line} {name}"
-        for path in source_files(*SCOPES)
+        for path in SCOPES
         for name, line in _uncalled_methods(parse(path), used)
     ]
 

@@ -37,8 +37,10 @@ import pytest
 
 from analysis_service.sampling import OFFERED_PARAMS, TierSampling
 from analysis_service.vendors import VENDORS
+from tests.source_tree import PYTHON, REPO_ROOT, parse, source_files
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.lint
+
 PACKAGE = REPO_ROOT / "src" / "analysis_service"
 
 #: Kwargs that redirect a request to an address of the caller's choosing.
@@ -88,14 +90,14 @@ CONFIG_FORBIDDEN_KWARGS = (
 )
 
 
-def _package_sources() -> list[Path]:
-    return sorted(PACKAGE.rglob("*.py"))
+def _project_sources() -> list[Path]:
+    return source_files(*PYTHON)
 
 
 def _assigned_keywords(source: Path) -> set[str]:
     """Every keyword argument name spelled in a call in ``source``."""
     names: set[str] = set()
-    for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+    for node in ast.walk(parse(source)):
         if isinstance(node, ast.Call):
             names.update(kw.arg for kw in node.keywords if kw.arg)
         if isinstance(node, ast.Dict):
@@ -117,7 +119,7 @@ def test_no_module_names_a_provider_endpoint_kwarg(kwarg):
     """
     offenders = [
         source.relative_to(REPO_ROOT)
-        for source in _package_sources()
+        for source in _project_sources()
         if kwarg in _assigned_keywords(source)
     ]
     assert not offenders, (
@@ -141,7 +143,7 @@ def test_no_module_names_a_tls_kwarg(kwarg):
     """
     offenders = [
         source.relative_to(REPO_ROOT)
-        for source in _package_sources()
+        for source in _project_sources()
         if kwarg in _assigned_keywords(source)
     ]
     assert not offenders, (
@@ -291,8 +293,8 @@ def test_a_provider_naming_kwarg_takes_its_value_from_the_registry(kwarg):
     different name.
     """
     literals = []
-    for source in _package_sources():
-        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+    for source in _project_sources():
+        for node in ast.walk(parse(source)):
             if not isinstance(node, ast.Call):
                 continue
             for keyword in node.keywords:

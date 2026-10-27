@@ -25,6 +25,8 @@ from evals.critic_review.loading import corpus_model, load_fixtures, source_text
 from evals.critic_review.model import CriticFixture, FixtureKind
 from evals.critic_review.replay import carries_both_answers
 
+pytestmark = pytest.mark.lint
+
 
 def draft_of(fixture: CriticFixture):
     """The fixture's draft in its own package's record shape.

@@ -19,9 +19,13 @@ from __future__ import annotations
 import ast
 from collections import defaultdict
 
-from tests.source_tree import REPO_ROOT, parse, source_files
+import pytest
 
-SEARCHED = ("src", "evals", "webapp", "tests")
+from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files
+
+pytestmark = pytest.mark.lint
+
+SEARCHED = source_files(*PYTHON, *TESTS)
 
 #: Characters of ``ast.dump`` below which a body is too small to be a copy.
 FLOOR = 250
@@ -44,7 +48,7 @@ def _body_key(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
 def duplicates() -> list[list[str]]:
     """Every body defined verbatim in more than one file, with each location."""
     sites: dict[str, list[str]] = defaultdict(list)
-    for path in source_files(*SEARCHED):
+    for path in SEARCHED:
         for node in ast.walk(parse(path)):
             if isinstance(node, _FUNCTIONS) and (key := _body_key(node)):
                 sites[key].append(

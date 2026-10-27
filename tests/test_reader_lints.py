@@ -38,12 +38,14 @@ from evals.harness.archive import CaseKind, case_suffix
 from evals.harness.bundle import REPORTS_SUFFIX
 from evals.harness.reference import CASE_FILES, MUST_FIND
 from evals.harness.roster import STANDINGS
-from tests.source_tree import REPO_ROOT, parse, source_files
+from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
 from webapp import main, offline_sitting, review, sitting
 from webapp.page import client_script
 
+pytestmark = pytest.mark.lint
+
 #: Every directory that may legitimately read a fact, including the tests.
-SEARCHED = ("src", "evals", "webapp", "tests")
+SEARCHED = (*PYTHON, *TESTS)
 
 #: The sitting app's endpoints and the one script that reads their answers.
 #: Keyed by module so a second surface arrives as a row rather than a branch.
@@ -156,7 +158,7 @@ def _without_comments(pages: tuple[str, ...], scripts: tuple[str, ...]) -> str:
 
 def _asserted_spellings() -> list[tuple[str, int, str]]:
     found = []
-    for path in source_files("tests"):
+    for path in source_files(*TESTS):
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             match = _ASSERTION.search(line)
             if match is None or not _PAGE_TARGET.search(match.group(3)):
@@ -199,7 +201,7 @@ _MODEL_BASES = re.compile(r"BaseModel|dataclass|NamedTuple|TypedDict")
 def _declared_fields() -> dict[str, tuple[Path, int]]:
     """Every field of every model, dataclass or named tuple, by ``Class.field``."""
     fields: dict[str, tuple[Path, int]] = {}
-    for path in source_files("src", "evals", "webapp"):
+    for path in source_files(*PYTHON):
         for node in ast.walk(parse(path)):
             if not isinstance(node, ast.ClassDef):
                 continue
@@ -227,7 +229,7 @@ def _readers_corpus() -> str:
     match, so the lint would read its own table as a reader and the rot check
     would fail on every declared row.
     """
-    files = source_files(*SEARCHED, suffixes=(".py", ".js", ".html"))
+    files = source_files(*PYTHON, *TESTS, suffixes=(".py", ".js", ".html"))
     own = Path(__file__).resolve()
     return "\n".join(
         path.read_text(encoding="utf-8") for path in files if path.resolve() != own
@@ -313,7 +315,7 @@ def test_the_must_find_tier_is_compared_through_one_name():
     """
     offenders = {
         f"{path.relative_to(REPO_ROOT)}:{line}"
-        for path in source_files("evals", "src", "webapp")
+        for path in source_files(*PYTHON)
         for line in _tier_comparisons(path)
         if path != REPO_ROOT / "evals" / "harness" / "reference.py"
     }
@@ -357,7 +359,7 @@ def test_the_tier_comparison_scan_finds_one_when_there_is_one(tmp_path):
 
 #: Where a message is production output. Tests are excluded: a test may
 #: deliberately build such a string to drive a scan.
-MESSAGE_ROOTS = ("src", "evals", "webapp")
+MESSAGE_FILES = source_files(*PYTHON)
 
 
 def _pinned_by(test: ast.expr) -> list[tuple[str, str, str]]:
@@ -413,7 +415,7 @@ def _constant_interpolations(tree: ast.AST) -> list[tuple[int, str, str]]:
 def test_no_message_interpolates_a_value_its_own_branch_pinned():
     """A message whose field is a constant tells its reader nothing."""
     found = []
-    for path in source_files(*MESSAGE_ROOTS):
+    for path in MESSAGE_FILES:
         for line, expr, literal in _constant_interpolations(parse(path)):
             found.append(
                 f"{path.relative_to(REPO_ROOT)}:{line} interpolates {expr},"
@@ -504,7 +506,7 @@ def test_no_second_site_respells_an_owned_vocabulary(owner):
     # shipped tree is the thing that comes to disagree.
     found = [
         f"{path.relative_to(REPO_ROOT)}:{line}"
-        for path in source_files("src", "evals", "webapp")
+        for path in source_files(*PYTHON)
         if path.relative_to(REPO_ROOT).as_posix()
         not in (owner.split(":")[0], *DECLARED_RESPELLINGS)
         for line in _respelled(parse(path), members)
@@ -611,7 +613,7 @@ def test_no_site_reads_an_open_attribute_by_exact_match():
     attributes = _qualifiable_attributes()
     offenders = {
         f"{path.relative_to(REPO_ROOT)}:{line}"
-        for path in source_files("src", "evals", "webapp")
+        for path in source_files(*PYTHON)
         for line in _unknown_comparisons(path, attributes)
     }
 
@@ -656,10 +658,16 @@ def test_the_unknown_comparison_scan_finds_one_when_there_is_one(tmp_path):
 # spends. A reader that spells a name out keeps its own spelling when the rule
 # moves, and its own test still passes.
 
-#: Production roots. ``evals/experiments`` records the scripts an audit ran on
-#: the day, as frozen evidence, so no lint holds them to the live rule.
-_CASE_NAME_ROOTS = ("src", "evals", "webapp")
-_FROZEN_SCRIPTS = "evals/experiments"
+#: The production files, less the scripts an audit ran.
+_CASE_NAME_FILES = without(
+    source_files(*PYTHON),
+    {
+        "evals/experiments": (
+            "the scripts an audit ran on the day, as frozen evidence, so no"
+            " lint holds them to the live rule"
+        ),
+    },
+)
 
 
 def _case_name_spellings() -> frozenset[str]:
@@ -687,11 +695,8 @@ def test_every_case_file_name_comes_from_the_bundle():
     """
     spellings = _case_name_spellings()
     found = [
-        f"{relative}:{line}"
-        for path in source_files(*_CASE_NAME_ROOTS)
-        if not (relative := path.relative_to(REPO_ROOT).as_posix()).startswith(
-            _FROZEN_SCRIPTS
-        )
+        f"{path.relative_to(REPO_ROOT).as_posix()}:{line}"
+        for path in _CASE_NAME_FILES
         for line in _spelled_case_names(parse(path), spellings)
     ]
 

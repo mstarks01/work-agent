@@ -29,11 +29,24 @@ from pathlib import Path
 import pytest
 
 from analysis_service.frameworks import PACKAGES, widest_fan_out
-from tests.source_tree import REPO_ROOT, source_files
+from tests.source_tree import REPO_ROOT, TESTS, WHOLE_TREE, source_files, without
 
-#: Where a fan-out claim can be made, and the suffixes worth reading.
-SEARCHED = ("src", "config", "evals", "docs")
+pytestmark = pytest.mark.lint
+
+#: The suffixes worth reading.
 SUFFIXES = (".py", ".toml", ".md")
+
+#: The parts of the tree no fan-out claim is read in, with the reason.
+LEFT_OUT: dict[str, str] = {
+    TESTS[0]: (
+        "a test docstring often states the lane count of the one package its"
+        " fixture builds, and telling that from a fixed fan-out claim needs a"
+        " reading of each one"
+    ),
+}
+
+#: Where a fan-out claim can be made: every file of :data:`SUFFIXES`.
+SEARCHED = without(source_files(*WHOLE_TREE, suffixes=SUFFIXES), LEFT_OUT)
 
 #: A fixed count of the agents a job fans out. Words as well as digits, because
 #: every instance #286 found was spelled "six" rather than "6".
@@ -62,7 +75,7 @@ DECLARES = re.compile(
 def _searched_files() -> list[Path]:
     return [
         path
-        for path in source_files(*SEARCHED, suffixes=SUFFIXES)
+        for path in SEARCHED
         if not _exempt(f"/{path.relative_to(REPO_ROOT).as_posix()}")
     ]
 

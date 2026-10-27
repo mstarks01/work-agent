@@ -147,8 +147,7 @@ could then exchange its token for these credentials. The condition must name
 the repository, not just the owner: `repository_owner` alone still admits every
 repo under the account, including one an attacker gets a workflow merged into.
 
-**The repository claim is where this condition used to stop, and it is not
-enough.** A collaborator's pull-request branch produces a token whose
+**The repository claim alone is not enough.** A collaborator's pull-request branch produces a token whose
 `repository` claim is identical to `main`'s, so repository scoping federates
 reviewed and unreviewed code alike. `job_workflow_ref` is the claim that tells
 them apart: it names the ref of the *workflow definition* GitHub is running —
@@ -160,8 +159,8 @@ that is executing.
 Pass `--trusted-ref` to name a different ref. It is a full git ref rather than a
 branch name, because that is what the claim carries.
 
-Re-running with a different `--repo` or `--trusted-ref` updates the condition
-rather than leaving the old one trusted.
+Re-running with a different `--repo` or `--trusted-ref` replaces the condition,
+so only the new values are trusted.
 
 ### What this rejects
 
@@ -218,7 +217,7 @@ gh workflow run "Evals (live Vertex)" -f mode=extraction
 ```
 
 `extraction` is the cheap mode — it exercises the whole auth path against the
-`base` tier without spending six category agents and a critic per case.
+`base` tier without spending a lane agent per lane and a critic per case.
 
 ## Cost
 

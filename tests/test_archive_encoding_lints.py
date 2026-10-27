@@ -48,6 +48,8 @@ from evals.harness.archive import (
     kind_of,
 )
 
+pytestmark = pytest.mark.lint
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 

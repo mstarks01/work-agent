@@ -258,6 +258,11 @@ rule and names each site; every site but the one reader fails it. Put it in
 `tests/test_one_reader_lints.py`, or in the lint file that holds that kind of
 rule. Show that it fails on a deliberate second reader, then revert that.
 
+The lint reads a named file set from `tests/source_tree.py`, such as `PYTHON`
+or `guide_files()`, and never a list of roots of its own. If the lint must read
+less than a set, name each part it leaves out with `without` and give the
+reason. A lint module declares itself with `pytestmark = pytest.mark.lint`.
+
 Without the lint, each new reader of the rule needs a pull request of its own.
 Where no AST pattern can find the rule, say so in the pull request body and
 name the test that holds the readers against each other.

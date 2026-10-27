@@ -44,7 +44,9 @@ from typing import get_args
 
 import pytest
 
-from tests.source_tree import REPO_ROOT, parse, source_files
+from tests.source_tree import PYTHON, REPO_ROOT, parse, source_files
+
+pytestmark = pytest.mark.lint
 
 #: Container annotations whose first parameter names the vocabulary. A mapping
 #: is included because a table keyed by the vocabulary answers for it exactly as
@@ -124,7 +126,7 @@ def _annotated_vocabularies() -> list[tuple[str, str, str]]:
     tomorrow is covered with no edit here.
     """
     found: list[tuple[str, str, str]] = []
-    for path in source_files("src", "evals", "webapp"):
+    for path in source_files(*PYTHON):
         try:
             tree = parse(path)
         except SyntaxError:  # pragma: no cover - the tree parses

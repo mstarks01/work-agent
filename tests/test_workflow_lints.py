@@ -22,7 +22,9 @@ from pathlib import Path
 import pytest
 
 from analysis_service.vendors import SECRET_FILE_SUFFIX
-from tests.source_tree import REPO_ROOT, parse, source_files
+from tests.source_tree import PYTHON, REPO_ROOT, WORKFLOWS, parse, source_files
+
+pytestmark = pytest.mark.lint
 
 PACKAGE = REPO_ROOT / "src" / "analysis_service"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "evals-live.yml"
@@ -81,8 +83,9 @@ def _reachable_from_evals() -> set[str]:
     reaching one of them reaches only the module that defines it.
     """
     pending: set[str] = set()
-    for source in source_files("evals"):
-        pending |= _imported(source)
+    for source in source_files(*PYTHON):
+        if source.is_relative_to(REPO_ROOT / "evals"):
+            pending |= _imported(source)
     reached: set[str] = set()
     while pending:
         module = pending.pop()
@@ -244,7 +247,7 @@ _SECRET_REFERENCES = ("secrets.", "secrets[")
 
 
 def _workflows() -> list[Path]:
-    return sorted(WORKFLOW_DIR.glob("*.yml"))
+    return source_files(*WORKFLOWS, suffixes=(".yml",))
 
 
 def _code_lines(workflow: Path) -> list[str]:

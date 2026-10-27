@@ -59,6 +59,8 @@ from tests.test_graph import (  # noqa: F401  (four fixtures)
 )
 from tests.test_validation import TestCitationsResolve, codes
 
+pytestmark = pytest.mark.lint
+
 OUTCOMES = TABLE["outcome"]
 
 #: The checks, by the name a row's ``check`` gives. Each one runs the code

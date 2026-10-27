@@ -61,18 +61,19 @@ from analysis_service.sources import (
 )
 from analysis_service.validation import MAX_ELEMENTS
 from analysis_service.vendors import VENDORS, CredentialMode
+from tests.source_tree import REPO_ROOT, guide_files
 from tests.test_api import make_client
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.lint
+
 DOCS = REPO_ROOT / "docs"
 CONFIGURATION = DOCS / "Configuration.md"
 HTTP_API = DOCS / "HTTP-API.md"
 CONCEPTS = DOCS / "Concepts.md"
 
-#: The guides a reader copies a TOML example from. ``docs/adr/``,
-#: ``docs/research/`` and ``docs/history/`` record a past state, so an old
-#: version there is correct.
-GUIDES = (REPO_ROOT / "README.md", *sorted(DOCS.glob("*.md")))
+#: The guides a reader copies a TOML example from. A record of a past state,
+#: such as ``docs/adr/``, is not a guide, so an old version there is correct.
+GUIDES = guide_files()
 
 SHIPPED_PATHS = ConfigPaths.from_env({})
 SHIPPED_RESILIENCE = load_resilience(SHIPPED_PATHS.resilience, env={})

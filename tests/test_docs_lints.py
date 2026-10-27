@@ -18,6 +18,8 @@ import pytest
 
 from examples.sync_docs import IncludeError, doc_paths, extract, render
 
+pytestmark = pytest.mark.lint
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 

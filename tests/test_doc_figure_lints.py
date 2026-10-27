@@ -73,6 +73,8 @@ from evals.harness.identity import MechanicalIdentity, SubsetVerbIdentity
 from evals.harness.reference import development_cases, flows_by_case, load_corpus
 from evals.harness.replay import unsigned_rows
 
+pytestmark = pytest.mark.lint
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: Small numbers as the prose writes them. Only the counts a guide spells out

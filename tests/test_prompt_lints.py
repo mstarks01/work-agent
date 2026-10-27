@@ -43,7 +43,6 @@ knowing about.
 
 import json
 import re
-from pathlib import Path
 from typing import Literal, get_args, get_origin
 
 import pytest
@@ -104,9 +103,11 @@ from analysis_service.token_caps import (
     prompt_key,
 )
 from evals.harness.exemplar_verbs import _JSON_BLOCK, proposal_type
+from tests.source_tree import MODEL_TEXT, REPO_ROOT, source_files, without
 
-PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
-REPO_ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.lint
+
+PROMPTS_DIR = REPO_ROOT / "prompts"
 FRAMEWORKS_DIR = REPO_ROOT / "frameworks"
 # The one place a lint here still names a package, and the declaration in
 # ``tests/test_framework_neutrality.py`` says why: the verb menu is STRIDE's
@@ -1068,12 +1069,21 @@ def test_the_prompt_states_the_flow_id_shape_the_service_writes():
 
 
 #: Every text a model reads that can show a flow ID: the prompt bodies and
-#: deltas, and each package's skills, notes, cases and output contracts.
+#: deltas, each package's skills, notes, cases and output contracts, and the
+#: Domain Packs.
 _FLOW_SHOWING_TEXTS = {
     **{f"prompts/{name}.md": name for name in PROMPT_BODY_NAMES + PROMPT_DELTA_NAMES},
     **{
         path.relative_to(REPO_ROOT).as_posix(): path
-        for path in sorted(FRAMEWORKS_DIR.rglob("*.md"))
+        for path in without(
+            source_files(*MODEL_TEXT, suffixes=(".md",)),
+            {
+                "prompts": (
+                    "a prompt body is read through its loader, by name, so the"
+                    " text is the composed one"
+                ),
+            },
+        )
     },
 }
 
