@@ -212,7 +212,7 @@ DEFAULT_DISCLAIMER = (
 
 
 def assertion_disclosure(record: AssertionRecord) -> str:
-    """What a reader of the report is owed about the facts analysis rested on.
+    """What the report must tell a reader about the facts analysis rested on.
 
     **Required by #926's contract, and not sufficient for it** (the owner's
     decision of 2026-09-23). An unchecked assertion informs conditional

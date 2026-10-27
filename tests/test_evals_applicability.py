@@ -496,7 +496,7 @@ def test_grounds_reads_a_lane_without_naming_any_framework_s_field():
 
 
 def test_coverage_reports_every_lane_of_every_framework_that_ran():
-    """The row count a two-framework sweep owes, against a one-framework sweep.
+    """The row count a two-framework sweep must give, against a one-framework sweep.
 
     The sweep collects the coverage of every framework, so ASVS's 17 lanes
     reach the table (#213). The framework list is what was *built*, so a package

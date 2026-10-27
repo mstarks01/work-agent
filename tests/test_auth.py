@@ -285,8 +285,8 @@ class TestSigningAlgorithms:
             OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")
 
     def test_one_bad_entry_rejects_the_whole_list(self):
-        # Not "drop the bad one and carry on": an operator who wrote HS256 is
-        # owed an error, and a silently-ignored entry reads as an accepted one.
+        # Not "drop the bad one and carry on": an operator who wrote HS256 must
+        # get an error, and a silently-ignored entry reads as an accepted one.
         env = self._env(ANALYSIS_OIDC_ALGORITHMS="RS256,HS256")
         with pytest.raises(AuthConfigError, match="HS256"):
             OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")

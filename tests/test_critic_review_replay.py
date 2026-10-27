@@ -361,7 +361,7 @@ def test_the_advice_is_scored_apart_from_the_fate(fixtures, model):
     agreed, of_read = score.recommendation_agreed
     assert of_read == len(survivors(fixtures))
     assert agreed == of_read
-    # Every rejected draft owes no reading, so none is counted unread.
+    # A rejected draft needs no reading, so none is counted unread.
     assert score.recommendation_unread == ()
 
 

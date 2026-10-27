@@ -1557,7 +1557,7 @@ def prepare_analysis(
     they are repo paths, not facts about the job, and ADK binds a FunctionNode's
     parameters from session state. So is ``assertions``: whether an ``assert``
     node sits ahead of this one is a fact about the built graph, and it says
-    whether a proposal is owed. Where it is, this node resolves it through
+    whether a proposal is required. Where it is, this node resolves it through
     :meth:`~analysis_service.assertions.AssertionRecord.of` — once, here,
     because every later reader takes the record off
     :data:`STATE_ASSERTION_CATALOG` rather than resolving again — and the

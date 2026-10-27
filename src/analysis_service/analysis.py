@@ -311,9 +311,9 @@ def crossing_facts(crossing: BoundaryCrossing, flow: DataFlow) -> dict[str, str 
 
     **Stated as a property of a crossing rather than of a package**: a crossing
     is derived from two zones and either may be an inference, so any rule that
-    fires *because* of one owes its reader both zones and which of them the
-    service assumed. Every package reads the same System Model, so a package
-    written tomorrow gets the same three facts by calling this.
+    fires *because* of one must give its reader both zones and say which of
+    them the service assumed. Every package reads the same System Model, so a
+    package written tomorrow gets the same three facts by calling this.
 
     Scalars, because a :data:`~analysis_service.candidates.Fact` is one. The
     crossing names its assumed endpoints by **Element ID** and the flow names

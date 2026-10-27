@@ -262,10 +262,10 @@ def test_every_unselected_entry_names_a_registered_document():
 class TestEveryCrossingKeyedRuleNamesItsInference:
     """#1052, stated as a property so a package written tomorrow answers it.
 
-    A rule that fires *because* two zones differ owes its reader both zones and
-    which of them this service assumed. The rule is a property of a **Boundary
-    Crossing** rather than of a package, so this drives every package's rules
-    over the corpus and asks the same thing of each.
+    A rule that fires *because* two zones differ must give its reader both zones
+    and say which of them this service assumed. The rule is a property of a
+    **Boundary Crossing** rather than of a package, so this drives every
+    package's rules over the corpus and asks the same thing of each.
     """
 
     def leads(self):

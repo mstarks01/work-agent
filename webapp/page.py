@@ -241,9 +241,9 @@ def is_same_origin(request: Request) -> bool:
     **Necessary and not sufficient.** See this module's own docstring for the
     other half.
 
-    Callers answer a refusal in their own shape — the first-run app owes its
-    form page a ``message`` and the other two raise — so this decides and does
-    not respond.
+    Callers answer a refusal in their own shape — the first-run app must give
+    its form page a ``message`` and the other two raise — so this decides and
+    does not respond.
     """
     return request.headers.get("sec-fetch-site") == "same-origin"
 

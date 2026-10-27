@@ -1327,7 +1327,7 @@ class TestTheDraftSurvivesTheProcess:
     The property here is that the page holds no copy of what the reader
     wrote. Every word of it is in the **Draft Sitting** the moment they write
     it, so a second process over the same store answers the same as the
-    first — which is what a reader who closes a laptop is owed.
+    first — which is what a reader who closes a laptop must get.
     """
 
     def test_opening_a_case_writes_nothing(self, tree):

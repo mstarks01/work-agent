@@ -141,7 +141,8 @@ class FixtureOutcome:
     #: question — did this draft reach the report?
     fate_agrees: bool
     #: For a fixture that must die, did the reason engage with the inference or
-    #: the contradiction the reader identified? ``None`` where nothing is owed.
+    #: the contradiction the reader identified? ``None`` where no such reason is
+    #: required.
     reason_engages: bool | None
     #: Did the **reader** say this draft reaches the report? Carried rather
     #: than derived from :attr:`survived` and :attr:`fate_agrees`, which cannot
@@ -197,7 +198,7 @@ class FixtureOutcome:
         and not a failure of this comparison: a surviving draft with no reading
         is a critic that did not look, and
         :attr:`ReplayScore.recommendation_unread` counts those apart. A
-        rejected draft owes no reading.
+        rejected draft needs no reading.
         """
         if self.recommendation_read is None:
             return None
@@ -339,7 +340,7 @@ class ReplayScore:
         """Surviving drafts the critic ruled without reading the advice on them.
 
         These are surviving drafts whose ruling records no reading of the
-        advice. A rejected draft owes no reading and is not counted here.
+        advice. A rejected draft needs no reading and is not counted here.
         """
         return tuple(
             o

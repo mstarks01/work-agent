@@ -514,8 +514,8 @@ def complete_rulings(
         ruling = _without_stray_dismissals(ruling, by_id.get(ruling.id, []))
         if ruling.id in misfiled:
             # A lane error is a table lookup, so the ruling is the table's
-            # whatever the critic said (#442). The reason names the lanes the
-            # verb belongs to, which is what the audit array owes a reader, and
+            # whatever the critic said (#442). The reason names the lanes the verb
+            # belongs to, which is what the audit array must give a reader, and
             # the step is `lane` by construction: the table is the lane check.
             verdict = ruling.verdict.model_copy(
                 update={
@@ -649,7 +649,7 @@ def review_issues(
     # invented ID implicates none either — there is no draft behind it to show.
     #
     # Every per-ruling problem does implicate one. Naming the unknown a
-    # needs-info hangs on, or writing the reason a rejection owes a reader,
+    # needs-info hangs on, or writing the reason a rejection must give a reader,
     # cannot be done from an ID — both are assertions about a specific claim,
     # and a re-ask that cannot read it would have to invent one.
     implicated = set(dropped) | {
