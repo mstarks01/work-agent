@@ -474,7 +474,9 @@ The app can ask you questions before the analysis, and after the report.
 
 Where your description names a protocol that is secure by its own definition, such as SFTP's encryption or WireGuard's peer authentication, the app records that property and does not ask about it. An answer settles its fact, even where your description said otherwise. A run
 that waits for your answers is kept in the app's job store, like every other
-run, and the app never removes it to make room. When every run the app holds
+run, and the app never removes it to make room. A run that you answered or
+amended waits no more when the run that continues it pauses or has a report,
+because the app takes no more answers for it. When every run the app holds
 waits for answers, the app refuses a new run until you answer or continue
 one. With the `memory` store, a restart of the app loses it.
 

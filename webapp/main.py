@@ -403,8 +403,13 @@ class Workspace:
     async def waiting(self, record: Envelope) -> bool:
         """True while the job waits for answers.
 
-        A job whose resumed job has not reached a report still waits: that
-        job can fail, and this one is then the only place its answers resume.
+        A paused job that no job locks waits. A paused job whose locking job
+        still runs also waits: that job can fail, and this one is then the
+        only place its answers resume. A paused job whose locking job has
+        :func:`~analysis_service.jobs.ended` waits no more. That job has a
+        report or pauses itself, and a paused job never fails, so this one
+        takes no answers again. A locking job that this owner no longer holds
+        has ended too, because a store deletes only a job that has ended.
         """
         if record.status != "awaiting-answers":
             return False
@@ -412,7 +417,7 @@ class Workspace:
         if locker is None:
             return True
         child = await self.store.owned(locker, record.owner_id)
-        return child is None or child.status != "completed"
+        return child is not None and not ended(child)
 
     @asynccontextmanager
     async def make_room(
