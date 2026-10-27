@@ -90,7 +90,13 @@ def test_an_answered_finding_never_comes_back():
         votes=[cast(value_of(known), "01", "up", "sam", content=known.content)]
     )
 
-    assert build([known], FLOWS, ledger, voter="", sitting=SITTING) == []
+    assert build([known], FLOWS, ledger, voter="sam", sitting=SITTING) == []
+
+
+def test_a_queue_for_no_voter_is_refused():
+    """A queue is built for one named reviewer, so an empty voter is a misuse."""
+    with pytest.raises(ValueError, match="one named voter"):
+        build([finding()], FLOWS, Ledger(), voter="", sitting=SITTING)
 
 
 def test_naming_a_voter_asks_only_what_that_voter_has_not_answered():
@@ -517,15 +523,14 @@ class TestARewrittenFindingIsAskedAgain:
             "Re-argued since",
         ]
 
-    def test_an_unnamed_queue_stays_blind(self):
-        """Re-offering here would tell this reviewer that somebody else had
-        answered the earlier version. That leak is why the queue has no
-        `unmatched` row."""
+    def test_another_reviewer_is_not_told_an_earlier_answer(self):
+        """Ada's queue offers the re-argued finding with no earlier answer,
+        because showing Sam's would tell her how another reviewer voted. That
+        leak is why the queue has no `unmatched` row."""
         answered_before = finding()
         led = self._ledger(answered_before)
         reargued = finding(content=other_content())
 
-        assert build([reargued], FLOWS, led, voter="", sitting=SITTING) == []
         assert not build([reargued], FLOWS, led, voter="ada", sitting=SITTING)[
             0
         ].previously
