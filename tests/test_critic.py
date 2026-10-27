@@ -841,7 +841,9 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         """
         conditional, plain = self._draft(), sample_draft("S-02")
 
-        shown = critic.critic_view([conditional, plain])
+        shown = critic.critic_view(
+            [conditional, plain], only=None, repaired=(), unverified=(), assertions=None
+        )
 
         assert [view["id"] for view in shown] == ["S-01", "S-02"]
 
@@ -1169,8 +1171,12 @@ class TestTheCriticView:
         """``only`` narrows what is rendered and nothing else."""
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
 
-        (narrowed,) = critic.critic_view(drafts, only={"S-01"})
-        whole = critic.critic_view(drafts)
+        (narrowed,) = critic.critic_view(
+            drafts, only={"S-01"}, repaired=(), unverified=(), assertions=None
+        )
+        whole = critic.critic_view(
+            drafts, only=None, repaired=(), unverified=(), assertions=None
+        )
 
         assert narrowed == next(view for view in whole if view["id"] == "S-01")
 
@@ -1180,14 +1186,25 @@ class TestTheCriticView:
         Every duplicate rejection on record dropped a different finding
         (QA-2026-10-03-02-E3), so the view marks no pair.
         """
-        views = critic.critic_view([sample_draft("S-01"), sample_draft("S-02")])
+        views = critic.critic_view(
+            [sample_draft("S-01"), sample_draft("S-02")],
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+        )
 
         assert not any("same_action_as" in view for view in views)
 
     def test_narrowing_to_nothing_renders_nothing(self):
         drafts = [sample_draft("S-01")]
 
-        assert critic.critic_view(drafts, only=set()) == []
+        assert (
+            critic.critic_view(
+                drafts, only=set(), repaired=(), unverified=(), assertions=None
+            )
+            == []
+        )
 
     def test_both_critic_passes_read_one_view(self):
         """The fan-in and the re-ask reach the same function.
@@ -1198,8 +1215,12 @@ class TestTheCriticView:
         drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
         valid_model()
 
-        first_pass = critic.critic_view(drafts)
-        re_ask = critic.critic_view(drafts, only={"S-01", "T-01"})
+        first_pass = critic.critic_view(
+            drafts, only=None, repaired=(), unverified=(), assertions=None
+        )
+        re_ask = critic.critic_view(
+            drafts, only={"S-01", "T-01"}, repaired=(), unverified=(), assertions=None
+        )
 
         assert first_pass == re_ask
 

@@ -299,6 +299,9 @@ class TestOnlyAnAskedFactTakesAnAnswer:
             checkpoint.assertions.catalog,
             frozenset(),
             [earlier],
+            asked_links=(),
+            earlier_links=(),
+            reopen=False,
         )
 
 
@@ -1106,7 +1109,15 @@ class TestARefusalNamesItsFactByLabel:
             ValueError, match=r"facts\[0\]: this job asked no"
         ) as excinfo:
             check_answers(
-                [], [FactAnswer(key=key, value="orders")], model, None, frozenset()
+                [],
+                [FactAnswer(key=key, value="orders")],
+                model,
+                None,
+                frozenset(),
+                earlier=(),
+                asked_links=(),
+                earlier_links=(),
+                reopen=False,
             )
         assert FLOW not in str(excinfo.value)
 

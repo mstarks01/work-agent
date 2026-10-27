@@ -53,7 +53,6 @@ draft the critic later rejects was still part of the system being examined.
 from __future__ import annotations
 
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from types import MappingProxyType
 
 from analysis_service.analysis import unknown_controls
 from analysis_service.candidates import CandidateSet
@@ -76,11 +75,11 @@ def lane_scope(
     package: FrameworkPackage,
     model: SystemModel,
     candidate_set: CandidateSet | None,
-    options: Mapping[str, object] = MappingProxyType({}),
-    units: Sequence[str] = (),
-    ruled_out: Sequence[str] = (),
-    ruled_in: Sequence[str] = (),
-    applicability: Sequence[ApplicabilityEntry] = (),
+    options: Mapping[str, object],
+    units: Sequence[str],
+    ruled_out: Sequence[str],
+    ruled_in: Sequence[str],
+    applicability: Sequence[ApplicabilityEntry],
 ) -> str:
     """One lane's denominators and its job's options, as a line the agent reads.
 

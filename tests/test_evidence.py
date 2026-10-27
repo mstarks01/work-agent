@@ -523,13 +523,13 @@ class TestRenderCatalog:
 
     def test_every_entry_appears_as_its_own_row(self):
         catalog = evidence_catalog(valid_model())
-        rendered = render_catalog(catalog)
+        rendered = render_catalog(catalog, assertions=None)
 
         for ref in catalog:
             assert f"| `{ref}` |" in rendered
 
     def test_it_is_not_a_list_an_agent_could_pattern_complete(self):
-        rendered = render_catalog(evidence_catalog(valid_model()))
+        rendered = render_catalog(evidence_catalog(valid_model()), assertions=None)
 
         assert not rendered.lstrip().startswith("[")
         assert "| cite this exactly |" in rendered
@@ -538,7 +538,7 @@ class TestRenderCatalog:
         """The count is what makes the set readable as closed rather than as a sample."""
         catalog = evidence_catalog(valid_model())
 
-        assert f"{len(catalog)} facts" in render_catalog(catalog)
+        assert f"{len(catalog)} facts" in render_catalog(catalog, assertions=None)
 
     def test_the_kinds_of_fact_read_differently(self):
         """An unstated attribute, a stated absence and a derived crossing are
@@ -564,7 +564,8 @@ class TestRenderCatalog:
                 "crossing:flow:process:a>process:b>call": Ground(
                     kind="derived-fact", flow_id="flow:process:a>process:b>call"
                 ),
-            }
+            },
+            assertions=None,
         )
 
         assert "`encryption_at_rest` never stated" in rendered
@@ -614,11 +615,11 @@ class TestRenderCatalog:
         catalog = evidence_catalog(valid_model(), assertions(row()))
 
         with pytest.raises(KeyError):
-            render_catalog(catalog)
+            render_catalog(catalog, assertions=None)
 
     def test_an_empty_catalog_renders_no_rows(self):
         """A model with every control stated and no crossing is legal, if rare."""
-        rendered = render_catalog({})
+        rendered = render_catalog({}, assertions=None)
 
         assert "0 facts" in rendered
         assert "| `" not in rendered
@@ -627,12 +628,14 @@ class TestRenderCatalog:
         """Two runs over one model must send byte-identical instructions."""
         catalog = evidence_catalog(valid_model())
 
-        assert render_catalog(catalog) == render_catalog(catalog)
+        assert render_catalog(catalog, assertions=None) == render_catalog(
+            catalog, assertions=None
+        )
 
     def test_row_order_is_the_catalogs_own(self):
         """Which is the model's, so a diff between runs means the model moved."""
         catalog = evidence_catalog(valid_model())
-        rendered = render_catalog(catalog)
+        rendered = render_catalog(catalog, assertions=None)
         positions = [rendered.index(f"| `{ref}` |") for ref in catalog]
 
         assert positions == sorted(positions)
@@ -660,7 +663,9 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         ground = evidence_catalog(valid_model(), held)[assertion_id(stated)]
         draft = sample_draft("S-01", grounds=[ground])
 
-        (view,) = critic_view([draft], assertions=held)
+        (view,) = critic_view(
+            [draft], assertions=held, only=None, repaired=(), unverified=()
+        )
 
         (fact,) = view["assertion_facts"]
         assert fact["assertion"] == assertion_id(stated)
@@ -673,7 +678,9 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         ground = evidence_catalog(valid_model(), held)[assertion_id(row())]
         draft = sample_draft("S-01", grounds=[ground])
 
-        (view,) = critic_view([draft], assertions=held)
+        (view,) = critic_view(
+            [draft], assertions=held, only=None, repaired=(), unverified=()
+        )
 
         assert view["assertion_facts"][0]["says"] in render_catalog(
             evidence_catalog(valid_model(), held), held
@@ -681,7 +688,13 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         assert view["assertion_facts"][0]["says"] == ground_gloss(ground, held)
 
     def test_a_job_that_ran_no_catalog_carries_no_key(self):
-        (view,) = critic_view([sample_draft("S-01")])
+        (view,) = critic_view(
+            [sample_draft("S-01")],
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+        )
 
         assert "assertion_facts" not in view
 

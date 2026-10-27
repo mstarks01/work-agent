@@ -305,7 +305,17 @@ def test_every_early_question_is_admitted(reason):
             else ANSWERS.get(attribute, ("stated by the submitter",))[0]
         )
         answer = FactAnswer(key=question.key, value=value)
-        check_answers([], [answer], held.system_model, catalog, early_keys(held))
+        check_answers(
+            [],
+            [answer],
+            held.system_model,
+            catalog,
+            early_keys(held),
+            earlier=(),
+            asked_links=(),
+            earlier_links=(),
+            reopen=False,
+        )
 
 
 def lanes_read_open(held, attribute):
@@ -337,11 +347,31 @@ def test_the_pause_asks_exactly_what_the_lanes_read_open(reason, stated_by_extra
 
     if lanes_read_open(held, attribute):
         assert key in early_keys(held)
-        check_answers([], given, held.system_model, catalog, early_keys(held))
+        check_answers(
+            [],
+            given,
+            held.system_model,
+            catalog,
+            early_keys(held),
+            earlier=(),
+            asked_links=(),
+            earlier_links=(),
+            reopen=False,
+        )
     else:
         assert key not in early_keys(held)
         with pytest.raises(ValueError, match="is stated"):
-            check_answers([], given, held.system_model, catalog, early_keys(held))
+            check_answers(
+                [],
+                given,
+                held.system_model,
+                catalog,
+                early_keys(held),
+                earlier=(),
+                asked_links=(),
+                earlier_links=(),
+                reopen=False,
+            )
 
 
 def test_the_pause_table_holds_both_outcomes():

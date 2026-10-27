@@ -201,7 +201,17 @@ class TestLaneScope:
     """
 
     def test_it_reports_the_models_denominators(self, model, candidates):
-        scope = lane_scope("spoofing", STRIDE, model, candidates["spoofing"])
+        scope = lane_scope(
+            "spoofing",
+            STRIDE,
+            model,
+            candidates["spoofing"],
+            options={},
+            units=(),
+            ruled_out=(),
+            ruled_in=(),
+            applicability=(),
+        )
 
         assert f"{len(model.elements())} elements" in scope
         assert f"{len(model.boundary_crossings())} boundary crossings" in scope
@@ -214,7 +224,17 @@ class TestLaneScope:
         Two computations of "how many elements" would be two claims rather than
         one fact, and the one the agent read is the one nobody could check.
         """
-        scope = lane_scope("spoofing", STRIDE, model, candidates["spoofing"])
+        scope = lane_scope(
+            "spoofing",
+            STRIDE,
+            model,
+            candidates["spoofing"],
+            options={},
+            units=(),
+            ruled_out=(),
+            ruled_in=(),
+            applicability=(),
+        )
         row = coverage_for("spoofing", build_coverage({}, candidates, model, STRIDE))
 
         assert f"{row.elements} elements" in scope
@@ -231,20 +251,58 @@ class TestLaneScope:
         because it never looked, so it is the last lane that should be told
         nothing about the system's size.
         """
-        scope = lane_scope("repudiation", STRIDE, model, None)
+        scope = lane_scope(
+            "repudiation",
+            STRIDE,
+            model,
+            None,
+            options={},
+            units=(),
+            ruled_out=(),
+            ruled_in=(),
+            applicability=(),
+        )
 
         assert f"{len(model.elements())} elements" in scope
         assert "0 fired" in scope
 
     def test_it_names_the_lanes_own_category(self, model, candidates):
         assert "denial-of-service rules" in lane_scope(
-            "denial-of-service", STRIDE, model, candidates["denial-of-service"]
+            "denial-of-service",
+            STRIDE,
+            model,
+            candidates["denial-of-service"],
+            options={},
+            units=(),
+            ruled_out=(),
+            ruled_in=(),
+            applicability=(),
         )
 
     def test_it_is_stable_across_calls(self, model, candidates):
         """Two runs over one model must send byte-identical instructions."""
-        first = lane_scope("tampering", STRIDE, model, candidates["tampering"])
-        second = lane_scope("tampering", STRIDE, model, candidates["tampering"])
+        first = lane_scope(
+            "tampering",
+            STRIDE,
+            model,
+            candidates["tampering"],
+            options={},
+            units=(),
+            ruled_out=(),
+            ruled_in=(),
+            applicability=(),
+        )
+        second = lane_scope(
+            "tampering",
+            STRIDE,
+            model,
+            candidates["tampering"],
+            options={},
+            units=(),
+            ruled_out=(),
+            ruled_in=(),
+            applicability=(),
+        )
 
         assert first == second
 
@@ -253,8 +311,28 @@ def test_the_scope_line_names_the_units_ruled_out_in_code():
     """#443: the agent is told which of its units the report already settled."""
     model = valid_model()
 
-    scope = lane_scope("spoofing", STRIDE, model, None, ruled_out=("U-1", "U-2"))
+    scope = lane_scope(
+        "spoofing",
+        STRIDE,
+        model,
+        None,
+        ruled_out=("U-1", "U-2"),
+        options={},
+        units=(),
+        ruled_in=(),
+        applicability=(),
+    )
 
     assert "2 units of this lane were ruled out in code" in scope
     assert "U-1, U-2" in scope
-    assert "ruled out" not in lane_scope("spoofing", STRIDE, model, None)
+    assert "ruled out" not in lane_scope(
+        "spoofing",
+        STRIDE,
+        model,
+        None,
+        options={},
+        units=(),
+        ruled_out=(),
+        ruled_in=(),
+        applicability=(),
+    )

@@ -535,7 +535,7 @@ def _cell(value: str) -> str:
 
 
 def render_catalog(
-    catalog: Mapping[str, Ground], assertions: AssertionCatalog | None = None
+    catalog: Mapping[str, Ground], assertions: AssertionCatalog | None
 ) -> str:
     """The catalog as a table an agent selects from rather than a list it reads.
 

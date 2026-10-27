@@ -238,7 +238,12 @@ class TestJoinDrafts:
 
         assert [draft.title for draft in joined.drafts] == ["first", "second"]
         assert joined.marks.dropped_claims == []
-        view = {row["id"]: row for row in critic.critic_view(joined.drafts)}
+        view = {
+            row["id"]: row
+            for row in critic.critic_view(
+                joined.drafts, only=None, repaired=(), unverified=(), assertions=None
+            )
+        }
         assert set(view) == {"D-01", "D-02"}
         assert not any("same_action_as" in row for row in view.values())
 
@@ -744,7 +749,11 @@ class TestQuoteVerification:
         joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
         (view,) = critic.critic_view(
-            joined.drafts, repaired=joined.marks.repaired_quotes
+            joined.drafts,
+            repaired=joined.marks.repaired_quotes,
+            only=None,
+            unverified=(),
+            assertions=None,
         )
 
         assert view["repaired_quotes"] == [
@@ -754,7 +763,9 @@ class TestQuoteVerification:
                 "moved": [],
             }
         ]
-        (plain,) = critic.critic_view(joined.drafts)
+        (plain,) = critic.critic_view(
+            joined.drafts, only=None, repaired=(), unverified=(), assertions=None
+        )
         assert "repaired_quotes" not in plain
 
     def test_the_critic_is_shown_which_quote_was_not_found(self, model):
@@ -774,11 +785,17 @@ class TestQuoteVerification:
         joined = join_drafts(drafts, STRIDE, model, SOURCES, assertions=None)
 
         (view,) = critic.critic_view(
-            joined.drafts, unverified=joined.marks.unverified_grounds
+            joined.drafts,
+            unverified=joined.marks.unverified_grounds,
+            only=None,
+            repaired=(),
+            assertions=None,
         )
         assert [entry["index"] for entry in view["unverified_quotes"]] == [0]
         assert LABEL in view["unverified_quotes"][0]["reason"]
-        (plain,) = critic.critic_view(joined.drafts)
+        (plain,) = critic.critic_view(
+            joined.drafts, only=None, repaired=(), unverified=(), assertions=None
+        )
         assert "unverified_quotes" not in plain
 
     def test_a_claim_whose_every_ground_fails_is_dropped_and_marked(self, model):

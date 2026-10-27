@@ -76,7 +76,7 @@ def test_the_exemplar_fixture_holds_the_ids_its_prose_defines(name):
 
 @pytest.mark.parametrize("name", sorted(exemplar_systems()))
 def test_the_exemplar_fixture_derives_the_catalog_its_prose_shows(name):
-    rendered = render_catalog(evidence_catalog(fixture_model(name)))
+    rendered = render_catalog(evidence_catalog(fixture_model(name)), assertions=None)
     assert rendered.strip() in exemplar_systems()[name]
 
 
