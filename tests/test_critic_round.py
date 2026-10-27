@@ -1,8 +1,7 @@
 """The Critic's round as a value: the first pass, the merge and the outcome.
 
-Each behaviour here was once asserted by driving ``graph.route_review`` twice
-against a fake context and reading state keys back. The round decides every
-one of them, so the tests ask the round, and nothing here parks or routes.
+The round decides each behaviour here, so the tests ask the round, and nothing
+here parks or routes.
 """
 
 from __future__ import annotations
@@ -27,7 +26,6 @@ from analysis_service.critic_round import (
     FirstPass,
     Revision,
     critic_request,
-    node_request,
     rulings_of,
 )
 from analysis_service.frameworks import schemas_for
@@ -319,11 +317,3 @@ class TestTheRequest:
             "unverified_count": 1,
             "unresolved_mention_count": 0,
         }
-
-    def test_a_closing_is_the_last_part_of_the_user_turn(self):
-        instruction, turn = asyncio.run(
-            node_request("Read {key}.", {"key": "this"}, {"a": 1}, "Last words.")
-        )
-
-        assert instruction == "Read this."
-        assert [part.text for part in turn.parts] == ['{"a": 1}', "Last words."]

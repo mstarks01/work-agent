@@ -385,6 +385,14 @@ class Threat(DraftThreat, RuledClaim):
     recommendation: RecommendationReading | None = None
 
     @model_validator(mode="after")
+    def _rated_unless_a_lane_rejection(self) -> Self:
+        if self.confidence is None and self.verdict.rejected_because != "lane":
+            raise ValueError(
+                "a threat carries a confidence unless code rejected it for its lane"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _no_reading_on_a_rejection(self) -> Self:
         # The critic reads the advice only on a threat that survived, so a
         # reading on a rejected one is advice nobody will act on.

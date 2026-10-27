@@ -256,7 +256,7 @@ class TestAssetVocabulary:
         assert issues[0].element_id == "store:orders-db"
 
     def test_an_extraction_that_writes_no_tag_as_a_word_passes_with_none(self):
-        """``""`` and ``unknown`` say "no tag", so the repair pass is not spent on them."""
+        """``""`` and ``unknown`` say "no tag", so the repair pass does not run for them."""
         model = valid_model()
         model.data_stores[0].assets = ["", " Unknown ", "pii"]
         normalized, issues = parse_and_validate(model.model_dump(), normalize_ids=True)

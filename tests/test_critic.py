@@ -371,7 +371,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         return [sample_ruling("S-01", verdict=ProposedVerdict(**verdict))]
 
     def test_a_needs_info_without_a_reason_gains_one_naming_its_open_facts(self, model):
-        """Code names the facts the critic listed, so no re-ask is spent on it."""
+        """Code names the facts the critic listed, so no re-ask runs for it."""
         asked = UnknownRef(subject="is it logged")
         rulings = self._rulings(related_unknowns=[asked])
 

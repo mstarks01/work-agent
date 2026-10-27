@@ -21,6 +21,13 @@ from collections.abc import Iterable, Mapping
 from functools import cache
 from pathlib import Path
 
+from analysis_service.frameworks import (
+    CRITIC_DOC,
+    LANE_CLOSING_DOC,
+    OUTPUT_DOC,
+    SEVERITY_RUBRIC_DOC,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: Directory names the repository does not hold, wherever they sit inside it:
@@ -88,10 +95,15 @@ MODEL_TEXT: tuple[str, ...] = ("prompts", "frameworks", "domains")
 #: ``notes`` are retrieved material, so none of them states an outcome.
 PROMPTS: tuple[str, ...] = (
     "prompts/*.md",
-    "frameworks/*/critic.md",
-    "frameworks/*/output.md",
-    "frameworks/*/severity_rubric.md",
-    "frameworks/*/lane_closing.md",
+    *(
+        f"frameworks/*/{doc}.md"
+        for doc in (
+            CRITIC_DOC,
+            OUTPUT_DOC,
+            SEVERITY_RUBRIC_DOC,
+            *sorted({doc for doc in LANE_CLOSING_DOC.values() if doc}),
+        )
+    ),
     "frameworks/*/lanes/*/*.md",
 )
 
