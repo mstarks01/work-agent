@@ -366,7 +366,9 @@ class UnknownRef(BaseModel):
     )
     #: The parts of the ``question`` kind the argument rests on, by facet ID,
     #: where it rests on some of them and not on all (ADR 0073). Empty where it
-    #: rests on the whole question, and for every other spelling. A facet the
+    #: rests on the whole question, and for every other spelling: the review
+    #: seam (:func:`~analysis_service.critic.review_issues`) refuses facets on
+    #: an entry of another spelling. A facet the
     #: kind does not have names nothing, and a reference that names none of
     #: its kind's facets waits on the whole question
     #: (:func:`~analysis_service.fact_answers.needed_facets`).
@@ -2630,8 +2632,9 @@ class FrameworkAnalysis(BaseModel):
     knowledge_docs: list[str] = Field(default_factory=list)
     #: How many **Candidates** fire only because of the assertion catalog: the
     #: leads this job's rules give that the same rules give no lane on the model
-    #: before the catalog's projection. ``None`` where no catalog was held, so
-    #: an unmeasured job never reads as a zero.
+    #: before the catalog's projection. ``None`` where no catalog was held or
+    #: the precondition refused the model, so an unmeasured block never reads
+    #: as a zero.
     catalog_leads: int | None = Field(default=None, ge=0)
     summary: SerializeAsAny[BlockSummary]
 

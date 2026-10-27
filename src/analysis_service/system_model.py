@@ -824,8 +824,27 @@ class BoundaryCrossing(BaseModel):
     destination_zone: str
     #: False when either zone is :data:`UNKNOWN`. Read it rather than comparing
     #: the zones again, so the three outcomes have one reader.
-    decided: bool = True
+    #: :meth:`_decide` derives it from the zones, and refuses a stated value
+    #: that disagrees.
+    decided: bool
     assumed_endpoints: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _decide(cls, data: Any) -> Any:
+        """``decided`` from the two zones. A stored crossing without the field
+        loads with the derived value."""
+        if not isinstance(data, Mapping):
+            return data
+        zones = (data.get("source_zone"), data.get("destination_zone"))
+        decided = UNKNOWN not in zones
+        if data.get("decided", decided) != decided:
+            raise ValueError(
+                f"decided is {data['decided']!r}, and the zones {zones!r} say"
+                f" {decided!r}: a crossing is undecided exactly when a zone is"
+                f" {UNKNOWN!r}"
+            )
+        return {**data, "decided": decided}
 
 
 class EmittedSystemModel(BaseModel):
@@ -990,24 +1009,19 @@ class SystemModel(EmittedSystemModel):
                         f"cannot derive crossings: flow {flow.id!r} endpoint "
                         f"{endpoint!r} is not a zoned element in this model"
                     )
-            source_zone = zone_by_id[flow.source]
-            destination_zone = zone_by_id[flow.destination]
-            decided = UNKNOWN not in (source_zone, destination_zone)
-            if decided and source_zone == destination_zone:
-                continue
-            crossings.append(
-                BoundaryCrossing(
-                    flow_id=flow.id,
-                    source_zone=source_zone,
-                    destination_zone=destination_zone,
-                    decided=decided,
-                    assumed_endpoints=[
-                        endpoint
-                        for endpoint in (flow.source, flow.destination)
-                        if endpoint in assumed
-                    ],
-                )
+            crossing = BoundaryCrossing(
+                flow_id=flow.id,
+                source_zone=zone_by_id[flow.source],
+                destination_zone=zone_by_id[flow.destination],
+                assumed_endpoints=[
+                    endpoint
+                    for endpoint in (flow.source, flow.destination)
+                    if endpoint in assumed
+                ],
             )
+            if crossing.decided and crossing.source_zone == crossing.destination_zone:
+                continue
+            crossings.append(crossing)
         return crossings
 
     def shared_names(self) -> dict[str, list[str]]:

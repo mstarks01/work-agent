@@ -363,6 +363,17 @@ def _unresolved_unknown_ref_issues(
                     )
                 )
                 continue
+            if ref.facets and ref.kind != "question":
+                issues.append(
+                    UnreconciledRuling.of(
+                        claim_id=ruling.id,
+                        kind="unresolved-unknown",
+                        message=f"claim {ruling.id!r} names facets on a"
+                        f" {ref.kind} entry; facets name parts of a question"
+                        " kind, so only a question entry carries them",
+                    )
+                )
+                continue
             if ref.kind == "question":
                 # A kind of question about an element: the kind is the
                 # table's, and the element is the model's, so both are checked
