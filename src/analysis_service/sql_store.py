@@ -998,10 +998,9 @@ class SqlJobStore:
             )
         await self._objects.check()
 
-    async def _object(
-        self, row: Row[Any], name: ObjectName, digest: str
-    ) -> bytes | None:
-        """The object ``name`` of the job ``row`` names, checked against ``digest``.
+    async def _object(self, row: Row[Any], name: ObjectName) -> bytes | None:
+        """The object ``name`` of the job ``row`` names, checked against the
+        digest the row holds in :data:`DIGEST_COLUMNS`.
 
         ``None`` where the object is missing because a delete removed the row
         after the caller read it. A delete changes the row first, so a row
@@ -1015,6 +1014,7 @@ class SqlJobStore:
                 )
             if held is None:
                 return None
+        digest = row._mapping[DIGEST_COLUMNS[name]]
         if data is None or not hmac.compare_digest(object_digest(data), digest):
             logger.error(
                 "job %s of owner %s: its %s object is missing or fails its digest"
@@ -1234,12 +1234,12 @@ class SqlJobStore:
         if found is None:
             return None
         row, texts = found
-        sources = await self._object(row, "sources.json", row.sources_sha256)
+        sources = await self._object(row, "sources.json")
         if sources is None:
             return None
         report = None
         if _names(row, "report.json"):
-            report = await self._object(row, "report.json", row.report_sha256)
+            report = await self._object(row, "report.json")
             if report is None:
                 return None
         return _record(row, sources, report, texts)
@@ -1268,7 +1268,7 @@ class SqlJobStore:
             row = found.one_or_none()
         if row is None:
             return None
-        data = await self._object(row, "sources.json", row.sources_sha256)
+        data = await self._object(row, "sources.json")
         if data is None:
             return None
         return _part_of(row, lambda: _SOURCES.validate_json(data))
@@ -1289,7 +1289,7 @@ class SqlJobStore:
             row = found.one_or_none()
         if row is None or not _names(row, "report.json"):
             return None
-        data = await self._object(row, "report.json", row.report_sha256)
+        data = await self._object(row, "report.json")
         return None if data is None else (row, data)
 
     async def report_json(self, job_id: str, owner_id: str) -> dict[str, Any] | None:

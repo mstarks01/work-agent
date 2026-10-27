@@ -1646,7 +1646,6 @@ def prepare_analysis(
             continue
         routes.append(nodes.run_route)
         inputs = framework_lane_inputs(
-            package,
             nodes,
             model,
             options.get(name) or {},
@@ -2274,7 +2273,6 @@ class LaneInputs:
 
 
 def framework_lane_inputs(
-    package: FrameworkPackage,
     nodes: FrameworkNodes,
     model: SystemModel,
     options: Mapping[str, object],
@@ -2288,6 +2286,7 @@ def framework_lane_inputs(
     from today's rules with it, so a replay that measures a rule change measures
     the lead the graph would send.
     """
+    package = nodes.package
     candidates = generate_candidates(model, package.lanes, package.rules, held)
     # Selected for every lane at once, because a lane's tie-break reads what
     # earlier lanes were sent: `select_per_lane` is the one reader of that

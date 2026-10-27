@@ -23,6 +23,7 @@ import pytest
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES
 from analysis_service.claims import Ruling
+from analysis_service.sql_store import DIGEST_COLUMNS
 from evals.harness.prices import UnitPrices
 from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
 
@@ -1143,6 +1144,27 @@ def test_a_defined_name_has_one_declaration():
     assert declared == {
         name: {owner} if owner else set() for name, owner in _ONE_MEANING.items()
     }
+
+
+def _reads_an_object_digest_off_a_row(node: ast.AST) -> bool:
+    """Whether ``node`` reads a digest column of :data:`DIGEST_COLUMNS` as an
+    attribute of a row, and not as a column of the table."""
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr in DIGEST_COLUMNS.values()
+        and not _is_attribute(node.value, "c", "jobs")
+    )
+
+
+def test_an_object_digest_is_read_through_its_column_table():
+    """The object reader and ``_names`` read the digest of an object through
+    ``DIGEST_COLUMNS``. A save hands ``check_save`` the report digest it
+    compares the stored digest with. Other models hold a field of the same
+    name, so the lint reads the store's module."""
+    store = [REPO_ROOT / "src/analysis_service/sql_store.py"]
+    assert _sites(_reads_an_object_digest_off_a_row, store) == [
+        ("src/analysis_service/sql_store.py", "save")
+    ]
 
 
 #: A module path under the service package, and a prompt path: the two halves

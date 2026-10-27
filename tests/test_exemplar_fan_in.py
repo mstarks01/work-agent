@@ -153,7 +153,6 @@ def test_every_exemplar_draft_passes_the_fan_in_unmarked(framework, lane):
             f"{where}: the {framework} lanes never run on this system"
         )
         inputs = framework_lane_inputs(
-            package,
             nodes,
             model,
             WIDEST_OPTIONS[framework],
