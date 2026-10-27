@@ -1127,7 +1127,7 @@ class Claim(BaseModel):
 
         A framework whose claims carry an action verb can say from a table
         which lanes that action may be filed in; a draft outside them is a lane
-        error the review seam rejects before any judgement is spent on it
+        error the review seam rejects before any judgement runs on it
         (#442). The neutral answer is that every lane is legal, which is what a
         framework with no verb, or no lane grammar over its verbs, inherits.
         """
@@ -2162,14 +2162,14 @@ class SharedElementName(BaseModel):
     :func:`~analysis_service.graph.validate_extraction` routes on — and a shared
     name does not deserve that, because it is not always wrong. A system can
     legitimately run a process and keep a store of the same name, and failing
-    extraction on the pair would reject a valid model *and* spend ``repair``'s
-    single pass telling a transcriber to rename something correct. So the
+    extraction on the pair would reject a valid model *and* use ``repair``'s
+    single pass to tell a transcriber to rename something correct. So the
     finding lands here instead, beside the other service-owned marks, and the
     gate is left with the one severity it has.
 
     A mark for a human, and pointedly not for ``repair``: that prompt is told
     to change nothing the issues do not cite, and a maybe is the worst thing to
-    spend its one pass on. This is the first mark about the *model* rather than
+    use its one pass on. This is the first mark about the *model* rather than
     about the threats — :class:`UnverifiedGround`, :class:`UnresolvedMention`
     and :class:`MissingMitigation` all annotate findings — which is why it
     holds element IDs rather than a ``threat_id``.

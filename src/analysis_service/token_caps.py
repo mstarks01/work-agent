@@ -125,7 +125,7 @@ TOKEN_CAPS: dict[str, int] = {
     #
     # It says that a `name` needs an ASCII letter or digit (ADR 0096). A name
     # with neither has no ID, and the gate refuses it as `empty-slug` and
-    # spends the repair pass; the rule tells the model how to name such a thing.
+    # uses the repair pass; the rule tells the model how to name such a thing.
     "prompts/extract": 4700,
     # The compact transport's delta, appended after the body above. It is the
     # whole cost of the route on the input side, paid on every extraction call

@@ -570,7 +570,7 @@ class QuestionSet:
         the early questions the page showed, which is what the record keeps
         as shown and what a skip must be of (:meth:`presented`). A report's one follow-up is
         refused where its answers add no information
-        (:func:`_adds_information`), so it is not spent on a run that reads
+        (:func:`_adds_information`), so it does not go to a run that reads
         nothing new.
         """
         if self.resumed_by is not None:

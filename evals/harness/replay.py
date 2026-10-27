@@ -860,7 +860,7 @@ def replay_assertions(
     under another name, and a scope spelled another way are compared as the
     reviewer ruled they should be. The fates are then the plain matcher's,
     assigned by :func:`_assigned` so that no reference row's exact answer is
-    spent on another row that had only a worse use for it.
+    given to another row that had only a worse use for it.
 
     **The looser reading rides along.** :func:`aligned_rows` reads the same
     reference and the same result under a key that sets a flow's label aside,

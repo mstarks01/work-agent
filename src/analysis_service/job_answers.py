@@ -602,7 +602,7 @@ class JobAnswers:
                     "the report's follow-up has started, or another save landed"
                     " first; read the questions again"
                 )
-            # A draft runs nothing and spends no follow-up (ADR 0070).
+            # A draft runs nothing and uses no follow-up (ADR 0070).
             return DraftSaved(job_id=parent.id, revision=outcome.revision + 1)
         if isinstance(outcome, SavedAnswers):
             if not await self.store.save_answers(

@@ -624,7 +624,7 @@ def _quote_issue(
         )
     # Snapped rather than matched exactly, for the reason element IDs are
     # derived: which spelling of the job's label arrived is mechanical, and
-    # ``repair``'s one pass is too scarce to spend on a re-cased word.
+    # ``repair``'s one pass is too scarce to use on a re-cased word.
     snapped = canonical(label, sources)
     if not snapped:
         return (
@@ -808,7 +808,7 @@ def repair_scope(
     was given holds it under the ID the rename replaces. Unless that flow is
     in scope, :func:`restore_unimplicated` puts the replaced entry back,
     pointing at an element ID the repaired model does not carry; the gate
-    reports the dangling reference, and the one repair pass is spent on a
+    reports the dangling reference, and the one repair pass goes to a
     repair that was correct (#1040). The flows are the rename's own half
     rather than a change of the repair's own, which is why they are derived
     here instead of being asked for in the prompt.

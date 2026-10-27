@@ -3,7 +3,7 @@
 At 2fae7d3, 201 schema-valid conditional threats with distinct unknown
 subjects made the follow-up ask 201 questions, and the answer request admitted
 at most 200 facts. A follow-up could not save a batch without running, and its
-first run spent the one follow-up. These tests build that report and answer
+first run used the one follow-up. These tests build that report and answer
 it through the ``/v1`` routes.
 """
 
@@ -271,7 +271,7 @@ class TestTheDraft:
 
     def test_a_draft_of_nothing_new_is_kept_but_its_run_is_refused(self):
         """A save is not a run: "I don't know" for everything saves, and the
-        run that would read nothing new is refused without being spent."""
+        run that would read nothing new is refused and uses no follow-up."""
         client, store = _client()
         job = _finished(store, count=2)
         unknown = [{"key": _subject(0), "value": "unknown"}]

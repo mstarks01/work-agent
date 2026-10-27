@@ -757,7 +757,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         """``immaterial_unknowns`` is a statement about this draft's own grounds.
 
         A near-miss spelling — the right element with a neighbouring attribute
-        — dismisses nothing, so code removes it rather than spending the re-ask
+        — dismisses nothing, so code removes it and does not use the re-ask
         on it. The real pair stays open, and the ruling reads ``needs-info``.
         """
         draft = sample_draft(

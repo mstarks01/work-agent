@@ -617,9 +617,9 @@ class TestExcerptsVerify:
 class TestExcerptLabelsSnap:
     """A label differing only in spelling is the job's label, not a new one.
 
-    ``repair`` gets one pass; spending it on a re-cased word is spending it on
-    nothing. The rewrite rides on ``normalize_ids`` for the reason IDs do — it
-    is on exactly where a model arrives from a model.
+    ``repair`` gets one pass, and a pass used on a re-cased word does nothing.
+    The rewrite rides on ``normalize_ids`` for the reason IDs do — it is on
+    exactly where a model arrives from a model.
     """
 
     SOURCES = TestCitationsResolve.SOURCES

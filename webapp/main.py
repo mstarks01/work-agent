@@ -1485,7 +1485,7 @@ def create_app(
         if isinstance(outcome, Started):
             return JSONResponse({"run": outcome.job_id})
         if isinstance(outcome, DraftSaved):
-            # A draft runs nothing and spends no follow-up (ADR 0070).
+            # A draft runs nothing and uses no follow-up (ADR 0070).
             return JSONResponse({"saved": True, "revision": outcome.revision})
         # A save runs no model: the answers go onto the paused run, and the
         # list is read again off the model with them in.

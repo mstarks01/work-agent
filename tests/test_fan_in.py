@@ -442,7 +442,7 @@ class TestGroundReferences:
 
 
 class TestUnresolvedMentions:
-    """Marked, never fatal: the fan-in has no re-ask path to spend on prose."""
+    """Marked, never fatal: the fan-in has no re-ask path to use on prose."""
 
     def drafted(self, description, threat_id="S-01"):
         return {"spoofing": [sample_draft(threat_id, description=description)]}

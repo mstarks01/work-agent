@@ -946,7 +946,7 @@ def _facets(facets: dict[str, str]) -> FactAnswer:
 
 
 class TestAFollowUpMustAddSomething:
-    """An all-"I don't know" follow-up spent the report's only rerun (#1289)."""
+    """An all-"I don't know" follow-up used the report's only rerun (#1289)."""
 
     FACT = (FLOW, "data_description", "", "", "", "")
     LINK = LinkAnswer(principal="customer", element="entity:customer")

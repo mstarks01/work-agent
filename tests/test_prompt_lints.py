@@ -777,7 +777,7 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
 # the model `assets`, a closed vocabulary of six tags that does not contain it
 # and cannot. The prompt must say so (#295). A model that follows a prompt
 # without that warning writes `unknown` into `assets`, which is
-# `illegal-asset-tag`: a Tier 1 failure that kills the job and spends its one
+# `illegal-asset-tag`: a Tier 1 failure that kills the job and uses its one
 # repair pass.
 #
 # `gpt-4o` did exactly that on `04-ml-inference-service` in the 2026-08-23

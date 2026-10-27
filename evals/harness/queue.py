@@ -18,7 +18,7 @@ reviewer who can see which configuration produced a finding is a reviewer whose
 vote can encode a preference about the configuration, which is exactly the bias
 the vote exists to escape.
 
-It skips what is already answered. A vote is spent once and kept for ever,
+It skips what is already answered. A vote is cast once and kept for ever,
 because it hangs on a fingerprint, so the second sitting over a corpus sees only
 what the first did not: new findings from a changed configuration, and
 disagreements. That is the whole economic argument for the fingerprint.
@@ -28,7 +28,7 @@ carries the structural digest of the claim it answered (ADR 0029), so a finding
 whose verdict, grounds or ratings have moved since is offered again, last in the
 order, with the reason saying so and with that reviewer's earlier answer beside
 the new claim. A rewording alone does not re-ask: a model writes new prose every
-run, and re-asking on that would spend a whole sitting on paraphrases.
+run, and re-asking on that would fill a whole sitting with paraphrases.
 
 It is limited to the named reviewer's own answers on purpose. In a queue built
 for nobody, re-offering a re-argued finding would tell this reviewer that

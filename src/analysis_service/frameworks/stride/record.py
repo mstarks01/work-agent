@@ -359,7 +359,7 @@ class RecommendationReading(BaseModel):
     #: What the advice misses, where it does not. Free of any rule binding it to
     #: ``sound``: the critic's text asks for one on an unsound reading, and a
     #: missing sentence is a thin record rather than output the service should
-    #: spend a re-ask on. Empty is the ordinary value on a sound reading.
+    #: use a re-ask on. Empty is the ordinary value on a sound reading.
     note: str = Field(default="", max_length=REASON_MAX_CHARS)
 
 

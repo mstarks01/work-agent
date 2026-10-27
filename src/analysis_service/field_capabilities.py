@@ -3,7 +3,7 @@
 A flow that states HTTPS between two of the application's own parts proves
 that the application uses TLS, and a process that is internet-facing with a
 web interface proves that it exposes an HTTP service. Asking the owner about
-either one only spends an answer (ADR 0085).
+either one only wastes an answer (ADR 0085).
 
 **Only a field with a closed set of values proves a row**: an element's kind,
 a process's exposure and interface, the asset tags, a stated protocol from the

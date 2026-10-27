@@ -167,7 +167,7 @@ def test_every_exempted_rule_is_a_rule_some_package_declares(models):
 #: Over the whole corpus every selection is a tie at one matched rule, and
 #: declaration order alone would send all 39 to the first-declared document.
 #: The tie-break reads what the job has already sent, so a lane that
-#: ties spends its slot on material the job has not.
+#: ties fills its slot with material the job has not sent.
 UNSELECTED: dict[str, str] = {
     "asvs:real-time-media-and-signalling": (
         "The other reading, and a corpus gap rather than a selection one: its"

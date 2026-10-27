@@ -339,7 +339,7 @@ ROLES: tuple[str, ...] = (
 # One key per artifact per ``(framework, lane)`` rather than one, for the reason
 # ``{lane}`` is substituted at build time: the lane agents run in parallel
 # against a single session state, which cannot hold N values for one key.
-# Handing every agent every lane's material would also spend most of the block on
+# Handing every agent every lane's material would also fill most of the block with
 # other people's leads, and the material genuinely differs per lane — the candidate
 # rules that selected the corpus documents fired per lane, and the rule counts
 # behind the scope differ per category.
@@ -1306,7 +1306,7 @@ def validate_extraction(
     """Run the mechanical validity gate and route on the result.
 
     Element IDs are derived here rather than demanded of the model (ticket
-    037), so ``repair``'s one pass is never spent reconciling an ID with its
+    037), so ``repair``'s one pass never goes to reconcile an ID with its
     own name.
 
     On failure, parks the rejected model and the issues where the repair

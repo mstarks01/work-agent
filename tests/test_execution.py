@@ -444,7 +444,7 @@ class TestARefusedFramework:
 
     **Tested here rather than as a function.** Driving ``prepare`` alone proves
     the predicate; only a drive proves the *topology*, which is the part that can
-    drop a block or spend a lane agent the gate meant to stop. Every test swaps
+    drop a block or run a lane agent the gate meant to stop. Every test swaps
     STRIDE's total precondition for one that refuses, because a gate whose only
     exerciser always answers ``satisfied`` proves nothing.
     """

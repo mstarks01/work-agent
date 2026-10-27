@@ -165,7 +165,7 @@ def structural(claim: Claim) -> str:
     Sixteen hex characters for the reason a fingerprint uses them: the
     population is a corpus rather than a namespace, and a value a person can
     read out loud beside a ledger row is worth more than the collision margin it
-    spends.
+    loses.
     """
     parts: list[str] = []
     for ground in claim.grounds:
