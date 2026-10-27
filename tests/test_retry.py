@@ -875,9 +875,9 @@ class TestTheFinishReasonContract:
 
     Every test above scripts the string ``reject_unfinished`` matches on, which
     proves the check works and nothing about whether it will ever fire. These
-    two probe the installed library instead — the same reason
+    probe the installed library instead — the same reason
     ``test_model_gate.py`` probes litellm rather than mirroring its behaviour.
-    A version that changes either mapping shows up here as a failing test
+    A version that changes any of these mappings shows up here as a failing test
     rather than as a truncation that sails through in production.
     """
 
@@ -895,6 +895,16 @@ class TestTheFinishReasonContract:
         from litellm.litellm_core_utils.core_helpers import map_finish_reason
 
         assert map_finish_reason("refusal") == "content_filter"
+
+    @pytest.mark.parametrize(
+        "reason", ["model_context_window_exceeded", "pause_turn", "error"]
+    )
+    def test_litellm_reads_these_stops_as_a_finished_answer(self, reason):
+        """The gap the ``_UNFINISHED`` comment states. A litellm that maps one
+        of these elsewhere fails here, so the table can grow a row for it."""
+        from litellm.litellm_core_utils.core_helpers import map_finish_reason
+
+        assert map_finish_reason(reason) == "stop"
 
     def test_a_normal_stop_maps_somewhere_else(self):
         from google.adk.models.lite_llm import _map_finish_reason

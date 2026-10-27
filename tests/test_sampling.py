@@ -9,6 +9,7 @@ graph node is asserted in ``test_graph``.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -322,9 +323,9 @@ class TestEnvOverrides:
             == "ANALYSIS_SAMPLING_STRONG_TEMPERATURE"
         )
 
-    def test_no_env_reads_os_environ(self, config_path, monkeypatch):
+    def test_os_environ_overrides_apply(self, config_path, monkeypatch):
         monkeypatch.setenv(env_var_for("strong", "temperature"), "0.9")
-        config = load_sampling(config_path(config_toml()), env=None)
+        config = load_sampling(config_path(config_toml()), env=os.environ)
         assert config.for_tier("strong").temperature == 0.9
 
     def test_offered_surface_is_exactly_the_offered_params(self):

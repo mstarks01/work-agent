@@ -731,6 +731,12 @@ def stamp_attempt(responses: Sequence, attempt: int) -> Sequence:
 #: Each finish reason that leaves a fragment, in the order they are checked:
 #: the error it raises, the log line, and the error's message. The log line
 #: takes the model's name as its one ``%s``, and the message as ``{model}``.
+#:
+#: **Three stops never reach this table.** The pinned litellm maps
+#: ``model_context_window_exceeded`` and ``pause_turn``, which it does not
+#: know, and ``error`` to ``stop``. So an answer cut off for one of them reads
+#: as finished, keeps no fragment, and fails at the schema instead.
+#: ``tests/test_retry.py`` pins that map.
 _UNFINISHED: dict[str, tuple[type[UnfinishedCompletionError], str, str]] = {
     _SAFETY_FINISH_REASON: (
         RefusedCompletionError,

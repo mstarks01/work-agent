@@ -950,7 +950,10 @@ def test_a_new_job_is_created_and_admitted_in_job_answers():
 _SHARED_BOUNDS: dict[str, str] = {
     "source_label": "MAX_LABEL_CHARS",
     "source_excerpt": "EXCERPT_MAX_CHARS",
+    "excerpt": "EXCERPT_MAX_CHARS",
+    "quote": "EXCERPT_MAX_CHARS",
     "element_id": "ELEMENT_ID_MAX_CHARS",
+    "element": "ELEMENT_ID_MAX_CHARS",
     "flow_id": "ELEMENT_ID_MAX_CHARS",
     **dict.fromkeys(CONTROL_ATTRIBUTES, "CONTROL_VALUE_MAX_CHARS"),
 }
@@ -1236,11 +1239,11 @@ def test_a_page_parses_its_own_path_once():
     Each other site reads ``RUN``, so a route change is one edit.
     """
     sites = [
-        (script.name, number)
-        for script in sorted((REPO_ROOT / "webapp/static").glob("*.js"))
+        (script.relative_to(REPO_ROOT).as_posix(), number)
+        for script in source_files(*PYTHON, suffixes=(".js",))
         for number, line in enumerate(
             script.read_text(encoding="utf-8").splitlines(), 1
         )
         if _PATH_PARSE.search(line)
     ]
-    assert [name for name, _ in sites] == ["report_view.js"], sites
+    assert [name for name, _ in sites] == ["webapp/static/report_view.js"], sites

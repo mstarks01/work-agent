@@ -307,7 +307,8 @@ OPERATOR = Identity.local(DEFAULT_CALLER)
 
 
 class WorkspaceFull(Exception):
-    """Every job the workspace holds waits for answers, so none can make room."""
+    """Every job the workspace holds runs or waits for answers, so none can make
+    room."""
 
 
 @dataclass(frozen=True)
@@ -435,7 +436,7 @@ class Workspace:
         may hold one place over the bound: that job stays the place to retry
         from until its answer has a report, and it is never deleted to make
         room for its own answer. Raises :class:`WorkspaceFull` where every
-        held job waits.
+        held job runs or waits.
         """
         limit = self._max_jobs + (answering is not None)
         chosen_at = datetime.now(UTC)
@@ -448,8 +449,9 @@ class Workspace:
         excess = len(held) - limit + 1
         if excess > len(removable):
             raise WorkspaceFull(
-                f"{len(held)} analyses wait for answers. Answer or continue"
-                " one of them before you start another."
+                f"{len(held)} analyses run or wait for answers, so none can"
+                " make room. Answer or continue one of them before you start"
+                " another."
             )
         yield
         for job in removable[: max(excess, 0)]:

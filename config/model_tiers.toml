@@ -13,7 +13,7 @@
 #
 # WHY `analyze/`: `Analyst` names a human, the person who reads the report, so
 # each node is named for what it does: it analyses one lane. The graph's own node
-# names are a separate namespace; `TIER_NODE_BY_GRAPH_NODE` in graph.py maps
+# names are a separate namespace; `tier_node_by_graph_node` in graph.py maps
 # between the two.
 #
 # WHY A PAIR, NOT A ROUTER STRING: `vertex_ai/gemini-2.5-pro` would have to be
@@ -232,10 +232,10 @@ assert = "base"
 # turns it off, but every install names its tier, as it does for the assertion
 # pass.
 capabilities = "base"
-# Three keys per framework. Every lane of one framework runs the same judgement
-# on the same tier, so this is one knob per framework rather than one per lane —
-# an operator choosing to run one framework cheaper than another is the choice
-# that has a purpose, and six keys that always held one value had no reader.
+# Three keys per framework. Every lane of one framework runs the same judgement,
+# so one key per framework is the usual knob: an operator choosing to run one
+# framework cheaper than another is the choice that has a purpose. A lane key,
+# described at the top of this file, is the exception.
 #
 # THE KEYS ARE REQUIRED IN EVERY INSTALL, including one whose `carried` list
 # names a single framework. `LLM_NODES` derives from `FrameworkName`, which names

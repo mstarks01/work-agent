@@ -79,7 +79,11 @@ from analysis_service.sources import (
     SourceLimits,
     clean_system_name,
 )
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import (
+    ELEMENT_ID_MAX_CHARS,
+    EXCERPT_MAX_CHARS,
+    SystemModel,
+)
 from analysis_service.validation import parse_and_validate
 from evals.harness.identity import CaseFlows
 from evals.harness.verbs import check_verb
@@ -606,13 +610,13 @@ class ElementAlias(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     #: The blessed element this is another name for.
-    element: str = Field(min_length=1, max_length=300)
+    element: str = Field(min_length=1, max_length=ELEMENT_ID_MAX_CHARS)
     #: The supported name, as the source words it. The ID is derived from it,
     #: through the same function that derives every element ID.
     name: str = Field(min_length=1, max_length=200)
     #: The words in the case's own source that support the name. Checked, so an
     #: alias cannot drift into a name the text never offered.
-    excerpt: str = Field(min_length=1, max_length=1000)
+    excerpt: str = Field(min_length=1, max_length=EXCERPT_MAX_CHARS)
     #: Why it is supported, in the reader's words. Prose for a person; nothing
     #: computes on it.
     ruling: str = Field(default="", max_length=1000)

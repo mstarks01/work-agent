@@ -54,7 +54,7 @@ from evals.harness import content as digests
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
 from evals.harness.identity import NO_FLOWS, CaseFlows, channels
-from evals.harness.ledger import Identity, Ledger, identity_of
+from evals.harness.ledger import Identity, Ledger, github_login, identity_of
 
 
 @dataclass(frozen=True)
@@ -212,10 +212,10 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
 #
 # The pool is derived from votes, and this queue skips what is already
 # answered. "Answered" is only this queue's voter's, so a pooled finding that
-# survives was pooled by *somebody else* -- and the row's weight, its position in the order
-# and the reason printed beside it would tell this reviewer how another
-# reviewer voted. The second-opinion pass is the one place that must not be
-# told.
+# survives was pooled by *somebody else* -- and the row's weight, its position
+# in the order and the reason printed beside it would tell this reviewer how
+# another reviewer voted. The second-opinion pass is the one place that must
+# not be told.
 #
 # Ranking by the corpus reference sets would be a different row, and would
 # answer the question honestly.
@@ -270,8 +270,10 @@ def answered(
     rule (ADR 0060).
 
     Only ``voter``'s own votes count, so another reviewer's answer never takes
-    an item out of this queue. An empty ``voter`` raises :class:`ValueError`:
-    a queue is built for one named reviewer.
+    an item out of this queue. A ``voter`` that
+    :func:`~evals.harness.ledger.github_login` refuses raises
+    :class:`~evals.harness.ledger.LedgerError`: a queue is built for one named
+    reviewer, whose votes the ledger accepts.
 
     **Public because the app re-asks the same question per request.** It builds
     the queue once and filters it again on every serve. The app calls this
@@ -279,8 +281,7 @@ def answered(
     `needs-evidence` answer as answered and drop what this re-offers. One rule
     needs one reader.
     """
-    if not voter:
-        raise ValueError("a review queue is built for one named voter")
+    github_login(voter)
     live = ledger.current()
     skipped = set()
     for identity, content in contents.items():
@@ -310,7 +311,6 @@ def restated(
     :meth:`~evals.harness.ledger.Vote.answers_for` — one rule, one reader — and
     both narrow to the named reviewer's own votes for the reason
     :func:`answered` gives.
-
     """
     return {
         identity: _said(vote)

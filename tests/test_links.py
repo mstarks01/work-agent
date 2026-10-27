@@ -39,6 +39,7 @@ from analysis_service.links import (
     with_link_answers,
 )
 from analysis_service.sources import Source, quotable
+from analysis_service.system_model import make_element_id
 from tests.factories import valid_model
 from tests.test_api import auth, make_client, submission
 from tests.test_graph import KEYS, FakeContext
@@ -92,6 +93,12 @@ class TestTheAnswerShape:
     def test_a_component_or_none(self):
         assert LinkAnswer(principal="x", element="entity:customer").element
         assert LinkAnswer(principal="x", element=NONE_OF_THESE).element == "none"
+
+    def test_a_component_with_the_longest_name_is_an_answer(self):
+        """An answer names any component the page offers, and an Element ID
+        is longer than the name it comes from."""
+        element = make_element_id("entity", "x" * 200)
+        assert LinkAnswer(principal="x", element=element).element == element
 
     @pytest.mark.parametrize(
         "element",
