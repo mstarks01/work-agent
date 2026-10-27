@@ -89,7 +89,7 @@ from analysis_service.parsing import is_version
 
 # The only schema version this loader accepts. Every config file pins its own
 # version and every loader exact-matches it, so the numbers are independent: a
-# shared one would buy nothing, since a stale file fails its own check.
+# shared one would gain nothing, since a stale file fails its own check.
 #
 # Every tier's block is required, the ``review`` tier's included: a file that
 # could omit a tier would run criticism moved onto ``review`` on values nobody

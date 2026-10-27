@@ -624,7 +624,7 @@ def render_element_roster(model: SystemModel) -> str:
 
     **The gloss is type and place, never the attributes.** Those are in the
     System Model already and this table is paid for on every lane agent of every
-    framework; repeating them would buy nothing and cost the most expensive
+    framework; repeating them would gain nothing and enlarge the most expensive
     block in the job-varying half. What a row has to carry is enough for an
     agent to recognise the element it means without reconstructing the ID —
     which is what the left column is for.

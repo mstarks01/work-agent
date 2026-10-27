@@ -19,8 +19,8 @@ recognizes the one it already names, under a spelling the job's own construction
 rules make equivalent. A reference that names nothing comes back empty, and the
 caller's check reports it exactly as before.
 
-The fold is two rungs, case and whitespace. The quote ladder's rungs are
-concessions bought with measured precision. These two are almost always free,
+The fold is two rungs, case and whitespace. Each rung of the quote ladder is a
+concession that loses some measured precision. These two almost never lose any,
 and the uniqueness guard, rather than the argument for why, is what makes them
 safe.
 

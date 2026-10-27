@@ -141,7 +141,7 @@ def _primary(full: Arm, compact: Arm) -> tuple[bool, str]:
 
 
 def _margin(figure: str, margin: float) -> Callable[[Arm, Arm], tuple[bool, str]]:
-    """One non-inferiority margin, one-sided: better by any amount buys nothing."""
+    """One non-inferiority margin, one-sided: better by any amount gains nothing."""
 
     def verdict(full: Arm, compact: Arm) -> tuple[bool, str]:
         delta = statistics.fmean(compact.figure(figure)) - statistics.fmean(

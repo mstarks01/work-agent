@@ -624,7 +624,7 @@ class TestTheBandIsReadOffTheFates:
     """The spread of the must-find total, from runs already paid for.
 
     The expensive reading is five sweeps of one configuration and the sample
-    deviation of five totals, which buys a deviation on four degrees of
+    deviation of five totals, which gives a deviation on four degrees of
     freedom. This sums each reference's own variance instead, so a pair of
     sweeps answers — the sum is over the references, not over the runs (#879).
     """

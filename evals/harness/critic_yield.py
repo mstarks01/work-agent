@@ -108,7 +108,7 @@ class KilledDraft:
 
 @dataclass(frozen=True)
 class CriticYield:
-    """What one case's critic pass cost and bought."""
+    """What one case's critic pass removed, and what it gained."""
 
     case_id: str
     drafts_in: int

@@ -9,15 +9,15 @@ vote answers what no comparison of fields can.
 
 The comparison is set equality, never overlap. ``affected_element_ids`` is a
 list whose order no rule reads, so the comparison sorts. Relaxing equality to a
-shared element is the obvious way to buy back a paraphrase that named the flow
+shared element is the obvious way to recover a paraphrase that named the flow
 where the reference named the process, and ``tests/test_claim_identity.py``
-records what that costs on the blessed corpus: an order of magnitude more claims
+records what that does on the blessed corpus: an order of magnitude more claims
 merge, and every one of them is a pair the corpus records as a distinct claim.
 
 A Trust Boundary is dropped before the comparison. It is an Element with an
 Element ID like any other, and the reference sets cite one in 431 citations. A
 zone is the context a claim sits in rather than the thing the claim is about.
-Comparing on a citation that arbitrary is noise, and dropping it costs nothing
+Comparing on a citation that arbitrary is noise, and dropping it loses nothing
 the corpus can show.
 
 :func:`endpoint_form` is the looser comparison the frontier in

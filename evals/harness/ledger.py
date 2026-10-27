@@ -500,7 +500,7 @@ class Ledger:
     """Every vote ever cast, in the order it was cast.
 
     Loaded whole. At a corpus of thirteen cases and a few hundred findings the
-    files are small enough that streaming would buy nothing and cost the
+    files are small enough that streaming would gain nothing and lose the
     ability to answer a question about the whole history in one pass. When
     they stop being small the answer is a different store, not a lazier
     reader.

@@ -119,7 +119,7 @@ LANE_SECTION_HEADINGS: tuple[str, ...] = (
 
 #: The text a package carries under its root, by **convention rather than
 #: declaration**. A declared path would let a package name a file freely and
-#: buys nothing; a convention plus a checked rule gives the same guarantee with
+#: gains nothing; a convention plus a checked rule gives the same guarantee with
 #: fewer members to get wrong.
 #:
 #: Per lane: ``lanes/<lane>/skill.md`` and ``lanes/<lane>/exemplars.md``.

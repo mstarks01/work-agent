@@ -469,8 +469,8 @@ class TestARewrittenFindingIsAskedAgain:
         assert queue[0].previously == "down (too-vague)"
 
     def test_a_re_argument_ranks_below_a_finding_nobody_has_answered(self):
-        """The topic already has an answer, which buys less than one nobody
-        has answered at all."""
+        """The topic already has an answer, which gives less information than
+        one nobody has answered at all."""
         answered_before = finding()
         led = self._ledger(answered_before)
         reargued = finding(title="Re-argued since", content=other_content())

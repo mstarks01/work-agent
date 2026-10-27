@@ -1257,7 +1257,7 @@ def test_every_bedrock_reference_model_names_an_inference_profile():
     pair would have died on a ValidationException at the first live request —
     which is the answer
     [#626](https://github.com/mstarks01/work-agent/issues/626) asked for and
-    could not buy, because nobody has provisioned ``ANALYSIS_BEDROCK_API_KEY``.
+    could not get, because nobody has provisioned ``ANALYSIS_BEDROCK_API_KEY``.
 
     Named for one vendor because the fact is one vendor's, and the property is
     general: **a vendor may serve a model under an identifier its price table

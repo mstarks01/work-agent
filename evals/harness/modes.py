@@ -1,6 +1,6 @@
 """The eval modes over one corpus, and the three the split exists for.
 
-:data:`MODE_ENTRIES` holds every mode. Two artifacts per case buy the three
+:data:`MODE_ENTRIES` holds every mode. Two artifacts per case give the three
 below, and the point of the split is attribution. An end-to-end-only fixture cannot say whether a recall miss was a
 category-agent failure or an element ``extract`` never produced.
 

@@ -1902,7 +1902,7 @@ def _entry_issues(
     # An inference says what it rests on, in words a person reads and, where
     # code made it, in rows. **Not in rows alone**: an assertion's identity is
     # computed, so a model writing a premise ID would be writing a key it
-    # cannot compute, and demanding one buys a fabricated reference rather
+    # cannot compute, and demanding one gets a fabricated reference rather
     # than a basis. The words are required; the rows are optional and checked
     # where they are given.
     if entry.basis in ("inferred", "derived") and not entry.explanation:

@@ -857,7 +857,7 @@ def _ruling_view(
     the empty string on any given ground, and rendering them uses a line each
     on a field whose own validator forbids it carrying anything.
 
-    THE HAZARD THIS BUYS, stated rather than left to be discovered: a field
+    THE HAZARD THIS ADDS, stated rather than left to be discovered: a field
     added to a package's record with a default disappears from that
     framework's critic's view whenever it holds that default, silently and with
     nothing downstream able to see it. Every field a critic rules on is required

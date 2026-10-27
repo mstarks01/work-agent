@@ -10,7 +10,7 @@ vendor is privileged.
 ``review`` is a place rather than a policy. Which nodes sit on it is the node
 map's business, and the shipped map puts ``critic/<name>`` and
 ``recritic/<name>`` on ``strong``. That is the same domain as the analysis,
-which is cheaper and is what most deployments want. What the tier buys is that a
+which is cheaper and is what most deployments want. What the tier gives is that a
 deployment can move them, and ``review_independence`` in the config file is
 where it says how far apart they have to be. Without ``review``, the only way
 to make criticism distinct is to run it on ``base``, which is a re-ask on a
@@ -322,7 +322,7 @@ class ModelTierConfig(BaseModel):
     #: vendor with nothing to choose is an error, and a missing key for a vendor
     #: with a choice is an error.
     #:
-    #: Empty in every shipped file. What the declaration buys is a recorded
+    #: Empty in every shipped file. What the declaration gives is a recorded
     #: figure that means one thing:
     #: :func:`analysis_service.charges.records_reported_charge` records a
     #: vendor's reported charge only where the declared arrangement says the
@@ -333,7 +333,7 @@ class ModelTierConfig(BaseModel):
     #: Which upstream providers a request on each gateway vendor may reach.
     #: Keyed by vendor for the same reason :attr:`charges` is. Optional where
     #: the other two tables are required, because an analysis is an analysis
-    #: whichever upstream answers; what a pin buys is a **Baseline**, which is
+    #: whichever upstream answers; what a pin gives is a **Baseline**, which is
     #: named after the one upstream the record says served it, and a run that
     #: may land on two upstreams cannot be one. A key for a vendor whose
     #: :attr:`~analysis_service.vendors.Vendor.upstream_pin` is ``None`` is an

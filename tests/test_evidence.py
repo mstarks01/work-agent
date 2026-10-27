@@ -1091,8 +1091,8 @@ class TestTheElementRoster:
     def test_the_gloss_carries_no_attribute_values(self):
         """Those are in the System Model, and this is paid per lane per framework.
 
-        Repeating them would buy nothing and cost the most expensive block in
-        the job-varying half.
+        Repeating them would gain nothing and enlarge the most expensive block
+        in the job-varying half.
         """
         model = valid_model()
         roster = render_element_roster(model)

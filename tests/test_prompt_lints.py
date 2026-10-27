@@ -355,7 +355,7 @@ def test_prompt_body_within_token_cap(name):
     """The alarm: this body has not grown past what its cap allows.
 
     Failing here is not a verdict on the edit. Call ``alarm_at`` over the new
-    size, write the answer into ``TOKEN_CAPS``, and say what the text buys.
+    size, write the answer into ``TOKEN_CAPS``, and say what the text gives.
     """
     assert estimate_tokens(loader.load(name)) <= TOKEN_CAPS[prompt_key(name)]
 

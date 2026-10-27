@@ -2216,7 +2216,7 @@ class TestALane:
 
     The claim worth testing is not the spelling of any one key. It is that the
     key a lane *writes* and the key its instruction *reads* are the same key,
-    for every artifact — which is what putting both behind one declaration buys.
+    for every artifact — which is what putting both behind one declaration gives.
     """
 
     def test_what_a_lane_writes_is_what_its_prompt_reads(self):

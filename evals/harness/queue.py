@@ -1,9 +1,9 @@
 """Which findings a reviewer is asked about, and in what order.
 
 Human attention is the scarce resource in this whole design, so the order is a
-budget rather than a convenience. A finding twenty runs already agree on buys
-nothing. A finding that appears in one run of five, or that two configurations
-disagree about, buys the most information a single click can.
+budget rather than a convenience. A finding twenty runs already agree on gives
+no new information. A finding that appears in one run of five, or that two
+configurations disagree about, gives the most information a single click can.
 
 It is built from finished artifacts and the ledger, and nothing else. There is
 no provider, no credential and no engine. That is what lets a sitting happen on
@@ -233,8 +233,8 @@ def priority_of(finding: Finding, restated: bool = False) -> tuple[int, str]:
 
     ``restated`` says this reviewer answered this finding when it rested on a
     different verdict, different grounds or different ratings. It sits below
-    ``new`` because the topic already has an answer, which buys less than a
-    finding nobody has answered at all.
+    ``new`` because the topic already has an answer, which gives less
+    information than a finding nobody has answered at all.
     """
     reasons = {
         "volatile": 0 < finding.seen_in < finding.runs,
@@ -470,10 +470,10 @@ def merge_runs(
 
     The reading :attr:`QueueItem.volatile` rests on, and the reason the review
     app takes several artifacts rather than one: a finding every sweep of one
-    configuration produced is settled, and a finding two sweeps of five
-    produced is where a reviewer's click buys the most. Over a single artifact
-    every count is 1 of 1 and nothing is volatile, which is the honest reading
-    of one run rather than a missing measurement.
+    configuration produced is settled, and a finding two sweeps of five produced
+    is where a reviewer's click gives the most information. Over a single
+    artifact every count is 1 of 1 and nothing is volatile, which is the honest
+    reading of one run rather than a missing measurement.
 
     **A run that names one identity twice counts once.** The denominator is
     runs, so a lane repeating itself inside one report is a different question

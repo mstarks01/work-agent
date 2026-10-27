@@ -45,7 +45,7 @@ def alarm_at(largest: int) -> int:
     """The cap a kind whose largest asset is ``largest`` tokens gets.
 
     Call this when the lint fails, write the answer into :data:`TOKEN_CAPS`,
-    and say in the commit message what the new text buys. Nothing has to leave
+    and say in the commit message what the new text gives. Nothing has to leave
     to make room for it.
     """
     return math.ceil(largest * (1 + HEADROOM_FRACTION) / 100) * 100

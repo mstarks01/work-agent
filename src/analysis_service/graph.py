@@ -1236,7 +1236,7 @@ def unfence(rendered: str) -> str:
 #: also what `require_identity` verifies a bearer token through, and a graph that
 #: could fill it would make every arriving caller wait for a node body.
 #:
-#: Small because a node body is CPU-bound, so more threads than cores buys
+#: Small because a node body is CPU-bound, so more threads than cores gives
 #: queueing rather than throughput, and because the point of the bound is to
 #: leave the default limiter's slots for the request path.
 _NODE_THREADS = anyio.CapacityLimiter(8)
@@ -2161,14 +2161,14 @@ def assemble_report(
     can only use the time again — and :data:`STATE_ANALYSIS`, already written,
     is what says the pass happened.
 
-    **Two triggers that run at once are not serialized, and need not be.**
-    Node bodies run on the worker pool, and the gate is a read of the session
-    state followed by a write, so two triggers that both find every framework
+    **Two triggers that run at once are not serialized, and need not be.** Node
+    bodies run on the worker pool, and the gate is a read of the session state
+    followed by a write, so two triggers that both find every framework
     finished before either writes both assemble. What keeps that safe is the
     assembly, not the gate: it is a pure function of the parked artifacts, so
-    both passes write the same value and the second costs time and nothing
-    else. A lock here would buy one assembly instead of two identical ones,
-    at the price of a lock on the one node every framework's route ends at.
+    both passes write the same value and the second uses time and does no other
+    harm. A lock here would give one assembly instead of two identical ones,
+    but it would put a lock on the one node every framework's route ends at.
 
     **A join node is the wrong fix here**, and the run-time gate is why. ADK's
     ``JoinNode`` waits for *all* predecessors to complete, and a refused

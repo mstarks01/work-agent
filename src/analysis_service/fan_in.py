@@ -135,7 +135,7 @@ def fan_in(
     agent chose from and the set its choice is resolved against are the same
     set. Sharing one catalog would have to carry it through the session, where
     a value a node can reach is a value a node can change, and what it would
-    buy is 0.048 ms on a corpus-sized model and 3.7 ms on one of 600 elements.
+    gain is 0.048 ms on a corpus-sized model and 3.7 ms on one of 600 elements.
     ``evals/bench/deterministic.py catalog`` re-derives the two figures.
 
     ``sources`` maps each source's label to its text. Empty means the quote

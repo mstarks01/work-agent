@@ -666,7 +666,7 @@ class CaseMetadata(BaseModel):
 class GoldenCase:
     """One case: the submitted text, the blessed model, the reference sets.
 
-    Two artifacts rather than an input/output pair, which is what buys the
+    Two artifacts rather than an input/output pair, which is what gives the
     three eval modes and per-node attribution of a regression.
 
     ``references`` is keyed by framework because the records are: one shared

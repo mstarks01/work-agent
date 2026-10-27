@@ -2105,7 +2105,7 @@ class TestTheFalsificationFixtures:
         assert score.crossings_match is False
 
     def test_renaming_the_hard_elements_no_longer_buys_agreement(self):
-        """Agreement cannot be bought by renaming the facts that are hard to get right.
+        """Renaming the facts that are hard to get right cannot raise agreement.
 
         ``_check_attributes`` joins on the alignment. Without rule 6,
         renaming case 01's five flows takes all 25 of their scored fields out

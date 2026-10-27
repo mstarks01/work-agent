@@ -1,4 +1,4 @@
-"""The gain gates: a coverage gain bought by saying more is caught (#1093).
+"""The gain gates: a coverage gain that comes from saying more is caught (#1093).
 
 The negative control is the point of the module. A copy of a sealed Baseline is
 flooded: every case gains a must-find and also files six more unmatched

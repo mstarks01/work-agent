@@ -113,7 +113,7 @@ class TestSelection:
         )
 
     def test_a_tie_goes_to_material_the_job_has_not_sent(self):
-        """The whole of what ``seen`` buys.
+        """The whole of what ``seen`` gives.
 
         Over the blessed corpus every selection is a tie at one matched rule.
         Declaration order alone would choose all 39 and send every one to the

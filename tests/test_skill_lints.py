@@ -75,7 +75,7 @@ def test_lane_skill_has_exact_fixed_headings_in_order(framework, lane):
     """Duplicate of the package gate's own check, and kept deliberately.
 
     :func:`~analysis_service.frameworks.validate_package` refuses a package whose
-    lane headings do not match, so this cannot fail alone. What it buys is that
+    lane headings do not match, so this cannot fail alone. What it gives is that
     the failure names the lane at collection time rather than at deployment
     construction, which is where a maintainer editing a skill is looking.
     """

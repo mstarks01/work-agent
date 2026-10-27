@@ -207,7 +207,7 @@ def test_the_shipped_fixtures_cause_no_matcher_refusals(pairs):
 
 
 def test_a_refusal_is_reported_and_never_scored(tmp_path, pairs):
-    """A matcher that cannot read a scored pair must not buy accuracy with it."""
+    """A matcher that cannot read a scored pair must not gain accuracy from it."""
     path = tmp_path / "pairs.json"
     path.write_text(
         json.dumps(

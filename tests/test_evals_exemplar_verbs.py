@@ -7,7 +7,7 @@ sweep artifact nobody diffed.
 
 **A pinned count moving is not a defect.** When one moves, re-read the sweep,
 write the new number into :mod:`evals.harness.exemplar_verbs`'s docstring, and
-update the pin here. What the pin buys is that the docstring cannot rot.
+update the pin here. What the pin gives is that the docstring cannot rot.
 
 Deterministic and free of provider calls, so it gates on every PR.
 """

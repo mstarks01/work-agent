@@ -916,7 +916,7 @@ class Claim(BaseModel):
     ``affected_element_ids`` **may be empty here**, where STRIDE narrows it to
     ``min_length=1`` in its own record. A framework whose requirements address a
     coding practice rather than anything in the graph has nothing legal to put
-    there, and the alternative — a whole-application pseudo-element — buys a
+    there, and the alternative — a whole-application pseudo-element — gets a
     legal value by putting a lie in the model. The referential check still runs
     over whatever IDs are present.
 
@@ -1616,8 +1616,8 @@ class Ruling(BaseModel):
 
     WHY THE CRITIC DOES NOT RE-EMIT THE DRAFT. The service holds the drafts —
     they are the same bytes it put in the critic's prompt — so a transcription
-    would buy nothing and cost the run's largest block of output tokens. It
-    would also cost correctness: re-emitting a description is a chance to alter
+    would gain nothing and add the run's largest block of output tokens. It
+    would also harm correctness: re-emitting a description is a chance to alter
     it. Under this schema the critic cannot, and a ruling carries no element
     references to check.
 

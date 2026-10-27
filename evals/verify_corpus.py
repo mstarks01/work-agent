@@ -106,7 +106,7 @@ CALIBRATION_PATH = Path(__file__).resolve().parent / "calibration_labels" / "pai
 # telemetry normalizer" — rather than hiding it in a flow's `protocol` string,
 # and case 13 models the host that serves its console. Both cases describe the
 # system they always described; what grew is how much of it the reference
-# admits, and refusing that would hold the corpus at a size bought by leaving
+# admits, and refusing that would hold the corpus at a size reached by leaving
 # named components out. 22 leaves one slot, on the reasoning
 # `analysis_service.token_caps.alarm_at` states: nothing has to leave to make
 # room for it.

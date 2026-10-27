@@ -150,7 +150,7 @@ def _rules(flows_by_case):
     The verbs are in the signature so that one table can hold an element-only
     rule and a rule that reads the action, and the two columns stay comparable.
     Every element rule ignores them, which is the point: the difference between
-    the rows is exactly what the verb buys.
+    the rows is exactly what the verb adds.
     """
 
     def bare(case, ids):
@@ -404,7 +404,7 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: would make the tightest possible rule look best.
 #:
 #: ``subset`` is what ``endpoint subset`` merges on these cases; ``subset_verb``
-#: is what survives the verb. The gap between them is what the verb buys.
+#: is what survives the verb. The gap between them is what the verb adds.
 VERB_MEASURED = {
     "cases": 16,
     "within_lane_pairs": 365,

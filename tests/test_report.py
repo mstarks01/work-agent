@@ -296,7 +296,7 @@ class TestGround:
 
     The union would forbid a nonsense combination in the schema itself; the
     flat object is the portable shape across six independently-vendored
-    ``strong``-tier agents, and this validator is what buys back the guarantee
+    ``strong``-tier agents, and this validator is what restores the guarantee
     — on arrival rather than at generation time.
     """
 

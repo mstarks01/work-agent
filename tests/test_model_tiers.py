@@ -538,7 +538,7 @@ class TestDeclaredUpstreams:
     """A deployment may pin which upstreams a gateway request reaches.
 
     Optional where the credential and charge tables are required: an analysis
-    is an analysis whichever upstream answers, and what a pin buys is a
+    is an analysis whichever upstream answers, and what a pin gives is a
     Baseline. Both halves read ``Vendor.upstream_pin``, so the rule follows the
     registry.
     """

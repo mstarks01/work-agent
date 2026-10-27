@@ -991,7 +991,7 @@ def over_applied_for_promotion(
 
 @dataclass(frozen=True)
 class ApplicabilityYield:
-    """What one case's ASVS critic pass cost and bought.
+    """What one case's ASVS critic pass removed, and what it gained.
 
     The same two-sided instrument :mod:`evals.harness.critic_yield` is for, over
     the only destructive move this package's **Critic** has. STRIDE's critic

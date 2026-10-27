@@ -9,7 +9,7 @@ has no place on the shared shape.
 The layering is ``Claim`` -> :class:`DraftThreat` -> :class:`Threat`, where
 ``Threat`` also inherits :class:`~analysis_service.claims.RuledClaim` so that
 ``verdict`` arrives from the neutral side rather than being declared twice. Both
-existing class names survive: renaming them would cost a schema bump and buy
+existing class names survive: renaming them would need a schema bump and gain
 nothing.
 """
 
