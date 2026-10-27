@@ -1004,6 +1004,39 @@ def test_each_declared_field_still_holds_another_bound():
     assert OTHER_BOUND.keys() <= held
 
 
+def _spells_a_digest_shape(node: ast.AST) -> bool:
+    """Whether ``node`` is a pattern string that spells a SHA-256 hex digest.
+    A string with a space in it is prose that names the shape."""
+    return (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and "[0-9a-f]{64}" in node.value
+        and " " not in node.value
+    )
+
+
+def test_the_shape_of_a_digest_is_spelled_once():
+    """Only ``parsing.Sha256Hex`` spells the shape, and each model field that
+    holds a digest reads it."""
+    assert _sites(_spells_a_digest_shape) == [
+        ("src/analysis_service/parsing.py", "<module>")
+    ]
+
+
+def _digests_a_source_text(node: ast.AST) -> bool:
+    """Whether ``node`` hashes the ``text`` of a value, as a Source's content
+    digest does."""
+    return _calls(node, "sha256") and any(
+        _is_attribute(child, "text") for arg in node.args for child in ast.walk(arg)
+    )
+
+
+def test_a_source_digest_has_one_writer():
+    """Only ``sources.text_digest`` hashes a Source's text, so a report's
+    source ref and a support span pin one text to one digest."""
+    assert _sites(_digests_a_source_text) == []
+
+
 #: A module path under the service package, and a prompt path: the two halves
 #: of a pairing that only ``.github/scripts/prompt_outcomes.toml`` states.
 _MODULE_PATH = re.compile(r"^src/analysis_service/")

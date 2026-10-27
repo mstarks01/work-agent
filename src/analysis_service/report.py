@@ -52,7 +52,13 @@ from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import block_type_for
 from analysis_service.ladder import SchemaPath, SchemaRefusal
 from analysis_service.model_tiers import ReviewIndependence
-from analysis_service.sources import MAX_LABEL_CHARS, Source, clean_system_name
+from analysis_service.parsing import Sha256Hex
+from analysis_service.sources import (
+    MAX_LABEL_CHARS,
+    Source,
+    clean_system_name,
+    text_digest,
+)
 from analysis_service.system_model import (
     BoundaryCrossing,
     SystemModel,
@@ -410,8 +416,8 @@ class NodeRun(BaseModel):
     node: str = Field(min_length=1, max_length=100)
     model: str | None = None  # served; None for deterministic FunctionNodes
     requested_model: str | None = None  # configured
-    instruction_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    execution_fingerprint: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    instruction_sha256: Sha256Hex | None = None
+    execution_fingerprint: Sha256Hex | None = None
     duration_ms: int = Field(ge=0)
     usage: TokenUsage | None = None
     attempts: int = Field(default=1, ge=1)
@@ -615,7 +621,7 @@ class AnalysisContext(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    instruction_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    instruction_sha256: Sha256Hex
     domain_packs: list[str] = Field(default_factory=list)
 
 
@@ -685,7 +691,7 @@ class SourceRef(BaseModel):
 
     kind: str = Field(min_length=1, max_length=50)
     label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
-    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    sha256: Sha256Hex
 
 
 def _stored_system_name(value: str) -> str:
@@ -735,7 +741,7 @@ class InputRef(BaseModel):
     # Taken **over the refs**, not over the concatenated text: the refs are in
     # the report, so this stays recomputable from the report alone — which a
     # digest of bytes nobody kept would not be.
-    source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_sha256: Sha256Hex
 
     @staticmethod
     def aggregate_digest(refs: Sequence[SourceRef]) -> str:
@@ -754,7 +760,7 @@ class InputRef(BaseModel):
             SourceRef(
                 kind=source.kind,
                 label=source.label,
-                sha256=hashlib.sha256(source.text.encode("utf-8")).hexdigest(),
+                sha256=text_digest(source.text),
             )
             for source in sources
         ]

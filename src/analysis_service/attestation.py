@@ -68,6 +68,7 @@ from pydantic import (
 )
 
 from analysis_service.errors import ConfigError
+from analysis_service.parsing import Sha256Hex
 
 #: The canonicalization rules a signature is over. Bumped when any of them
 #: changes, because every existing signature stops verifying when they do — which
@@ -169,7 +170,7 @@ class Attestation(BaseModel):
 
     canonical_version: int = Field(ge=1)
     payload_type: str
-    report_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    report_sha256: Sha256Hex
     key_id: str = Field(min_length=1, max_length=200)
     #: base64, over the canonical bytes.
     signature: str = Field(min_length=1)

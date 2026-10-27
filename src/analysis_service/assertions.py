@@ -79,6 +79,7 @@ from analysis_service.grounding import (
     placements,
     verify_quote,
 )
+from analysis_service.parsing import Sha256Hex
 from analysis_service.references import canonical
 from analysis_service.sources import (
     ANSWERS_LABEL,
@@ -675,7 +676,7 @@ class SupportSpan(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     source_label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
-    digest: str = Field(min_length=64, max_length=64)
+    digest: Sha256Hex
     start: int = Field(ge=0)
     end: int = Field(gt=0)
     quote: str = Field(min_length=1, max_length=EXCERPT_MAX_CHARS)

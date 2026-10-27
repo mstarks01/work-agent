@@ -57,14 +57,11 @@ from pydantic import (
     model_validator,
 )
 
-from analysis_service.certification import (
-    CertificationError,
-    Fingerprint,
-    TierResolver,
-)
+from analysis_service.certification import CertificationError, TierResolver
 from analysis_service.charges import UPSTREAM_MAX_CHARS
 from analysis_service.identity import IDENTITY_VERSION, execution_fingerprint
 from analysis_service.model_tiers import TIER_NAMES, TierName
+from analysis_service.parsing import Sha256Hex
 from analysis_service.report import NodeRun
 from analysis_service.sampling import SamplingConfig, TierSampling
 
@@ -126,8 +123,8 @@ class NodeExecution(BaseModel):
     tier: TierName
     requested_model: str = Field(min_length=1, max_length=200)
     served_model: str = Field(min_length=1, max_length=200)
-    instruction_sha256: Fingerprint
-    generation_fingerprint: Fingerprint
+    instruction_sha256: Sha256Hex
+    generation_fingerprint: Sha256Hex
     #: The serving organisation the provider named, where it named one. Absent
     #: from every direct route and from every sweep recorded before the field
     #: existed, which is why it defaults rather than being required: an absent
@@ -188,8 +185,8 @@ class TierIdentity(BaseModel):
     #: served builds are: two served builds is a rotation an operator has to
     #: choose between, while two digests is two graphs a sweep legitimately
     #: built, and both get blessed.
-    instruction_digests: tuple[Fingerprint, ...]
-    fingerprints: tuple[Fingerprint, ...]
+    instruction_digests: tuple[Sha256Hex, ...]
+    fingerprints: tuple[Sha256Hex, ...]
     nodes: tuple[str, ...]
 
     @property
