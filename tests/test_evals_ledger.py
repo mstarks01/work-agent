@@ -577,7 +577,7 @@ class TestTheKeyIsComputedNeverStated:
     If the stored string were taken on the row's word, with `components` --
     the fields the key is made of -- unread, a row could describe one finding
     and key another. Every reader keys on the string: `pool`,
-    `_standing`, `agreement`. A maintainer cannot catch it by reading: a roster
+    `_vote_status`, `agreement`. A maintainer cannot catch it by reading: a roster
     edit says `standing = "maintainer"` in a diff, and this says sixteen hex
     characters.
     """

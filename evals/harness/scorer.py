@@ -889,7 +889,7 @@ def unlisted_for_promotion(scores: Sequence[CaseScore]) -> list[dict[str, Any]]:
 
     **Only what a person read.** Promotion writes ``entry.claim`` — this run's
     finding — into the reference set, so a vote cast on a different argument
-    must not offer it. ``pooled`` already means that: :func:`_standing` drops a
+    must not offer it. ``pooled`` already means that: :func:`_vote_status` drops a
     vote whose structural digest has moved and answers ``stale`` instead, so a
     re-argued finding leaves this list until somebody answers it again.
     """

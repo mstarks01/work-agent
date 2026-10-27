@@ -282,7 +282,7 @@ class Vote:
         # pull request, so the key is recomputed from `components` -- the
         # fields the key is *made of* -- and never trusted as stored. A stored
         # string taken on the row's word could describe one finding and key
-        # another, and every reader keys on the string: `pool`, `_standing`,
+        # another, and every reader keys on the string: `pool`, `_vote_status`,
         # `agreement`.
         #
         # A maintainer cannot catch that by reading. A roster edit says
