@@ -436,6 +436,16 @@ def test_the_cell_has_one_reader():
     ]
 
 
+def test_settings_env_has_one_writer():
+    """Only the save operation writes ``settings.env``.
+
+    The replace of the file is the one step that commits a save (ADR 0093),
+    so a second caller would commit a save that skips the checks before it.
+    """
+    sites = _sites(lambda node: _calls(node, "write_settings_env"))
+    assert sites == [("webapp/settings_save.py", "_commit")]
+
+
 def test_a_served_report_has_one_reader():
     """Only ``served`` asks the app whether a job's report may be served.
 

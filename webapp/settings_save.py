@@ -13,36 +13,56 @@ value is a reset: the save removes the line, and the shipped value applies.
 read. A refusal names the setting and the rule, and never the value.
 
 The value of a key setting is the key text. The save writes it to a new
-:func:`new_key_file` of its variable (:func:`write_keys`) and sets the
-variable to that path. A save removes the key line of each vendor that no
-tier uses (:func:`unused_keys`), and then deletes each key file that no
-variable names (:func:`unused_key_files`).
+key file of its variable (:func:`_write_keys`) and sets the variable to that
+path. A save removes the key line of each vendor that no tier uses
+(:func:`_unused_keys`), and then deletes each key file that no variable names
+(:func:`_unused_key_files`).
+
+:func:`apply_save` is the one save operation. It runs each step of a save in
+the order that makes the save safe, and it gives one :data:`SaveOutcome`.
 """
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import re
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from secrets import token_hex
+from typing import Protocol, TypeVar
 
 from analysis_service.config_files import (
+    SettingsFileError,
     SettingsLine,
     create_private,
+    read_settings,
     secret_refusal,
     value_refusal,
+    write_settings_env,
 )
+from analysis_service.errors import ConfigError
+from analysis_service.model_gate import NoThinkingLevel
 from analysis_service.model_tiers import ModelTierConfig
-from analysis_service.settings_variables import deployment_variables, secret_vars
+from analysis_service.settings_variables import (
+    deployment_variables,
+    merged_env,
+    secret_vars,
+)
+from analysis_service.store_backends import build_store, retention_days
 from analysis_service.store_backends import env_variables as store_variables
+from analysis_service.store_settings import StoreConfigError
 from analysis_service.vendors import VENDORS, refused_var
-from webapp.settings_page import SETTINGS
+from webapp.settings_page import CHANGED_SAMPLING, SETTINGS, sampling_key
+from webapp.settings_view import with_store_defaults
+
+logger = logging.getLogger("webapp")
 
 #: The largest save body that the server reads.
 MAX_SAVE_BYTES = 64 * 1024
 
-#: The name of a :func:`new_key_file`: a stem, a dot and 16 hexadecimal
+#: The name of a :func:`_new_key_file`: a stem, a dot and 16 hexadecimal
 #: characters from ``token_hex(8)``.
 _KEY_FILE_NAME = re.compile(r"(?P<stem>[a-z0-9_]+)\.[0-9a-f]{16}")
 
@@ -69,6 +89,47 @@ class Refusal:
     message: str
 
 
+class Built(Protocol):
+    """What a build of the test Deployment gives: the tiers that it read, and
+    the error that stopped it, or ``None``."""
+
+    @property
+    def tiers(self) -> ModelTierConfig | None: ...
+
+    @property
+    def error(self) -> ConfigError | None: ...
+
+
+BuiltT = TypeVar("BuiltT", bound=Built)
+
+
+@dataclass(frozen=True)
+class Saved:
+    """``settings.env`` holds the save, and the swap ran. ``env`` is the
+    mapping that the saved file gives."""
+
+    env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class SaveConflict:
+    """``settings.env`` changed after the page loaded it: before the save or
+    while the check ran. The save changed nothing."""
+
+
+@dataclass(frozen=True)
+class SaveRefused:
+    """A rule, a loader or the store check refused the save. The save changed
+    nothing."""
+
+    refusals: tuple[Refusal, ...]
+
+
+#: Each outcome of :func:`apply_save`. An ``OSError`` before the commit is no
+#: outcome: it raises, and the save changed nothing.
+SaveOutcome = Saved | SaveConflict | SaveRefused
+
+
 def parse_save(body: object) -> Save:
     """The save that ``body``, a parsed JSON value, holds, or raise
     :class:`SaveShapeError`."""
@@ -88,7 +149,7 @@ def parse_save(body: object) -> Save:
     return Save(revision, changes, tuple(dict.fromkeys(remove)))
 
 
-def refusals(
+def _refusals(
     save: Save, process_env: Mapping[str, str], lines: Mapping[str, SettingsLine]
 ) -> list[Refusal]:
     """Each refusal of the keys of ``save``, in the order of the body.
@@ -145,7 +206,7 @@ def refusals(
     return found
 
 
-def saved_keys(save: Save) -> dict[str, str]:
+def _saved_keys(save: Save) -> dict[str, str]:
     """The key text of each key setting that ``save`` sets, by its variable."""
     secrets = secret_vars()
     return {
@@ -159,7 +220,7 @@ def _key_stem(var: str) -> str:
     return refused_var(var).removeprefix("ANALYSIS_").lower()
 
 
-def new_key_file(directory: Path, var: str) -> Path:
+def _new_key_file(directory: Path, var: str) -> Path:
     """A new absolute path for a key file of the key variable ``var`` in
     ``directory``: its name without ``ANALYSIS_`` and ``_FILE``, in lower
     case, a dot and a random token, such as ``anthropic_api_key.3f9c0a1b2d4e5f60``.
@@ -167,30 +228,30 @@ def new_key_file(directory: Path, var: str) -> Path:
     return directory.absolute() / f"{_key_stem(var)}.{token_hex(8)}"
 
 
-def write_keys(directory: Path, keys: Mapping[str, str]) -> dict[str, Path]:
-    """Write each key text of ``keys`` to a new :func:`new_key_file` by
+def _write_keys(directory: Path, keys: Mapping[str, str]) -> dict[str, Path]:
+    """Write each key text of ``keys`` to a new :func:`_new_key_file` by
     :func:`~analysis_service.config_files.create_private`, and give each path
     by its variable. Where a write fails, it deletes each file it wrote and
     raises."""
     written: dict[str, Path] = {}
     try:
         for var, text in keys.items():
-            path = new_key_file(directory, var)
+            path = _new_key_file(directory, var)
             create_private(path, text.encode())
             written[var] = path
     except BaseException:
-        delete_files(written.values())
+        _delete_files(written.values())
         raise
     return written
 
 
-def delete_files(paths: Iterable[Path]) -> None:
+def _delete_files(paths: Iterable[Path]) -> None:
     """Delete each file of ``paths`` that exists."""
     for path in paths:
         path.unlink(missing_ok=True)
 
 
-def saved_lines(
+def _saved_lines(
     lines: Mapping[str, SettingsLine],
     save: Save,
     written: Mapping[str, Path],
@@ -199,13 +260,13 @@ def saved_lines(
     """The lines of ``settings.env`` after ``save``, without the variables of
     ``drop``, numbered as the new file numbers them. A line keeps its place,
     and a new line goes at the end. A key setting's line holds the path that
-    ``written``, from :func:`write_keys`, gives its variable."""
+    ``written``, from :func:`_write_keys`, gives its variable."""
     secrets = secret_vars()
     values = {var: line.value for var, line in lines.items() if var not in save.remove}
     for key, value in save.changes.items():
         var = SETTINGS[key].variable
         if var is None:
-            raise ValueError(f"{key} has no variable; refusals() refuses it")
+            raise ValueError(f"{key} has no variable; _refusals() refuses it")
         if value is None:
             values.pop(var, None)
         else:
@@ -229,7 +290,7 @@ def restart_keys(running: Mapping[str, str], saved: Mapping[str, str]) -> list[s
     ]
 
 
-def unused_keys(tiers: ModelTierConfig | None) -> frozenset[str]:
+def _unused_keys(tiers: ModelTierConfig | None) -> frozenset[str]:
     """The key variables of each vendor that no tier of ``tiers`` uses.
 
     The page's script reads the same rule in ``deletedKeys`` to warn before
@@ -245,9 +306,9 @@ def unused_keys(tiers: ModelTierConfig | None) -> frozenset[str]:
     )
 
 
-def unused_key_files(directory: Path, env: Mapping[str, str]) -> list[Path]:
+def _unused_key_files(directory: Path, env: Mapping[str, str]) -> list[Path]:
     """Each file in ``directory`` whose name has the form of a
-    :func:`new_key_file` and that no key variable of ``env`` names."""
+    :func:`_new_key_file` and that no key variable of ``env`` names."""
     secrets = secret_vars()
     stems = {_key_stem(var) for var in secrets}
     named = {Path(env[var]).resolve() for var in secrets if env.get(var)}
@@ -259,3 +320,113 @@ def unused_key_files(directory: Path, env: Mapping[str, str]) -> list[Path]:
         and path.is_file()
         and path.resolve() not in named
     )
+
+
+def _check(
+    env: Mapping[str, str], build: Callable[[Mapping[str, str]], BuiltT]
+) -> tuple[BuiltT, list[Refusal]]:
+    """The check of the mapping that a save gives: the value that ``build``
+    makes from it, and a refusal for each loader that refuses it. A thinking
+    level on a model that takes none is refused on its own row.
+
+    ``build`` builds the test Deployment and its runner, and the store check
+    runs :func:`~analysis_service.store_backends.build_store` and the
+    retention rule. No step calls a provider.
+    """
+    built = build(env)
+    found = [] if built.error is None else [_refusal_of(built.error)]
+    try:
+        build_store(with_store_defaults(env))
+        retention_days(env)
+    except (StoreConfigError, ImportError) as exc:
+        found.append(Refusal(None, str(exc)))
+    return built, found
+
+
+def _refusal_of(error: ConfigError) -> Refusal:
+    """The refusal of a build error, on the row that it names where one does."""
+    key = (
+        sampling_key(error.tier, CHANGED_SAMPLING)
+        if isinstance(error, NoThinkingLevel)
+        else None
+    )
+    return Refusal(key, str(error))
+
+
+async def apply_save(
+    lock: asyncio.Lock,
+    path: Path,
+    save: Save,
+    process_env: Mapping[str, str],
+    build: Callable[[Mapping[str, str]], BuiltT],
+    swap: Callable[[BuiltT], None],
+) -> SaveOutcome:
+    """Check ``save`` against the ``settings.env`` at ``path``, write it, and
+    give the value that the check built to ``swap`` (ADR 0092, ADR 0093).
+
+    One save at a time holds ``lock`` from the revision check to the swap.
+    The revision must be the one that the page loaded, and the value rule,
+    the secret rule, the test Deployment and the store check must pass. The
+    save writes each new key to a new key file first, and ``build`` builds
+    the test Deployment on those paths, in a thread. The replace of
+    ``settings.env`` is the one step that commits the save: before it, each
+    outcome and each exception deletes the new key files, so the old
+    ``settings.env`` and its key files stay in force. After it, ``swap``
+    takes the value that the check built, and the save then deletes each key
+    file that no variable names. A failure of that deletion only logs.
+
+    A :class:`~analysis_service.config_files.SettingsFileError` refuses the
+    whole save.
+    """
+    async with lock:
+        try:
+            committed = await _commit(path, save, process_env, build)
+        except SettingsFileError as exc:
+            return SaveRefused((Refusal(None, str(exc)),))
+        if isinstance(committed, SaveConflict | SaveRefused):
+            return committed
+        built, env = committed
+        swap(built)
+        try:
+            _delete_files(_unused_key_files(path.parent, env))
+        except OSError as exc:
+            # The next save deletes each key file that this one left.
+            logger.warning("a key file that no variable names stays: %s", exc)
+    return Saved(env)
+
+
+async def _commit(
+    path: Path,
+    save: Save,
+    process_env: Mapping[str, str],
+    build: Callable[[Mapping[str, str]], BuiltT],
+) -> tuple[BuiltT, Mapping[str, str]] | SaveConflict | SaveRefused:
+    """The steps of :func:`apply_save` up to the replace of ``settings.env``:
+    the value that the check built and the saved mapping, or the outcome
+    that stopped the save."""
+    revision, lines = read_settings(path)
+    if save.revision != revision:
+        return SaveConflict()
+    if found := _refusals(save, process_env, lines):
+        return SaveRefused(tuple(found))
+    written: dict[str, Path] = {}
+    committed = False
+    try:
+        written = _write_keys(path.parent, _saved_keys(save))
+        env = merged_env(process_env, _saved_lines(lines, save, written), path)
+        built, found = await asyncio.to_thread(_check, env, build)
+        if found:
+            return SaveRefused(tuple(found))
+        # A hand edit while the check ran is not written over.
+        if read_settings(path).revision != revision:
+            return SaveConflict()
+        # The tiers that the check built name the vendors whose key lines the
+        # save drops, so the lines and the mapping are made again after it.
+        saved = _saved_lines(lines, save, written, _unused_keys(built.tiers))
+        env = merged_env(process_env, saved, path)
+        write_settings_env(path, {var: line.value for var, line in saved.items()})
+        committed = True
+    finally:
+        if not committed:
+            _delete_files(written.values())
+    return built, env
