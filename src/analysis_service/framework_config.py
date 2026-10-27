@@ -17,7 +17,6 @@ value is framework names separated by commas, with no spaces, such as
 
 from __future__ import annotations
 
-import os
 import tomllib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -55,9 +54,7 @@ class FrameworkConfigError(ConfigError):
     """The framework configuration is invalid or names something unavailable."""
 
 
-def load_frameworks(
-    path: Path, env: Mapping[str, str] | None
-) -> tuple[FrameworkName, ...]:
+def load_frameworks(path: Path, env: Mapping[str, str]) -> tuple[FrameworkName, ...]:
     """The frameworks this install carries, in file order or in the order of
     :data:`CARRIED_VAR`.
 
@@ -65,8 +62,6 @@ def load_frameworks(
     version, an empty list, a repeated name, or a name outside the closed
     vocabulary. An install that has not chosen stops and says so.
     """
-    if env is None:
-        env = os.environ
     try:
         raw = tomllib.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:

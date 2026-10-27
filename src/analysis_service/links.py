@@ -55,7 +55,11 @@ from analysis_service.fact_answers import (
 )
 from analysis_service.fact_writes import check_fact_answers, fact_rows
 from analysis_service.sources import ANSWERS_LABEL, Source, plain_name, text_digest
-from analysis_service.system_model import PLAIN_ID_RE, SystemModel
+from analysis_service.system_model import (
+    ELEMENT_ID_MAX_CHARS,
+    PLAIN_ID_RE,
+    SystemModel,
+)
 
 __all__ = [
     "ANSWERS_LABEL",
@@ -111,7 +115,7 @@ class LinkAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     principal: str = Field(min_length=1, max_length=200)
-    element: str = Field(min_length=1, max_length=200)
+    element: str = Field(min_length=1, max_length=ELEMENT_ID_MAX_CHARS)
 
     @field_validator("principal")
     @classmethod

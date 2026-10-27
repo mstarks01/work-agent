@@ -10,6 +10,8 @@ Deterministic and free of provider calls, so they gate on every PR.
 
 from __future__ import annotations
 
+import pytest
+
 from evals.harness.fingerprint import Components, version_for
 from evals.harness.ledger import append, load
 from evals.harness.run import main
@@ -111,6 +113,19 @@ def _sweep(tmp_path, name="artifact.json", claims=None):
     """
     report = sample_report(threats=[_claim()] if claims is None else list(claims))
     return write_report_sweep(tmp_path / name, "01-payments-checkout", report)
+
+
+@pytest.mark.parametrize("voter", ["", " ", "Ada L"])
+def test_review_refuses_a_voter_the_ledger_refuses(tmp_path, capsys, voter):
+    """The flag reads the ledger's own voter rule, so the command never reports
+    a queue for a voter whose every vote the ledger refuses."""
+    artifact = _sweep(tmp_path)
+
+    with pytest.raises(SystemExit) as stopped:
+        main(["review", str(artifact), "--voter", voter, "--ledger", str(tmp_path)])
+
+    assert stopped.value.code == 2
+    assert "--voter" in capsys.readouterr().err
 
 
 def test_review_reports_what_is_waiting(tmp_path, capsys):

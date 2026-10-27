@@ -81,10 +81,10 @@ It reads JSON and never loads this project's models, so a report from a build
 whose schema has since moved still verifies, and a verifier written in another
 language can follow the same rules from the description above.
 
-Six verdicts, each with its own exit code, because the states a caller must act
+Six outcomes, each with its own exit code, because the states a caller must act
 on differently are more than two:
 
-| Verdict | Exit | Meaning |
+| Outcome | Exit | Meaning |
 | --- | --- | --- |
 | `verified` | 0 | Origin and integrity established. Nothing more. |
 | `unsigned` | 10 | No attestation supplied. An ordinary artifact from a deployment that does not sign — **not** a failure, and not trust. |

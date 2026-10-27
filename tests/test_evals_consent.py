@@ -178,7 +178,7 @@ def node(model="openai/gpt-5.6", completion=1000):
 class TestTheEstimate:
     def test_an_exact_configuration_match_is_a_recorded_number(self, tmp_path, priced):
         merged(tmp_path, "one", IDENTITY, actual=0.60)
-        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+        estimate = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path)
         assert estimate.label == "recorded"
         assert estimate.amount_usd == pytest.approx(0.60)
         assert "exact configuration" in " ".join(estimate.lines)
@@ -200,14 +200,33 @@ class TestTheEstimate:
         manifest["sweeps"][0]["cost"][field] = value
         path.write_text(json.dumps(manifest), encoding="utf-8")
 
-        assert consent.estimate(IDENTITY, ROUTES, tmp_path).label != "recorded"
+        assert (
+            consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path).label != "recorded"
+        )
 
     def test_another_baseline_lends_its_tokens_as_a_guess(self, tmp_path, priced):
         merged(tmp_path, "other", {**IDENTITY, "repo_commit": "e" * 40}, actual=0.60)
-        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+        estimate = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path)
         assert estimate.label == "estimated"
         assert estimate.amount_usd is not None
         assert "borrowed" in " ".join(estimate.lines)
+
+    def test_a_lent_node_is_priced_at_the_tier_this_run_gives_it(
+        self, tmp_path, priced
+    ):
+        """A lane key moves a node to another tier, and the lender's record of
+        where the node ran does not price this run."""
+        merged(tmp_path, "other", {**IDENTITY, "repo_commit": "e" * 40}, actual=0.60)
+        moved = consent.estimate(
+            IDENTITY, ROUTES, {**TIER_NODES, "critic": "base"}, tmp_path
+        )
+        both_base = consent.estimate(
+            IDENTITY, {**ROUTES, "strong": ROUTES["base"]}, TIER_NODES, tmp_path
+        )
+        assert moved.amount_usd == pytest.approx(both_base.amount_usd)
+        assert moved.amount_usd != pytest.approx(
+            consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path).amount_usd
+        )
 
     def test_the_borrowed_guess_does_not_move_with_the_lender_sweep_count(
         self, tmp_path, priced
@@ -229,7 +248,9 @@ class TestTheEstimate:
                 actual=0.60,
                 sweeps=sweeps,
             )
-            amounts.append(consent.estimate(IDENTITY, ROUTES, root).amount_usd)
+            amounts.append(
+                consent.estimate(IDENTITY, ROUTES, TIER_NODES, root).amount_usd
+            )
 
         assert amounts[0] is not None
         assert all(amount == pytest.approx(amounts[0]) for amount in amounts)
@@ -246,9 +267,9 @@ class TestTheEstimate:
             actual=0.60,
             cases=thirteen,
         )
-        whole = consent.estimate(IDENTITY, ROUTES, tmp_path)
-        one = consent.estimate(IDENTITY, ROUTES, tmp_path, cases=1)
-        all_named = consent.estimate(IDENTITY, ROUTES, tmp_path, cases=13)
+        whole = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path)
+        one = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path, cases=1)
+        all_named = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path, cases=13)
 
         assert whole.amount_usd is not None and one.amount_usd is not None
         assert one.amount_usd == pytest.approx(whole.amount_usd / 13)
@@ -262,8 +283,8 @@ class TestTheEstimate:
         """The other direction of the same shape: a one-case pre-flight lending
         a whole sweep its own figure would quote a thirteenth of the spend."""
         merged(tmp_path, "other", {**IDENTITY, "repo_commit": "e" * 40}, actual=0.60)
-        one = consent.estimate(IDENTITY, ROUTES, tmp_path, cases=1)
-        thirteen = consent.estimate(IDENTITY, ROUTES, tmp_path, cases=13)
+        one = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path, cases=1)
+        thirteen = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path, cases=13)
 
         assert one.amount_usd is not None and thirteen.amount_usd is not None
         assert thirteen.amount_usd == pytest.approx(one.amount_usd * 13)
@@ -274,14 +295,14 @@ class TestTheEstimate:
     ):
         """The lender supplies counts; this run's own routes supply the prices."""
         merged(tmp_path, "other", {**IDENTITY, "repo_commit": "e" * 40}, actual=0.60)
-        before = consent.estimate(IDENTITY, ROUTES, tmp_path).amount_usd
+        before = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path).amount_usd
 
         dearer = {
             **priced,
             "openai/gpt-5.6": UnitPrices("openai/gpt-5.6", 4e-6, 1.6e-5, 4e-7),
         }
         monkeypatch.setattr(consent, "unit_prices", dearer.get)
-        after = consent.estimate(IDENTITY, ROUTES, tmp_path).amount_usd
+        after = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path).amount_usd
 
         assert before is not None and after is not None
         assert after > before
@@ -320,7 +341,7 @@ class TestTheEstimate:
                 ),
             }
             monkeypatch.setattr(consent, "unit_prices", rates.get)
-            got = consent.estimate(IDENTITY, ROUTES, tmp_path).amount_usd
+            got = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path).amount_usd
             assert got is not None
             return got
 
@@ -359,7 +380,7 @@ class TestTheEstimate:
             usage={"extract": (0, 0, 100_000), "critic": (0, 0, 100_000)},
         )
 
-        estimate = consent.estimate(mine, ROUTES, tmp_path)
+        estimate = consent.estimate(mine, ROUTES, TIER_NODES, tmp_path)
 
         assert "borrowed from zzz-both" in " ".join(estimate.lines)
         assert estimate.amount_usd == pytest.approx(1.2)
@@ -400,7 +421,7 @@ class TestTheEstimate:
             {**IDENTITY, "corpus_digest": "f" * 64},
             actual=0.60,
         )
-        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+        estimate = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path)
 
         joined = " ".join(estimate.lines)
         assert "not this configuration" in joined
@@ -416,19 +437,19 @@ class TestTheEstimate:
             {**IDENTITY, "models": {"base": "old/base", "strong": "old/strong"}},
             actual=0.60,
         )
-        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+        estimate = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path)
 
         assert "not this configuration" not in " ".join(estimate.lines)
 
     def test_no_merged_baseline_states_no_amount(self, tmp_path, priced):
-        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+        estimate = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path)
         assert estimate.label == "unpriced"
         assert estimate.amount_usd is None
         assert "no merged Baseline" in " ".join(estimate.lines)
 
     def test_a_model_the_map_misses_states_no_amount(self, tmp_path, priced):
         routes = {**ROUTES, "strong": "mystery/model"}
-        estimate = consent.estimate(IDENTITY, routes, tmp_path)
+        estimate = consent.estimate(IDENTITY, routes, TIER_NODES, tmp_path)
         assert estimate.label == "unpriced"
         assert estimate.amount_usd is None
         assert "no price for strong (mystery/model)" in " ".join(estimate.lines)
@@ -459,7 +480,7 @@ class TestTheDriftDisclosure:
             actual=0.60,
             recorded_prices=self.RECORDED,
         )
-        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+        estimate = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path)
 
         drift = [line for line in estimate.lines if "the price map now says" in line]
         assert len(drift) == 1
@@ -480,7 +501,7 @@ class TestTheDriftDisclosure:
             known.model, known.input_per_token, known.output_per_token, None
         )
         merged(tmp_path, "one", IDENTITY, actual=0.60, recorded_prices=(recorded,))
-        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+        estimate = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path)
 
         (drift,) = [line for line in estimate.lines if "the price map now says" in line]
         assert "no cache rate" in drift
@@ -494,7 +515,7 @@ class TestTheDriftDisclosure:
             actual=0.60,
             recorded_prices=(priced["openai/gpt-5.6"],),
         )
-        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+        estimate = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path)
 
         assert not [line for line in estimate.lines if "price map now" in line]
 
@@ -507,7 +528,7 @@ class TestTheDriftDisclosure:
             actual=0.60,
             recorded_prices=self.RECORDED,
         )
-        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+        estimate = consent.estimate(IDENTITY, ROUTES, TIER_NODES, tmp_path)
 
         assert estimate.label == "estimated"
         assert any("the price map now says" in line for line in estimate.lines)
@@ -1024,11 +1045,11 @@ class TestABorrowedArtifactStaysInsideItsBaseline:
         directory = tmp_path / "baseline"
         directory.mkdir()
 
-        assert consent._reprice(directory, "/etc/hostname", {}) is None
+        assert consent._reprice(directory, "/etc/hostname", {}, {}) is None
 
     def test_a_traversing_artifact_name_is_refused(self, tmp_path):
         directory = tmp_path / "baseline"
         directory.mkdir()
         (tmp_path / "elsewhere.json").write_text("{}", encoding="utf-8")
 
-        assert consent._reprice(directory, "../elsewhere.json", {}) is None
+        assert consent._reprice(directory, "../elsewhere.json", {}, {}) is None

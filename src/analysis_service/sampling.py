@@ -67,7 +67,6 @@ knob surface is exactly the offered surface and no wider.
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -420,15 +419,13 @@ def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
         table[param] = _parse_env_value(var, param, value.strip())
 
 
-def load_sampling(path: Path | str, env: Mapping[str, str] | None) -> SamplingConfig:
+def load_sampling(path: Path | str, env: Mapping[str, str]) -> SamplingConfig:
     """Load and validate the per-tier sampling config, applying env overrides.
 
     Overrides are folded in before validation, so an out-of-range value arriving
     via the environment fails closed exactly like one in the file. Every failure
     path raises :class:`SamplingConfigError`.
     """
-    if env is None:
-        env = os.environ
     raw = read_toml(path, SamplingConfigError)
 
     version = raw.get("version")

@@ -160,12 +160,14 @@ class Threat(RuledClaim):
     category: StrideCategory  # spoofing | tampering | repudiation | ...
     severity: Severity
     mitigations: list[Mitigation]  # {summary, detail}
-    confidence: Rating  # low | medium | high (critic-calibrated)
+    confidence: Rating | None  # low | medium | high (critic-calibrated)
     recommendation: RecommendationReading | None  # {sound, note}
 ```
 
-Five fields, and nothing else. `recommendation` is the critic's reading of the threat's `mitigations`, or
-`null` where the critic made none.
+Five fields, and nothing else. `confidence` is `null` only on a threat that
+code rejected for its lane, because nobody rated it. `recommendation` is the
+critic's reading of the threat's `mitigations`. It is `null` where the critic
+made none, and on every rejected threat.
 
 Category letters: `S` spoofing, `T` tampering, `R` repudiation,
 `I` information-disclosure, `D` denial-of-service, `E` elevation-of-privilege.

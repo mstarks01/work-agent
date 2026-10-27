@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -302,15 +302,17 @@ def _recorded_actual(manifest: dict[str, Any]) -> float | None:
 def estimate(
     identity: dict[str, Any],
     routes: dict[str, str],
+    node_tiers: Mapping[str, str],
     root: Path,
     cases: int | None = None,
 ) -> Estimate:
     """Price this sweep before it runs, from the merged Baselines.
 
     ``identity`` is the five-part Baseline identity this sweep would carry,
-    and ``routes`` is the requested route per tier. An exact identity match
-    is a ``recorded`` number; any other Baseline lends its per-tier token
-    counts, repriced with this run's models, for an ``estimated`` one.
+    ``routes`` is the requested route per tier, and ``node_tiers`` is the tier
+    this run gives each graph node. An exact identity match is a ``recorded``
+    number; any other Baseline lends its per-node token counts, repriced with
+    this run's models, for an ``estimated`` one.
 
     ``cases`` is how many cases this run names. A lender's counts are a whole
     sweep's over however many cases it ran, so a run that names a different
@@ -350,7 +352,7 @@ def estimate(
     if missing:
         return Estimate(label="unpriced", amount_usd=None, lines=tuple(lines))
 
-    borrowed = _borrow(baselines, routes, identity, cases)
+    borrowed = _borrow(baselines, routes, node_tiers, identity, cases)
     if borrowed is None:
         lines.append(
             "no merged Baseline to calibrate token counts from, so no amount"
@@ -390,16 +392,18 @@ def _manifest_named(
 def _borrow(
     baselines: Sequence[tuple[Path, dict[str, Any]]],
     routes: dict[str, str],
+    node_tiers: Mapping[str, str],
     identity: dict[str, Any],
     cases: int | None,
 ) -> Borrowed | None:
     """The most comparable Baseline's recorded token counts, at this run's prices.
 
     **The counts are borrowed, not the total.** Each of the lender's nodes
-    ran on some tier; this run has its own route for that tier; so the node's
-    recorded usage is priced at that route's rates and the sweep's cost falls
-    out of :func:`~evals.harness.prices.price_calls` — the one costing path
-    the recorded actual and CI's re-check already go through.
+    runs on a tier in this run, and that tier has this run's route; so the
+    node's recorded usage is priced at that route's rates, whatever tier the
+    lender ran it on, and the sweep's cost falls out of
+    :func:`~evals.harness.prices.price_calls` — the one costing path the
+    recorded actual and CI's re-check already go through.
 
     **Which Baseline lends is a decision, not the directory order.** Token
     counts are counts of work, so a lender that ran a different framework
@@ -427,7 +431,9 @@ def _borrow(
         priced = []
         lender_cases = 0
         for entry in manifest.get("sweeps", []):
-            repriced = _reprice(directory, str(entry.get("artifact", "")), routes)
+            repriced = _reprice(
+                directory, str(entry.get("artifact", "")), routes, node_tiers
+            )
             if repriced is not None:
                 amount, lender_cases = repriced
                 priced.append(amount)
@@ -452,15 +458,19 @@ def _borrow(
 
 
 def _reprice(
-    directory: Path, artifact_name: str, routes: dict[str, str]
+    directory: Path,
+    artifact_name: str,
+    routes: dict[str, str],
+    node_tiers: Mapping[str, str],
 ) -> tuple[float, int] | None:
     """One recorded sweep's usage, as if this run's models had served it, and its case count.
 
     ``None`` rather than a number whenever the answer would rest on a guess:
-    an artifact that will not load, a node provenance never recorded, a tier
-    this run does not route, or a route the price map misses. The caller
-    tries the next Baseline, and states ``unpriced`` when none answers —
-    never a zero, which is the one outcome #334 forbids outright.
+    an artifact that will not load, a node provenance never recorded, a node
+    this run does not carry, a tier this run does not route, or a route the
+    price map misses. The caller tries the next Baseline, and states
+    ``unpriced`` when none answers — never a zero, which is the one outcome
+    #334 forbids outright.
 
     The name is joined here rather than by the caller, so the join and the
     check that it stayed inside the directory sit together. ``artifact`` comes
@@ -480,10 +490,9 @@ def _reprice(
     calls: list[tuple[str, str, TokenUsage]] = []
     rates: dict[str, UnitPrices] = {}
     for node, usage in sorted(baseline.usage_of(artifact).items()):
-        executions = artifact.provenance.node_runs.get(node)
-        if not executions:
+        if not artifact.provenance.node_runs.get(node):
             return None
-        route = routes.get(executions[-1].tier)
+        route = routes.get(node_tiers.get(node, ""))
         if route is None:
             return None
         prices = unit_prices(route)

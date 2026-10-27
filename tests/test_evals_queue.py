@@ -14,7 +14,7 @@ import pytest
 
 from evals.harness.fingerprint import components_for, version_for
 from evals.harness.identity import CaseFlows
-from evals.harness.ledger import Ledger
+from evals.harness.ledger import Ledger, LedgerError
 from evals.harness.queue import (
     PRIORITIES,
     Finding,
@@ -93,10 +93,11 @@ def test_an_answered_finding_never_comes_back():
     assert build([known], FLOWS, ledger, voter="sam", sitting=SITTING) == []
 
 
-def test_a_queue_for_no_voter_is_refused():
-    """A queue is built for one named reviewer, so an empty voter is a misuse."""
-    with pytest.raises(ValueError, match="one named voter"):
-        build([finding()], FLOWS, Ledger(), voter="", sitting=SITTING)
+@pytest.mark.parametrize("voter", ["", " ", "Ada L"])
+def test_a_queue_for_a_voter_the_ledger_refuses_is_refused(voter):
+    """A queue is built for one reviewer whose votes the ledger accepts."""
+    with pytest.raises(LedgerError):
+        build([finding()], FLOWS, Ledger(), voter=voter, sitting=SITTING)
 
 
 def test_naming_a_voter_asks_only_what_that_voter_has_not_answered():

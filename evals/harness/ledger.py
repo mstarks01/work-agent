@@ -163,6 +163,23 @@ class LedgerError(ValueError):
     """A vote is malformed, or the ledger cannot be read."""
 
 
+def github_login(voter: str) -> str:
+    """``voter``, refused unless it is a GitHub login.
+
+    The one rule for who may vote. A vote and a review queue both read it, so
+    a queue is never built for a voter whose every vote the ledger refuses.
+    """
+    if not voter.strip():
+        raise LedgerError("a vote carries no voter; this ledger is never anonymous")
+    if not GITHUB_LOGIN.match(voter):
+        raise LedgerError(
+            f"{voter!r} is not a GitHub login; the voter is the account that"
+            " opens the PR (#320), and the login names this voter's file in the"
+            " ledger directory"
+        )
+    return voter
+
+
 #: The fields of a :class:`Vote` that hold a string. A ``sitting`` of another
 #: type compares unequal to every sitting, so the vote drops out of the queue.
 _TEXT_FIELDS = (
@@ -230,14 +247,7 @@ class Vote:
                 )
         if self.verdict not in get_args(VoteChoice):
             raise LedgerError(f"{self.verdict!r} is not a verdict")
-        if not self.voter.strip():
-            raise LedgerError("a vote carries no voter; this ledger is never anonymous")
-        if not GITHUB_LOGIN.match(self.voter):
-            raise LedgerError(
-                f"{self.voter!r} is not a GitHub login; the voter is the"
-                " account that opens the PR (#320), and the login names this"
-                " voter's file in the ledger directory"
-            )
+        github_login(self.voter)
         if self.verdict == "down" and self.reason is None:
             raise LedgerError(
                 "a down-vote needs a reason, because the reason is what decides"

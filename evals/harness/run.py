@@ -1112,6 +1112,7 @@ def command_run(args: argparse.Namespace) -> int:
     estimate = consent.estimate(
         _would_be_identity(cases, deployment, commit, corpus, args),
         _tier_routes(deployment),
+        {node: deployment.tier_of(node) for node in deployment.tier_nodes},
         REPO_ROOT,
         cases=len(cases),
     )
@@ -2354,6 +2355,7 @@ def _review_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--voter",
         required=True,
+        type=ledger.github_login,
         help="whose queue to report; a finding this person has answered is not"
         " waiting for them, even when somebody else has not answered it",
     )

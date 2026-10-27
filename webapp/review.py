@@ -91,6 +91,7 @@ from evals.harness.ledger import (
     VoteChoice,
     append,
     cast,
+    github_login,
     load,
 )
 from evals.harness.reference import flows_by_case, load_corpus
@@ -605,6 +606,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--voter",
         required=True,
+        type=github_login,
         help="who is reviewing; recorded on every vote and never asked for in"
         " the browser, so one reviewer cannot file votes as another",
     )
