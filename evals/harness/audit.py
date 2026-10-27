@@ -160,7 +160,7 @@ class Condition:
     stage: Stage
 
 
-Verdict = Literal["kept", "reverted"]
+ChangeOutcome = Literal["kept", "reverted"]
 Belongs = Literal["skill", "harness", "instrumentation", "scorer", "references"]
 Mode = Literal["audit", "implement", "extend"]
 
@@ -276,7 +276,7 @@ def holdout_cases() -> frozenset[str]:
 
 
 @dataclass(frozen=True)
-class Candidate:
+class TriedChange:
     """One candidate change an experiment made, and what became of it.
 
     A candidate is one lever on one branch. A change that did not work is
@@ -287,7 +287,7 @@ class Candidate:
     branch: str
     commit: str
     #: ``kept`` only where the experiment was ``supported``.
-    verdict: Verdict
+    verdict: ChangeOutcome
     #: Why it was kept or reverted. Required for a revert.
     reason: str
     #: The paths the change touched, from ``git diff`` between the row's
@@ -534,7 +534,7 @@ class Experiment:
     #: diagnostic, and ``None`` for every other experiment.
     condition: Condition | None = None
     #: The candidate change, for an experiment that made one.
-    candidate: Candidate | None = None
+    candidate: TriedChange | None = None
     #: The extension ticket. Every ``blocked`` row recorded through
     #: ``--record`` carries one.
     ticket: Ticket | None = None
@@ -739,7 +739,7 @@ def _strings(
     return tuple(value)
 
 
-def _candidate(row: object, where: str) -> Candidate | None:
+def _candidate(row: object, where: str) -> TriedChange | None:
     held = _block(row, "candidate", where)
     if held is None:
         return None
@@ -759,7 +759,7 @@ def _candidate(row: object, where: str) -> Candidate | None:
         raise ExperimentError(
             f"{where}: candidate parity is not a non-blank answer per package"
         )
-    return Candidate(
+    return TriedChange(
         **texts,
         verdict=verdict,
         reason=reason,
@@ -1420,7 +1420,7 @@ def render_ticket(experiment: Experiment) -> tuple[str, str]:
 
 
 @dataclass
-class Report:
+class ExperimentsOutput:
     """What the ``experiments`` command prints, as lines."""
 
     lines: list[str] = field(default_factory=list)
@@ -1429,9 +1429,9 @@ class Report:
         return "\n".join(self.lines)
 
 
-def render(found: Sequence[Lookup]) -> Report:
+def render(found: Sequence[Lookup]) -> ExperimentsOutput:
     """The lookup as a reader sees it: one block per experiment, newest last."""
-    report = Report()
+    report = ExperimentsOutput()
     if not found:
         report.lines.append("No prior experiment matches. This is new ground.")
         return report

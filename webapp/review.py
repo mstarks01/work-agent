@@ -88,7 +88,7 @@ from evals.harness.ledger import (
     SUBSTANCE_REASONS,
     Ledger,
     LedgerError,
-    Verdict,
+    VoteChoice,
     append,
     cast,
     load,
@@ -111,7 +111,7 @@ PORT = 8010
 
 #: The verdicts the endpoint accepts, spelled from the type the ledger declares
 #: so the two cannot drift apart.
-VERDICTS: tuple[str, ...] = get_args(Verdict)
+VERDICTS: tuple[str, ...] = get_args(VoteChoice)
 
 #: What each package's records rule on, in the words the reviewer reads. A
 #: table rather than one heading, because the two packages do not ask the same
@@ -344,7 +344,7 @@ def create_app(session: Session) -> FastAPI:
                 status_code=422,
                 detail=f"verdict is not one of {', '.join(VERDICTS)}",
             )
-        verdict: Verdict = body.verdict  # type: ignore[assignment]
+        verdict: VoteChoice = body.verdict  # type: ignore[assignment]
         try:
             recorded = cast(
                 item.components,

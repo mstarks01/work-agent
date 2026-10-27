@@ -1,6 +1,6 @@
 # Vendor parity
 
-What a change to one **Vendor** row owes every other row, and how the suite checks it.
+What a change to one **Vendor** row must answer for every other row, and how the suite checks it.
 
 A **Vendor** row has the same failure mode as a **Framework Package**: a
 constant, a branch, or a table entry that is absent or short, and none of them

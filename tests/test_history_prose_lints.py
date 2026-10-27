@@ -234,10 +234,15 @@ def test_the_scan_reads_every_kind_of_prose(tmp_path):
 #: money word such as "bill" for a provider charge is not here. Case-insensitive.
 MONEY = re.compile(r"\b(debts?|clean bill|ow(e|es|ed|ing))\b", re.IGNORECASE)
 
-#: Every code file of the project and its tests, read whole: comments,
-#: docstrings, strings and identifiers.
+#: Every code file of the project and its tests, every guide, and the config
+#: files and workflows, read whole: comments, docstrings, strings and
+#: identifiers. The prompts are not here: a prompt edit changes model input.
 MONEY_SEARCHED = without(
-    source_files(*PYTHON, *TESTS, suffixes=(".py", ".js", ".html", ".css")),
+    [
+        *source_files(*PYTHON, *TESTS, suffixes=(".py", ".js", ".html", ".css")),
+        *guide_files(),
+        *HASH_COMMENTED,
+    ],
     {
         "evals/experiments": (
             "frozen prose, which records an experiment as it ran and never changes"
@@ -250,7 +255,7 @@ MONEY_SEARCHED = without(
 )
 
 
-def test_no_code_file_uses_a_ruled_out_money_word():
+def test_no_file_uses_a_ruled_out_money_word():
     """A money word for a technical fact is a metaphor that a reader must decode.
 
     The sentence names the concrete fact instead: what the code drops, refuses,

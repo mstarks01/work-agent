@@ -215,7 +215,7 @@ Before any paid sweep, run one case first and read its provenance.
   copies the rule measures the copy.
 - A structural identity match is not proof that a finding is semantically
   right, and an unlisted output is not automatically wrong.
-- A change to one framework package owes an explicit answer for every other
+- A change to one framework package needs an explicit answer for every other
   package in `PACKAGES`. See `docs/agents/framework-parity.md`.
 
 ## References

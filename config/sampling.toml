@@ -151,8 +151,8 @@ version = 5
 #          without narrowing which models the service can run, which is a
 #          different claim from "enough" — reasoning tokens are spent against
 #          this same cap, and on a high-effort reasoning model they are most of
-#          it. What it buys is 2x the room the truncation was observed at. A
-#          sweep still owes this tier a real number, in both directions.
+#          it. It gives 2x the room the truncation was observed at. A sweep
+#          must still measure a real number for this tier, in both directions.
 #
 # base is unchanged and cannot rise: 16,384 is exactly gpt-4o's published
 # ceiling, so it is already at the floor of its own ceiling set. It has not

@@ -588,7 +588,7 @@ states a temperature cannot run Claude 4.7 or later, which rejects the parameter
 and takes only `1` on an OpenAI reasoning family. Arm 1 runs anywhere. If arm 2
 wins, `promote` will refuse it — the file leaves `temperature` unset with a
 rationale, and pinning a param the file deliberately leaves unset is a human
-decision that owes a replacement rationale, not a silent sweep write.
+decision that needs a replacement rationale, not a silent sweep write.
 
 ### Prompts and exemplars
 

@@ -1173,7 +1173,7 @@ the `Literal` that names its values. It also checks that the contract suite in
 pair, so a new row runs every contract test. A new job store implements the
 `JobStore` protocol. These are some of the protocol's methods:
 
-| Method | What a backend owes it |
+| Method | What a backend must do |
 | --- | --- |
 | `reserve` | **Counts and inserts in one atomic operation.** Every bound admission enforces — the concurrency ceiling, the per-owner rate, the per-owner token budget and the deployment's global token budget — is enforced here and nowhere else. A backend that checks and then inserts has put the race back: two submissions that each read the count before either inserts both pass a ceiling of one. The same operation creates the **Principal** of a first submission, and only where it admits the job. It refuses with `principal_exists` where the identity already holds one. |
 | `principal` | The principal of an issuer and a `sub`, or nothing. It creates nothing. |

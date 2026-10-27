@@ -283,9 +283,9 @@ class TestUnsureIsAnAnswer:
         the same thing — the reader read the finding and cannot decide — so a
         second word for it would be a second meaning waiting to happen.
         """
-        from evals.harness.ledger import Verdict
+        from evals.harness.ledger import VoteChoice
 
-        assert "unsure" in get_args(Verdict)
+        assert "unsure" in get_args(VoteChoice)
 
     def test_a_sitting_of_nothing_but_unsure_records(self, store):
         """A reader who cannot judge one entry still finishes their sitting."""
