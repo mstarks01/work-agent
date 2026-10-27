@@ -526,10 +526,9 @@ def test_the_pipeline_binds_retry_and_timeout():
     # analysis_service.retry, where a shared budget can bound it.
     assert translator_of(critic.model)._additional_args["num_retries"] == 0
     assert translator_of(critic.model)._additional_args["timeout"] == 300.0
-    assert (
-        translator_of(critic.model)._additional_args["timeout"]
-        == deployment.resilience.request_timeout_seconds()
-    )
+    assert translator_of(critic.model)._additional_args[
+        "timeout"
+    ] == deployment.resilience.request_timeout_seconds(upstreams=())
 
 
 OPENROUTER_ENV = {

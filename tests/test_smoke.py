@@ -391,7 +391,7 @@ class TestDrivingTheEngine:
         engine = Engine(
             StubRunner(outcome),
             limits=DEPLOYMENT.resilience.source_limits(),
-            deadline_seconds=DEPLOYMENT.resilience.deadline_seconds(),
+            deadline_seconds=DEPLOYMENT.job_deadline_seconds(),
             frameworks=sample_selection(),
         )
         monkeypatch.setattr(
