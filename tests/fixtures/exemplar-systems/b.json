@@ -74,7 +74,7 @@
       "encryption_in_transit": "unknown",
       "source_excerpt": "Its topics are consumed by the stream processor",
       "source_label": "Fleet telemetry platform notes",
-      "operations": "read"
+      "operations": "write"
     },
     {
       "id": "flow:process:stream-processor>store:telemetry-store>write-readings",

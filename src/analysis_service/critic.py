@@ -199,9 +199,9 @@ class ReviewProblems(NamedTuple):
     the claim it is about, which check found it, and the sentence a model
     reads. ``implicated`` is the subset of *drafted* IDs whose drafts the
     re-ask cannot fix without reading: a draft it never ruled, which it must
-    rule now, and a draft whose needs-info verdict must be repointed or
-    replaced by a verdict the stated facts support. Neither is answerable from
-    an ID.
+    rule now, and every draft a per-ruling problem names, such as a needs-info
+    verdict to repoint, a reason to write, or a confirmed exclusion to reject.
+    None is answerable from an ID.
 
     Both come out of one pass so they cannot disagree about what went wrong —
     the reason this is a record rather than two functions over the same inputs.
@@ -297,9 +297,10 @@ def _confirmed_exclusion_issues(
             claim_id=ruling.id,
             kind="verdict-shape",
             message=f"claim {ruling.id!r} excludes its requirement and is ruled"
-            " confirmed, which says the requirement applies: set rejected_because"
-            " to evidence where the stated facts show it does not apply, or to"
-            " reasoning where they do not",
+            " confirmed, which says the requirement applies: rule it rejected,"
+            " set rejected_because to evidence where the stated facts show it"
+            " does not apply, or to reasoning where they do not, and write the"
+            " reason",
         )
         for ruling in rulings
         if ruling.id in excluding and ruling.verdict.status == "confirmed"
