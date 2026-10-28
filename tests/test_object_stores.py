@@ -293,6 +293,39 @@ class TestTheSettings:
         monkeypatch.setenv("AWS_ENDPOINT_URL_S3", "http://127.0.0.1:9")
         start(env)
 
+    @pytest.mark.parametrize(
+        ("endpoint", "message"),
+        [
+            ("https://storage.googleapis.com", "ANALYSIS_OBJECT_STORE=gcs"),
+            (
+                "https://storage.europe-west1.rep.googleapis.com",
+                "ANALYSIS_OBJECT_STORE=gcs",
+            ),
+            ("https://Storage.GoogleAPIs.com:443", "ANALYSIS_OBJECT_STORE=gcs"),
+            ("https://storage.googleapis.com.", "ANALYSIS_OBJECT_STORE=gcs"),
+            ("https://s3.us-west-004.backblazeb2.com", "a Backblaze B2 host"),
+        ],
+    )
+    def test_a_host_without_a_create_only_write(self, env, endpoint, message):
+        """A put through it replaces an object with no error (ADR 0103)."""
+        env["ANALYSIS_OBJECT_ENDPOINT"] = endpoint
+        with pytest.raises(StoreConfigError, match=message) as refused:
+            build_store(env)
+        assert endpoint.lower() not in str(refused.value).lower()
+
+    @pytest.mark.parametrize(
+        "endpoint",
+        [
+            "https://notgoogleapis.com",
+            "https://s3.notbackblazeb2.com",
+            "https://googleapis.com.example",
+            "https://0123abcd.r2.cloudflarestorage.com",
+        ],
+    )
+    def test_a_host_with_a_create_only_write(self, env, endpoint):
+        env["ANALYSIS_OBJECT_ENDPOINT"] = endpoint
+        build_store(env)
+
 
 def iam(env: dict[str, str]) -> dict[str, str]:
     """``env`` in the ``iam`` mode, with no key file."""
