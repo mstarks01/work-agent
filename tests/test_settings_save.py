@@ -25,6 +25,7 @@ from pathlib import Path
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from google.auth.exceptions import DefaultCredentialsError
 
 from analysis_service import config_files
 from analysis_service.certification import CertifyResult
@@ -510,6 +511,40 @@ class TestAStoreChange:
         saved = save(client, {"resilience.timeout_ms": "5000"})
 
         assert saved.json()["restart"] == []
+
+    @pytest.mark.parametrize(
+        ("credentials", "message"),
+        [
+            ("api_key", "a key file and an HMAC key are out of scope"),
+            ("iam", "reads only the identity of the metadata server"),
+        ],
+    )
+    def test_a_gcs_store_that_the_row_refuses_writes_nothing(
+        self, tmp_path, monkeypatch, credentials, message
+    ):
+        """The process holds no metadata server identity, as on a laptop."""
+
+        def default(**_):
+            raise DefaultCredentialsError("no credential")
+
+        monkeypatch.setattr("google.auth.default", default)
+        client, _ = app_on(tmp_path, hand_written())
+        before = settings_text(tmp_path)
+
+        refused = save(
+            client,
+            {
+                "store.job_store": "sql",
+                "store.object_store": "gcs",
+                "store.object_bucket": "analysis-jobs",
+                "store.object_credentials": credentials,
+            },
+        )
+
+        assert refused.status_code == 422, refused.text
+        (error,) = refused.json()["errors"]
+        assert message in error["message"]
+        assert settings_text(tmp_path) == before
 
 
 #: The name of a key file that a save writes, as the module docstring of

@@ -106,6 +106,34 @@ def moto_s3(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 @pytest.fixture
+def fake_gcs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The GCS JSON API, which ``fake-gcs-server`` serves at
+    ``TEST_GCS_ENDPOINT``, for one test.
+
+    ``google.auth.default`` gives a metadata server credential, so the
+    settings path and the identity check of the ``gcs`` row stay real. The
+    row's one client maker then reaches the emulator with no credential.
+    """
+    from google.auth.credentials import AnonymousCredentials
+    from google.cloud import storage
+
+    from analysis_service import gcs_objects
+    from tests.sql_stores import PLATFORM_CREDENTIAL, gcs_endpoint
+
+    endpoint = gcs_endpoint()
+
+    def emulator_client(credentials: object) -> storage.Client:
+        return storage.Client(
+            project="test",
+            credentials=AnonymousCredentials(),
+            client_options={"api_endpoint": endpoint},
+        )
+
+    monkeypatch.setattr("google.auth.default", lambda **_: (PLATFORM_CREDENTIAL, None))
+    monkeypatch.setattr(gcs_objects, "make_client", emulator_client)
+
+
+@pytest.fixture
 def no_static_key(moto_s3: None) -> Iterator[None]:
     """Remove the key pair that moto puts in the environment, and put it back
     before moto restores the environment."""

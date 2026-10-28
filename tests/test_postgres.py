@@ -1,7 +1,7 @@
 """The PostgreSQL row of the ``sql`` store: its settings, its TLS and its pool.
 
 The settings tests need no server. The tests marked ``postgres`` run in the
-PostgreSQL lane of CI, against a server with TLS and a server without it (see
+server lane of CI, against a server with TLS and a server without it (see
 ``tests/sql_stores.py``). The contract suite in ``tests/test_job_store.py``
 also runs on PostgreSQL in that lane.
 """

@@ -56,7 +56,13 @@ from tests.factories import (
     sample_selection,
     valid_model,
 )
-from tests.sql_stores import OBJECT_ENVS, object_env, postgres_env, sql_env
+from tests.sql_stores import (
+    OBJECT_ENVS,
+    object_env,
+    postgres_env,
+    server_marks,
+    sql_env,
+)
 from tests.test_parsing import ISDIGIT_TRAPS
 from tests.test_pause import waiting
 
@@ -86,14 +92,9 @@ BACKEND_PAIRS = (
     *(f"sql/{driver}/{objects}" for driver in SQL_SETTINGS for objects in OBJECT_ENVS),
 )
 
-#: The mark of each database that needs a server, so that its pairs run in its
-#: CI lane.
-LANES = {"postgresql+asyncpg": pytest.mark.postgres}
-
 
 def _param(pair: str):
-    driver = pair.split("/")[1] if "/" in pair else pair
-    return pytest.param(pair, marks=LANES.get(driver, ()))
+    return pytest.param(pair, marks=server_marks(*pair.split("/")))
 
 
 def _settings(request, tmp_path_factory, monkeypatch):
