@@ -55,7 +55,7 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** The last map, [#1760](https://github.com/mstarks01/work-agent/issues/1760), is under
+**None.** The last map, [#1991](https://github.com/mstarks01/work-agent/issues/1991), is under
 Completed maps. Chart a new one only against the bar at the end of this file.
 
 ### Completed maps
@@ -63,6 +63,25 @@ Completed maps. Chart a new one only against the bar at the end of this file.
 A completed map lives as a closed GitHub issue. Its tickets' resolution comments hold the reasoning,
 and the code holds the current state, so read the code first. Each map below settles the rules named
 beside it.
+
+- [#1991](https://github.com/mstarks01/work-agent/issues/1991) — Google Cloud Storage as an
+  object store. The spec [#1998](https://github.com/mstarks01/work-agent/issues/1998) holds the
+  build, as the tickets #1999 to #2002.
+  - GCS is its own row, `gcs`, on the native `google-cloud-storage` client in a `gcs` extra. A put
+    is create-only through `if_generation_match=0`. The row always uses the GCS endpoint and reads
+    no endpoint, region or addressing setting. The `s3` row refuses the GCS and Backblaze B2
+    hosts from one table (ADR 0103).
+  - One `buckets.get` at the startup refuses versioning, soft delete above 0, a retention policy,
+    a default event-based hold and Object Retention Lock. It requires enforced public access
+    prevention and uniform bucket-level access (ADR 0104).
+  - The row has one credential mode, `iam`. `gcp_identity` accepts only the metadata server
+    credential, with the `devstorage.read_write` scope. The Vertex row keeps the ADC chain
+    (ADR 0105).
+  - `fake-gcs-server` in the "Server lane" of CI runs the contract suite under a `gcs` mark. The
+    bucket state and credential refusals run with no server.
+  - The Settings page does not change: the save check runs the row's own `from_env`.
+  - Key files, HMAC keys, Workload Identity Federation, an S3-interop route, a Vertex identity
+    check, Cloud SQL IAM authentication and Azure Blob Storage are out of scope.
 
 - [#1760](https://github.com/mstarks01/work-agent/issues/1760) — a Settings page in the
   first-run app. The spec [#1767](https://github.com/mstarks01/work-agent/issues/1767) holds the
