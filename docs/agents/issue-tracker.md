@@ -55,8 +55,8 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** The last map, [#1760](https://github.com/mstarks01/work-agent/issues/1760), is under
-Completed maps. Chart a new one only against the bar at the end of this file.
+[#1991](https://github.com/mstarks01/work-agent/issues/1991) — Google Cloud Storage as an
+object store. Read the map's Decisions so far before you take a ticket.
 
 ### Completed maps
 
