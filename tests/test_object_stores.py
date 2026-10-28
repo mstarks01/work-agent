@@ -39,6 +39,7 @@ from tests.sql_stores import (
     filesystem_env,
     object_env,
     s3_env,
+    server_marks,
     sql_env,
 )
 from tests.test_sql_store import start
@@ -51,7 +52,12 @@ SOURCES = object_key(
 )
 
 
-@pytest.fixture(params=get_args(ObjectStoreName))
+@pytest.fixture(
+    params=[
+        pytest.param(name, marks=server_marks(name))
+        for name in get_args(ObjectStoreName)
+    ]
+)
 def objects(request, tmp_path) -> ObjectStore:
     """A fresh object store of each row."""
     row = object_env(request, request.param)
@@ -419,15 +425,7 @@ def test_each_boto3_call_runs_in_a_worker_thread(env, monkeypatch):
     monkeypatch.setattr(boto3.Session, "client", client)
     objects = build_object_store(env)
 
-    async def every_call() -> int:
-        await objects.check()
-        await objects.put(KEY, b"data")
-        await objects.get(KEY)
-        await objects.delete(KEY)
-        await listing(objects)
-        return threading.get_ident()
-
-    loop = asyncio.run(every_call())
+    loop = asyncio.run(every_call(objects))
     assert {name for name, _ in calls} == {
         "HeadBucket",
         "GetBucketVersioning",
@@ -438,6 +436,16 @@ def test_each_boto3_call_runs_in_a_worker_thread(env, monkeypatch):
         "ListObjectsV2",
     }
     assert loop not in {thread for _, thread in calls}
+
+
+async def every_call(objects: ObjectStore) -> int:
+    """Run each call of ``objects`` once. The ID of the event loop's thread."""
+    await objects.check()
+    await objects.put(KEY, b"data")
+    await objects.get(KEY)
+    await objects.delete(KEY)
+    await listing(objects)
+    return threading.get_ident()
 
 
 def test_without_boto3_the_startup_names_the_aws_extra(tmp_path, monkeypatch):

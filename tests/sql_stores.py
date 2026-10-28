@@ -2,13 +2,14 @@
 
 The migration runs once in each test process, as the deploy step runs it, and
 each store gets a copy of that database, so a test never shares a store. The
-object store is a filesystem root or an ``s3`` bucket. A test of the ``s3``
-row takes the ``moto_s3`` fixture, so that moto serves the bucket in the test
-process.
+object store is a filesystem root, an ``s3`` bucket or a ``gcs`` bucket. A
+test of the ``s3`` row takes the ``moto_s3`` fixture, so that moto serves the
+bucket in the test process. A test of the ``gcs`` row takes the ``fake_gcs``
+fixture, so that ``fake-gcs-server`` serves the bucket.
 
-A SQLite store needs nothing. A PostgreSQL store needs a server, so the tests
-that use one carry the ``postgres`` mark and run in the PostgreSQL lane of CI.
-The lane reads these variables:
+A SQLite store needs nothing. A PostgreSQL store and a ``gcs`` bucket each need
+a server, so the tests that use one carry the mark of :data:`SERVER_MARKS` and run in
+the server lane of CI. The lane reads these variables:
 
 * ``TEST_POSTGRES_URL``: a user that can create databases, on a server with
   TLS, as a ``postgresql+asyncpg://`` URL with no password. Where it is unset,
@@ -18,6 +19,8 @@ The lane reads these variables:
   user.
 * ``TEST_POSTGRES_CA_FILE``: the CA of the certificate of the server.
 * ``TEST_POSTGRES_PLAIN_URL``: the same user on a server without TLS.
+* ``TEST_GCS_ENDPOINT``: the URL of ``fake-gcs-server``. Where it is unset,
+  each ``gcs`` test skips, except where ``REQUIRE_GCS=1``, where it fails.
 """
 
 from __future__ import annotations
@@ -37,13 +40,25 @@ from pathlib import Path
 import boto3
 import pytest
 from alembic import command
+from google.auth import compute_engine
 from sqlalchemy.engine import URL, make_url
 
+from analysis_service import gcs_objects
 from analysis_service.migrations import alembic_config
 from analysis_service.objects import S3_KEY_FILES, ObjectStoreName
 from analysis_service.sql_store import engine_for
 
 REQUIRE_POSTGRES = os.environ.get("REQUIRE_POSTGRES") == "1"
+REQUIRE_GCS = os.environ.get("REQUIRE_GCS") == "1"
+
+#: The mark of each database and object store that needs a server, so that
+#: its tests run in the server lane of CI.
+SERVER_MARKS = {"postgresql+asyncpg": pytest.mark.postgres, "gcs": pytest.mark.gcs}
+
+
+def server_marks(*names: str) -> tuple[pytest.MarkDecorator, ...]:
+    """The mark of each of ``names`` that needs a server."""
+    return tuple(SERVER_MARKS[name] for name in names if name in SERVER_MARKS)
 
 
 def sqlite_url(path: Path) -> str:
@@ -115,6 +130,36 @@ def s3_env(directory: Path) -> dict[str, str]:
     return env
 
 
+#: A metadata server credential that sends no request for its universe
+#: domain. The ``fake_gcs`` fixture gives it to the row.
+PLATFORM_CREDENTIAL = compute_engine.Credentials(universe_domain="googleapis.com")
+
+
+def gcs_endpoint() -> str:
+    """``TEST_GCS_ENDPOINT``. Where it is unset, the test skips, or fails
+    where ``REQUIRE_GCS=1``."""
+    value = os.environ.get("TEST_GCS_ENDPOINT", "").strip()
+    if not value:
+        reason = "TEST_GCS_ENDPOINT is unset, so the gcs lane cannot run"
+        if REQUIRE_GCS:
+            pytest.fail(f"REQUIRE_GCS=1, and {reason}")
+        pytest.skip(reason)
+    return value
+
+
+def gcs_env(directory: Path) -> dict[str, str]:
+    """The settings of a fresh bucket in ``fake-gcs-server``: take the
+    ``fake_gcs`` fixture."""
+    assert gcs_objects.make_client.__name__ == "emulator_client", "take fake_gcs first"
+    bucket = f"jobs-{uuid.uuid4().hex}"
+    gcs_objects.make_client(PLATFORM_CREDENTIAL).create_bucket(bucket)
+    return {
+        "ANALYSIS_OBJECT_STORE": "gcs",
+        "ANALYSIS_OBJECT_BUCKET": bucket,
+        "ANALYSIS_OBJECT_CREDENTIALS": "iam",
+    }
+
+
 @dataclass(frozen=True)
 class ObjectStoreEnv:
     """How a test reaches one object store: a row of :data:`OBJECT_ENVS`.
@@ -133,6 +178,7 @@ class ObjectStoreEnv:
 OBJECT_ENVS: dict[ObjectStoreName, ObjectStoreEnv] = {
     "filesystem": ObjectStoreEnv(settings=filesystem_env, fixtures=()),
     "s3": ObjectStoreEnv(settings=s3_env, fixtures=("moto_s3",)),
+    "gcs": ObjectStoreEnv(settings=gcs_env, fixtures=("fake_gcs",)),
 }
 
 

@@ -76,6 +76,12 @@ dependencies = [
 # version range.
 aws = ["boto3>=1.43.1,<2.0", "botocore"]
 bedrock = ["analysis-service[aws]"]
+# The `gcs` object store (ADR 0103). It stays out of `BUILD_DISTRIBUTIONS`
+# for the reason that `boto3` does: it stores bytes and never changes what a
+# node answers. The store imports `google-api-core` and `google-auth` by name,
+# so the extra names them, with no range of their own, for the reason that the
+# `aws` extra names `botocore`.
+gcs = ["google-cloud-storage>=3.17.1,<4.0", "google-api-core", "google-auth"]
 # The `sql` job store (ADR 0065): SQLAlchemy async Core with one code path for
 # PostgreSQL and SQLite, and Alembic for the schema. A `memory` deployment
 # installs none of them. The upper bounds keep a new minor release out of the
@@ -101,6 +107,8 @@ dev = [
     # The `sql` extra, named for the same reason: the job store contract suite
     # runs on every backend, so CI installs the `sql` store's libraries.
     "analysis-service[sql]",
+    # The `gcs` extra, named for the same reason.
+    "analysis-service[gcs]",
     "httpx>=0.27",
     # The `s3` object store's contract suite runs on an S3 API that moto
     # serves in the test process, so no test reaches a network.
@@ -230,6 +238,12 @@ ignore_missing_imports = true
 module = ["boto3", "boto3.*", "botocore", "botocore.*"]
 ignore_missing_imports = true
 
+# `google-cloud-storage` ships no type information either. The `gcs` object
+# store keeps its client as `Any`.
+[[tool.mypy.overrides]]
+module = ["google.cloud", "google.cloud.storage", "google.cloud.storage.*"]
+ignore_missing_imports = true
+
 [tool.ruff.format]
 # Markdown is excluded because ruff would reformat the illustrative code fences
 # in docs/ -- schema sketches whose aligned trailing comments are prose, not
@@ -248,6 +262,7 @@ testpaths = ["tests"]
 # production image (wayfinder ticket 009 decision 14).
 pythonpath = ["."]
 markers = [
-    "postgres: needs a PostgreSQL server; runs in the PostgreSQL lane of CI (see tests/sql_stores.py)",
+    "postgres: needs a PostgreSQL server; runs in the server lane of CI (see tests/sql_stores.py)",
+    "gcs: needs fake-gcs-server; runs in the server lane of CI (see tests/sql_stores.py)",
     "lint: the module asserts a property of the repository's own files; tests/source_tree.py lint_modules reads it",
 ]

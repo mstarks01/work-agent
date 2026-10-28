@@ -282,6 +282,18 @@ def _s3_store(env: Mapping[str, str]) -> ObjectStore:
     return S3ObjectStore.from_env(env)
 
 
+def _gcs_store(env: Mapping[str, str]) -> ObjectStore:
+    """The ``gcs`` store, from the ``gcs`` extra (ADR 0103)."""
+    try:
+        from analysis_service.gcs_objects import GcsObjectStore
+    except ModuleNotFoundError as missing:
+        raise StoreConfigError(
+            f"the gcs object store needs the gcs extra ({missing.name} is not"
+            " installed): install analysis-service[gcs]"
+        ) from None
+    return GcsObjectStore.from_env(env)
+
+
 #: The files that hold the static key pair of the ``api_key`` mode of the
 #: ``s3`` store, by the ``boto3`` argument that each one fills. They live here,
 #: and not in :mod:`~analysis_service.s3_objects`, so that a reader without the
@@ -311,15 +323,18 @@ class ObjectStoreBackend:
     reads: tuple[str, ...]
 
 
-ObjectStoreName = Literal["filesystem", "s3"]
+ObjectStoreName = Literal["filesystem", "s3", "gcs"]
 
 #: The setting that selects a row of :data:`OBJECT_STORES`.
 OBJECT_STORE_VAR = "ANALYSIS_OBJECT_STORE"
-#: The s3 settings that the Settings page offers as a closed choice.
+#: The s3 setting that the Settings page offers as a closed choice.
 OBJECT_ADDRESSING_VAR = "ANALYSIS_OBJECT_ADDRESSING"
+#: The setting of the s3 and gcs rows that the Settings page offers as a
+#: closed choice.
 OBJECT_CREDENTIALS_VAR = "ANALYSIS_OBJECT_CREDENTIALS"
-#: The s3 settings that the s3 store reads as free text.
+#: The setting of the s3 and gcs rows that each reads as free text.
 OBJECT_BUCKET_VAR = "ANALYSIS_OBJECT_BUCKET"
+#: The s3 settings that the s3 store reads as free text.
 OBJECT_REGION_VAR = "ANALYSIS_OBJECT_REGION"
 OBJECT_ENDPOINT_VAR = "ANALYSIS_OBJECT_ENDPOINT"
 
@@ -341,6 +356,10 @@ OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
             OBJECT_CREDENTIALS_VAR,
             *S3_KEY_FILES.values(),
         ),
+    ),
+    "gcs": ObjectStoreBackend(
+        build=_gcs_store,
+        reads=(OBJECT_STORE_VAR, OBJECT_BUCKET_VAR, OBJECT_CREDENTIALS_VAR),
     ),
 }
 

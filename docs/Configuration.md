@@ -1393,7 +1393,7 @@ backend.
 | Variable | Values | Rule |
 | --- | --- | --- |
 | `ANALYSIS_JOB_STORE` | `memory`, `sql` | Required. |
-| `ANALYSIS_OBJECT_STORE` | `filesystem`, `s3` | Required by `sql`. Refused by `memory`. |
+| `ANALYSIS_OBJECT_STORE` | `filesystem`, `s3`, `gcs` | Required by `sql`. Refused by `memory`. `gcs` needs the `gcs` extra. |
 | `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///<path>`, `postgresql+asyncpg://<user>@<host>:<port>/<database>` | Required by `sql`. A URL that holds a password stops the startup. |
 | `ANALYSIS_DATABASE_CREDENTIALS` | `password`, `iam` | Required for PostgreSQL. Refused for SQLite. |
 | `ANALYSIS_DATABASE_PASSWORD_FILE` | the path of a file that holds the password | Required by `password`. The only way to give the password. Refused by `iam`. |
@@ -1401,12 +1401,12 @@ backend.
 | `ANALYSIS_DATABASE_REGION` | an AWS region that matches `[a-z0-9-]{1,32}`, for example `eu-west-1` | Required by `rds`. Refused by `password`. |
 | `ANALYSIS_DATABASE_CA_FILE` | the path of a PEM file of CA certificates | Optional, for PostgreSQL. Unset trusts the system CA bundle. |
 | `ANALYSIS_OBJECT_ROOT` | an absolute path to a directory | Required by `filesystem`. |
-| `ANALYSIS_OBJECT_BUCKET` | the name of a bucket: 3 to 63 lower-case letters, digits, `.` and `-`, with a letter or a digit at each end | Required by `s3`. |
-| `ANALYSIS_OBJECT_REGION` | the name of a region, which matches `[a-z0-9-]{1,32}` | Required by `s3`. |
-| `ANALYSIS_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. |
-| `ANALYSIS_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. |
-| `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3`. |
-| `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`, `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` | a path to a file | Required by `api_key`. Refused by `iam`. |
+| `ANALYSIS_OBJECT_BUCKET` | the name of a bucket: 3 to 63 lower-case letters, digits, `.` and `-`, with a letter or a digit at each end. `gcs` also accepts `_` | Required by `s3` and `gcs`. |
+| `ANALYSIS_OBJECT_REGION` | the name of a region, which matches `[a-z0-9-]{1,32}` | Required by `s3`. Refused by `gcs`. |
+| `ANALYSIS_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. Refused by `gcs`, which always uses `https://storage.googleapis.com`. |
+| `ANALYSIS_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. Refused by `gcs`. |
+| `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3` and `gcs`. On `gcs`, `iam` accepts only the metadata server identity of Cloud Run, GKE Workload Identity or GCE, and `api_key` stops the startup. |
+| `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`, `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` | a path to a file | Required by `api_key` on `s3`. Refused by `iam` and by `gcs`. |
 | `ANALYSIS_RETENTION_DAYS` | a whole number of days from 1 to 36500 | Optional. Unset keeps every job. See [Retention](HTTP-API.md#retention). |
 
 ### Bearer auth

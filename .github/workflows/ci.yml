@@ -191,13 +191,15 @@ jobs:
             echo "and [docs/adr/0003-no-privileged-vendor.md](docs/adr/0003-no-privileged-vendor.md)."
           } >>"$GITHUB_STEP_SUMMARY"
 
-  # The PostgreSQL lane: the tests marked `postgres`, against two throwaway
+  # The server lane: the tests marked `postgres` or `gcs`, against throwaway
   # servers that live for this job only. The `postgres` server has TLS, and
   # `postgres-plain` has none, so a test can show that the store refuses a
   # server without TLS. Their password is not a secret: each server holds no
-  # data, and only this runner can reach it.
+  # data, and only this runner can reach it. `fake-gcs-server` serves the GCS
+  # JSON API for the `gcs` object store. One job runs both, because the
+  # `sql/<postgresql>/gcs` pair needs both servers.
   postgres:
-    name: PostgreSQL lane
+    name: Server lane
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -222,6 +224,15 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 2s --health-timeout 5s
           --health-retries 30
+      fake-gcs:
+        image: fsouza/fake-gcs-server:1.56.1@sha256:797ce226d62f947c009dc40246b30cfb456b8473d8241407f9d6f2c04e4d69ef
+        env:
+          FAKE_GCS_BACKEND: memory
+          FAKE_GCS_SCHEME: http
+          FAKE_GCS_PORT: "4443"
+          FAKE_GCS_EXTERNAL_URL: http://localhost:4443
+        ports:
+          - 4443:4443
 
     steps:
       - name: Check out
@@ -286,14 +297,29 @@ jobs:
           echo "the server did not turn TLS on" >&2
           exit 1
 
-      # REQUIRE_POSTGRES makes a lane test fail where it would skip. -v lists
-      # each lane test, and the last line counts them.
-      - name: PostgreSQL lane
+      # The emulator image has no shell for a health command, so this step
+      # waits until the emulator answers a bucket listing.
+      - name: Wait for the emulator
+        run: |
+          for _ in $(seq 30); do
+            if curl -sf http://localhost:4443/storage/v1/b >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "fake-gcs-server did not answer" >&2
+          exit 1
+
+      # REQUIRE_POSTGRES and REQUIRE_GCS make a lane test fail where it would
+      # skip. -v lists each lane test, and the last line counts them.
+      - name: Server lane
         env:
           ANALYSIS_OFFLINE: "1"
           REQUIRE_POSTGRES: "1"
+          REQUIRE_GCS: "1"
+          TEST_GCS_ENDPOINT: http://localhost:4443
           TEST_POSTGRES_URL: postgresql+asyncpg://postgres@localhost:5432/postgres
           TEST_POSTGRES_PASSWORD_FILE: ${{ runner.temp }}/postgres/password
           TEST_POSTGRES_CA_FILE: ${{ runner.temp }}/postgres/ca.crt
           TEST_POSTGRES_PLAIN_URL: postgresql+asyncpg://postgres@localhost:5433/postgres
-        run: uv run pytest -m postgres -v
+        run: uv run pytest -m "postgres or gcs" -v

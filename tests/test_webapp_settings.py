@@ -377,6 +377,20 @@ class TestWhatTheSelectionShows:
         )
         assert "store.object_bucket" not in rows
 
+    def test_the_gcs_store_shows_only_the_settings_it_reads(self, tmp_path):
+        rows = rows_of(
+            memory_client(
+                tmp_path, ANALYSIS_JOB_STORE="sql", ANALYSIS_OBJECT_STORE="gcs"
+            )
+        )
+
+        assert {key for key in rows if key.startswith("store.object_")} == {
+            "store.object_store",
+            "store.object_bucket",
+            "store.object_credentials",
+        }
+        assert "gcs" in rows["store.object_store"]["options"]
+
 
 class TestModelSuggestions:
     def test_the_suggestions_come_from_the_model_gate(self, tmp_path):
