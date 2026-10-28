@@ -1,9 +1,9 @@
 """The scorer, offline, with zero provider calls — like the scorer itself.
 
 Matching goes through a scripted stand-in so a test states an outcome
-directly, and the standing of the unmatched comes from an in-memory vote
+directly, and the vote status of the unmatched comes from an in-memory vote
 ledger. Under test: the lane prefilter, the one-to-one assignment, the
-standing lookup, the severity arithmetic — the halves that must never drift.
+vote-status lookup, the severity arithmetic — the halves that must never drift.
 """
 
 from __future__ import annotations
@@ -149,7 +149,7 @@ def test_assignment_is_one_to_one(case, no_votes):
 
     assert len(score.matched) == 1
     assert score.produced_count == 2
-    assert len(score.unlisted) == 1  # the loser keeps a standing, not discarded
+    assert len(score.unlisted) == 1  # the loser keeps a vote status, not discarded
 
 
 def test_must_find_references_win_assignment_ties(case, no_votes):
@@ -174,7 +174,7 @@ def test_an_unvoted_unmatched_threat_is_visible_and_never_gates(case, no_votes):
 
     score = score_case(case, produced, ScriptedMatcher(), no_votes)
 
-    assert score.standing_counts == {
+    assert score.status_counts == {
         "rejected": 0,
         "pooled": 0,
         "open": 0,
@@ -260,7 +260,7 @@ def test_a_pooled_finding_feeds_promotion(case):
 
     score = score_case(case, produced, ScriptedMatcher(), votes)
 
-    assert score.standing_counts["pooled"] == 1
+    assert score.status_counts["pooled"] == 1
     assert score.rejected_rate == 0.0
     promoted = unlisted_for_promotion([score])
     assert promoted[0]["claim"] == "A grounded but unlisted claim."
@@ -296,7 +296,7 @@ class TestAStandingIsAboutTheArgumentAndNotTheKey:
 
         score = score_case(case, produced, ScriptedMatcher(), votes)
 
-        assert score.unlisted[0].standing == "pooled"
+        assert score.unlisted[0].status == "pooled"
 
     def test_a_vote_on_an_earlier_argument_is_stale(self, case):
         produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
@@ -313,8 +313,8 @@ class TestAStandingIsAboutTheArgumentAndNotTheKey:
 
         score = score_case(case, produced, ScriptedMatcher(), votes)
 
-        assert score.unlisted[0].standing == "stale"
-        assert score.standing_counts["stale"] == 1
+        assert score.unlisted[0].status == "stale"
+        assert score.status_counts["stale"] == 1
 
     def test_a_stale_substance_rejection_does_not_gate(self, case):
         """It gates nothing, because the person judged another argument."""
@@ -333,7 +333,7 @@ class TestAStandingIsAboutTheArgumentAndNotTheKey:
 
         score = score_case(case, produced, ScriptedMatcher(), votes)
 
-        assert score.unlisted[0].standing == "stale"
+        assert score.unlisted[0].status == "stale"
         assert score.rejected_rate == 0.0
 
     def test_a_stale_vote_does_not_feed_promotion(self, case):
@@ -361,21 +361,21 @@ class TestAStandingIsAboutTheArgumentAndNotTheKey:
 
         score = score_case(case, produced, ScriptedMatcher(), Ledger())
 
-        assert score.unlisted[0].standing == "unvoted"
+        assert score.unlisted[0].status == "unvoted"
 
-    def test_a_rewording_alone_leaves_the_standing_alive(self, case):
+    def test_a_rewording_alone_leaves_the_vote_status_alive(self, case):
         """Prose moves every run, so binding a substance vote to it would
-        expire every standing on every sweep."""
+        expire every vote status on every sweep."""
         produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
         votes = Ledger([vote_on(case, produced[0], "up")])
         reworded = [produced[0].model_copy(update={"description": "Said again."})]
 
         score = score_case(case, reworded, ScriptedMatcher(), votes)
 
-        assert score.unlisted[0].standing == "pooled"
+        assert score.unlisted[0].status == "pooled"
 
 
-def test_a_substance_down_vote_is_the_gating_standing(case):
+def test_a_substance_down_vote_is_the_gating_status(case):
     produced = [produced_threat(1, "spoofing", "An attacker abuses a made-up service.")]
     votes = Ledger(
         [vote_on(case, produced[0], "down", reason="unsupported-by-the-model")]
@@ -383,7 +383,7 @@ def test_a_substance_down_vote_is_the_gating_standing(case):
 
     score = score_case(case, produced, ScriptedMatcher(), votes)
 
-    assert score.standing_counts["rejected"] == 1
+    assert score.status_counts["rejected"] == 1
     assert score.rejected_rate == 1.0
 
 
@@ -395,7 +395,7 @@ def test_a_style_down_vote_pools_and_never_gates(case):
 
     score = score_case(case, produced, ScriptedMatcher(), votes)
 
-    assert score.standing_counts["pooled"] == 1
+    assert score.status_counts["pooled"] == 1
     assert score.rejected_rate == 0.0
 
 
@@ -429,7 +429,7 @@ def test_a_rejection_wins_over_a_second_reviewers_pool_vote(case):
 
     score = score_case(case, produced, ScriptedMatcher(), votes)
 
-    assert score.standing_counts["rejected"] == 1
+    assert score.status_counts["rejected"] == 1
 
 
 def test_an_unsure_vote_leaves_the_finding_open(case):
@@ -438,7 +438,7 @@ def test_an_unsure_vote_leaves_the_finding_open(case):
 
     score = score_case(case, produced, ScriptedMatcher(), votes)
 
-    assert score.standing_counts["open"] == 1
+    assert score.status_counts["open"] == 1
     assert score.rejected_rate == 0.0
     assert unlisted_for_promotion([score]) == []
 
@@ -464,7 +464,7 @@ def test_needs_info_threats_are_keyed_like_any_other(case, no_votes):
     score = score_case(case, produced, matcher, no_votes)
 
     assert [entry.threat_id for entry in score.unlisted] == ["S-01"]
-    assert score.standing_counts["unvoted"] == 1
+    assert score.status_counts["unvoted"] == 1
 
 
 def test_element_disagreement_is_scored_not_filtered(case, no_votes):

@@ -23,7 +23,7 @@ It is mechanical everywhere, and a human answers the one question code cannot:
    ``unvoted``, which is visible, non-gating, and exactly what the review queue
    serves. A finding whose votes were all cast on an earlier version of the
    argument is ``stale``, which gates nothing and pools nothing: the fingerprint
-   is blind to what a claim says, so a standing carried across a re-argument
+   is blind to what a claim says, so a vote status carried across a re-argument
    would read as a person validating what this run says.
 5. Severity calibration, mechanical. ``derive_severity_level`` is shipped
    arithmetic, and comparing bands needs no vote.
@@ -39,7 +39,7 @@ Every number here is rule-relative and ledger-relative. It is valid for tracking
 movement and comparing configurations. It is not an absolute, and it is not
 comparable to published figures from other tools. The matching half is
 deterministic, so it cannot move between two runs of one configuration. The
-standing half moves only when a person votes.
+vote-status half moves only when a person votes.
 
 The scorer takes :class:`~analysis_service.frameworks.stride.record.DraftThreat` rather than
 :class:`~analysis_service.frameworks.stride.record.Threat`, so the same function scores the
@@ -153,7 +153,7 @@ class MatchedPair:
 #: Where an unmatched produced threat stands with the reviewers.
 #:
 #: ``rejected`` — a current vote carries a substance reason, so a person read
-#: the finding and said the analysis is wrong. The one gating standing.
+#: the finding and said the analysis is wrong. The one gating status.
 #: ``pooled`` — a current vote puts it in the pool: real, just not in the
 #: reference set yet. ``promotion_candidates`` surfaces these.
 #: ``open`` — somebody answered ``unsure`` or ``needs-evidence``; neither
@@ -171,16 +171,16 @@ VoteStatus = Literal["rejected", "pooled", "open", "unvoted", "stale"]
 
 @dataclass(frozen=True)
 class UnlistedThreat:
-    """An unmatched produced threat, its fingerprint, and its standing.
+    """An unmatched produced threat, its fingerprint, and its vote status.
 
     The fingerprint is the join key to the vote ledger and the review queue:
-    the standing recorded here is the ledger's answer at scoring time, and the
+    the vote status recorded here is the ledger's answer at scoring time, and the
     same key re-reads the ledger after the next sitting with no re-run.
 
-    A standing is read against the claim this run produced, never against the
+    A vote status is read against the claim this run produced, never against the
     fingerprint alone. A vote whose structural digest differs from this claim's
     stands ``stale``. A title and an explanation can change to text that asserts
-    the opposite of the finding while no key moves, so a standing carried across
+    the opposite of the finding while no key moves, so a vote status carried across
     that change would call a contradiction a human-validated finding.
     """
 
@@ -188,7 +188,7 @@ class UnlistedThreat:
     category: StrideCategory
     claim: str
     fingerprint: str
-    standing: VoteStatus
+    status: VoteStatus
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -196,7 +196,7 @@ class UnlistedThreat:
             "category": self.category,
             "claim": self.claim,
             "fingerprint": self.fingerprint,
-            "standing": self.standing,
+            "standing": self.status,
         }
 
 
@@ -318,16 +318,16 @@ class CaseScore:
         )
 
     @property
-    def standing_counts(self) -> dict[str, int]:
-        counts = Counter(entry.standing for entry in self.unlisted)
-        return {standing: counts.get(standing, 0) for standing in _VOTE_STATUSES}
+    def status_counts(self) -> dict[str, int]:
+        counts = Counter(entry.status for entry in self.unlisted)
+        return {status: counts.get(status, 0) for status in _VOTE_STATUSES}
 
     @property
     def eligible_count(self) -> int:
         """How many produced findings could ever raise :attr:`rejected_rate`.
 
         The size of ``unlisted``, which is the only population
-        :func:`_standing_of_unmatched` keys and looks up. A matched finding
+        :func:`_status_of_unmatched` keys and looks up. A matched finding
         never reaches it; neither does a lane error, or one citing an element
         the blessed model does not hold. So this is smaller
         than ``produced_count``, sometimes much smaller, and the gap is the
@@ -343,7 +343,7 @@ class CaseScore:
         so a rate over ``produced_count`` beside a ``reviewed_count`` of zero
         is not a low false-positive rate — it is no measurement at all.
         """
-        return self.eligible_count - self.standing_counts["unvoted"]
+        return self.eligible_count - self.status_counts["unvoted"]
 
     @property
     def rejected_rate(self) -> float:
@@ -363,7 +363,7 @@ class CaseScore:
         what the recorded artifacts hold, and the two denominators it hides
         travel with it.
         """
-        return ratio(self.standing_counts["rejected"], self.produced_count)
+        return ratio(self.status_counts["rejected"], self.produced_count)
 
     @property
     def rejected_rate_of_reviewed(self) -> float:
@@ -373,12 +373,12 @@ class CaseScore:
         is still not precision: the reviewed set is whatever a sitting reached,
         never a sample drawn to represent the rest.
         """
-        return ratio(self.standing_counts["rejected"], self.reviewed_count)
+        return ratio(self.status_counts["rejected"], self.reviewed_count)
 
     @property
     def unvoted_count(self) -> int:
         """How much of the unlisted set no person has answered yet."""
-        return self.standing_counts["unvoted"]
+        return self.status_counts["unvoted"]
 
     @property
     def severity_exact_rate(self) -> float:
@@ -407,7 +407,7 @@ class CaseScore:
                 "eligible": self.eligible_count,
                 "reviewed": self.reviewed_count,
                 "lane_errors": len(self.lane_errors),
-                **self.standing_counts,
+                **self.status_counts,
             },
             "metrics": {
                 "must_find_coverage": round(self.must_find_coverage, 3),
@@ -457,7 +457,7 @@ def score_case(
     draft base class, so this one function scores both sides of the critic: the
     merged drafts going in, and the report's threats coming out.
 
-    ``votes`` decides the standing of every unmatched threat. Passing the
+    ``votes`` decides the vote status of every unmatched threat. Passing the
     object rather than a path keeps this function pure: the caller loads the
     ledger once, and a test hands in one it built in memory.
     """
@@ -499,7 +499,7 @@ def score_case(
         case, produced, matcher, rulings, unmatched_positions, missed
     )
     misfiled = {error.threat_id for error in lane_errors}
-    unlisted, foreign = _standing_of_unmatched(
+    unlisted, foreign = _status_of_unmatched(
         case, produced, votes, unmatched_positions, misfiled, rows
     )
 
@@ -708,7 +708,7 @@ def _find_lane_errors(
     return tuple(errors)
 
 
-def _standing_of_unmatched(
+def _status_of_unmatched(
     case: GoldenCase,
     produced: Sequence[DraftThreat],
     votes: Ledger,
@@ -768,21 +768,21 @@ def _standing_of_unmatched(
                 category=threat.category,
                 claim=candidate_claim(threat),
                 fingerprint=value,
-                standing=_vote_status(current, structural(threat)),
+                status=_vote_status(current, structural(threat)),
             )
         )
     return tuple(unlisted), tuple(foreign)
 
 
 def _vote_status(current: Sequence[Vote], content: str) -> VoteStatus:
-    """One fingerprint's standing against the claim this run produced.
+    """One fingerprint's vote status against the claim this run produced.
 
     ``content`` is that claim's structural digest. A vote answers only while its
     own digest matches: a claim re-argued since the vote was cast is a different
     argument, and the person judged the earlier one. Those votes fall out first,
-    and what is left decides the standing.
+    and what is left decides the vote status.
 
-    ``rejected`` wins over ``pooled`` when reviewers disagree: a standing that
+    ``rejected`` wins over ``pooled`` when reviewers disagree: a vote status that
     hid a substance objection behind a second reviewer's up-vote would let the
     gate pass on the vote most favourable to the tool. The disagreement itself
     is the queue's business to surface for a third opinion.
@@ -902,7 +902,7 @@ def unlisted_for_promotion(scores: Sequence[CaseScore]) -> list[dict[str, Any]]:
         }
         for score in scores
         for entry in score.unlisted
-        if entry.standing == "pooled"
+        if entry.status == "pooled"
     ]
 
 

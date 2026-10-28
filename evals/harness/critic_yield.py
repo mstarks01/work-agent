@@ -17,7 +17,7 @@ one carrying a ``rejected`` verdict, and the two sides are a superset and its
 subset. The whole instrument is therefore a matter of scoring the same case
 twice through the shipped scorer, with no second metric implementation and no
 special-cased matching, and then reading the killed drafts' pre-critic
-dispositions, which is the state the critic faced.
+scored outcomes, which is the state the critic faced.
 
 One property holds this together: the scored task is identical on both sides.
 Both passes go through :func:`~evals.harness.scorer.score_case`, whose claim is
@@ -84,7 +84,7 @@ class KilledDraft:
     threat_id: str
     category: StrideCategory
     claim: str
-    disposition: ScoredOutcome
+    outcome: ScoredOutcome
     reference_index: int | None
     #: The step the critic said it rejected the draft at, off the block's own
     #: verdict: ``lane``, ``reasoning``, ``duplicate``, ``evidence`` and the
@@ -99,7 +99,7 @@ class KilledDraft:
             "threat_id": self.threat_id,
             "category": self.category,
             "claim": self.claim,
-            "disposition": self.disposition,
+            "disposition": self.outcome,
             "reference_index": self.reference_index,
             "cause": self.cause,
         }
@@ -130,15 +130,13 @@ class CriticYield:
     def rejected_killed(self) -> int:
         """The critic earning its cost: drafts it removed that a person had
         already rejected for substance."""
-        return sum(1 for draft in self.killed if draft.disposition == "rejected")
+        return sum(1 for draft in self.killed if draft.outcome == "rejected")
 
     @property
     def matched_killed(self) -> int:
         """The critic destroying real findings — the number that can veto the
         pattern. A draft that had matched a reference, killed anyway."""
-        return sum(
-            1 for draft in self.killed if draft.disposition.startswith("matched")
-        )
+        return sum(1 for draft in self.killed if draft.outcome.startswith("matched"))
 
     @property
     def matched_lost(self) -> int:
@@ -150,7 +148,7 @@ class CriticYield:
         return sum(
             1
             for draft in self.killed
-            if draft.disposition.startswith("matched")
+            if draft.outcome.startswith("matched")
             and draft.reference_index not in self.matched_after_indices
         )
 
@@ -160,7 +158,7 @@ class CriticYield:
         return sum(
             1
             for draft in self.killed
-            if draft.disposition == "matched-must-find"
+            if draft.outcome == "matched-must-find"
             and draft.reference_index not in self.matched_after_indices
         )
 
@@ -168,9 +166,7 @@ class CriticYield:
     def must_find_killed(self) -> int:
         """The sharpest form of the veto: a killed draft that had answered a
         reference the Tier 2 gate depends on."""
-        return sum(
-            1 for draft in self.killed if draft.disposition == "matched-must-find"
-        )
+        return sum(1 for draft in self.killed if draft.outcome == "matched-must-find")
 
     # --- rates, all rule-and-ledger-relative ------------------------------
 
@@ -191,8 +187,8 @@ class CriticYield:
                 draft.cause or UNSTATED, {"killed": 0, "matched": 0, "must_find": 0}
             )
             entry["killed"] += 1
-            entry["matched"] += draft.disposition.startswith("matched")
-            entry["must_find"] += draft.disposition == "matched-must-find"
+            entry["matched"] += draft.outcome.startswith("matched")
+            entry["must_find"] += draft.outcome == "matched-must-find"
         return dict(sorted(by_cause.items()))
 
     @property
@@ -327,7 +323,7 @@ def _yield(
             threat_id=draft.id,
             category=draft.category,
             claim=candidate_claim(draft),
-            disposition=outcomes[draft.id][0],
+            outcome=outcomes[draft.id][0],
             reference_index=outcomes[draft.id][1],
             cause=steps.get(draft.id),
         )
@@ -339,8 +335,8 @@ def _yield(
         drafts_in=pre.produced_count,
         threats_out=post.produced_count,
         killed=killed,
-        rejected_before=pre.standing_counts["rejected"],
-        rejected_after=post.standing_counts["rejected"],
+        rejected_before=pre.status_counts["rejected"],
+        rejected_after=post.status_counts["rejected"],
         matched_before=len(pre.matched),
         matched_after=len(post.matched),
         must_find_before=pre.must_find_matched,
@@ -370,7 +366,7 @@ def _scored_outcomes(score: CaseScore) -> dict[str, tuple[ScoredOutcome, int | N
     for error in score.lane_errors:
         records[error.threat_id] = ("lane-error", error.reference_index)
     for entry in score.unlisted:
-        records[entry.threat_id] = (entry.standing, None)
+        records[entry.threat_id] = (entry.status, None)
     for threat_id in score.produced_ids:
         records.setdefault(threat_id, ("unscored", None))
     return records

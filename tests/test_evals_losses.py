@@ -455,7 +455,7 @@ class TestADisplacedRow:
         assert pooled([charged])["displaced"] >= 1
 
     def test_the_ledger_answer_on_that_draft_rides_beside_it(self, case, flows):
-        """``displaced_standing`` separates a real finding from a refused one.
+        """``displaced_status`` separates a real finding from a refused one.
 
         Both spell ``place`` on the row, and the 2026-09-22 audit had to join
         the ledger by hand to tell them apart.
@@ -467,19 +467,19 @@ class TestADisplacedRow:
         # pooled counts are per row rather than per draft.
         unvoted = charge(case, flows, [draft], [claim])
         rows = pooled([unvoted])["displaced"]
-        assert by_index(unvoted)[index].displaced_standing == "unvoted"
+        assert by_index(unvoted)[index].displaced_status == "unvoted"
         assert pooled([unvoted])["displaced_standing"] == {"unvoted": rows}
 
         voted = charge(
             case, flows, [draft], [claim], votes=accepted(case, claim, flows)
         )
-        assert by_index(voted)[index].displaced_standing == "pooled"
+        assert by_index(voted)[index].displaced_status == "pooled"
         assert pooled([voted])["displaced_standing"] == {"pooled": rows}
 
-    def test_the_standing_is_the_scorer_s_own_and_never_a_second_lookup(
+    def test_the_vote_status_is_the_scorer_s_own_and_never_a_second_lookup(
         self, case, flows
     ):
-        """Every row's standing is the one the scorer recorded, or nothing.
+        """Every row's vote status is the one the scorer recorded, or nothing.
 
         The field may not invent an answer: a displaced draft the scorer
         matched to a reference of its own is absent from ``unlisted``, and
@@ -492,12 +492,12 @@ class TestADisplacedRow:
             case, produced, SubsetVerbIdentity({case.id: flows}), Ledger()
         )
         charged = charge(case, flows, [draft], produced)
-        recorded = {threat.threat_id: threat.standing for threat in score.unlisted}
+        recorded = {threat.threat_id: threat.status for threat in score.unlisted}
 
         assert by_index(charged)[index].displaced_draft_id == draft.id
         for loss in charged.losses:
             expected = recorded.get(loss.displaced_draft_id)
-            assert loss.displaced_standing == expected
+            assert loss.displaced_status == expected
 
     def test_a_lane_that_wrote_nothing_nearby_names_no_draft(self, case, flows):
         charged = charge(case, flows, [], [])

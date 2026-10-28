@@ -7,7 +7,7 @@ a scored sweep into the question and the answer back into a ruling.
 
 **It reads the rows the scorer already charged.** :mod:`~evals.harness.losses`
 names the surviving draft at a ``verb`` loss's place and the displaced draft
-beside a ``place`` or ``unled`` loss, with the vote standing on it. Those are
+beside a ``place`` or ``unled`` loss, with the vote status on it. Those are
 the near misses; this module selects from them and computes nothing about
 places or verbs of its own, so there is one reader of "which draft sits next
 to this miss".
@@ -52,7 +52,7 @@ VERDICTS = ("same", "different", "unsure")
 #: row is asked again on the next ballot.
 RULED: tuple[RulingVerdict, ...] = get_args(RulingVerdict)
 
-#: The standings a displaced draft may carry and still be asked about. A
+#: The vote statuses a displaced draft may carry and still be asked about. A
 #: ``rejected`` draft is one a person refused; ``None`` means it matched a
 #: reference of its own and nobody was asked.
 ASKABLE = frozenset({"pooled", "open", "unvoted", "stale"})
@@ -178,7 +178,7 @@ def _near(loss: Loss) -> str | None:
     """The draft a loss row names beside the miss, where one may be asked about."""
     if loss.cause == "verb":
         return loss.draft_id
-    if loss.cause in ("place", "unled") and loss.displaced_standing in ASKABLE:
+    if loss.cause in ("place", "unled") and loss.displaced_status in ASKABLE:
         return loss.displaced_draft_id
     return None
 

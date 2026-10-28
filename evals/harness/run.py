@@ -844,9 +844,9 @@ def _print_series(by_series: dict[str, Sweep]) -> None:
             continue
         counts: dict[str, int] = {}
         for score in sweep.scores:
-            for standing, count in score.standing_counts.items():
-                counts[standing] = counts.get(standing, 0) + count
-        summary = ", ".join(f"{count} {standing}" for standing, count in counts.items())
+            for status, count in score.status_counts.items():
+                counts[status] = counts.get(status, 0) + count
+        summary = ", ".join(f"{count} {status}" for status, count in counts.items())
         print(
             f"  series {name!r} ({', '.join(standings.SERIES[name])}):"
             f" {summary or 'nothing scored'}"
