@@ -113,6 +113,10 @@ def fake_gcs(monkeypatch: pytest.MonkeyPatch) -> None:
     ``google.auth.default`` gives a metadata server credential, so the
     settings path and the identity check of the ``gcs`` row stay real. The
     row's one client maker then reaches the emulator with no credential.
+
+    The emulator returns no ``iamConfiguration`` in a bucket resource, and
+    drops one that a request sends. So the client gives each bucket that
+    ``get_bucket`` returns the access values that the startup check needs.
     """
     from google.auth.credentials import AnonymousCredentials
     from google.cloud import storage
@@ -122,8 +126,15 @@ def fake_gcs(monkeypatch: pytest.MonkeyPatch) -> None:
 
     endpoint = gcs_endpoint()
 
+    class EmulatorClient(storage.Client):
+        def get_bucket(self, *args, **kwargs) -> storage.Bucket:
+            bucket = super().get_bucket(*args, **kwargs)
+            bucket.iam_configuration.public_access_prevention = "enforced"
+            bucket.iam_configuration.uniform_bucket_level_access_enabled = True
+            return bucket
+
     def emulator_client(credentials: object) -> storage.Client:
-        return storage.Client(
+        return EmulatorClient(
             project="test",
             credentials=AnonymousCredentials(),
             client_options={"api_endpoint": endpoint},

@@ -15,9 +15,10 @@ The client errors this module handles, and what each one becomes:
 * **A key that holds an object.** A put with ``if_generation_match=0``
   raises ``PreconditionFailed``, and :meth:`GcsObjectStore.put` raises
   :class:`FileExistsError`, as the ``filesystem`` row does.
-* **A missing bucket** (HTTP 404) **and each other refused** ``buckets.get``.
-  :meth:`GcsObjectStore.check` turns each into a :class:`StoreConfigError`,
-  so the startup stops.
+* **A missing bucket** (HTTP 404), **a refused** ``buckets.get`` (HTTP 403)
+  **and each other failed** ``buckets.get``. :meth:`GcsObjectStore.check`
+  turns each into a :class:`StoreConfigError`, so the startup stops. The 403
+  message names the permission and the role that the row needs.
 * **A metadata server that does not answer** while the client reads the
   universe domain of the credential. :meth:`GcsObjectStore.from_env` turns
   the ``GoogleAuthError`` into a :class:`StoreConfigError`.
@@ -37,10 +38,12 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import AsyncIterator, Callable, Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from typing import NoReturn
 
 from google.api_core.exceptions import (
+    Forbidden,
     GoogleAPICallError,
     NotFound,
     PreconditionFailed,
@@ -106,6 +109,68 @@ CREDENTIALS: dict[CredentialMode, Callable[[Mapping[str, str]], Credentials]] = 
 }
 
 
+@dataclass(frozen=True)
+class BucketRule:
+    """A bucket state that stops the startup (ADR 0104): a row of
+    :data:`BUCKET_RULES`."""
+
+    #: The field of the ``buckets.get`` resource.
+    field: str
+    #: True where the bucket is in the refused state.
+    refuses: Callable[[storage.Bucket], bool]
+    #: The value that the row needs, for the message. ``{bucket}`` becomes
+    #: the name of the bucket.
+    needs: str
+
+
+#: Each bucket state where a delete can keep the content, or where the content
+#: can become public. The row reads no per-object hold, no retain-until time
+#: and no lifecycle rule.
+BUCKET_RULES = (
+    BucketRule(
+        field="versioning.enabled",
+        refuses=lambda bucket: bucket.versioning_enabled,
+        needs="false",
+    ),
+    BucketRule(
+        field="softDeletePolicy.retentionDurationSeconds",
+        refuses=lambda bucket: bool(
+            bucket.soft_delete_policy.retention_duration_seconds
+        ),
+        needs="0 (gcloud storage buckets update gs://{bucket} --clear-soft-delete)",
+    ),
+    BucketRule(
+        field="retentionPolicy.retentionPeriod",
+        refuses=lambda bucket: bucket.retention_period is not None,
+        needs="unset",
+    ),
+    BucketRule(
+        field="defaultEventBasedHold",
+        refuses=lambda bucket: bool(bucket.default_event_based_hold),
+        needs="false",
+    ),
+    BucketRule(
+        field="objectRetention.mode",
+        refuses=lambda bucket: bucket.object_retention_mode == "Enabled",
+        needs="unset",
+    ),
+    BucketRule(
+        field="iamConfiguration.publicAccessPrevention",
+        refuses=lambda bucket: (
+            bucket.iam_configuration.public_access_prevention != "enforced"
+        ),
+        needs="enforced",
+    ),
+    BucketRule(
+        field="iamConfiguration.uniformBucketLevelAccess.enabled",
+        refuses=lambda bucket: (
+            not bucket.iam_configuration.uniform_bucket_level_access_enabled
+        ),
+        needs="true",
+    ),
+)
+
+
 class GcsObjectStore:
     """Objects in one bucket, through a ``storage.Client``.
 
@@ -146,13 +211,19 @@ class GcsObjectStore:
 
     async def check(self) -> None:
         """Send one ``buckets.get``. A missing bucket, a refused request, a
-        host the service cannot reach or a token it cannot refresh stops the
-        startup."""
+        host the service cannot reach, a token it cannot refresh or a state of
+        :data:`BUCKET_RULES` stops the startup."""
         name = self._bucket.name
         try:
-            await asyncio.to_thread(self._client.get_bucket, name)
+            bucket = await asyncio.to_thread(self._client.get_bucket, name)
         except NotFound:
             raise StoreConfigError(f"the bucket {name!r} does not exist") from None
+        except Forbidden:
+            raise StoreConfigError(
+                f"buckets.get on the bucket {name!r} was refused (HTTP 403); grant"
+                " the service identity storage.buckets.get on the bucket, which"
+                " roles/storage.bucketViewer holds"
+            ) from None
         except GoogleAPICallError as error:
             raise StoreConfigError(
                 f"buckets.get on the bucket {name!r} failed with HTTP {error.code}"
@@ -162,6 +233,16 @@ class GcsObjectStore:
                 f"the gcs object store cannot reach the bucket {name!r} or get a"
                 f" token for it ({type(error).__name__})"
             ) from None
+        if refused := [
+            f"{rule.field} must be {rule.needs.format(bucket=name)}"
+            for rule in BUCKET_RULES
+            if rule.refuses(bucket)
+        ]:
+            raise StoreConfigError(
+                f"the gcs object store refuses the bucket {name!r}, because a"
+                f" delete can keep its content or its content can become public:"
+                f" {'; '.join(refused)}"
+            )
 
     async def put(self, key: str, data: bytes) -> None:
         await asyncio.to_thread(_put, self._bucket.blob(key), data)

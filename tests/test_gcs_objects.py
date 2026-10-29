@@ -182,14 +182,48 @@ class TestTheIdentity:
         assert "hunter2" not in message and str(tmp_path) not in message
 
 
+#: A ``buckets.get`` resource with every value that the row needs.
+PASSING_BUCKET = {
+    "kind": "storage#bucket",
+    "name": "analysis-jobs",
+    "versioning": {"enabled": False},
+    "softDeletePolicy": {"retentionDurationSeconds": "0"},
+    "defaultEventBasedHold": False,
+    "iamConfiguration": {
+        "publicAccessPrevention": "enforced",
+        "uniformBucketLevelAccess": {"enabled": True},
+    },
+}
+
+
+def answer(monkeypatch, resource: dict) -> None:
+    """Make ``get_bucket`` return the ``Bucket`` that the library builds from
+    ``resource``, as a ``buckets.get`` response would."""
+
+    def get_bucket(client, name):
+        bucket = storage.Bucket(client, name=name)
+        bucket._set_properties(resource)
+        return bucket
+
+    monkeypatch.setattr(storage.Client, "get_bucket", get_bucket)
+
+
 class TestTheStartupCheck:
-    """A refused ``buckets.get`` stops the startup, with no provider text."""
+    """A refused ``buckets.get`` or a refused bucket state stops the startup,
+    with no provider text (ADR 0104)."""
 
     @pytest.mark.parametrize(
         ("error", "message"),
         [
             (NotFound("hunter2"), "the bucket 'analysis-jobs' does not exist"),
-            (Forbidden("hunter2"), "failed with HTTP 403"),
+            (
+                Forbidden("hunter2"),
+                (
+                    r"refused \(HTTP 403\); grant the service identity"
+                    r" storage\.buckets\.get on the bucket, which"
+                    r" roles/storage\.bucketViewer holds"
+                ),
+            ),
             (requests.ConnectionError("hunter2"), r"\(ConnectionError\)"),
             (RefreshError("hunter2"), r"\(RefreshError\)"),
             (RetryError("hunter2", None), r"\(RetryError\)"),
@@ -204,6 +238,80 @@ class TestTheStartupCheck:
         with pytest.raises(StoreConfigError, match=message) as refused:
             asyncio.run(objects.check())
         assert "hunter2" not in str(refused.value)
+
+    @pytest.mark.parametrize(
+        ("change", "message"),
+        [
+            ({"versioning": {"enabled": True}}, "versioning.enabled must be false"),
+            (
+                {"softDeletePolicy": {"retentionDurationSeconds": "604800"}},
+                (
+                    "softDeletePolicy.retentionDurationSeconds must be 0 (gcloud"
+                    " storage buckets update gs://analysis-jobs --clear-soft-delete)"
+                ),
+            ),
+            (
+                {"retentionPolicy": {"retentionPeriod": "86400"}},
+                "retentionPolicy.retentionPeriod must be unset",
+            ),
+            (
+                {"retentionPolicy": {"retentionPeriod": "86400", "isLocked": True}},
+                "retentionPolicy.retentionPeriod must be unset",
+            ),
+            ({"defaultEventBasedHold": True}, "defaultEventBasedHold must be false"),
+            (
+                {"objectRetention": {"mode": "Enabled"}},
+                "objectRetention.mode must be unset",
+            ),
+            *(
+                (
+                    {"iamConfiguration": iam},
+                    "iamConfiguration.publicAccessPrevention must be enforced",
+                )
+                for iam in [
+                    {
+                        "publicAccessPrevention": "inherited",
+                        "uniformBucketLevelAccess": {"enabled": True},
+                    },
+                    {"uniformBucketLevelAccess": {"enabled": True}},
+                ]
+            ),
+            *(
+                (
+                    {"iamConfiguration": iam},
+                    "iamConfiguration.uniformBucketLevelAccess.enabled must be true",
+                )
+                for iam in [
+                    {
+                        "publicAccessPrevention": "enforced",
+                        "uniformBucketLevelAccess": {"enabled": False},
+                    },
+                    {"publicAccessPrevention": "enforced"},
+                ]
+            ),
+        ],
+    )
+    def test_a_refused_bucket_state(self, env, monkeypatch, change, message):
+        answer(monkeypatch, {**PASSING_BUCKET, **change})
+        objects = build_object_store(env)
+        with pytest.raises(StoreConfigError) as refused:
+            asyncio.run(objects.check())
+        assert str(refused.value).endswith(f": {message}")
+
+    def test_each_refused_state_is_named(self, env, monkeypatch):
+        answer(monkeypatch, {"name": "analysis-jobs", "versioning": {"enabled": True}})
+        objects = build_object_store(env)
+        with pytest.raises(StoreConfigError) as refused:
+            asyncio.run(objects.check())
+        assert str(refused.value).endswith(
+            ": versioning.enabled must be false;"
+            " iamConfiguration.publicAccessPrevention must be enforced;"
+            " iamConfiguration.uniformBucketLevelAccess.enabled must be true"
+        )
+
+    def test_a_bucket_with_every_needed_value_starts_the_store(self, env, monkeypatch):
+        answer(monkeypatch, PASSING_BUCKET)
+        asyncio.run(build_object_store(env).check())
 
 
 @pytest.mark.gcs
