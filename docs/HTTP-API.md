@@ -1046,6 +1046,108 @@ an endpoint that the service cannot reach or a bucket with versioning
 `Enabled` or `Suspended` stops the startup. A store that answers
 `GetBucketVersioning` with `NotImplemented` keeps no versions, and passes.
 
+#### The `gcs` object store
+
+The `gcs` object store keeps each object in a Google Cloud Storage bucket. It
+uses `google-cloud-storage`, which the `gcs` extra holds. Install both extras:
+
+```bash
+pip install 'analysis-service[sql,gcs]'
+```
+
+When `gcs` is selected and the client is not installed, the startup stops with
+a message that names the `gcs` extra.
+
+The service writes each object with the generation precondition `0`, so a put
+never replaces an object. Google Cloud Storage refuses that write with HTTP
+412 when the key holds an object.
+
+The store always uses `https://storage.googleapis.com`. So
+`ANALYSIS_OBJECT_ENDPOINT`, `ANALYSIS_OBJECT_REGION` and
+`ANALYSIS_OBJECT_ADDRESSING` stop the startup, and the service ignores
+`STORAGE_EMULATOR_HOST` and `API_ENDPOINT_OVERRIDE`. Each request uses TLS,
+and the client always verifies the certificate of the endpoint.
+
+Set `ANALYSIS_OBJECT_CREDENTIALS` to `iam`. The service gives no key, and it
+accepts only the identity of the metadata server (ADR 0105): the service
+account of a Cloud Run service, of a GKE pod with Workload Identity, or of a
+GCE instance. The token holds only the scope
+`https://www.googleapis.com/auth/devstorage.read_write`. Each other identity
+stops the startup: a service account key file, a gcloud user login, an
+impersonated credential and Workload Identity Federation. `api_key` also stops
+the startup, because the row reads no key file and no HMAC key. The message
+names the type of credential that the service found, and never the credential.
+This rule has two results:
+
+- A developer machine with a gcloud login cannot run the `gcs` row against a
+  real bucket.
+- `google.auth` reads `GOOGLE_APPLICATION_CREDENTIALS` before the metadata
+  server. So a process that sets that variable for the Vertex vendor row
+  cannot also run the `gcs` row, and the message names the variable. Unset
+  it, and the Vertex row then also uses the identity of the metadata server.
+
+Make the bucket before the first start, with each setting that the startup
+check needs (ADR 0104):
+
+```bash
+gcloud storage buckets create gs://<bucket> \
+  --location=<location> \
+  --uniform-bucket-level-access \
+  --public-access-prevention \
+  --soft-delete-duration=0
+```
+
+- `--uniform-bucket-level-access` turns off the ACL of each object, so the IAM
+  roles on the bucket are the only access control.
+- `--public-access-prevention` sets public access prevention to `enforced`,
+  so no role can make an object public. The API serves each report, and no
+  reader needs the bucket.
+- `--soft-delete-duration=0` turns soft delete off. A new bucket keeps each
+  deleted object for 7 days, and the service then cannot remove the content
+  of a deleted or expired job.
+- Do not give `--retention-period` or `--enable-per-object-retention`. A
+  retention policy and Object Retention Lock make a delete fail.
+- Do not turn on versioning or a default event-based hold later.
+
+Use a bucket that never had versioning turned on. When versioning goes off,
+the versions written before stay in the bucket, and the startup check does not
+see them.
+
+Give the service account of the service two roles on the bucket:
+
+```bash
+gcloud storage buckets add-iam-policy-binding gs://<bucket> \
+  --member=serviceAccount:<service-account-email> \
+  --role=roles/storage.objectUser
+gcloud storage buckets add-iam-policy-binding gs://<bucket> \
+  --member=serviceAccount:<service-account-email> \
+  --role=roles/storage.bucketViewer
+```
+
+`roles/storage.objectUser` lets the service read, write, list and delete the
+objects. `roles/storage.bucketViewer` holds `storage.buckets.get`, which the
+startup check needs. Grant no wider role.
+
+The service uses no lifecycle rule. Do not add one: a rule that deletes an
+object can remove the sources or the report of a live job, and a read of that
+job then returns `500`.
+
+At the startup, the service sends one `buckets.get` to the bucket. Each of
+these stops the startup:
+
+- The bucket does not exist.
+- The request is refused with HTTP 403. The message names
+  `storage.buckets.get` and `roles/storage.bucketViewer`.
+- The service cannot reach the host or get a token.
+- A delete can keep the content of the bucket, or the content can become
+  public. The message names each field and the value it needs: versioning
+  off, a soft delete duration of `0`, no retention policy, no default
+  event-based hold, no Object Retention Lock, public access prevention
+  `enforced` and uniform bucket-level access on. For soft delete, it gives
+  the command `gcloud storage buckets update gs://<bucket> --clear-soft-delete`.
+
+The check does not read the hold or the retention time of an object.
+
 #### The migration step
 
 The service never changes the schema. Run the migration as a deploy step,
@@ -1093,7 +1195,8 @@ The service starts in this order, and a failure at a step stops the startup:
 2. It reads `ANALYSIS_RETENTION_DAYS`.
 3. The `sql` store checks that the schema is at the latest revision.
 4. The `sql` store checks the object store: for `filesystem`, the root, and
-   for `s3`, `HeadBucket` and `GetBucketVersioning` on the bucket.
+   for `s3`, `HeadBucket` and `GetBucketVersioning` on the bucket, and for
+   `gcs`, `buckets.get` on the bucket.
 5. The restart scan fails each `queued` or `running` job in the store.
 6. The service takes requests. The [orphan sweep](#orphan-objects) starts at
    the same time. Where a retention period is set, the
