@@ -125,11 +125,33 @@ def _session(env: Mapping[str, str]) -> boto3.Session:
     return CREDENTIALS[mode](env)
 
 
+#: Each endpoint host that accepts no ``If-None-Match`` on a write, by its
+#: suffix: the name of its store, then what to do instead (ADR 0103). Through
+#: such a host, a put replaces an object with no error.
+_NO_CREATE_ONLY: dict[str, tuple[str, str]] = {
+    "googleapis.com": ("Google Cloud Storage", "set ANALYSIS_OBJECT_STORE=gcs"),
+    "backblazeb2.com": ("Backblaze B2", "use a store that accepts it"),
+}
+
+
+def _refuse_host(host: str) -> None:
+    """Refuse ``host`` where it is a suffix of :data:`_NO_CREATE_ONLY`, or ends
+    in one at a label boundary."""
+    host = host.rstrip(".")
+    for suffix, (store, remedy) in _NO_CREATE_ONLY.items():
+        if host == suffix or host.endswith(f".{suffix}"):
+            raise StoreConfigError(
+                f"ANALYSIS_OBJECT_ENDPOINT names a {store} host, which accepts"
+                f" no If-None-Match on a write; {remedy}"
+            )
+
+
 def _endpoint(env: Mapping[str, str]) -> str | None:
     """``ANALYSIS_OBJECT_ENDPOINT``, or ``None`` for the AWS endpoint of the
     region. Only ``https://`` with a host and an optional port passes, so an
-    object never crosses the network without TLS, and no message repeats the
-    value, which can hold a password."""
+    object never crosses the network without TLS, and a host of
+    :data:`_NO_CREATE_ONLY` stops the startup. No message repeats the value,
+    which can hold a password."""
     value = env.get(OBJECT_ENDPOINT_VAR, "").strip()
     if not value:
         return None
@@ -153,6 +175,8 @@ def _endpoint(env: Mapping[str, str]) -> str | None:
             "ANALYSIS_OBJECT_ENDPOINT must hold https://, a host and an optional"
             " port, and nothing more"
         )
+    # ``hostname`` is lower case and holds no port.
+    _refuse_host(host)
     return value
 
 

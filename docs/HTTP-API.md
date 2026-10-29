@@ -989,8 +989,10 @@ Set these values for each provider whose documentation confirms the header:
 | AWS S3 | unset | the region of the bucket, for example `eu-west-1` | `iam` for a role that the platform attaches, or `api_key` |
 | Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` | `api_key`, with an R2 access key ID and secret access key |
 
-Do not use Backblaze B2. Its reference for `PutObject` does not list the
-`If-None-Match` header.
+The startup stops when `ANALYSIS_OBJECT_ENDPOINT` names a Google Cloud
+Storage host (`googleapis.com`) or a Backblaze B2 host (`backblazeb2.com`).
+Neither host accepts `If-None-Match` on a write. For Google Cloud Storage, set
+`ANALYSIS_OBJECT_STORE=gcs`.
 
 `ANALYSIS_OBJECT_ADDRESSING` sets where a request names the bucket. `virtual`
 puts the bucket in the host name, `<bucket>.<host>`, and `path` puts it in the
