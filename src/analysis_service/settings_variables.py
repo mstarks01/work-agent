@@ -30,7 +30,7 @@ from analysis_service.config_files import (
     settings_dir,
     value_refusal,
 )
-from analysis_service.objects import S3_KEY_FILES
+from analysis_service.objects import GCS_KEY_FILE_VAR, S3_KEY_FILES
 from analysis_service.store_settings import DATABASE_PASSWORD_FILE_VAR
 
 
@@ -62,10 +62,10 @@ def secret_vars() -> frozenset[str]:
 
     **The one reader of that fact.** The Settings page and its write-only key
     field call it. Each loader reads the file of one of these variables
-    through :func:`~analysis_service.config_files.read_secret`, which applies the
-    permission rule of a secret file. It collects the secret
+    through :func:`~analysis_service.config_files.read_secret_file`, which
+    applies the permission rule of a secret file. It collects the secret
     credential variables of each vendor and mode, the key files of the ``s3``
-    object store, and the database password file. A ``_FILE`` suffix does not
+    and ``gcs`` object stores, and the database password file. A ``_FILE`` suffix does not
     make a secret: ``ANALYSIS_TIERS_FILE`` names a config file, and
     ``ANALYSIS_DATABASE_CA_FILE`` names a certificate.
     """
@@ -75,7 +75,12 @@ def secret_vars() -> frozenset[str]:
         for var in vendor.all_secret_env_vars()
     }
     return frozenset(
-        {*vendor_secrets, *S3_KEY_FILES.values(), DATABASE_PASSWORD_FILE_VAR}
+        {
+            *vendor_secrets,
+            *S3_KEY_FILES.values(),
+            GCS_KEY_FILE_VAR,
+            DATABASE_PASSWORD_FILE_VAR,
+        }
     )
 
 

@@ -304,6 +304,11 @@ S3_KEY_FILES: dict[str, str] = {
     "aws_secret_access_key": "ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE",
 }
 
+#: The file that holds the service account key of the ``api_key`` mode of the
+#: ``gcs`` store (ADR 0108). It lives here for the reason that
+#: :data:`S3_KEY_FILES` does.
+GCS_KEY_FILE_VAR = "ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE"
+
 #: How a request of the ``s3`` store names the bucket: in the host name, or in
 #: the path. The values are the ``addressing_style`` values of ``botocore``.
 #: The type lives here for the reason that :data:`S3_KEY_FILES` does.
@@ -365,8 +370,13 @@ OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
     ),
     "gcs": ObjectStoreBackend(
         build=_gcs_store,
-        reads=(OBJECT_STORE_VAR, OBJECT_BUCKET_VAR, OBJECT_CREDENTIALS_VAR),
-        mode_reads={},
+        reads=(
+            OBJECT_STORE_VAR,
+            OBJECT_BUCKET_VAR,
+            OBJECT_CREDENTIALS_VAR,
+            GCS_KEY_FILE_VAR,
+        ),
+        mode_reads={CredentialMode.API_KEY: (GCS_KEY_FILE_VAR,)},
     ),
 }
 

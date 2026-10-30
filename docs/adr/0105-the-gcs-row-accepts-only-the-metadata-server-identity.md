@@ -5,6 +5,8 @@
 - **Map**: [#1991](https://github.com/mstarks01/work-agent/issues/1991), ticket
   [#1995](https://github.com/mstarks01/work-agent/issues/1995)
 - **Relates to**: [ADR 0103](0103-gcs-uses-its-own-row-on-the-native-client.md)
+- **Amended by**: [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md),
+  which gives the row an `api_key` mode
 
 ## Context
 
@@ -32,6 +34,10 @@ credential from the metadata server.**
 
 - `ANALYSIS_OBJECT_CREDENTIALS` stays required. `api_key` stops the startup,
   and the message says that a key file and an HMAC key are out of scope.
+
+  > **Amended by [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md).**
+  > `api_key` reads a service account key file.
+
 - A new module, `gcp_identity`, holds `platform_credentials(label)`. It calls
   `google.auth.default()` with the scope
   `https://www.googleapis.com/auth/devstorage.read_write`. It refuses each

@@ -10,6 +10,8 @@ import os
 from collections.abc import Iterator
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from analysis_service.config_files import SETTINGS_DIR_VAR, refused_var
 from analysis_service.offline import OFFLINE_ENV
@@ -167,3 +169,26 @@ def corpus_case():
     from evals.harness.reference import load_corpus
 
     return load_corpus(REPO_ROOT / "evals" / "corpus")[0]
+
+
+@pytest.fixture(scope="session")
+def key_info() -> dict[str, str]:
+    """A service account key, as Google downloads it."""
+    pem = (
+        rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        .private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+        .decode()
+    )
+    return {
+        "type": "service_account",
+        "project_id": "analysis",
+        "private_key_id": "0" * 40,
+        "private_key": pem,
+        "client_email": "analysis@analysis.iam.gserviceaccount.com",
+        "client_id": "1" * 21,
+        "token_uri": "https://oauth2.googleapis.com/token",
+    }

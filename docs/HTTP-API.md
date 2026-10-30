@@ -868,8 +868,9 @@ does not read also stops the startup.
 | `ANALYSIS_OBJECT_REGION` | the name of a region, which matches `[a-z0-9-]{1,32}` | Required by `s3`. Refused by `gcs`. |
 | `ANALYSIS_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. Refused by `gcs`, which always uses `https://storage.googleapis.com`. |
 | `ANALYSIS_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. Refused by `gcs`. |
-| `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3` and `gcs`. On `gcs`, `iam` accepts only the metadata server identity of Cloud Run, GKE Workload Identity or GCE, and `api_key` stops the startup. |
+| `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3` and `gcs`. On `gcs`, `iam` accepts only the metadata server identity of Cloud Run, GKE Workload Identity or GCE, and `api_key` reads a service account key file. |
 | `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`, `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` | a path to a file | Required by `api_key` on `s3`. Refused by `iam` and by `gcs`. |
+| `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE` | a path to a service account key file | Required by `api_key` on `gcs`. Refused by `iam` and by `s3`. |
 | `ANALYSIS_RETENTION_DAYS` | a whole number of days from 1 to 36500 | Optional. Unset keeps every job. See [Retention](#retention). |
 
 ### The `memory` store
@@ -1071,22 +1072,44 @@ The store always uses `https://storage.googleapis.com`. So
 `STORAGE_EMULATOR_HOST` and `API_ENDPOINT_OVERRIDE`. Each request uses TLS,
 and the client always verifies the certificate of the endpoint.
 
-Set `ANALYSIS_OBJECT_CREDENTIALS` to `iam`. The service gives no key, and it
-accepts only the identity of the metadata server (ADR 0105): the service
-account of a Cloud Run service, of a GKE pod with Workload Identity, or of a
-GCE instance. The token holds only the scope
-`https://www.googleapis.com/auth/devstorage.read_write`. Each other identity
-stops the startup: a service account key file, a gcloud user login, an
-impersonated credential and Workload Identity Federation. `api_key` also stops
-the startup, because the row reads no key file and no HMAC key. The message
-names the type of credential that the service found, and never the credential.
-This rule has two results:
+`ANALYSIS_OBJECT_CREDENTIALS` declares the credential mode. In each mode, the
+token holds only the scope
+`https://www.googleapis.com/auth/devstorage.read_write`.
 
-- A developer machine with a gcloud login cannot run the `gcs` row against a
-  real bucket.
+- `iam`: the service gives no key, and it accepts only the identity of the
+  metadata server (ADR 0105): the service account of a Cloud Run service, of a
+  GKE pod with Workload Identity, or of a GCE instance. Each other identity
+  stops the startup: a service account key file, a gcloud user login, an
+  impersonated credential and Workload Identity Federation. So does
+  `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE`. The message names the type of
+  credential that the service found, and never the credential.
+- `api_key`: the service reads a service account key from the file that
+  `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE` names (ADR 0108). Use the JSON key
+  file as Google downloads it. Give the file permissions that only the service
+  user can read; the service refuses a file that breaks the
+  [permission rule](Configuration.md#file-permissions). The file must be JSON
+  of at most 16 KiB, and its `type` must be `service_account`. Each other kind
+  of credential file stops the startup, because an `external_account` file can
+  name a command that the client runs to get a token. This mode does not read
+  `GOOGLE_APPLICATION_CREDENTIALS`. No message repeats the content of the file.
+
+A key does not expire unless your organization sets an expiry, and a person who
+holds the key can use each API that its service account can use. So for the
+`api_key` mode:
+
+- Create a service account for the service alone, and grant it roles on the
+  bucket only.
+- Set a key expiry where your organization allows one, and rotate the key.
+- An organization that sets `iam.disableServiceAccountKeyCreation` blocks key
+  creation. There, use the `iam` mode.
+
+The `iam` rule has two results:
+
+- A developer machine with a gcloud login cannot run the `iam` mode against a
+  real bucket. Use the `api_key` mode there.
 - `google.auth` reads `GOOGLE_APPLICATION_CREDENTIALS` before the metadata
   server. So a process that sets that variable for the Vertex vendor row
-  cannot also run the `gcs` row, and the message names the variable. Unset
+  cannot also run the `iam` mode, and the message names the variable. Unset
   it, and the Vertex row then also uses the identity of the metadata server.
 
 Make the bucket before the first start, with each setting that the startup

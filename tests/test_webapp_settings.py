@@ -431,10 +431,23 @@ class TestTheStoreRowsOfUnsavedChanges:
         assert "store.object_root" not in shown
 
     @pytest.mark.parametrize(
+        ("store", "keys"),
+        [
+            (
+                "s3",
+                {
+                    "store.object_access_key_id_file",
+                    "store.object_secret_access_key_file",
+                },
+            ),
+            ("gcs", {"store.object_service_account_key_file"}),
+        ],
+    )
+    @pytest.mark.parametrize(
         ("mode", "shows_keys"), [("api_key", True), ("iam", False)]
     )
-    def test_the_s3_key_rows_follow_the_credential_mode(
-        self, tmp_path, mode, shows_keys
+    def test_the_key_rows_follow_the_credential_mode(
+        self, tmp_path, store, keys, mode, shows_keys
     ):
         client = client_for(tmp_path, hand_written())
 
@@ -442,17 +455,20 @@ class TestTheStoreRowsOfUnsavedChanges:
             client,
             {
                 "store.job_store": "sql",
-                "store.object_store": "s3",
+                "store.object_store": store,
                 "store.object_credentials": mode,
             },
         )
 
-        keys = {
-            "store.object_access_key_id_file",
-            "store.object_secret_access_key_file",
-        }
-        shown = keys & set(answer.json()["shown"])
+        shown = {key for key in answer.json()["shown"] if key.endswith("_file")}
         assert shown == (keys if shows_keys else set())
+
+    def test_the_gcs_key_row_is_a_write_only_key_field(self, tmp_path):
+        rows = rows_of(client_for(tmp_path, hand_written()))
+
+        row = rows["store.object_service_account_key_file"]
+        assert row["secret"] is True
+        assert "value" not in row
 
     def test_a_null_change_unsets_a_saved_store_setting(self, tmp_path):
         write_settings(tmp_path, hand_written(ANALYSIS_JOB_STORE="sql"))

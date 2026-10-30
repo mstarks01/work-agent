@@ -14,6 +14,7 @@ import asyncio
 import json
 import sys
 import threading
+from pathlib import Path
 
 import google.cloud
 import pytest
@@ -27,7 +28,7 @@ from google.oauth2 import service_account
 
 from analysis_service import gcs_objects
 from analysis_service.gcp_identity import STORAGE_SCOPE
-from analysis_service.objects import build_object_store
+from analysis_service.objects import GCS_KEY_FILE_VAR, build_object_store
 from analysis_service.store_settings import StoreConfigError
 from tests.sql_stores import PLATFORM_CREDENTIAL, gcs_env
 from tests.test_object_stores import changed, every_call
@@ -76,7 +77,15 @@ class TestTheSettings:
             ({"ANALYSIS_OBJECT_CREDENTIALS": "token"}, "unknown value for"),
             (
                 {"ANALYSIS_OBJECT_CREDENTIALS": "api_key"},
-                "no api_key mode, because a key file and an HMAC key are out of scope",
+                "needs ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE; it is unset",
+            ),
+            (
+                {"ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE": "/run/hunter2"},
+                "reads no key; unset ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE",
+            ),
+            (
+                {"ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY": "hunter2"},
+                "unset ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY, which this service refuses",
             ),
             *(
                 ({var: value}, f"gcs object store takes no {var}")
@@ -180,6 +189,102 @@ class TestTheIdentity:
         assert "found google.oauth2.credentials.Credentials" in message
         assert "reads GOOGLE_APPLICATION_CREDENTIALS first, so unset it" in message
         assert "hunter2" not in message and str(tmp_path) not in message
+
+
+def key_env(tmp_path, content: str | bytes, mode: int = 0o600) -> dict[str, str]:
+    """The settings of the ``api_key`` mode, with ``content`` in its key file."""
+    path = tmp_path / "key.json"
+    if isinstance(content, str):
+        content = content.encode()
+    path.write_bytes(content)
+    path.chmod(mode)
+    return {
+        **SETTINGS,
+        "ANALYSIS_OBJECT_CREDENTIALS": "api_key",
+        GCS_KEY_FILE_VAR: str(path),
+    }
+
+
+class TestTheApiKeyMode:
+    """``api_key`` reads one service account key file (ADR 0108)."""
+
+    @pytest.mark.parametrize("indent", [2, None])
+    def test_a_service_account_key_passes_with_the_one_scope(
+        self, tmp_path, key_info, indent, monkeypatch
+    ):
+        """The downloaded file has line breaks, and a key that the Settings
+        page writes has none. The mode never calls the ADC chain."""
+
+        def default(**_):
+            raise AssertionError("the api_key mode called google.auth.default")
+
+        monkeypatch.setattr("google.auth.default", default)
+        store = build_object_store(
+            key_env(tmp_path, json.dumps(key_info, indent=indent))
+        )
+        credentials = store._client._credentials
+        assert isinstance(credentials, service_account.Credentials)
+        assert credentials.service_account_email == key_info["client_email"]
+        assert credentials.scopes == [STORAGE_SCOPE]
+
+    @pytest.mark.parametrize(
+        ("content", "message"),
+        [
+            ("", "is not UTF-8 JSON"),
+            ("hunter2", "is not UTF-8 JSON"),
+            (b"\xff\xfe", "is not UTF-8 JSON"),
+            ("[" * 100_000, "is longer than 16,384 bytes"),
+            ('["hunter2"]', "its type must be service_account"),
+            ('{"private_key": "hunter2"}', "its type must be service_account"),
+        ],
+    )
+    def test_a_file_that_is_not_a_key_stops_the_startup(
+        self, tmp_path, content, message
+    ):
+        with pytest.raises(StoreConfigError, match=message) as refused:
+            build_object_store(key_env(tmp_path, content))
+        assert "hunter2" not in str(refused.value)
+
+    @pytest.mark.parametrize(
+        "kind",
+        [
+            {"type": "authorized_user", "refresh_token": "hunter2"},
+            {
+                "type": "external_account",
+                "credential_source": {"executable": {"command": "/bin/hunter2"}},
+            },
+            {"type": "impersonated_service_account", "hunter2": "x"},
+        ],
+    )
+    def test_another_kind_of_credential_file_stops_the_startup(self, tmp_path, kind):
+        with pytest.raises(
+            StoreConfigError, match="is not a service account key"
+        ) as refused:
+            build_object_store(key_env(tmp_path, json.dumps(kind)))
+        assert "hunter2" not in str(refused.value)
+
+    def test_a_key_with_a_broken_private_key_stops_the_startup(
+        self, tmp_path, key_info
+    ):
+        broken = key_info | {"private_key": "-----BEGIN PRIVATE KEY-----\nhunter2"}
+        with pytest.raises(StoreConfigError, match="is not usable") as refused:
+            build_object_store(key_env(tmp_path, json.dumps(broken)))
+        assert "hunter2" not in str(refused.value)
+
+    def test_a_key_of_another_universe_stops_the_startup(self, tmp_path, key_info):
+        other = key_info | {"universe_domain": "example.com"}
+        with pytest.raises(StoreConfigError, match="cannot use the universe domain"):
+            build_object_store(key_env(tmp_path, json.dumps(other)))
+
+    def test_a_key_that_others_can_read_stops_the_startup(self, tmp_path, key_info):
+        with pytest.raises(StoreConfigError, match="lets other users read it"):
+            build_object_store(key_env(tmp_path, json.dumps(key_info), 0o644))
+
+    def test_a_missing_file_stops_the_startup(self, tmp_path, key_info):
+        env = key_env(tmp_path, json.dumps(key_info))
+        Path(env[GCS_KEY_FILE_VAR]).unlink()
+        with pytest.raises(StoreConfigError, match="cannot read"):
+            build_object_store(env)
 
 
 #: A ``buckets.get`` resource with every value that the row needs.
