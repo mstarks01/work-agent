@@ -127,8 +127,12 @@ dev = [
 # below): the app itself simply isn't packaged. Groups never enter the built
 # distribution either, so the integrator at route step 5 inherits none of
 # this — their dependency surface stays whatever `src/analysis_service` needs.
+# The app's default store is `sql` on SQLite (ADR 0111), so the group carries
+# the `sql` extra and `uv run` installs it with the app. The extra stays the
+# one statement of its ranges.
 web = [
     "uvicorn>=0.30",
+    "analysis-service[sql]",
 ]
 # Browser tests of the first-run app's pages (#1289): the web group's server,
 # and headless Chromium driven through Playwright. A group of its own, so a

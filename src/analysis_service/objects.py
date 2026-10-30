@@ -154,7 +154,7 @@ class FilesystemObjectStore:
             OBJECT_STORES["filesystem"].reads,
             "the filesystem object store",
         )
-        value = env.get("ANALYSIS_OBJECT_ROOT", "")
+        value = env.get(OBJECT_ROOT_VAR, "")
         if not value:
             raise StoreConfigError("set ANALYSIS_OBJECT_ROOT for the filesystem store")
         root = Path(value)
@@ -341,6 +341,8 @@ OBJECT_BUCKET_VAR = "ANALYSIS_OBJECT_BUCKET"
 #: The s3 settings that the s3 store reads as free text.
 OBJECT_REGION_VAR = "ANALYSIS_OBJECT_REGION"
 OBJECT_ENDPOINT_VAR = "ANALYSIS_OBJECT_ENDPOINT"
+#: The directory of the filesystem store.
+OBJECT_ROOT_VAR = "ANALYSIS_OBJECT_ROOT"
 
 #: Each ``ANALYSIS_OBJECT_STORE`` value, and how to build its store from the
 #: environment. The table answers for every name of :data:`ObjectStoreName`.

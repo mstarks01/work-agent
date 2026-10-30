@@ -112,7 +112,9 @@ def test_the_store_defaults_have_one_merge():
 
     def merges(node: ast.AST) -> bool:
         return isinstance(node, ast.Dict) and any(
-            key is None and _is_name(value, "STORE_DEFAULTS")
+            key is None
+            and isinstance(value, ast.Call)
+            and _is_name(value.func, "store_defaults")
             for key, value in zip(node.keys, node.values, strict=True)
         )
 

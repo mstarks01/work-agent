@@ -236,7 +236,6 @@ from analysis_service.sources import (
 )
 from analysis_service.store_backends import (
     audited_delete,
-    build_store,
     store_lifespan,
 )
 from analysis_service.vendors import (
@@ -269,7 +268,12 @@ from webapp.settings_save import (
     parse_save,
     restart_keys,
 )
-from webapp.settings_view import settings_view, store_shown, with_store_defaults
+from webapp.settings_view import (
+    build_app_store,
+    settings_view,
+    store_shown,
+    with_store_defaults,
+)
 
 logger = logging.getLogger("webapp")
 
@@ -647,7 +651,7 @@ DEFAULT_NAME = "Your system"
 #: shows no note.
 _MEMORY_STORE_NOTE = (
     "This app keeps your runs in memory, so a restart clears them."
-    " To keep them, set a sql store as docs/Web-App.md states."
+    " To keep them, reset the job store on the Settings page."
 )
 
 #: The page's statement of :func:`~analysis_service.sources.clean_system_name`.
@@ -1256,11 +1260,12 @@ def create_app(
     The app builds the store and the workspace first, from that mapping,
     before the Deployment and without it (ADR 0093). Without a
     ``workspace``, it builds its store with
-    :func:`~analysis_service.store_backends.build_store` from the service's
-    backend settings, and an unusable setting raises, also where the
-    Deployment then fails to build. Where ``ANALYSIS_JOB_STORE`` is unset,
-    the store is ``memory``, so a first run needs no setting. The app logs
-    the store class it built. At startup, before the app
+    :func:`~webapp.settings_view.build_app_store` from the service's backend
+    settings, and an unusable setting raises, also where the Deployment then
+    fails to build. Where ``ANALYSIS_JOB_STORE`` is unset, the store is
+    ``sql`` on SQLite in the data directory, which the app makes and
+    migrates, so a first run needs no setting and keeps its runs
+    (ADR 0111). The app logs the store class it built. At startup, before the app
     takes a request, the app always runs
     :func:`~analysis_service.store_backends.store_lifespan` over the store, as
     the service does.
@@ -1277,7 +1282,7 @@ def create_app(
         env = process_env
         startup = Startup(settings=None, frameworks=(), tiers=None, error=exc)
     if workspace is None:
-        store = build_store(with_store_defaults(env), first_run=True)
+        store = build_app_store(env)
         logger.info("job store: %s", type(store).__name__)
         workspace = Workspace(store=store)
     state = build(env) if startup is None else startup

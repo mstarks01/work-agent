@@ -105,8 +105,48 @@ def payload(page: str, block: str) -> dict:
     return json.loads(match.group(1))
 
 
+class TestTheDefaultStore:
+    """With no store setting, the app keeps its runs in SQLite and a file root
+    in its data directory, and makes and migrates both (ADR 0111)."""
+
+    def test_a_restart_keeps_every_run(self, tiers, default_store):
+        with app(tiers) as client:
+            run = run_to_completion(client)
+        with app(tiers) as client:
+            assert [row["run"] for row in client.get("/workspace/runs").json()] == [run]
+            assert client.get(f"/report/{run}").status_code == 200
+
+    def test_it_makes_the_data_directory_and_the_root_private(
+        self, tiers, default_store
+    ):
+        from webapp import settings_view
+
+        directory = settings_view.data_dir({})
+        with app(tiers):
+            pass
+        for path in (directory, directory / "objects"):
+            assert stat.S_IMODE(path.stat().st_mode) == 0o700, path
+        assert stat.S_IMODE((directory / "jobs.db").stat().st_mode) == 0o600
+
+    def test_the_page_has_no_store_note(self, tiers, default_store):
+        with app(tiers) as client:
+            assert "This app keeps your runs" not in client.get("/").text
+
+    def test_a_data_directory_that_others_can_open_stops_the_startup(
+        self, tiers, default_store
+    ):
+        from webapp import settings_view
+
+        directory = settings_view.data_dir({})
+        directory.mkdir(mode=0o700, parents=True)
+        directory.chmod(0o755)
+        with pytest.raises(StoreConfigError, match="set its mode to 0700"):
+            app(tiers)
+
+
 class TestTheSettings:
-    def test_with_no_store_setting_a_restart_loses_every_run(self, tiers):
+    def test_with_the_memory_store_a_restart_loses_every_run(self, tiers, monkeypatch):
+        monkeypatch.setenv("ANALYSIS_JOB_STORE", "memory")
         with app(tiers) as client:
             run_to_completion(client)
         with app(tiers) as client:
