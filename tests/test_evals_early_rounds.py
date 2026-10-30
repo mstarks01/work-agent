@@ -130,3 +130,21 @@ def test_a_joint_replay_keeps_the_options_the_report_chose(tmp_path, monkeypatch
     joint = {case: frameworks for case, frameworks, _ in calls if len(frameworks) > 1}
     assert joint["13-dispatch-control-plane"]["asvs"] == {"level": 1}
     assert joint["01-payments-checkout"]["asvs"] == {"level": 2}
+
+
+def test_a_replay_names_each_file_it_read(tmp_path, monkeypatch):
+    """The run record reads each report with the selections replayed on it,
+    and each blessed model with none (#2029)."""
+    _archived(tmp_path, "01-payments-checkout", _asvs_report(2))
+    _archived(tmp_path, "05-cookbook-queue-webapp", sample_report())
+    monkeypatch.setattr(early_rounds, "replay", lambda *args: None)
+
+    _, inputs = early_rounds.replays(tmp_path, CORPUS)
+
+    asvs = tmp_path / "01-payments-checkout" / "01-payments-checkout.report.json"
+    assert inputs[asvs] == {
+        "alone": {"asvs": {"level": 2}},
+        "all": {"stride": {}, "asvs": {"level": 2}},
+    }
+    assert inputs[CORPUS / "01-payments-checkout" / "model.json"] == {}
+    assert len(inputs) == 4
