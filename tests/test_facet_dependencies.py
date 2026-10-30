@@ -14,6 +14,7 @@ from analysis_service.answer_state import question_set
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import (
     FactAnswer,
+    asked_facets,
     covers,
     fact_line,
     merged_facts,
@@ -223,3 +224,72 @@ class TestAFacetTwoFrameworksShare:
         needs = follow_up_needs(self.analyses(), valid_model(), None, [actor_only])
         assert ("stride", "S-01") not in needs.waiting
         assert needs.waiting[("asvs", "v5.0.0-6.2.1")] == frozenset({KEY})
+
+
+def _limits(*facets):
+    return UnknownRef(element_id=STORE, question="capacity-limits", facets=list(facets))
+
+
+def _asked(analyses, earlier=()):
+    [question] = [
+        q
+        for q in fact_questions(analyses, valid_model(), None, earlier)
+        if q.key[4] == "capacity-limits"
+    ]
+    return question
+
+
+class TestTheFacetsAPageAsks:
+    """The report page asks only the facets its findings need (#2029
+    package 1, ADR 0112)."""
+
+    def test_a_size_only_finding_asks_size(self):
+        question = _asked([sample_analysis([_finding("D-01", _limits("size"))])])
+        assert question.asks == ("size",)
+        assert question.to_json()["asks"] == ["size"]
+
+    def test_two_findings_ask_both_and_one_answer_leaves_the_other(self):
+        analyses = [
+            sample_analysis(
+                [_finding("D-01", _limits("rate")), _finding("D-02", _limits("size"))]
+            )
+        ]
+        assert _asked(analyses).asks == ("rate", "size")
+        rate = FactAnswer(key=_limits().key, facets={"rate": "yes"})
+        question = _asked(analyses, [rate])
+        assert question.findings == ("stride/D-02",)
+        assert question.asks == ("size",)
+
+    def test_a_whole_kind_reference_asks_every_facet(self):
+        analyses = [
+            sample_analysis(
+                [_finding("D-01", _limits("size")), _finding("D-02", _limits())]
+            )
+        ]
+        assert _asked(analyses).asks == ("rate", "size", "concurrency", "quota")
+
+    def test_i_don_t_know_is_not_known_and_one_facet_answers_no_other(self):
+        analyses = [sample_analysis([_finding("D-01", _limits("rate"))])]
+        for facets in ({"rate": "unknown"}, {"size": "yes"}):
+            answer = FactAnswer(key=_limits().key, facets=facets)
+            assert _asked(analyses, [answer]).asks == ("rate",)
+
+    def test_a_later_finding_asks_a_facet_the_earlier_answer_left_out(self):
+        size = FactAnswer(key=_limits().key, facets={"size": "yes"})
+        first = [sample_analysis([_finding("D-01", _limits("size"))])]
+        assert not [
+            q
+            for q in fact_questions(first, valid_model(), None, [size])
+            if q.key[4] == "capacity-limits"
+        ]
+        later = [sample_analysis([_finding("D-02", _limits("rate"))])]
+        assert _asked(later, [size]).asks == ("rate",)
+
+    def test_a_fact_no_finding_waits_on_asks_every_facet(self):
+        assert asked_facets(_limits().key) == ("rate", "size", "concurrency", "quota")
+        assert asked_facets(KEY, ["stride/S-01"], {}) == (
+            "records-actor",
+            "record-protected",
+        )
+        attribute = UnknownRef(element_id=STORE, attribute="encryption_at_rest")
+        assert asked_facets(attribute.key) == ()

@@ -5,8 +5,10 @@ from __future__ import annotations
 import pytest
 
 from analysis_service.bands import Band
+from analysis_service.claims import UnknownRef
 from analysis_service.questions import FollowUpNeeds
-from evals.harness.follow_up_policies import POLICIES
+from evals.harness.follow_up_policies import POLICIES, readings
+from tests.factories import asking_threat, sample_analysis, sample_report
 
 CRITICAL, LOW = 0, -3
 
@@ -61,3 +63,25 @@ def test_a_critic_only_critical_fact_now_comes_first():
 def test_every_order_asks_each_open_fact_once(policy):
     keys = [k for _, k in POLICIES[policy](PAIR)]
     assert sorted(keys) == sorted({A, B, C})
+
+
+def test_the_asked_effort_charges_only_the_facets_a_finding_needs():
+    """A size-only finding costs one choice asked and four whole, and both
+    counts complete it (#2029 package 1, ADR 0112)."""
+    size = UnknownRef(
+        element_id="store:orders-db", question="capacity-limits", facets=["size"]
+    )
+    report = sample_report(analyses=[sample_analysis([asking_threat(size)])])
+    whole = {
+        one.effort: one
+        for one in readings("r", report)
+        if one.policy == "shipped" and one.budget is None
+    }
+    assert (whole["asked"].choices, whole["whole"].choices) == (1, 4)
+    assert whole["asked"].completed == whole["whole"].completed == 1
+    at_one = {
+        one.effort: one.completed
+        for one in readings("r", report)
+        if one.policy == "shipped" and one.budget == 1
+    }
+    assert at_one == {"asked": 1, "whole": 0}

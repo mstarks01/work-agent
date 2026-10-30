@@ -2154,6 +2154,7 @@ def facet_fact(element, kind="capacity-limits"):
         "form": "facets",
         "suggestions": [],
         "facets": [{"id": f.id, "question": f.question} for f in facets],
+        "asks": [f.id for f in facets],
         "group": kind,
         "group_heading": f"{kind}?",
         "element": element.name,
@@ -2517,6 +2518,7 @@ def test_skip_the_rest_sets_aside_a_question_answered_in_part():
         "kind": "question",
         "form": "facets",
         "facets": facets,
+        "asks": ["rate", "size"],
         "decisions": 2,
     }
     steps = f"""
@@ -2670,6 +2672,7 @@ def test_a_question_answered_in_part_and_skipped_has_one_editor():
         "kind": "question",
         "form": "facets",
         "facets": facets,
+        "asks": ["rate", "size"],
         "decisions": 2,
     }
     answered = question | {
@@ -3836,6 +3839,103 @@ calls.push({ said: text(ids.questions) });
         assert "2 earlier answers do not fit this system model" in said
         assert "Old DB: encryption at rest \u2014 AES" in said
         assert "batch loader \u2014 none of these" in said, "a link answer is listed"
+
+
+class TestTheFacetsAPageAsks:
+    """The report page shows an input for each facet a waiting finding needs,
+    and the rest under "Additional details" (#2029 package 1, ADR 0112)."""
+
+    def question(self, element, finding, asks):
+        return {
+            **facet_fact(element, "capacity-limits"),
+            "basis": "critic",
+            "cited_by": 1,
+            "covered_so_far": 1,
+            "findings": [finding],
+            "needs": {finding: asks},
+            "asks": asks,
+            "history": "open",
+            "max_length": 500,
+        }
+
+    def payloads(self, *questions):
+        return {
+            "report": {"system_model": valid_model().model_dump(mode="json")},
+            "link_questions": [],
+            "fact_questions": list(questions),
+            "final": False,
+        }
+
+    SEEN = """
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+const seen = () => ({
+  hidden: box.all("select").map(s => Boolean(s.hidden)),
+  labels: box.all("label").map(l => Boolean(l.hidden)),
+  values: box.all("select").map(s => s.value),
+  toggle: (box.all("button").find(b => b.attributes["aria-expanded"]) || {}).textContent,
+  said: text(document.getElementById("question-actions")),
+});
+"""
+
+    def test_a_size_only_finding_shows_size_and_offers_the_rest(self):
+        store = valid_model().data_stores[0]
+        steps = (
+            self.SEEN
+            + """
+calls.push(seen());
+const toggle = box.all("button").find(b => b.attributes["aria-expanded"]);
+await toggle.listeners.click();
+calls.push(seen());
+"""
+        )
+        payloads = self.payloads(self.question(store, "stride/D-01", ["size"]))
+        before, after = _run_answer_block(payloads, steps)["calls"]
+        assert before["hidden"] == [True, False, True, True]
+        assert before["toggle"] == "Additional details (3)"
+        assert after["hidden"] == [False, False, False, False]
+        assert after["toggle"] == "Hide additional details"
+
+    def test_an_answer_to_the_asked_facet_counts_as_given(self):
+        store = valid_model().data_stores[0]
+        steps = (
+            self.SEEN
+            + """
+const size = box.all("select")[1];
+size.value = "yes"; size.listeners.change();
+calls.push(seen());
+"""
+        )
+        payloads = self.payloads(self.question(store, "stride/D-01", ["size"]))
+        [page] = _run_answer_block(payloads, steps)["calls"]
+        assert "1 answer reaches 1 finding" in page["said"]
+        assert "cover every question for 1 of the 1 finding" in page["said"]
+
+    def test_a_shared_answer_reaches_only_the_rows_that_ask_the_facet(self):
+        store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
+        steps = (
+            self.SEEN
+            + """
+const [rate] = box.all("select");
+rate.value = "yes"; rate.listeners.change();
+calls.push(seen());
+"""
+        )
+        payloads = self.payloads(
+            self.question(store, "stride/D-01", ["size"]),
+            self.question(flow, "stride/D-02", ["rate", "size"]),
+        )
+        [page] = _run_answer_block(payloads, steps)["calls"]
+        assert page["labels"] == [False, False, True, True]
+        shared, store_row, flow_row = (
+            page["values"][:4],
+            page["values"][4:8],
+            page["values"][8:],
+        )
+        assert shared[0] == "yes"
+        assert store_row[0] == "", "the store's row does not ask the rate"
+        assert flow_row[0] == "yes"
+        assert page["hidden"][4:] == [True, False, True, True, False, False, True, True]
 
 
 class TestFacetNeedsAndDetails:

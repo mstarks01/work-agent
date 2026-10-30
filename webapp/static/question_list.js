@@ -3,7 +3,8 @@
 // box for its group, in the service's order. A box whose rows ask one kind of
 // two or more elements asks it once, with the rows under "Answer each one
 // separately" (ADR 0081). A facets question is a table: a column per facet
-// and a row per element.
+// and a row per element. A row asks only the facets in its question's `asks`
+// (ADR 0112), and "Additional details" shows the rest.
 //
 // The page keeps its own rule for what it sends and when. It hands in:
 // `list`, the node the boxes go in; `onEdit(row, event)`, run on each edit;
@@ -15,8 +16,9 @@
 // A row is the page's own object: `{ q, kind, node }`, `kind` "fact" or
 // "link". Drawing sets `row.read`, the answer as the service takes it or
 // null, `row.set`, `row.input` and `row.compact`. A fact row also sets
-// `row.known`, whether its answer says more than "I don't know", and a facets
-// row `row.knownFor(facets)`, whether the facets named are. Every label is
+// `row.known`, whether its answer says more than "I don't know" (for a facets
+// row, to each facet it asks), and a facets row `row.knownFor(facets)`,
+// whether the facets named are. Every label is
 // untrusted and lands as text.
 const questionList = ({
   list,
@@ -187,17 +189,52 @@ const questionList = ({
     const corner = document.createElement("th");
     corner.textContent = "Part of your system";
     head.append(corner);
-    const columns = q.facets.map((facet) => {
+    const heads = q.facets.map((facet) => {
       const cell = document.createElement("th");
       cell.textContent = facet.question;
       head.append(cell);
-      return [];
+      return cell;
     });
     const detailHead = document.createElement("th");
     detailHead.textContent = "Exceptions or detail (optional)";
     head.append(detailHead);
     table.append(head);
-    return { table, columns, count: 0 };
+    const grid = { table, facets: q.facets, heads, rows: new Set(), shared: [], more: false, count: 0 };
+    grid.toggle = button("", () => {
+      grid.more = !grid.more;
+      showFacets(grid);
+    });
+    return grid;
+  };
+  // A table shows each facet a row asks for and each facet that holds an
+  // answer. "Additional details" shows the rest, which stay unknown until a
+  // person answers them (ADR 0112). A column that no row shows hides whole,
+  // so the cells stay under their headings.
+  const showFacets = (grid) => {
+    let extra = 0;
+    const open = grid.facets.map(() => false);
+    for (const row of grid.rows) {
+      row.cells.forEach(({ asked, select }, column) => {
+        const shown = asked || Boolean(select.value) || grid.more;
+        select.hidden = !shown;
+        if (!asked && !select.value) extra += 1;
+        if (shown) open[column] = true;
+      });
+    }
+    for (const row of grid.rows) {
+      row.cells.forEach(({ cell }, column) => {
+        cell.hidden = !open[column];
+      });
+    }
+    grid.heads.forEach((head, column) => {
+      head.hidden = !open[column];
+    });
+    grid.shared.forEach((label, column) => {
+      label.hidden = !open[column];
+    });
+    grid.toggle.hidden = !extra;
+    grid.toggle.textContent = grid.more ? "Hide additional details" : `Additional details (${extra})`;
+    grid.toggle.setAttribute("aria-expanded", String(grid.more));
   };
   const drawFacetRow = (row, prefill) => {
     const q = row.q;
@@ -206,13 +243,12 @@ const questionList = ({
     name.append(questionTitle(q, q.element), ...notes(row));
     // A facet answered before offers no blank where the page cannot reopen
     // it: the service keeps the earlier answer to a facet left out.
-    const selects = q.facets.map((facet, column) => {
+    const selects = q.facets.map((facet) => {
       const before = (prefill && prefill.facets && prefill.facets[facet.id]) || "";
       const select = facetSelect(reopen || !before ? "(leave unanswered)" : null, before, reopen);
       select.dataset.key = questionKey(q.key);
       select.dataset.facet = facet.id;
       select.addEventListener("change", (event) => edited(row, event));
-      grid.columns[column].push(select);
       const cell = document.createElement("td");
       cell.append(select);
       return cell;
@@ -222,6 +258,12 @@ const questionList = ({
     const detailCell = document.createElement("td");
     detailCell.append(detail, " ", ...extras(row));
     const inputs = selects.map((cell) => cell.children[0]);
+    const asks = new Set(q.asks);
+    row.cells = q.facets.map((facet, column) => ({
+      asked: asks.has(facet.id),
+      cell: selects[column],
+      select: inputs[column],
+    }));
     row.read = () => {
       const given = {};
       for (const select of inputs) {
@@ -238,19 +280,24 @@ const questionList = ({
     row.knownFor = (facets) => inputs
       .filter((select) => !facets.length || facets.includes(select.dataset.facet))
       .every((select) => select.value && select.value !== DONT_KNOW);
-    row.known = () => row.knownFor([]);
-    // Whether a facet is still blank, which a skip sets aside.
-    row.open = () => inputs.some((select) => !select.value);
+    row.known = () => row.knownFor(q.asks);
+    // Whether a facet it asks is still blank, which a skip sets aside.
+    row.open = () => row.cells.some(({ asked, select }) => asked && !select.value);
+    // A shared answer reaches only the facets the row shows.
     row.setFacet = (id, value) => {
-      for (const select of inputs) if (select.dataset.facet === id) select.value = value;
+      for (const select of inputs) {
+        if (select.dataset.facet === id && !select.hidden) select.value = value;
+      }
     };
     row.set = (next) => {
       for (const select of inputs) select.value = (next.facets || {})[select.dataset.facet] || "";
       detail.value = next.detail || "";
     };
-    row.input = inputs[0];
+    row.input = row.cells.find(({ asked }) => asked).select;
     row.compact = false;
     row.node.replaceChildren(name, ...selects, detailCell);
+    grid.rows.add(row);
+    showFacets(grid);
   };
   const drawCompactFacets = (row, answer) => {
     const name = document.createElement("td");
@@ -261,7 +308,9 @@ const questionList = ({
     change.append(button("Change", () => drawFacetRow(row, answer)));
     row.compact = true;
     row.read = () => null;
+    row.cells = [];
     row.node.replaceChildren(name, shown, change);
+    showFacets(row.grid);
   };
   // Draw a row's open editor, with `prefill` as its saved answer or null.
   const drawOpen = (row, prefill) => {
@@ -342,7 +391,7 @@ const questionList = ({
     const line = document.createElement("p");
     if (q.form === "facets") {
       line.className = "shared-facets";
-      for (const facet of q.facets) {
+      box.grid.shared = q.facets.map((facet) => {
         const label = document.createElement("label");
         label.className = "shared-facet";
         const select = facetSelect("(leave unanswered)", "", reopen);
@@ -353,7 +402,9 @@ const questionList = ({
         prompt.textContent = facet.question;
         label.append(prompt, select);
         line.append(label);
-      }
+        return label;
+      });
+      showFacets(box.grid);
       return line;
     }
     const shared = inputFor(q, null, () =>
@@ -376,6 +427,7 @@ const questionList = ({
       box.top.className = "";
       box.top.replaceChildren();
       box.shared = null;
+      if (box.grid) box.grid.shared = [];
       box.each.open = true;
       return;
     }
@@ -427,7 +479,7 @@ const questionList = ({
     if (row.q.form === "facets" && row.kind === "fact") {
       if (!box.grid) {
         box.grid = facetTable(row.q);
-        box.each.append(box.grid.table);
+        box.each.append(box.grid.table, box.grid.toggle);
       }
       row.grid = box.grid;
       const key = row.node.dataset.key;
@@ -447,7 +499,11 @@ const questionList = ({
     row.node.remove();
     if (!box) return;
     box.rows = box.rows.filter((other) => other !== row);
-    if (row.grid) row.grid.count -= 1;
+    if (row.grid) {
+      row.grid.count -= 1;
+      row.grid.rows.delete(row);
+      showFacets(row.grid);
+    }
     if (!box.rows.length) box.node.remove();
     else {
       titleBox(box);
@@ -461,7 +517,7 @@ const questionList = ({
       row.grid = facetTable(row.q);
       row.node = document.createElement("tr");
       row.grid.table.append(row.node);
-      holder.append(row.grid.table);
+      holder.append(row.grid.table, row.grid.toggle);
     }
     drawOpen(row, prefill);
   };

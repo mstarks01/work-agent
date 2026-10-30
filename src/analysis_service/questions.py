@@ -42,6 +42,7 @@ from analysis_service.fact_answers import (
     FactStatus,
     answer_facets,
     answered_keys,
+    asked_facets,
     covers,
     fact_kind,
     needs_of,
@@ -130,6 +131,11 @@ class FactQuestion:
     #: here needs every facet.
     needs: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
+    @property
+    def asks(self) -> tuple[str, ...]:
+        """The facets a page asks for (:func:`~analysis_service.fact_answers.asked_facets`)."""
+        return asked_facets(self.key, self.findings, self.needs)
+
     def to_json(self) -> dict[str, object]:
         return {
             "key": list(self.key),
@@ -143,6 +149,7 @@ class FactQuestion:
             "form": self.form,
             "suggestions": list(self.suggestions),
             "facets": facets_json(self.facets),
+            "asks": list(self.asks),
             "max_length": self.max_length,
             "group": self.group,
             "group_heading": self.group_heading,

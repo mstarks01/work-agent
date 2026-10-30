@@ -14,7 +14,11 @@ by band, as each package ranks its findings. It is a count of dependency sets
 an order completes, never a count of findings an answer changes.
 
 **Effort is choices**: one a facet for a question answered in facets, and one
-for every other question.
+for every other question. :data:`EFFORTS` counts the facets two ways: the
+facets the page asks (:attr:`~analysis_service.questions.FactQuestion.asks`,
+ADR 0112), and every facet of the kind, as the page asked them before. A fact
+the page does not ask, such as an attribute the model states, counts every
+facet under both.
 
 **Each order is a policy in** :data:`POLICIES`.
 """
@@ -39,6 +43,7 @@ from analysis_service.questions import (
     Finding,
     FollowUpNeeds,
     choices_of,
+    fact_questions,
     follow_up_needs,
     follow_up_order,
 )
@@ -114,6 +119,22 @@ POLICIES: Mapping[str, Callable[[FollowUpNeeds], list[tuple[Basis, UnknownKey]]]
 }
 
 
+#: How a question's choices are counted, by name.
+EFFORTS = ("asked", "whole")
+
+
+def _efforts(report: Report) -> Mapping[str, Callable[[UnknownKey], int]]:
+    """Each count of a question's choices on the page ``report`` shows."""
+    asked = {
+        question.key: len(question.asks) or 1
+        for question in fact_questions(report.analyses, report.system_model, None)
+    }
+    return {
+        "asked": lambda key: asked.get(key, choices_of(key)),
+        "whole": choices_of,
+    }
+
+
 @dataclass(frozen=True)
 class Reading:
     """One order's worth to one report at one budget."""
@@ -121,6 +142,8 @@ class Reading:
     report: str
     framework: str
     policy: str
+    #: How the choices are counted (:data:`EFFORTS`).
+    effort: str
     #: The budget in choices, or ``None`` for the whole order.
     budget: int | None
     choices: int
@@ -145,35 +168,39 @@ def readings(path: str, report: Report, built: Report | None = None) -> list[Rea
         else follow_up_needs(built.analyses, built.system_model, None)
     )
     labels = {finding: needs.bands[finding].label for finding in needs.waiting}
+    efforts = _efforts(report if built is None else built)
     found = []
     for policy, build in POLICIES.items():
         order = [key for _, key in build(source)]
-        for budget in (*BUDGETS, None):
-            spent = 0
-            answered: set[UnknownKey] = set()
-            for key in order:
-                if budget is not None and spent + choices_of(key) > budget:
-                    break
-                spent += choices_of(key)
-                answered.add(key)
-            done = [
-                labels[finding]
-                for finding, keys in needs.waiting.items()
-                if keys <= answered
-            ]
-            found.append(
-                Reading(
-                    report=path,
-                    framework=framework,
-                    policy=policy,
-                    budget=budget,
-                    choices=spent,
-                    findings=len(needs.waiting),
-                    completed=len(done),
-                    finding_bands=dict(Counter(labels.values())),
-                    completed_bands=dict(Counter(done)),
+        for effort in EFFORTS:
+            cost = efforts[effort]
+            for budget in (*BUDGETS, None):
+                spent = 0
+                answered: set[UnknownKey] = set()
+                for key in order:
+                    if budget is not None and spent + cost(key) > budget:
+                        break
+                    spent += cost(key)
+                    answered.add(key)
+                done = [
+                    labels[finding]
+                    for finding, keys in needs.waiting.items()
+                    if keys <= answered
+                ]
+                found.append(
+                    Reading(
+                        report=path,
+                        framework=framework,
+                        policy=policy,
+                        effort=effort,
+                        budget=budget,
+                        choices=spent,
+                        findings=len(needs.waiting),
+                        completed=len(done),
+                        finding_bands=dict(Counter(labels.values())),
+                        completed_bands=dict(Counter(done)),
+                    )
                 )
-            )
     return found
 
 
@@ -246,12 +273,13 @@ SUMMED = ("choices", "findings", "completed")
 
 
 def summary(found: Sequence[Reading]) -> dict[str, dict[str, dict[str, int]]]:
-    """Sums over reports, by framework, policy and budget."""
+    """Sums over reports, by framework, policy, effort and budget."""
     sums: dict[str, dict[str, Counter[str]]] = {}
     for one in found:
         group = sums.setdefault(one.framework, {})
         row = group.setdefault(
-            f"{one.policy} @ {'all' if one.budget is None else one.budget}", Counter()
+            f"{one.policy} / {one.effort} @ {'all' if one.budget is None else one.budget}",
+            Counter(),
         )
         row["reports"] += 1
         for field in SUMMED:
