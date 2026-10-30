@@ -139,17 +139,24 @@ def build_app_store(env: Mapping[str, str]) -> JobStore:
 
     **The one builder of this app's store**, at its startup and in the check
     of a Settings save. Where the store uses the default data directory or
-    object root, it makes each one that does not exist with mode ``0700``.
-    Then it builds the store with its first-run step (ADR 0110, ADR 0111).
+    object root, it makes each one that does not exist with mode ``0700``,
+    and a directory that it cannot make stops the startup with a
+    :class:`StoreConfigError`. Then it builds the store with its first-run
+    step (ADR 0110, ADR 0111).
     """
     store_env = with_store_defaults(env)
     directory = data_dir(env)
     root = _default_root(directory)
     in_root = store_env.get(OBJECT_ROOT_VAR) == str(root)
-    if in_root or store_env.get(DATABASE_URL_VAR) == _default_database(directory):
-        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if in_root:
-        root.mkdir(mode=0o700, exist_ok=True)
+    try:
+        if in_root or store_env.get(DATABASE_URL_VAR) == _default_database(directory):
+            directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if in_root:
+            root.mkdir(mode=0o700, exist_ok=True)
+    except OSError as exc:
+        raise StoreConfigError(
+            f"the app cannot make its data directory {directory}: {exc.strerror}"
+        ) from None
     return build_store(store_env, first_run=True)
 
 

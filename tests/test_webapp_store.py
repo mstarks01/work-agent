@@ -143,6 +143,19 @@ class TestTheDefaultStore:
         with pytest.raises(StoreConfigError, match="set its mode to 0700"):
             app(tiers)
 
+    def test_a_data_directory_it_cannot_make_stops_the_startup(
+        self, tiers, default_store
+    ):
+        from webapp import settings_view
+
+        parent = settings_view.data_dir({}).parent
+        parent.chmod(0o500)
+        try:
+            with pytest.raises(StoreConfigError, match="cannot make its data"):
+                app(tiers)
+        finally:
+            parent.chmod(0o700)
+
 
 class TestTheSettings:
     def test_with_the_memory_store_a_restart_loses_every_run(self, tiers, monkeypatch):
