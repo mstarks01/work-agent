@@ -250,13 +250,22 @@ def draft_path(root: Path, login: str, case_id: str) -> Path:
     case, which is the **Ledger**'s own answer to the same problem: two
     writers never touch one file.
 
-    Both segments are checked here rather than trusted. The case id arrives in
+    Both segments are checked rather than trusted. The case id arrives in
     a request, and a value carrying a separator would write outside the store.
     """
-    for name in (login, case_id):
-        if not name or name.startswith(".") or name != Path(name).name:
-            raise DraftError(f"{name!r} is not a name a draft can be filed under")
-    return root / login / f"{case_id}.json"
+    return _draft_folder(root, login) / f"{_filed(case_id)}.json"
+
+
+def _draft_folder(root: Path, login: str) -> Path:
+    """The folder of this reader's drafts, with the login checked."""
+    return root / _filed(login)
+
+
+def _filed(name: str) -> str:
+    """``name``, where it is one path segment a draft can be filed under."""
+    if not name or name.startswith(".") or name != Path(name).name:
+        raise DraftError(f"{name!r} is not a name a draft can be filed under")
+    return name
 
 
 def save_draft(root: Path, login: str, draft: Draft) -> Path:
@@ -342,7 +351,7 @@ def draft_states(root: Path, login: str) -> dict[str, DraftStatus]:
     else, so one bad draft loses its own case and no other. Nothing here
     writes, so a survey of the store changes nothing on disk.
     """
-    folder = root / login
+    folder = _draft_folder(root, login)
     if not folder.is_dir():
         return {}
     held: dict[str, DraftStatus] = {}

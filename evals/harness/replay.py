@@ -619,6 +619,14 @@ def unsigned_rows(corpus_dir: Path, case: GoldenCase) -> int | None:
     return sum(row.reviewed_by is None for row in facts.rows)
 
 
+def unsigned_reason(corpus_dir: Path, case: GoldenCase) -> str:
+    """Why :func:`signed_reference` gives ``None`` for the case."""
+    unsigned = unsigned_rows(corpus_dir, case)
+    if unsigned is None:
+        return "no facts file, so nothing grades it"
+    return f"{unsigned} unsigned reference row(s); a draft grades nothing"
+
+
 @dataclass(frozen=True)
 class AliasTarget:
     """What a signed alias rewrites to, and under which produced subjects.

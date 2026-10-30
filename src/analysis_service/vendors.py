@@ -48,7 +48,6 @@ from typing import Literal
 from analysis_service.config_files import (
     SECRET_FILE_SUFFIX,
     read_secret,
-    refused_var,
 )
 from analysis_service.errors import ConfigError
 
@@ -1312,12 +1311,6 @@ class Vendor:
         self, env: Mapping[str, str], entry: _CredentialVar, mode: CredentialMode
     ) -> str:
         if entry.secret:
-            bare = refused_var(entry.var)
-            if env.get(bare, "").strip():
-                raise ProviderAuthError(
-                    f"vendor {self.name!r} reads its secret from the file that"
-                    f" {entry.var} names; unset {bare}, which this service refuses"
-                )
             value = read_secret(env, entry.var, ProviderAuthError)
         else:
             value = env.get(entry.var, "").strip()

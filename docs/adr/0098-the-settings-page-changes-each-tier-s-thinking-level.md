@@ -14,7 +14,7 @@
 
 Map #1760 ruled that the Settings page shows the sampling settings and does
 not change them, because a change makes each run uncertified until a sweep
-measures it. So the owner could set a tier's thinking level only with
+measures it. So the person who starts the app could set a tier's thinking level only with
 `ANALYSIS_SAMPLING_<TIER>_THINKING` in the command that starts the app.
 
 The thinking level decides whether a job finishes and what it finds. On
@@ -36,7 +36,7 @@ The other sampling fields and review independence stay shown only.
 
 ## Consequences
 
-The owner can tune the level in the first-run app, and the save checks it with
+The person who starts the app can tune the level in the first-run app, and the save checks it with
 the real loaders as it checks each other setting. A run that the change makes
-uncertified carries the label, as before; nothing in the first-run app refuses
+uncertified has the **Certification** `uncertified`; nothing in the first-run app refuses
 an uncertified run.

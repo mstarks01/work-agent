@@ -1814,12 +1814,7 @@ def replay_artifact(
             continue
         reference = replay.signed_reference(corpus_dir, case)
         if reference is None:
-            unsigned = replay.unsigned_rows(corpus_dir, case)
-            skipped[case.id] = (
-                "no facts file, so nothing grades it"
-                if unsigned is None
-                else f"{unsigned} unsigned reference row(s); a draft grades nothing"
-            )
+            skipped[case.id] = replay.unsigned_reason(corpus_dir, case)
             continue
         graded.append(replay.replay_assertions(case, reference, proposed[case.id]))
     return sweep(assertions=tuple(graded), skipped=skipped)

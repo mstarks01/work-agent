@@ -1070,6 +1070,9 @@ class TestAnUnsignedReferenceGradesNothing:
 
         assert replay.unsigned_rows(tmp_path, golden) is None
         assert replay.signed_reference(tmp_path, golden) is None
+        assert replay.unsigned_reason(tmp_path, golden) == (
+            "no facts file, so nothing grades it"
+        )
 
     def test_an_unsigned_row_withholds_the_catalog(self, tmp_path):
         golden = case("01")
@@ -1085,6 +1088,9 @@ class TestAnUnsignedReferenceGradesNothing:
 
         assert replay.unsigned_rows(tmp_path, golden) == 1
         assert replay.signed_reference(tmp_path, golden) is None
+        assert replay.unsigned_reason(tmp_path, golden) == (
+            "1 unsigned reference row(s); a draft grades nothing"
+        )
 
 
 class TestAnArchivedCatalogIsRedrawnFromItsLabels:

@@ -47,7 +47,7 @@ from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from analysis_service.aws_identity import platform_session
-from analysis_service.config_files import read_secret, refused_var
+from analysis_service.config_files import read_secret, refuse_bare_secret
 from analysis_service.objects import (
     OBJECT_ADDRESSING_VAR,
     OBJECT_BUCKET_VAR,
@@ -108,12 +108,7 @@ CREDENTIALS: dict[CredentialMode, Callable[[Mapping[str, str]], boto3.Session]] 
 def _refuse_stray_settings(env: Mapping[str, str]) -> None:
     """Refuse a key in the environment by name, then any other unread setting."""
     for var in S3_KEY_FILES.values():
-        bare = refused_var(var)
-        if env.get(bare, "").strip():
-            raise StoreConfigError(
-                f"the s3 object store reads its key from the file that {var}"
-                f" names; unset {bare}, which this service refuses"
-            )
+        refuse_bare_secret(env, var, StoreConfigError)
     refuse_unread(
         env, ("ANALYSIS_OBJECT_",), OBJECT_STORES["s3"].reads, "the s3 object store"
     )

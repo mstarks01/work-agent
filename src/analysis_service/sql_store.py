@@ -91,7 +91,7 @@ from analysis_service.answer_sets import AnswerSet
 from analysis_service.aws_identity import platform_session
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import UnknownKey
-from analysis_service.config_files import read_secret, refused_var
+from analysis_service.config_files import read_secret, refuse_bare_secret
 from analysis_service.fact_answers import STORED, FactAnswer, SkipKey
 from analysis_service.jobs import (
     RESTART_FAILURE_MESSAGE,
@@ -659,12 +659,7 @@ def _postgres(url: URL, env: Mapping[str, str]) -> dict[str, Any]:
     if not url.database:
         raise StoreConfigError(f"{DATABASE_URL_VAR} for PostgreSQL names no database")
     url = url.set(port=url.port or 5432)
-    bare = refused_var(DATABASE_PASSWORD_FILE_VAR)
-    if env.get(bare, "").strip():
-        raise StoreConfigError(
-            f"the database password comes only from the file that {DATABASE_PASSWORD_FILE_VAR}"
-            f" names; unset {bare}"
-        )
+    refuse_bare_secret(env, DATABASE_PASSWORD_FILE_VAR, StoreConfigError)
     name = closed_setting(
         env.get(DATABASE_CREDENTIALS_VAR, ""),
         DATABASE_CREDENTIALS_VAR,

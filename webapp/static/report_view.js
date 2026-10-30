@@ -1459,7 +1459,7 @@
   };
   // The geometry, in viewBox units.
   const DIAGRAM = { pad: 12, inset: 14, nodeW: 128, nodeH: 54, slotGap: 18,
-    laneGap: 26, rowGap: 68, bottom: 16 };
+    columnGap: 26, rowGap: 68, bottom: 16 };
   // The way out of a box through each side.
   const NORMALS = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
   // A point on a cubic curve.
@@ -1533,29 +1533,29 @@
     }, 0);
     const best = used.length > 6 ? used
       : orders(used).reduce((kept, order) => (spread(order) < spread(kept) ? order : kept));
-    const lanes = unplaced.members.length ? [...best, unplaced] : best;
+    const columns = unplaced.members.length ? [...best, unplaced] : best;
 
-    // Each lane is as wide as its fullest row. Each element takes the slot
+    // Each column is as wide as its fullest row. Each element takes the slot
     // nearest the elements it talks to, so the flows run straight.
     const D = DIAGRAM;
-    const laneOf = new Map();
-    lanes.forEach((lane, l) => lane.members.forEach(i => laneOf.set(i, l)));
-    const cells = lanes.map(lane => {
+    const columnOf = new Map();
+    columns.forEach((column, l) => column.members.forEach(i => columnOf.set(i, l)));
+    const cells = columns.map(column => {
       const byRow = new Map();
-      lane.members.forEach(i => byRow.set(rank[i], [...(byRow.get(rank[i]) || []), i]));
+      column.members.forEach(i => byRow.set(rank[i], [...(byRow.get(rank[i]) || []), i]));
       return [...byRow.values()];
     });
     const slots = cells.map(rowsOf => Math.max(...rowsOf.map(row => row.length)));
-    const laneW = slots.map(n => 2 * D.inset + n * D.nodeW + (n - 1) * D.slotGap);
-    const laneX = [];
+    const columnW = slots.map(n => 2 * D.inset + n * D.nodeW + (n - 1) * D.slotGap);
+    const columnX = [];
     let right = D.pad;
-    laneW.forEach((w, l) => { laneX[l] = right; right += w + D.laneGap; });
-    const width = right - D.laneGap + D.pad;
-    const slotX = (l, s) => laneX[l] + D.inset + s * (D.nodeW + D.slotGap);
+    columnW.forEach((w, l) => { columnX[l] = right; right += w + D.columnGap; });
+    const width = right - D.columnGap + D.pad;
+    const slotX = (l, s) => columnX[l] + D.inset + s * (D.nodeW + D.slotGap);
     const slotOf = new Map();
     cells.forEach((rowsOf, l) => rowsOf.forEach(row => row.forEach((i, at) =>
       slotOf.set(i, at + Math.floor((slots[l] - row.length) / 2)))));
-    const centreX = i => slotX(laneOf.get(i), slotOf.get(i)) + D.nodeW / 2;
+    const centreX = i => slotX(columnOf.get(i), slotOf.get(i)) + D.nodeW / 2;
     const neighbours = nodes.map(() => []);
     flows.forEach(f => {
       const a = index.get(f.source);
@@ -1570,19 +1570,19 @@
         row.sort((a, b) => want.get(a) - want.get(b) || a - b);
         let from = 0;
         row.forEach((i, at) => {
-          const nearest = Math.round((want.get(i) - D.nodeW / 2 - laneX[l] - D.inset) / (D.nodeW + D.slotGap));
+          const nearest = Math.round((want.get(i) - D.nodeW / 2 - columnX[l] - D.inset) / (D.nodeW + D.slotGap));
           const slot = Math.min(Math.max(nearest, from), slots[l] - (row.length - at));
           slotOf.set(i, slot);
           from = slot + 1;
         });
       }));
     }
-    // Each zone's name wraps to the width of its lane, and the tallest name
+    // Each zone's name wraps to the width of its column, and the tallest name
     // sets the height of every header.
-    const names = lanes.map((lane, l) => wrapped(lane.name, Math.floor((laneW[l] - 24) / 7)));
+    const names = columns.map((column, l) => wrapped(column.name, Math.floor((columnW[l] - 24) / 7)));
     const header = 22 + 15 * Math.max(...names.map(lines => lines.length));
     const place = new Map(nodes.map((_, i) => [i, {
-      x: slotX(laneOf.get(i), slotOf.get(i)),
+      x: slotX(columnOf.get(i), slotOf.get(i)),
       y: D.pad + header + rank[i] * (D.nodeH + D.rowGap),
     }]));
     const height = D.pad + header + rows.length * D.nodeH + (rows.length - 1) * D.rowGap + D.bottom + D.pad;
@@ -1608,17 +1608,17 @@
     });
     root.append(defs);
 
-    const headers = lanes.map((lane, l) => ({ x: laneX[l], y: D.pad, w: laneW[l], h: header }));
-    lanes.forEach((lane, l) => {
-      const group = svg("g", { class: lane.id === null ? "zone unplaced" : "zone",
-        "data-zone": lane.id === null ? "" : lane.id });
-      const label = svg("text", { x: laneX[l] + 14, y: D.pad + 22, class: "zone-label" });
-      names[l].forEach((line, at) => label.append(svg("tspan", { x: laneX[l] + 14, dy: at ? 15 : 0 }, line)));
+    const headers = columns.map((column, l) => ({ x: columnX[l], y: D.pad, w: columnW[l], h: header }));
+    columns.forEach((column, l) => {
+      const group = svg("g", { class: column.id === null ? "zone unplaced" : "zone",
+        "data-zone": column.id === null ? "" : column.id });
+      const label = svg("text", { x: columnX[l] + 14, y: D.pad + 22, class: "zone-label" });
+      names[l].forEach((line, at) => label.append(svg("tspan", { x: columnX[l] + 14, dy: at ? 15 : 0 }, line)));
       group.append(
-        svg("rect", { x: laneX[l], y: D.pad, width: laneW[l], height: height - 2 * D.pad, rx: 12, class: "zone-box" }),
+        svg("rect", { x: columnX[l], y: D.pad, width: columnW[l], height: height - 2 * D.pad, rx: 12, class: "zone-box" }),
         label,
       );
-      if (names[l].join(" ") !== lane.name) group.append(svg("title", {}, lane.name));
+      if (names[l].join(" ") !== column.name) group.append(svg("title", {}, column.name));
       root.append(group);
     });
 
@@ -1665,7 +1665,7 @@
     // Each flow is a chain of curves that leave and meet its boxes square to
     // their sides. A flow between two next rows is one curve in the gap
     // between them. A flow over more rows turns, in the gap after its source,
-    // into a free channel down the lanes, and turns out of it in the gap
+    // into a free channel down the columns, and turns out of it in the gap
     // before its destination; a channel used once already costs more, so two
     // flows seldom share one. A flow along a row bows out until it passes
     // over no other element.
@@ -1676,7 +1676,7 @@
       ...cells.flatMap((_, l) => Array.from({ length: slots[l] }, (_, s) => ({ x: slotX(l, s) + D.nodeW / 2, cost: 0 }))),
       ...cells.flatMap((_, l) => Array.from({ length: slots[l] - 1 }, (_, s) =>
         ({ x: slotX(l, s) + D.nodeW + D.slotGap / 2, cost: 0 }))),
-      ...laneX.flatMap((x, l) => [{ x: x + D.inset / 2, cost: 400 }, { x: x + laneW[l] - D.inset / 2, cost: 400 }]),
+      ...columnX.flatMap((x, l) => [{ x: x + D.inset / 2, cost: 400 }, { x: x + columnW[l] - D.inset / 2, cost: 400 }]),
     ];
     const occupied = [];
     const line = (a, b) => [a, { x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 },
@@ -1770,11 +1770,11 @@
     });
     root.append(lines);
 
-    lanes.forEach(lane => lane.members.forEach(i => {
+    columns.forEach(column => column.members.forEach(i => {
       const { kind, e } = nodes[i];
       const { x, y } = place.get(i);
       const group = svg("g", { class: `element ${kind}`, "data-element": e.id,
-        "data-zone": lane.id === null ? "" : lane.id });
+        "data-zone": column.id === null ? "" : column.id });
       const assumed = ASSUMED_ZONES.has(e.id);
       group.append(svg("title", {}, `${e.name} (${KIND_WORDS[kind]})${assumed ? ", zone assumed" : ""}`));
       if (kind === "data-store") {

@@ -1886,6 +1886,14 @@ class TestTheDraftStore:
     def test_a_survey_of_a_reader_with_no_store_is_empty(self, tmp_path):
         assert sittings.draft_states(self.store(tmp_path), "ada") == {}
 
+    @pytest.mark.parametrize("login", ["..", "../ada", ".hidden", ""])
+    def test_a_survey_refuses_a_login_a_draft_cannot_be_filed_under(
+        self, tmp_path, login
+    ):
+        """The survey reads the folder by the rule ``draft_path`` writes it by."""
+        with pytest.raises(sittings.DraftError):
+            sittings.draft_states(self.store(tmp_path), login)
+
     def test_the_default_root_is_outside_any_repository(self, tmp_path):
         """Under the reader's own state directory, which is where a store
         that must never merge belongs."""

@@ -71,7 +71,11 @@ from evals.harness.artifact import load_artifact
 from evals.harness.bundle import assertions_from_reports, finished_file
 from evals.harness.modes import AssertionResult, EvalRunError
 from evals.harness.reference import GoldenCase, load_corpus
-from evals.harness.replay import replay_assertions, signed_reference
+from evals.harness.replay import (
+    replay_assertions,
+    signed_reference,
+    unsigned_reason,
+)
 
 #: The baseline arm the budgets below were set from: one case, STRIDE only,
 #: ``analysis`` mode so the blessed model is fixed, `ANALYSIS_ASSERTIONS`
@@ -633,7 +637,7 @@ def pooled_recall(paths: Sequence[Path]) -> float:
             case = next(case for case in held if case.id == case_id)
             reference = signed_reference(CORPUS, case)
             if reference is None:
-                raise ValueError(f"{case_id}: no signed reference to grade against")
+                raise ValueError(f"{case_id}: {unsigned_reason(CORPUS, case)}")
             graded = replay_assertions(case, reference, result)
             found += graded.recovered
             required += len(graded.required)
