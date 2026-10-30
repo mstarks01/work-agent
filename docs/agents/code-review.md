@@ -94,8 +94,9 @@ a grep. Class 1 is the largest by damage: it holds the fixes that passed their
 tests in runs 5 to 9, and #640. Measured on 2026-09-06, a
 whole-tree sweep of the decidable classes over code older than the last round
 found nothing that breaks a flow; the findings that mattered sat in code
-younger than the round. Spend attention on `git diff reviewed/<last>...HEAD`
-and on fix diffs, and let the lints hold the rest.
+younger than the round. So read `git diff reviewed/<last>...HEAD` and the fix
+diffs first. Then sweep the whole tree for each finding, as
+[Sweep the tree for each finding](#sweep-the-tree-for-each-finding) says.
 
 Put the result in the pull request, so the record sits with the change. A
 pre-merge review cuts no tag.
@@ -107,6 +108,25 @@ range already had a reader: the round hunts across pull requests, over the whole
 tree, and on surfaces no diff touched. The tag message names which pull requests
 in the range got a pre-merge review, so the next round knows which half of the
 range is new ground.
+
+### Sweep the tree for each finding
+
+**A defect that a review finds must not exist anywhere else in the tree.**
+This applies to each finding, however small: a bug, a stale name, a word that
+`GLOSSARY.md` gives another meaning, a wrong sentence in a doc, or damaged data
+in a ledger row.
+
+- Sweep the whole tree for the exact mechanism of each finding, not for a
+  general pattern. A general pattern returns noise.
+- Skip a sweep only with a stated reason, for example a lint that already
+  refuses the shape, or a search that proves one site. Put the reason in the
+  report.
+- Fix each instance that the sweep finds, in the same way as the finding.
+- When a mechanism comes back in a later round, add a lint that refuses it.
+  Then it cannot come back again.
+- Count the findings in two groups: code older than the last `reviewed/*` tag,
+  and newer code. The count in older code must go down from round to round. A
+  count that does not go down shows a mechanism that needs a lint.
 
 ### Read the prompts against the code they describe
 
@@ -196,6 +216,8 @@ The message carries what a later reader cannot recover from the diff:
   knows which half of its own range nobody read before the merge
 - which axes ran, and what each read as its source of truth
 - how many findings each axis produced, and where each was fixed
+- how many findings were in code older than the last `reviewed/*` tag, and how
+  many were in newer code
 - **what was left open by decision**, with the reason — this is the part that
   stops the next review re-reporting a settled question as a new finding
 
