@@ -230,6 +230,8 @@ An analysis job ends in one of these terminal statuses:
   submitter questions. The job holds its valid system model and, where the
   assertion pass ran, its assertion catalog. An answer starts a resumed job
   from them. Only a job submitted with questions turned on ends here.
+- **Stopped:** a person stopped the run in the first-run app. No partial
+  report is returned.
 
 A completed multi-framework report includes one block per selected framework,
 even when a framework's precondition skips its analyzers. The block then records

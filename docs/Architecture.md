@@ -384,6 +384,9 @@ points:
 - **failed** (raises) — an internal error. No partial report is ever produced:
   an empty Tampering section means "looked, found nothing", never "the Tampering
   agent errored".
+- **stopped** — a person stopped the run, and the graph was cancelled as at
+  the deadline. No partial report is produced
+  ([ADR 0109](adr/0109-a-person-can-stop-a-run-and-the-job-ends-stopped.md)).
 
 That last guarantee is enforced, not assumed. An LLM node whose completion is
 truncated writes no output key at all — ADK saves one only from a final event

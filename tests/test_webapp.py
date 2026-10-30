@@ -296,7 +296,7 @@ def test_every_write_route_refuses_a_request_that_is_not_same_origin(client):
         for method in sorted(getattr(route, "methods", None) or ())
         if method in {"POST", "PUT", "DELETE"}
     ]
-    assert len(writes) == 8, writes
+    assert len(writes) == 9, writes
     for method, path in writes:
         response = client.request(
             method, path, json={}, headers={"Sec-Fetch-Site": "cross-site"}
