@@ -1045,11 +1045,11 @@ class TestABorrowedArtifactStaysInsideItsBaseline:
         directory = tmp_path / "baseline"
         directory.mkdir()
 
-        assert consent._reprice(directory, "/etc/hostname", {}, {}) is None
+        assert consent._reprice(directory, "/etc/hostname", {}) is None
 
     def test_a_traversing_artifact_name_is_refused(self, tmp_path):
         directory = tmp_path / "baseline"
         directory.mkdir()
         (tmp_path / "elsewhere.json").write_text("{}", encoding="utf-8")
 
-        assert consent._reprice(directory, "../elsewhere.json", {}, {}) is None
+        assert consent._reprice(directory, "../elsewhere.json", {}) is None

@@ -198,7 +198,7 @@ jobs:
   # data, and only this runner can reach it. `fake-gcs-server` serves the GCS
   # JSON API for the `gcs` object store. One job runs both, because the
   # `sql/<postgresql>/gcs` pair needs both servers.
-  postgres:
+  server-lane:
     name: Server lane
     runs-on: ubuntu-latest
     timeout-minutes: 15

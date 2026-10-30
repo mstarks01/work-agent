@@ -1,4 +1,4 @@
-# 106. A workspace title is a label, and the report keeps its system name
+# 106. A workspace title is the workspace's own name, and the report keeps its system name
 
 - **Status**: accepted
 - **Date**: 2026-10-30

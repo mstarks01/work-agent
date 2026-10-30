@@ -497,7 +497,7 @@ The status and framework selects filter it more.
 - **Rename** gives the analysis a title. The list shows the title in place of
   the system name, and a blank title shows the system name again. The report
   keeps the system name that you submitted
-  ([ADR 0106](adr/0106-a-workspace-title-is-a-label-and-the-report-keeps-its-system-name.md)).
+  ([ADR 0106](adr/0106-a-workspace-title-is-the-workspaces-own-name-and-the-report-keeps-its-system-name.md)).
 - **Delete** removes the analysis with each of its reports, after you
   confirm. You cannot delete an analysis while it runs. If an answer in
   another tab starts a job of the analysis during the delete, the delete
