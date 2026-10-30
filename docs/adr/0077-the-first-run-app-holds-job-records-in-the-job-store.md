@@ -8,6 +8,7 @@
   [ADR 0066](0066-a-deleted-job-leaves-a-usage-row.md), whose delete the
   app's retention cap uses; [ADR 0070](0070-a-follow-up-saves-a-draft-in-batches.md),
   whose consequences said the app keeps a draft on its run in memory
+- **Amended by**: [ADR 0111](0111-the-first-run-app-keeps-its-runs-in-sqlite-by-default.md)
 
 ## Context
 
@@ -28,6 +29,10 @@ module writes and starts a job for both surfaces.**
 > **Amended by [#1676](https://github.com/mstarks01/work-agent/issues/1676).**
 > The first-run app builds its job store from the store settings of the
 > service, and uses the `memory` store where none is set.
+>
+> **Amended by [ADR 0111](0111-the-first-run-app-keeps-its-runs-in-sqlite-by-default.md).**
+> Where no store is set, the app uses a `sql` store on SQLite in its data
+> directory.
 
 - `analysis_service.job_answers` reads a job from the store, builds its
   Answer State, stores a round, a draft or a correction, or creates the

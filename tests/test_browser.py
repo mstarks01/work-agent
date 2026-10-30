@@ -922,7 +922,7 @@ def test_the_store_rows_follow_the_unsaved_store_choices(browser, tmp_path):
     for url in serve(create_app(env=env_in(tmp_path))):
         page, errors = opened(browser, url + "/settings")
         page.wait_for_selector(shown)
-        on_memory = page.eval_on_selector_all(
+        on_default = page.eval_on_selector_all(
             shown, "rows => rows.map(r => r.dataset.key)"
         )
         page.select_option('tr[data-key="store.job_store"] select', "sql")
@@ -942,7 +942,14 @@ def test_the_store_rows_follow_the_unsaved_store_choices(browser, tmp_path):
         listed = page.locator("#changes-list").inner_text()
         page.close()
     assert errors == [], f"the settings page raised: {errors}"
-    assert set(on_memory) == {"store.job_store", "store.retention_days"}
+    # With no store setting, the page shows the default SQLite store (ADR 0111).
+    assert set(on_default) == {
+        "store.job_store",
+        "store.retention_days",
+        "store.database_url",
+        "store.object_store",
+        "store.object_root",
+    }
     assert {
         "store.database_url",
         "store.database_credentials",

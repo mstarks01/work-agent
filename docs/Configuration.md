@@ -1388,7 +1388,9 @@ engine keeps no jobs and does not read them. An unset or unknown backend value
 stops the startup. A set `ANALYSIS_DATABASE_*` or `ANALYSIS_OBJECT_*` variable
 that the selected backend does not read also stops the startup. [Job
 storage](HTTP-API.md#job-storage) in the HTTP API guide tells how to set up each
-backend.
+backend. The first-run app reads the same variables, and gives a SQLite
+default for each one that is unset; see
+[Where the runs are kept](Web-App.md#where-the-runs-are-kept).
 
 | Variable | Values | Rule |
 | --- | --- | --- |

@@ -49,6 +49,49 @@ def _empty_settings_dir(tmp_path_factory: pytest.TempPathFactory) -> str:
 
 
 @pytest.fixture(autouse=True)
+def _isolate_data_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Point the first-run app's default store at a new data directory, so no
+    test writes to or reads the runs of the developer's machine (ADR 0111).
+
+    The app reads the directory from the mapping it is given, and many tests
+    give one with no ``XDG_DATA_HOME``, so the app's reader is replaced too.
+    """
+    base = tmp_path_factory.mktemp("data")
+    monkeypatch.setenv("XDG_DATA_HOME", str(base))
+    monkeypatch.setattr(
+        "webapp.settings_view.data_dir", lambda env: base / "work-agent"
+    )
+
+
+@pytest.fixture
+def default_store() -> None:
+    """Run the first-run app on its default store; see ``_memory_app_store``."""
+
+
+@pytest.fixture(autouse=True)
+def _memory_app_store(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> None:
+    """Run the first-run app on ``memory`` where a test selects no job store.
+
+    A ``TestClient`` outside its ``with`` block runs each request on a loop
+    of its own, so a job task on the default SQLite store stops when its
+    request ends. A test of the default store takes ``default_store``.
+    """
+    if "default_store" in request.fixturenames:
+        return
+    from analysis_service.store_backends import JOB_STORE_VAR
+    from webapp import main
+
+    built = main.build_app_store
+    monkeypatch.setattr(
+        main, "build_app_store", lambda env: built({JOB_STORE_VAR: "memory", **env})
+    )
+
+
+@pytest.fixture(autouse=True)
 def _isolate_settings_dir(
     monkeypatch: pytest.MonkeyPatch, _empty_settings_dir: str
 ) -> None:

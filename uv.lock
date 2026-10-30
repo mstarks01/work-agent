@@ -259,6 +259,7 @@ sql = [
 
 [package.dev-dependencies]
 browser = [
+    { name = "analysis-service", extra = ["sql"] },
     { name = "playwright" },
     { name = "uvicorn" },
 ]
@@ -273,6 +274,7 @@ dev = [
     { name = "ruff" },
 ]
 web = [
+    { name = "analysis-service", extra = ["sql"] },
     { name = "uvicorn" },
 ]
 
@@ -303,6 +305,7 @@ provides-extras = ["aws", "bedrock", "gcs", "sql"]
 
 [package.metadata.requires-dev]
 browser = [
+    { name = "analysis-service", extras = ["sql"] },
     { name = "playwright", specifier = ">=1.55" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]
@@ -318,7 +321,10 @@ dev = [
     { name = "pytest-xdist", specifier = ">=3.8" },
     { name = "ruff", specifier = ">=0.16.0" },
 ]
-web = [{ name = "uvicorn", specifier = ">=0.30" }]
+web = [
+    { name = "analysis-service", extras = ["sql"] },
+    { name = "uvicorn", specifier = ">=0.30" },
+]
 
 [[package]]
 name = "annotated-doc"

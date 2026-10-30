@@ -114,6 +114,18 @@ def settings_dir(env: Mapping[str, str]) -> Path:
     return base / "work-agent"
 
 
+def data_dir(env: Mapping[str, str]) -> Path:
+    """The data directory of the first-run app, where its default store keeps
+    the runs (ADR 0111).
+
+    ``$XDG_DATA_HOME/work-agent``, else ``~/.local/share/work-agent`` where
+    ``XDG_DATA_HOME`` is unset or not an absolute path.
+    """
+    xdg = env.get("XDG_DATA_HOME", "")
+    base = Path(xdg) if os.path.isabs(xdg) else Path.home() / ".local" / "share"
+    return base / "work-agent"
+
+
 @contextmanager
 def private_fd(
     path: Path | str, error: type[Exception], *, secret: bool = False

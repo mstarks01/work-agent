@@ -12,8 +12,8 @@ Then <http://127.0.0.1:8000>.
 
 It **embeds the service in process**: its jobs live in a service job store, and
 the module that admits, stores and starts a job for the [`/v1` API](HTTP-API.md)
-does the same for this app. With no store setting, the store is `memory`; see
-[Where the runs are kept](#where-the-runs-are-kept). It does not call `/v1` over HTTP,
+does the same for this app. With no store setting, the store is SQLite in the
+app's data directory; see [Where the runs are kept](#where-the-runs-are-kept). It does not call `/v1` over HTTP,
 so it needs no bearer token and no OIDC provider. It runs real models against
 whatever you type, and every analysis costs whatever your vendor charges.
 
@@ -370,37 +370,47 @@ see.
 
 The app keeps its runs in a job store. It reads the store settings of the
 [`/v1` service](HTTP-API.md#job-storage) and builds the store as the service
-does, with one difference: where `ANALYSIS_JOB_STORE` is unset, the app uses
-`memory`. So the first run needs no setting, and a restart loses every run.
-The service's table states each setting and its values. An unusable setting
-stops the startup, and the app does not fall back to `memory`. At startup, the
-app logs the store class it built.
+does, with one difference: where a store setting is unset, the app gives a
+default. With no store setting, the app keeps its runs in SQLite and a file
+root in its data directory, `$XDG_DATA_HOME/work-agent`, or
+`~/.local/share/work-agent` where `XDG_DATA_HOME` is unset
+([ADR 0111](adr/0111-the-first-run-app-keeps-its-runs-in-sqlite-by-default.md)):
 
-To keep your runs in SQLite and a directory, install the `sql` extra, make the
-directories, then start the app:
+| Setting | Default |
+| --- | --- |
+| `ANALYSIS_JOB_STORE` | `sql` |
+| `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///` and the data directory, then `/jobs.db` |
+| `ANALYSIS_OBJECT_STORE` | `filesystem` |
+| `ANALYSIS_OBJECT_ROOT` | the data directory, then `/objects` |
 
-```sh
-uv sync --extra sql
-install -d -m 0700 ~/.local/share/work-agent ~/.local/share/work-agent/objects
-export ANALYSIS_JOB_STORE=sql ANALYSIS_OBJECT_STORE=filesystem \
-  ANALYSIS_DATABASE_URL=sqlite+aiosqlite:///$HOME/.local/share/work-agent/jobs.db \
-  ANALYSIS_OBJECT_ROOT=$HOME/.local/share/work-agent/objects
-uv run python webapp/main.py
-```
+A default applies only where the selected rows read it. So with
+`ANALYSIS_JOB_STORE=memory`, the app gives no database or object setting, and
+with `ANALYSIS_OBJECT_STORE=s3`, it gives no object root. The Settings page
+shows each default value, and a change there takes effect at the next start.
 
-The app migrates a SQLite database itself, so it needs no migration step
-([ADR 0110](adr/0110-the-first-run-app-migrates-a-sqlite-job-store.md)). Where
-the file does not exist, the app makes it with mode `0600`. Where the file is
-at an older revision, the app migrates it to the latest one and logs one line
-that names the two revisions. A file at a revision that this app does not know
-stops the startup. The Settings page runs the same step when you save a SQLite
-store, so a save can name a file that does not exist yet. A PostgreSQL
-database still needs [the migration step](HTTP-API.md#the-migration-step)
-before the app starts.
+So a first run needs no setting and no command, and a restart keeps every
+run. The `web` dependency group carries the `sql` extra, so `uv run` installs
+the SQLite packages with the app. The app makes the data directory and the
+object root with mode `0700` where they do not exist. It makes the database
+file with mode `0600`, and migrates it itself
+([ADR 0110](adr/0110-the-first-run-app-migrates-a-sqlite-job-store.md)).
+Where the file is at an older revision, the app migrates it to the latest one
+and logs one line that names the two revisions. A file at a revision that
+this app does not know stops the startup. A data directory or a root that a
+group or others can open also stops the startup. The app does not change its
+mode.
+
+To keep nothing on disk, select the `memory` store on the Settings page. A
+restart then loses every run. A PostgreSQL database still needs
+[the migration step](HTTP-API.md#the-migration-step) before the app starts.
+
+An unusable setting stops the startup, and the app does not fall back to
+another store. At startup, the app logs the store class it built.
 
 The app starts in the order of [the service](HTTP-API.md#the-startup), and a
-failed step stops the startup. The differences are the `memory` default at the
-first step and the SQLite migration before the store is built. The app builds the store and runs these steps before it builds
+failed step stops the startup. The differences are the store defaults at the
+first step, and the private directories and the SQLite migration before the
+store is built. The app builds the store and runs these steps before it builds
 the engine, so they also run when the app serves the diagnostic page. The
 restart scan fails each run that was queued or running at the last stop, and
 the run shows a message that names the restart. Submit that run again.

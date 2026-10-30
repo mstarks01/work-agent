@@ -323,6 +323,17 @@ class TestSecrets:
         assert row["value"] == url
 
 
+#: The store rows that the page shows with no store setting: the default
+#: ``sql`` store on SQLite with a filesystem root (ADR 0111).
+DEFAULT_SHOWN = [
+    "store.job_store",
+    "store.retention_days",
+    "store.database_url",
+    "store.object_store",
+    "store.object_root",
+]
+
+
 class TestWhatTheSelectionShows:
     def test_each_vendor_row_carries_its_vendor_and_the_modes_that_read_it(
         self, tmp_path
@@ -355,12 +366,28 @@ class TestWhatTheSelectionShows:
         assert setups.keys() == {"bedrock", "vertex"}
         assert setups["vertex"] == "gcloud auth application-default login"
 
-    def test_the_memory_store_shows_no_database_or_object_setting(self, tmp_path):
+    def test_the_default_store_shows_its_database_and_object_root(self, tmp_path):
+        """With no store setting, the page shows the SQLite store in the data
+        directory, each value marked as a default (ADR 0111)."""
         data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
         rows = {row["key"]: row for row in data["rows"]}
 
+        assert data["store_shown"] == DEFAULT_SHOWN
+        assert rows["store.job_store"]["value"] == "sql"
+        database = rows["store.database_url"]
+        assert database["source"] == "default"
+        assert database["value"].startswith("sqlite+aiosqlite:///")
+        assert database["value"].endswith("/work-agent/jobs.db")
+        assert rows["store.object_store"]["value"] == "filesystem"
+
+    def test_the_memory_store_shows_no_database_or_object_setting(self, tmp_path):
+        data = page_data(
+            client_for(tmp_path, hand_written(ANALYSIS_JOB_STORE="memory")).get(
+                "/settings"
+            )
+        )
+
         assert data["store_shown"] == ["store.job_store", "store.retention_days"]
-        assert rows["store.job_store"]["value"] == "memory"
 
     def test_the_data_carries_every_store_row(self, tmp_path):
         rows = rows_of(client_for(tmp_path, hand_written()))
@@ -466,7 +493,7 @@ class TestTheStoreRowsOfUnsavedChanges:
 
         answer = rows_for(client, {"store.job_store": None})
 
-        assert answer.json()["shown"] == ["store.job_store", "store.retention_days"]
+        assert answer.json()["shown"] == DEFAULT_SHOWN
 
     def test_the_process_environment_wins_over_a_change(self, tmp_path):
         client = memory_client(tmp_path, ANALYSIS_JOB_STORE="memory")
@@ -480,7 +507,7 @@ class TestTheStoreRowsOfUnsavedChanges:
 
         answer = rows_for(client, {"tiers.base.model": "sql", "no.such.key": "sql"})
 
-        assert answer.json()["shown"] == ["store.job_store", "store.retention_days"]
+        assert answer.json()["shown"] == DEFAULT_SHOWN
 
     @pytest.mark.parametrize(
         ("body", "media_type", "status"),
