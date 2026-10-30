@@ -25,6 +25,7 @@ from moto.core import set_initial_no_auth_action_count
 
 from analysis_service.aws_identity import PLATFORM_METHODS, platform_session
 from analysis_service.objects import (
+    OBJECT_STORES,
     S3_KEY_FILES,
     ObjectStore,
     ObjectStoreName,
@@ -33,6 +34,7 @@ from analysis_service.objects import (
 )
 from analysis_service.store_backends import build_store
 from analysis_service.store_settings import StoreConfigError
+from analysis_service.vendors import CredentialMode
 from tests.sql_stores import (
     TEST_KEYS,
     TEST_REGION,
@@ -62,6 +64,14 @@ def objects(request, tmp_path) -> ObjectStore:
     """A fresh object store of each row."""
     row = object_env(request, request.param)
     return build_object_store(row.settings(tmp_path))
+
+
+@pytest.mark.parametrize("name", get_args(ObjectStoreName))
+def test_each_setting_of_a_mode_is_a_setting_of_its_row(name):
+    backend = OBJECT_STORES[name]
+    assert set(backend.mode_reads) <= set(CredentialMode)
+    for mode_vars in backend.mode_reads.values():
+        assert set(mode_vars) <= set(backend.reads)
 
 
 class TestEachRow:
@@ -376,6 +386,15 @@ class TestTheIamMode:
         credentials = SimpleNamespace(method=method)
         monkeypatch.setattr(boto3.Session, "get_credentials", lambda _: credentials)
         assert platform_session("a label").get_credentials() is credentials
+
+    @pytest.mark.parametrize(
+        "var", OBJECT_STORES["s3"].mode_reads[CredentialMode.API_KEY]
+    )
+    def test_a_setting_of_the_api_key_mode_stops_the_startup(self, env, var):
+        """The Settings page hides the rows of the ``api_key`` mode in the
+        ``iam`` mode, so the ``iam`` mode refuses each of them."""
+        with pytest.raises(StoreConfigError, match=f"reads no static key; unset {var}"):
+            build_store(iam(env) | {var: "/run/secrets/key"})
 
     def test_the_api_key_mode_reads_the_files(self, env):
         """moto's pair in the environment differs from the pair in the files."""

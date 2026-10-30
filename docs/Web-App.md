@@ -266,8 +266,8 @@ The page shows only the rows that a loader reads now. The credential rows follow
 the vendor of each tier and that vendor's credential mode, with the unsaved
 changes applied, so one save sets a tier and its key. A vendor in the `iam`
 mode shows a short note and its setup command. The job storage rows follow the
-selected job store, object store and database, with the unsaved changes
-applied, so one save sets a `sql` job store and the settings that it reads.
+selected job store, object store, object credential mode and database, with
+the unsaved changes applied, so one save sets a `sql` job store and the settings that it reads.
 Each job storage row takes effect only after a restart. The thinking row of each tier follows the tier's model, with
 the unsaved changes applied. For a model that takes a thinking level, it offers
 "The model's own level", `low`, `medium` and `high`; the first choice removes a

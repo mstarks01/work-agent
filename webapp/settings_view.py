@@ -31,6 +31,7 @@ withheld.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal, get_args
@@ -59,7 +60,7 @@ from analysis_service.model_tiers import (
     credentials_env_var_for,
     upstreams_env_var_for,
 )
-from analysis_service.objects import OBJECT_STORES, object_store_name
+from analysis_service.objects import object_reads
 from analysis_service.sampling import ReasoningEffort
 from analysis_service.settings_variables import deployment_variables, secret_vars
 from analysis_service.store_backends import (
@@ -443,12 +444,8 @@ def _store_rows(merged: Mapping[str, str]) -> set[str]:
         return shown
     shown.update(job_store.reads)
     if job_store.objects:
-        try:
-            name = object_store_name(env)
-        except StoreConfigError:
-            pass
-        else:
-            shown.update(OBJECT_STORES[name].reads)
+        with contextlib.suppress(StoreConfigError):
+            shown.update(object_reads(env))
     if DATABASE_URL_VAR in job_store.reads:
         try:
             from analysis_service.sql_store import database_reads

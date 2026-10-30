@@ -30,6 +30,7 @@ from analysis_service.store_settings import (
     closed_setting,
     refuse_unread,
 )
+from analysis_service.vendors import CredentialMode
 
 #: The two objects of a job. A job has one report, which the service writes
 #: once, so no name carries a revision.
@@ -319,8 +320,11 @@ class ObjectStoreBackend:
     #: Builds the store from the environment.
     build: Callable[[Mapping[str, str]], ObjectStore]
     #: Every ``ANALYSIS_OBJECT_*`` setting that this store reads. The store
-    #: refuses each other one, and the Settings page shows only these.
+    #: refuses each other one.
     reads: tuple[str, ...]
+    #: The settings of :attr:`reads` that only one credential mode reads, by
+    #: that mode. The Settings page shows them only for that mode.
+    mode_reads: Mapping[CredentialMode, tuple[str, ...]]
 
 
 ObjectStoreName = Literal["filesystem", "s3", "gcs"]
@@ -344,6 +348,7 @@ OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
     "filesystem": ObjectStoreBackend(
         build=FilesystemObjectStore.from_env,
         reads=(OBJECT_STORE_VAR, "ANALYSIS_OBJECT_ROOT"),
+        mode_reads={},
     ),
     "s3": ObjectStoreBackend(
         build=_s3_store,
@@ -356,10 +361,12 @@ OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
             OBJECT_CREDENTIALS_VAR,
             *S3_KEY_FILES.values(),
         ),
+        mode_reads={CredentialMode.API_KEY: tuple(S3_KEY_FILES.values())},
     ),
     "gcs": ObjectStoreBackend(
         build=_gcs_store,
         reads=(OBJECT_STORE_VAR, OBJECT_BUCKET_VAR, OBJECT_CREDENTIALS_VAR),
+        mode_reads={},
     ),
 }
 
@@ -372,6 +379,35 @@ def object_store_name(env: Mapping[str, str]) -> ObjectStoreName:
     return closed_setting(
         env.get(OBJECT_STORE_VAR, ""), OBJECT_STORE_VAR, OBJECT_STORES
     )
+
+
+#: Each ``ANALYSIS_OBJECT_CREDENTIALS`` value, by its mode.
+_MODES = {mode: mode.value for mode in CredentialMode}
+
+
+def object_reads(env: Mapping[str, str]) -> tuple[str, ...]:
+    """The object settings that the settings in ``env`` select: the reads of
+    the row of :data:`OBJECT_STORES`, without the reads of each credential mode
+    that ``env`` does not select.
+
+    The Settings page shows only these. Where the credential mode names no
+    mode, no setting of :attr:`ObjectStoreBackend.mode_reads` is in the list.
+    """
+    backend = OBJECT_STORES[object_store_name(env)]
+    mode: CredentialMode | None
+    try:
+        mode = closed_setting(
+            env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, _MODES
+        )
+    except StoreConfigError:
+        mode = None
+    unread = {
+        var
+        for other, mode_vars in backend.mode_reads.items()
+        if other != mode
+        for var in mode_vars
+    }
+    return tuple(var for var in backend.reads if var not in unread)
 
 
 def build_object_store(env: Mapping[str, str]) -> ObjectStore:
