@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-10-30
 - **Relates to**: [ADR 0066](0066-a-deleted-job-leaves-a-usage-row.md),
-  [ADR 0106](0106-a-workspace-title-is-a-label-and-the-report-keeps-its-system-name.md)
+  [ADR 0106](0106-a-workspace-title-is-the-workspaces-own-name-and-the-report-keeps-its-system-name.md)
 
 ## Context
 

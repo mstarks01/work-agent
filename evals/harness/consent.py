@@ -352,7 +352,10 @@ def estimate(
     if missing:
         return Estimate(label="unpriced", amount_usd=None, lines=tuple(lines))
 
-    borrowed = _borrow(baselines, routes, node_tiers, identity, cases)
+    node_routes = {
+        node: routes[tier] for node, tier in node_tiers.items() if tier in routes
+    }
+    borrowed = _borrow(baselines, node_routes, identity, cases)
     if borrowed is None:
         lines.append(
             "no merged Baseline to calibrate token counts from, so no amount"
@@ -391,8 +394,7 @@ def _manifest_named(
 
 def _borrow(
     baselines: Sequence[tuple[Path, dict[str, Any]]],
-    routes: dict[str, str],
-    node_tiers: Mapping[str, str],
+    node_routes: Mapping[str, str],
     identity: dict[str, Any],
     cases: int | None,
 ) -> Borrowed | None:
@@ -431,9 +433,7 @@ def _borrow(
         priced = []
         lender_cases = 0
         for entry in manifest.get("sweeps", []):
-            repriced = _reprice(
-                directory, str(entry.get("artifact", "")), routes, node_tiers
-            )
+            repriced = _reprice(directory, str(entry.get("artifact", "")), node_routes)
             if repriced is not None:
                 amount, lender_cases = repriced
                 priced.append(amount)
@@ -460,15 +460,15 @@ def _borrow(
 def _reprice(
     directory: Path,
     artifact_name: str,
-    routes: dict[str, str],
-    node_tiers: Mapping[str, str],
+    node_routes: Mapping[str, str],
 ) -> tuple[float, int] | None:
     """One recorded sweep's usage, as if this run's models had served it, and its case count.
 
     ``None`` rather than a number whenever the answer would rest on a guess:
     an artifact that will not load, a node provenance never recorded, a node
-    this run does not carry, a tier this run does not route, or a route the
-    price map misses. The caller tries the next Baseline, and states
+    that ``node_routes`` gives no route, or a route the price map misses.
+    ``node_routes`` is this run's route for each node: the route of the tier
+    that this run gives the node. The caller tries the next Baseline, and states
     ``unpriced`` when none answers — never a zero, which is the one outcome
     #334 forbids outright.
 
@@ -492,7 +492,7 @@ def _reprice(
     for node, usage in sorted(baseline.usage_of(artifact).items()):
         if not artifact.provenance.node_runs.get(node):
             return None
-        route = routes.get(node_tiers.get(node, ""))
+        route = node_routes.get(node)
         if route is None:
             return None
         prices = unit_prices(route)

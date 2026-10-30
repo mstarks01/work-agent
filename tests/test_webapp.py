@@ -287,6 +287,26 @@ def test_analyze_refuses_a_request_that_is_not_same_origin(client):
         assert response.status_code == 403, headers
 
 
+def test_every_write_route_refuses_a_request_that_is_not_same_origin(client):
+    """Each POST, PUT and DELETE route asks the one gate before it reads the
+    body, so a new write route without it fails here."""
+    writes = [
+        (method, route.path.replace("{run_id}", "job-missing"))
+        for route in client.app.routes
+        for method in sorted(getattr(route, "methods", None) or ())
+        if method in {"POST", "PUT", "DELETE"}
+    ]
+    assert len(writes) == 7, writes
+    for method, path in writes:
+        response = client.request(
+            method, path, json={}, headers={"Sec-Fetch-Site": "cross-site"}
+        )
+        assert response.status_code == 403, (method, path)
+        assert response.json() == {
+            "message": "This request did not come from the app's own page."
+        }
+
+
 def test_a_run_streams_one_tick_per_node_then_redirects(client):
     started = client.post("/analyze", json=posted("A web app."), headers=SAME_ORIGIN)
     run_id = started.json()["run"]

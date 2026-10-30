@@ -58,8 +58,8 @@ The security posture is deliberate throughout:
   Server-side, the two f-string pages escape through
   :func:`~webapp.page.escape`, which is quote-safe, so where a value lands is
   not part of whether the escape is adequate.
-* CSRF: ``POST /analyze``, ``POST /answer/{run}`` and ``POST /settings``
-  require ``Sec-Fetch-Site: same-origin``. The header
+* CSRF: each ``POST``, ``PUT`` and ``DELETE`` route requires
+  ``Sec-Fetch-Site: same-origin`` through :func:`_cross_origin`. The header
   is browser-set and unspoofable from script, and it is checked before anything
   else, so a cross-origin caller cannot even start a run. The check is
   :func:`~webapp.page.is_same_origin`, which the two eval-side apps share
@@ -1129,6 +1129,22 @@ def _message(status: int, message: str) -> JSONResponse:
     return JSONResponse({"message": message}, status_code=status)
 
 
+def _cross_origin(request: Request) -> JSONResponse | None:
+    """The ``403`` of a write route for a request that
+    :func:`~webapp.page.is_same_origin` refuses, or ``None`` where the request
+    came from the app's own page.
+
+    **The one same-origin gate of this app's write routes.** Each ``POST``,
+    ``PUT`` and ``DELETE`` route asks it before it does anything else.
+    """
+    if is_same_origin(request):
+        return None
+    logger.warning(
+        "refused a %s %s that was not same-origin", request.method, request.url.path
+    )
+    return _message(403, "This request did not come from the app's own page.")
+
+
 async def _refused(status: int, request: Request, exc: Exception) -> JSONResponse:
     fields = exc.fields() if isinstance(exc, Refused) else {}
     return JSONResponse({"message": str(exc), **fields}, status_code=status)
@@ -1322,9 +1338,8 @@ def create_app(
         changes nothing. The response holds the new page data and the keys
         of each store setting that takes effect after a restart.
         """
-        if not is_same_origin(request):
-            logger.warning("refused a POST /settings that was not same-origin")
-            return _message(403, "This request did not come from the app's own page.")
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
         media_type = request.headers.get("content-type", "").partition(";")[0]
         if media_type.strip().lower() != "application/json":
             return _message(415, "A save is a JSON body.")
@@ -1427,9 +1442,8 @@ def create_app(
         job's usage row (ADR 0066). Refused while a job of it has not ended.
         Where the store keeps a job partway, the ``409`` lists in ``deleted``
         the IDs of the jobs that the route deleted first (ADR 0107)."""
-        if not is_same_origin(request):
-            logger.warning("refused a DELETE of an analysis that was not same-origin")
-            return _message(403, "This request did not come from the app's own page.")
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
         answers = cell.read(unavailable).answers
         group = await workspace.analysis(answers, run_id)
         if not group:
@@ -1458,9 +1472,8 @@ def create_app(
     async def rename_analysis(run_id: str, request: Request) -> Response:
         """Write the title on every job of the analysis (ADR 0106). A blank
         title removes it, and the list shows the system name again."""
-        if not is_same_origin(request):
-            logger.warning("refused a title PUT that was not same-origin")
-            return _message(403, "This request did not come from the app's own page.")
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
         answers = cell.read(unavailable).answers
         body = await _json(request)
         sent = body.get("title") if isinstance(body, dict) else None
@@ -1481,9 +1494,8 @@ def create_app(
 
     @app.post("/analyze")
     async def analyze(request: Request) -> Response:
-        if not is_same_origin(request):
-            logger.warning("refused a POST /analyze that was not same-origin")
-            return _message(403, "This request did not come from the app's own page.")
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
         current = cell.read(unavailable)
         answers = current.answers
 
@@ -1539,9 +1551,8 @@ def create_app(
         finished run has nothing to continue. A save answers with the
         new revision.
         """
-        if not is_same_origin(request):
-            logger.warning("refused a POST /answer that was not same-origin")
-            return _message(403, "This request did not come from the app's own page.")
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
         current = cell.read(unavailable)
         answers = current.answers
         try:
@@ -1581,9 +1592,8 @@ def create_app(
         The new run reads the paused run's sources with the amendment added,
         pauses again, and carries the paused run's answers.
         """
-        if not is_same_origin(request):
-            logger.warning("refused a POST /amend that was not same-origin")
-            return _message(403, "This request did not come from the app's own page.")
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
         current = cell.read(unavailable)
         answers = current.answers
         try:
@@ -1657,9 +1667,8 @@ def create_app(
     @app.post("/correct/{run_id}")
     async def correct(run_id: str, request: Request) -> Response:
         """Correct a final report's answers, and run nothing (ADR 0054)."""
-        if not is_same_origin(request):
-            logger.warning("refused a POST /correct that was not same-origin")
-            return _message(403, "This request did not come from the app's own page.")
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
         current = cell.read(unavailable)
         answers = current.answers
         try:
