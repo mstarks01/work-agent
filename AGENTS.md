@@ -27,7 +27,8 @@ in the body of each pull request that changes code.
 
 A round starts from `git tag -l 'reviewed/*' --sort=-creatordate | head -1` and
 ends in a new annotated `reviewed/<date>` tag. Read that tag's message before
-you report a finding: it lists what was left open by decision. See
+you report a finding: it lists what was left open by decision. Sweep the whole
+tree for each finding, however small, and fix each instance. See
 `docs/agents/code-review.md`.
 
 ### Triage labels
