@@ -360,6 +360,9 @@ def estimate(
         lines.append(
             "no merged Baseline to calibrate token counts from, so no amount"
             " can be stated"
+            if not baselines
+            else f"no sweep of the {len(baselines)} merged Baselines can be"
+            " repriced for this run's nodes and routes, so no amount can be stated"
         )
         return Estimate(label="unpriced", amount_usd=None, lines=tuple(lines))
     lines.append(

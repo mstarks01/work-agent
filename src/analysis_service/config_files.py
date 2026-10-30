@@ -354,15 +354,33 @@ def refused_var(secret_var: str) -> str:
     return secret_var.removesuffix(SECRET_FILE_SUFFIX)
 
 
+def refuse_bare_secret(
+    env: Mapping[str, str], var: str, error: type[Exception]
+) -> None:
+    """Raise ``error`` where the environment holds the secret of ``var`` itself.
+
+    **The one reader of that refusal.** :func:`read_secret` asks it, and a
+    store asks it early for each key file that its mode may not read.
+    """
+    bare = refused_var(var)
+    if bare != var and env.get(bare, "").strip():
+        raise error(
+            f"{var} names the file that holds the secret;"
+            f" unset {bare}, which this service refuses"
+        )
+
+
 def read_secret(env: Mapping[str, str], var: str, error: type[Exception]) -> str:
     """The secret in the file that ``var`` names, or ``""`` if ``var`` is unset.
 
     The secret is the content of the file without one final ``\\n``. Raises
-    ``error`` when the file cannot be read, when it fails :func:`private_fd`
-    for a secret file, or when the secret fails :func:`secret_refusal`. The
-    message names the variable or the file, and never the content (OWASP
-    A09).
+    ``error`` when the environment holds the secret itself
+    (:func:`refuse_bare_secret`), when the file cannot be read, when it fails
+    :func:`private_fd` for a secret file, or when the secret fails
+    :func:`secret_refusal`. The message names the variable or the file, and
+    never the content (OWASP A09).
     """
+    refuse_bare_secret(env, var, error)
     path = env.get(var, "").strip()
     if not path:
         return ""

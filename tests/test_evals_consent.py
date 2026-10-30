@@ -447,6 +447,19 @@ class TestTheEstimate:
         assert estimate.amount_usd is None
         assert "no merged Baseline" in " ".join(estimate.lines)
 
+    def test_a_baseline_that_cannot_be_repriced_is_not_called_absent(
+        self, tmp_path, priced
+    ):
+        """A Baseline exists, but this run routes none of its nodes."""
+        merged(tmp_path, "other", {**IDENTITY, "corpus_digest": "f" * 64}, actual=0.6)
+
+        estimate = consent.estimate(IDENTITY, ROUTES, {}, tmp_path)
+
+        joined = " ".join(estimate.lines)
+        assert estimate.amount_usd is None
+        assert "no merged Baseline" not in joined
+        assert "no sweep of the 1 merged Baselines can be repriced" in joined
+
     def test_a_model_the_map_misses_states_no_amount(self, tmp_path, priced):
         routes = {**ROUTES, "strong": "mystery/model"}
         estimate = consent.estimate(IDENTITY, routes, TIER_NODES, tmp_path)

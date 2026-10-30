@@ -263,7 +263,7 @@ jobs:
           cd "$dir"
           umask 077
           openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
-            -subj "/CN=PostgreSQL lane CA" -keyout ca.key -out ca.crt \
+            -subj "/CN=Server lane CA" -keyout ca.key -out ca.crt \
             -addext "basicConstraints=critical,CA:TRUE" \
             -addext "keyUsage=critical,keyCertSign,cRLSign"
           openssl req -newkey rsa:2048 -nodes -subj "/CN=localhost" \

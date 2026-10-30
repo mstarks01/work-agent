@@ -115,6 +115,13 @@ class TestThePermissionRule:
 
 
 class TestTheSecretRule:
+    def test_a_secret_in_the_environment_itself_is_refused(self, tmp_path):
+        """``read_secret`` refuses it, so a new reader cannot skip the rule."""
+        path = private_file(tmp_path / "key", "SECRET", 0o600)
+        env = key_env(path) | {"ANALYSIS_OPENAI_API_KEY": "SECRET"}
+        with pytest.raises(ProviderAuthError, match="unset ANALYSIS_OPENAI_API_KEY,"):
+            read_secret(env, KEY_VAR, ProviderAuthError)
+
     def test_one_final_newline_is_not_part_of_the_secret(self, tmp_path):
         path = private_file(tmp_path / "key", "SECRET\n")
         assert read_secret(key_env(path), KEY_VAR, ProviderAuthError) == "SECRET"

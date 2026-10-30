@@ -91,7 +91,7 @@ class TestTheSettings:
             ),
             (
                 {"ANALYSIS_DATABASE_PASSWORD": "hunter2"},
-                "unset ANALYSIS_DATABASE_PASSWORD$",
+                "unset ANALYSIS_DATABASE_PASSWORD, which this service refuses$",
             ),
             (
                 {"ANALYSIS_DATABASE_IAM": "rds"},

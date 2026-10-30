@@ -62,6 +62,7 @@ from evals.harness.replay import (
     replay_assertions,
     required_rows,
     signed_reference,
+    unsigned_reason,
 )
 
 #: Every falsification and positive-control line #926's acceptance list names,
@@ -788,7 +789,7 @@ def outcomes(corpus_dir: Path) -> list[Outcome]:
         reference = signed_reference(corpus_dir, case)
         if reference is None:
             raise KeyError(
-                f"{name} runs on {probe.case_id}, whose reference nobody signed"
+                f"{name} runs on {probe.case_id}: " + unsigned_reason(corpus_dir, case)
             )
         found.append(run_probe(name, case, reference))
     return found
@@ -1032,7 +1033,7 @@ def consumed(corpus_dir: Path) -> list[Consumed]:
         reference = signed_reference(corpus_dir, case)
         if reference is None:
             raise KeyError(
-                f"{name} runs on {probe.case_id}, whose reference nobody signed"
+                f"{name} runs on {probe.case_id}: " + unsigned_reason(corpus_dir, case)
             )
         for reviewed in (False, True):
             found.append(consume_probe(name, case, reference, reviewed=reviewed))
