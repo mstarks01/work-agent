@@ -1159,7 +1159,9 @@ The check does not read the hold or the retention time of an object.
 #### The migration step
 
 The service never changes the schema. Run the migration as a deploy step,
-before you start the service, under a user that can change the database:
+before you start the service, under a user that can change the database. This
+applies to SQLite too. Only the first-run app migrates a SQLite database
+itself ([ADR 0110](adr/0110-the-first-run-app-migrates-a-sqlite-job-store.md)):
 
 ```bash
 ANALYSIS_DATABASE_URL=sqlite+aiosqlite:////var/lib/analysis/jobs.db \

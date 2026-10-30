@@ -32,7 +32,8 @@ The rules this module keeps:
 * **The service never migrates.** An operator runs
   ``python -m analysis_service.migrations`` as a deploy step, and
   :meth:`SqlJobStore.startup_check` refuses a schema that is not at the latest
-  revision.
+  revision. The first-run app migrates a database whose row allows it, with
+  :func:`migrate_first_run_database`, before it builds the store (ADR 0110).
 """
 
 from __future__ import annotations
@@ -51,6 +52,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from alembic.migration import MigrationContext
+from alembic.util import CommandError
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import (
     BigInteger,
@@ -80,7 +82,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine import URL, make_url
-from sqlalchemy.exc import ArgumentError
+from sqlalchemy.exc import ArgumentError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool, Pool
 from sqlalchemy.types import TypeDecorator
@@ -785,9 +787,12 @@ class Database:
     #: Takes the global lock of admission, in the write transaction of
     #: admission.
     admission_lock: Callable[[AsyncConnection], Awaitable[None]]
-    #: Makes the database where there is none. Only the migration step calls
-    #: it, through :func:`create_database`; the service never makes one.
+    #: Makes the database where there is none. Only a migration calls it,
+    #: through :func:`create_database`; the service never makes one.
     create: Callable[[URL], None]
+    #: Whether the first-run app migrates this database itself. True only
+    #: where one person owns the database and runs the app (ADR 0110).
+    first_run_migrates: bool
     #: The database settings that this database reads itself, beside those of
     #: its row of :data:`DATABASE_CREDENTIALS`. :attr:`connect` refuses each
     #: other one, and the Settings page shows only these.
@@ -808,6 +813,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         connect=_sqlite,
         admission_lock=_held_by_begin_immediate,
         create=_create_sqlite,
+        first_run_migrates=True,
         reads=(DATABASE_URL_VAR,),
     ),
     # The server checks a password or an IAM token only when a connection
@@ -819,6 +825,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         connect=_postgres,
         admission_lock=_advisory_lock,
         create=_no_creation,
+        first_run_migrates=False,
         reads=(DATABASE_URL_VAR, DATABASE_CREDENTIALS_VAR, DATABASE_CA_FILE_VAR),
     ),
 }
@@ -884,6 +891,53 @@ def create_database(env: Mapping[str, str]) -> None:
     ``create`` field of its row. The migration step calls it first."""
     url = database_url(env)
     _database(url).create(url)
+
+
+def migrate_first_run_database(env: Mapping[str, str]) -> None:
+    """Migrate the database that the settings name to the latest revision,
+    where its row sets ``first_run_migrates`` (ADR 0110).
+
+    The first-run app calls it through
+    :func:`~analysis_service.store_backends.build_store` at its startup and in
+    the check of a Settings save. It makes a missing database first,
+    as the migration step does. A database at the latest revision, or at a
+    revision that the tree does not hold, stays as it is, and the startup
+    check refuses the second. A migration writes one log line that names the
+    two revisions. A database that cannot be read or migrated stops the
+    startup with a :class:`StoreConfigError`, which names no path. It runs
+    event loops of its own, so call it where none runs.
+    """
+    url = database_url(env)
+    database = _database(url)
+    if not database.first_run_migrates:
+        return
+    create_database(env)
+    head = migrations.head()
+    try:
+        current = asyncio.run(_current_revision(env))
+        if current == head or not migrations.holds(current):
+            return
+        migrations.upgrade(env)
+    except (SQLAlchemyError, CommandError):
+        logger.exception("the first-run app could not migrate the job database")
+        raise StoreConfigError(
+            f"the database that {DATABASE_URL_VAR} names cannot be migrated;"
+            " the log says why"
+        ) from None
+    logger.info(
+        "the first-run app migrated the job database from revision %s to %s",
+        current,
+        head,
+    )
+
+
+async def _current_revision(env: Mapping[str, str]) -> str | None:
+    engine = engine_for(env)
+    try:
+        async with engine.connect() as connection:
+            return await connection.run_sync(_revision)
+    finally:
+        await engine.dispose()
 
 
 def engine_for(env: Mapping[str, str]) -> AsyncEngine:

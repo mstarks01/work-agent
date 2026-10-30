@@ -377,7 +377,7 @@ stops the startup, and the app does not fall back to `memory`. At startup, the
 app logs the store class it built.
 
 To keep your runs in SQLite and a directory, install the `sql` extra, make the
-directory, run the migration step once, then start the app:
+directories, then start the app:
 
 ```sh
 uv sync --extra sql
@@ -385,13 +385,22 @@ install -d -m 0700 ~/.local/share/work-agent ~/.local/share/work-agent/objects
 export ANALYSIS_JOB_STORE=sql ANALYSIS_OBJECT_STORE=filesystem \
   ANALYSIS_DATABASE_URL=sqlite+aiosqlite:///$HOME/.local/share/work-agent/jobs.db \
   ANALYSIS_OBJECT_ROOT=$HOME/.local/share/work-agent/objects
-uv run python -m analysis_service.migrations
 uv run python webapp/main.py
 ```
 
+The app migrates a SQLite database itself, so it needs no migration step
+([ADR 0110](adr/0110-the-first-run-app-migrates-a-sqlite-job-store.md)). Where
+the file does not exist, the app makes it with mode `0600`. Where the file is
+at an older revision, the app migrates it to the latest one and logs one line
+that names the two revisions. A file at a revision that this app does not know
+stops the startup. The Settings page runs the same step when you save a SQLite
+store, so a save can name a file that does not exist yet. A PostgreSQL
+database still needs [the migration step](HTTP-API.md#the-migration-step)
+before the app starts.
+
 The app starts in the order of [the service](HTTP-API.md#the-startup), and a
-failed step stops the startup. The only difference is the `memory` default at
-the first step. The app builds the store and runs these steps before it builds
+failed step stops the startup. The differences are the `memory` default at the
+first step and the SQLite migration before the store is built. The app builds the store and runs these steps before it builds
 the engine, so they also run when the app serves the diagnostic page. The
 restart scan fails each run that was queued or running at the last stop, and
 the run shows a message that names the restart. Submit that run again.

@@ -10,9 +10,7 @@ the credentials of the migration role.
 
 import os
 
-from alembic import command
-
-from analysis_service.migrations import alembic_config
+from analysis_service.migrations import upgrade
 
 if __name__ == "__main__":
-    command.upgrade(alembic_config(os.environ), "head")
+    upgrade(os.environ)
