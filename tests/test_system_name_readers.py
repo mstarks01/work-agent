@@ -135,8 +135,8 @@ def _title_outcome(name: str) -> Outcome:
         response = client.put(
             f"/workspace/runs/{run}/title", json={"title": name}, headers=SAME_ORIGIN
         )
-        assert response.status_code in {200, 400}, response.status_code
-        if response.status_code == 400:
+        assert response.status_code in {200, 422}, response.status_code
+        if response.status_code == 422:
             return (False, None)
         record = asyncio.run(workspace.store.get(run))
         assert record is not None

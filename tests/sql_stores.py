@@ -214,7 +214,7 @@ def lane_url() -> URL:
     where ``REQUIRE_POSTGRES=1``."""
     value = os.environ.get("TEST_POSTGRES_URL", "").strip()
     if not value:
-        reason = "TEST_POSTGRES_URL is unset, so the PostgreSQL lane cannot run"
+        reason = "TEST_POSTGRES_URL is unset, so the server lane cannot run"
         if REQUIRE_POSTGRES:
             pytest.fail(f"REQUIRE_POSTGRES=1, and {reason}")
         pytest.skip(reason)

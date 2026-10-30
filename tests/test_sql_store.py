@@ -432,7 +432,7 @@ class TestADeleteBeforeTheAdmission:
         async def deleting_first(record, **bounds):
             parent = parent_of(record)
             if parent is not None:
-                assert await store.delete(parent, record.owner_id) is not None
+                assert isinstance(await store.delete(parent, record.owner_id), int)
             return await reserve(record, **bounds)
 
         runner.run = counting
@@ -835,7 +835,7 @@ class TestAStoredValueThisServiceDoesNotList:
         asyncio.run(admit(store, child))
         store_unlisted(database_of(env), child.id, case)
         if deleted:
-            assert asyncio.run(store.delete(child.id, "alice")) is not None
+            assert isinstance(asyncio.run(store.delete(child.id, "alice")), int)
         assert asyncio.run(store.resumed_by(parent, "alice")) is None
         asyncio.run(admit(store, follow_up(parent)))
 

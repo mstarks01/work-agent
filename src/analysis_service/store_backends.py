@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal, get_args
 
-from analysis_service.jobs import InMemoryJobStore, JobStore
+from analysis_service.jobs import DeleteRefusal, InMemoryJobStore, JobStore
 from analysis_service.objects import (
     OBJECT_ADDRESSING_VAR,
     OBJECT_CREDENTIALS_VAR,
@@ -161,7 +161,7 @@ async def audited_delete(
     cause: DeleteCause,
     *,
     updated_before: datetime | None = None,
-) -> int | None:
+) -> int | DeleteRefusal:
     """Delete the owned job with :meth:`JobStore.delete`, and log the delete.
 
     **The one writer of the delete log line** (ADR 0066). The delete route and
@@ -171,7 +171,7 @@ async def audited_delete(
     :meth:`JobStore.delete` returns.
     """
     removed = await store.delete(job_id, owner_id, updated_before=updated_before)
-    if removed is not None:
+    if not isinstance(removed, DeleteRefusal):
         logger.info(
             "deleted job %s of owner %s: cause %s, %d object(s) removed",
             job_id,

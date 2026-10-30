@@ -30,6 +30,7 @@ from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Admission,
     Checkpoint,
+    DeleteRefusal,
     InMemoryJobStore,
     JobRecord,
     JobStatus,
@@ -173,7 +174,7 @@ class DeletingReads:
         if key in self.deleting:
             owner_id, job_id, _ = key.split("/")
             assert self.store is not None
-            assert await self.store.delete(job_id, owner_id) is not None
+            assert isinstance(await self.store.delete(job_id, owner_id), int)
         return await self._objects.get(key)
 
 
@@ -820,7 +821,7 @@ class TestTheParentLock:
         """A delete that commits after the route read the parent leaves no
         parent for the child."""
         parent = waiting(store) if child is amendment else completed(store)
-        assert asyncio.run(store.delete(parent, "alice")) is not None
+        assert isinstance(asyncio.run(store.delete(parent, "alice")), int)
         orphan = child(parent)
         refused = reserve(store, orphan)
         assert refused == Admission(outcome="parent_missing", active=0)
@@ -833,12 +834,14 @@ class TestTheParentLock:
         parent = waiting(store) if child is amendment else completed(store)
         flying = child(parent)
         asyncio.run(admit(store, flying))
-        assert asyncio.run(store.delete(parent, "alice")) is None
+        assert asyncio.run(store.delete(parent, "alice")) == DeleteRefusal(
+            "child", flying.id
+        )
         assert asyncio.run(store.owned(parent, "alice")) is not None
         flying.transition("running")
         flying.transition("failed")
         asyncio.run(store.save(flying))
-        assert asyncio.run(store.delete(parent, "alice")) is not None
+        assert isinstance(asyncio.run(store.delete(parent, "alice")), int)
 
     @pytest.mark.parametrize("child", [follow_up, amendment])
     def test_a_child_of_another_owners_job_is_refused(self, store, child):
@@ -1005,7 +1008,7 @@ class TestADeletedJobLeavesAUsageRow:
 
     def test_no_read_serves_a_deleted_job(self, store):
         job = completed(store)
-        assert asyncio.run(store.delete(job, "alice")) is not None
+        assert isinstance(asyncio.run(store.delete(job, "alice")), int)
         assert asyncio.run(store.get(job)) is None
         assert asyncio.run(store.owned(job, "alice")) is None
         assert asyncio.run(store.report(job, "alice")) is None
@@ -1026,9 +1029,13 @@ class TestADeletedJobLeavesAUsageRow:
         job = completed(store)
         queued = new_record()
         asyncio.run(admit(store, queued))
-        assert asyncio.run(store.delete(job, "mallory")) is None
-        assert asyncio.run(store.delete(queued.id, "alice")) is None
-        assert asyncio.run(store.delete("job-missing", "alice")) is None
+        assert asyncio.run(store.delete(job, "mallory")) == DeleteRefusal("absent")
+        assert asyncio.run(store.delete(queued.id, "alice")) == DeleteRefusal(
+            "in_flight"
+        )
+        assert asyncio.run(store.delete("job-missing", "alice")) == DeleteRefusal(
+            "absent"
+        )
         assert asyncio.run(store.get(job)) is not None
 
     def test_a_deleted_job_still_counts_toward_the_rate(self, store):
@@ -1065,7 +1072,7 @@ class TestADeletedJobLeavesAUsageRow:
         child.report = sample_report()
         child.transition("completed")
         asyncio.run(admit(store, child))
-        assert asyncio.run(store.delete(child.id, "alice")) is not None
+        assert isinstance(asyncio.run(store.delete(child.id, "alice")), int)
         assert asyncio.run(store.resumed_by(parent, "alice")) == child.id
 
     def test_the_listing_is_the_owner_s_jobs_oldest_first_as_envelopes(self, store):
@@ -1138,7 +1145,8 @@ class TestTheRetentionSweep:
         job = last_updated(store, "completed", days_ago=2)
         cutoff = datetime.now(UTC) - timedelta(days=1)
         assert asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
-        assert asyncio.run(store.delete(job, "alice", updated_before=cutoff)) is None
+        refused = asyncio.run(store.delete(job, "alice", updated_before=cutoff))
+        assert refused == DeleteRefusal("changed")
         assert asyncio.run(store.get(job)) is not None
 
     def test_a_draft_and_a_delete_with_a_cutoff_never_both_land(self, store):
@@ -1153,7 +1161,7 @@ class TestTheRetentionSweep:
             )
 
         removed, saved = asyncio.run(race())
-        assert (removed is not None) != saved
+        assert isinstance(removed, int) != saved
 
     def test_it_keeps_a_job_that_changes_after_the_listing(self, store):
         job = last_updated(store, "completed", days_ago=2)
@@ -1229,14 +1237,14 @@ class TestAnUnreadableJobHasEnded:
     @pytest.mark.parametrize("status", IN_FLIGHT)
     def test_its_owner_deletes_it_and_its_usage_row_holds_no_slot(self, store, status):
         job = unreadable(store, status)
-        assert asyncio.run(store.delete(job, "alice")) is not None
+        assert isinstance(asyncio.run(store.delete(job, "alice")), int)
         assert asyncio.run(store.owned(job, "alice")) is None
         assert reserve(store, new_record(), ceiling=1).outcome == "admitted"
 
     @pytest.mark.parametrize("status", IN_FLIGHT)
     def test_another_owner_cannot_delete_it(self, store, status):
         job = unreadable(store, status)
-        assert asyncio.run(store.delete(job, "mallory")) is None
+        assert asyncio.run(store.delete(job, "mallory")) == DeleteRefusal("absent")
         assert asyncio.run(store.owned(job, "alice")) is not None
 
     @pytest.mark.parametrize("status", IN_FLIGHT)
@@ -1262,7 +1270,7 @@ class TestAnUnreadableJobHasEnded:
         parent = completed(store)
         child = unreadable(store, status, record=follow_up(parent))
         if deleted:
-            assert asyncio.run(store.delete(child, "alice")) is not None
+            assert isinstance(asyncio.run(store.delete(child, "alice")), int)
         assert asyncio.run(store.resumed_by(parent, "alice")) is None
         assert reserve(store, follow_up(parent)).outcome == "admitted"
 
