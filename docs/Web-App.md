@@ -498,7 +498,11 @@ The status and framework selects filter it more.
   keeps the system name that you submitted
   ([ADR 0106](adr/0106-a-workspace-title-is-a-label-and-the-report-keeps-its-system-name.md)).
 - **Delete** removes the analysis with each of its reports, after you
-  confirm. You cannot delete an analysis while it runs. The app keeps a usage
+  confirm. You cannot delete an analysis while it runs. If an answer in
+  another tab starts a job of the analysis during the delete, the delete
+  stops with the same message, and the analysis stays in the list
+  ([ADR 0107](adr/0107-a-delete-keeps-a-job-whose-child-is-in-flight.md)).
+  Some of its reports can be gone. The app keeps a usage
   row for each deleted job, so a delete does not reset the usage limits
   ([ADR 0066](adr/0066-a-deleted-job-leaves-a-usage-row.md)).
 - Select analyses with the checkboxes, then use **Delete selected**. The

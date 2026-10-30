@@ -827,6 +827,20 @@ class TestTheParentLock:
         assert asyncio.run(store.owned(orphan.id, "alice")) is None
 
     @pytest.mark.parametrize("child", [follow_up, amendment])
+    def test_a_parent_whose_child_is_in_flight_is_kept(self, store, child):
+        """A delete takes the parent's lock, as admission does, so a delete
+        and an answer that starts a child never both land (ADR 0107)."""
+        parent = waiting(store) if child is amendment else completed(store)
+        flying = child(parent)
+        asyncio.run(admit(store, flying))
+        assert asyncio.run(store.delete(parent, "alice")) is None
+        assert asyncio.run(store.owned(parent, "alice")) is not None
+        flying.transition("running")
+        flying.transition("failed")
+        asyncio.run(store.save(flying))
+        assert asyncio.run(store.delete(parent, "alice")) is not None
+
+    @pytest.mark.parametrize("child", [follow_up, amendment])
     def test_a_child_of_another_owners_job_is_refused(self, store, child):
         parent = (
             waiting(store, owner="mallory")

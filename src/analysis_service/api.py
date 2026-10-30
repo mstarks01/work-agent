@@ -938,8 +938,10 @@ def create_app(
         ``204`` where the job is deleted, and each route then reads it as
         missing. ``409`` where the job is queued or running and has not
         :func:`~analysis_service.jobs.ended`: an unreadable job has ended,
-        whatever its stored status (ADR 0095). A missing job, another owner's
-        job and an ID of another shape share one ``404``.
+        whatever its stored status (ADR 0095). ``409`` too where a job that
+        resumes or amends it is in flight, and the store keeps it (ADR 0107).
+        A missing job, another owner's job and an ID of another shape share
+        one ``404``.
         """
         record = await _answers(request).owned(job_id, owner_id)
         if not ended(record):
@@ -949,7 +951,13 @@ def create_app(
             )
         store: JobStore = request.app.state.store
         if await audited_delete(store, job_id, owner_id, "owner") is None:
-            raise NoSuchJob(job_id)
+            if await store.owned(job_id, owner_id) is None:
+                raise NoSuchJob(job_id)
+            raise HTTPException(
+                status_code=409,
+                detail="a job that continues this job is queued or running;"
+                " delete it when that job ends",
+            )
         return Response(status_code=204)
 
     @app.get("/v1/jobs/{job_id}/report")

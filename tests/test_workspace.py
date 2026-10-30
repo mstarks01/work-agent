@@ -321,3 +321,49 @@ class TestTheTitle:
             assert _rename(client, run, TITLE, headers={}).status_code == 403
             assert _rename(client, run, TITLE, headers=CROSS_SITE).status_code == 403
             assert client.get("/workspace/runs").json()[0]["title"] is None
+
+
+class AdmitsAChildOnDelete:
+    """A store that admits a follow-up of a job when the route deletes that
+    job, as an answer in another tab would between the route's check and its
+    delete."""
+
+    def __init__(self, store) -> None:
+        self._store = store
+        self.child: str | None = None
+
+    def __getattr__(self, name: str):
+        return getattr(self._store, name)
+
+    async def delete(self, job_id, owner_id, **cutoff):
+        from tests.factories import SEEDING_BUDGET
+        from tests.test_job_store import follow_up
+
+        if self.child is None:
+            child = follow_up(job_id).model_copy(update={"owner_id": owner_id})
+            admission = await self._store.reserve(
+                child, ceiling=100, budget=SEEDING_BUDGET, principal=None
+            )
+            assert admission.outcome == "admitted", admission
+            self.child = child.id
+        return await self._store.delete(job_id, owner_id, **cutoff)
+
+
+def test_a_child_started_during_the_delete_keeps_the_analysis(tiers):
+    """The store keeps a parent whose child is in flight (ADR 0107), so the
+    route answers 409 and the analysis stays whole."""
+    from analysis_service.jobs import InMemoryJobStore
+    from webapp.main import Workspace
+
+    store = AdmitsAChildOnDelete(InMemoryJobStore())
+    client = TestClient(
+        web.app_for(tiers, web.PausingRunner(), workspace=Workspace(store=store)),
+        base_url=LOOPBACK,
+    )
+    with client:
+        run = web._completed(client)
+        refused = client.delete(f"/workspace/runs/{run}", headers=SAME_ORIGIN)
+        assert refused.status_code == 409, refused.text
+        [row] = client.get("/workspace/runs").json()
+        assert row["run"] == store.child
+        assert asyncio.run(store.get(run)) is not None

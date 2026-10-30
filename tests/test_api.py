@@ -959,6 +959,23 @@ class TestDelete:
         assert response.headers["content-type"] == "application/problem+json"
         assert client.get(f"/v1/jobs/{record.id}", headers=auth()).status_code == 200
 
+    def test_a_job_whose_child_is_in_flight_is_409_and_stays(self):
+        """The store keeps a parent whose child holds a slot (ADR 0107)."""
+        from tests.test_job_store import follow_up
+
+        client, store = make_client()
+        job_id = submit(client)
+        owner_id = asyncio.run(store.get(job_id)).owner_id
+        child = follow_up(job_id).model_copy(update={"owner_id": owner_id})
+        admission = asyncio.run(
+            store.reserve(child, ceiling=100, budget=SEEDING_BUDGET, principal=None)
+        )
+        assert admission.outcome == "admitted", admission
+        response = client.delete(f"/v1/jobs/{job_id}", headers=auth())
+        assert response.status_code == 409
+        assert response.headers["content-type"] == "application/problem+json"
+        assert client.get(f"/v1/jobs/{job_id}", headers=auth()).status_code == 200
+
     def test_another_owner_cannot_delete_a_job(self):
         client, _ = make_client()
         job_id = submit(client, "alice-token")
