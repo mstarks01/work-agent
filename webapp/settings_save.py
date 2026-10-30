@@ -341,13 +341,15 @@ def _check(
     level on a model that takes none is refused on its own row.
 
     ``build`` builds the test Deployment and its runner, and the store check
-    runs :func:`~analysis_service.store_backends.build_store` and the
-    retention rule. No step calls a provider.
+    runs :func:`~analysis_service.store_backends.build_store` with its
+    first-run step and the retention rule, as the startup does. So a save can
+    name a SQLite file that does not exist yet (ADR 0110). No step calls a
+    provider.
     """
     built = build(env)
     found = [] if built.error is None else [_refusal_of(built.error)]
     try:
-        build_store(with_store_defaults(env))
+        build_store(with_store_defaults(env), first_run=True)
         retention_days(env)
     except (StoreConfigError, ImportError) as exc:
         found.append(Refusal(None, str(exc)))

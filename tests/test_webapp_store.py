@@ -14,12 +14,14 @@ import json
 import logging
 import re
 import sqlite3
+import stat
 import time
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from analysis_service import migrations
 from analysis_service.answer_sets import NO_ANSWERS
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import RESTART_FAILURE_MESSAGE, InMemoryJobStore, JobRecord
@@ -28,7 +30,7 @@ from analysis_service.store_backends import build_store
 from analysis_service.store_settings import StoreConfigError
 from tests import test_webapp
 from tests.factories import SEEDING_BUDGET, sample_selection, valid_model
-from tests.sql_stores import database_of, sql_env
+from tests.sql_stores import database_of, filesystem_env, sql_env, sqlite_url
 from tests.test_api import completed_days_ago
 from tests.test_sql_store import UNLISTED, store_unlisted
 from tests.test_webapp import (
@@ -178,6 +180,74 @@ class TestTheSettings:
                 time.sleep(0.01)
             assert client.portal.call(store.get, expired) is None
             assert client.portal.call(store.get, kept) is not None
+
+
+@pytest.fixture
+def first_run(tmp_path: Path, monkeypatch) -> Path:
+    """A ``sql`` store on a SQLite file that no migration touched, in a
+    private directory, set as the app reads it. The file does not exist."""
+    directory = tmp_path / "data"
+    directory.mkdir(mode=0o700)
+    database = directory / "jobs.db"
+    env = {
+        "ANALYSIS_JOB_STORE": "sql",
+        "ANALYSIS_DATABASE_URL": sqlite_url(database),
+        **filesystem_env(tmp_path),
+    }
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    return database
+
+
+def _migrated_lines(caplog) -> list[str]:
+    return [line for line in caplog.messages if "migrated the job database" in line]
+
+
+class TestTheFirstRunMigration:
+    """The first-run app migrates a SQLite database itself (ADR 0110)."""
+
+    @pytest.mark.parametrize("exists", [False, True], ids=["missing", "empty"])
+    def test_it_migrates_a_new_file_and_runs_on_it(
+        self, tiers, first_run, caplog, exists
+    ):
+        if exists:
+            first_run.touch(mode=0o600)
+        with (
+            caplog.at_level(logging.INFO, logger="analysis_service.sql_store"),
+            app(tiers) as client,
+        ):
+            run_to_completion(client)
+        assert stat.S_IMODE(first_run.stat().st_mode) == 0o600
+        line = f"from revision None to {migrations.head()}"
+        assert _migrated_lines(caplog) == [
+            f"the first-run app migrated the job database {line}"
+        ]
+
+    def test_a_file_at_the_latest_revision_stays_as_it_is(self, tiers, durable, caplog):
+        with (
+            caplog.at_level(logging.INFO, logger="analysis_service.sql_store"),
+            app(tiers),
+        ):
+            pass
+        assert _migrated_lines(caplog) == []
+
+    def test_a_revision_the_tree_does_not_hold_stops_the_startup(self, tiers, durable):
+        with sqlite3.connect(database_of(durable)) as connection:
+            connection.execute("UPDATE alembic_version SET version_num = 'r9999'")
+        with (
+            pytest.raises(StoreConfigError, match="revision r9999"),
+            app(tiers),
+        ):
+            pass
+
+    def test_a_file_that_is_not_a_database_stops_the_startup(
+        self, tiers, first_run, caplog
+    ):
+        first_run.write_bytes(b"not a database" * 100)
+        first_run.chmod(0o600)
+        with pytest.raises(StoreConfigError, match="cannot be migrated"):
+            app(tiers)
+        assert str(first_run) not in str(caplog.messages)
 
 
 class TestARestart:

@@ -512,6 +512,30 @@ class TestAStoreChange:
 
         assert saved.json()["restart"] == []
 
+    def test_a_new_sqlite_file_passes_and_is_migrated(self, tmp_path):
+        """The save check runs the first-run migration, as the startup does,
+        so a save can name a file that does not exist yet (ADR 0110)."""
+        from tests.sql_stores import filesystem_env, sqlite_url
+
+        client, _ = app_on(tmp_path, hand_written())
+        directory = tmp_path / "data"
+        directory.mkdir(mode=0o700)
+        database = directory / "jobs.db"
+        root = filesystem_env(directory)["ANALYSIS_OBJECT_ROOT"]
+
+        saved = save(
+            client,
+            {
+                "store.job_store": "sql",
+                "store.database_url": sqlite_url(database),
+                "store.object_store": "filesystem",
+                "store.object_root": root,
+            },
+        )
+
+        assert saved.status_code == 200, saved.text
+        assert stat.S_IMODE(database.stat().st_mode) == 0o600
+
     @pytest.mark.parametrize(
         ("credentials", "message"),
         [

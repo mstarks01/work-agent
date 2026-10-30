@@ -72,6 +72,23 @@ class JobStoreBackend:
     #: not read. A store that keeps none refuses each other one. The Settings
     #: page shows only these.
     reads: tuple[str, ...]
+    #: What the first-run app does to the store before it builds it: the
+    #: migration of a database that one person owns (ADR 0110).
+    first_run: Callable[[Mapping[str, str]], None]
+
+
+def _no_first_run(env: Mapping[str, str]) -> None:
+    """Do nothing: the store holds no schema."""
+
+
+def _sql_first_run(env: Mapping[str, str]) -> None:
+    """Migrate the database where its row allows it."""
+    try:
+        from analysis_service.sql_store import migrate_first_run_database
+    except ModuleNotFoundError:
+        # The build of the store names the missing extra.
+        return
+    migrate_first_run_database(env)
 
 
 def _sql_store(env: Mapping[str, str], objects: ObjectStore | None) -> JobStore:
@@ -92,12 +109,16 @@ def _sql_store(env: Mapping[str, str], objects: ObjectStore | None) -> JobStore:
 #: :data:`JobStoreName`.
 JOB_STORES: dict[JobStoreName, JobStoreBackend] = {
     "memory": JobStoreBackend(
-        build=lambda env, objects: InMemoryJobStore(), objects=False, reads=()
+        build=lambda env, objects: InMemoryJobStore(),
+        objects=False,
+        reads=(),
+        first_run=_no_first_run,
     ),
     "sql": JobStoreBackend(
         build=_sql_store,
         objects=True,
         reads=(DATABASE_URL_VAR, OBJECT_STORE_VAR),
+        first_run=_sql_first_run,
     ),
 }
 
@@ -124,7 +145,9 @@ def job_store_name(env: Mapping[str, str]) -> JobStoreName:
     return closed_setting(env.get(JOB_STORE_VAR, ""), JOB_STORE_VAR, JOB_STORES)
 
 
-def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
+def build_store(
+    env: Mapping[str, str] = os.environ, *, first_run: bool = False
+) -> JobStore:
     """Select and construct the configured job store; fail closed.
 
     The backend is chosen by ``ANALYSIS_JOB_STORE`` at deploy time — never by the
@@ -135,18 +158,26 @@ def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
     and refused, with each database setting, where it does not. This builds the
     store and opens no connection; :meth:`JobStore.startup_check` checks what
     the store reaches.
+
+    Only the first-run app passes ``first_run``: it runs the row's first-run
+    step after the object store is built and before the store is. The
+    ``/v1`` service never migrates (ADR 0110).
     """
     name = job_store_name(env)
     backend = JOB_STORES[name]
     if backend.objects:
-        return backend.build(env, build_object_store(env))
-    refuse_unread(
-        env,
-        ("ANALYSIS_DATABASE_", "ANALYSIS_OBJECT_"),
-        backend.reads,
-        f"the {name} job store",
-    )
-    return backend.build(env, None)
+        objects = build_object_store(env)
+    else:
+        refuse_unread(
+            env,
+            ("ANALYSIS_DATABASE_", "ANALYSIS_OBJECT_"),
+            backend.reads,
+            f"the {name} job store",
+        )
+        objects = None
+    if first_run:
+        backend.first_run(env)
+    return backend.build(env, objects)
 
 
 #: Why a job is deleted: its owner asked, its retention period passed, or the

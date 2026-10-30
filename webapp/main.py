@@ -1277,7 +1277,7 @@ def create_app(
         env = process_env
         startup = Startup(settings=None, frameworks=(), tiers=None, error=exc)
     if workspace is None:
-        store = build_store(with_store_defaults(env))
+        store = build_store(with_store_defaults(env), first_run=True)
         logger.info("job store: %s", type(store).__name__)
         workspace = Workspace(store=store)
     state = build(env) if startup is None else startup
