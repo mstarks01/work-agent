@@ -430,6 +430,30 @@ class TestTheStoreRowsOfUnsavedChanges:
         } <= shown
         assert "store.object_root" not in shown
 
+    @pytest.mark.parametrize(
+        ("mode", "shows_keys"), [("api_key", True), ("iam", False)]
+    )
+    def test_the_s3_key_rows_follow_the_credential_mode(
+        self, tmp_path, mode, shows_keys
+    ):
+        client = client_for(tmp_path, hand_written())
+
+        answer = rows_for(
+            client,
+            {
+                "store.job_store": "sql",
+                "store.object_store": "s3",
+                "store.object_credentials": mode,
+            },
+        )
+
+        keys = {
+            "store.object_access_key_id_file",
+            "store.object_secret_access_key_file",
+        }
+        shown = keys & set(answer.json()["shown"])
+        assert shown == (keys if shows_keys else set())
+
     def test_a_null_change_unsets_a_saved_store_setting(self, tmp_path):
         write_settings(tmp_path, hand_written(ANALYSIS_JOB_STORE="sql"))
         client = TestClient(
