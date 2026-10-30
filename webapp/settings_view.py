@@ -8,9 +8,12 @@ sets carries the shipped value beside it. The page locates each TOML file with
 the loader's reader, and where the loader refuses the path or the file, a row
 of that file shows the refusal in place of a value.
 
-The page shows a store row only where a loader reads it now: the store rows
+The page shows a store row only where a loader reads it: the store rows
 follow the ``reads`` of the selected job store, object store and database.
-A vendor row carries its vendor, and a credential row also the modes that
+The data carries every store row and the keys of the shown ones
+(``store_shown``). After a store edit, the page's script sends its unsaved
+changes, and :func:`store_shown` gives the keys again, so one save sets a job
+store and the settings that it reads. A vendor row carries its vendor, and a credential row also the modes that
 read it, from the ``VENDORS`` rows. The page's script shows a vendor row
 where a tier names the vendor and the mode reads the row, with the unsaved
 changes applied, so one save sets a tier and its key. An entry marked
@@ -108,39 +111,29 @@ def settings_view(
     process_env: Mapping[str, str],
     error: ConfigError | None,
 ) -> dict[str, Any]:
-    """The page's data: the rows, the unknown lines of ``settings.env``, the
-    engine's error, the modes of each vendor, the keys of the rows that choose
+    """The page's data: the rows, the keys of the shown store rows
+    (``store_shown``), the unknown lines of ``settings.env``, the engine's error, the modes of each vendor, the keys of the rows that choose
     a tier's vendor (``vendor_rows``), the ``iam`` notes and the model
     suggestions of each vendor. The page's script picks the suggestions of a
     tier from the vendor that the unsaved changes choose for it.
     """
     path = settings_dir(process_env) / SETTINGS_FILE
-    try:
-        revision, lines = read_settings(path)
-    except SettingsFileError:
-        # The startup refused the file for the same reason, and the banner
-        # names it. A save needs a revision, so the page cannot save.
-        revision, lines = None, {}
-    known = set(deployment_variables())
-    page = {var: line for var, line in lines.items() if var in known}
-    merged = {
-        **{var: line.value for var, line in page.items()},
-        **{var: process_env[var] for var in known & process_env.keys()},
-    }
+    revision, lines = _read_page(path)
+    page = _known(lines)
+    merged = _merged(process_env, page, {})
     files = _Files(merged)
     values = {
         key: _value(setting, process_env, page, files)
         for key, setting in SETTINGS.items()
     }
     owners = _vendor_rows()
-    shown = owners.keys() | _store_rows(merged)
-    hidden = _vendor_variables() | set(store_variables())
-    restart = set(store_variables())
+    unowned = _vendor_variables() - owners.keys()
+    stores = set(store_variables())
     secrets = secret_vars()
     rows = []
     for key, setting in SETTINGS.items():
         var = setting.variable
-        if setting.mark == "excluded" or (var in hidden and var not in shown):
+        if setting.mark == "excluded" or var in unowned:
             continue
         row = values[key] | {
             "key": key,
@@ -149,7 +142,8 @@ def settings_view(
             "mark": setting.mark,
             "reason": setting.reason,
             "note": setting.note,
-            "restart": var in restart,
+            "restart": var in stores,
+            "store": var in stores,
             "example": EXAMPLES.get(key),
             **_CONTROLS.get(key, {}),
             **(owners.get(var, {}) if var is not None else {}),
@@ -165,9 +159,10 @@ def settings_view(
         "unknown": [
             {"key": var, "line": line.number}
             for var, line in lines.items()
-            if var not in known
+            if var not in page
         ],
         "rows": rows,
+        "store_shown": _store_keys(merged),
         "modes": {
             vendor: [mode.value for mode in VENDORS[vendor].credential_modes]
             for vendor in VENDOR_NAMES
@@ -183,6 +178,65 @@ def settings_view(
             vendor: list(no_thinking_models(vendor)) for vendor in VENDOR_NAMES
         },
     }
+
+
+def store_shown(
+    process_env: Mapping[str, str], changes: Mapping[str, str | None]
+) -> list[str]:
+    """The keys of the store rows that the page shows with ``changes``, the
+    unsaved changes of the page, applied over ``settings.env``.
+
+    Only a change of a store setting that holds no secret counts, and the
+    process environment still wins over it. A ``null`` change unsets the
+    setting.
+    """
+    path = settings_dir(process_env) / SETTINGS_FILE
+    _, lines = _read_page(path)
+    return _store_keys(_merged(process_env, _known(lines), changes))
+
+
+def _read_page(path: Path) -> tuple[str | None, dict[str, SettingsLine]]:
+    """The revision and the lines of ``settings.env``, or no revision and no
+    lines where the file is refused."""
+    try:
+        return read_settings(path)
+    except SettingsFileError:
+        # The startup refused the file for the same reason, and the banner
+        # names it. A save needs a revision, so the page cannot save.
+        return None, {}
+
+
+def _known(lines: Mapping[str, SettingsLine]) -> dict[str, SettingsLine]:
+    """The lines of a variable that a Deployment Setting loader reads."""
+    known = set(deployment_variables())
+    return {var: line for var, line in lines.items() if var in known}
+
+
+def _merged(
+    process_env: Mapping[str, str],
+    page: Mapping[str, SettingsLine],
+    changes: Mapping[str, str | None],
+) -> dict[str, str]:
+    """The settings that the loaders read: the lines of ``page``, then the
+    store ``changes`` that hold no secret, then the process environment."""
+    merged = {var: line.value for var, line in page.items()}
+    stores = set(store_variables()) - secret_vars()
+    for key, value in changes.items():
+        setting = SETTINGS.get(key)
+        if setting is None or setting.variable not in stores:
+            continue
+        if value is None:
+            merged.pop(setting.variable, None)
+        else:
+            merged[setting.variable] = value
+    known = set(deployment_variables())
+    return merged | {var: process_env[var] for var in known & process_env.keys()}
+
+
+def _store_keys(merged: Mapping[str, str]) -> list[str]:
+    """The keys of the store rows that the settings in ``merged`` read."""
+    shown = _store_rows(merged)
+    return [key for key, setting in SETTINGS.items() if setting.variable in shown]
 
 
 def _controls() -> dict[str, dict[str, Any]]:

@@ -136,18 +136,28 @@ def parse_save(body: object) -> Save:
     :class:`SaveShapeError`."""
     if not isinstance(body, dict):
         raise SaveShapeError("the body is not an object")
+    changes = parse_changes(body)
     revision = body.get("revision")
-    changes = body.get("changes", {})
     remove = body.get("remove", [])
     if not isinstance(revision, str):
         raise SaveShapeError("revision is not text")
+    if not isinstance(remove, list) or not all(isinstance(var, str) for var in remove):
+        raise SaveShapeError("remove is not a list of text")
+    return Save(revision, changes, tuple(dict.fromkeys(remove)))
+
+
+def parse_changes(body: object) -> dict[str, str | None]:
+    """The ``changes`` object of ``body``, a parsed JSON value, or raise
+    :class:`SaveShapeError`. A save and the store row request of the page
+    both send it."""
+    if not isinstance(body, dict):
+        raise SaveShapeError("the body is not an object")
+    changes = body.get("changes", {})
     if not isinstance(changes, dict) or not all(
         isinstance(value, str | None) for value in changes.values()
     ):
         raise SaveShapeError("changes is not an object of text or null values")
-    if not isinstance(remove, list) or not all(isinstance(var, str) for var in remove):
-        raise SaveShapeError("remove is not a list of text")
-    return Save(revision, changes, tuple(dict.fromkeys(remove)))
+    return changes
 
 
 def _refusals(

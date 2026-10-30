@@ -83,7 +83,7 @@ The security posture is deliberate throughout:
   origin, through ``connect-src 'self'`` for ``/example``, ``/analyze``,
   ``/answer/{run}``, ``/amend/{run}``, ``/events/{run}`` and
   ``/workspace/runs``, the Settings page reaches only its own origin, to post
-  to ``/settings``, and the diagnostic page runs no
+  to ``/settings`` and ``/settings/rows``, and the diagnostic page runs no
   script, so it is granted no ``script-src`` at all. Each page declares what it does as a
   :class:`~webapp.page.Grants`, and the policy follows from the declaration
   rather than from a string this file keeps. A page and its policy are built
@@ -263,10 +263,11 @@ from webapp.settings_save import (
     Saved,
     SaveRefused,
     apply_save,
+    parse_changes,
     parse_save,
     restart_keys,
 )
-from webapp.settings_view import settings_view, with_store_defaults
+from webapp.settings_view import settings_view, store_shown, with_store_defaults
 
 logger = logging.getLogger("webapp")
 
@@ -1381,6 +1382,26 @@ def create_app(
                         ),
                     }
                 )
+
+    @app.post("/settings/rows")
+    async def settings_rows(request: Request) -> Response:
+        """The keys of the store rows that the Settings page shows with its
+        unsaved changes applied (:func:`~webapp.settings_view.store_shown`).
+        It writes nothing. The page sends no secret, and the route reads none.
+        """
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        media_type = request.headers.get("content-type", "").partition(";")[0]
+        if media_type.strip().lower() != "application/json":
+            return _message(415, "The changes are a JSON body.")
+        body = await _limited_body(request, MAX_SAVE_BYTES)
+        if body is None:
+            return _message(413, f"The changes are at most {MAX_SAVE_BYTES:,} bytes.")
+        try:
+            changes = parse_changes(json.loads(body))
+        except (ValueError, RecursionError):
+            return _message(400, "Expected a JSON object with a 'changes' object.")
+        return JSONResponse({"shown": store_shown(process_env, changes)})
 
     @app.get("/example", response_class=PlainTextResponse)
     async def example() -> Response:
