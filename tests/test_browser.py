@@ -733,9 +733,11 @@ def test_workspace_reopens_grouped_questions_and_renders_names_as_text(page):
     page.click("#library-nav")
     page.wait_for_selector("#analysis-list a")
     assert page.locator("#analysis-list th").all_inner_texts() == [
+        "",
         "Name",
         "Date",
         "Status",
+        "Actions",
     ]
     assert page.locator("#analysis-list time").first.get_attribute("datetime")
     page.locator('[data-sort="name"]').click()
@@ -745,6 +747,48 @@ def test_workspace_reopens_grouped_questions_and_renders_names_as_text(page):
     assert page.locator("#analysis-list img").count() == 0
     page.locator("#analysis-list a").click()
     page.wait_for_selector("#asked", state="visible")
+
+
+def submitted(page, name: str) -> None:
+    """Start a run that completes, through the page's own fetch, so the
+    request carries the browser's ``Sec-Fetch-Site``."""
+    from tests.test_webapp import posted
+
+    body = json.dumps(posted("A web app talks to a database.") | {"name": name})
+    status = page.evaluate(
+        """async (body) => (await fetch("/analyze", {method: "POST",
+        headers: {"Content-Type": "application/json"}, body})).status""",
+        body,
+    )
+    assert status == 200
+
+
+def test_the_analyses_list_renames_filters_and_deletes(page):
+    submitted(page, '<img src=x onerror="alert(1)">')
+    submitted(page, "Beta")
+    page.goto("/?view=analyses")
+    page.wait_for_selector("#analysis-rows tr >> nth=1")
+    page.fill("#analysis-search", "beta")
+    assert page.locator("#analysis-rows tr").count() == 1
+    page.fill("#analysis-search", "")
+    page.select_option("#analysis-status", "running")
+    assert page.is_visible("#analysis-empty")
+    page.select_option("#analysis-status", "")
+    page.click('[aria-label="Rename Beta"]')
+    page.fill("#analysis-rows input:not([type=checkbox])", "<script>x</script> board")
+    page.keyboard.press("Enter")
+    page.wait_for_selector("text=<script>x</script> board")
+    assert page.locator("#analysis-list img, #analysis-list script").count() == 0
+    page.check("#select-shown")
+    assert page.inner_text("#delete-selected") == "Delete selected (2)"
+    page.click("#delete-selected")
+    assert "2 analyses" in page.inner_text("#confirm-delete-text")
+    page.click("#confirm-delete-cancel")
+    assert page.locator("#analysis-rows tr").count() == 2
+    page.click("#delete-selected")
+    page.click("#confirm-delete-go")
+    page.wait_for_selector("#analysis-empty", state="visible")
+    assert page.inner_text("#workspace-message") == "Deleted 2 analyses."
 
 
 def test_the_settings_page_runs_its_script(browser, tmp_path):

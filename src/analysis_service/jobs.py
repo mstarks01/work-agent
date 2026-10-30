@@ -157,6 +157,7 @@ RECORD_FIELDS: dict[str, EnvelopeHold] = {
     "sources": "never",
     "frameworks": "same-schema",
     "system_name": "always",
+    "title": "always",
     "answers": "same-schema",
     "shown_early": "same-schema",
     "corrections": "same-schema",
@@ -342,6 +343,10 @@ class JobRecord(BaseModel):
     # another schema version (:func:`envelope_parts`).
     frameworks: Annotated[list[FrameworkSelection], Field(min_length=1)] | None
     system_name: str | None = None
+    # The name the operator gave the analysis in the web app's workspace.
+    # Only :meth:`JobStore.set_title` writes it after admission, and a save
+    # keeps the stored value. The report never reads it (ADR 0106).
+    title: str | None = None
     # The submitter's answers to an earlier report's link questions and open
     # facts. They are also composed into the answers Source, which is what an
     # answer's row quotes; these are what ``prepare`` writes the rows from. See
@@ -430,6 +435,7 @@ class JobRecord(BaseModel):
         sources: Sequence[Source],
         frameworks: Sequence[FrameworkSelection],
         system_name: str | None = None,
+        title: str | None = None,
         answers: AnswerSet = NO_ANSWERS,
         shown_early: Sequence[UnknownKey] = (),
         skipped_early: Sequence[SkipKey] = (),
@@ -449,6 +455,7 @@ class JobRecord(BaseModel):
             sources=list(sources),
             frameworks=list(frameworks),
             system_name=system_name,
+            title=title,
             answers=answers,
             shown_early=list(shown_early),
             skipped_early=list(skipped_early),
@@ -608,6 +615,7 @@ class UnreadableRecord(BaseModel):
     owner_id: str
     schema_version: str
     system_name: str | None
+    title: str | None
     created_at: datetime
     updated_at: datetime
     #: ``None`` where the stored status is not a :data:`JobStatus`.
@@ -820,6 +828,15 @@ class JobStore(Protocol):
         draft: AnswerSet,
         revision: int,
     ) -> bool: ...
+
+    async def set_title(self, job_id: str, owner_id: str, title: str | None) -> bool:
+        """Write the workspace title of the owned job (ADR 0106).
+
+        False where the job is missing or another owner's, and nothing
+        changes. The revision and ``updated_at`` stay as they are, so a
+        rename makes no saved answer stale.
+        """
+        ...
 
     async def owned_jobs(self, owner_id: str) -> list[Envelope]:
         """Every job of the owner, as envelopes, oldest first. A job whose
@@ -1257,7 +1274,9 @@ class InMemoryJobStore:
             raise ValueError(f"job {record.id!r} does not exist")
         digest = None if held.report is None else report_digest(held.report)
         check_save(record, digest, held.events)
-        self._records[record.id] = record.model_copy(deep=True)
+        self._records[record.id] = record.model_copy(
+            deep=True, update={"title": held.title}
+        )
 
     async def save_answers(
         self,
@@ -1352,6 +1371,13 @@ class InMemoryJobStore:
         record.revision += 1
         record.corrections = list(corrections)
         record.updated_at = datetime.now(UTC)
+        return True
+
+    async def set_title(self, job_id: str, owner_id: str, title: str | None) -> bool:
+        record = self._records.get(job_id)
+        if record is None or record.owner_id != owner_id:
+            return False
+        record.title = title
         return True
 
     async def owned_jobs(self, owner_id: str) -> list[Envelope]:

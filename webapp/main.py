@@ -280,6 +280,8 @@ PORT = 8000
 #: to stay inside the bound.
 MAX_RUNS = 20
 
+_STILL_RUNNING = "This analysis is still running. Delete it when it stops."
+
 #: The report page loads nothing external. It reaches its own origin to post
 #: answers to ``/answer/{run}`` and corrections to ``/correct/{run}``.
 _REPORT_GRANTS = Grants(script=True, style=True, connect=True)
@@ -485,6 +487,19 @@ class Workspace:
             current = above
         return current.id
 
+    async def analysis(self, answers: JobAnswers, job_id: str) -> list[Envelope]:
+        """Every job of the analysis that holds ``job_id``, oldest first, or
+        none where the operator holds no job ``job_id``."""
+        record = await self.owned(answers, job_id)
+        if record is None:
+            return []
+        group = await self.workspace_id(record)
+        return [
+            item
+            for item in await self.jobs(answers)
+            if await self.workspace_id(item) == group
+        ]
+
     async def snapshots(self, answers: JobAnswers) -> list[dict[str, object]]:
         """Latest retained job per analysis, with its retained reports, newest first."""
         grouped: dict[str, list[Envelope]] = {}
@@ -517,6 +532,7 @@ class Workspace:
         return {
             "run": record.id,
             "name": _name_of(record),
+            "title": record.title,
             "created_at": min(
                 (item.created_at for item in related), default=record.created_at
             ).isoformat(),
@@ -663,7 +679,9 @@ def _body_of(raw: object, model: type[BaseModel]) -> dict[str, object]:
 
 
 def _name_of(record: Envelope) -> str:
-    return record.system_name or DEFAULT_NAME
+    """The name each workspace view shows. The report shows its own
+    ``system_name`` and never the title (ADR 0106)."""
+    return record.title or record.system_name or DEFAULT_NAME
 
 
 def _selection_of(record: Envelope) -> list[FrameworkSelection]:
@@ -1400,6 +1418,51 @@ def create_app(
                 record.id, owner_id
             )
         return JSONResponse(payload)
+
+    @app.delete("/workspace/runs/{run_id}")
+    async def delete_analysis(run_id: str, request: Request) -> Response:
+        """Delete every job of the analysis, the newest first, and keep each
+        job's usage row (ADR 0066). Refused while a job of it has not ended."""
+        if not is_same_origin(request):
+            logger.warning("refused a DELETE of an analysis that was not same-origin")
+            return _message(403, "This request did not come from the app's own page.")
+        answers = cell.read(unavailable).answers
+        group = await workspace.analysis(answers, run_id)
+        if not group:
+            return no_such_run()
+        if not all(ended(job) for job in group):
+            return _message(409, _STILL_RUNNING)
+        for job in reversed(group):
+            removed = await audited_delete(
+                workspace.store, job.id, job.owner_id, "owner"
+            )
+            if removed is None:
+                # A job of the group started after the check above.
+                return _message(409, _STILL_RUNNING)
+        return Response(status_code=204)
+
+    @app.put("/workspace/runs/{run_id}/title")
+    async def rename_analysis(run_id: str, request: Request) -> Response:
+        """Write the title on every job of the analysis (ADR 0106). A blank
+        title removes it, and the list shows the system name again."""
+        if not is_same_origin(request):
+            logger.warning("refused a title PUT that was not same-origin")
+            return _message(403, "This request did not come from the app's own page.")
+        answers = cell.read(unavailable).answers
+        body = await _json(request)
+        sent = body.get("title") if isinstance(body, dict) else None
+        if not isinstance(sent, str):
+            return _message(400, _NAME_REFUSED)
+        try:
+            title = clean_system_name(sent)
+        except ValueError:
+            return _message(400, _NAME_REFUSED)
+        group = await workspace.analysis(answers, run_id)
+        if not group:
+            return no_such_run()
+        for job in group:
+            await workspace.store.set_title(job.id, job.owner_id, title)
+        return JSONResponse({"title": title})
 
     @app.post("/analyze")
     async def analyze(request: Request) -> Response:

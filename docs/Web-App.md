@@ -487,9 +487,23 @@ Reopening a running analysis polls a read-only snapshot, leaving its original
 progress stream alone. An analysis that the app cannot read, because another
 schema version stored it or a stored value is one the app no longer lists,
 stays in the list. A run whose stored value the app no longer lists shows as
-**Cannot be read**. Its pages return `409` and ask you to submit it again. Names are limited to 200 characters on one line. Search filters
-the held analyses by name. The list shows each analysis's name, creation date,
-and status, and can be sorted by name or date.
+**Cannot be read**. Its pages return `409` and ask you to submit it again. Names are limited to 200 characters on one line.
+
+The list shows each analysis's name, creation date and status, and can be
+sorted by name or date. The search box filters the list by name and framework.
+The status and framework selects filter it more.
+
+- **Rename** gives the analysis a title. The list shows the title in place of
+  the system name, and a blank title shows the system name again. The report
+  keeps the system name that you submitted
+  ([ADR 0106](adr/0106-a-workspace-title-is-a-label-and-the-report-keeps-its-system-name.md)).
+- **Delete** removes the analysis with each of its reports, after you
+  confirm. You cannot delete an analysis while it runs. The app keeps a usage
+  row for each deleted job, so a delete does not reset the usage limits
+  ([ADR 0066](adr/0066-a-deleted-job-leaves-a-usage-row.md)).
+- Select analyses with the checkboxes, then use **Delete selected**. The
+  checkbox in the header selects each analysis that the filters show. The page
+  lists each analysis that it could not delete, with the reason.
 
 The bound of 20 runs still applies. With the `memory` store, a restart clears
 everything; with a `sql` store, the analyses stay

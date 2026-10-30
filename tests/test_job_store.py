@@ -925,6 +925,31 @@ class TestTheSaves:
         saved = asyncio.run(store.get(final_job))
         assert (saved.corrections, saved.revision) == (first, revision + 1)
 
+    def test_a_title_lands_only_on_the_owners_job_and_moves_no_revision(self, store):
+        """ADR 0106: a rename makes no saved answer stale."""
+        job = completed(store)
+        before = asyncio.run(store.get(job))
+        assert not asyncio.run(store.set_title(job, "mallory", "Orders"))
+        assert not asyncio.run(store.set_title("job-missing", "alice", "Orders"))
+        assert asyncio.run(store.set_title(job, "alice", "Orders"))
+        saved = asyncio.run(store.get(job))
+        assert saved.title == "Orders"
+        assert (saved.revision, saved.updated_at) == (
+            before.revision,
+            before.updated_at,
+        )
+        assert asyncio.run(store.owned(job, "alice")).title == "Orders"
+        assert asyncio.run(store.set_title(job, "alice", None))
+        assert asyncio.run(store.get(job)).title is None
+
+    def test_a_save_keeps_the_stored_title(self, store):
+        """A runner saves the record it read, so a save never writes the title."""
+        job = completed(store)
+        held = asyncio.run(store.get(job))
+        assert asyncio.run(store.set_title(job, "alice", "Orders"))
+        asyncio.run(store.save(held))
+        assert asyncio.run(store.get(job)).title == "Orders"
+
 
 class TestTheSaveContract:
     """A report is written once, and a save only appends events."""
@@ -1759,6 +1784,7 @@ class TestTheSchemaVersion:
             owner_id=record.owner_id,
             schema_version=SCHEMA_VERSION,
             system_name=None,
+            title=None,
             created_at=record.created_at,
             updated_at=record.updated_at,
             status=None,

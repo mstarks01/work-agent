@@ -691,8 +691,54 @@ summary:hover {
   margin:12px 0 0;
   color:var(--text)
 }
-#analysis-search {
-  max-width:360px
+.analysis-filters {
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px 16px
+}
+.analysis-filters > div {
+  flex:1 1 180px
+}
+.analysis-filters > div:first-child {
+  flex-basis:280px
+}
+.analysis-filters select {
+  width:100%
+}
+.analysis-actions {
+  margin-top:16px
+}
+.danger {
+  color:var(--error);
+  border-color:var(--error)
+}
+.danger:hover {
+  background:var(--error-bg)
+}
+#confirm-delete {
+  max-width:min(440px,calc(100vw - 32px));
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--canvas);
+  color:var(--text);
+  padding:20px
+}
+#confirm-delete::backdrop {
+  background:rgb(0 0 0 / .35)
+}
+.dialog-actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:10px
+}
+.row-actions {
+  display:flex;
+  gap:6px;
+  white-space:nowrap
+}
+.row-actions button {
+  min-height:34px;
+  padding:5px 10px
 }
 .analysis-table-wrap {
   overflow-x:auto;
@@ -700,7 +746,7 @@ summary:hover {
 }
 #analysis-list {
   display:table;
-  min-width:480px;
+  min-width:640px;
   width:100%;
   overflow:visible
 }
@@ -712,8 +758,14 @@ summary:hover {
   padding:14px 10px
 }
 #analysis-list th:first-child,#analysis-list td:first-child {
-  width:55%;
+  width:1%;
   padding-left:0
+}
+#analysis-list .name-cell {
+  width:45%
+}
+#analysis-list .name-cell input {
+  min-width:0
 }
 #analysis-list th:last-child,#analysis-list td:last-child {
   padding-right:0

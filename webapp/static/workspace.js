@@ -67,6 +67,58 @@ const workspace = (() => {
     if (!response.ok) throw new Error(data.message);
     return data;
   };
+  // Ask once with the native dialog; resolves true on Delete.
+  const confirmDelete = (text) => new Promise((resolve) => {
+    const dialog = el("confirm-delete");
+    el("confirm-delete-text").textContent = text;
+    const done = (answer) => { dialog.onclose = null; dialog.close(); resolve(answer); };
+    el("confirm-delete-go").onclick = () => done(true);
+    el("confirm-delete-cancel").onclick = () => done(false);
+    dialog.onclose = () => resolve(false);
+    dialog.showModal();
+  });
+  // One DELETE per analysis; a refusal does not stop the others.
+  const deleteRuns = async (runs) => {
+    const reports = runs.reduce((total, run) => total + run.reports.length, 0);
+    const text = runs.length === 1
+      ? "Delete “" + runs[0].name + "” and its " + counted(reports, "report", "reports") + "? You cannot undo this."
+      : "Delete " + counted(runs.length, "analysis", "analyses") + " and their " + counted(reports, "report", "reports") + "? You cannot undo this.";
+    if (!await confirmDelete(text)) return;
+    const refused = [];
+    for (const run of runs) {
+      const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run), {method: "DELETE"});
+      if (!response.ok) refused.push(run.name + ": " + ((await response.json().catch(() => ({}))).message || "Could not delete it."));
+    }
+    await library();
+    message(refused.length ? "Not deleted. " + refused.join(" ") : "Deleted " + counted(runs.length, "analysis", "analyses") + ".");
+  };
+  const rename = (run, cell) => {
+    const input = document.createElement("input");
+    input.value = run.title || run.name;
+    input.maxLength = el("analysis-name").maxLength;
+    input.setAttribute("aria-label", "New name for " + run.name);
+    let settled = false;
+    const save = async (keep) => {
+      if (settled) return;
+      settled = true;
+      if (keep && input.value !== (run.title || run.name)) {
+        const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/title", {
+          method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({title: input.value}),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) { await library(); message(data.message || "Could not rename it."); return; }
+      }
+      await library();
+    };
+    input.onkeydown = (event) => {
+      if (event.key === "Enter") save(true);
+      else if (event.key === "Escape") save(false);
+    };
+    input.onblur = () => save(true);
+    cell.replaceChildren(input);
+    input.focus();
+    input.select();
+  };
   const library = async () => {
     ++generation;
     show("library-panel");
@@ -78,39 +130,91 @@ const workspace = (() => {
       const data = await response.json();
       let sortBy = "date";
       let descending = true;
+      const selected = new Set();
+      const fill = (select, values, label) => {
+        const chosen = select.value;
+        select.replaceChildren(select.options[0], ...values.map((value) => {
+          const option = node("option", label(value));
+          option.value = value;
+          return option;
+        }));
+        select.value = values.includes(chosen) ? chosen : "";
+      };
+      fill(el("analysis-status"), Object.keys(labels), (status) => labels[status]);
+      fill(el("analysis-framework"), [...document.querySelectorAll("input[name=framework]")].map((box) => box.value), (name) => name);
+      let shown = [];
       const render = () => {
         el("analysis-rows").replaceChildren();
-        const found = data.filter((run) => run.name.toLocaleLowerCase().includes(el("analysis-search").value.toLocaleLowerCase()));
-        found.sort((left, right) => {
+        const text = el("analysis-search").value.toLocaleLowerCase();
+        const status = el("analysis-status").value;
+        const framework = el("analysis-framework").value;
+        shown = data.filter((run) =>
+          [run.name, ...run.frameworks].some((value) => value.toLocaleLowerCase().includes(text))
+          && (!status || run.status === status)
+          && (!framework || run.frameworks.includes(framework)));
+        shown.sort((left, right) => {
           const order = sortBy === "name"
             ? left.name.localeCompare(right.name, undefined, { sensitivity: "base", numeric: true })
             : new Date(left.created_at) - new Date(right.created_at);
           return (descending ? -order : order) || left.name.localeCompare(right.name);
         });
-        found.forEach((run) => {
+        shown.forEach((run) => {
           const link = node("a", run.name);
           link.href = "/?run=" + encodeURIComponent(run.run);
           const created = node("time", new Date(run.created_at).toLocaleDateString(undefined, {dateStyle: "medium"}));
           created.dateTime = run.created_at;
           const row = node("tr", "");
-          const nameCell = node("td", "");
+          const selectCell = node("td", "");
+          const nameCell = node("td", "", "name-cell");
           const dateCell = node("td", "");
           const statusCell = node("td", "");
+          const actionCell = node("td", "");
+          const box = document.createElement("input");
+          box.type = "checkbox";
+          box.checked = selected.has(run.run);
+          box.setAttribute("aria-label", "Select " + run.name);
+          box.onchange = () => { box.checked ? selected.add(run.run) : selected.delete(run.run); update(); };
+          const actions = node("div", "", "row-actions");
+          const renameButton = node("button", "Rename");
+          renameButton.type = "button";
+          renameButton.setAttribute("aria-label", "Rename " + run.name);
+          renameButton.onclick = () => rename(run, nameCell);
+          const deleteButton = node("button", "Delete", "danger");
+          deleteButton.type = "button";
+          deleteButton.setAttribute("aria-label", "Delete " + run.name);
+          deleteButton.onclick = () => deleteRuns([run]);
+          actions.append(renameButton, deleteButton);
+          selectCell.append(box);
           nameCell.append(link);
           dateCell.append(created);
           statusCell.append(node("span", labels[run.status] || run.status, "badge"));
-          row.append(nameCell, dateCell, statusCell);
+          actionCell.append(actions);
+          row.append(selectCell, nameCell, dateCell, statusCell, actionCell);
           el("analysis-rows").append(row);
         });
-        el("analysis-list").hidden = !found.length;
-        el("analysis-empty").hidden = Boolean(found.length);
+        el("analysis-list").hidden = !shown.length;
+        el("analysis-empty").hidden = Boolean(shown.length);
         el("analysis-empty").textContent = data.length
-          ? "No analyses match your search."
+          ? "No analyses match your filters."
           : "Start with a system description. Your analyses will appear here.";
         for (const key of ["name", "date"]) {
           el("sort-" + key).setAttribute("aria-sort", sortBy === key ? (descending ? "descending" : "ascending") : "none");
         }
+        update();
       };
+      // Only rows the filters show count as selected.
+      const update = () => {
+        const chosen = shown.filter((run) => selected.has(run.run));
+        el("delete-selected").disabled = !chosen.length;
+        el("delete-selected").textContent = chosen.length ? "Delete selected (" + chosen.length + ")" : "Delete selected";
+        el("select-shown").checked = Boolean(shown.length) && chosen.length === shown.length;
+        el("select-shown").indeterminate = Boolean(chosen.length) && chosen.length < shown.length;
+      };
+      el("select-shown").onchange = () => {
+        shown.forEach((run) => { el("select-shown").checked ? selected.add(run.run) : selected.delete(run.run); });
+        render();
+      };
+      el("delete-selected").onclick = () => deleteRuns(shown.filter((run) => selected.has(run.run)));
       el("library-panel").querySelectorAll("[data-sort]").forEach((button) => {
         button.onclick = () => {
           const key = button.dataset.sort;
@@ -120,6 +224,8 @@ const workspace = (() => {
         };
       });
       el("analysis-search").oninput = render;
+      el("analysis-status").onchange = render;
+      el("analysis-framework").onchange = render;
       render();
     } catch (error) { message(error.message); }
   };

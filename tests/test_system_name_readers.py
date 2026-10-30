@@ -1,7 +1,8 @@
 """The system name rule, and the entry points held against each other.
 
 ``clean_system_name`` is the rule. The HTTP route, the in-process engine, the
-web app's form route and the stored report's own field are its four callers,
+web app's form route, the web app's rename route and the stored report's own
+field are its five callers,
 and this file does the job
 the parity suites do elsewhere: never ask whether a caller agrees with its own
 expectation, ask whether the callers agree with each other.
@@ -15,6 +16,8 @@ what the report says.
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -27,8 +30,14 @@ from analysis_service.sources import MAX_SYSTEM_NAME_CHARS, Source, clean_system
 from tests.factories import TEST_TIER_ENV
 from tests.test_api import auth, make_client, submission
 from tests.test_engine import RecordingRunner, analyze, engine_for
-from tests.test_webapp import LOOPBACK, SAME_ORIGIN, posted, startup_for
-from webapp.main import create_app
+from tests.test_webapp import (
+    LOOPBACK,
+    SAME_ORIGIN,
+    posted,
+    run_to_completion,
+    startup_for,
+)
+from webapp.main import Workspace, create_app
 
 # Written as escapes rather than as themselves: every one of these is invisible
 # or reorders the line around it, which is the property that makes it worth
@@ -115,6 +124,25 @@ def _webapp_outcome(name: str) -> Outcome:
     return (True, runner.jobs[0].system_name)
 
 
+def _title_outcome(name: str) -> Outcome:
+    """What the workspace's rename route did with ``name``, by its status and
+    the title it wrote onto the job."""
+    tiers = Deployment.from_env(env=TEST_TIER_ENV).tiers
+    workspace = Workspace()
+    client = TestClient(create_app(startup_for(tiers), workspace), base_url=LOOPBACK)
+    with client:
+        run = run_to_completion(client)
+        response = client.put(
+            f"/workspace/runs/{run}/title", json={"title": name}, headers=SAME_ORIGIN
+        )
+        assert response.status_code in {200, 400}, response.status_code
+        if response.status_code == 400:
+            return (False, None)
+        record = asyncio.run(workspace.store.get(run))
+        assert record is not None
+        return (True, record.title)
+
+
 def _rule_outcome(name: str) -> Outcome:
     """What the shared rule says, in the shape the doors are read in."""
     try:
@@ -125,8 +153,14 @@ def _rule_outcome(name: str) -> Outcome:
 
 @pytest.mark.parametrize("name", NAMES)
 def test_the_entry_points_agree(name: str) -> None:
-    """The route, the engine and the web app refuse and store the same names."""
-    assert _http_outcome(name) == _engine_outcome(name) == _webapp_outcome(name)
+    """The route, the engine, the web app and its rename refuse and store the
+    same names."""
+    assert (
+        _http_outcome(name)
+        == _engine_outcome(name)
+        == _webapp_outcome(name)
+        == _title_outcome(name)
+    )
 
 
 @pytest.mark.parametrize("name", NAMES)
@@ -137,6 +171,7 @@ def test_neither_door_departs_from_the_rule(name: str) -> None:
     assert _http_outcome(name) == expected
     assert _engine_outcome(name) == expected
     assert _webapp_outcome(name) == expected
+    assert _title_outcome(name) == expected
 
 
 def test_the_form_field_takes_the_rule_bound() -> None:
