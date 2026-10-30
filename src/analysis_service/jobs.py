@@ -850,7 +850,10 @@ class JobStore(Protocol):
         """Delete the owned job's content and keep its usage row (ADR 0066).
 
         The number of objects the delete removed, or ``None`` where nothing
-        changed: the job is missing, another owner's, or not :func:`ended`.
+        changed: the job is missing, another owner's, or not :func:`ended`, or
+        a job that resumes or amends it holds a slot (ADR 0107). The delete
+        checks the child under the lock that admission takes on the parent, so
+        a delete and the admission of a child never both land.
         Where ``updated_before`` is set, a job whose last update is
         not before it also answers ``None``. The store checks it in the step
         that deletes, so a job that changed after the retention sweep listed
@@ -938,10 +941,11 @@ def _parent_id(row: JobRecord | UsageRow) -> str | None:
     return parent_of(row) if isinstance(row, JobRecord) else row.parent_id
 
 
-def _holds_a_slot(job: Envelope | UsageRow) -> bool:
+def holds_a_slot(job: Envelope | UsageRow) -> bool:
     """Whether ``job`` holds one of its owner's in-flight slots: it has not
     :func:`ended`. A usage row holds none, because a store deletes only a job
-    that has ended."""
+    that has ended. A store also keeps a job whose child holds a slot
+    (ADR 0107)."""
     return not isinstance(job, UsageRow) and not ended(job)
 
 
@@ -955,7 +959,7 @@ def locks_its_parent(child: Envelope | UsageRow) -> bool:
     stored status locks only where it is terminal, and a usage row keeps the
     stored status of the job it held (ADR 0095). Each job store asks it.
     """
-    if _holds_a_slot(child):
+    if holds_a_slot(child):
         return True
     status = child.status
     return status in TERMINAL_STATUSES and status not in NON_LOCKING_STATUSES
@@ -990,7 +994,7 @@ def check_bounds(
     held = list(held)
     mine = [job for job in held if job.owner_id == record.owner_id]
 
-    active = sum(1 for job in mine if _holds_a_slot(job))
+    active = sum(1 for job in mine if holds_a_slot(job))
     if active >= ceiling:
         return Admission(outcome="at_ceiling", active=active)
 
@@ -1399,9 +1403,11 @@ class InMemoryJobStore:
         """Remove the owned job's content, and keep its usage row (ADR 0066).
 
         Only a job that has :func:`ended` can be deleted: a job in flight
-        holds a slot its run releases. ``None`` where the job is missing, not
-        the owner's, not ended or not last updated before ``updated_before``,
-        and nothing changes. Else ``0``: this store holds no objects.
+        holds a slot its run releases. A job whose child holds a slot stays
+        too (ADR 0107). ``None`` where the job is missing, not the owner's,
+        not ended, kept by its child or not last updated before
+        ``updated_before``, and nothing changes. Else ``0``: this store holds
+        no objects.
         """
         record = self._records.get(job_id)
         if (
@@ -1409,6 +1415,10 @@ class InMemoryJobStore:
             or record.owner_id != owner_id
             or not ended(record)
             or (updated_before is not None and record.updated_at >= updated_before)
+            or any(
+                _parent_id(child) == job_id and holds_a_slot(child)
+                for child in self._rows()
+            )
         ):
             return None
         del self._records[job_id]

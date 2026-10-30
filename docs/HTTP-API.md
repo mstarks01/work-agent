@@ -120,7 +120,9 @@ job it resumes only where its stored status is `completed` or
 **Owner** can delete a job, and only a job that has ended: a job in a terminal
 status (`completed`, `failed`, `rejected` or `awaiting-answers`), or an
 [unreadable job](#a-job-from-an-older-schema-version). A `queued` or `running`
-job returns `409`, and the job stays as it is. A job that is not yours, a job that does not
+job returns `409`, and the job stays as it is. A job whose follow-up or
+amendment job is `queued` or `running` also returns `409` and stays, until
+that job ends (ADR 0107). A job that is not yours, a job that does not
 exist and an ID that is not `job-` with 32 lowercase hex digits all return the
 same `404`. The service checks the ID before it looks for the job.
 
@@ -1227,7 +1229,8 @@ sweep runs when the service starts and then once each hour, so a job stays
 for one hour after its period at most. The sweep deletes a job that has
 ended: a job in a terminal status (`completed`, `failed`, `rejected` or
 `awaiting-answers`), or an [unreadable job](#a-job-from-an-older-schema-version).
-It never deletes a `queued` or `running` job. The store checks the period again when it
+It never deletes a `queued` or `running` job, or a job whose follow-up or
+amendment job is `queued` or `running` (ADR 0107). The store checks the period again when it
 deletes the job, so a job that changes after the sweep finds it stays. A swept job is deleted the same way as a
 job that its owner [deletes](#deleting-a-job): the job keeps its usage row,
 and the service log gets one line with the cause `retention`. The service
