@@ -32,7 +32,7 @@ credential from the metadata server.**
 
 - `ANALYSIS_OBJECT_CREDENTIALS` stays required. `api_key` stops the startup,
   and the message says that a key file and an HMAC key are out of scope.
-- A new module, `gcp_identity`, holds `platform_credentials(label)`. It calls
+- A new module, `gcp_identity`, holds `platform_credentials(setting)`. It calls
   `google.auth.default()` with the scope
   `https://www.googleapis.com/auth/devstorage.read_write`. It refuses each
   result that is not a `compute_engine.Credentials`. The `gcs` row passes the

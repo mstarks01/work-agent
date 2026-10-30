@@ -35,13 +35,13 @@ APPLICATION_CREDENTIALS_VAR = "GOOGLE_APPLICATION_CREDENTIALS"
 ACCEPTED_TYPE = "google.auth.compute_engine.Credentials"
 
 
-def platform_credentials(label: str) -> Credentials:
+def platform_credentials(setting: str) -> Credentials:
     """The credential of the metadata server, with :data:`STORAGE_SCOPE` only.
 
     Each other type that ``google.auth.default()`` returns stops the startup,
-    and so does a chain that finds no credential. ``label`` names the setting
-    in the error, which names the accepted type and the type found, and no
-    credential and no path.
+    and so does a chain that finds no credential. The error names ``setting``,
+    the setting that asks for this identity. It names the accepted type and the
+    type found, and no credential and no path.
     """
     import google.auth
     from google.auth import compute_engine
@@ -62,6 +62,6 @@ def platform_credentials(label: str) -> Credentials:
         else ""
     )
     raise StoreConfigError(
-        f"{label} reads only the identity of the metadata server"
+        f"{setting} reads only the identity of the metadata server"
         f" ({ACCEPTED_TYPE}), and google.auth found {found}{source}"
     )
