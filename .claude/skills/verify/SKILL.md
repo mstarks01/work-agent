@@ -10,31 +10,55 @@ Production auth needs `ANALYSIS_AUTH_PROVIDER=oidc` plus `ANALYSIS_OIDC_ISSUER`,
 `ANALYSIS_OIDC_AUDIENCE`, and `ANALYSIS_OIDC_JWKS_URL`; `create_app()` fails closed
 without them.
 
-## Launch with real auth (no IdP needed)
+## Launch offline
 
-Run a throwaway JWKS: generate an RSA key, serve
-`{"keys": [jwt.algorithms.RSAAlgorithm.to_jwk(pub)]}` (add `kid`/`alg`) from a
-stdlib `HTTPServer` thread, set `ANALYSIS_AUTH_PROVIDER=oidc`, point
-`ANALYSIS_OIDC_JWKS_URL` at it, mint RS256
-tokens with matching `kid`, `iss`, `aud`, `exp`, `sub`. Then:
+`OidcSettings` refuses a JWKS URL that is not `https://`, so a local JWKS
+server on `http://` cannot stand in for an IdP. Pass a verifier to
+`create_app()` in its place. A runner in place of a **Deployment** also needs
+each setting the Deployment would give. Take them from `tests/test_api.py`, as
+`make_client` does:
 
-```bash
-uv run python <script that sets env, then uvicorn.run(create_app(), port=8470)>
+```python
+import os
+import sys
+
+os.environ |= {"ANALYSIS_OFFLINE": "1", "ANALYSIS_JOB_STORE": "memory"}
+sys.path.insert(0, os.getcwd())  # run from the repository root
+
+import uvicorn
+from analysis_service import StubPipelineRunner
+from analysis_service.api import create_app
+from tests import test_api
+from tests.factories import SEEDING_BUDGET
+
+app = create_app(
+    runner=StubPipelineRunner(),
+    frameworks=("stride",),
+    limits=test_api.TEST_LIMITS,
+    job_deadline_seconds=test_api.TEST_DEADLINE_SECONDS,
+    max_active_jobs=test_api.TEST_MAX_ACTIVE_JOBS,
+    budget=SEEDING_BUDGET,
+    verifier=test_api.FakeVerifier(),
+)
+uvicorn.run(app, port=8470)
 ```
 
-uvicorn is a `web` dependency-group member, not a wheel dependency. The group is
-in `[tool.uv] default-groups`, so `uv sync` installs it and no `--with uvicorn`
-is needed.
-Set the env vars **before** importing `analysis_service.api`.
+- Send `test_api.auth("alice-token")` as the header. `bob-token` and
+  `carol-token` are the other owners in `test_api.TOKENS`.
+- Set the env vars **before** you import `analysis_service.api`.
+- `ANALYSIS_JOB_STORE` has no default. For the `sql` store on SQLite, merge
+  `tests.sql_stores.sql_env(<new directory>)` into the environment in place of
+  `memory`.
+- uvicorn is a `web` dependency-group member, not a wheel dependency. The
+  group is in `[tool.uv] default-groups`, so `uv sync` installs it.
 
-`create_app()` defaults to the real ADK graph — the **Deployment** builds a
-`analysis_service.pipeline.AdkPipelineRunner` per framework selection
-(`analysis_service.deployment.Deployment.runner`) — so a submitted job calls
-the vendor each model tier names, and fails without a tier config and
-credentials. To drive the HTTP surface offline, pass
-`create_app(runner=StubPipelineRunner())`; to exercise the real graph with
-canned model output, build a pipeline with a `resolve_model` returning a
-`BaseLlm` stand-in, as `tests/test_pipeline.py` does.
+`create_app()` with no runner uses the real ADK graph: the **Deployment**
+builds an `analysis_service.pipeline.AdkPipelineRunner` for each framework
+selection (`analysis_service.deployment.Deployment.runner`). A submitted job
+then calls the vendor that each model tier names, and it fails without a tier
+config and credentials. To run the real graph on canned model output, build a
+pipeline with a `resolve_model` that returns a `BaseLlm` stand-in, as
+`tests/test_pipeline.py` does.
 
 ## Flows worth driving
 
@@ -48,7 +72,7 @@ canned model output, build a pipeline with a `resolve_model` returning a
 - Ownership: a second subject's token must get 404 (not 403) on all reads.
 - Errors: no/expired/tampered token → 401 problem+json with
   `WWW-Authenticate: Bearer`; sources over `max_source_bytes` or `max_sources`
-  (`config/resilience.toml`) → 413; garbage JSON → 422.
+  (`test_api.TEST_LIMITS` in the offline launch: 512 bytes, 3 sources) → 413; garbage JSON → 422.
 
 ## Gotchas
 
