@@ -62,6 +62,7 @@ from analysis_service.jobs import Checkpoint
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
+from evals.harness.run_record import Selections, run_record
 
 #: A replay that has not ended by this save is reported as not ending.
 MAX_SAVES = 50
@@ -353,8 +354,9 @@ def replay(
     )
 
 
-def replays(root: Path, corpus: Path) -> list[Replay]:
-    """Every archived report under ``root`` whose case has a blessed model.
+def replays(root: Path, corpus: Path) -> tuple[list[Replay], dict[Path, Selections]]:
+    """Every archived report under ``root`` whose case has a blessed model,
+    and each file read with the selections read on it.
 
     Each model is also replayed once with every framework the archive holds,
     so a job whose frameworks share the list is measured too. A framework
@@ -362,6 +364,7 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
     takes the options of an archived job that chose it.
     """
     found: list[Replay] = []
+    inputs: dict[Path, Selections] = {}
     paths = sorted(root.rglob(f"*{case_suffix('report')}"))
     every: dict[FrameworkName, Mapping[str, Any]] = {}
     for path in paths:
@@ -384,6 +387,8 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
             replay(case, report.system_model, blessed, frameworks, name)
             for name in ANSWERERS
         )
+        inputs[path] = {"alone": frameworks}
+        inputs[blessed_path] = {}
         if len(every) > 1 and set(frameworks) != set(every):
             found.append(
                 replay(
@@ -394,7 +399,8 @@ def replays(root: Path, corpus: Path) -> list[Replay]:
                     "capability-yes",
                 )
             )
-    return found
+            inputs[path] = {"alone": frameworks, "all": every | frameworks}
+    return found, inputs
 
 
 #: The figures a summary reports, each read off a replay.
@@ -491,13 +497,15 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         "--corpus", type=Path, default=Path("evals/corpus"), help="the corpus"
     )
     parser.add_argument(
-        "--out", type=Path, help="write every replay and the summary here as JSON"
+        "--out",
+        type=Path,
+        help="write the run record, every replay and the summary here as JSON",
     )
 
 
 def command_early_rounds(args: argparse.Namespace) -> int:
     """Replay the list on every archived model, and print the summary."""
-    found = replays(args.root, args.corpus)
+    found, inputs = replays(args.root, args.corpus)
     if not found:
         print("no archived report has a case with a blessed model", file=sys.stderr)
         return 1
@@ -506,7 +514,15 @@ def command_early_rounds(args: argparse.Namespace) -> int:
     if args.out is not None:
         args.out.write_text(
             json.dumps(
-                {"summary": table, "replays": [asdict(one) for one in found]},
+                {
+                    "record": run_record(
+                        "early-rounds",
+                        {"answerers": list(ANSWERERS), "max_saves": MAX_SAVES},
+                        inputs,
+                    ),
+                    "summary": table,
+                    "replays": [asdict(one) for one in found],
+                },
                 indent=2,
             )
             + "\n",

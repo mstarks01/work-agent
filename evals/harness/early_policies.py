@@ -63,6 +63,7 @@ from analysis_service.system_model import SystemModel
 from evals.harness import audit
 from evals.harness.archive import case_suffix
 from evals.harness.early_rounds import MAX_SAVES, dont_know
+from evals.harness.run_record import run_record
 
 #: The frameworks a job selects, each with its options.
 Selection = Mapping[FrameworkName, Mapping[str, Any]]
@@ -391,11 +392,11 @@ def paired(root: Path) -> list[Paired]:
     return found
 
 
-def sweep(root: Path) -> list[Reading]:
-    """Every policy's reading on every :func:`paired` report, under both selections."""
+def sweep(pairs: Sequence[Paired]) -> list[Reading]:
+    """Every policy's reading on each of ``pairs``, under both selections."""
     return [
         reading
-        for one in paired(root)
+        for one in pairs
         for reading in readings(one.case, str(one.path), one.report, one.selections)
     ]
 
@@ -433,13 +434,16 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         help="the directory whose archived *.report.json files are read",
     )
     parser.add_argument(
-        "--out", type=Path, help="write the summary, and one for each case, as JSON"
+        "--out",
+        type=Path,
+        help="write the run record, the summary, and one for each case, as JSON",
     )
 
 
 def command_early_policies(args: argparse.Namespace) -> int:
     """Read every policy on every paired archived report, and print the sums."""
-    found = sweep(args.root)
+    pairs = paired(args.root)
+    found = sweep(pairs)
     if not found:
         print("no case has archived reports of two frameworks", file=sys.stderr)
         return 1
@@ -449,6 +453,11 @@ def command_early_policies(args: argparse.Namespace) -> int:
         args.out.write_text(
             json.dumps(
                 {
+                    "record": run_record(
+                        "early-policies",
+                        {"policies": list(POLICIES), "budgets": BUDGETS},
+                        {one.path: one.selections for one in pairs},
+                    ),
                     "summary": table,
                     "by_case": {
                         case: summary([one for one in found if one.case == case])

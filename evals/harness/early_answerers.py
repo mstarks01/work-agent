@@ -66,6 +66,7 @@ from analysis_service.system_model import SystemModel
 from evals.harness.early_policies import Needs, Selection, needs_of, paired
 from evals.harness.early_rounds import dont_know, paused_state
 from evals.harness.rule_applicability import TRUTH_ANSWERS, load_fixtures
+from evals.harness.run_record import run_record
 
 #: The submitter effort, in choices, at which each walk is read.
 BUDGETS = (5, 10, 20)
@@ -434,12 +435,12 @@ def jobs(
 
 
 def sweep(
-    root: Path, workers: int, selections: Collection[str]
+    work: Sequence[tuple[str, str, Mapping[str, Selection]]], workers: int
 ) -> list[dict[str, Any]]:
-    """Every reading over the archive, read in ``workers`` processes."""
+    """Every reading of the :func:`jobs` ``work``, read in ``workers`` processes."""
     found: list[dict[str, Any]] = []
     with ProcessPoolExecutor(max_workers=workers) as pool:
-        for rows in pool.map(_readings_of, jobs(root, selections)):
+        for rows in pool.map(_readings_of, work):
             found.extend(rows)
     return found
 
@@ -503,13 +504,16 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         " every framework the case holds ('all'), or both",
     )
     parser.add_argument(
-        "--out", type=Path, help="write the summary and every reading as JSON"
+        "--out",
+        type=Path,
+        help="write the run record, the summary and every reading as JSON",
     )
 
 
 def command_early_answerers(args: argparse.Namespace) -> int:
     """Walk every policy with every answerer over the archive, and print the sums."""
-    found = sweep(args.root, args.workers, args.selections.split(","))
+    work = jobs(args.root, args.selections.split(","))
+    found = sweep(work, args.workers)
     if not found:
         print("no case has archived reports of two frameworks", file=sys.stderr)
         return 1
@@ -520,8 +524,17 @@ def command_early_answerers(args: argparse.Namespace) -> int:
         # The summary is laid out to read; each reading is one line, so the
         # file stays a few megabytes over thousands of walks.
         rows = ",\n".join(json.dumps(row, separators=(",", ":")) for row in found)
+        record = run_record(
+            "early-answerers",
+            {
+                "policies": dict(POLICIES),
+                "answerers": list(ANSWERERS),
+                "budgets": BUDGETS,
+            },
+            {Path(path): selections for _, path, selections in work},
+        )
         args.out.write_text(
-            json.dumps({"summary": table}, indent=2)[:-2]
+            json.dumps({"record": record, "summary": table}, indent=2)[:-2]
             + ',\n  "readings": [\n'
             + rows
             + "\n  ]\n}\n",
