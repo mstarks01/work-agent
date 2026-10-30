@@ -385,7 +385,7 @@ class TestTheIamMode:
     def test_each_platform_method_passes(self, method, monkeypatch):
         credentials = SimpleNamespace(method=method)
         monkeypatch.setattr(boto3.Session, "get_credentials", lambda _: credentials)
-        assert platform_session("a label").get_credentials() is credentials
+        assert platform_session("a setting").get_credentials() is credentials
 
     @pytest.mark.parametrize(
         "var", OBJECT_STORES["s3"].mode_reads[CredentialMode.API_KEY]
