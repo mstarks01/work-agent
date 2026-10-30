@@ -974,6 +974,7 @@ class TestDelete:
         response = client.delete(f"/v1/jobs/{job_id}", headers=auth())
         assert response.status_code == 409
         assert response.headers["content-type"] == "application/problem+json"
+        assert child.id in response.json()["detail"]
         assert client.get(f"/v1/jobs/{job_id}", headers=auth()).status_code == 200
 
     def test_another_owner_cannot_delete_a_job(self):

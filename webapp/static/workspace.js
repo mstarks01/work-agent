@@ -94,14 +94,14 @@ const workspace = (() => {
   };
   const rename = (run, cell) => {
     const input = document.createElement("input");
-    input.value = run.title || run.name;
+    input.value = run.name;
     input.maxLength = el("analysis-name").maxLength;
     input.setAttribute("aria-label", "New name for " + run.name);
     let settled = false;
     const save = async (keep) => {
       if (settled) return;
       settled = true;
-      if (keep && input.value !== (run.title || run.name)) {
+      if (keep && input.value !== run.name) {
         const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/title", {
           method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({title: input.value}),
         });
@@ -149,7 +149,7 @@ const workspace = (() => {
         const status = el("analysis-status").value;
         const framework = el("analysis-framework").value;
         shown = data.filter((run) =>
-          [run.name, ...run.frameworks].some((value) => value.toLocaleLowerCase().includes(text))
+          [run.name, run.system_name, ...run.frameworks].some((value) => value?.toLocaleLowerCase().includes(text))
           && (!status || run.status === status)
           && (!framework || run.frameworks.includes(framework)));
         shown.sort((left, right) => {

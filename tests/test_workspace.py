@@ -280,7 +280,7 @@ class TestTheTitle:
             paused, child = _paused_with_child(client)
             assert _rename(client, child, TITLE).status_code == 200
             owner = asyncio.run(workspace.store.get(paused)).owner_id
-            assert asyncio.run(workspace.store.delete(paused, owner)) is not None
+            assert isinstance(asyncio.run(workspace.store.delete(paused, owner)), int)
             [row] = client.get("/workspace/runs").json()
             assert row["name"] == TITLE
 
@@ -300,9 +300,22 @@ class TestTheTitle:
         assert TITLE not in page
 
     @pytest.mark.parametrize(
-        "body", [{"title": "x" * (MAX_SYSTEM_NAME_CHARS + 1)}, {"title": 42}, {}, []]
+        ("body", "status", "message"),
+        [
+            (
+                {"title": "x" * (MAX_SYSTEM_NAME_CHARS + 1)},
+                422,
+                f"The title exceeds {MAX_SYSTEM_NAME_CHARS} characters.",
+            ),
+            ({"title": "a\nb"}, 422, "The title carries a line break."),
+            ({"title": 42}, 400, None),
+            ({}, 400, None),
+            ([], 400, None),
+        ],
     )
-    def test_a_refused_title_keeps_the_old_one(self, tiers, body):
+    def test_a_refused_title_keeps_the_old_one(self, tiers, body, status, message):
+        """A title the name rule refuses answers 422 with the rule's reason
+        (#2008). A body with no text title answers 400."""
         client, _ = _workspace_client(tiers)
         with client:
             run = web._completed(client)
@@ -310,8 +323,26 @@ class TestTheTitle:
             refused = client.put(
                 f"/workspace/runs/{run}/title", json=body, headers=SAME_ORIGIN
             )
-            assert refused.status_code == 400, refused.text
+            assert refused.status_code == status, refused.text
+            if message is not None:
+                assert refused.json()["message"] == message
             assert client.get("/workspace/runs").json()[0]["title"] == TITLE
+
+    def test_a_titled_row_keeps_the_system_name_for_the_filter(self, tiers):
+        """The filter reads the system name that a title hides (#2008)."""
+        client, _ = _workspace_client(tiers)
+        with client:
+            started = client.post(
+                "/analyze",
+                json=posted("A web app talks to a database.")
+                | {"questions": False, "name": "Orders"},
+                headers=SAME_ORIGIN,
+            )
+            run = started.json()["run"]
+            assert web.ran(client, run) == "completed"
+            assert _rename(client, run, TITLE).status_code == 200
+            [row] = client.get("/workspace/runs").json()
+            assert (row["name"], row["system_name"]) == (TITLE, "Orders")
 
     def test_a_missing_run_and_a_cross_origin_rename_change_nothing(self, tiers):
         client, _ = _workspace_client(tiers)
@@ -364,6 +395,47 @@ def test_a_child_started_during_the_delete_keeps_the_analysis(tiers):
         run = web._completed(client)
         refused = client.delete(f"/workspace/runs/{run}", headers=SAME_ORIGIN)
         assert refused.status_code == 409, refused.text
+        assert refused.json()["deleted"] == []
         [row] = client.get("/workspace/runs").json()
         assert row["run"] == store.child
         assert asyncio.run(store.get(run)) is not None
+
+
+class RefusesTheSecondDelete:
+    """A store that keeps the second job the route deletes, as a child that
+    an answer in another tab started would (ADR 0107)."""
+
+    def __init__(self, store) -> None:
+        self._store = store
+        self._calls = 0
+
+    def __getattr__(self, name: str):
+        return getattr(self._store, name)
+
+    async def delete(self, job_id, owner_id, **cutoff):
+        from analysis_service.jobs import DeleteRefusal
+
+        self._calls += 1
+        if self._calls == 2:
+            return DeleteRefusal("child", "job-elsewhere")
+        return await self._store.delete(job_id, owner_id, **cutoff)
+
+
+def test_a_refusal_partway_names_the_jobs_the_route_deleted(tiers):
+    """The jobs deleted before a refusal stay deleted, and the 409 names them."""
+    from analysis_service.jobs import InMemoryJobStore
+    from webapp.main import Workspace
+
+    store = RefusesTheSecondDelete(InMemoryJobStore())
+    client = TestClient(
+        web.app_for(tiers, web.PausingRunner(), workspace=Workspace(store=store)),
+        base_url=LOOPBACK,
+    )
+    with client:
+        paused, child = _paused_with_child(client)
+        refused = client.delete(f"/workspace/runs/{paused}", headers=SAME_ORIGIN)
+        assert refused.status_code == 409, refused.text
+        assert refused.json()["deleted"] == [child]
+        assert "deleted 1 of its jobs" in refused.json()["message"]
+        assert asyncio.run(store.get(child)) is None
+        assert asyncio.run(store.get(paused)) is not None

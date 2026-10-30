@@ -97,12 +97,12 @@ from analysis_service.job_answers import (
 )
 from analysis_service.jobs import (
     Admission,
+    DeleteRefusal,
     Envelope,
     JobRecord,
     JobStatus,
     JobStore,
     PipelineRunner,
-    ended,
     event_frames,
     execute_job,
     is_follow_up,
@@ -943,22 +943,24 @@ def create_app(
         A missing job, another owner's job and an ID of another shape share
         one ``404``.
         """
-        record = await _answers(request).owned(job_id, owner_id)
-        if not ended(record):
-            raise HTTPException(
-                status_code=409,
-                detail="the job is queued or running; delete it when it ends",
-            )
+        await _answers(request).owned(job_id, owner_id)
         store: JobStore = request.app.state.store
-        if await audited_delete(store, job_id, owner_id, "owner") is None:
-            if await store.owned(job_id, owner_id) is None:
+        removed = await audited_delete(store, job_id, owner_id, "owner")
+        if not isinstance(removed, DeleteRefusal):
+            return Response(status_code=204)
+        match removed.reason:
+            case "absent":
                 raise NoSuchJob(job_id)
-            raise HTTPException(
-                status_code=409,
-                detail="a job that continues this job is queued or running;"
-                " delete it when that job ends",
-            )
-        return Response(status_code=204)
+            case "in_flight":
+                detail = "the job is queued or running; delete it when it ends"
+            case "child":
+                detail = (
+                    f"job {removed.child_id} continues this job and is queued or"
+                    " running; delete this job when that job ends"
+                )
+            case "changed":
+                raise AssertionError("the delete route sets no updated_before")
+        raise HTTPException(status_code=409, detail=detail)
 
     @app.get("/v1/jobs/{job_id}/report")
     async def get_report(

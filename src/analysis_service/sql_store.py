@@ -98,6 +98,7 @@ from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Admission,
     Checkpoint,
+    DeleteRefusal,
     Envelope,
     JobEvent,
     JobRecord,
@@ -1556,31 +1557,31 @@ class SqlJobStore:
 
     async def delete(
         self, job_id: str, owner_id: str, *, updated_before: datetime | None = None
-    ) -> int | None:
+    ) -> int | DeleteRefusal:
         """Turn the owned job's row into a usage row, then delete its objects
-        (ADR 0066). The number of objects removed, or ``None`` where the job
-        is not the owner's, has not :func:`~analysis_service.jobs.ended`, has
-        a child that holds a slot (ADR 0107) or was not last updated before
-        ``updated_before``, and nothing changes. The usage row keeps the
-        stored status as it is. The row lock is the one that admission takes
-        on a child's parent, so a child admitted first keeps the job, and a
-        child admitted after finds no parent."""
+        (ADR 0066). The number of objects removed, or a
+        :class:`~analysis_service.jobs.DeleteRefusal` where nothing changes.
+        The usage row keeps the stored status as it is. The row lock is the
+        one that admission takes on a child's parent, so a child admitted
+        first keeps the job, and a child admitted after finds no parent."""
         query = (
             select(jobs)
             .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
             .with_for_update()
         )
-        if updated_before is not None:
-            query = query.where(jobs.c.updated_at < updated_before)
         async with self._transaction(writes=True) as connection:
             found = await connection.execute(query)
             row = found.one_or_none()
-            if row is None or not await _ended(connection, row):
-                return None
+            if row is None:
+                return DeleteRefusal("absent")
+            if not await _ended(connection, row):
+                return DeleteRefusal("in_flight")
+            if updated_before is not None and row.updated_at >= updated_before:
+                return DeleteRefusal("changed")
             children = await connection.execute(_children(job_id))
             for child in children.all():
                 if holds_a_slot(await self._admission_record(connection, child)):
-                    return None
+                    return DeleteRefusal("child", child.job_id)
             await connection.execute(
                 insert(usage_rows).values(
                     job_id=row.id,

@@ -151,7 +151,7 @@ class TestTheChangesRoute:
         client, store = make_client()
         parent = _completed(store, sample_report([]))
         child = _completed(store, sample_report([]), _follow_up_of(parent))
-        assert asyncio.run(store.delete(parent, "alice")) is not None
+        assert isinstance(asyncio.run(store.delete(parent, "alice")), int)
 
         response = client.get(f"/v1/jobs/{child}/changes", headers=auth())
 

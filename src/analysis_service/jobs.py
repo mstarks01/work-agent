@@ -705,6 +705,30 @@ class Admission:
     global_tokens: int = 0
 
 
+# Why a :meth:`JobStore.delete` changed nothing. ``absent`` says the job is
+# missing or another owner's. ``in_flight`` says the job has not
+# :func:`ended`. ``child`` says a job that resumes or amends it holds a slot
+# (ADR 0107). ``changed`` says its last update is not before
+# ``updated_before``.
+DeleteRefusalReason = Literal["absent", "in_flight", "child", "changed"]
+
+
+@dataclass(frozen=True)
+class DeleteRefusal:
+    """What :meth:`JobStore.delete` answers where it changed nothing.
+
+    ``child_id`` names the child that keeps the job, and only the reason
+    ``child`` carries one.
+    """
+
+    reason: DeleteRefusalReason
+    child_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if (self.reason == "child") != (self.child_id is not None):
+            raise ValueError("only the reason child names a child_id")
+
+
 class JobStore(Protocol):
     """Persistence seam for job records; the real backend is a deferred decision.
 
@@ -846,18 +870,18 @@ class JobStore(Protocol):
 
     async def delete(
         self, job_id: str, owner_id: str, *, updated_before: datetime | None = None
-    ) -> int | None:
+    ) -> int | DeleteRefusal:
         """Delete the owned job's content and keep its usage row (ADR 0066).
 
-        The number of objects the delete removed, or ``None`` where nothing
-        changed: the job is missing, another owner's, or not :func:`ended`, or
-        a job that resumes or amends it holds a slot (ADR 0107). The delete
-        checks the child under the lock that admission takes on the parent, so
-        a delete and the admission of a child never both land.
-        Where ``updated_before`` is set, a job whose last update is
-        not before it also answers ``None``. The store checks it in the step
-        that deletes, so a job that changed after the retention sweep listed
-        it stays.
+        The number of objects the delete removed, or a :class:`DeleteRefusal`
+        where nothing changed: the job is missing, another owner's, or not
+        :func:`ended`, or a job that resumes or amends it holds a slot
+        (ADR 0107). The delete checks the child under the lock that admission
+        takes on the parent, so a delete and the admission of a child never
+        both land. Where ``updated_before`` is set, a job whose last update is
+        not before it is refused too. The store checks it in the step that
+        deletes, so a job that changed after the retention sweep listed it
+        stays.
         """
         ...
 
@@ -1399,28 +1423,25 @@ class InMemoryJobStore:
 
     async def delete(
         self, job_id: str, owner_id: str, *, updated_before: datetime | None = None
-    ) -> int | None:
+    ) -> int | DeleteRefusal:
         """Remove the owned job's content, and keep its usage row (ADR 0066).
 
         Only a job that has :func:`ended` can be deleted: a job in flight
         holds a slot its run releases. A job whose child holds a slot stays
-        too (ADR 0107). ``None`` where the job is missing, not the owner's,
-        not ended, kept by its child or not last updated before
-        ``updated_before``, and nothing changes. Else ``0``: this store holds
-        no objects.
+        too (ADR 0107). A :class:`DeleteRefusal` where nothing changes, else
+        ``0``: this store holds no objects.
         """
         record = self._records.get(job_id)
-        if (
-            record is None
-            or record.owner_id != owner_id
-            or not ended(record)
-            or (updated_before is not None and record.updated_at >= updated_before)
-            or any(
-                _parent_id(child) == job_id and holds_a_slot(child)
-                for child in self._rows()
-            )
-        ):
-            return None
+        if record is None or record.owner_id != owner_id:
+            return DeleteRefusal("absent")
+        if not ended(record):
+            return DeleteRefusal("in_flight")
+        if updated_before is not None and record.updated_at >= updated_before:
+            return DeleteRefusal("changed")
+        # A usage row holds no slot, so only the records can keep the job.
+        for child in self._records.values():
+            if parent_of(child) == job_id and holds_a_slot(child):
+                return DeleteRefusal("child", child.id)
         del self._records[job_id]
         self._usage[job_id] = UsageRow(
             job_id=job_id,

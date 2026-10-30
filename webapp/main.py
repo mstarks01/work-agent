@@ -198,6 +198,7 @@ from analysis_service.job_answers import (
     Withheld,
 )
 from analysis_service.jobs import (
+    DeleteRefusal,
     Envelope,
     InMemoryJobStore,
     JobRecord,
@@ -533,6 +534,7 @@ class Workspace:
             "run": record.id,
             "name": _name_of(record),
             "title": record.title,
+            "system_name": record.system_name,
             "created_at": min(
                 (item.created_at for item in related), default=record.created_at
             ).isoformat(),
@@ -1422,7 +1424,9 @@ def create_app(
     @app.delete("/workspace/runs/{run_id}")
     async def delete_analysis(run_id: str, request: Request) -> Response:
         """Delete every job of the analysis, the newest first, and keep each
-        job's usage row (ADR 0066). Refused while a job of it has not ended."""
+        job's usage row (ADR 0066). Refused while a job of it has not ended.
+        Where the store keeps a job partway, the ``409`` lists in ``deleted``
+        the IDs of the jobs that the route deleted first (ADR 0107)."""
         if not is_same_origin(request):
             logger.warning("refused a DELETE of an analysis that was not same-origin")
             return _message(403, "This request did not come from the app's own page.")
@@ -1432,13 +1436,22 @@ def create_app(
             return no_such_run()
         if not all(ended(job) for job in group):
             return _message(409, _STILL_RUNNING)
+        deleted: list[str] = []
         for job in reversed(group):
             removed = await audited_delete(
                 workspace.store, job.id, job.owner_id, "owner"
             )
-            if removed is None:
-                # A job of the group started after the check above.
-                return _message(409, _STILL_RUNNING)
+            if not isinstance(removed, DeleteRefusal):
+                deleted.append(job.id)
+            elif removed.reason != "absent":
+                # A job of the group started after the check above. The jobs
+                # deleted before it stay deleted (ADR 0107).
+                message = _STILL_RUNNING
+                if deleted:
+                    message += f" The app deleted {len(deleted)} of its jobs first."
+                return JSONResponse(
+                    {"message": message, "deleted": deleted}, status_code=409
+                )
         return Response(status_code=204)
 
     @app.put("/workspace/runs/{run_id}/title")
@@ -1455,8 +1468,10 @@ def create_app(
             return _message(400, _NAME_REFUSED)
         try:
             title = clean_system_name(sent)
-        except ValueError:
-            return _message(400, _NAME_REFUSED)
+        except ValueError as refused:
+            # The reasons of the rule name a bound or a character class, never
+            # the text it refused.
+            return _message(422, f"The title {refused}.")
         group = await workspace.analysis(answers, run_id)
         if not group:
             return no_such_run()

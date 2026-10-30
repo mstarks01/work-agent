@@ -122,7 +122,8 @@ status (`completed`, `failed`, `rejected` or `awaiting-answers`), or an
 [unreadable job](#a-job-from-an-older-schema-version). A `queued` or `running`
 job returns `409`, and the job stays as it is. A job whose follow-up or
 amendment job is `queued` or `running` also returns `409` and stays, until
-that job ends (ADR 0107). A job that is not yours, a job that does not
+that job ends (ADR 0107). The `detail` of that `409` names the job ID of the
+follow-up or amendment job. A job that is not yours, a job that does not
 exist and an ID that is not `job-` with 32 lowercase hex digits all return the
 same `404`. The service checks the ID before it looks for the job.
 
