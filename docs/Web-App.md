@@ -499,8 +499,15 @@ The status and framework selects filter it more.
   the system name, and a blank title shows the system name again. The report
   keeps the system name that you submitted
   ([ADR 0106](adr/0106-a-workspace-title-is-the-workspaces-own-name-and-the-report-keeps-its-system-name.md)).
+- **Stop** shows on an analysis that is in progress, and the progress panel
+  shows **Stop analysis**. A stop ends the run at once, and the analysis shows
+  **Stopped**. The run makes no report, and the tokens it used stay counted.
+  A stopped follow-up gives its questions back to the paused run, so you can
+  answer them again. A run that ends before the stop reaches it ends as it
+  ran
+  ([ADR 0109](adr/0109-a-person-can-stop-a-run-and-the-job-ends-stopped.md)).
 - **Delete** removes the analysis with each of its reports, after you
-  confirm. You cannot delete an analysis while it runs. If an answer in
+  confirm. You cannot delete an analysis while it runs. Stop it first. If an answer in
   another tab starts a job of the analysis during the delete, the delete
   stops with the same message and says how many of its jobs it deleted
   first. The analysis stays in the list

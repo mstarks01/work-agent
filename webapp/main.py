@@ -108,6 +108,7 @@ from collections.abc import (
     AsyncIterator,
     Callable,
     Collection,
+    Iterable,
     Mapping,
     Sequence,
 )
@@ -204,6 +205,7 @@ from analysis_service.jobs import (
     JobRecord,
     JobStore,
     PipelineRunner,
+    StopSignal,
     ended,
     event_frames,
     execute_job,
@@ -282,7 +284,13 @@ PORT = 8000
 #: to stay inside the bound.
 MAX_RUNS = 20
 
-_STILL_RUNNING = "This analysis is still running. Delete it when it stops."
+_STILL_RUNNING = "This analysis is still running. Stop it, then delete it."
+
+_NOT_RUNNING = "This analysis is not running."
+
+#: How long the stop route waits for a stopped run to end. A run ends when
+#: its graph's cancellation finishes, so the wait is short.
+STOP_WAIT_SECONDS = 10.0
 
 #: The report page loads nothing external. It reaches its own origin to post
 #: answers to ``/answer/{run}`` and corrections to ``/correct/{run}``.
@@ -350,7 +358,7 @@ class Workspace:
     ) -> None:
         self.store: JobStore = InMemoryJobStore() if store is None else store
         self._max_jobs = max_jobs
-        self._tasks: set[asyncio.Task[None]] = set()
+        self._runs: dict[str, tuple[asyncio.Task[None], StopSignal]] = {}
 
     def start(self, deadline_seconds: float) -> Start:
         """What runs an admitted job on this process's event loop, under
@@ -358,16 +366,36 @@ class Workspace:
         got at admission, whatever the cell holds later."""
 
         def run(record: JobRecord, runner: PipelineRunner) -> None:
+            stop = StopSignal()
             task = asyncio.create_task(
                 execute_job(
-                    self.store, runner, record.id, deadline_seconds=deadline_seconds
+                    self.store,
+                    runner,
+                    record.id,
+                    deadline_seconds=deadline_seconds,
+                    stop=stop,
                 )
             )
-            # Held so the task is not garbage-collected mid-flight.
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
+            # Held so the task is not garbage-collected mid-flight, and so
+            # :meth:`stop` can reach it.
+            self._runs[record.id] = (task, stop)
+            task.add_done_callback(lambda _: self._runs.pop(record.id, None))
 
         return run
+
+    async def stop(self, job_ids: Iterable[str]) -> bool:
+        """Stop each run of ``job_ids`` that this process runs, and wait up to
+        :data:`STOP_WAIT_SECONDS` for them to end. False where it runs none
+        of them (ADR 0109)."""
+        tasks = []
+        for job_id in job_ids:
+            if (held := self._runs.get(job_id)) is not None:
+                task, stop = held
+                stop.request()
+                tasks.append(task)
+        if tasks:
+            await asyncio.wait(tasks, timeout=STOP_WAIT_SECONDS)
+        return bool(tasks)
 
     async def owner_id(self, answers: JobAnswers, job_id: str) -> str:
         """The operator's owner ID, by :meth:`JobAnswers.owner_id`. Before the
@@ -695,7 +723,9 @@ def _selection_of(record: Envelope) -> list[FrameworkSelection]:
 
 
 #: A job's status as the pages read it. ``workspace.js`` labels each one.
-PageStatus = Literal["running", "awaiting-answers", "completed", "failed", "unreadable"]
+PageStatus = Literal[
+    "running", "awaiting-answers", "completed", "failed", "stopped", "unreadable"
+]
 
 
 def _page_status(record: Envelope) -> PageStatus:
@@ -1489,6 +1519,22 @@ def create_app(
                 )
         return Response(status_code=204)
 
+    @app.post("/workspace/runs/{run_id}/stop")
+    async def stop_analysis(run_id: str, request: Request) -> Response:
+        """Stop the run of the analysis that has not ended (ADR 0109). The
+        route answers ``204`` once the run ended, ``202`` where it still
+        ends, and ``409`` where no run of the analysis runs."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        answers = cell.read(unavailable).answers
+        group = await workspace.analysis(answers, run_id)
+        if not group:
+            return no_such_run()
+        if not await workspace.stop(job.id for job in group if not ended(job)):
+            return _message(409, _NOT_RUNNING)
+        group = await workspace.analysis(answers, run_id)
+        return Response(status_code=204 if all(map(ended, group)) else 202)
+
     @app.put("/workspace/runs/{run_id}/title")
     async def rename_analysis(run_id: str, request: Request) -> Response:
         """Write the title on every job of the analysis (ADR 0106). A blank
@@ -1860,6 +1906,8 @@ async def _stream(
             for issue in record.validation_issues
         ]
         yield _frame("rejected", {"issues": issues})
+    elif status == "stopped":
+        yield _frame("stopped", {})
     else:
         yield _frame("failed", {"message": record.error or "The analysis failed."})
 

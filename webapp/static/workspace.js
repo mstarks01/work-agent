@@ -29,7 +29,7 @@ const workspace = (() => {
     if (className) item.className = className;
     return item;
   };
-  const labels = {"running": "In progress", "awaiting-answers": "Questions ready", "completed": "Report ready", "failed": "Stopped", "unreadable": "Cannot be read"};
+  const labels = {"running": "In progress", "awaiting-answers": "Questions ready", "completed": "Report ready", "failed": "Failed", "stopped": "Stopped", "unreadable": "Cannot be read"};
   const message = (text) => { el("workspace-message").textContent = text; };
   const metadata = (data) => {
     el("description").readOnly = true;
@@ -49,6 +49,7 @@ const workspace = (() => {
     el("analysis-state").textContent = labels[data.status] || data.status;
     el("analysis-frameworks").textContent = data.frameworks.join(" · ");
     el("questions-nav").disabled = !(data.status === "awaiting-answers" || (data.status === "running" && data.pauses));
+    el("stop-run").hidden = data.status !== "running";
     if (!el("progress-panel").hidden) mark("progress-panel");
     el("report-list").replaceChildren();
     data.reports.forEach((report) => {
@@ -91,6 +92,14 @@ const workspace = (() => {
     }
     await library();
     message(refused.length ? "Not deleted. " + refused.join(" ") : "Deleted " + counted(runs.length, "analysis", "analyses") + ".");
+  };
+  // Stop the analysis's run. A 204 says the run ended, and a 202 that it
+  // still ends; resolves to whether it ended and the page's message for it.
+  const stopRun = async (run) => {
+    const response = await fetch("/workspace/runs/" + encodeURIComponent(run.run) + "/stop", {method: "POST"});
+    if (response.status === 204) return {ended: true, text: "Stopped “" + run.name + "”."};
+    if (response.status === 202) return {ended: false, text: "Stopping “" + run.name + "”. Its run ends after its current step."};
+    return {ended: false, text: "Not stopped. " + ((await response.json().catch(() => ({}))).message || "Could not stop it.")};
   };
   const rename = (run, cell) => {
     const input = document.createElement("input");
@@ -183,7 +192,20 @@ const workspace = (() => {
           deleteButton.type = "button";
           deleteButton.setAttribute("aria-label", "Delete " + run.name);
           deleteButton.onclick = () => deleteRuns([run]);
-          actions.append(renameButton, deleteButton);
+          actions.append(renameButton);
+          if (run.status === "running") {
+            const stopButton = node("button", "Stop", "danger");
+            stopButton.type = "button";
+            stopButton.setAttribute("aria-label", "Stop " + run.name);
+            stopButton.onclick = async () => {
+              stopButton.disabled = true;
+              const {text} = await stopRun(run);
+              await library();
+              message(text);
+            };
+            actions.append(stopButton);
+          }
+          actions.append(deleteButton);
           selectCell.append(box);
           nameCell.append(link);
           dateCell.append(created);
@@ -263,7 +285,8 @@ const workspace = (() => {
         location.replace("/report/" + encodeURIComponent(data.run));
       } else {
         show("reports-panel");
-        if (data.status === "failed") message("The analysis stopped. Open an earlier paused run to retry, or start a new analysis.");
+        if (data.status === "failed") message("The analysis failed. Open an earlier paused run to retry, or start a new analysis.");
+        if (data.status === "stopped") message("You stopped the analysis. Open an earlier paused run to retry, or start a new analysis.");
         if (data.status === "completed" && !served) message("The report of this analysis is withheld.");
       }
     } catch (error) { message(error.message); }
@@ -272,6 +295,13 @@ const workspace = (() => {
   el("library-nav").addEventListener("click", (event) => {
     event.preventDefault();
     library();
+  });
+  el("stop-run").addEventListener("click", async () => {
+    el("stop-run").disabled = true;
+    const {ended, text} = await stopRun(current);
+    el("stop-run").disabled = false;
+    // An ended run shows its own status on the next read.
+    if (!ended) message(text);
   });
   el("description-nav").addEventListener("click", () => show("description-panel"));
   el("questions-nav").addEventListener("click", () => show(running() ? "progress-panel" : "asked"));
