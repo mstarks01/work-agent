@@ -118,7 +118,7 @@ job it resumes only where its stored status is `completed` or
 
 `DELETE /v1/jobs/{id}` deletes a job and returns `204` with no body. Only the
 **Owner** can delete a job, and only a job that has ended: a job in a terminal
-status (`completed`, `failed`, `rejected` or `awaiting-answers`), or an
+status (`completed`, `failed`, `rejected`, `awaiting-answers` or `stopped`), or an
 [unreadable job](#a-job-from-an-older-schema-version). A `queued` or `running`
 job returns `409`, and the job stays as it is. A job whose follow-up or
 amendment job is `queued` or `running` also returns `409` and stays, until
@@ -159,13 +159,14 @@ flowchart LR
     running -- validity gate refused the input --> rejected([rejected])
     running -- internal error or service restarted --> failed([failed])
     running -- questions asked --> awaiting([awaiting-answers])
+    running -- a person stopped it --> stopped([stopped])
 
     classDef live fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
     classDef good fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#052e16
     classDef bad fill:#fee2e2,stroke:#dc2626,stroke-width:1.5px,color:#450a0a
     class queued,running live
     class completed,awaiting good
-    class rejected,failed bad
+    class rejected,failed,stopped bad
 ```
 
 - `completed` — the report is available at `/v1/jobs/{id}/report`.
@@ -182,6 +183,10 @@ flowchart LR
   takes. `GET /v1/jobs/{id}/questions` lists what it asks, and
   `POST /v1/jobs/{id}/answers` continues it as a new job (see below). A waiting
   job takes none of your in-flight slots.
+- `stopped` — a person stopped the run in the first-run app. The job holds
+  no report and no error, and it keeps its token reservation. `/v1` has no
+  route that stops a job
+  ([ADR 0109](adr/0109-a-person-can-stop-a-run-and-the-job-ends-stopped.md)).
 - `unreadable` — only in the poll response, never a stored status. The job
   holds a stored value that this service no longer lists. See
   [A job from an older schema version](#a-job-from-an-older-schema-version).
@@ -579,7 +584,7 @@ or waits on it. The analysis does not run again. A correction carries the
 | `400` | `links` is sent and this deployment builds no assertion catalog; two answers name the same principal or the same fact; a link answer names a principal the job did not ask about; a fact answer names a fact the job did not ask, or a value the fact cannot take, or a line longer than 1,000 characters; or the answers would leave a capability present while an ancestor capability is absent. That problem body carries `contradiction`, `{"part", "ancestor"}`: the two capability questions' keys, which a client can answer together in one request. |
 | `404` | The job is not yours, or does not exist. |
 | `400` | `links` and `facts` are both empty and the job is not waiting on answers. Empty means "continue without answers". Or the job's report is final: its follow-up has run. |
-| `409` | The job is neither completed nor waiting on answers, its report is withheld, its report carries no catalog, or it is [from an older schema version](#a-job-from-an-older-schema-version). Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed, was rejected, or is unreadable with a stored status other than `completed` or `awaiting-answers`. Or the answers would start a job that selects a framework this deployment no longer carries, after a change of `ANALYSIS_FRAMEWORKS_CARRIED`; the message names the framework. A save, a draft and a correction start no job, so they still pass. |
+| `409` | The job is neither completed nor waiting on answers, its report is withheld, its report carries no catalog, or it is [from an older schema version](#a-job-from-an-older-schema-version). Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed, was rejected, was stopped, or is unreadable with a stored status other than `completed` or `awaiting-answers`. Or the answers would start a job that selects a framework this deployment no longer carries, after a change of `ANALYSIS_FRAMEWORKS_CARRIED`; the message names the framework. A save, a draft and a correction start no job, so they still pass. |
 | `413` | The job's sources with the answers composed in are over this deployment's size or count limit. A save is refused too, so no saved answer holds a job that no start could run. |
 | `422` | An entry of `links` or `facts` is malformed, or a list holds more than its limit: 50 links, 200 facts. |
 

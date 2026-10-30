@@ -1194,6 +1194,10 @@
       }
       fail(lead, issues);
     });
+    stream.addEventListener("stopped", () => {
+      stream.close();
+      fail("You stopped the analysis.");
+    });
     stream.addEventListener("failed", (event) => {
       stream.close();
       fail(JSON.parse(event.data).message);

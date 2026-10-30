@@ -77,15 +77,22 @@ logger = logging.getLogger(__name__)
 JOB_ID_PATTERN = re.compile(r"job-[0-9a-f]{32}")
 
 JobStatus = Literal[
-    "queued", "running", "completed", "failed", "rejected", "awaiting-answers"
+    "queued",
+    "running",
+    "completed",
+    "failed",
+    "rejected",
+    "awaiting-answers",
+    "stopped",
 ]
 
 # ``awaiting-answers`` ends the job's run: the job stopped after its assertion
 # pass to ask a person, and holds its model and catalog. It is terminal for the
 # lifecycle and for admission, so a job waiting on a person takes no in-flight
 # slot and its tokens settle. Answering it starts a resumed job (#1252).
+# ``stopped`` is a run that a person stopped (ADR 0109).
 TERMINAL_STATUSES: frozenset[JobStatus] = frozenset(
-    {"completed", "failed", "rejected", "awaiting-answers"}
+    {"completed", "failed", "rejected", "awaiting-answers", "stopped"}
 )
 
 _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
@@ -96,12 +103,15 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
     "failed": frozenset(),
     "rejected": frozenset(),
     "awaiting-answers": frozenset(),
+    "stopped": frozenset(),
 }
 
 # The statuses of a resumed job that read none of its answers into a report.
 # A resumed job in one of these does not lock its parent, so the parent takes
 # answers again.
-NON_LOCKING_STATUSES: frozenset[JobStatus] = frozenset({"failed", "rejected"})
+NON_LOCKING_STATUSES: frozenset[JobStatus] = frozenset(
+    {"failed", "rejected", "stopped"}
+)
 
 
 def parent_of(record: JobRecord) -> str | None:
@@ -1710,12 +1720,43 @@ async def _store_outcome(store: JobStore, record: JobRecord) -> bool:
     return False
 
 
+class StopSignal:
+    """A person's request to stop one job's run, which :func:`execute_job` reads.
+
+    A request ends the run's deadline scope at once, so a stop takes the path
+    of the deadline: the graph is cancelled, and the job stores no report
+    and keeps its reservation. A request that comes after the run returned
+    changes nothing, and the job ends as its run did (ADR 0109).
+    """
+
+    def __init__(self) -> None:
+        self.requested = False
+        self._scope: asyncio.Timeout | None = None
+
+    def request(self) -> None:
+        """Stop the run now, or at its start where it has not started."""
+        self.requested = True
+        self._expire()
+
+    def bind(self, scope: asyncio.Timeout | None) -> None:
+        """Make ``scope`` the deadline scope that a request ends, or none."""
+        self._scope = scope
+        if self.requested:
+            self._expire()
+
+    def _expire(self) -> None:
+        scope = self._scope
+        if scope is not None and not scope.expired():
+            scope.reschedule(asyncio.get_running_loop().time())
+
+
 async def execute_job(
     store: JobStore,
     runner: PipelineRunner,
     job_id: str,
     *,
     deadline_seconds: float,
+    stop: StopSignal | None = None,
 ) -> None:
     """Drive one queued job through the runner to a terminal state, under a deadline.
 
@@ -1744,10 +1785,14 @@ async def execute_job(
     same rule from the other side: a block missing from ``analyses`` is refused
     rather than served as a report the caller has to notice is short.
 
+    A request on ``stop`` ends the run on the same path, and the job ends
+    ``stopped``. A caller with no stop control passes none.
+
     Each save that starts or ends the run goes through :func:`_store_outcome`,
     so a store failure there fails the job and never leaves it ``running``
     after its worker stops.
     """
+    stop = StopSignal() if stop is None else stop
     try:
         async with asyncio.timeout(STORE_TIMEOUT_SECONDS):
             record = await store.get(job_id)
@@ -1768,16 +1813,31 @@ async def execute_job(
 
     started = datetime.now(UTC)
     try:
-        async with asyncio.timeout(deadline_seconds):
-            outcome = await runner.run(record, on_node)
+        async with asyncio.timeout(deadline_seconds) as scope:
+            stop.bind(scope)
+            try:
+                outcome = await runner.run(record, on_node)
+            finally:
+                stop.bind(None)
     except TimeoutError:
         elapsed = (datetime.now(UTC) - started).total_seconds()
+        completed = [event.node for event in record.events if event.kind == "node"]
+        if stop.requested:
+            logger.info(
+                "job %s stopped by its owner after %.1fs; nodes completed: %s",
+                job_id,
+                elapsed,
+                completed or "none",
+            )
+            record.transition("stopped")
+            await _store_outcome(store, record)
+            return
         logger.error(
             "job %s exceeded the %.0fs deadline after %.1fs; nodes completed: %s",
             job_id,
             deadline_seconds,
             elapsed,
-            [event.node for event in record.events if event.kind == "node"] or "none",
+            completed or "none",
         )
         record.transition("failed")
         record.error = DEADLINE_FAILURE_MESSAGE

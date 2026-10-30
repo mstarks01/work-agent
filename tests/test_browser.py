@@ -791,6 +791,40 @@ def test_the_analyses_list_renames_filters_and_deletes(page):
     assert page.inner_text("#workspace-message") == "Deleted 2 analyses."
 
 
+@pytest.fixture
+def hanging(tiers):
+    """The first-run app over a run that never ends, served on a free port."""
+    from tests.test_jobs import HangingRunner
+
+    yield from serve(web.app_for(tiers, HangingRunner()))
+
+
+def test_the_stop_buttons_stop_a_running_analysis(browser, hanging):
+    """The row's Stop and the progress panel's Stop analysis each end a run
+    that would otherwise never end (ADR 0109)."""
+    context = browser.new_context(base_url=hanging)
+    page = context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto("/")
+    submitted(page, "Hangs")
+    page.goto("/?view=analyses")
+    page.click('[aria-label="Stop Hangs"]')
+    page.wait_for_selector("#analysis-rows .badge:text-is('Stopped')")
+    assert page.inner_text("#workspace-message") == "Stopped “Hangs”."
+    assert page.locator('[aria-label="Stop Hangs"]').count() == 0
+
+    submitted(page, "Hangs again")
+    page.goto("/?view=analyses")
+    page.click("#analysis-rows a:text-is('Hangs again')")
+    page.wait_for_selector("#stop-run", state="visible")
+    page.click("#stop-run")
+    page.wait_for_selector("#analysis-state:text-is('Stopped')")
+    assert page.inner_text("#workspace-message").startswith("You stopped the analysis.")
+    context.close()
+    assert errors == [], f"the page raised: {errors}"
+
+
 def test_the_settings_page_runs_its_script(browser, tmp_path):
     from tests.test_settings_env import env_in, hand_written, write_settings
     from webapp.main import create_app

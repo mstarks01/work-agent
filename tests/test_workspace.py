@@ -216,6 +216,53 @@ class TestTheDelete:
 CROSS_SITE = {"Sec-Fetch-Site": "cross-site"}
 
 
+def _stop(client, run: str, headers=SAME_ORIGIN):
+    return client.post(f"/workspace/runs/{run}/stop", headers=headers)
+
+
+class TestTheStop:
+    def test_it_stops_a_running_analysis(self, tiers):
+        from tests.test_jobs import HangingRunner
+
+        runner = HangingRunner()
+        client, workspace = _workspace_client(tiers, runner)
+        with client:
+            run = web.start(client, questions=False)
+            stopped = _stop(client, run)
+            assert stopped.status_code == 204, stopped.text
+            assert runner.cancelled
+            assert web.ran(client, run) == "stopped"
+            assert "event: stopped" in client.get(f"/events/{run}").text
+            assert client.get("/workspace/runs").json()[0]["status"] == "stopped"
+            # A stopped analysis holds no slot, so a new one starts.
+            second = web.start(client, questions=False)
+            assert _stop(client, second).status_code == 204
+        assert not workspace._runs
+
+    def test_it_refuses_an_analysis_that_does_not_run(self, tiers):
+        from tests.test_webapp_store import queued_run
+
+        client, workspace = _workspace_client(tiers)
+        with client:
+            done = web._completed(client)
+            assert _stop(client, done).status_code == 409
+            # A job that no run of this process holds cannot be stopped here.
+            queued = queued_run(workspace.store)
+            assert _stop(client, queued).status_code == 409
+
+    def test_a_missing_run_and_a_cross_origin_stop_change_nothing(self, tiers):
+        from tests.test_jobs import HangingRunner
+
+        client, _ = _workspace_client(tiers, HangingRunner())
+        with client:
+            run = web.start(client, questions=False)
+            assert _stop(client, "job-missing").status_code == 404
+            assert _stop(client, run, headers={}).status_code == 403
+            assert _stop(client, run, headers=CROSS_SITE).status_code == 403
+            assert client.get("/workspace/runs").json()[0]["status"] == "running"
+            assert _stop(client, run).status_code == 204
+
+
 class TestTheTitle:
     def test_it_names_the_analysis_and_a_blank_title_removes_it(self, tiers):
         client, workspace = _workspace_client(tiers)

@@ -19,6 +19,7 @@ from analysis_service.jobs import (
     PipelineCompleted,
     PipelineOutcome,
     PipelineRejected,
+    StopSignal,
     StubPipelineRunner,
     execute_job,
 )
@@ -385,5 +386,63 @@ class TestJobDeadline:
 
     def test_a_run_inside_the_deadline_is_untouched(self):
         record = TestExecuteJob.run_with(StubPipelineRunner(), deadline_seconds=30)
+        assert record.status == "completed"
+        assert record.report is not None
+
+
+def _stopped(runner, *, early: bool = False, reserved: int = 0) -> JobRecord:
+    """Run ``runner`` and request a stop: before the run starts where
+    ``early``, else once the run reached its first await."""
+
+    async def scenario():
+        store = InMemoryJobStore()
+        record = make_record()
+        record.reserved_tokens = reserved
+        await admit(store, record)
+        stop = StopSignal()
+        if early:
+            stop.request()
+        task = asyncio.create_task(
+            execute_job(store, runner, record.id, deadline_seconds=30, stop=stop)
+        )
+        await asyncio.sleep(0.05)
+        stop.request()
+        await asyncio.wait_for(task, timeout=5)
+        return await store.get(record.id)
+
+    return asyncio.run(scenario())
+
+
+class TestTheStop:
+    """A person's stop takes the deadline's path and ends ``stopped`` (ADR 0109)."""
+
+    def test_a_stop_ends_the_run_stopped_and_cancels_the_work(self):
+        runner = HangingRunner(nodes=("extract", "validate"))
+        record = _stopped(runner, reserved=3_857)
+        assert runner.cancelled
+        assert record.status == "stopped"
+        assert record.error is None
+        assert record.report is None
+        assert [e.node for e in record.events if e.kind == "node"] == [
+            "extract",
+            "validate",
+        ]
+        assert record.events[-1].status == "stopped"
+        # Nothing measured the cancelled graph, so the reservation stays.
+        assert record.measured_tokens is None
+        assert record.reserved_tokens == 3_857
+
+    def test_a_stop_before_the_run_starts_stops_it_at_its_start(self):
+        runner = HangingRunner()
+        record = _stopped(runner, early=True)
+        assert runner.cancelled
+        assert [e.status for e in record.events if e.kind == "status"] == [
+            "queued",
+            "running",
+            "stopped",
+        ]
+
+    def test_a_stop_after_the_run_returned_changes_nothing(self):
+        record = _stopped(StubPipelineRunner())
         assert record.status == "completed"
         assert record.report is not None
