@@ -213,14 +213,18 @@ def test_no_form_control_can_influence_which_model_runs(client, tiers):
 
 def test_the_only_controls_are_the_picker_and_the_description(client):
     """One textarea, a checkbox per carried framework and the question toggle,
-    one select per option, and the earlier analysis whose answers to reuse."""
+    one select per option, and the earlier analysis whose answers to reuse.
+    The analyses list adds its select-all checkbox and its two filters."""
     page = client.get("/").text
 
     assert page.count("<textarea") == 1
-    assert page.count('type="checkbox"') == len(CARRIED) + 1
+    assert page.count('type="checkbox"') == len(CARRIED) + 2
     assert 'id="ask"' in page
+    assert 'id="select-shown"' in page
     # ASVS declares a level and STRIDE declares nothing, so one option select.
-    assert page.count("<select") == 2
+    assert page.count("<select") == 4
+    assert 'id="analysis-status"' in page
+    assert 'id="analysis-framework"' in page
     assert 'data-option="level"' in page
     assert 'id="answers-from"' in page
 
@@ -613,6 +617,7 @@ def test_each_run_route_answers_a_malformed_id_as_a_missing_run_before_the_store
                     "facts": [A_FACT_ANSWER],
                     "revision": 0,
                 },
+                ("PUT", "/workspace/runs/{run_id}/title"): {"title": "Orders"},
             },
             headers=SAME_ORIGIN,
         )

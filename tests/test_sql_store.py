@@ -458,6 +458,7 @@ def every_field(owner_id: str = "alice") -> JobRecord:
         sources=[Source.description("a web app storing orders")],
         frameworks=sample_selection(),
         system_name="orders",
+        title="Orders board",
         answers=answers,
         shown_early=[KEY],
         skipped_early=[KEY, "a free question"],

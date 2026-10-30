@@ -1,10 +1,15 @@
 """Session workspace boundaries, using only the offline engine fixture."""
 
+import asyncio
+import logging
+
 import pytest
+from fastapi.testclient import TestClient
 
 from analysis_service.sources import MAX_SYSTEM_NAME_CHARS
 from tests import test_webapp_questions as web
-from tests.test_webapp import BREAKOUT, SAME_ORIGIN, posted
+from tests.test_webapp import BREAKOUT, LOOPBACK, SAME_ORIGIN, posted
+from webapp.main import DEFAULT_NAME
 
 tiers = web.tiers
 
@@ -98,3 +103,221 @@ def test_completed_processing_steps_survive_snapshot_reads(tiers):
         assert again["completed_steps"] == detail["completed_steps"], (
             "Snapshot reads must not consume progress"
         )
+
+
+TITLE = "My orders board"
+
+
+def _workspace_client(tiers, runner=None):
+    from webapp.main import Workspace
+
+    workspace = Workspace()
+    runner = web.PausingRunner() if runner is None else runner
+    client = TestClient(
+        web.app_for(tiers, runner, workspace=workspace), base_url=LOOPBACK
+    )
+    return client, workspace
+
+
+def _paused_with_child(client) -> tuple[str, str]:
+    """A paused run, and the Resumed Job its continue started, run to its end."""
+    paused = web._paused(client)
+    resumed = client.post(
+        f"/answer/{paused}", json={"links": [], "revision": 0}, headers=SAME_ORIGIN
+    )
+    assert resumed.status_code == 200, resumed.text
+    child = resumed.json()["run"]
+    assert web.ran(client, child) == "completed"
+    return paused, child
+
+
+def _rename(client, run: str, title, headers=SAME_ORIGIN):
+    return client.put(
+        f"/workspace/runs/{run}/title", json={"title": title}, headers=headers
+    )
+
+
+class TestTheDelete:
+    def test_it_removes_every_job_of_the_analysis(self, tiers, caplog):
+        client, _ = _workspace_client(tiers)
+        with client:
+            paused, child = _paused_with_child(client)
+            other = web._completed(client)
+            with caplog.at_level(
+                logging.INFO, logger="analysis_service.store_backends"
+            ):
+                deleted = client.delete(
+                    f"/workspace/runs/{paused}", headers=SAME_ORIGIN
+                )
+            assert deleted.status_code == 204, deleted.text
+            assert [run["run"] for run in client.get("/workspace/runs").json()] == [
+                other
+            ]
+            assert client.get(f"/workspace/runs/{child}").status_code == 404
+            assert client.get(f"/report/{child}").status_code == 404
+        assert [line.split()[2] for line in caplog.messages] == [child, paused]
+        assert all("cause owner" in line for line in caplog.messages)
+
+    def test_it_keeps_each_jobs_usage_row(self, tiers):
+        client, workspace = _workspace_client(tiers)
+        with client:
+            run = web._completed(client)
+            assert (
+                client.delete(f"/workspace/runs/{run}", headers=SAME_ORIGIN).status_code
+                == 204
+            )
+        assert run in workspace.store._usage
+
+    def test_it_deletes_a_paused_analysis(self, tiers):
+        client, _ = _workspace_client(tiers)
+        with client:
+            paused = web._paused(client)
+            assert (
+                client.delete(
+                    f"/workspace/runs/{paused}", headers=SAME_ORIGIN
+                ).status_code
+                == 204
+            )
+            assert client.get("/workspace/runs").json() == []
+
+    def test_it_refuses_an_analysis_that_runs_and_deletes_nothing(self, tiers):
+        from tests.test_webapp_store import queued_run
+
+        client, workspace = _workspace_client(tiers)
+        with client:
+            web._completed(client)
+            queued = queued_run(workspace.store)
+            refused = client.delete(f"/workspace/runs/{queued}", headers=SAME_ORIGIN)
+            assert refused.status_code == 409, refused.text
+            assert queued in {
+                run["run"] for run in client.get("/workspace/runs").json()
+            }
+
+    def test_a_missing_run_and_a_cross_origin_delete_change_nothing(self, tiers):
+        client, _ = _workspace_client(tiers)
+        with client:
+            run = web._completed(client)
+            assert (
+                client.delete(
+                    "/workspace/runs/job-missing", headers=SAME_ORIGIN
+                ).status_code
+                == 404
+            )
+            assert client.delete(f"/workspace/runs/{run}").status_code == 403
+            assert (
+                client.delete(f"/workspace/runs/{run}", headers=CROSS_SITE).status_code
+                == 403
+            )
+            assert [item["run"] for item in client.get("/workspace/runs").json()] == [
+                run
+            ]
+
+
+CROSS_SITE = {"Sec-Fetch-Site": "cross-site"}
+
+
+class TestTheTitle:
+    def test_it_names_the_analysis_and_a_blank_title_removes_it(self, tiers):
+        client, workspace = _workspace_client(tiers)
+        with client:
+            paused, child = _paused_with_child(client)
+            renamed = _rename(client, child, f"  {TITLE}  ")
+            assert renamed.status_code == 200, renamed.text
+            assert renamed.json() == {"title": TITLE}
+            [row] = client.get("/workspace/runs").json()
+            assert (row["name"], row["title"]) == (TITLE, TITLE)
+            assert {report["name"] for report in row["reports"]} == {TITLE}
+            assert client.get(f"/workspace/runs/{child}").json()["name"] == TITLE
+            for job in (paused, child):
+                assert asyncio.run(workspace.store.get(job)).title == TITLE
+            assert _rename(client, paused, "   ").json() == {"title": None}
+            [row] = client.get("/workspace/runs").json()
+            assert (row["name"], row["title"]) == (DEFAULT_NAME, None)
+
+    def test_it_moves_no_revision(self, tiers):
+        client, workspace = _workspace_client(tiers)
+        with client:
+            paused = web._paused(client)
+            before = asyncio.run(workspace.store.get(paused))
+            assert _rename(client, paused, TITLE).status_code == 200
+            after = asyncio.run(workspace.store.get(paused))
+            assert (after.revision, after.updated_at) == (
+                before.revision,
+                before.updated_at,
+            )
+            saved = client.post(
+                f"/answer/{paused}",
+                json={"save": True, "links": [web.LINK], "revision": before.revision},
+                headers=SAME_ORIGIN,
+            )
+            assert saved.status_code == 200, saved.text
+
+    def test_a_resumed_job_and_an_amendment_copy_it(self, tiers):
+        client, workspace = _workspace_client(tiers, web.PausingRunner(catalog=False))
+        with client:
+            paused = web._paused(client)
+            assert _rename(client, paused, TITLE).status_code == 200
+            amended = client.post(
+                f"/amend/{paused}",
+                json={"text": web.AMENDMENT, "revision": 0},
+                headers=SAME_ORIGIN,
+            )
+            amendment = amended.json()["run"]
+            assert web.ran(client, amendment) == "awaiting-answers"
+            resumed = client.post(
+                f"/answer/{amendment}",
+                json={"links": [], "revision": 0},
+                headers=SAME_ORIGIN,
+            )
+            child = resumed.json()["run"]
+            web.ran(client, child)
+            for job in (amendment, child):
+                assert asyncio.run(workspace.store.get(job)).title == TITLE
+
+    def test_it_stays_when_the_root_job_is_deleted(self, tiers):
+        client, workspace = _workspace_client(tiers)
+        with client:
+            paused, child = _paused_with_child(client)
+            assert _rename(client, child, TITLE).status_code == 200
+            owner = asyncio.run(workspace.store.get(paused)).owner_id
+            assert asyncio.run(workspace.store.delete(paused, owner)) is not None
+            [row] = client.get("/workspace/runs").json()
+            assert row["name"] == TITLE
+
+    def test_the_report_keeps_its_system_name(self, tiers):
+        client, _ = _workspace_client(tiers)
+        with client:
+            started = client.post(
+                "/analyze",
+                json=posted("A web app.") | {"name": "Orders API"},
+                headers=SAME_ORIGIN,
+            )
+            run = started.json()["run"]
+            web.ran(client, run)
+            assert _rename(client, run, TITLE).status_code == 200
+            page = client.get(f"/report/{run}").text
+        assert "Orders API" in page
+        assert TITLE not in page
+
+    @pytest.mark.parametrize(
+        "body", [{"title": "x" * (MAX_SYSTEM_NAME_CHARS + 1)}, {"title": 42}, {}, []]
+    )
+    def test_a_refused_title_keeps_the_old_one(self, tiers, body):
+        client, _ = _workspace_client(tiers)
+        with client:
+            run = web._completed(client)
+            assert _rename(client, run, TITLE).status_code == 200
+            refused = client.put(
+                f"/workspace/runs/{run}/title", json=body, headers=SAME_ORIGIN
+            )
+            assert refused.status_code == 400, refused.text
+            assert client.get("/workspace/runs").json()[0]["title"] == TITLE
+
+    def test_a_missing_run_and_a_cross_origin_rename_change_nothing(self, tiers):
+        client, _ = _workspace_client(tiers)
+        with client:
+            run = web._completed(client)
+            assert _rename(client, "job-missing", TITLE).status_code == 404
+            assert _rename(client, run, TITLE, headers={}).status_code == 403
+            assert _rename(client, run, TITLE, headers=CROSS_SITE).status_code == 403
+            assert client.get("/workspace/runs").json()[0]["title"] is None

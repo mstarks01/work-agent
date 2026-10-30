@@ -57,6 +57,7 @@ def upgrade() -> None:
         sa.Column("revision", sa.Integer(), nullable=False),
         sa.Column("parent_revision", sa.Integer()),
         sa.Column("system_name", sa.Text()),
+        sa.Column("title", sa.Text()),
         sa.Column("amends", sa.String(64)),
         sa.Column("error", sa.Text()),
         sa.Column("ask_questions", sa.Boolean(), nullable=False),

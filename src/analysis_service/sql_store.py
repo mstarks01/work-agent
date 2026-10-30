@@ -216,6 +216,7 @@ jobs = Table(
     Column("revision", Integer, nullable=False),
     Column("parent_revision", Integer),
     Column("system_name", Text),
+    Column("title", Text),
     Column("amends", String(64)),
     Column("error", Text),
     Column("ask_questions", Boolean, nullable=False),
@@ -415,6 +416,7 @@ def _envelope(row: Row[Any], events: Sequence[str]) -> Envelope:
         owner_id=row.owner_id,
         schema_version=row.schema_version,
         system_name=row.system_name,
+        title=row.title,
         created_at=row.created_at,
         updated_at=row.updated_at,
         status=status,
@@ -1386,6 +1388,8 @@ class SqlJobStore:
             raise ValueError(f"job {record.id!r} does not exist")
         check_save(record, row.report_sha256, _stored_events(row, events))
         values = _job_row(record)
+        # Only set_title writes the title after admission (ADR 0106).
+        del values["title"]
         if record.report is not None and not _names(row, "report.json"):
             data = stored_report(record.report)
             key = object_key(row.owner_id, row.id, "report.json")
@@ -1524,6 +1528,15 @@ class SqlJobStore:
                     revision=jobs.c.revision + 1,
                     updated_at=datetime.now(UTC),
                 )
+            )
+            return saved.rowcount == 1
+
+    async def set_title(self, job_id: str, owner_id: str, title: str | None) -> bool:
+        async with self._transaction(writes=True) as connection:
+            saved = await connection.execute(
+                update(jobs)
+                .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+                .values(title=title)
             )
             return saved.rowcount == 1
 
