@@ -138,7 +138,9 @@ def _title_outcome(name: str) -> Outcome:
         assert response.status_code in {200, 400}, response.status_code
         if response.status_code == 400:
             return (False, None)
-        return (True, asyncio.run(workspace.store.get(run)).title)
+        record = asyncio.run(workspace.store.get(run))
+        assert record is not None
+        return (True, record.title)
 
 
 def _rule_outcome(name: str) -> Outcome:
