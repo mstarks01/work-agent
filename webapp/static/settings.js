@@ -46,9 +46,46 @@ function chosenMode(vendor) {
   return modes.length === 1 ? modes[0] : pending(rowOf(`credentials.${vendor}.mode`));
 }
 
-// A vendor row shows where a tier names the vendor and its mode reads the row.
+// The keys of the store rows that the store choices read, with the unsaved
+// changes applied. The server decides them (`store_shown` in
+// webapp/settings_view.py), and `askStoreRows` asks again after a store edit.
+// `storeAnswer` is the request that has not answered yet, else null.
+let storeShown = new Set();
+let storeAsked = 0;
+let storeAnswer = null;
+
+// A store row shows where the store choices read it. A vendor row shows where
+// a tier names the vendor and its mode reads the row.
 const visible = (row) =>
-  !row.vendor || (chosenVendors().has(row.vendor) && (!row.modes || row.modes.includes(chosenMode(row.vendor))));
+  (!row.store || storeShown.has(row.key)) &&
+  (!row.vendor || (chosenVendors().has(row.vendor) && (!row.modes || row.modes.includes(chosenMode(row.vendor)))));
+
+// Send the unsaved store changes that hold no secret, then draw the store rows
+// that the answer names. Only the answer to the latest request applies. Where
+// the app does not answer, the rows stay, and the save check names a missing
+// setting.
+function askStoreRows() {
+  const asked = ++storeAsked;
+  const sent = Object.fromEntries([...changes].filter(([key]) => rowOf(key).store && !rowOf(key).secret));
+  const answer = fetch("/settings/rows", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ changes: sent }),
+  })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((payload) => {
+      if (asked !== storeAsked || !payload) return;
+      storeShown = new Set(payload.shown);
+      fill(currentFilter());
+      panel();
+    })
+    .catch(() => {})
+    .finally(() => {
+      if (storeAnswer === answer) storeAnswer = null;
+    });
+  storeAnswer = answer;
+  return answer;
+}
 
 // Each saved key of settings.env that a save deletes, because no tier names
 // its vendor after the changes. The server reads the same rule in
@@ -83,6 +120,8 @@ function textControl(row) {
   // A model decides what its tier's thinking row offers, so a finished edit
   // draws the table again.
   if (suggests(row)) input.addEventListener("change", () => fill(currentFilter()));
+  // A store setting decides which store rows show.
+  if (row.store) input.addEventListener("change", askStoreRows);
   return input;
 }
 
@@ -143,6 +182,7 @@ function choiceControl(row) {
   select.addEventListener("change", () => {
     change(row, row.unset && select.value === "" ? null : select.value);
     fill(currentFilter());
+    if (row.store) askStoreRows();
   });
   return select;
 }
@@ -393,6 +433,12 @@ function showSaved(restart) {
 
 async function save() {
   if (saving) return;
+  // A finished store edit asks for its rows, and the save sends the rows that
+  // show, so the save waits for the answer.
+  if (storeAnswer) {
+    await storeAnswer;
+    if (saving) return;
+  }
   const sentChanges = new Map([...changes].filter(([key]) => visible(rowOf(key))));
   const sentRemovals = new Set(removals);
   if (!sentChanges.size && !sentRemovals.size) return;
@@ -449,6 +495,7 @@ async function save() {
       for (const key of sentRemovals) removals.delete(key);
       invalidNumbers.clear();
       render();
+      if ([...changes.keys()].some((key) => rowOf(key)?.store)) askStoreRows();
       showSaved(payload.restart);
       return;
     }
@@ -508,6 +555,8 @@ function banners() {
 }
 
 function render() {
+  storeAsked++;
+  storeShown = new Set(SETTINGS.store_shown);
   banners();
   modelLists();
   document.getElementById("settings-file").textContent = SETTINGS.settings_file;

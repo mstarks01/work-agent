@@ -877,6 +877,49 @@ def test_the_settings_page_saves_resets_and_refuses_a_stale_tab(browser, tmp_pat
     assert "Reload the page" in stale
 
 
+def test_the_store_rows_follow_the_unsaved_store_choices(browser, tmp_path):
+    """A store choice shows the rows it reads before any save, so one save
+    sets the job store and the settings it needs."""
+    from tests.test_settings_env import env_in, hand_written, write_settings
+    from webapp.main import create_app
+
+    write_settings(tmp_path, hand_written())
+    shown = "#settings-rows tr[data-key^='store.']"
+    for url in serve(create_app(env=env_in(tmp_path))):
+        page, errors = opened(browser, url + "/settings")
+        page.wait_for_selector(shown)
+        on_memory = page.eval_on_selector_all(
+            shown, "rows => rows.map(r => r.dataset.key)"
+        )
+        page.select_option('tr[data-key="store.job_store"] select', "sql")
+        page.wait_for_selector('tr[data-key="store.object_store"]')
+        page.select_option('tr[data-key="store.object_store"] select', "gcs")
+        page.wait_for_selector('tr[data-key="store.object_bucket"]')
+        page.locator('tr[data-key="store.database_url"] input').fill(
+            "postgresql+asyncpg://analysis@db.example.com/analysis"
+        )
+        page.locator("#settings-search").click()
+        page.wait_for_selector('tr[data-key="store.database_credentials"]')
+        on_gcs = page.eval_on_selector_all(
+            shown, "rows => rows.map(r => r.dataset.key)"
+        )
+        page.select_option('tr[data-key="store.job_store"] select', "memory")
+        page.wait_for_selector('tr[data-key="store.object_store"]', state="detached")
+        listed = page.locator("#changes-list").inner_text()
+        page.close()
+    assert errors == [], f"the settings page raised: {errors}"
+    assert set(on_memory) == {"store.job_store", "store.retention_days"}
+    assert {
+        "store.database_url",
+        "store.database_credentials",
+        "store.object_store",
+        "store.object_bucket",
+        "store.object_credentials",
+    } <= set(on_gcs)
+    assert "store.object_root" not in on_gcs
+    assert "This setting is inactive" in listed
+
+
 def test_a_thinking_row_follows_its_tier_model_and_resets_to_the_default(
     browser, tmp_path
 ):

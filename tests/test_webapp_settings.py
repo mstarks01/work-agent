@@ -33,7 +33,7 @@ from tests.test_settings_env import (
     settings_client,
     write_settings,
 )
-from tests.test_webapp import LOOPBACK
+from tests.test_webapp import LOOPBACK, SAME_ORIGIN
 from webapp.main import Workspace, create_app
 from webapp.settings_page import (
     CHANGED_SAMPLING,
@@ -356,15 +356,25 @@ class TestWhatTheSelectionShows:
         assert setups["vertex"] == "gcloud auth application-default login"
 
     def test_the_memory_store_shows_no_database_or_object_setting(self, tmp_path):
+        data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
+        rows = {row["key"]: row for row in data["rows"]}
+
+        assert data["store_shown"] == ["store.job_store", "store.retention_days"]
+        assert rows["store.job_store"]["value"] == "memory"
+
+    def test_the_data_carries_every_store_row(self, tmp_path):
         rows = rows_of(client_for(tmp_path, hand_written()))
 
-        store = {key for key in rows if key.startswith("store.")}
-        assert store == {"store.job_store", "store.retention_days"}
-        assert rows["store.job_store"]["value"] == "memory"
+        store = {key for key, row in rows.items() if row["store"]}
+        assert store == {
+            key
+            for key, setting in SETTINGS.items()
+            if setting.variable in store_variables() and setting.mark != "excluded"
+        }
         assert all(rows[key]["restart"] for key in store)
 
     def test_the_sql_store_shows_the_reads_of_its_object_store(self, tmp_path):
-        rows = rows_of(
+        shown = store_shown_of(
             memory_client(
                 tmp_path,
                 ANALYSIS_JOB_STORE="sql",
@@ -373,23 +383,110 @@ class TestWhatTheSelectionShows:
         )
 
         assert {"store.database_url", "store.object_store", "store.object_root"} <= (
-            rows.keys()
+            shown
         )
-        assert "store.object_bucket" not in rows
+        assert "store.object_bucket" not in shown
 
     def test_the_gcs_store_shows_only_the_settings_it_reads(self, tmp_path):
-        rows = rows_of(
-            memory_client(
-                tmp_path, ANALYSIS_JOB_STORE="sql", ANALYSIS_OBJECT_STORE="gcs"
-            )
+        client = memory_client(
+            tmp_path, ANALYSIS_JOB_STORE="sql", ANALYSIS_OBJECT_STORE="gcs"
         )
 
-        assert {key for key in rows if key.startswith("store.object_")} == {
+        assert {
+            key for key in store_shown_of(client) if key.startswith("store.object_")
+        } == {
             "store.object_store",
             "store.object_bucket",
             "store.object_credentials",
         }
-        assert "gcs" in rows["store.object_store"]["options"]
+        assert "gcs" in rows_of(client)["store.object_store"]["options"]
+
+
+def store_shown_of(client) -> set[str]:
+    return set(page_data(client.get("/settings"))["store_shown"])
+
+
+def rows_for(client, changes: dict, **headers: str):
+    return client.post(
+        "/settings/rows", json={"changes": changes}, headers=SAME_ORIGIN | headers
+    )
+
+
+class TestTheStoreRowsOfUnsavedChanges:
+    def test_an_unsaved_store_choice_shows_the_settings_it_reads(self, tmp_path):
+        client = client_for(tmp_path, hand_written())
+
+        answer = rows_for(
+            client, {"store.job_store": "sql", "store.object_store": "gcs"}
+        )
+
+        assert answer.status_code == 200, answer.text
+        shown = set(answer.json()["shown"])
+        assert {
+            "store.database_url",
+            "store.object_store",
+            "store.object_bucket",
+            "store.object_credentials",
+        } <= shown
+        assert "store.object_root" not in shown
+
+    def test_a_null_change_unsets_a_saved_store_setting(self, tmp_path):
+        write_settings(tmp_path, hand_written(ANALYSIS_JOB_STORE="sql"))
+        client = TestClient(
+            create_app(
+                workspace=Workspace(store=InMemoryJobStore()), env=env_in(tmp_path)
+            ),
+            base_url=LOOPBACK,
+        )
+        assert "store.database_url" in store_shown_of(client)
+
+        answer = rows_for(client, {"store.job_store": None})
+
+        assert answer.json()["shown"] == ["store.job_store", "store.retention_days"]
+
+    def test_the_process_environment_wins_over_a_change(self, tmp_path):
+        client = memory_client(tmp_path, ANALYSIS_JOB_STORE="memory")
+
+        answer = rows_for(client, {"store.job_store": "sql"})
+
+        assert answer.json()["shown"] == ["store.job_store", "store.retention_days"]
+
+    def test_a_change_of_another_setting_counts_for_nothing(self, tmp_path):
+        client = client_for(tmp_path, hand_written())
+
+        answer = rows_for(client, {"tiers.base.model": "sql", "no.such.key": "sql"})
+
+        assert answer.json()["shown"] == ["store.job_store", "store.retention_days"]
+
+    @pytest.mark.parametrize(
+        ("body", "media_type", "status"),
+        [
+            (b"not json", "application/json", 400),
+            (b"[]", "application/json", 400),
+            (b'{"changes": {"k": 1}}', "application/json", 400),
+            (b"[" * 10_000, "application/json", 400),
+            (b'{"changes": {}}', "text/plain", 415),
+        ],
+    )
+    def test_a_body_that_is_not_changes_is_refused(
+        self, tmp_path, body, media_type, status
+    ):
+        client = client_for(tmp_path, hand_written())
+
+        refused = client.post(
+            "/settings/rows",
+            content=body,
+            headers=SAME_ORIGIN | {"Content-Type": media_type},
+        )
+
+        assert refused.status_code == status, refused.text
+
+    def test_a_cross_origin_request_is_refused(self, tmp_path):
+        client = client_for(tmp_path, hand_written())
+
+        refused = rows_for(client, {}, **{"Sec-Fetch-Site": "cross-site"})
+
+        assert refused.status_code == 403
 
 
 class TestModelSuggestions:

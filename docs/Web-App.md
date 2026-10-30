@@ -266,8 +266,9 @@ The page shows only the rows that a loader reads now. The credential rows follow
 the vendor of each tier and that vendor's credential mode, with the unsaved
 changes applied, so one save sets a tier and its key. A vendor in the `iam`
 mode shows a short note and its setup command. The job storage rows follow the
-selected job store, object store and database, and each one takes effect only
-after a restart. The thinking row of each tier follows the tier's model, with
+selected job store, object store and database, with the unsaved changes
+applied, so one save sets a `sql` job store and the settings that it reads.
+Each job storage row takes effect only after a restart. The thinking row of each tier follows the tier's model, with
 the unsaved changes applied. For a model that takes a thinking level, it offers
 "The model's own level", `low`, `medium` and `high`; the first choice removes a
 saved level. For a listed model that takes none, it says so and offers to remove
@@ -456,7 +457,7 @@ Each policy grants only what its own page does:
 | Report | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/answer/{run}` and `/correct/{run}`. It loads nothing. |
 | Form | the same, for `/example`, `/analyze`, `/answer/{run}`, `/amend/{run}`, `/events/{run}` and `/workspace/runs`. |
 | Diagnostic | `style-src` nonce only — it runs no script, so it is granted none. |
-| Settings | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/settings`. It draws its table from the data in the page. |
+| Settings | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/settings` and `/settings/rows`. It draws its table from the data in the page. |
 
 `base-uri` and `form-action` are `'none'` everywhere; the form posts through
 fetch, so a navigation away from it would be something going wrong. A page and
