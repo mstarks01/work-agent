@@ -1130,14 +1130,18 @@ A refusal names the file and its mode. A Kubernetes secret volume has mode
 
 A secret file is a file that one of these variables names: the `_FILE`
 variable of each vendor key, `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`,
-`ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` and `ANALYSIS_DATABASE_PASSWORD_FILE`.
-`ANALYSIS_TIERS_FILE` and `ANALYSIS_DATABASE_CA_FILE` do not name a secret.
+`ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE`,
+`ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE` and
+`ANALYSIS_DATABASE_PASSWORD_FILE`. `ANALYSIS_TIERS_FILE` and
+`ANALYSIS_DATABASE_CA_FILE` do not name a secret.
 
 The secret is the content of the file without one final newline, because an
 editor ends a file with a newline. The secret must not be empty, must be printable, must have no whitespace at either end,
 and must have 4,096 characters or fewer. A space, a `\` or a `$` inside a
 secret is allowed. A refusal names the variable and the rule, and never the
-secret.
+secret. The service account key of `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE`
+is the one exception: it is the JSON file as Google downloads it, with its line
+breaks, and at most 16 KiB.
 
 ### Config paths (override where files are read from)
 
@@ -1405,8 +1409,9 @@ backend.
 | `ANALYSIS_OBJECT_REGION` | the name of a region, which matches `[a-z0-9-]{1,32}` | Required by `s3`. Refused by `gcs`. |
 | `ANALYSIS_OBJECT_ENDPOINT` | `https://`, a host and an optional port | Optional for `s3`. Unset selects the AWS endpoint of the region. Any other URL stops the startup. Refused by `gcs`, which always uses `https://storage.googleapis.com`. |
 | `ANALYSIS_OBJECT_ADDRESSING` | `virtual`, `path` | Optional for `s3`. The default is `virtual`. Refused by `gcs`. |
-| `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3` and `gcs`. On `gcs`, `iam` accepts only the metadata server identity of Cloud Run, GKE Workload Identity or GCE, and `api_key` stops the startup. |
+| `ANALYSIS_OBJECT_CREDENTIALS` | `iam`, `api_key` | Required by `s3` and `gcs`. On `gcs`, `iam` accepts only the metadata server identity of Cloud Run, GKE Workload Identity or GCE, and `api_key` reads a service account key file. |
 | `ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE`, `ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE` | a path to a file | Required by `api_key` on `s3`. Refused by `iam` and by `gcs`. |
+| `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE` | a path to a service account key file | Required by `api_key` on `gcs`. Refused by `iam` and by `s3`. |
 | `ANALYSIS_RETENTION_DAYS` | a whole number of days from 1 to 36500 | Optional. Unset keeps every job. See [Retention](HTTP-API.md#retention). |
 
 ### Bearer auth

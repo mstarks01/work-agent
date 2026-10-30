@@ -25,7 +25,7 @@ from analysis_service.deployment import (
     ConfigPaths,
 )
 from analysis_service.model_tiers import TIER_NAMES, load_model_tiers
-from analysis_service.objects import S3_KEY_FILES
+from analysis_service.objects import GCS_KEY_FILE_VAR, S3_KEY_FILES
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import SamplingConfigError
 from analysis_service.settings_variables import deployment_variables, secret_vars
@@ -69,6 +69,7 @@ class TestSecretVars:
         assert secret_vars() == {
             *vendor_secrets,
             *S3_KEY_FILES.values(),
+            GCS_KEY_FILE_VAR,
             DATABASE_PASSWORD_FILE_VAR,
         }
 

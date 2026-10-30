@@ -359,7 +359,7 @@ def refuse_bare_secret(
 ) -> None:
     """Raise ``error`` where the environment holds the secret of ``var`` itself.
 
-    **The one reader of that refusal.** :func:`read_secret` asks it, and a
+    **The one reader of that refusal.** :func:`read_secret_file` asks it, and a
     store asks it early for each key file that its mode may not read.
     """
     bare = refused_var(var)
@@ -370,24 +370,45 @@ def refuse_bare_secret(
         )
 
 
-def read_secret(env: Mapping[str, str], var: str, error: type[Exception]) -> str:
-    """The secret in the file that ``var`` names, or ``""`` if ``var`` is unset.
+def read_secret_file(
+    env: Mapping[str, str], var: str, error: type[Exception]
+) -> bytes | None:
+    """The content of the secret file that ``var`` names, or ``None`` if
+    ``var`` is unset.
 
-    The secret is the content of the file without one final ``\\n``. Raises
-    ``error`` when the environment holds the secret itself
-    (:func:`refuse_bare_secret`), when the file cannot be read, when it fails
-    :func:`private_fd` for a secret file, or when the secret fails
-    :func:`secret_refusal`. The message names the variable or the file, and
-    never the content (OWASP A09).
+    **The one reader of a secret file.** Raises ``error`` when the environment
+    holds the secret itself (:func:`refuse_bare_secret`), when the file cannot
+    be read, or when it fails :func:`private_fd` for a secret file. The message
+    names the variable or the file, and never the content (OWASP A09).
+    :func:`read_secret` reads a secret text through it, and the ``api_key``
+    mode of the ``gcs`` object store reads its JSON key (ADR 0108).
     """
     refuse_bare_secret(env, var, error)
     path = env.get(var, "").strip()
     if not path:
+        return None
+    try:
+        return read_private(path, error, secret=True)
+    except OSError as exc:
+        raise error(
+            f"{var} names a file this service cannot read ({type(exc).__name__})"
+        ) from exc
+
+
+def read_secret(env: Mapping[str, str], var: str, error: type[Exception]) -> str:
+    """The secret in the file that ``var`` names, or ``""`` if ``var`` is unset.
+
+    The secret is the content of the file without one final ``\\n``. Raises
+    ``error`` where :func:`read_secret_file` does, when the content is not
+    UTF-8, or when the secret fails :func:`secret_refusal`. The message names
+    the variable or the file, and never the content (OWASP A09).
+    """
+    content = read_secret_file(env, var, error)
+    if content is None:
         return ""
     try:
-        content = read_private(path, error, secret=True)
         value = content.decode("utf-8").removesuffix("\n")
-    except (OSError, UnicodeDecodeError) as exc:
+    except UnicodeDecodeError as exc:
         raise error(
             f"{var} names a file this service cannot read ({type(exc).__name__})"
         ) from exc

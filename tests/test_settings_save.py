@@ -13,6 +13,7 @@ job on a stub runner, so a test reads which Deployment ran a job.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -515,7 +516,7 @@ class TestAStoreChange:
     @pytest.mark.parametrize(
         ("credentials", "message"),
         [
-            ("api_key", "a key file and an HMAC key are out of scope"),
+            ("api_key", "needs ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE; it is unset"),
             ("iam", "reads only the identity of the metadata server"),
         ],
     )
@@ -545,6 +546,33 @@ class TestAStoreChange:
         (error,) = refused.json()["errors"]
         assert message in error["message"]
         assert settings_text(tmp_path) == before
+
+    def test_a_gcs_key_from_the_page_passes_the_store_check(self, tmp_path, key_info):
+        """The key field holds one line, and the save writes it to a private
+        file that the ``api_key`` mode of the ``gcs`` row reads."""
+        client, _ = app_on(tmp_path, hand_written())
+        (tmp_path / "jobs.db").touch(mode=0o600)
+
+        saved = save(
+            client,
+            {
+                "store.job_store": "sql",
+                "store.database_url": f"sqlite+aiosqlite:///{tmp_path / 'jobs.db'}",
+                "store.object_store": "gcs",
+                "store.object_bucket": "analysis-jobs",
+                "store.object_credentials": "api_key",
+                "store.object_service_account_key_file": json.dumps(key_info),
+            },
+        )
+
+        assert saved.status_code == 200, saved.text
+        lines = dict(
+            line.split("=", 1) for line in settings_text(tmp_path).splitlines()
+        )
+        path = Path(lines["ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE"])
+        assert path.stat().st_mode & 0o077 == 0
+        assert json.loads(path.read_text()) == key_info
+        assert key_info["private_key"] not in settings_text(tmp_path)
 
 
 #: The name of a key file that a save writes, as the module docstring of

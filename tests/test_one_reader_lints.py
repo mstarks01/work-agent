@@ -1185,11 +1185,11 @@ def _reads_a_secret_file(node: ast.AST) -> bool:
 
 
 def test_a_secret_file_has_one_reader():
-    """Each loader of a key or a password asks ``read_secret`` with its own
-    error class, so the mode rule, the newline rule and the secret rule have
-    one reader."""
+    """Each loader of a key or a password asks ``read_secret`` or, for the
+    JSON key of the ``gcs`` row, ``read_secret_file`` with its own error class,
+    so the mode rule of a secret file has one reader."""
     assert _sites(_reads_a_secret_file) == [
-        ("src/analysis_service/config_files.py", "read_secret")
+        ("src/analysis_service/config_files.py", "read_secret_file")
     ]
 
 
