@@ -2243,7 +2243,8 @@ def test_same_for_all_is_offered_only_where_rows_share_a_question(case):
 def test_the_form_script_keeps_the_list_s_order_with_a_box_for_each_run():
     """A box holds each run of rows that share a group, in the service's
     order. A group that comes back later opens a new box: a heading never
-    moves a row ahead of another (ADR 0078)."""
+    moves a row ahead of another (ADR 0078). The first boxes start open up to
+    three choices, and the rest closed."""
     store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
     process = valid_model().processes[0]
 
@@ -2291,12 +2292,12 @@ await ids.continue.listeners.click(); await settle();
         {
             "title": "stored-copy-integrity heading?",
             "rows": [store.name, flow.name],
-            "open": False,
+            "open": True,
         },
         {
             "title": "audit-evidence heading?",
             "rows": [flow.name, store.name],
-            "open": False,
+            "open": True,
         },
         {
             "title": "stored-copy-integrity heading?",
@@ -4127,6 +4128,91 @@ calls.push(box.all("th").map(h => h.scope || ""));
         assert "login: encryption in transit: the mechanism" in names
         assert f"{store.name}: {facets['facets'][0]['question']}" in names
         assert set(scopes) == {"col"}
+
+
+class TestTheShortPause:
+    """The pause page says what the list asks now, and opens a first batch
+    (#2029 package 8)."""
+
+    def question(self, n, group):
+        flow = valid_model().data_flows[0]
+        return {
+            "key": [flow.id, f"attribute-{n}", "", "", "", ""],
+            "kind": "attribute",
+            "label": f"question {n}",
+            "reasons": [],
+            "choices": [],
+            "form": "control",
+            "suggestions": [],
+            "max_length": 200,
+            "group": group,
+            "group_heading": f"{group}?",
+            "element": flow.name,
+        }
+
+    def pause(self, summary=None, extra=""):
+        listed = [self.question(n, group) for n, group in enumerate("ABCD")]
+        payload = {
+            "run": "r1",
+            "revision": 0,
+            "link_questions": [],
+            "early_questions": listed,
+            "answered_early": [],
+            "answered_links": [],
+            "early_summary": summary,
+        }
+        steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+const payload = {json.dumps(payload)};
+streams[0].listeners.questions({{ data: JSON.stringify(payload) }});
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+const boxes = () => ids.questions.querySelectorAll("details")
+  .filter(d => d.className === "question-group").map(d => Boolean(d.open));
+calls.push({{ said: text(ids.questions), open: boxes() }});
+{extra}
+"""
+        return [call for call in _run_form_script(steps)["calls"] if "open" in call]
+
+    def summary(self, **counts):
+        names = (
+            "introduced",
+            "choices",
+            "settled",
+            "partial",
+            "unknown",
+            "skipped",
+            "held_back",
+            "below_floor",
+            "unnecessary",
+        )
+        base = dict.fromkeys(names, 0)
+        return base | {"applicability": {}} | counts
+
+    def test_the_list_says_what_it_asks_and_what_may_follow(self):
+        (seen,) = self.pause(
+            self.summary(recommended=4, recommended_choices=6, blocked=3)
+        )
+        assert "4 questions are in the list, with 6 choices to make." in seen["said"]
+        assert "3 more questions wait on an answer in the list" in seen["said"]
+
+    def test_no_waiting_question_adds_no_claim(self):
+        (seen,) = self.pause(
+            self.summary(recommended=4, recommended_choices=4, blocked=0)
+        )
+        assert "4 questions are in the list, with 4 choices to make." in seen["said"]
+        assert "wait on an answer" not in seen["said"]
+
+    def test_the_first_boxes_open_up_to_three_choices_once(self):
+        """A box the owner closes stays closed when the list comes back."""
+        again = """
+ids.questions.querySelectorAll("details").find(d => d.className === "question-group").open = false;
+streams[0].listeners.questions({ data: JSON.stringify(payload) });
+calls.push({ open: boxes() });
+"""
+        first, second = self.pause(extra=again)
+        assert first["open"] == [True, True, True, False]
+        assert second["open"] == [False, True, True, False]
 
 
 class TestTheFacetsAPageAsks:
