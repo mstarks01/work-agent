@@ -15,6 +15,7 @@ from analysis_service.answer_state import EARLY_RULES, passes_floor
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import (
+    KIND_REASON,
     PRIOR_REASON,
     QUESTION_PRIOR,
     PriorRow,
@@ -203,15 +204,27 @@ class TestTheOrder:
         }
         assert set(question.reasons) == rules
 
-    def test_a_fact_no_rule_reads_gives_the_prior_as_its_reason(self):
-        """A rule that only names the element says nothing about this fact."""
+    def test_a_kind_no_rule_reads_names_what_an_answer_informs(self):
+        """A rule that only names the element says nothing about this fact, so
+        the kind's own reviewed scope words the reason (#2029 package 8)."""
         (question,) = early_questions(
             valid_model(),
             {"stride": {}},
             None,
             prior_of({"DataStore": {"audit-evidence": 1.0}}),
         )
-        assert question.reasons == (PRIOR_REASON,)
+        covers = QUESTION_KINDS["audit-evidence"].covers
+        store = valid_model().data_stores[0].name
+        assert question.reasons == (KIND_REASON.format(covers=covers, element=store),)
+
+    def test_an_attribute_no_rule_reads_gives_the_prior_as_its_reason(self):
+        asked = early_questions(
+            valid_model(),
+            {"stride": {}},
+            None,
+            prior_of({"DataFlow": {"operations": 1.0}}),
+        )
+        assert (PRIOR_REASON,) in [question.reasons for question in asked]
 
 
 def test_the_framework_order_changes_no_question():
