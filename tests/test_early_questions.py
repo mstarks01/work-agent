@@ -204,7 +204,7 @@ class TestTheOrder:
         }
         assert set(question.reasons) == rules
 
-    def test_a_kind_no_rule_reads_names_what_an_answer_decides(self):
+    def test_a_kind_no_rule_reads_names_what_an_answer_informs(self):
         """A rule that only names the element says nothing about this fact, so
         the kind's own reviewed scope words the reason (#2029 package 8)."""
         (question,) = early_questions(

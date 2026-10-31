@@ -139,8 +139,8 @@ PRIOR_REASON = "Findings in earlier analyses often depend on this fact."
 
 #: The reason a question kind gives where no rule reads its fact: what the
 #: kind covers (:attr:`~analysis_service.question_kinds.QuestionKind.covers`),
-#: which names the findings an answer decides.
-KIND_REASON = "An answer decides which findings about {covers} the analysis reports for {element}."
+#: which names the findings an answer informs.
+KIND_REASON = "An answer informs which findings about {covers} the analysis reports for {element}."
 
 #: The reason a gate question gives, once for each framework it decides.
 GATE_REASON = "Whether the {framework} analysis runs depends on this fact."
