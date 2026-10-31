@@ -51,7 +51,7 @@ token whose principal does not exist yet gets the same `404` as a missing job.
 | `POST` | `/v1/jobs/{id}/corrections` | Correct a final report's answers, as `{"facts": [...], "revision"}`: a changed value, or `unknown`. `200` with `{"job_id", "revision", "corrections", "corrected_findings"}`. No job starts, and the report is not rewritten. `400` where the report is not final, `facts` is empty, a correction names no answer the report read, or changes none. `409` where another correction moved the revision. `422` where `revision` is missing. |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the answers, and a completed job keeps a draft of its follow-up; either answers `200` with its own `job_id`, and a save never starts a job. `409` where a save moved the answers after this request read them. |
 | `POST` | `/v1/jobs/{id}/amendments` | Amend a job in `awaiting-answers`, as `{"text", "revision"}`: what is true that its model misses or reads wrongly. Starts a **new** job that extracts the job's sources again with the amendment added, and pauses again; `201` with its `job_id`. `400` where the job does not wait on answers or `text` is blank. `409` where the revision has moved, before or while the request reads it, a job already locks this one, or the job selects a framework that this deployment no longer carries; that message names the framework. `422` where `revision` is missing. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "early_blocked", "early_unnecessary", "policy_version", "fallback", "final", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits", "carried_dropped", "carried_dropped_links"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "early_blocked", "early_unnecessary", "policy_version", "fallback", "final", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits", "carried_dropped", "carried_dropped_links", "carried_renames", "rename_choices"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -388,8 +388,25 @@ take each answer they still ask, and `carried_dropped` and
 and an ID follows the element's name, so an answer carries where the new
 description gives the element the same name. A job you do not own reads as
 `404`. The service answers `400` where `questions` is off, or where the earlier
-job holds no answer. The earlier job does not change. See
+job holds no answer. The earlier job does not change, and a later deletion of
+it does not change what the new job carries. See
 [ADR 0079](adr/0079-a-new-analysis-can-carry-an-earlier-job-s-answers.md).
+
+Each entry of `carried_dropped` has a `reason`: `missing-element` where it
+names an element this model does not have, and `not-taken` where this job's
+questions refuse it, because the sources state the fact or no question asks
+it. **Map a renamed element** where the new description names it differently
+([ADR 0116](adr/0116-an-owner-maps-a-carried-answer-s-element-to-a-new-one.md)).
+`rename_choices` lists each missing element with the elements of its type that
+it can map to. Send a save to the waiting job with `renames`: every rename the
+job holds after the save, each `{"earlier": "<missing element ID>",
+"element": "<element ID of this model>"}`. Leave `renames` out to keep the ones
+it holds. The service carries the element's answers to the element you name,
+and the answers of each flow whose ID names it. The service never maps an
+element by a similar name. It answers `400` for a rename to an element of
+another type, to an element a carried answer already names, or of an element a
+carried answer does not name, and for two renames of one element.
+`carried_renames` lists the renames the job holds.
 
 A waiting job lives through a restart of the service on the `sql`
 [job store](#job-storage). On the `memory` store, a restart loses it with its

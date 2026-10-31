@@ -9,6 +9,9 @@
 - **Amended by**: [#1672](https://github.com/mstarks01/work-agent/issues/1672),
   under which the carried answers survive a restart where
   `ANALYSIS_JOB_STORE` is `sql`
+- **Amended by**: [ADR 0116](0116-an-owner-maps-a-carried-answer-s-element-to-a-new-one.md),
+  where the owner maps a carried answer's element to an element of the new
+  model under another name
 
 ## Context
 
@@ -34,6 +37,10 @@ does. An answer about an element the new model does not have, or about a fact
 it states, is dropped, and the questions route lists it in `carried_dropped`.
 An answer names an element by its ID, and an ID follows the element's name, so
 an answer carries where the new description gives the element the same name.
+
+> **Amended by [ADR 0116](0116-an-owner-maps-a-carried-answer-s-element-to-a-new-one.md).**
+> The owner can map an element the new description names differently, and
+> the answer carries to the element named.
 
 **The rules are fail-closed.** Another owner's job reads as missing (`404`). A
 submission without `questions` is refused, because a job that does not pause

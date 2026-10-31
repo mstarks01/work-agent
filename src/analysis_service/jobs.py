@@ -51,6 +51,7 @@ from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, HeldAnswerSet
 from analysis_service.assertion_use import assertion_use
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
+from analysis_service.carried_renames import MAX_RENAMES, ElementRename, renamed
 from analysis_service.certification import CertifyResult
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.execution import GraphFailed
@@ -178,6 +179,7 @@ RECORD_FIELDS: dict[str, EnvelopeHold] = {
     "amends": "always",
     "parent_revision": "always",
     "carried": "same-schema",
+    "carried_renames": "same-schema",
     "ask_questions": "always",
     "checkpoint": "never",
     "status": "always",
@@ -403,6 +405,11 @@ class JobRecord(BaseModel):
     # (ADR 0079). Its question set takes each one whose fact it still asks,
     # and lists the rest. The extraction never reads them.
     carried: HeldAnswerSet = NO_ANSWERS
+    # The owner's renames of the elements the carried answers name (ADR 0116):
+    # each maps an earlier element to an element of this job's model.
+    carried_renames: list[ElementRename] = Field(
+        default_factory=list, max_length=MAX_RENAMES
+    )
     # Whether this job stops after its assertion pass to ask a person, and
     # waits for the answers. Off unless a submission asks for it, so an
     # autonomous run never waits.
@@ -514,14 +521,13 @@ class JobRecord(BaseModel):
         submission names this job (ADR 0079) or an amendment starts from it
         (ADR 0072). A final report's corrections lie over a report's draft,
         the draft over the answers the job's run read or its pause saved, and
-        those over every answer the job carried, a dropped one included.
-        Nothing is checked here: the job that carries them checks each one
-        against its own questions.
+        those over every answer the job carried under its renames, a dropped
+        one included. Nothing is checked here: the job that carries them
+        checks each one against its own questions.
         """
         corrected = AnswerSet(facts=tuple(self.corrections))
-        return corrected.over(
-            self.draft.expanded().over(self.answers.over(self.carried))
-        )
+        carried = renamed(self.carried, self.carried_renames)
+        return corrected.over(self.draft.expanded().over(self.answers.over(carried)))
 
     def selection(self) -> tuple[FrameworkName, ...]:
         """This job's frameworks by name, in selection order.
@@ -847,6 +853,8 @@ class JobStore(Protocol):
         shown: Sequence[UnknownKey],
         skipped: Sequence[SkipKey],
         revision: int,
+        *,
+        renames: Sequence[ElementRename],
     ) -> bool: ...
 
     async def save_corrections(
@@ -1326,11 +1334,14 @@ class InMemoryJobStore:
         shown: Sequence[UnknownKey],
         skipped: Sequence[SkipKey],
         revision: int,
+        *,
+        renames: Sequence[ElementRename],
     ) -> bool:
         """Keep the saved answers of a job that still waits for them.
 
-        ``shown`` is every early question the pause has shown, and ``skipped``
-        every one its submitter skipped for now. ``revision`` is the
+        ``shown`` is every early question the pause has shown, ``skipped``
+        every one its submitter skipped for now, and ``renames`` every rename
+        of a carried answer's element (ADR 0116). ``revision`` is the
         revision the save read: the check and the next revision are one step,
         so of two saves that read one revision only the first lands. Only these
         change, so the checkpoint an envelope read leaves
@@ -1351,6 +1362,7 @@ class InMemoryJobStore:
         record.answers = answers
         record.shown_early = list(shown)
         record.skipped_early = list(skipped)
+        record.carried_renames = list(renames)
         record.updated_at = datetime.now(UTC)
         return True
 

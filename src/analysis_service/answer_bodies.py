@@ -38,6 +38,7 @@ from pydantic import (
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import MAX_SKIPS, Answers, Revision
+from analysis_service.carried_renames import MAX_RENAMES, ElementRename
 from analysis_service.claims import UnknownKey
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import (
@@ -75,7 +76,10 @@ class AnswersSubmission(BaseModel):
     of one of them (ADR 0069). ``revision`` is the revision the answers
     were read against, which a waiting job and every save require. ``shares``
     answers a question once for each part it covers (ADR 0114); each covered
-    part counts as one fact answer toward the bound. One request carries at
+    part counts as one fact answer toward the bound. ``renames`` is every
+    rename a waiting job holds after a save: each maps an element a carried
+    answer names to an element of this model (ADR 0116). Left out, the job
+    keeps the renames it holds. One request carries at
     most the ``answer_limits`` the questions route publishes; a follow-up
     larger than that saves its draft in batches.
     """
@@ -92,6 +96,7 @@ class AnswersSubmission(BaseModel):
     skip: list[SkipKey] = Field(default_factory=list, max_length=MAX_SKIPS)
     presented: list[UnknownKey] = Field(default_factory=list, max_length=MAX_HELD_FACTS)
     revision: Revision | None = None
+    renames: list[ElementRename] | None = Field(default=None, max_length=MAX_RENAMES)
 
     @model_validator(mode="after")
     def _within_the_fact_bound(self) -> AnswersSubmission:
@@ -195,6 +200,7 @@ def read_answers(raw: object) -> Answers:
         skips=tuple(body.skip),
         presented=tuple(body.presented),
         revision=body.revision,
+        renames=None if body.renames is None else tuple(body.renames),
     )
 
 
