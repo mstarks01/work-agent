@@ -198,11 +198,11 @@ class TestTheOrder:
             prior_of({"DataStore": {"encryption_at_rest": 1.0}}),
         )
         rules = {
-            rule.question
+            rule.effect
             for rule in PACKAGES["stride"].rules
             if rule.rule_id == "information-disclosure-store-at-rest-unverified"
         }
-        assert set(question.reasons) == rules
+        assert set(question.reasons) == rules, "the owner reads the effect"
 
     def test_a_kind_no_rule_reads_names_what_an_answer_informs(self):
         """A rule that only names the element says nothing about this fact, so
@@ -234,7 +234,7 @@ def test_the_framework_order_changes_no_question():
     backward = early_questions(model, {"asvs": {"level": 2}, "stride": {}}, None)
     assert forward == backward
     at_rest = next(q for q in forward if q.key[1] == "encryption_at_rest")
-    stride = {rule.question for rule in PACKAGES["stride"].rules}
+    stride = {rule.effect for rule in PACKAGES["stride"].rules}
     assert set(at_rest.reasons) <= stride
     assert at_rest.frameworks == ("stride",)
 

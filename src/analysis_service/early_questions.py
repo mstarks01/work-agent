@@ -452,7 +452,7 @@ def _early_questions(
     reasons: dict[UnknownKey, list[str]] = {}
     for name in runnable:
         package = PACKAGES[name]
-        asks = {rule.rule_id: rule.question for rule in package.rules}
+        asks = {rule.rule_id: rule.effect for rule in package.rules}
         named: dict[str, list[Candidate]] = {}
         for lane, found in generate_candidates(
             model, package.lanes, package.rules, catalog

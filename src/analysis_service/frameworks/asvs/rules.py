@@ -63,7 +63,7 @@ from analysis_service.analysis import (
     states_a_protocol,
 )
 from analysis_service.assertions import AssertionCatalog
-from analysis_service.candidates import Match, Rule, clip_fact
+from analysis_service.candidates import Match, Rule, clip_fact, with_effects
 from analysis_service.claims import UnknownRef
 from analysis_service.frameworks import NoRule, PreconditionResult, PredicateReader
 from analysis_service.protocol_defaults import NEGATED
@@ -764,9 +764,96 @@ STRUCTURAL_RULES: tuple[Rule, ...] = (
 )
 
 
-RULES: tuple[Rule, ...] = (
-    *(_rule_of(test) for test in PRESENCE_TESTS),
-    *STRUCTURAL_RULES,
+#: What an answer about a fact each rule reads informs, as the early list shows
+#: it to the owner. The maintainer reviews each sentence.
+EFFECTS: Mapping[str, str] = MappingProxyType(
+    {
+        "encoding-and-sanitization-database": (
+            "Informs whether the checks for queries built from input apply."
+        ),
+        "encoding-and-sanitization-rich-text-input": (
+            "Informs whether the checks for text that users author apply."
+        ),
+        "encoding-and-sanitization-xml-parser": (
+            "Informs whether the checks for unsafe XML parsing apply."
+        ),
+        "validation-and-business-logic-client-side-code": (
+            "Informs whether the checks for validation on an untrusted side apply."
+        ),
+        "validation-and-business-logic-multi-step-flow": (
+            "Informs whether the checks for steps taken out of order apply."
+        ),
+        "web-frontend-security-browser-frontend": (
+            "Informs whether the checks for browser headers and origin rules apply."
+        ),
+        "web-frontend-security-cookies": (
+            "Informs whether the checks for cookie attributes apply."
+        ),
+        "web-frontend-security-cors": (
+            "Informs whether the checks for cross-origin access apply."
+        ),
+        "api-and-web-service-websocket": (
+            "Informs whether the checks for WebSocket connections apply."
+        ),
+        "file-handling-file-upload": (
+            "Informs whether the checks for uploaded files apply."
+        ),
+        "authentication-authentication": (
+            "Informs whether the authentication checks apply."
+        ),
+        "authentication-password-auth": ("Informs whether the password checks apply."),
+        "session-management-sessions": ("Informs whether the session checks apply."),
+        "self-contained-tokens-self-contained-tokens": (
+            "Informs whether the checks for self-contained tokens apply."
+        ),
+        "oauth-and-oidc-oauth": (
+            "Informs whether the OAuth and OpenID Connect checks apply."
+        ),
+        "cryptography-encryption": (
+            "Informs whether the encryption and key checks apply."
+        ),
+        "data-protection-browser-frontend": (
+            "Informs whether the checks for sensitive data kept in a browser apply."
+        ),
+        "authorization-privileged-role": (
+            "Informs whether the checks for access to functions and records apply."
+        ),
+        "secure-communication-transport": (
+            "Informs whether the checks for channel protection apply."
+        ),
+        "configuration-secret-material": (
+            "Informs whether the checks for secrets and configuration apply."
+        ),
+        "secure-coding-and-architecture-third-party-component": (
+            "Informs whether the checks for third-party components apply."
+        ),
+        "security-logging-and-error-handling-log-or-audit-trail": (
+            "Informs whether the logging and alert checks apply."
+        ),
+        "webrtc-real-time-media": (
+            "Informs whether the checks for real-time media apply."
+        ),
+        "secure-communication-unverified-transit": (
+            "Informs which checks for channel protection stay open."
+        ),
+        "authorization-shared-account": (
+            "Informs whether the checks for one credential that all callers "
+            "share apply."
+        ),
+        "data-protection-classified-store": (
+            "Informs whether the checks for classified data in this store apply."
+        ),
+        "security-logging-and-error-handling-write-with-no-record": (
+            "Informs whether the checks for writes that no record names apply."
+        ),
+        "validation-and-business-logic-crossing-from-an-entity": (
+            "Informs whether the checks for input from an outside party apply."
+        ),
+    }
+)
+
+RULES: tuple[Rule, ...] = with_effects(
+    (*(_rule_of(test) for test in PRESENCE_TESTS), *STRUCTURAL_RULES), EFFECTS
 )
 
 

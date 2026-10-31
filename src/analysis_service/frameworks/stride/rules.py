@@ -65,7 +65,7 @@ from analysis_service.assertions import (
     AssertionCatalog,
     answer,
 )
-from analysis_service.candidates import Fact, Match, Rule, clip_fact
+from analysis_service.candidates import Fact, Match, Rule, clip_fact, with_effects
 from analysis_service.frameworks import NoRule, PredicateReader
 from analysis_service.system_model import DataFlow, SystemModel
 
@@ -657,7 +657,7 @@ def _inbound_from_exposed_process(
         )
 
 
-RULES: tuple[Rule, ...] = (
+_RULES: tuple[Rule, ...] = (
     Rule(
         rule_id="spoofing-unverified-boundary-auth",
         lane="spoofing",
@@ -861,6 +861,94 @@ RULES: tuple[Rule, ...] = (
         find=_inbound_from_exposed_process,
     ),
 )
+
+
+#: What an answer about a fact each rule reads informs, as the early list shows
+#: it to the owner. The maintainer reviews each sentence.
+EFFECTS: Mapping[str, str] = MappingProxyType(
+    {
+        "spoofing-unverified-boundary-auth": (
+            "Informs whether the analysis reports that a caller across this "
+            "boundary can pose as another party."
+        ),
+        "spoofing-unverified-external-caller": (
+            "Informs whether the analysis reports that someone can pose as this"
+            " external system."
+        ),
+        "spoofing-second-factor-stated-absent": (
+            "Informs whether the analysis reports what a holder of one sign-in "
+            "factor can do."
+        ),
+        "spoofing-origin-stated-unverified": (
+            "Informs whether the analysis reports that another party can supply"
+            " what this receiver takes."
+        ),
+        "spoofing-standing-credential": (
+            "Informs whether the analysis reports the risk of a credential that"
+            " stays valid."
+        ),
+        "tampering-unprotected-transit-crossing": (
+            "Informs whether the analysis reports that an attacker on the path "
+            "can change this flow."
+        ),
+        "tampering-unverified-write-to-store": (
+            "Informs whether the analysis reports writes to this store that no "
+            "caller check stops."
+        ),
+        "tampering-signature-stated-unverified": (
+            "Informs whether the analysis reports that someone can replace what"
+            " this receiver runs or trusts."
+        ),
+        "tampering-content-stated-unvalidated": (
+            "Informs whether the analysis reports false values that pass the "
+            "format check."
+        ),
+        "repudiation-unattributable-action": (
+            "Informs whether the analysis reports actions that no record ties "
+            "to an actor."
+        ),
+        "repudiation-shared-credential": (
+            "Informs whether the analysis reports actions that a shared "
+            "credential hides."
+        ),
+        "repudiation-record-names-intermediary": (
+            "Informs whether the analysis reports records that name only the "
+            "component in between."
+        ),
+        "information-disclosure-unprotected-sensitive-transit": (
+            "Informs whether the analysis reports that an observer can read this flow."
+        ),
+        "information-disclosure-destination-stated-unverified": (
+            "Informs whether the analysis reports delivery to the wrong party."
+        ),
+        "information-disclosure-store-at-rest-unverified": (
+            "Informs whether the analysis reports access to the storage beneath"
+            " this store."
+        ),
+        "information-disclosure-store-readers": (
+            "Informs whether the analysis reports what the readers of this "
+            "store expose."
+        ),
+        "denial-of-service-internet-exposed-process": (
+            "Informs whether the analysis reports that requests from the "
+            "internet can exhaust this process."
+        ),
+        "denial-of-service-shared-dependency": (
+            "Informs whether the analysis reports failures that spread from "
+            "this shared element."
+        ),
+        "elevation-of-privilege-privilege-zone-crossing": (
+            "Informs whether the analysis reports privilege gained across this "
+            "boundary."
+        ),
+        "elevation-of-privilege-inbound-from-exposed-process": (
+            "Informs whether the analysis reports the authority an attacker "
+            "gets from this process."
+        ),
+    }
+)
+
+RULES: tuple[Rule, ...] = with_effects(_RULES, EFFECTS)
 
 
 #: Every assertion predicate with no graph field, and the rule here that reads
