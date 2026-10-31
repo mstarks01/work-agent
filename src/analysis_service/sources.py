@@ -132,9 +132,10 @@ _REGISTERS: dict[SourceKind, str] = {
     "diagram": (
         "a diagram of the system in Mermaid text. A node can be an element, and"
         " an arrow can be a data flow in the direction of the arrow. A subgraph"
-        " is a trust zone only where its label says so. The shape of a node"
-        " states no attribute. An excerpt quotes the line of the diagram as"
-        " written"
+        " is a trust zone only where its label says so. Where a comment in the"
+        " diagram states its shape convention, a node's shape states its type"
+        " as the comment says. Otherwise the shape of a node states no"
+        " attribute. An excerpt quotes the line of the diagram as written"
     ),
     "answers": "the submitter's answers to questions this service asked",
 }

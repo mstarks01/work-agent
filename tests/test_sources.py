@@ -197,6 +197,7 @@ class TestRender:
         outside = "\n".join(lines_outside_fences(render_sources([diagram])))
         assert "Mermaid" in outside
         assert "trust zone only where its label says so" in outside
+        assert "a comment in the diagram states its shape convention" in outside
 
     def test_a_job_with_no_diagram_renders_no_diagram_guidance(self):
         """The diagram guidance rides on its own source's header, so a job
