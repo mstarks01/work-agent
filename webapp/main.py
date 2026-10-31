@@ -219,6 +219,7 @@ from analysis_service.links import (
     components,
     fold_principal,
 )
+from analysis_service.mermaid import model_mermaid
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import (
     gaps,
@@ -989,6 +990,7 @@ def render_report(
         ),
         severity_order=script_json(list(SEVERITY_ORDER)),
         assumed_zones=script_json(sorted(report.system_model.assumed_zone_elements())),
+        mermaid=script_json(model_mermaid(report.system_model)),
         lanes=script_json(
             {name: package.id_rule.lane_field for name, package in PACKAGES.items()}
         ),

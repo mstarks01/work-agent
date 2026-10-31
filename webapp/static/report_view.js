@@ -1831,6 +1831,15 @@
       "box a process, and two lines a data store. A coloured arrow crosses a trust " +
       "boundary, and a dotted arrow may cross one, because a zone is not stated.");
     $("model-diagram").append(diagram, caption);
+    // The same model as Mermaid text, written by the service, to paste into
+    // a document that renders Mermaid.
+    const mermaid = JSON.parse($("mermaid").textContent);
+    if (mermaid) {
+      const link = el("a", "mermaid-link", "Download as Mermaid");
+      link.href = URL.createObjectURL(new Blob([mermaid], { type: "text/plain" }));
+      link.download = "system-model.mmd";
+      caption.append(" ", link);
+    }
   } else {
     $("model-diagram").hidden = true;
   }

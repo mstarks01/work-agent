@@ -105,6 +105,7 @@ on:
       - "!src/analysis_service/gcp_identity.py"
       - "!src/analysis_service/gcs_objects.py"
       - "!src/analysis_service/job_answers.py"
+      - "!src/analysis_service/mermaid.py"
       - "!src/analysis_service/objects.py"
       - "!src/analysis_service/report_changes.py"
       - "!src/analysis_service/report_conditions.py"
