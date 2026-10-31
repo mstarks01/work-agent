@@ -11,10 +11,12 @@ from analysis_service.answer_bodies import read_answers
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import Answers
 from analysis_service.carried_renames import ElementRename, renamed
-from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_answers import FactAnswer, key_ref
+from analysis_service.fact_writes import capability_statements
 from evals.harness.early_rounds import paused_state
 from tests.test_answer_shares import MODEL, STORE
 from tests.test_api import auth, submission
+from tests.test_evals_early_answerers import _capability
 from tests.test_links import catalog_client
 from tests.test_pause import waiting
 
@@ -176,3 +178,53 @@ class TestTheRoute:
         assert client.delete(f"/v1/jobs/{earlier}", headers=auth()).status_code == 204
 
         assert asyncio.run(store.get(child)).carried.facts == (ENCRYPTED,)
+
+
+class TestADependentAnswer:
+    """A changed parent takes back only the carried answers under it
+    (#2029 package 7): the sign-in parts go, and an unrelated answer stays."""
+
+    def _carried(self) -> AnswerSet:
+        return AnswerSet(
+            facts=tuple(
+                _capability(name, "yes")
+                for name in (
+                    "authentication",
+                    "password-authentication",
+                    "multi-factor-authentication",
+                    "file-upload",
+                )
+            )
+        )
+
+    @staticmethod
+    def _names(answers: AnswerSet) -> list[str]:
+        return sorted(key_ref(a.key).capability for a in answers.facts)
+
+    def test_an_owner_s_no_takes_back_the_sign_in_parts(self):
+        base = paused_state(MODEL, {"asvs": {"level": 2}}, (), ())
+        state = replace(
+            base,
+            carried_in=self._carried(),
+            answers=AnswerSet(facts=(_capability("authentication", "no"),)),
+        )
+        assert self._names(state.carried.taken) == ["file-upload"]
+        assert self._names(state.carried.dropped) == [
+            "multi-factor-authentication",
+            "password-authentication",
+        ]
+
+    def test_sources_that_state_the_change_take_them_back_too(self):
+        no = _capability("authentication", "no")
+        stated = MODEL.model_copy(
+            update={"capabilities": capability_statements(MODEL.capabilities, [no])}
+        )
+        state = replace(
+            paused_state(stated, {"asvs": {"level": 2}}, (), ()),
+            carried_in=self._carried(),
+        )
+        assert self._names(state.carried.taken) == ["file-upload"]
+        reasons = {
+            e["reason"] for e in state.carried.to_json(stated)["carried_dropped"]
+        }
+        assert reasons == {"not-taken"}
