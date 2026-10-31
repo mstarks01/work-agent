@@ -86,6 +86,7 @@ __all__ = [
     "answer_facets",
     "answered_keys",
     "answered_row",
+    "asked_facets",
     "attribute_place",
     "covers",
     "detail_note",
@@ -519,6 +520,26 @@ def needs_of(refs: Sequence[UnknownRef]) -> dict[UnknownKey, tuple[str, ...]]:
         key: tuple(facet.id for facet in answer_facets(key) if facet.id in held)
         for key, held in needs.items()
     }
+
+
+def asked_facets(
+    key: UnknownKey,
+    findings: Sequence[str] = (),
+    needs: Mapping[str, Sequence[str]] | None = None,
+) -> tuple[str, ...]:
+    """The facets of ``key`` a page asks for: each facet a waiting finding needs.
+
+    ``findings`` wait on the fact, and ``needs`` maps a finding that needs only
+    some facets to those facets (ADR 0073). A finding absent from ``needs``
+    needs every facet, and so does a fact no finding waits on, such as an early
+    question or an earlier answer (ADR 0112). Empty for a fact with no facets.
+    """
+    ids = tuple(facet.id for facet in answer_facets(key))
+    needs = needs or {}
+    if not findings or any(finding not in needs for finding in findings):
+        return ids
+    needed = {facet for finding in findings for facet in needs[finding]}
+    return tuple(facet for facet in ids if facet in needed)
 
 
 def covers(answer: FactAnswer | None, facets: Sequence[str]) -> bool:

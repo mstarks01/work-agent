@@ -82,7 +82,13 @@ from analysis_service.claims import (
     UnknownKey,
     UnknownRef,
 )
-from analysis_service.fact_answers import FactKind, answer_facets, fact_kind, key_ref
+from analysis_service.fact_answers import (
+    FactKind,
+    answer_facets,
+    asked_facets,
+    fact_kind,
+    key_ref,
+)
 from analysis_service.frameworks import PACKAGES, PreconditionResult, run_precondition
 from analysis_service.memo import Memo, remembered
 from analysis_service.open_facts import (
@@ -295,6 +301,7 @@ class EarlyQuestion:
             "form": self.form,
             "suggestions": list(self.suggestions),
             "facets": facets_json(self.facets),
+            "asks": list(asked_facets(self.key)),
             "max_length": self.max_length,
             "decisions": self.decisions,
             "group": self.group,

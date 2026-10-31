@@ -1083,9 +1083,9 @@
       coverage.textContent =
         `Your answers cover every question for ${covered} of the ${counted(waitsOn.size, "finding", "findings")} ` +
         "that wait on one. The analysis decides again whether they are settled.";
-      const given = FACT_QUESTIONS.filter((q, index) => knownFor(index, [])).length;
+      const given = FACT_QUESTIONS.filter((q, index) => factRow(index).known()).length;
       const reached = [...waitsOn]
-        .filter(([, asked]) => asked.some(index => knownFor(index, []))).map(([f]) => f);
+        .filter(([, asked]) => asked.some(index => factRow(index).known())).map(([f]) => f);
       const lanes = new Set(reached.map(f => laneOfFinding.get(f)).filter(Boolean));
       reach.textContent = given
         ? `${counted(given, "answer reaches", "answers reach")} ${counted(reached.length, "finding", "findings")} in ${counted(lanes.size, "lane", "lanes")}. ` +

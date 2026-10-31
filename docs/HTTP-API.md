@@ -544,6 +544,9 @@ to a fact that an earlier save answered, to change it. Each fact question
 carries `needs`: each finding that waits on only some facets of the
 question, with the facets it needs; a finding not listed needs every facet
 ([ADR 0073](adr/0073-a-finding-can-wait-on-some-facets-and-an-answer-can-carry-a-detail.md)).
+Each question also carries `asks`: the facets that its waiting findings
+need, which the web app shows as inputs. You can still answer any facet
+([ADR 0112](adr/0112-the-report-page-asks-only-the-facets-its-findings-need.md)).
 A fact answer may carry a `detail`: one line, at most 300 characters, in your
 own words, such as an exception to a "yes". It follows the answer on its line
 of the answers source, and no code reads a fact out of it. Each fact question
