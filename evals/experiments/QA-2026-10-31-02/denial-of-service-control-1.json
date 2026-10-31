@@ -1,0 +1,88 @@
+{
+  "claims": [
+    {
+      "title": "Order-submission flooding can exhaust the storefront API and propagate load into order capture",
+      "description": "An attacker with a valid shopper session can repeatedly submit orders over `flow:entity:shopper>process:storefront-api>place-order` from the public-internet side of its boundary crossing. Each accepted submission causes `process:storefront-api` to forward the order over `flow:process:storefront-api>process:order-service>submit-order`, so attacker traffic consumes public API request capacity and drives work into `process:order-service` rather than ending at the edge. If request-rate, concurrency, input-size, and downstream timeout limits are not present, the attacker spends repeated ordinary requests while API workers and order-capture capacity are consumed; legitimate shoppers cannot place orders. Second-order, saturation of `process:order-service` delays its order persistence to `store:orders-db` and receipt creation to `store:receipt-archive`.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "flow:entity:shopper>process:storefront-api>place-order"
+      ],
+      "verb": "flood",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "crossing:flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "quotes": [
+        {
+          "text": "It is the only thing we expose to the internet.",
+          "source_label": "System description"
+        },
+        {
+          "text": "When a shopper submits an order the storefront API calls the order service over gRPC.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium: `flow:entity:shopper>process:storefront-api>place-order` crosses from `boundary:public-internet`, but the stated session-cookie authentication requires an attacker to obtain or create a shopper session. Impact is medium: flooding `process:storefront-api` disrupts shopper ordering and propagates over the crossing into `process:order-service`; the model shows the resulting persistence and receipt paths but does not establish an irreversible outage."
+      },
+      "mitigations": [
+        {
+          "summary": "Apply identity-aware request and work limits to order submission",
+          "detail": "Set per-session, per-account, and per-source rate and concurrency limits on `flow:entity:shopper>process:storefront-api>place-order`, with hard request-size bounds before order processing."
+        },
+        {
+          "summary": "Contain downstream order-capture pressure",
+          "detail": "Use bounded queues or concurrency limits between `process:storefront-api` and `process:order-service`, with short timeouts and load shedding so public bursts cannot consume all order-service capacity."
+        }
+      ]
+    },
+    {
+      "title": "Unverified settlement-webhook authentication may permit anonymous flooding of the shared storefront API",
+      "description": "`flow:entity:card-processor>process:storefront-api>settlement-webhook` crosses from `boundary:public-internet` into the only internet-exposed process, but both its authentication and origin verification are unverified. If those unknowns resolve to absent or ineffective webhook authentication, an unauthenticated internet attacker can cheaply POST settlement-shaped requests to `process:storefront-api` and exhaust its request workers, connection capacity, or downstream processing budget. The same shared API also receives shopper order traffic on `flow:entity:shopper>process:storefront-api>place-order`; therefore a flood on the webhook route can deny legitimate order placement even though the attacker never needs a shopper session. This is conditional on the unresolved authentication and origin-verification facts, not an assertion that the processor callback is currently unsigned.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook"
+      ],
+      "verb": "flood",
+      "evidence_refs": [
+        "crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:authentication",
+        "assertion:origin-verification~flow:entity:card-processor>process:storefront-api>settlement-webhook~any~unknown"
+      ],
+      "quotes": [
+        {
+          "text": "I would have to check how that callback is authenticated.",
+          "source_label": "System description"
+        },
+        {
+          "text": "After they settle a payment they POST a webhook back to the storefront API to tell us the order is paid.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high conditional on `unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:authentication` and the unverified origin-verification assertion: the flow crosses from `boundary:public-internet`, so no credential prerequisite is established if the unknown resolves unfavorably. Impact is medium because `process:storefront-api` is shared by the webhook and the shopper order flow, so its saturation interrupts ordering, while the modeled availability loss is recoverable."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and bound webhook traffic before processing",
+          "detail": "Verify a processor-specific signature and replay window on `flow:entity:card-processor>process:storefront-api>settlement-webhook` before settlement handling; impose strict body-size, per-source rate, and concurrent-request limits."
+        },
+        {
+          "summary": "Isolate webhook capacity from shopper ordering",
+          "detail": "Separate or bulkhead webhook handling from shopper-facing capacity in `process:storefront-api`, and use bounded asynchronous processing so callback bursts cannot starve `flow:entity:shopper>process:storefront-api>place-order`."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

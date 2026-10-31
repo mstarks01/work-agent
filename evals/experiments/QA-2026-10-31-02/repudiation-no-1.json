@@ -1,0 +1,207 @@
+{
+  "claims": [
+    {
+      "title": "A shopper can deny placing a financial order because the order path keeps no accountable action record",
+      "description": "A shopper using `flow:entity:shopper>process:storefront-api>place-order` can later deny having placed an order because the submitter states that this flow and `process:storefront-api` do not record who performed each action and do not retain such a record beyond the reach of the people recorded. The order then crosses on `flow:process:storefront-api>process:order-service>submit-order` toward `process:order-service` and `store:orders-db`, but no stated record binds the authenticated shopper session to the resulting financial order. A bad-faith shopper, or a genuinely defrauded one, cannot be conclusively contradicted in a payment, fulfilment, or chargeback dispute. Second-order: the lack of attributable evidence affects the financial order and shopper-address records persisted in `store:orders-db`, not merely the API request.",
+      "affected_element_ids": [
+        "entity:shopper",
+        "process:storefront-api",
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "process:order-service"
+      ],
+      "verb": "unattributable",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "crossing:flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "quotes": [
+        {
+          "text": "Does it record who performed each action? no; Is that record kept where the people it records cannot change or delete it? no",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high because every shopper order enters across `crossing:flow:entity:shopper>process:storefront-api>place-order` and the stated record gap applies to the normal action path. Impact is medium because the disputed action creates `financial` orders and reaches `store:orders-db`, which holds `financial` and `pii` data, although this threat concerns evidential accountability rather than disclosure."
+      },
+      "mitigations": [
+        {
+          "summary": "Create an independent, actor-bound order audit trail",
+          "detail": "Have `process:storefront-api` emit an immutable event for each order attempt and completion containing the verified shopper identity, order identifier, timestamp, action, and outcome; retain it separately from the acting service."
+        },
+        {
+          "summary": "Propagate the shopper identity to order capture",
+          "detail": "Carry a verified originating-subject claim through `flow:process:storefront-api>process:order-service>submit-order` and record it with the resulting order operation rather than recording only service identities."
+        }
+      ]
+    },
+    {
+      "title": "The card processor can deny sending a settlement confirmation because no accountable webhook record is retained",
+      "description": "`entity:card-processor` sends a financial settlement callback through `flow:entity:card-processor>process:storefront-api>settlement-webhook`, crossing from the public-internet boundary into `process:storefront-api`. The submitter states that this flow does not record who performed each action and that any such record is not kept where recorded parties cannot change or delete it; it also states that the API does not check who sent received content. Consequently, if the storefront marks an order paid, neither side has stated evidence that binds that specific callback to `entity:card-processor`. The processor can deny issuing a disputed settlement notification, and the operator cannot use a durable, independently retained record to rebut the denial. Second-order: the dispute can affect the financial order state subsequently handled by `process:order-service` and stored in `store:orders-db`.",
+      "affected_element_ids": [
+        "entity:card-processor",
+        "process:storefront-api",
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook"
+      ],
+      "verb": "unattributable",
+      "evidence_refs": [
+        "crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:authentication",
+        "assertion:origin-verification~flow:entity:card-processor>process:storefront-api>settlement-webhook~any~unknown"
+      ],
+      "quotes": [
+        {
+          "text": "Does it record who performed each action? no; Is that record kept where the people it records cannot change or delete it? no",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Does it check who sent what it takes, such as by a signature or an authenticated sender? no",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high because a partner-delivery or settlement dispute requires no unusual attacker capability, and `crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook` is a public-boundary callback whose authentication remains unstated in `unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:authentication`. Impact is medium because the callback carries a `financial` settlement confirmation that can change an order's payment state."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and retain verifiable settlement callbacks",
+          "detail": "Require signed, timestamped, replay-protected callbacks from `entity:card-processor`, and retain the raw signed payload, verification result, received timestamp, and order identifier in an append-only audit store."
+        },
+        {
+          "summary": "Separate settlement evidence from the API that consumes it",
+          "detail": "Give the audit writer a distinct principal and retention protection so `process:storefront-api` cannot revise or delete evidence of callbacks it processed."
+        }
+      ]
+    },
+    {
+      "title": "An internal caller can submit or deny orders because the unauthenticated gRPC hop has no attributable record",
+      "description": "An actor with a foothold able to reach `flow:process:storefront-api>process:order-service>submit-order` can submit an order to `process:order-service`, because authentication on that boundary-crossing gRPC flow is stated absent. The submitter also states that neither the flow nor `process:order-service` records who performed each action or keeps the evidence outside the control of recorded parties. Thus a caller can cause financial order capture and later deny having submitted it; even if an order row exists in `store:orders-db`, the stated evidence does not identify the originating actor. This is an accountability gap rather than the underlying unauthorized-access issue. Second-order: disputed orders reach the financial and PII-bearing `store:orders-db` and can undermine fulfilment and payment reconciliation for each affected order.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "process:order-service",
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "store:orders-db"
+      ],
+      "verb": "unattributable",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "Does it record who performed each action? no; Is that record kept where the people it records cannot change or delete it? no",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because exploiting the absent authentication in `absent:flow:process:storefront-api>process:order-service>submit-order:authentication` requires reaching the internal order-service path, although that path crosses from the storefront zone into the core zone. Impact is medium because `process:order-service` handles `financial` assets and writes financial order data to `store:orders-db`."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate the caller and preserve its origin across gRPC",
+          "detail": "Require a workload-authenticated `process:storefront-api` caller on `flow:process:storefront-api>process:order-service>submit-order` and propagate the verified shopper or calling-service identity, request ID, and authorization result to the order-service audit event."
+        },
+        {
+          "summary": "Retain order-submission evidence independently",
+          "detail": "Send structured order-submission events to append-only storage under a separate audit principal, including origin identity, order ID, timestamp, decision, and outcome."
+        }
+      ]
+    },
+    {
+      "title": "Changes to orders cannot be attributed to a person because the database uses one application account and no action record",
+      "description": "`process:order-service` reads and writes `store:orders-db` through `flow:process:order-service>store:orders-db>read-write-orders` using a single application account with full read/write authority. The submitter states that `store:orders-db` does not record who performed each action and does not keep any such record where recorded parties cannot change or delete it. Therefore an operator, service user, or attacker acting through the application account can alter a financial order row and later deny responsibility: an extant row can show state, but the stated evidence cannot identify the human or originating request behind the write. Second-order: the accountability loss covers the confidential `financial` and `pii` corpus in `store:orders-db`, impairing resolution of refunds, fulfilment changes, and payment disputes.",
+      "affected_element_ids": [
+        "process:order-service",
+        "store:orders-db",
+        "flow:process:order-service>store:orders-db>read-write-orders"
+      ],
+      "verb": "unattributable",
+      "evidence_refs": [
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161",
+        "assertion:credential-custody~credential:order-service-database-password~any~v.c4f5cadf8e5c"
+      ],
+      "quotes": [
+        {
+          "text": "Does it record who performed each action? no; Is that record kept where the people it records cannot change or delete it? no",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "a single application account that has full read/write",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because the actor must obtain a position using or controlling the order-service application account, whose full read/write grant is stated in `assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161`. Impact is high because `store:orders-db` is confidential and holds both `financial` and `pii` data, so unresolvable disputes can concern the full set of persisted orders rather than one transient request."
+      },
+      "mitigations": [
+        {
+          "summary": "Record attributed, append-only order changes",
+          "detail": "Implement change history or CDC for `store:orders-db` that records before and after values, verified originating subject, service identity, request ID, timestamp, and outcome; make corrections new events rather than overwrites."
+        },
+        {
+          "summary": "Replace the broad shared database identity with scoped identities",
+          "detail": "Use short-lived workload credentials with narrowly scoped database permissions, and ensure audit events retain the calling principal in addition to the database service identity."
+        }
+      ]
+    },
+    {
+      "title": "Receipt evidence cannot prove who completed an order because the archive records no accountable action",
+      "description": "`process:order-service` writes completed-order receipts through `flow:process:order-service>store:receipt-archive>append-receipt`. Although the receipt describes the order and service writer, the submitter expressly states that `store:receipt-archive` and this flow do not record who performed each action and do not retain the record where the people it records cannot change or delete it. A person acting through the order-service path can therefore deny creating, issuing, or causing a particular receipt, while a shopper can dispute an alleged completed order without independently retained evidence binding the receipt to the originating actor. Second-order: because `store:receipt-archive` holds `business-critical-data`, this erodes the evidential value of receipts across completed orders rather than only a single API interaction.",
+      "affected_element_ids": [
+        "process:order-service",
+        "store:receipt-archive",
+        "flow:process:order-service>store:receipt-archive>append-receipt"
+      ],
+      "verb": "unattributable",
+      "evidence_refs": [],
+      "quotes": [
+        {
+          "text": "The receipt records which order was written and that the order service wrote it.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Does it record who performed each action? no; Is that record kept where the people it records cannot change or delete it? no",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because using the receipt-writing path requires a position acting through `process:order-service`, but the stated accountability gap applies whenever that path is used. Impact is medium because `store:receipt-archive` is tagged `business-critical-data` and receipts are the stated evidence of completed orders, though the threat does not itself disclose or corrupt the archive."
+      },
+      "mitigations": [
+        {
+          "summary": "Make receipts attributable to the originating action",
+          "detail": "Record the verified shopper or authorized operator identity, original request ID, order ID, timestamp, and completion outcome alongside each receipt, rather than only the `process:order-service` identity."
+        },
+        {
+          "summary": "Protect receipt evidence from the producer",
+          "detail": "Write receipt-audit events to append-only or WORM storage under a separate audit principal and retention lock, so the service being evidenced cannot amend or delete the retained record."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

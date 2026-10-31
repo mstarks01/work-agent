@@ -148,6 +148,11 @@ DECLARED: dict[str, str] = {
         "This code is that framework's: it prints the matches `e8_count.py`"
         " counts, beside their drafts, through the same identity."
     ),
+    "evals/experiments/QA-2026-10-31-02/build_answers.py": (
+        "A recorded experiment's script. It reads the STRIDE prior because the"
+        " experiment measures the STRIDE lanes; the ASVS prior holds no"
+        " question kinds, so there is nothing for another package to read."
+    ),
     "evals/experiments/QA-2026-10-27-01/price.py": (
         "This code is that framework's. It prices trial lead rules against the"
         " lanes that read them, which exists only for a package whose leads"
