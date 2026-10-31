@@ -1776,6 +1776,24 @@ _PLACED = """() => [...document.querySelectorAll('#model-diagram g.element')].ma
 })"""
 
 
+def test_the_diagram_link_downloads_the_model_as_mermaid(browser):
+    """The link under the diagram saves the service's Mermaid text unchanged."""
+    from analysis_service.mermaid import model_mermaid
+    from tests.factories import sample_report
+
+    report = sample_report()
+    page, errors = _drawn(browser, report)
+    with page.expect_download() as download:
+        page.click("#model-diagram .mermaid-link")
+    saved = download.value
+    text = Path(saved.path()).read_text(encoding="utf-8")
+    page.close()
+
+    assert errors == []
+    assert saved.suggested_filename == "system-model.mmd"
+    assert text == model_mermaid(report.system_model)
+
+
 def test_the_diagram_draws_each_element_in_its_zone_and_each_flow_once(browser):
     """Every element once, inside the box of the zone the model states, and
     every flow once, marked where it crosses a boundary (#1884)."""

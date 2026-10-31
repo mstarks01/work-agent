@@ -330,7 +330,7 @@
     border-radius: 8px; background: var(--surface); font-size: 0.9rem; }
   .preview-bar span { flex: 1 1 auto; font-weight: 600; }
   .exporting #report-tabs, .exporting #analysis-tabs, .exporting #invite,
-  .exporting .export-bar, .exporting .finding-open { display: none; }
+  .exporting .export-bar, .exporting .finding-open, .exporting .mermaid-link { display: none; }
   .exporting #about-view, .exporting #export-questions { border-top: 1px solid var(--hairline);
     margin-top: 32px; padding-top: 8px; }
   .export-question { margin: 0 0 12px; break-inside: avoid; }
@@ -340,7 +340,7 @@
   /* A print is the complete export: no navigation and no controls. */
   @media print {
     .skip-link, .sidebar, #themebtn, #analysis-tabs, #report-tabs, #invite,
-    #preview-bar, .export-bar { display: none; }
+    #preview-bar, .export-bar, .mermaid-link { display: none; }
     .workspace { display: block; min-height: 0; }
     main.report-main > .viz-root { min-height: 0; padding: 0; background: none; }
     .finding { break-inside: avoid; }
@@ -493,6 +493,7 @@
 <!-- Each element whose trust zone the service inferred rather than read, from
      SystemModel.assumed_zone_elements. Escaped the same way. -->
 <script type="application/json" id="assumed_zones" nonce="__CSP_NONCE__"><!--assumed_zones--></script>
+<script type="application/json" id="mermaid" nonce="__CSP_NONCE__"><!--mermaid--></script>
 
 <!-- The answer limits the service admits, from
      analysis_service.answer_state.ANSWER_LIMITS. Escaped the same way. -->
