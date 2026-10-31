@@ -63,6 +63,12 @@ from analysis_service.answer_shares import check_shares, merged_shares
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.bands import UNRANKED
 from analysis_service.capabilities import CapabilityFact, lineage, resolve
+from analysis_service.carried_renames import (
+    ElementRename,
+    check_renames,
+    rename_choices,
+    renamed,
+)
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.early_questions import (
     EarlyQuestion,
@@ -99,6 +105,7 @@ from analysis_service.links import (
 )
 from analysis_service.open_facts import (
     CAPABILITY_GROUP,
+    element_names,
     group_of,
     open_attribute,
     prepared_model,
@@ -1443,6 +1450,9 @@ class Answers:
     skips: Sequence[SkipKey] = ()
     presented: Sequence[UnknownKey] = ()
     revision: int | None = None
+    #: Every rename the job holds after this save (ADR 0116), or ``None`` to
+    #: keep the ones it holds. Only a waiting job's save sends renames.
+    renames: Sequence[ElementRename] | None = None
 
 
 @dataclass(frozen=True)
@@ -1458,6 +1468,7 @@ class SavedAnswers:
     shown: tuple[UnknownKey, ...]
     skipped: tuple[SkipKey, ...]
     revision: int
+    renames: tuple[ElementRename, ...] = ()
 
 
 #: The label an amendment's description carries, with the lowest number after
@@ -1476,17 +1487,49 @@ class Carried:
 
     taken: AnswerSet
     dropped: AnswerSet
+    #: The renames the job holds (ADR 0116).
+    renames: tuple[ElementRename, ...] = ()
+    #: For each element a dropped answer names and the model does not have,
+    #: the elements a rename can map it to.
+    choices: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     def dropped_json(self, model: SystemModel) -> dict[str, list[dict[str, object]]]:
         """The answers its questions do not take, as every surface lists them:
-        each fact with the label its question shows, and each link."""
+        each fact with the label its question shows and why it is not taken,
+        each link, the renames, and what each missing element can map to.
+
+        A fact is ``missing-element`` where it names an element the model
+        does not have, and ``not-taken`` where the job's questions refuse it:
+        the sources state the fact, or no question asks it.
+        """
+        names = element_names(model)
+
+        def element(element_id: str) -> dict[str, str]:
+            return {"element": element_id, "name": names.get(element_id, element_id)}
+
         return {
             "carried_dropped": [
-                {"label": fact_label(fact.key, model)} | fact.model_dump(mode="json")
+                {
+                    "label": fact_label(fact.key, model),
+                    "reason": (
+                        "missing-element"
+                        if key_ref(fact.key).element_id in self.choices
+                        else "not-taken"
+                    ),
+                }
+                | fact.model_dump(mode="json")
                 for fact in self.dropped.facts
             ],
             "carried_dropped_links": [
                 link.model_dump(mode="json") for link in self.dropped.links
+            ],
+            "carried_renames": [
+                {"earlier": rename.earlier} | element(rename.element)
+                for rename in self.renames
+            ],
+            "rename_choices": [
+                {"earlier": earlier, "choices": [element(one) for one in choices]}
+                for earlier, choices in self.choices.items()
             ],
         }
 
@@ -1576,6 +1619,8 @@ class AnswerState:
     #: The answers a paused job held when its amendment started this job
     #: (ADR 0072). This job's questions take each one they still ask.
     carried_in: AnswerSet = NO_ANSWERS
+    #: The owner's renames of the elements the carried answers name (ADR 0116).
+    renames: tuple[ElementRename, ...] = ()
 
     def _question_set(self, answers: AnswerSet) -> QuestionSet:
         assertions = self.checkpoint.assertions
@@ -1604,13 +1649,14 @@ class AnswerState:
         """
         if self.carried_in.empty:
             return Carried(taken=NO_ANSWERS, dropped=NO_ANSWERS)
+        carried = renamed(self.carried_in, self.renames)
         base = self._question_set(self.answers)
         saved = {answer.key for answer in self.answers.facts}
         placed = {fold_principal(link.principal) for link in self.answers.links}
-        facts = [a for a in self.carried_in.facts if a.key not in saved]
+        facts = [a for a in carried.facts if a.key not in saved]
         links = [
             link
-            for link in self.carried_in.links
+            for link in carried.links
             if fold_principal(link.principal) not in placed
         ]
         taken_facts = tuple(
@@ -1624,6 +1670,10 @@ class AnswerState:
             dropped=AnswerSet(
                 links=tuple(link for link in links if link not in taken_links),
                 facts=tuple(a for a in facts if a not in taken_facts),
+            ),
+            renames=self.renames,
+            choices=rename_choices(
+                self.carried_in, self.checkpoint.system_model, self.renames
             ),
         )
 
@@ -1720,6 +1770,23 @@ class AnswerState:
         the job holds no sources to bound, as an eval replay of saves.
         """
         self._check_revision(answers.revision, required=self.waiting or answers.save)
+        if answers.renames is not None:
+            if not (self.waiting and answers.save):
+                raise ValueError("only a save to a waiting job sends renames")
+            check_renames(
+                answers.renames, self.carried_in, self.checkpoint.system_model
+            )
+            renaming = replace(self, renames=tuple(answers.renames))
+            if answers.given.empty and not answers.skips:
+                # A rename alone is a change: the job keeps its own answers.
+                return SavedAnswers(
+                    answers=self.answers,
+                    shown=tuple(self.shown),
+                    skipped=tuple(self.skipped),
+                    revision=self.revision,
+                    renames=renaming.renames,
+                )
+            return renaming.answer(replace(answers, renames=None), limits=limits)
         given = answers.given
         if not self.waiting:
             if answers.save and given.empty:
@@ -1747,6 +1814,7 @@ class AnswerState:
                 shown=admitted.shown,
                 skipped=admitted.skipped,
                 revision=self.revision,
+                renames=self.renames,
             )
         return ResumedJob(
             sources=admitted.sources,

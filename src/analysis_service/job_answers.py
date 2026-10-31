@@ -258,6 +258,7 @@ class Answerable:
             resumed_by=self.resumed_by,
             draft=record.draft,
             carried_in=record.carried,
+            renames=tuple(record.carried_renames),
         )
 
     def payload(self) -> dict[str, Any]:
@@ -618,6 +619,7 @@ class JobAnswers:
                 outcome.shown,
                 outcome.skipped,
                 outcome.revision,
+                renames=outcome.renames,
             ):
                 raise SaveConflict(
                     "the job no longer waits on answers, or another save landed"

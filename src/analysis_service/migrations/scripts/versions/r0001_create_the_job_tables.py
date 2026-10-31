@@ -21,6 +21,7 @@ _JSON_COLUMNS = (
     "skipped_early",
     "resumption",
     "carried",
+    "carried_renames",
     "checkpoint",
     "validation_issues",
     "certification",

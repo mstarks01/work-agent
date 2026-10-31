@@ -92,6 +92,7 @@ from analysis_service import migrations
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.aws_identity import platform_session
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.carried_renames import ElementRename
 from analysis_service.claims import UnknownKey
 from analysis_service.config_files import read_secret, refuse_bare_secret
 from analysis_service.fact_answers import STORED, FactAnswer, SkipKey
@@ -232,6 +233,7 @@ jobs = Table(
     Column("skipped_early", _Json, nullable=False),
     Column("resumption", _Json, nullable=False),
     Column("carried", _Json, nullable=False),
+    Column("carried_renames", _Json, nullable=False),
     Column("checkpoint", _Json, nullable=False),
     Column("validation_issues", _Json, nullable=False),
     Column("certification", _Json, nullable=False),
@@ -1481,6 +1483,8 @@ class SqlJobStore:
         shown: Sequence[UnknownKey],
         skipped: Sequence[SkipKey],
         revision: int,
+        *,
+        renames: Sequence[ElementRename],
     ) -> bool:
         """Keep a waiting job's saved answers, as one conditional ``UPDATE`` on
         the revision, under the lock on the job's row."""
@@ -1488,6 +1492,7 @@ class SqlJobStore:
             "answers": _json("answers", answers),
             "shown_early": _json("shown_early", list(shown)),
             "skipped_early": _json("skipped_early", list(skipped)),
+            "carried_renames": _json("carried_renames", list(renames)),
         }
         async with self._transaction(writes=True) as connection:
             await self._lock(connection, job_id)

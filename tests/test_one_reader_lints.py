@@ -620,6 +620,11 @@ ID_DERIVERS: dict[Site, str] = {
         "it builds a flow ID at the identity version of the ID it relabels,"
         " which ``derive_element_id`` does not take"
     ),
+    ("src/analysis_service/carried_renames.py", "_renamed_id"): (
+        "it builds a carried flow ID again with a renamed endpoint, at the"
+        " identity version of the ID it rebuilds, which ``derive_element_id``"
+        " does not take, and it holds no element"
+    ),
     ("src/analysis_service/assertions.py", "subject_id"): (
         "a non-graph subject is no element, and its ID takes the derivation an"
         " element ID has from its type prefix and its name"
