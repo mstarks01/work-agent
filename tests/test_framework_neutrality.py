@@ -177,6 +177,11 @@ DECLARED: dict[str, str] = {
         " IDENTIFIER_OF's entries follow from whether the package owns a"
         " catalog to read."
     ),
+    "evals/harness/shared_answers.py": (
+        "OPTIONS is a table keyed by framework, and SELECTIONS reads every"
+        " package in PACKAGES through it. Self-completing — a package missing"
+        " from OPTIONS raises when the module loads."
+    ),
     "evals/harness/scorer.py": (
         "This code is STRIDE's. It reads a category and two rated severity axes,"
         " which only that package's record carries (#167)."

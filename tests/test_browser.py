@@ -428,13 +428,16 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         context.close()
 
 
-def test_one_shared_answer_saves_the_part_for_every_element_listed(page):
+def test_one_shared_answer_saves_the_part_for_every_element_ticked(page):
     """A box asks its question once (ADR 0081): one choice in the shared
-    control saves that part for each element under it."""
+    control saves that part for each element a person ticks (ADR 0113)."""
     pause(page)
     shared = page.locator("#list .shared-controls select").first
     shared.wait_for()
-    keys = page.locator("#list .each-one select[data-facet]")
+    box = shared.locator("xpath=ancestor::details[contains(@class, 'question-group')]")
+    for tick in box.locator("input.share-answer").all():
+        tick.check()
+    keys = box.locator(".each-one select[data-facet]")
     facet = shared.get_attribute("data-facet")
     with page.expect_response(_post_to_answer) as response:
         shared.select_option("yes")

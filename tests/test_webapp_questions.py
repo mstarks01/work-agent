@@ -2026,18 +2026,20 @@ calls.push({ heading: title.children[0].textContent,
     assert seen[2] == {"heading": heading, "names": [heading + name for name in names]}
 
 
-def test_one_shared_answer_fills_every_row_but_an_exception():
-    """A box asks its question once for every part it lists, and a row
-    unticked under "Answer each one separately" keeps its own (ADR 0081)."""
+def test_one_shared_answer_fills_only_the_parts_a_person_ticks():
+    """A box asks its question once, every part starts unticked, and the
+    answer reaches only the parts a person ticks (ADR 0081, ADR 0113)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
         _SHARED_STEPS.replace("FACTS", json.dumps(facts))
         + """
 const heading = group.children.find(c => c.tag === "summary");
-calls.push({ closed: !each.open,
+calls.push({ open: each.open,
+  ticked: rowsOf().map(r => child(r, "input").checked),
   applies: heading.children.find(c => c.className === "group-applies").textContent });
-child(rowsOf()[1], "input").checked = false;
+const tick = child(rowsOf()[0], "input");
+tick.checked = true; tick.listeners.change();
 const state = child(shared[0].children[0], "select");
 state.value = "none"; state.listeners.change();
 await ids.continue.listeners.click(); await settle();
@@ -2046,11 +2048,39 @@ await ids.continue.listeners.click(); await settle();
     seen = _run_form_script(steps)["calls"]
     assert seen[1] == {"shared": 1}
     assert seen[2] == {
-        "closed": True,
-        "applies": f"Applies to: {first.name}, {second.name}",
+        "open": True,
+        "ticked": [False, False],
+        "applies": f"Parts: {first.name}, {second.name}",
     }
     sent = next(c for c in seen if c.get("url") == "/answer/r1")
     assert sent["body"]["facts"] == [{"key": facts[0]["key"], "value": "none"}]
+
+
+def test_unticking_a_part_takes_back_only_the_shared_answer():
+    """A part unticked after the shared answer reached it loses that value,
+    and a part a person answered by hand after it keeps its own (ADR 0113)."""
+    first, second = valid_model().data_flows[:2]
+    facts = [_control_row(first), _control_row(second)]
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+const own = (r) => walk(r).find(c => c.tag === "select");
+const [one, two] = rowsOf();
+for (const r of [one, two]) { const t = child(r, "input"); t.checked = true; t.listeners.change(); }
+const state = child(shared[0].children[0], "select");
+state.value = "none"; state.listeners.change();
+own(two).value = "none"; own(two).listeners.change();
+calls.push({ after: [own(one).value, own(two).value],
+  ticked: [one, two].map(r => child(r, "input").checked) });
+const t = child(one, "input"); t.checked = false; t.listeners.change();
+calls.push({ untick: [own(one).value, own(two).value] });
+"""
+    )
+    seen = _run_form_script(steps)["calls"]
+    after = next(c for c in seen if "after" in c)
+    untick = next(c["untick"] for c in seen if "untick" in c)
+    assert after == {"after": ["none", "none"], "ticked": [True, False]}
+    assert untick == ["", "none"]
 
 
 @pytest.mark.parametrize("case", ["one-row", "two-forms", "interleaved"])
@@ -2162,8 +2192,9 @@ def facet_fact(element, kind="capacity-limits"):
 
 
 def test_the_pause_asks_facets_once_with_a_table_for_the_exceptions():
-    """One select per facet above the table sets every row's part, and the
-    table holds a column per facet and a row per element (ADR 0081)."""
+    """One select per facet above the table sets each ticked row's part, and
+    the table holds a column per facet and a row per element (ADR 0081,
+    ADR 0113)."""
     store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
     facts = [facet_fact(store), facet_fact(flow)]
     steps = f"""
@@ -2173,6 +2204,10 @@ streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questi
 const [table] = ids.questions.querySelectorAll("table");
 const [head, ...rows] = table.children;
 calls.push({{ columns: head.children.map(c => c.textContent), rows: rows.length }});
+for (const row of rows) {{
+  const tick = row.children[0].children[0];
+  tick.checked = true; tick.listeners.change();
+}}
 const shared = ids.questions.querySelectorAll("div").find(d => d.className === "shared-controls");
 const every = shared.children[0].children[0].children.find(c => c.tag === "select");
 every.value = "yes";
@@ -3916,6 +3951,9 @@ calls.push(seen());
         steps = (
             self.SEEN
             + """
+for (const tick of box.all("input").filter(i => i.className === "share-answer")) {
+  tick.checked = true; tick.listeners.change();
+}
 const [rate] = box.all("select");
 rate.value = "yes"; rate.listeners.change();
 calls.push(seen());

@@ -95,6 +95,7 @@ from evals.harness import (
     roster,
     rule_applicability,
     schema_paths,
+    shared_answers,
     standings,
     submit,
     verb_pricing,
@@ -2655,6 +2656,12 @@ COMMANDS: dict[str, Command] = {
         " settles at matched choices (offline, no credentials)",
         run=early_answerers.command_early_answerers,
         arguments=early_answerers.arguments,
+    ),
+    "shared-answers": Command(
+        help="read how often one shared answer is wrong for a part its box"
+        " lists, against the corpus's blessed models (offline, no credentials)",
+        run=shared_answers.command_shared_answers,
+        arguments=shared_answers.arguments,
     ),
     "follow-up-policies": Command(
         help="compare orders of a report's follow-up questions at a matched"
