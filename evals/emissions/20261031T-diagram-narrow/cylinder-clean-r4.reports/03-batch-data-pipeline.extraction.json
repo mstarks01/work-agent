@@ -1,0 +1,564 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:insurance-partner",
+        "name": "insurance partner",
+        "description": "insurance partner",
+        "assets": [],
+        "source_excerpt": "n0[\"insurance partner\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:partner-network"
+      },
+      {
+        "id": "entity:data-analyst",
+        "name": "data analyst",
+        "description": "data analyst",
+        "assets": [],
+        "source_excerpt": "n1[\"data analyst\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:warehouse-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:ingest-scheduler",
+        "name": "ingest scheduler",
+        "description": "ingest scheduler",
+        "assets": [],
+        "source_excerpt": "n2(\"ingest scheduler\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:landing-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:spark-transform-job",
+        "name": "Spark transform job",
+        "description": "Spark transform job",
+        "assets": [],
+        "source_excerpt": "n3(\"Spark transform job\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Spark",
+        "trust_zone": "boundary:warehouse-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "landing bucket",
+        "assets": [],
+        "source_excerpt": "n4[(\"landing bucket\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:landing-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:airflow-metadata-database",
+        "name": "Airflow metadata database",
+        "description": "Airflow metadata database",
+        "assets": [],
+        "source_excerpt": "n5[(\"Airflow metadata database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:landing-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:claims-warehouse",
+        "name": "claims warehouse",
+        "description": "claims warehouse",
+        "assets": [],
+        "source_excerpt": "n6[(\"claims warehouse\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:warehouse-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
+        "name": "push daily extract",
+        "description": "push daily extract",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"push daily extract (SFTP)\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:insurance-partner",
+        "destination": "store:landing-bucket",
+        "protocol": "SFTP",
+        "authentication": "unknown",
+        "data_description": "daily extract",
+        "encryption_in_transit": "SFTP",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>store:landing-bucket>read-files",
+        "name": "read files",
+        "description": "list and read files",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"list and read files (object storage API)\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "store:landing-bucket",
+        "protocol": "object storage API",
+        "authentication": "unknown",
+        "data_description": "files",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections",
+        "name": "read connections",
+        "description": "read connections",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"read connections\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "store:airflow-metadata-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "connections",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform",
+        "name": "trigger transform",
+        "description": "trigger transform",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"trigger transform\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "process:spark-transform-job",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:spark-transform-job>store:claims-warehouse>load-records",
+        "name": "load records",
+        "description": "load records",
+        "assets": [],
+        "source_excerpt": "n3 -->|\"load records (BigQuery API)\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:spark-transform-job",
+        "destination": "store:claims-warehouse",
+        "protocol": "BigQuery API",
+        "authentication": "unknown",
+        "data_description": "records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:data-analyst>store:claims-warehouse>run-queries",
+        "name": "run queries",
+        "description": "run queries",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"run queries (BigQuery API)\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:data-analyst",
+        "destination": "store:claims-warehouse",
+        "protocol": "BigQuery API",
+        "authentication": "unknown",
+        "data_description": "queries",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:partner-network",
+        "name": "partner network",
+        "description": "Trust zone: partner network",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: partner network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:landing-network",
+        "name": "landing network",
+        "description": "Trust zone: landing network",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: landing network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:warehouse-network",
+        "name": "warehouse network",
+        "description": "Trust zone: warehouse network",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: warehouse network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The insurance partner is an external system.",
+        "element_id": "entity:insurance-partner",
+        "attribute": "kind",
+        "basis": "The node is named \"insurance partner\" and initiates a system flow."
+      },
+      {
+        "assumption": "The data analyst is a human external entity.",
+        "element_id": "entity:data-analyst",
+        "attribute": "kind",
+        "basis": "The node is named \"data analyst\"."
+      },
+      {
+        "assumption": "The partner network is a network trust boundary.",
+        "element_id": "boundary:partner-network",
+        "attribute": "kind",
+        "basis": "The diagram labels it \"Trust zone: partner network\"."
+      },
+      {
+        "assumption": "The landing network is a network trust boundary.",
+        "element_id": "boundary:landing-network",
+        "attribute": "kind",
+        "basis": "The diagram labels it \"Trust zone: landing network\"."
+      },
+      {
+        "assumption": "The warehouse network is a network trust boundary.",
+        "element_id": "boundary:warehouse-network",
+        "attribute": "kind",
+        "basis": "The diagram labels it \"Trust zone: warehouse network\"."
+      },
+      {
+        "assumption": "SFTP provides encryption in transit intrinsically.",
+        "element_id": "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
+        "attribute": "encryption_in_transit",
+        "basis": "The flow is explicitly labelled \"SFTP\"."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:insurance-partner",
+        "name": "insurance partner",
+        "description": "insurance partner",
+        "assets": [],
+        "source_excerpt": "n0[\"insurance partner\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:partner-network"
+      },
+      {
+        "id": "entity:data-analyst",
+        "name": "data analyst",
+        "description": "data analyst",
+        "assets": [],
+        "source_excerpt": "n1[\"data analyst\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:warehouse-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:ingest-scheduler",
+        "name": "ingest scheduler",
+        "description": "ingest scheduler",
+        "assets": [],
+        "source_excerpt": "n2(\"ingest scheduler\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:landing-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:spark-transform-job",
+        "name": "Spark transform job",
+        "description": "Spark transform job",
+        "assets": [],
+        "source_excerpt": "n3(\"Spark transform job\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Spark",
+        "trust_zone": "boundary:warehouse-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "landing bucket",
+        "assets": [],
+        "source_excerpt": "n4[(\"landing bucket\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:landing-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:airflow-metadata-database",
+        "name": "Airflow metadata database",
+        "description": "Airflow metadata database",
+        "assets": [],
+        "source_excerpt": "n5[(\"Airflow metadata database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:landing-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:claims-warehouse",
+        "name": "claims warehouse",
+        "description": "claims warehouse",
+        "assets": [],
+        "source_excerpt": "n6[(\"claims warehouse\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:warehouse-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
+        "name": "push daily extract",
+        "description": "push daily extract",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"push daily extract (SFTP)\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:insurance-partner",
+        "destination": "store:landing-bucket",
+        "protocol": "SFTP",
+        "authentication": "unknown",
+        "data_description": "daily extract",
+        "encryption_in_transit": "SFTP",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>store:landing-bucket>read-files",
+        "name": "read files",
+        "description": "list and read files",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"list and read files (object storage API)\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "store:landing-bucket",
+        "protocol": "object storage API",
+        "authentication": "unknown",
+        "data_description": "files",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections",
+        "name": "read connections",
+        "description": "read connections",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"read connections\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "store:airflow-metadata-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "connections",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform",
+        "name": "trigger transform",
+        "description": "trigger transform",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"trigger transform\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:ingest-scheduler",
+        "destination": "process:spark-transform-job",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:spark-transform-job>store:claims-warehouse>load-records",
+        "name": "load records",
+        "description": "load records",
+        "assets": [],
+        "source_excerpt": "n3 -->|\"load records (BigQuery API)\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:spark-transform-job",
+        "destination": "store:claims-warehouse",
+        "protocol": "BigQuery API",
+        "authentication": "unknown",
+        "data_description": "records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:data-analyst>store:claims-warehouse>run-queries",
+        "name": "run queries",
+        "description": "run queries",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"run queries (BigQuery API)\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:data-analyst",
+        "destination": "store:claims-warehouse",
+        "protocol": "BigQuery API",
+        "authentication": "unknown",
+        "data_description": "queries",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:partner-network",
+        "name": "partner network",
+        "description": "Trust zone: partner network",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: partner network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:landing-network",
+        "name": "landing network",
+        "description": "Trust zone: landing network",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: landing network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:warehouse-network",
+        "name": "warehouse network",
+        "description": "Trust zone: warehouse network",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: warehouse network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The insurance partner is an external system.",
+        "element_id": "entity:insurance-partner",
+        "attribute": "kind",
+        "basis": "The node is named \"insurance partner\" and initiates a system flow."
+      },
+      {
+        "assumption": "The data analyst is a human external entity.",
+        "element_id": "entity:data-analyst",
+        "attribute": "kind",
+        "basis": "The node is named \"data analyst\"."
+      },
+      {
+        "assumption": "The partner network is a network trust boundary.",
+        "element_id": "boundary:partner-network",
+        "attribute": "kind",
+        "basis": "The diagram labels it \"Trust zone: partner network\"."
+      },
+      {
+        "assumption": "The landing network is a network trust boundary.",
+        "element_id": "boundary:landing-network",
+        "attribute": "kind",
+        "basis": "The diagram labels it \"Trust zone: landing network\"."
+      },
+      {
+        "assumption": "The warehouse network is a network trust boundary.",
+        "element_id": "boundary:warehouse-network",
+        "attribute": "kind",
+        "basis": "The diagram labels it \"Trust zone: warehouse network\"."
+      },
+      {
+        "assumption": "SFTP provides encryption in transit intrinsically.",
+        "element_id": "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
+        "attribute": "encryption_in_transit",
+        "basis": "The flow is explicitly labelled \"SFTP\"."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

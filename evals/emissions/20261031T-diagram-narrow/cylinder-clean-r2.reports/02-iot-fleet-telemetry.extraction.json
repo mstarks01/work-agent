@@ -1,0 +1,680 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:sensor-node",
+        "name": "sensor node",
+        "description": "A sensor node in the field network.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n0[\"sensor node\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:field-network"
+      },
+      {
+        "id": "entity:field-technician",
+        "name": "field technician",
+        "description": "A field technician.",
+        "assets": [],
+        "source_excerpt": "n1[\"field technician\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:field-network"
+      },
+      {
+        "id": "entity:fleet-operator",
+        "name": "fleet operator",
+        "description": "A fleet operator.",
+        "assets": [],
+        "source_excerpt": "n2[\"fleet operator\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:device-gateway",
+        "name": "device gateway",
+        "description": "A device gateway that receives readings and looks up device information.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3(\"device gateway\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:ingest-edge",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:telemetry-normalizer",
+        "name": "telemetry normalizer",
+        "description": "A telemetry normalizer that loads and picks up readings.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"telemetry normalizer\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:analytics-core",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:device-registry",
+        "name": "device registry",
+        "description": "A device registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n5[(\"device registry\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Firestore",
+        "trust_zone": "boundary:ingest-edge",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:firmware-bucket",
+        "name": "firmware bucket",
+        "description": "A firmware bucket.",
+        "assets": [],
+        "source_excerpt": "n7[(\"firmware bucket\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:ingest-edge",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:pub-sub",
+        "name": "Pub/Sub",
+        "description": "A Pub/Sub store.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n8[(\"Pub/Sub\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Pub/Sub",
+        "trust_zone": "boundary:ingest-edge",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:telemetry-lake",
+        "name": "telemetry lake",
+        "description": "A telemetry lake.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n6[(\"telemetry lake\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "BigQuery",
+        "trust_zone": "boundary:analytics-core",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:sensor-node>process:device-gateway>publish-readings",
+        "name": "publish readings",
+        "description": "The sensor node publishes readings to the device gateway.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n0 -->|\"publish readings (MQTT)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:sensor-node",
+        "destination": "process:device-gateway",
+        "protocol": "MQTT",
+        "authentication": "unknown",
+        "data_description": "readings",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:device-gateway>store:device-registry>look-up-device",
+        "name": "look up device",
+        "description": "The device gateway looks up a device in the device registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"look up device (Firestore API)\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:device-gateway",
+        "destination": "store:device-registry",
+        "protocol": "Firestore API",
+        "authentication": "unknown",
+        "data_description": "device",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:telemetry-normalizer>store:telemetry-lake>load-readings",
+        "name": "load readings",
+        "description": "The telemetry normalizer loads readings from the telemetry lake.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"load readings (BigQuery API)\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:telemetry-normalizer",
+        "destination": "store:telemetry-lake",
+        "protocol": "BigQuery API",
+        "authentication": "unknown",
+        "data_description": "readings",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:sensor-node>store:firmware-bucket>poll-firmware",
+        "name": "poll firmware",
+        "description": "The sensor node polls firmware from the firmware bucket.",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"poll firmware (HTTPS)\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:sensor-node",
+        "destination": "store:firmware-bucket",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "firmware",
+        "encryption_in_transit": "HTTPS",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:field-technician>entity:sensor-node>local-service-session",
+        "name": "local service session",
+        "description": "The field technician initiates a local service session with the sensor node.",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"local service session (local serial console)\"| n0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:field-technician",
+        "destination": "entity:sensor-node",
+        "protocol": "local serial console",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:fleet-operator>store:telemetry-lake>query-dashboards",
+        "name": "query dashboards",
+        "description": "The fleet operator queries dashboards in the telemetry lake.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"query dashboards (BigQuery API)\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:fleet-operator",
+        "destination": "store:telemetry-lake",
+        "protocol": "BigQuery API",
+        "authentication": "unknown",
+        "data_description": "readings",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:device-gateway>store:pub-sub>forward-readings",
+        "name": "forward readings",
+        "description": "The device gateway forwards readings to Pub/Sub.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"forward readings\"| n8",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:device-gateway",
+        "destination": "store:pub-sub",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "readings",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings",
+        "name": "pick up readings",
+        "description": "The telemetry normalizer picks up readings from Pub/Sub.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"pick up readings\"| n8",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:telemetry-normalizer",
+        "destination": "store:pub-sub",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "readings",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:field-network",
+        "name": "field network",
+        "description": "Trust zone: field network.",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: field network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:ingest-edge",
+        "name": "ingest edge",
+        "description": "Trust zone: ingest edge.",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: ingest edge\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:analytics-core",
+        "name": "analytics core",
+        "description": "Trust zone: analytics core.",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: analytics core\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Trust zone: corporate network.",
+        "assets": [],
+        "source_excerpt": "subgraph z3[\"Trust zone: corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": []
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:sensor-node",
+        "name": "sensor node",
+        "description": "A sensor node in the field network.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n0[\"sensor node\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:field-network"
+      },
+      {
+        "id": "entity:field-technician",
+        "name": "field technician",
+        "description": "A field technician.",
+        "assets": [],
+        "source_excerpt": "n1[\"field technician\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:field-network"
+      },
+      {
+        "id": "entity:fleet-operator",
+        "name": "fleet operator",
+        "description": "A fleet operator.",
+        "assets": [],
+        "source_excerpt": "n2[\"fleet operator\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:device-gateway",
+        "name": "device gateway",
+        "description": "A device gateway that receives readings and looks up device information.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3(\"device gateway\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:ingest-edge",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:telemetry-normalizer",
+        "name": "telemetry normalizer",
+        "description": "A telemetry normalizer that loads and picks up readings.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"telemetry normalizer\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:analytics-core",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:device-registry",
+        "name": "device registry",
+        "description": "A device registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n5[(\"device registry\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Firestore",
+        "trust_zone": "boundary:ingest-edge",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:firmware-bucket",
+        "name": "firmware bucket",
+        "description": "A firmware bucket.",
+        "assets": [],
+        "source_excerpt": "n7[(\"firmware bucket\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:ingest-edge",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:pub-sub",
+        "name": "Pub/Sub",
+        "description": "A Pub/Sub store.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n8[(\"Pub/Sub\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Pub/Sub",
+        "trust_zone": "boundary:ingest-edge",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:telemetry-lake",
+        "name": "telemetry lake",
+        "description": "A telemetry lake.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n6[(\"telemetry lake\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "BigQuery",
+        "trust_zone": "boundary:analytics-core",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:sensor-node>process:device-gateway>publish-readings",
+        "name": "publish readings",
+        "description": "The sensor node publishes readings to the device gateway.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n0 -->|\"publish readings (MQTT)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:sensor-node",
+        "destination": "process:device-gateway",
+        "protocol": "MQTT",
+        "authentication": "unknown",
+        "data_description": "readings",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:device-gateway>store:device-registry>look-up-device",
+        "name": "look up device",
+        "description": "The device gateway looks up a device in the device registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"look up device (Firestore API)\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:device-gateway",
+        "destination": "store:device-registry",
+        "protocol": "Firestore API",
+        "authentication": "unknown",
+        "data_description": "device",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:telemetry-normalizer>store:telemetry-lake>load-readings",
+        "name": "load readings",
+        "description": "The telemetry normalizer loads readings from the telemetry lake.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"load readings (BigQuery API)\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:telemetry-normalizer",
+        "destination": "store:telemetry-lake",
+        "protocol": "BigQuery API",
+        "authentication": "unknown",
+        "data_description": "readings",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:sensor-node>store:firmware-bucket>poll-firmware",
+        "name": "poll firmware",
+        "description": "The sensor node polls firmware from the firmware bucket.",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"poll firmware (HTTPS)\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:sensor-node",
+        "destination": "store:firmware-bucket",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "firmware",
+        "encryption_in_transit": "HTTPS",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:field-technician>entity:sensor-node>local-service-session",
+        "name": "local service session",
+        "description": "The field technician initiates a local service session with the sensor node.",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"local service session (local serial console)\"| n0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:field-technician",
+        "destination": "entity:sensor-node",
+        "protocol": "local serial console",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:fleet-operator>store:telemetry-lake>query-dashboards",
+        "name": "query dashboards",
+        "description": "The fleet operator queries dashboards in the telemetry lake.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"query dashboards (BigQuery API)\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:fleet-operator",
+        "destination": "store:telemetry-lake",
+        "protocol": "BigQuery API",
+        "authentication": "unknown",
+        "data_description": "readings",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:device-gateway>store:pub-sub>forward-readings",
+        "name": "forward readings",
+        "description": "The device gateway forwards readings to Pub/Sub.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"forward readings\"| n8",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:device-gateway",
+        "destination": "store:pub-sub",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "readings",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings",
+        "name": "pick up readings",
+        "description": "The telemetry normalizer picks up readings from Pub/Sub.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"pick up readings\"| n8",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:telemetry-normalizer",
+        "destination": "store:pub-sub",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "readings",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:field-network",
+        "name": "field network",
+        "description": "Trust zone: field network.",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: field network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:ingest-edge",
+        "name": "ingest edge",
+        "description": "Trust zone: ingest edge.",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: ingest edge\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:analytics-core",
+        "name": "analytics core",
+        "description": "Trust zone: analytics core.",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: analytics core\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Trust zone: corporate network.",
+        "assets": [],
+        "source_excerpt": "subgraph z3[\"Trust zone: corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}
