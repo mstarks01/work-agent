@@ -4018,9 +4018,79 @@ const text = (n) => typeof n === "string" ? n
 calls.push({ said: text(ids.questions) });
 """
         said = _run_form_script(steps)["calls"][-1]["said"]
-        assert "2 earlier answers do not fit this system model" in said
+        assert "2 earlier answers are not kept, because this system model" in said
         assert "Old DB: encryption at rest \u2014 AES" in said
         assert "batch loader \u2014 none of these" in said, "a link answer is listed"
+
+
+class TestTheRenameOfACarriedElement:
+    """The owner says which part a missing element is now (ADR 0116)."""
+
+    PAUSE = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+  early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
+  answered_early: [], answered_links: [], revision: 3,
+  carried_dropped: [{ label: "store:old: encryption at rest", value: "AES",
+    reason: "missing-element", key: ["store:old", "encryption_at_rest", "", "", "", ""] }],
+  carried_renames: [{ earlier: "store:gone", element: "store:kept", name: "Kept DB" }],
+  rename_choices: [{ earlier: "store:old", choices: [{ element: "store:new", name: "New DB" }] }]
+}) });
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+"""
+
+    def _renames(self, seen):
+        sent = [c for c in seen["calls"] if c.get("url") == "/answer/r1"]
+        return sent[-1]["body"]
+
+    def test_a_chosen_part_is_sent_with_the_renames_held(self):
+        steps = (
+            self.PAUSE
+            + """
+const box = ids.questions.querySelectorAll("div").find(d => d.className === "rename");
+calls.push({ said: text(box) });
+box.querySelectorAll("select")[0].value = "store:new";
+const keep = box.querySelectorAll("button").find(b => b.textContent === "Keep these answers");
+await keep.listeners.click(); await settle();
+"""
+        )
+        seen = _run_form_script(steps)
+        said = next(c["said"] for c in seen["calls"] if "said" in c)
+        assert "1 earlier answer is about store:old" in said
+        body = self._renames(seen)
+        assert body["save"] is True and body["revision"] == 3
+        assert body["facts"] == [] and body["links"] == []
+        assert body["renames"] == [
+            {"earlier": "store:gone", "element": "store:kept"},
+            {"earlier": "store:old", "element": "store:new"},
+        ]
+
+    def test_undo_sends_the_renames_without_it(self):
+        steps = (
+            self.PAUSE
+            + """
+const undo = ids.questions.querySelectorAll("button").find(b => b.textContent === "Undo");
+calls.push({ said: text(ids.questions) });
+await undo.listeners.click(); await settle();
+"""
+        )
+        seen = _run_form_script(steps)
+        said = next(c["said"] for c in seen["calls"] if "said" in c)
+        assert "Earlier answers about store:gone now belong to Kept DB." in said
+        assert self._renames(seen)["renames"] == []
+
+    def test_no_part_chosen_sends_nothing(self):
+        steps = (
+            self.PAUSE
+            + """
+const box = ids.questions.querySelectorAll("div").find(d => d.className === "rename");
+const keep = box.querySelectorAll("button").find(b => b.textContent === "Keep these answers");
+await keep.listeners.click(); await settle();
+"""
+        )
+        seen = _run_form_script(steps)
+        assert not [c for c in seen["calls"] if c.get("url") == "/answer/r1"]
 
 
 class TestTheFacetsAPageAsks:

@@ -261,10 +261,14 @@
   intro.className = "list-intro";
   const tail = document.createElement("div");
   tail.className = "list-tail";
+  // The answers this run carried from an earlier one and could not take,
+  // redrawn from each payload (drawCarried).
+  const carried = document.createElement("div");
+  carried.className = "carried";
   let framed = false;
   const frame = () => {
     if (framed) return;
-    questions.replaceChildren(intro, list, tail);
+    questions.replaceChildren(intro, list, carried, tail);
     framed = true;
   };
 
@@ -787,6 +791,7 @@
     }
     restoreShares(data.answered_shares || [], (key) => edits.has(key));
     drawIntro(data);
+    drawCarried(data);
     drawTail(data);
     drawBoxes(data);
     announce(before, data);
@@ -890,31 +895,114 @@
       }
     }
   };
+  // ---- Carried answers ----------------------------------------------------
+  // Answers this run carried from an earlier one and could not take
+  // (AnswerState.carried, ADRs 0072 and 0079). An answer about a part this
+  // model does not have can follow the part to its new name, where the
+  // submitter says which part it is now (ADR 0116). Nothing is matched by a
+  // similar name.
+  const plainList = (lines) => {
+    const items = document.createElement("ul");
+    for (const line of lines) {
+      const item = document.createElement("li");
+      item.textContent = line;
+      items.append(item);
+    }
+    return items;
+  };
+  const hint = (text) => {
+    const line = document.createElement("p");
+    line.className = "hint";
+    line.textContent = text;
+    return line;
+  };
+  // Save every rename the run holds after this change, and nothing else.
+  const saveRenames = (renames) => answerAction(async () => {
+    await flush();
+    if (edits.size) {
+      refuse("Some answers are not saved yet. Save them, then try again.");
+      return;
+    }
+    const response = await fetch("/answer/" + pausedRun, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        links: [], facts: [], save: true, skip: [], presented: presented(), revision, renames,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      refuse(data.detail || "The service did not keep this change.");
+      return;
+    }
+    answerProblem.hidden = true;
+    if (data.early_questions) reconcile(data);
+  });
+  const drawCarried = (data) => {
+    const dropped = data.carried_dropped || [];
+    const renames = (data.carried_renames || []).map(({ earlier, element }) => ({ earlier, element }));
+    carried.replaceChildren();
+    for (const [index, rename] of (data.carried_renames || []).entries()) {
+      const line = document.createElement("p");
+      line.className = "hint";
+      line.append(
+        `Earlier answers about ${rename.earlier} now belong to ${rename.name}. `,
+        button("Undo", () => saveRenames(renames.filter((_, other) => other !== index)), "quiet"),
+      );
+      carried.append(line);
+    }
+    for (const { earlier, choices } of data.rename_choices || []) {
+      const about = dropped.filter((a) => a.key[0] === earlier);
+      if (!about.length) continue;
+      const box = document.createElement("div");
+      box.className = "rename";
+      box.append(
+        hint(`${counted(about.length, "earlier answer is", "earlier answers are")} about ${earlier},`
+          + " which this system model does not have:"),
+        plainList(about.map((a) => `${a.label} — ${answerText(a)}`)),
+      );
+      if (choices.length) {
+        const label = document.createElement("label");
+        label.textContent = "If it is now another part, choose it: ";
+        const pick = document.createElement("select");
+        const option = (text, value) => {
+          const one = document.createElement("option");
+          one.textContent = text;
+          one.value = value;
+          return one;
+        };
+        pick.append(option("Not in this system", ""));
+        for (const choice of choices) pick.append(option(choice.name, choice.element));
+        label.append(pick);
+        const keep = button("Keep these answers", () => {
+          if (!pick.value) {
+            refuse(`Choose the part that ${earlier} is now.`);
+            return;
+          }
+          saveRenames([...renames, { earlier, element: pick.value }]);
+        });
+        box.append(label, " ", keep);
+      }
+      carried.append(box);
+    }
+    const others = [
+      ...dropped.filter((a) => a.reason !== "missing-element").map((a) => `${a.label} — ${answerText(a)}`),
+      ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${linkAnswerText(a)}`),
+    ];
+    if (others.length) {
+      carried.append(
+        hint(`${counted(others.length, "earlier answer is", "earlier answers are")} not kept, because`
+          + " this system model states the fact or does not ask it:"),
+        plainList(others),
+      );
+    }
+  };
+
   // The tail: answers an amendment could not carry, and the amendment itself.
   let tailDrawn = false;
   const drawTail = (data) => {
     if (tailDrawn) return;
     tailDrawn = true;
-    // Answers this run carried from an earlier one and could not take: each
-    // names a part this model does not have, or a fact it states
-    // (AnswerState.carried, ADRs 0072 and 0079).
-    const dropped = [
-      ...(data.carried_dropped || []).map((a) => `${a.label} — ${answerText(a)}`),
-      ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${linkAnswerText(a)}`),
-    ];
-    if (dropped.length) {
-      const lead = document.createElement("p");
-      lead.className = "hint";
-      lead.textContent = `${counted(dropped.length, "earlier answer does", "earlier answers do")} not fit this`
-        + " system model, so they are not kept:";
-      const items = document.createElement("ul");
-      for (const line of dropped) {
-        const item = document.createElement("li");
-        item.textContent = line;
-        items.append(item);
-      }
-      tail.append(lead, items);
-    }
     // An amendment to the description itself: a part missing, or a fact read
     // wrongly. The service reads the description again with it, asks again,
     // and keeps every answer that still fits (ADR 0072).
