@@ -58,7 +58,11 @@ Both pages send a box's answer as one share of the parts ticked, and a part
 the saved share covers keeps holding it while the box does not list it. The
 first-run page shows a covered part under "Your answers", marked as a shared
 answer. The report page restores each box from the draft's shares over the
-shares its run read.
+shares its run read. Beside each shared answer a line names the parts it
+covers, and "Undo" puts back the answer before its last change and each part
+that change wrote. The report export prints an answer a share wrote as one
+shared answer with its count of parts; a correction to a final report is its
+part's own answer.
 
 A job that carries another job's answers (ADR 0079) or an amendment's new job
 (ADR 0072) carries each covered element's answer, not the share. A correction

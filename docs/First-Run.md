@@ -405,7 +405,9 @@ The app can ask you questions before the analysis, and after the report.
   each unticked. Tick each part that the answer covers, and the answer is
   saved for each part you tick. A part you leave unticked keeps its own
   answer, or none, and you can answer it on its own. Untick a part to take
-  back the shared answer from it. A matching question does not prove that
+  back the shared answer from it. A line beside the answer names the parts
+  it covers, and **Undo** puts back the answer and the parts as they were
+  before your last change to it. A matching question does not prove that
   one control covers every part, so the page ticks none for you. The service
   keeps which parts the answer covers. After a reload, a covered part shows
   under **Your answers**, marked "(shared answer)"; change it there to give
