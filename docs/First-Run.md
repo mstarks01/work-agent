@@ -406,7 +406,10 @@ The app can ask you questions before the analysis, and after the report.
   saved for each part you tick. A part you leave unticked keeps its own
   answer, or none, and you can answer it on its own. Untick a part to take
   back the shared answer from it. A matching question does not prove that
-  one control covers every part, so the page ticks none for you. The help
+  one control covers every part, so the page ticks none for you. The service
+  keeps which parts the answer covers. After a reload, a covered part shows
+  under **Your answers**, marked "(shared answer)"; change it there to give
+  that part its own answer. The help
   also quotes the words of your description that the part was read
   from. A line at the top explains that your answers can add questions as well as remove
   them, and the page says when they do. Each answer is saved as you give

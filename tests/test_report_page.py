@@ -384,7 +384,12 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
         f"{{framework: 'asvs'}}, {{verdict: {json.dumps(verdict)}}})));"
     )
     done = subprocess.run(
-        [node, "-e", program], capture_output=True, text=True, timeout=30, check=False
+        [node, "-"],
+        input=program,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
     )
     assert done.returncode == 0, done.stderr
 

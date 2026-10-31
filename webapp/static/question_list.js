@@ -354,6 +354,8 @@ const questionList = ({
   // rows together (ADR 0080), so a kind takes one box. A capability keeps
   // its place in its framework's turn, so the application's box can come
   // back later in the list, and then it opens a new box.
+  // Every box the list holds, so held shares can find theirs.
+  const boxes = new Set();
   const newBox = (q) => {
     const node = document.createElement("details");
     node.className = "question-group";
@@ -379,7 +381,9 @@ const questionList = ({
       node.append(help);
     }
     node.append(top, each);
-    return { node, title, applies, top, each, eachTitle, group: q.group, heading: q.group_heading, rows: [], grid: null, shared: null };
+    const box = { node, title, applies, top, each, eachTitle, group: q.group, heading: q.group_heading, rows: [], grid: null, shared: null };
+    boxes.add(box);
+    return box;
   };
   const titleBox = (box) => {
     const heading = document.createElement("span");
@@ -431,6 +435,14 @@ const questionList = ({
       box.sharedClear = (row) => {
         for (const select of selects) if (select.value) row.setFacet(select.dataset.facet, "");
       };
+      box.sharedAnswer = () => {
+        const facets = {};
+        for (const select of selects) if (select.value) facets[select.dataset.facet] = select.value;
+        return Object.keys(facets).length ? { facets } : null;
+      };
+      box.sharedSet = (answer) => {
+        for (const select of selects) select.value = (answer.facets || {})[select.dataset.facet] || "";
+      };
       showFacets(box.grid);
       return line;
     }
@@ -440,6 +452,13 @@ const questionList = ({
       if (shared.read()) row.set({ value: shared.read() });
     };
     box.sharedClear = (row) => row.set({ value: "" });
+    box.sharedAnswer = () => {
+      const answer = shared.answer();
+      if (!answer) return null;
+      const { key, ...rest } = answer;
+      return rest;
+    };
+    box.sharedSet = (answer) => shared.set(answer.value);
     // The box's heading asks the question for every part it lists, so it
     // names each control; a second control adds what it takes.
     shared.controls.forEach((control, at) => control.setAttribute("aria-label",
@@ -539,7 +558,10 @@ const questionList = ({
       row.grid.rows.delete(row);
       showFacets(row.grid);
     }
-    if (!box.rows.length) box.node.remove();
+    if (!box.rows.length) {
+      box.node.remove();
+      boxes.delete(box);
+    }
     else {
       titleBox(box);
       ensureShared(box);
@@ -556,7 +578,43 @@ const questionList = ({
     }
     drawOpen(row, prefill);
   };
-  return { place, removeRow, drawOpen, drawSaved, drawAlone, button };
+  // The share a box holds now, as the service takes it (ADR 0114): the shared
+  // answer under the box's question with the element left empty, and each
+  // part that holds it. A part of the box holds it where it is ticked; a part
+  // the `held` share covers that the box does not list, such as one answered
+  // before a reload, keeps holding it. Null where the box shares nothing or
+  // has no answer.
+  const shareOf = (box, held = null) => {
+    if (!box || !box.shared || !box.sharedAnswer) return null;
+    const answer = box.sharedAnswer();
+    const members = box.rows.filter((row) => row.kind === "fact");
+    if (!answer || !members.length) return null;
+    const listed = new Set(members.map((row) => row.q.key[0]));
+    const kept = held ? held.covers.filter((element) => !listed.has(element)) : [];
+    const covers = [...kept, ...members.filter((row) => row.inherited).map((row) => row.q.key[0])];
+    return { answer: { ...answer, key: ["", ...members[0].q.key.slice(1)] }, covers };
+  };
+  // Show the shares the service holds: each box takes its share's answer, and
+  // each part it covers is ticked and holds it. A box whose share waits to be
+  // saved (`pending`) keeps what the person did.
+  const restoreShares = (shares, pending) => {
+    const held = new Map(shares.map((share) => [shareKey(share.answer.key), share]));
+    for (const box of boxes) {
+      const members = box.rows.filter((row) => row.kind === "fact");
+      if (!box.shared || !members.length) continue;
+      const key = shareKey(members[0].q.key);
+      const share = held.get(key);
+      if (!share || pending(key)) continue;
+      box.sharedSet(share.answer);
+      for (const row of members) {
+        const covered = share.covers.includes(row.q.key[0]);
+        row.inherited = covered;
+        if (covered) row.exception = false;
+        if (row.tick) row.tick.checked = covered;
+      }
+    }
+  };
+  return { place, removeRow, drawOpen, drawSaved, drawAlone, button, shareOf, restoreShares };
 };
 
 // Two rules both pages read, so neither keeps its own copy.
@@ -566,6 +624,12 @@ const questionList = ({
 const questionKey = (key) => JSON.stringify(key);
 // A row's key is its question's key.
 const rowKey = (row) => questionKey(row.q.key);
+// The key a box's share is kept under: its question with the element left
+// empty, read from any part's key or from the share's own (ADR 0114).
+const shareKey = (key) => `share:${questionKey(["", ...key.slice(1)])}`;
+// The key of each part's question the held shares cover.
+const sharedKeys = (shares) => new Set(shares.flatMap((share) =>
+  share.covers.map((element) => questionKey([element, ...share.answer.key.slice(1)]))));
 // Whether a page asks two questions once (ADR 0081): one attribute or kind,
 // each of an element, with one form and one set of choices. The
 // `shared-answers` instrument reads the same rule, and a test holds the two to
@@ -603,6 +667,13 @@ const indexGroups = (index, list, select) => {
     });
     index.append(link);
   });
+};
+// Two shares are one share when their answers agree and they cover the same
+// parts, in any order (ADR 0114).
+const sameShare = (a, b) => {
+  if (!a || !b) return !a && !b;
+  const covers = (share) => [...share.covers].sort().join("\n");
+  return sameAnswer(a.answer, b.answer) && covers(a) === covers(b);
 };
 // Two answers are one answer when the fields the submitter gives agree. The
 // service serves every field, with its defaults and with the value it
