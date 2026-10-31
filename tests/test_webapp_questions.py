@@ -23,6 +23,7 @@ from analysis_service import StubPipelineRunner
 from analysis_service.analysis import ABSENT_WORD
 from analysis_service.answer_bodies import BodyRefused, read_answers
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import UnknownRef
@@ -623,7 +624,12 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         " href: location.href, asked: !ids.asked.hidden}));\n})();"
     )
     done = subprocess.run(
-        [node, "-e", program], capture_output=True, text=True, timeout=30, check=False
+        [node, "-"],
+        input=program,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
     )
     assert done.returncode == 0, done.stderr
     # A step that threw inside the async run leaves no result line; the
@@ -743,7 +749,12 @@ console.log(JSON.stringify({
 """
     )
     done = subprocess.run(
-        [node, "-e", program], capture_output=True, text=True, timeout=30, check=False
+        [node, "-"],
+        input=program,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
     )
     assert done.returncode == 0, done.stderr
     seen = json.loads(done.stdout.strip().splitlines()[-1])
@@ -2053,7 +2064,85 @@ await ids.continue.listeners.click(); await settle();
         "applies": f"Parts: {first.name}, {second.name}",
     }
     sent = next(c for c in seen if c.get("url") == "/answer/r1")
-    assert sent["body"]["facts"] == [{"key": facts[0]["key"], "value": "none"}]
+    assert sent["body"]["facts"] == []
+    assert sent["body"]["shares"] == [
+        {
+            "answer": {"key": ["", *facts[0]["key"][1:]], "value": "none"},
+            "covers": [first.id],
+        }
+    ]
+
+
+def test_a_shared_box_saves_one_share_and_an_untick_shrinks_it():
+    """The page sends the box's answer once, as a share of the parts ticked,
+    and an untick sends the share again with one part fewer (ADR 0114)."""
+    first, second = valid_model().data_flows[:2]
+    facts = [_control_row(first), _control_row(second)]
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+for (const r of rowsOf()) { const t = child(r, "input"); t.checked = true; t.listeners.change(); }
+const state = child(shared[0].children[0], "select");
+state.value = "none"; state.listeners.change();
+await settle();
+const t = child(rowsOf()[1], "input"); t.checked = false; t.listeners.change();
+await settle();
+"""
+    )
+    sent = [
+        c["body"]
+        for c in _run_form_script(steps)["calls"]
+        if c.get("url") == "/answer/r1"
+    ]
+    template = ["", *facts[0]["key"][1:]]
+    assert [body.get("shares") for body in sent if body.get("shares")] == [
+        [
+            {
+                "answer": {"key": template, "value": "none"},
+                "covers": [first.id, second.id],
+            }
+        ],
+        [{"answer": {"key": template, "value": "none"}, "covers": [first.id]}],
+    ]
+    assert all(body["facts"] == [] for body in sent)
+
+
+def test_a_part_ticked_after_a_reload_joins_the_held_share():
+    """A part the held share covers is answered, so a reload lists it under
+    "Your answers", marked shared. A part ticked then joins the share, and the
+    share keeps the part it covered (ADR 0114)."""
+    first, second = valid_model().data_flows[:2]
+    third = first.model_copy(
+        update={"id": "flow:process:web-app>store:orders-db>read", "name": "read"}
+    )
+    template = ["", "encryption_in_transit", "", "", "", ""]
+    held = {"answer": {"key": template, "value": "none"}, "covers": [first.id]}
+    answered = _control_row(first) | {
+        "answer": {"key": [first.id, *template[1:]], "value": "none"}
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+  early_questions: {json.dumps([_control_row(second), _control_row(third)])},
+  answered_early: [{json.dumps(answered)}], answered_shares: [{json.dumps(held)}],
+  answered_links: [], revision: 1 }}) }});
+const text = (n) => typeof n === "string" ? n : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({{ earlier: text(ids.earlier) }});
+const group = ids.questions.querySelectorAll("details").find((d) => d.className === "question-group");
+const each = group.children.find(c => c.className === "each-one");
+const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
+const [row] = each.children.filter(c => c.tag === "p");
+const tick = child(row, "input"); tick.checked = true; tick.listeners.change();
+await settle();
+"""
+    seen = _run_form_script(steps)["calls"]
+    earlier = next(c["earlier"] for c in seen if "earlier" in c)
+    assert "(shared answer)" in earlier
+    sent = next(c["body"] for c in seen if c.get("url") == "/answer/r1")
+    assert sent["facts"] == []
+    assert sent["shares"] == [
+        {"answer": {"key": template, "value": "none"}, "covers": [first.id, second.id]}
+    ]
 
 
 def test_unticking_a_part_takes_back_only_the_shared_answer():
@@ -2213,7 +2302,7 @@ const every = shared.children[0].children[0].children.find(c => c.tag === "selec
 every.value = "yes";
 every.listeners.change();
 const quota = rows[1].children[4].children[0];
-quota.value = "not applicable";
+quota.value = "not applicable"; quota.listeners.change();
 await ids.continue.listeners.click(); await settle();
 """
     seen = _run_form_script(steps)["calls"]
@@ -2229,12 +2318,21 @@ await ids.continue.listeners.click(); await settle();
         ],
         "rows": 2,
     }
+    # The second row, edited by hand, is an exception with its own answer;
+    # the share covers the first (ADR 0113, ADR 0114).
     assert sent["body"]["facts"] == [
-        {"key": facts[0]["key"], "facets": {"rate": "yes"}},
         {"key": facts[1]["key"], "facets": {"rate": "yes", "quota": "not applicable"}},
+    ]
+    assert sent["body"]["shares"] == [
+        {
+            "answer": {"key": ["", *facts[0]["key"][1:]], "facets": {"rate": "yes"}},
+            "covers": [store.id],
+        }
     ]
     for fact in sent["body"]["facts"]:
         FactAnswer.model_validate(fact)
+    for share in sent["body"]["shares"]:
+        SharedAnswer.model_validate(share)
 
 
 @pytest.mark.parametrize(("rows", "shared"), [(1, False), (2, True)])

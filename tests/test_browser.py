@@ -441,16 +441,20 @@ def test_one_shared_answer_saves_the_part_for_every_element_ticked(page):
     facet = shared.get_attribute("data-facet")
     with page.expect_response(_post_to_answer) as response:
         shared.select_option("yes")
-    facts = response.value.request.post_data_json["facts"]
+    assert response.value.ok
+    body = response.value.request.post_data_json
     elements = keys.evaluate_all(
         "(selects, facet) => [...new Set(selects.filter(s => s.dataset.facet === facet)"
-        ".map(s => s.dataset.key))]",
+        ".map(s => JSON.parse(s.dataset.key)[0]))]",
         facet,
     )
     assert len(elements) >= 2
-    sent = sorted(json.dumps(fact["key"], separators=(",", ":")) for fact in facts)
-    assert sent == sorted(elements)
-    assert all(fact["facets"] == {facet: "yes"} for fact in facts)
+    # One share for the box (ADR 0114), and no answer of each part's own.
+    [share] = body["shares"]
+    assert body["facts"] == []
+    assert sorted(share["covers"]) == sorted(elements)
+    assert share["answer"]["facets"] == {facet: "yes"}
+    assert share["answer"]["key"][0] == ""
 
 
 def test_no_to_the_rest_answers_each_blank_capability_question(page):

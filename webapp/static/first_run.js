@@ -248,7 +248,9 @@
     const active = document.activeElement;
     return Boolean(active && typeof node.contains === "function" && node.contains(active));
   };
-  const dirty = (row) => edits.has(rowKey(row));
+  // A part that holds its box's shared answer waits on the box's share.
+  const dirty = (row) => edits.has(rowKey(row))
+    || Boolean(row.inherited && edits.has(shareKey(row.q.key)));
   // A row the page must not rebuild: the submitter is editing it, or its edit is
   // not acknowledged yet.
   const busy = (row) => dirty(row) || focused(row.node);
@@ -346,15 +348,19 @@
   const bodyOf = (sent) => {
     const facts = [];
     const links = [];
+    const shares = [];
     const skip = [];
     for (const edit of sent.values()) {
       if (edit.skip) skip.push(edit.q.key);
       if (!edit.answer) continue;
       if (edit.kind === "link") links.push(edit.answer);
+      else if (edit.kind === "share") shares.push(edit.answer);
       else facts.push(edit.answer);
     }
-    if (!facts.length && !links.length && !skip.length) return null;
-    return { links, facts, save: true, skip, presented: presented(), revision };
+    if (!facts.length && !links.length && !shares.length && !skip.length) return null;
+    return {
+      links, facts, ...(shares.length ? { shares } : {}), save: true, skip, presented: presented(), revision,
+    };
   };
   const sendable = () =>
     new Map([...edits].filter(([, edit]) => !edit.refused && !edit.conflict));
@@ -366,7 +372,9 @@
     const count = { facts: 0, links: 0, skips: 0 };
     for (const [key, edit] of sendable()) {
       const need = { facts: 0, links: 0, skips: edit.skip ? 1 : 0 };
-      if (edit.answer) need[edit.kind === "link" ? "links" : "facts"] = 1;
+      // Each part a share covers counts as one fact answer (ADR 0114).
+      if (edit.kind === "share") need.facts = edit.answer.covers.length;
+      else if (edit.answer) need[edit.kind === "link" ? "links" : "facts"] = 1;
       const over = Object.keys(need).some((kind) => count[kind] + need[kind] > ANSWER_LIMITS[kind]);
       if (over) continue;
       for (const kind of Object.keys(need)) count[kind] += need[kind];
@@ -450,6 +458,7 @@
     for (const a of data.answered_links || []) {
       held.set(questionKey(a.key), { principal: a.principal, element: a.answer.element });
     }
+    for (const share of data.answered_shares || []) held.set(shareKey(share.answer.key), share);
     return held;
   };
   // Read the answers again, after a stale save or a lost response. An edit
@@ -476,9 +485,15 @@
     const theirs = answersOf(latest);
     for (const [key, edit] of edits) {
       const held = theirs.get(key);
-      if (edit.answer && sameAnswer(held, edit.answer)) {
+      const same = edit.kind === "share" ? sameShare : sameAnswer;
+      if (edit.answer && same(held, edit.answer)) {
         edits.delete(key);
-      } else if (!sameAnswer(held, edit.base)) {
+      } else if (edit.kind === "share" && !same(held, edit.base)) {
+        // A shared answer changed in another tab: the page shows the saved
+        // one, and says so, rather than overwrite it.
+        edits.delete(key);
+        refuse("A shared answer changed in another tab or window. The page shows the saved one.");
+      } else if (!same(held, edit.base)) {
         // An edit with no row on the page is the other half of a correction,
         // and the answer it corrected changed: it is dropped, not shown.
         if (rows.has(key)) edit.conflict = { theirs: theirs.get(key) || null };
@@ -552,7 +567,34 @@
   // ---- Edits --------------------------------------------------------------
   // Register what a row's editor holds now. A value equal to the saved one is
   // no edit; a blank sends nothing, and a saved answer stays as it was.
+  // The share of a row's box, as one edit for the box (ADR 0114). A share equal
+  // to the saved one is no edit, and a box that shares nothing and held no
+  // share sends none.
+  const registerShare = (row) => {
+    const key = shareKey(row.q.key);
+    const base = answersOf(view || {}).get(key) || null;
+    const share = shareOf(row.box, base);
+    if (!share || sameShare(share, base) || (!share.covers.length && !base)) {
+      edits.delete(key);
+      return false;
+    }
+    const pending = edits.get(key);
+    if (pending && !pending.refused && sameShare(pending.answer, share)) return false;
+    edits.set(key, { q: null, kind: "share", base, answer: share, skip: false });
+    return true;
+  };
   const registerEdit = (row) => {
+    const shared = Boolean(row.kind === "fact" && row.box && row.box.shared);
+    const boxChanged = shared && registerShare(row);
+    // A part that holds the shared answer sends no answer of its own: the
+    // box's share carries it.
+    if (row.inherited) {
+      edits.delete(rowKey(row));
+      return boxChanged;
+    }
+    return registerOwn(row) || boxChanged;
+  };
+  const registerOwn = (row) => {
     const key = rowKey(row);
     const answer = row.read();
     if (!answer || sameAnswer(answer, row.saved)) {
@@ -644,7 +686,7 @@
   // Drawn by questionList, as every page that asks open facts draws them. A
   // job waiting at its pause takes "I don't know" over a known answer, so
   // every input offers it. Each row offers "Skip for now".
-  const { place, removeRow: unplace, drawOpen, drawSaved, drawAlone, button } = questionList({
+  const { place, removeRow: unplace, drawOpen, drawSaved, drawAlone, button, shareOf, restoreShares } = questionList({
     list,
     onEdit,
     inputFor,
@@ -743,6 +785,7 @@
       const edit = edits.get(key);
       if (edit && edit.conflict && !row.conflict) showConflict(row, edit);
     }
+    restoreShares(data.answered_shares || [], (key) => edits.has(key));
     drawIntro(data);
     drawTail(data);
     drawBoxes(data);
@@ -920,6 +963,7 @@
   // "Answer it" and "Change" build an editor only when pressed.
   const drawBoxes = (data) => {
     const held = answersOf(data);
+    const covered = sharedKeys(data.answered_shares || []);
     // A question the list holds, compact or open, is not drawn in a box too.
     const inList = (key) => {
       const row = rows.get(key);
@@ -934,6 +978,8 @@
       const kept = document.createElement("span");
       if (before) {
         kept.textContent = ` — ${kind === "link" ? linkAnswerText(before) : answerText(before)}`;
+        // Changing it here makes it this part's own answer (ADR 0114).
+        if (covered.has(key)) kept.textContent += " (shared answer)";
       }
       row.append(kept);
       const open = button(before ? "Change" : "Answer it", () => {

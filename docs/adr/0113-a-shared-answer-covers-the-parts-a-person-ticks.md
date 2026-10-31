@@ -52,10 +52,8 @@ the parts spends 123 choices and over-claims none. An owner who shares and
 then corrects each part that differs would spend 70. These are offline counts
 over a corpus; the live effect on owners is unmeasured.
 
-The service still stores each part's answer as its own answer. A reload, a
-resume, the API and the export do not keep which parts a shared answer
-covered. The next step of package 2 stores the coverage, its origin and its
-exceptions.
+The service stores the parts a shared answer covers
+([ADR 0114](0114-a-shared-answer-is-stored-with-the-parts-it-covers.md)).
 
 ## Evidence
 
