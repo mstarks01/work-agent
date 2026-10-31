@@ -11,12 +11,12 @@ from analysis_service.answer_bodies import read_answers
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import Answers
 from analysis_service.carried_renames import ElementRename, renamed
-from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.fact_writes import capability_statements
 from evals.harness.early_rounds import paused_state
 from tests.test_answer_shares import MODEL, STORE
 from tests.test_api import auth, submission
+from tests.test_evals_early_answerers import _capability
 from tests.test_links import catalog_client
 from tests.test_pause import waiting
 
@@ -184,14 +184,10 @@ class TestADependentAnswer:
     """A changed parent takes back only the carried answers under it
     (#2029 package 7): the sign-in parts go, and an unrelated answer stays."""
 
-    @staticmethod
-    def _capability(name: str, value: str) -> FactAnswer:
-        return FactAnswer(key=UnknownRef(capability=name).key, value=value)
-
     def _carried(self) -> AnswerSet:
         return AnswerSet(
             facts=tuple(
-                self._capability(name, "yes")
+                _capability(name, "yes")
                 for name in (
                     "authentication",
                     "password-authentication",
@@ -210,7 +206,7 @@ class TestADependentAnswer:
         state = replace(
             base,
             carried_in=self._carried(),
-            answers=AnswerSet(facts=(self._capability("authentication", "no"),)),
+            answers=AnswerSet(facts=(_capability("authentication", "no"),)),
         )
         assert self._names(state.carried.taken) == ["file-upload"]
         assert self._names(state.carried.dropped) == [
@@ -219,7 +215,7 @@ class TestADependentAnswer:
         ]
 
     def test_sources_that_state_the_change_take_them_back_too(self):
-        no = self._capability("authentication", "no")
+        no = _capability("authentication", "no")
         stated = MODEL.model_copy(
             update={"capabilities": capability_statements(MODEL.capabilities, [no])}
         )
