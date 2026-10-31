@@ -154,6 +154,9 @@ evals/
     facts.json                  the reference facts, per predicate; a draft until signed (14 cases signed)
     rulings.json                other readings a person ruled answer a STRIDE claim (optional)
     case.json                   metadata, provenance, and the declared sources
+  build_diagrams.py             writes diagrams/ from each case's model.json
+  diagrams/<NN>-<slug>.mmd      each case's blessed model as Mermaid text, as
+                                `diagram` source input (generated, never hand-edit)
   calibration_labels/
     build_pairs.py              the match fixtures and their labels (edit this)
     pairs.json                  generated from build_pairs.py (never hand-edit)

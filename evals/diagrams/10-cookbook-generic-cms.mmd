@@ -1,0 +1,22 @@
+flowchart LR
+    subgraph z0["Trust zone: Public internet"]
+        n0["Reader"]
+        n1["Admin"]
+    end
+    subgraph z1["Trust zone: Hosted network"]
+        n3("Web server")
+        n4[("MySQL database")]
+    end
+    subgraph z2["Trust zone: CDN"]
+        n2["CDN"]
+        n5[("CDN bucket")]
+    end
+    n0 -->|"Page requests (HTTPS)"| n3
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n0 -->|"Asset fetch (HTTP)"| n2
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n3 -->|"CMS data (MySQL)"| n4
+    n3 -->|"Asset publish"| n5
+    linkStyle 3 stroke:#c0392b,stroke-width:2px
+    n1 -->|"Direct administration (MySQL)"| n4
+    linkStyle 4 stroke:#c0392b,stroke-width:2px

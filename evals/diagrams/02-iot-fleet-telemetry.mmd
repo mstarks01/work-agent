@@ -1,0 +1,30 @@
+flowchart LR
+    subgraph z0["Trust zone: field network"]
+        n0["sensor node"]
+        n1["field technician"]
+    end
+    subgraph z1["Trust zone: ingest edge"]
+        n3("device gateway")
+        n5[("device registry")]
+        n7[("firmware bucket")]
+        n8[("Pub/Sub")]
+    end
+    subgraph z2["Trust zone: analytics core"]
+        n4("telemetry normalizer")
+        n6[("telemetry lake")]
+    end
+    subgraph z3["Trust zone: corporate network"]
+        n2["fleet operator"]
+    end
+    n0 -->|"publish readings (MQTT)"| n3
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n3 -->|"look up device (Firestore API)"| n5
+    n4 -->|"load readings (BigQuery API)"| n6
+    n0 -->|"poll firmware (HTTPS)"| n7
+    linkStyle 3 stroke:#c0392b,stroke-width:2px
+    n1 -->|"local service session (local serial console)"| n0
+    n2 -->|"query dashboards (BigQuery API)"| n6
+    linkStyle 5 stroke:#c0392b,stroke-width:2px
+    n3 -->|"forward readings"| n8
+    n4 -->|"pick up readings"| n8
+    linkStyle 7 stroke:#c0392b,stroke-width:2px

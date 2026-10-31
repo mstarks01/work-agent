@@ -1,0 +1,26 @@
+flowchart LR
+    subgraph z0["Trust zone: Customer device"]
+        n0["Customer"]
+        n1("Mobile app")
+    end
+    subgraph z1["Trust zone: Sokify internal systems"]
+        n2("Web API")
+        n3("SIMS")
+        n4("Fax gateway")
+        n6[("User database")]
+        n7[("Delivery address flat file")]
+    end
+    subgraph z2["Trust zone: Marketing office"]
+        n5("Catalogue spreadsheet")
+    end
+    n0 -->|"Browse and order"| n1
+    n1 -->|"API traffic (HTTP)"| n2
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n5 -->|"SQL statements (SQL statements over an unstated transport)"| n2
+    linkStyle 2 stroke:#c0392b,stroke-width:2px
+    n2 -->|"Customer records"| n6
+    n2 -->|"Order handover"| n3
+    n3 -->|"Address write"| n7
+    n3 -->|"Dispatch note"| n4
+    n4 -->|"Confirmation fax (fax)"| n0
+    linkStyle 7 stroke:#c0392b,stroke-width:2px

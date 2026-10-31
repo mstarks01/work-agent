@@ -1,0 +1,22 @@
+flowchart LR
+    subgraph z0["Trust zone: public internet"]
+        n0["browser"]
+    end
+    subgraph z1["Trust zone: web tier"]
+        n1("web application")
+        n5[("web application config")]
+    end
+    subgraph z2["Trust zone: backend tier"]
+        n2("background worker process")
+        n3[("message queue")]
+        n4[("database")]
+        n6[("worker config")]
+    end
+    n0 -->|"page request (HTTP/S)"| n1
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n1 -->|"enqueue job"| n3
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n2 -->|"consume job"| n3
+    n2 -->|"read write records"| n4
+    n1 -->|"read configuration"| n5
+    n2 -->|"read configuration"| n6

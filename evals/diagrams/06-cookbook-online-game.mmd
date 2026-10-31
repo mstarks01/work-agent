@@ -1,0 +1,27 @@
+flowchart LR
+    subgraph z0["Trust zone: player local machine"]
+        n0["player"]
+        n2("game client")
+    end
+    subgraph z1["Trust zone: corporate network"]
+        n1["customer support staff"]
+    end
+    subgraph z2["Trust zone: production network"]
+        n3("lobby")
+        n4("game server")
+        n5("moderation website")
+        n6[("player database")]
+        n7[("stats database")]
+    end
+    n0 -->|"launch and play (local)"| n2
+    n2 -->|"matchmaking (TCP 1234)"| n3
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n2 -->|"gameplay traffic (TCP 1235)"| n4
+    linkStyle 2 stroke:#c0392b,stroke-width:2px
+    n3 -->|"hand over match"| n4
+    n3 -->|"read players"| n6
+    n4 -->|"read write stats"| n7
+    n4 -->|"update players"| n6
+    n1 -->|"moderate accounts"| n5
+    linkStyle 7 stroke:#c0392b,stroke-width:2px
+    n5 -->|"read write players"| n6

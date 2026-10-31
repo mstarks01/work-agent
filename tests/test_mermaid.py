@@ -20,16 +20,16 @@ HOSTILE = (
 def test_each_zone_is_a_subgraph_and_each_kind_its_shape():
     assert model_mermaid(valid_model()) == (
         "flowchart LR\n"
-        '    subgraph z0["Internet"]\n'
+        '    subgraph z0["Trust zone: Internet"]\n'
         '        n0["Customer"]\n'
         "    end\n"
-        '    subgraph z1["Internal Network"]\n'
+        '    subgraph z1["Trust zone: Internal Network"]\n'
         '        n1("Web App")\n'
         '        n2[("Orders DB")]\n'
         "    end\n"
-        '    n0 -->|"Login"| n1\n'
+        '    n0 -->|"Login (HTTPS)"| n1\n'
         "    linkStyle 0 stroke:#c0392b,stroke-width:2px\n"
-        '    n1 -->|"Store Order"| n2\n'
+        '    n1 -->|"Store Order (Postgres wire protocol)"| n2\n'
     )
 
 
@@ -39,6 +39,12 @@ def test_an_unplaced_element_sits_outside_every_zone_and_its_flow_may_cross():
     text = model_mermaid(model)
     assert '\n    n2[("Orders DB")]\n' in text
     assert "    linkStyle 1 stroke-dasharray:3 3\n" in text
+
+
+def test_a_flow_with_no_stated_protocol_shows_its_name_alone():
+    model = valid_model().model_copy(deep=True)
+    model.data_flows[0].protocol = UNKNOWN
+    assert '    n0 -->|"Login"| n1\n' in model_mermaid(model)
 
 
 def test_a_model_with_no_element_writes_nothing():
@@ -54,7 +60,7 @@ def test_a_submitted_name_stays_inside_its_label():
     model.data_flows[0].name = HOSTILE
     text = model_mermaid(model)
     labels = re.findall(r'"([^"]*)"', text)
-    hostile = [label for label in labels if label.startswith("end#34;")]
+    hostile = [label for label in labels if "end#34;" in label]
     assert len(hostile) == 3
     for label in hostile:
         assert not set(label) & set("<>`|&%"), label

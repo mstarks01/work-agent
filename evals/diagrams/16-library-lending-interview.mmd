@@ -1,0 +1,21 @@
+flowchart LR
+    subgraph z0["Trust zone: internet"]
+        n0["member"]
+        n3("library app")
+    end
+    subgraph z1["Trust zone: branch network"]
+        n1["desk staff"]
+        n4("self-service kiosk")
+    end
+    subgraph z2["Trust zone: council data centre"]
+        n2("lending API")
+        n5[("loans database")]
+    end
+    n0 -->|"borrow, renew and reserve"| n3
+    n3 -->|"loan and reservation requests"| n2
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n4 -->|"record loans and returns"| n2
+    linkStyle 2 stroke:#c0392b,stroke-width:2px
+    n1 -->|"change loans by hand"| n2
+    linkStyle 3 stroke:#c0392b,stroke-width:2px
+    n2 -->|"read and write loans"| n5
