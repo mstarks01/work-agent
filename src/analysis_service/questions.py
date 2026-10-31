@@ -166,7 +166,9 @@ def choices_of(key: UnknownKey) -> int:
 
 
 def _by_band(
-    open_facts: Mapping[Finding, AbstractSet[UnknownKey]], band: Mapping[Finding, int]
+    open_facts: Mapping[Finding, AbstractSet[UnknownKey]],
+    band: Mapping[Finding, int],
+    needed: Mapping[Finding, Mapping[UnknownKey, tuple[str, ...]]] | None = None,
 ) -> list[UnknownKey]:
     """The facts in the order that serves the most important findings first.
 
@@ -175,12 +177,18 @@ def _by_band(
     of that band, the next is the one that completes the most of them, then
     the most in each band below. Where none does, the next are the facts of
     that band's finding with the fewest choices left, the most cited first,
-    asked together. A lower band never comes before a higher one that still
+    asked together. A finding's choices are the facets it needs of each fact
+    (``needed``, ADR 0073), or every facet where it names none (ADR 0112). A lower band never comes before a higher one that still
     waits: a critical finding that waits on two facts comes before a low one
     that waits on one. A tie goes to more citations, then to the lower key,
     so one input always gives one order (``QA-2026-09-26-03-E35``).
     """
     left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
+    needed = needed or {}
+
+    def choices(finding: Finding, key: UnknownKey) -> int:
+        return len(needed.get(finding, {}).get(key, ())) or choices_of(key)
+
     order: list[UnknownKey] = []
     while left:
         cites = Counter(key for keys in left.values() for key in keys)
@@ -203,12 +211,16 @@ def _by_band(
                 )
             ]
         else:
-            nearest = min(
-                (keys for finding, keys in left.items() if band[finding] == top),
-                key=lambda keys: (
-                    sum(choices_of(key) for key in keys),
-                    len(keys),
-                    sorted(keys),
+            _, nearest = min(
+                (
+                    (finding, keys)
+                    for finding, keys in left.items()
+                    if band[finding] == top
+                ),
+                key=lambda pair: (
+                    sum(choices(pair[0], key) for key in pair[1]),
+                    len(pair[1]),
+                    sorted(pair[1]),
                 ),
             )
             chosen = sorted(nearest, key=lambda key: (-cites[key], key))
@@ -334,7 +346,7 @@ def follow_up_order(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
     order, and 42% more at ten (``QA-2026-09-26-03-E35``).
     """
     band = {finding: each.order for finding, each in needs.bands.items()}
-    first = _by_band(needs.waiting, band)
+    first = _by_band(needs.waiting, band, needs.facets)
     asked = set(first)
     rest = _by_band(
         {
@@ -346,6 +358,7 @@ def follow_up_order(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
             for finding in needs.bands
         },
         band,
+        needs.facets,
     )
     grounded = {key for keys in needs.evidence.values() for key in keys}
     return [

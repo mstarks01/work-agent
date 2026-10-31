@@ -4150,6 +4150,61 @@ await box.all("button").find(b => b.textContent === "Save draft").listeners.clic
         ]
 
 
+class TestThePageAndTheServiceCoverAlike:
+    """The report page's count of covered findings and the follow-up's
+    waiting findings are two readers of one rule (ADR 0073, ADR 0112): each
+    mix of answers is put to both."""
+
+    FINDINGS = ("stride/D-01", "stride/D-02", "stride/D-03")
+
+    @pytest.mark.parametrize("rate", ["", "yes", "unknown"])
+    @pytest.mark.parametrize("size", ["", "yes", "unknown"])
+    def test_each_mix_of_answers_covers_the_same_findings(self, rate, size):
+        from analysis_service.claims import UnknownRef
+        from analysis_service.questions import follow_up_needs
+        from tests.factories import asking_threat, sample_analysis
+
+        store = valid_model().data_stores[0]
+        question = TestTheFacetsAPageAsks().question(store, "stride/D-01", [])
+        question |= {
+            "findings": list(self.FINDINGS),
+            "needs": {"stride/D-01": ["size"], "stride/D-02": ["rate", "size"]},
+            "asks": ["rate", "size", "concurrency", "quota"],
+        }
+        payloads = TestTheFacetsAPageAsks().payloads(question)
+        steps = f"""
+const [rate, size] = box.all("select");
+rate.value = {json.dumps(rate)}; rate.listeners.change();
+size.value = {json.dumps(size)}; size.listeners.change();
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({{ said: text(document.getElementById("question-actions")) }});
+"""
+        [page] = _run_answer_block(payloads, steps)["calls"]
+        said = re.search(r"every question for (\d+) of the 3", page["said"])
+        assert said, page["said"]
+
+        whole = UnknownRef(element_id=store.id, question="capacity-limits")
+        refs = {
+            "D-01": whole.model_copy(update={"facets": ["size"]}),
+            "D-02": whole.model_copy(update={"facets": ["rate", "size"]}),
+            "D-03": whole,
+        }
+        threats = [
+            asking_threat(ref).model_copy(update={"id": claim})
+            for claim, ref in refs.items()
+        ]
+        given = {
+            facet: value for facet, value in (("rate", rate), ("size", size)) if value
+        }
+        earlier = [FactAnswer(key=whole.key, facets=given)] if given else []
+        waiting = follow_up_needs(
+            [sample_analysis(threats)], valid_model(), None, earlier
+        ).waiting
+        served = sum(1 for claim in refs if ("stride", claim) not in waiting)
+        assert int(said[1]) == served
+
+
 class TestFacetNeedsAndDetails:
     """The report page counts a finding covered by the facets it needs, and
     both pages send a detail beside a closed answer (#1542 F6, ADR 0073)."""
