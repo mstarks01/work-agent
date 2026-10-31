@@ -1,0 +1,17 @@
+flowchart LR
+    shopper[Shopper]
+    processor[Card processor]
+    subgraph cloudrun[Cloud Run]
+        api[Storefront API]
+    end
+    subgraph core[Core network]
+        orders[Order service]
+    end
+    db[(orders-db)]
+    receipts[(Receipt archive)]
+
+    shopper -->|"browse, place orders"| api
+    api -->|"order (gRPC)"| orders
+    orders <-->|"orders, addresses, card-last-four"| db
+    orders -->|"receipt (TLS)"| receipts
+    processor -->|"payment settled webhook (POST)"| api

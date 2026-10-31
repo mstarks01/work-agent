@@ -1,0 +1,494 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "shopper",
+        "description": "shopper",
+        "assets": [],
+        "source_excerpt": "n0[\"shopper\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "card processor",
+        "description": "card processor",
+        "assets": [],
+        "source_excerpt": "n1[\"card processor\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "storefront API",
+        "description": "storefront API",
+        "assets": [
+          "business-critical-data",
+          "financial"
+        ],
+        "source_excerpt": "n2(\"storefront API\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:storefront-dmz",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:order-service",
+        "name": "order service",
+        "description": "order service",
+        "assets": [
+          "business-critical-data",
+          "financial"
+        ],
+        "source_excerpt": "n3(\"order service\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders db",
+        "description": "orders db",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4[(\"orders db\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "receipt archive",
+        "description": "receipt archive",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "n5[(\"receipt archive\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:shopper>process:storefront-api>place-order",
+        "name": "place order",
+        "description": "place order",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n0 -->|\"place order\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "name": "settlement webhook",
+        "description": "settlement webhook",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "n1 -->|\"settlement webhook\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:storefront-api>process:order-service>submit-order",
+        "name": "submit order",
+        "description": "submit order",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"submit order (gRPC)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "gRPC",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:orders-db>read-write-orders",
+        "name": "read write orders",
+        "description": "read write orders",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"read write orders\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:order-service>store:receipt-archive>append-receipt",
+        "name": "append receipt",
+        "description": "append receipt",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "n3 -->|\"append receipt\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone: public internet",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: public internet\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:storefront-dmz",
+        "name": "storefront dmz",
+        "description": "Trust zone: storefront dmz",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: storefront dmz\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:core-services",
+        "name": "core services",
+        "description": "Trust zone: core services",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: core services\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The shopper is a human external entity.",
+        "element_id": "entity:shopper",
+        "attribute": "kind",
+        "basis": "The node is named \"shopper\", which denotes a person acting as the shopper."
+      },
+      {
+        "assumption": "The card processor is an external system.",
+        "element_id": "entity:card-processor",
+        "attribute": "kind",
+        "basis": "The node is named \"card processor\", which denotes a processing system rather than a human actor."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "shopper",
+        "description": "shopper",
+        "assets": [],
+        "source_excerpt": "n0[\"shopper\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "card processor",
+        "description": "card processor",
+        "assets": [],
+        "source_excerpt": "n1[\"card processor\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "storefront API",
+        "description": "storefront API",
+        "assets": [
+          "business-critical-data",
+          "financial"
+        ],
+        "source_excerpt": "n2(\"storefront API\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:storefront-dmz",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:order-service",
+        "name": "order service",
+        "description": "order service",
+        "assets": [
+          "business-critical-data",
+          "financial"
+        ],
+        "source_excerpt": "n3(\"order service\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders db",
+        "description": "orders db",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4[(\"orders db\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "receipt archive",
+        "description": "receipt archive",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "n5[(\"receipt archive\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:core-services",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:shopper>process:storefront-api>place-order",
+        "name": "place order",
+        "description": "place order",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n0 -->|\"place order\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "name": "settlement webhook",
+        "description": "settlement webhook",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "n1 -->|\"settlement webhook\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:storefront-api>process:order-service>submit-order",
+        "name": "submit order",
+        "description": "submit order",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"submit order (gRPC)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "gRPC",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:order-service>store:orders-db>read-write-orders",
+        "name": "read write orders",
+        "description": "read write orders",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"read write orders\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:order-service>store:receipt-archive>append-receipt",
+        "name": "append receipt",
+        "description": "append receipt",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "n3 -->|\"append receipt\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone: public internet",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: public internet\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:storefront-dmz",
+        "name": "storefront dmz",
+        "description": "Trust zone: storefront dmz",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: storefront dmz\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:core-services",
+        "name": "core services",
+        "description": "Trust zone: core services",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: core services\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The shopper is a human external entity.",
+        "element_id": "entity:shopper",
+        "attribute": "kind",
+        "basis": "The node is named \"shopper\", which denotes a person acting as the shopper."
+      },
+      {
+        "assumption": "The card processor is an external system.",
+        "element_id": "entity:card-processor",
+        "attribute": "kind",
+        "basis": "The node is named \"card processor\", which denotes a processing system rather than a human actor."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

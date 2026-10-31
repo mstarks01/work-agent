@@ -1,0 +1,25 @@
+flowchart LR
+    subgraph corp[Corporate network]
+        dev[Developers]
+        git[Git server]
+        ctrl[Deploy controller]
+    end
+    subgraph build[Build environment]
+        runner[Build runner]
+        reg[(Image registry)]
+    end
+    subgraph internet[Internet]
+        pkgs[Public package registry]
+    end
+    subgraph stores[Store estate]
+        store[Store servers]
+    end
+
+    dev -->|push branches| git
+    git -->|"source (merge to main)"| runner
+    pkgs -->|dependencies| runner
+    runner -->|"push image (commit sha tag)"| reg
+    runner -->|set current release| ctrl
+    dev -->|manual rebuild of main| runner
+    store -->|"poll current release (retail WAN)"| ctrl
+    reg -->|"pull image (WAN)"| store
