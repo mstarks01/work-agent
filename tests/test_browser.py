@@ -500,7 +500,7 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
             "() => !document.querySelector('#status-elapsed').textContent.includes('· 0:00.')"
         )
         assert opened.is_hidden("#upload")
-        assert opened.locator("#transcript-file").is_disabled()
+        assert opened.locator("#upload-file").is_disabled()
         assert opened.locator(".configuration").count() == 0
         assert (
             opened.locator("#progress-panel")
@@ -1264,6 +1264,28 @@ def test_an_uploaded_transcript_alone_starts_an_analysis(page):
             "label": "Uploaded transcript",
             "text": "Ana: the web app talks to a database. — Ben: yes.",
         }
+    ]
+    page.wait_for_selector("#asked", state="visible")
+
+
+def test_an_uploaded_mermaid_file_starts_an_analysis_as_a_diagram(page):
+    """A ``.mmd`` file goes to ``/analyze`` as a ``diagram`` source, and the
+    server accepts it."""
+    page.locator('input[name="framework"]').first.check()
+    diagram = "flowchart LR\n    user[Customer] -->|HTTPS| app(Web App)\n"
+    with page.expect_file_chooser() as chosen:
+        page.click("#upload")
+    chosen.value.set_files(
+        {"name": "model.mmd", "mimeType": "text/plain", "buffer": diagram.encode()}
+    )
+    page.wait_for_selector("#diagram-note", state="visible")
+    assert page.inner_text("#diagram-name") == "model.mmd"
+    assert page.is_hidden("#transcript-note")
+    page.fill("#analysis-name", "Diagram analysis")
+    with page.expect_request("**/analyze") as posted:
+        page.click("#go")
+    assert posted.value.post_data_json["sources"] == [
+        {"kind": "diagram", "label": "Uploaded diagram", "text": diagram}
     ]
     page.wait_for_selector("#asked", state="visible")
 

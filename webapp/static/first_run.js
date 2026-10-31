@@ -58,60 +58,65 @@
     }
   });
 
-  // A voice transcript, checked here so that only text leaves the page. The
-  // server never receives the file: the body carries the decoded text as a
-  // JSON string, as it does for a pasted description, so no file name, content
-  // type or multipart body reaches the server. The checks run before the text
-  // is kept, cheapest first: the size before a byte is read, then a strict
-  // UTF-8 decode, then no control character other than a tab or a line break.
-  // A refused file leaves the transcript the page holds as it was.
-  const transcriptFile = document.getElementById("transcript-file");
-  const transcriptNote = document.getElementById("transcript-note");
-  const maxTranscriptBytes = Number(transcriptFile.dataset.maxBytes);
+  // An uploaded transcript or diagram, checked here so that only text leaves
+  // the page. The server never receives the file: the body carries the decoded
+  // text as a JSON string, as it does for a pasted description, so no file
+  // name, content type or multipart body reaches the server. The checks run
+  // before the text is kept, cheapest first: the size before a byte is read,
+  // then a strict UTF-8 decode, then no control character other than a tab or
+  // a line break. A refused file leaves the uploads the page holds as they were.
+  // The file name's extension decides the kind: a Mermaid file is a diagram,
+  // and every other file is a transcript. The page holds one file of each kind.
+  const uploadFile = document.getElementById("upload-file");
+  const maxUploadBytes = Number(uploadFile.dataset.maxBytes);
   const maxDescriptionBytes = Number(box.dataset.maxBytes);
   const remainingNote = document.getElementById("description-remaining");
   const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/;
-  let transcript = null;
+  const DIAGRAM_FILE = /\.(mmd|mermaid)$/i;
+  const UPLOADS = {
+    transcript: { label: "Uploaded transcript", text: null },
+    diagram: { label: "Uploaded diagram", text: null },
+  };
+  const held = () => Object.entries(UPLOADS).filter(([, upload]) => upload.text !== null);
   const updateDescriptionRemaining = () => {
-    const used = new TextEncoder().encode(box.value).length
-      + new TextEncoder().encode(transcript || "").length;
+    const used = [box.value, ...held().map(([, upload]) => upload.text)]
+      .reduce((sum, text) => sum + new TextEncoder().encode(text).length, 0);
     const remaining = maxDescriptionBytes - used;
     remainingNote.textContent = remaining < 0
-      ? "Description and transcript are too long. Shorten them to continue."
+      ? "The description and the uploaded files are too long. Shorten them to continue."
       : `Up to ${remaining.toLocaleString()} bytes remaining`;
     remainingNote.classList.toggle("field-error", remaining < 0);
     return remaining;
   };
   box.addEventListener("input", updateDescriptionRemaining);
   updateDescriptionRemaining();
-  const holdTranscript = (text, name) => {
-    transcript = text;
-    document.getElementById("transcript-name").textContent = name;
-    transcriptNote.hidden = text === null;
-    box.required = text === null;
+  const hold = (kind, text, name) => {
+    UPLOADS[kind].text = text;
+    document.getElementById(`${kind}-name`).textContent = name;
+    document.getElementById(`${kind}-note`).hidden = text === null;
+    box.required = !held().length;
     updateDescriptionRemaining();
   };
-  document.getElementById("upload").addEventListener("click", () => transcriptFile.click());
-  document.getElementById("transcript-remove").addEventListener(
-    "click", () => holdTranscript(null, ""),
-  );
-  transcriptFile.addEventListener("change", async () => {
-    const [file] = transcriptFile.files;
-    transcriptFile.value = "";
+  document.getElementById("upload").addEventListener("click", () => uploadFile.click());
+  Object.keys(UPLOADS).forEach(kind => document.getElementById(`${kind}-remove`)
+    .addEventListener("click", () => hold(kind, null, "")));
+  uploadFile.addEventListener("change", async () => {
+    const [file] = uploadFile.files;
+    uploadFile.value = "";
     if (!file) return;
-    if (file.size > maxTranscriptBytes) {
-      fail(`This file is larger than the ${maxTranscriptBytes} bytes that one analysis can carry.`);
+    if (file.size > maxUploadBytes) {
+      fail(`This file is larger than the ${maxUploadBytes} bytes that one analysis can carry.`);
       return;
     }
     let text;
     try {
       text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
     } catch {
-      fail("The page could not read this file as UTF-8 text. Upload a plain text transcript.");
+      fail("The page could not read this file as UTF-8 text. Upload a plain text file.");
       return;
     }
     if (CONTROL.test(text)) {
-      fail("This file holds control characters, so it is not a plain text transcript.");
+      fail("This file holds control characters, so it is not a plain text file.");
       return;
     }
     if (!text.trim()) {
@@ -119,18 +124,16 @@
       return;
     }
     problem.hidden = true;
-    holdTranscript(text, file.name);
+    hold(DIAGRAM_FILE.test(file.name) ? "diagram" : "transcript", text, file.name);
   });
 
-  // The description goes with a transcript only where it holds text, and
-  // always where there is no transcript, so the service says what is missing.
+  // The description goes with an upload only where it holds text, and always
+  // where there is no upload, so the service says what is missing.
   const sources = () => [
-    ...(box.value.trim() || transcript === null
+    ...(box.value.trim() || !held().length
       ? [{ kind: "description", label: "Pasted description", text: box.value }]
       : []),
-    ...(transcript === null
-      ? []
-      : [{ kind: "transcript", label: "Uploaded transcript", text: transcript }]),
+    ...held().map(([kind, upload]) => ({ kind, label: upload.label, text: upload.text })),
   ];
 
   // Nodes and strings, never markup. replaceChildren() inserts a string as a
@@ -178,7 +181,7 @@
       return;
     }
     if (updateDescriptionRemaining() < 0) {
-      fail("Description and transcript are too long. Shorten them to continue.");
+      fail("The description and the uploaded files are too long. Shorten them to continue.");
       return;
     }
 

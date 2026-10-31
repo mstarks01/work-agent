@@ -6,8 +6,9 @@ them. A transcript-only job is a one-element list with no special case, and so
 is a description-only job. There is no separate single-text path.
 
 ``kind`` is a closed vocabulary, and it is load-bearing: it selects the register
-:func:`render_sources` names around that source's text, so a new kind means a
-change to the extraction prompt and this enum together.
+:func:`render_sources` names around that source's text. A new kind needs a
+register, and a change to the extraction prompt where the register alone does
+not say how to read the text.
 
 ``label`` is the key a ``source_excerpt`` cites, which is what keeps the
 traceability chain intact across any number of sources — threat, then element,
@@ -46,8 +47,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from analysis_service.grounding import normalize
 
 # Closed and load-bearing: each kind names the register rendered around its
-# text. Adding one means editing prompts/extract.md in the same change.
-SourceKind = Literal["description", "transcript", "answers"]
+# text. A new kind needs a register in _REGISTERS, and an edit to
+# prompts/extract.md where the register alone does not say how to read it.
+SourceKind = Literal["description", "transcript", "diagram", "answers"]
 
 # What a caller gets when they use the convenience constructors rather than
 # naming a source themselves. The wire never defaults a label — an unnamed
@@ -122,10 +124,18 @@ def _carries_formatting(value: str) -> bool:
 
 # All that ``kind`` still selects: one phrase telling the model what register
 # the text below is in. It sits outside the fence, so it is this module's bytes
-# and never the caller's.
-_REGISTERS: dict[str, str] = {
+# and never the caller's. The diagram phrase also says how to read a diagram,
+# so a job with no diagram source sends the same prompt as before the kind.
+_REGISTERS: dict[SourceKind, str] = {
     "description": "a written description of the system",
     "transcript": "a transcribed conversation about the system",
+    "diagram": (
+        "a diagram of the system in Mermaid text. A node can be an element, and"
+        " an arrow can be a data flow in the direction of the arrow. A subgraph"
+        " is a trust zone only where its label says so. The shape of a node"
+        " states no attribute. An excerpt quotes the line of the diagram as"
+        " written"
+    ),
     "answers": "the submitter's answers to questions this service asked",
 }
 
