@@ -77,8 +77,46 @@ const questionList = ({
       row.exception = true;
       row.inherited = false;
       if (row.tick) row.tick.checked = false;
+      showCovers(row.box);
     }
     onEdit(row, event);
+  };
+  // The line beside a shared answer that says which parts it covers: each
+  // ticked part, and the parts the saved share covers that the box does not
+  // list (ADR 0114).
+  const showCovers = (box) => {
+    if (!box || !box.coverLine) return;
+    const members = box.rows.filter((row) => row.kind === "fact");
+    const listed = new Set(members.map((row) => row.q.key[0]));
+    const before = box.held ? box.held.covers.filter((element) => !listed.has(element)).length : 0;
+    const parts = [
+      ...members.filter((row) => row.inherited).map((row) => row.q.element),
+      ...(before ? [counted(before, "part answered before", "parts answered before")] : []),
+    ];
+    box.coverLine.textContent = parts.length
+      ? `This answer covers: ${parts.join(", ")}`
+      : "This answer covers no part yet.";
+  };
+  // Undo the last change of a shared answer: the answer before it, and each
+  // part it wrote as that part was. One step back.
+  const undoShared = (box) => {
+    const undo = box.undo;
+    if (!undo) return;
+    box.undo = null;
+    box.undoButton.hidden = true;
+    sharing = true;
+    try {
+      box.sharedSet(undo.shared || { value: "", facets: {} });
+      for (const { row, answer, inherited } of undo.rows) {
+        row.set(answer || { value: "", facets: {} });
+        row.inherited = inherited;
+      }
+    } finally {
+      sharing = false;
+    }
+    box.lastShared = undo.shared;
+    for (const { row } of undo.rows) onEdit(row);
+    showCovers(box);
   };
   // A part a person ticks takes the shared answer. Unticking it takes back
   // only what the shared answer wrote, so the part's own answer stays
@@ -99,6 +137,7 @@ const questionList = ({
     } finally {
       sharing = false;
     }
+    showCovers(box);
     onEdit(row, event);
   };
 
@@ -397,11 +436,13 @@ const questionList = ({
   // shared answer leaves alone. A capability asks about the whole
   // application, so it never shares.
   const applyShared = (box, write) => {
+    const undo = { shared: box.lastShared || null, rows: [] };
     sharing = true;
     try {
       for (const row of box.rows) {
         if (row.kind !== "fact" || row.compact || row.exception) continue;
         if (row.tick && !row.tick.checked) continue;
+        undo.rows.push({ row, answer: row.read(), inherited: row.inherited });
         write(row);
         row.inherited = true;
         edited(row);
@@ -409,6 +450,10 @@ const questionList = ({
     } finally {
       sharing = false;
     }
+    box.undo = undo;
+    box.lastShared = box.sharedAnswer();
+    if (box.undoButton) box.undoButton.hidden = false;
+    showCovers(box);
   };
   const sharedControl = (box, q) => {
     const line = document.createElement("p");
@@ -488,9 +533,17 @@ const questionList = ({
     hint.className = "hint";
     hint.textContent = "Tick each part this answer covers. A part left unticked keeps"
       + " its own answer, or none.";
+    if (!box.coverLine) {
+      box.coverLine = document.createElement("p");
+      box.coverLine.className = "share-covers";
+      box.coverLine.setAttribute("aria-live", "polite");
+      box.undoButton = button("Undo", () => undoShared(box));
+      box.undoButton.hidden = !box.undo;
+    }
     box.top.className = "shared-controls";
-    box.top.replaceChildren(box.shared, hint);
+    box.top.replaceChildren(box.shared, hint, box.coverLine, box.undoButton);
     for (const row of members) addTick(row);
+    showCovers(box);
   };
   // A part starts unticked: the same question does not prove that one control
   // covers every part (ADR 0113). A ticked part takes the shared answer.
@@ -604,14 +657,20 @@ const questionList = ({
       if (!box.shared || !members.length) continue;
       const key = shareKey(members[0].q.key);
       const share = held.get(key);
-      if (!share || pending(key)) continue;
+      box.held = share || null;
+      if (!share || pending(key)) {
+        showCovers(box);
+        continue;
+      }
       box.sharedSet(share.answer);
+      box.lastShared = share.answer;
       for (const row of members) {
         const covered = share.covers.includes(row.q.key[0]);
         row.inherited = covered;
         if (covered) row.exception = false;
         if (row.tick) row.tick.checked = covered;
       }
+      showCovers(box);
     }
   };
   // Each box's share that differs from the saved one, `baseOf(key)` by its

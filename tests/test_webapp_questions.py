@@ -2145,6 +2145,55 @@ await settle();
     ]
 
 
+def test_the_box_says_which_parts_its_answer_covers():
+    """The line beside the shared answer names each ticked part, and follows
+    a tick and an untick (ADR 0114)."""
+    first, second = valid_model().data_flows[:2]
+    facts = [_control_row(first), _control_row(second)]
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+const line = () => shared[0].children.find(c => c.className === "share-covers").textContent;
+calls.push({ line: line() });
+const t = child(rowsOf()[1], "input"); t.checked = true; t.listeners.change();
+calls.push({ line: line() });
+t.checked = false; t.listeners.change();
+calls.push({ line: line() });
+"""
+    )
+    lines = [c["line"] for c in _run_form_script(steps)["calls"] if "line" in c]
+    assert lines == [
+        "This answer covers no part yet.",
+        f"This answer covers: {second.name}",
+        "This answer covers no part yet.",
+    ]
+
+
+def test_undo_puts_back_the_shared_answer_and_each_part_it_wrote():
+    """Undo restores the answer before the last change, and each part it
+    wrote (ADR 0114)."""
+    first, second = valid_model().data_flows[:2]
+    facts = [_control_row(first), _control_row(second)]
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+const own = (r) => walk(r).find(c => c.tag === "select");
+for (const r of rowsOf()) { const t = child(r, "input"); t.checked = true; t.listeners.change(); }
+const state = child(shared[0].children[0], "select");
+state.value = "none"; state.listeners.change();
+const undo = shared[0].children.find(c => c.tag === "button" && c.textContent === "Undo");
+calls.push({ shown: !undo.hidden, rows: rowsOf().map(r => own(r).value) });
+await undo.listeners.click();
+calls.push({ shown: !undo.hidden, shared: state.value, rows: rowsOf().map(r => own(r).value) });
+"""
+    )
+    seen = [c for c in _run_form_script(steps)["calls"] if "shown" in c]
+    assert seen == [
+        {"shown": True, "rows": ["none", "none"]},
+        {"shown": False, "shared": "", "rows": ["", ""]},
+    ]
+
+
 def test_unticking_a_part_takes_back_only_the_shared_answer():
     """A part unticked after the shared answer reached it loses that value,
     and a part a person answered by hand after it keeps its own (ADR 0113)."""
@@ -4148,6 +4197,64 @@ await box.all("button").find(b => b.textContent === "Save draft").listeners.clic
                 "covers": ["process:worker", store.id],
             }
         ]
+
+
+class TestTheExportMarksASharedAnswer:
+    """The export prints an answer a share wrote as one shared answer, and a
+    corrected answer as the part's own (ADR 0114)."""
+
+    def text(self, payloads):
+        steps = """
+calls.push({ export: document.getElementById("export-questions").textContent });
+"""
+        [page] = _run_answer_block(payloads, steps)["calls"]
+        return page["export"]
+
+    def row(self, flow, corrected=False):
+        key = [flow.id, "encryption_in_transit", "", "", "", ""]
+        return _control_row(flow) | {
+            "answer": {"key": key, "value": "none"},
+            "corrected": corrected,
+        }
+
+    def share(self, *flows):
+        template = ["", "encryption_in_transit", "", "", "", ""]
+        return {
+            "answer": {"key": template, "value": "none"},
+            "covers": [flow.id for flow in flows],
+        }
+
+    def test_an_answer_the_report_read_is_marked_shared(self):
+        first, second = valid_model().data_flows[:2]
+        payloads = {
+            "report": {"system_model": valid_model().model_dump(mode="json")},
+            "link_questions": [],
+            "fact_questions": [],
+            "final": False,
+            "earlier": {
+                "answers": [self.row(first), self.row(second)],
+                "shares": [self.share(first, second)],
+                "draft": {"links": [], "facts": [], "shares": []},
+                "revision": 1,
+            },
+        }
+        assert self.text(payloads).count("One shared answer for 2 parts") == 2
+
+    def test_a_corrected_answer_is_its_part_s_own(self):
+        first, second = valid_model().data_flows[:2]
+        payloads = {
+            "report": {"system_model": valid_model().model_dump(mode="json")},
+            "link_questions": [],
+            "fact_questions": [],
+            "final": True,
+            "corrections": {
+                "answers": [self.row(first), self.row(second, corrected=True)],
+                "shares": [self.share(first, second)],
+                "findings": [],
+                "revision": 1,
+            },
+        }
+        assert self.text(payloads).count("One shared answer for 2 parts") == 1
 
 
 class TestFacetNeedsAndDetails:

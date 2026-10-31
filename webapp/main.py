@@ -150,6 +150,7 @@ from analysis_service.answer_forms import (
     answer_suggestions,
     facets_json,
 )
+from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import (
     ANSWER_LIMITS,
     AlreadyResumed,
@@ -957,7 +958,11 @@ def render_report(
         parent_run=script_json(parent),
         corrections=script_json(
             _corrections_payload(
-                report, state.answers.facts, state.corrections, state.revision
+                report,
+                state.answers.facts,
+                state.corrections,
+                state.revision,
+                state.answers.shares,
             )
             if state.final
             else {}
@@ -1059,11 +1064,14 @@ def _corrections_payload(
     answered: Sequence[FactAnswer],
     corrections: Sequence[FactAnswer],
     revision: int,
+    shares: Sequence[SharedAnswer],
 ) -> dict[str, object]:
     """A final report's answers as it is corrected in, what corrections reach,
-    and the revision a correction names (ADR 0090).
+    the shares its run read, and the revision a correction names (ADR 0090,
+    ADR 0114).
 
-    Each answer carries its current value with every correction in.
+    Each answer carries its current value with every correction in. A
+    corrected answer is its part's own, whatever share covered the part.
     """
     corrected = {fact.key for fact in corrections}
     answers = merged_facts(answered, corrections)
@@ -1074,6 +1082,7 @@ def _corrections_payload(
             for row, answer in zip(rows, answers, strict=True)
         ],
         "findings": list(corrected_findings(report.analyses, answered, corrections)),
+        "shares": [share.model_dump(mode="json") for share in shares],
         "revision": revision,
     }
 

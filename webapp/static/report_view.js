@@ -1992,6 +1992,11 @@
   // The rows the Questions section draws, under their group headings. An
   // earlier answer prints as its text; an open question prints its history
   // and the findings it informs.
+  // An answer a share wrote prints so, with how many parts the share covers
+  // (ADR 0114). A corrected answer is its part's own.
+  const sharesRead = FINAL ? (CORRECTIONS.shares || []) : [...SAVED_SHARES.values()];
+  const shareOfKey = new Map(sharesRead.flatMap(share => share.covers
+    .map(element => [questionKey([element, ...share.answer.key.slice(1)]), share])));
   const byGroup = new Map();
   ENTRIES.forEach(entry => {
     const group = entry.q.group_heading;
@@ -2005,6 +2010,8 @@
       item.append(el("b", null, kind === "link" ? q.principal : q.label));
       if (q.answer) {
         item.append(el("div", "meta", `Answer: ${kind === "link" ? linkAnswerText(q.answer) : answerText(q.answer)}`));
+        const share = kind === "fact" && !q.corrected && shareOfKey.get(questionKey(q.key));
+        if (share) item.append(el("div", "meta", `One shared answer for ${counted(share.covers.length, "part", "parts")}`));
       }
       item.append(...correctionNote(q));
       if (q.history) item.append(el("div", "meta", HISTORY[q.history] || q.history));
