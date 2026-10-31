@@ -168,7 +168,7 @@ def choices_of(key: UnknownKey) -> int:
 def _by_band(
     open_facts: Mapping[Finding, AbstractSet[UnknownKey]],
     band: Mapping[Finding, int],
-    needed: Mapping[Finding, Mapping[UnknownKey, tuple[str, ...]]] | None = None,
+    needed: Mapping[Finding, Mapping[UnknownKey, tuple[str, ...]]],
 ) -> list[UnknownKey]:
     """The facts in the order that serves the most important findings first.
 
@@ -184,7 +184,6 @@ def _by_band(
     so one input always gives one order (``QA-2026-09-26-03-E35``).
     """
     left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
-    needed = needed or {}
 
     def choices(finding: Finding, key: UnknownKey) -> int:
         return len(needed.get(finding, {}).get(key, ())) or choices_of(key)

@@ -128,7 +128,7 @@ class TestTheRanking:
         }
         waiting.update({("stride", f"S-{i}"): {key("D")} for i in range(9)})
 
-        order = _by_band(waiting, dict.fromkeys(waiting, 0))
+        order = _by_band(waiting, dict.fromkeys(waiting, 0), {})
 
         assert order[0] == key("D")
         assert order[1:] == [key("A"), key("B"), key("C")]
@@ -140,7 +140,7 @@ class TestTheRanking:
         waiting.update({("stride", f"L-{i}"): {key("Y")} for i in range(3)})
         band = {finding: 0 for finding in waiting} | {("stride", "C-1"): 3}
 
-        assert _by_band(waiting, band) == [key("X"), key("Y")]
+        assert _by_band(waiting, band, {}) == [key("X"), key("Y")]
 
     def test_with_nothing_to_complete_the_highest_band_s_facts_come_first(self):
         key = lambda name: ("", "", "", name, "", "")
@@ -151,7 +151,7 @@ class TestTheRanking:
         }
         band = {("stride", "low"): 0, ("stride", "high"): 2, ("stride", "also-high"): 2}
 
-        assert _by_band(waiting, band)[:1] == [key("B")]
+        assert _by_band(waiting, band, {})[:1] == [key("B")]
 
     def test_the_nearest_finding_counts_only_the_facets_it_needs(self):
         """A finding that needs one facet of a four-facet kind is nearer than
@@ -166,7 +166,7 @@ class TestTheRanking:
         band = dict.fromkeys(waiting, 0)
         needed = {("stride", "size"): {limits: ("size",)}}
 
-        every = set(_by_band(waiting, band)[:2])
+        every = set(_by_band(waiting, band, {})[:2])
         assert every == {audit, subject("B")}, "a control: every facet"
         assert set(_by_band(waiting, band, needed)[:2]) == {limits, subject("A")}
 
