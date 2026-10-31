@@ -9,7 +9,9 @@
   whose kinds it asks early
 - **Evidence**: `QA-2026-09-26-03-E5` and `-E13` in `evals/experiments/`
 - **Amended by**: [ADR 0049](0049-an-answer-binds-to-an-open-fact-and-the-order-completes-findings.md),
-  which keeps the prior as the eligibility rule and shares the open-fact rule
+  which keeps the prior as the eligibility rule and shares the open-fact rule;
+  [ADR 0115](0115-an-early-field-question-ranks-by-the-rules-that-read-its-fact.md),
+  where the order counts only the rules that read a question's fact
   with the answer check, and
   [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md), which keeps the
   prior's order and the prior as the eligibility rule, and breaks a tie
@@ -42,6 +44,10 @@ nothing. A question's score is the prior times one plus the candidates,
 summed over the job's frameworks. On 13 tuned cases, with the prior read
 from the other 12 cases, the first six questions a case settled 59% to 64% of
 what the report's own six settled, and the first ten 62% to 63%.
+
+> **Amended by [ADR 0115](0115-an-early-field-question-ranks-by-the-rules-that-read-its-fact.md).**
+> The floor reads the score, and the list ranks a field question by its
+> relevance: the same product with only the candidates whose rule reads the fact.
 
 **The list ranks a question by its score per choice** (amended 2026-10-01).
 A question answered in facets costs one choice a facet, so a table of four

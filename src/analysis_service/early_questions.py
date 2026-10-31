@@ -17,7 +17,16 @@ the report's own order settled, at six and at ten questions a case. The count
 cannot see the main reason to ask early: the lanes then write their findings
 with the answer in hand.
 
-**The list ranks a question by its score per choice.** A question answered in
+**Eligibility and order read two values** (ADR 0115). The floor reads the
+score, so every candidate on an element keeps a question eligible. The list
+ranks a field question by its relevance: the same product with only the
+candidates whose rule reads that fact (:func:`reads`). A candidate that reads
+another fact of the element does not move the question up. No rule reads a
+question kind, so a kind ranks by its prior alone. On the archive this order
+completed 12% to 14% more STRIDE findings than the score did at 10 and 15
+choices.
+
+**The list ranks a question by its relevance per choice.** A question answered in
 facets costs a choice a facet, so a table of four facets must score four
 times a one-choice question to come before it. Ranked by score alone, a
 STRIDE-only pause opened with tables, and a submitter's first ten choices
@@ -75,7 +84,7 @@ from analysis_service.answer_forms import (
     facets_json,
 )
 from analysis_service.assertions import AssertionCatalog
-from analysis_service.candidates import generate_candidates
+from analysis_service.candidates import Candidate, generate_candidates
 from analysis_service.capabilities import CAPABILITIES, lineage
 from analysis_service.claims import (
     FrameworkName,
@@ -116,6 +125,7 @@ __all__ = [
     "element_type",
     "framework_gates",
     "load_prior",
+    "reads",
     "waiting_parts",
 ]
 
@@ -246,17 +256,20 @@ class EarlyQuestion:
     group: str
     group_heading: str
     element: str
-    #: The value the list is ranked from. For a field, the prior's rate for the
-    #: field on the element's type times one plus the candidates the rules
-    #: raise on the element, summed over the frameworks: a ranking heuristic,
-    #: not a measured count of the findings an answer changes. For a
-    #: capability, how many units it could settle. The list ranks a field
-    #: question by this value per choice (:attr:`decisions`), capabilities
-    #: first; the recommended list takes its places with the frameworks in
-    #: turn (:func:`~analysis_service.answer_state.by_turn`). Within a turn a
-    #: capability ranks by its :attr:`standing`, and what an answer settles
-    #: (:mod:`analysis_service.answer_effects`) breaks a tie.
+    #: The value the floor reads. For a field, the prior's rate for the field
+    #: on the element's type times one plus the candidates the rules raise on
+    #: the element, summed over the frameworks: a heuristic, not a measured
+    #: count of the findings an answer changes. For a capability, how many
+    #: units it could settle. The recommended list takes its places with the
+    #: frameworks in turn (:func:`~analysis_service.answer_state.by_turn`).
+    #: Within a turn a capability ranks by its :attr:`standing`, and what an
+    #: answer settles (:mod:`analysis_service.answer_effects`) breaks a tie.
     score: float = 0.0
+    #: For a field, the value the list ranks it by, per choice
+    #: (:attr:`decisions`): :attr:`score` with only the candidates whose rule
+    #: reads the field (:func:`reads`). A question kind takes the prior alone.
+    #: Zero for every other question.
+    relevance: float = 0.0
     #: The key of the question this one depends on: a capability's parent,
     #: whose "no" makes this one moot. ``None`` for every other question.
     parent: UnknownKey | None = None
@@ -372,8 +385,29 @@ def early_questions(
             json.dumps(sorted(assume)),
         ),
         lambda: _early_questions(model, frameworks, catalog, prior, assume),
-        held=(prior, PACKAGES),
+        held=(prior, PACKAGES, reads),
     )
+
+
+#: The candidate facts that name a field by another name: the zone of either
+#: end of a flow is that end's ``trust_zone``.
+ZONE_FACTS = frozenset({"source_zone", "destination_zone"})
+
+
+def reads(candidate: Candidate, field: str) -> bool:
+    """Whether ``candidate``'s rule read ``field`` on the elements it names.
+
+    **The one reader of the facts a candidate reads.** A rule reads each fact
+    it names, the ``trust_zone`` of a flow's end where it names that end's
+    zone, and the attribute it names where it reads a named attribute. No rule
+    names a question kind, so a kind is never read.
+    """
+    read = set(candidate.facts)
+    if read & ZONE_FACTS:
+        read.add("trust_zone")
+    if "attribute" in candidate.facts:
+        read.add(str(candidate.facts["attribute"]))
+    return field in read
 
 
 def _early_questions(
@@ -406,49 +440,51 @@ def _early_questions(
     deciding = _gate_questions(model, gates, catalog, names)
     decided = {question.key for question in deciding}
     score: dict[UnknownKey, float] = {}
+    relevance: dict[UnknownKey, float] = {}
     helps: dict[UnknownKey, list[FrameworkName]] = {}
-    reasons: dict[tuple[str, str], list[str]] = {}
+    reasons: dict[UnknownKey, list[str]] = {}
     for name in runnable:
         package = PACKAGES[name]
         asks = {rule.rule_id: rule.question for rule in package.rules}
-        named: Counter[str] = Counter()
+        named: dict[str, list[Candidate]] = {}
         for lane, found in generate_candidates(
             model, package.lanes, package.rules, catalog
         ).items():
             if package.record.idle(model, frameworks[name], lane):
                 continue
             for candidate in found.candidates:
-                named.update(set(candidate.element_ids))
-                for element_id in candidate.element_ids:
-                    for field in candidate.facts:
-                        said = reasons.setdefault((element_id, field), [])
-                        if asks[candidate.rule_id] not in said:
-                            said.append(asks[candidate.rule_id])
+                for element_id in set(candidate.element_ids):
+                    named.setdefault(element_id, []).append(candidate)
         for element in model.elements():
             rates = prior[name].rates.get(element_type(element), {})
             for field, rate in rates.items():
                 key = _open_key(model, element, field)
-                if key is not None and key not in decided:
-                    score[key] = score.get(key, 0.0) + rate * (1 + named[element.id])
-                    helps.setdefault(key, []).append(name)
-    asked = []
-    for key, value in score.items():
-        ref = key_ref(key)
-        asked.append(
-            _question(
-                key,
-                model,
-                catalog,
-                names,
-                reasons=tuple(
-                    reasons.get((ref.element_id, ref.attribute), ()) or (PRIOR_REASON,)
-                ),
-                frameworks=tuple(helps[key]),
-                score=value,
-            )
+                if key is None or key in decided:
+                    continue
+                on_element = named.get(element.id, [])
+                reading = [one for one in on_element if reads(one, field)]
+                score[key] = score.get(key, 0.0) + rate * (1 + len(on_element))
+                relevance[key] = relevance.get(key, 0.0) + rate * (1 + len(reading))
+                helps.setdefault(key, []).append(name)
+                said = reasons.setdefault(key, [])
+                for candidate in reading:
+                    if asks[candidate.rule_id] not in said:
+                        said.append(asks[candidate.rule_id])
+    asked = [
+        _question(
+            key,
+            model,
+            catalog,
+            names,
+            reasons=tuple(reasons[key]) or (PRIOR_REASON,),
+            frameworks=tuple(helps[key]),
+            score=value,
+            relevance=relevance[key],
         )
+        for key, value in score.items()
+    ]
     asked.sort(
-        key=lambda question: (-question.score / question.decisions, question.key)
+        key=lambda question: (-question.relevance / question.decisions, question.key)
     )
     return (*deciding, *capability_questions(model, runnable), *asked)
 
@@ -462,6 +498,7 @@ def _question(
     reasons: tuple[str, ...],
     frameworks: tuple[FrameworkName, ...],
     score: float = 0.0,
+    relevance: float = 0.0,
     gates: tuple[FrameworkName, ...] = (),
 ) -> EarlyQuestion:
     """One early question about an element's fact, with the form its answer takes."""
@@ -482,6 +519,7 @@ def _question(
         group_heading=heading,
         element=names.get(ref.element_id, ref.element_id),
         score=score,
+        relevance=relevance,
         gates=gates,
     )
 
