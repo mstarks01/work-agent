@@ -790,6 +790,7 @@
       if (edit && edit.conflict && !row.conflict) showConflict(row, edit);
     }
     restoreShares(data.answered_shares || [], (key) => edits.has(key));
+    openFirstBatch();
     drawIntro(data);
     drawCarried(data);
     drawTail(data);
@@ -862,6 +863,19 @@
     }
     // What the pause leaves open (PauseSummary): never "everything is settled".
     const summary = data.early_summary;
+    // What the list asks now, and what an answer can still add. An answer can
+    // raise either count, so the line names no total (PauseSummary).
+    if (summary && left && summary.recommended) {
+      const now = document.createElement("p");
+      now.className = "hint list-progress";
+      now.textContent = `${counted(summary.recommended, "question is", "questions are")} in the list,`
+        + ` with ${counted(summary.recommended_choices, "choice", "choices")} to make.`
+        + (summary.blocked
+          ? ` ${counted(summary.blocked, "more question waits", "more questions wait")} on an answer`
+            + " in the list, so your answers can add questions."
+          : "");
+      intro.append(now);
+    }
     if (summary) {
       const open = [];
       const count = (n, one, many, text) => { if (n) open.push(`${counted(n, one, many)} ${text}`); };
@@ -895,6 +909,29 @@
       }
     }
   };
+  // ---- First batch -------------------------------------------------------
+  // A new pause opens its boxes in the list's order until the open boxes hold
+  // FIRST_BATCH choices, once, and leaves the rest closed with their counts.
+  // A prototype (#2029 package 8): owner testing (#1286) decides the size. It
+  // hides no row, so a skip, "no to the rest" and the questions recorded as
+  // shown read the same rows as before.
+  const FIRST_BATCH = 3;
+  let batchOpened = false;
+  const openFirstBatch = () => {
+    if (batchOpened) return;
+    const opened = new Set();
+    let choices = 0;
+    for (const node of list.children) {
+      if (choices >= FIRST_BATCH) break;
+      const held = [...rows.values()].filter((row) => row.box && row.box.node === node);
+      if (!held.length) continue;
+      node.open = true;
+      opened.add(node);
+      choices += held.reduce((sum, row) => sum + ((row.q.facets || []).length || 1), 0);
+    }
+    batchOpened = opened.size > 0;
+  };
+
   // ---- Carried answers ----------------------------------------------------
   // Answers this run carried from an earlier one and could not take
   // (AnswerState.carried, ADRs 0072 and 0079). An answer about a part this
@@ -1148,6 +1185,7 @@
       edits.clear();
       list.replaceChildren();
       tailDrawn = false;
+      batchOpened = false;
       tail.replaceChildren();
       view = null;
     }

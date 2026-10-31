@@ -1593,10 +1593,14 @@ def _tab_to(page, reached: str, limit: int = 400) -> None:
 
 
 def test_a_keyboard_answers_skips_and_starts_with_no_pointer(page):
-    """Enter opens a group, Tab reaches each control, an arrow key answers,
-    and Enter skips and starts (#1632)."""
+    """Enter closes and opens a group, Tab reaches each control, an arrow key
+    answers, and Enter skips and starts (#1632). The first group starts open
+    (#2029 package 8)."""
     pause(page, opened=False)
     _tab_to(page, "active.matches('.question-group > summary')")
+    assert page.evaluate("document.activeElement.parentElement.open")
+    page.keyboard.press("Enter")
+    assert not page.evaluate("document.activeElement.parentElement.open")
     page.keyboard.press("Enter")
     assert page.evaluate("document.activeElement.parentElement.open")
     _tab_to(

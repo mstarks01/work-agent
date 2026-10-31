@@ -413,8 +413,12 @@ The app can ask you questions before the analysis, and after the report.
   under **Your answers**, marked "(shared answer)"; change it there to give
   that part its own answer. The help
   also quotes the words of your description that the part was read
-  from. A line at the top explains that your answers can add questions as well as remove
-  them, and the page says when they do. Each answer is saved as you give
+  from. A line at the top says how many questions the list holds, how many
+  choices they take, and how many more questions wait on an answer in the
+  list, because your answers can add questions as well as remove them. The
+  page says when they do. The first groups of the list open, up to three
+  choices; the other groups stay closed and show how many questions each
+  holds. A group you close stays closed. Each answer is saved as you give
   it: a chosen option at once, typed text a moment after you stop. The line
   near the question guidance says **Not saved** when a save fails, and **Save
   now** sends again what a lost connection left unsaved. If you leave the page
