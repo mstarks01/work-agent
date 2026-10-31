@@ -54,9 +54,11 @@ shipped order completes 2,029 findings instead of 1,957, and at 20 choices
 4,213 instead of 4,038. ASVS reports do not change. These are counts of
 dependency sets, not of findings that an answer changes.
 
-The follow-up order (`follow_up_order`) still charges every facet when it
-compares the findings nearest to completion. Package 5 of #2029 holds the
-ranking.
+The follow-up order (`follow_up_order`) charges a finding the facets it needs
+when it compares the findings nearest to completion. Over the same 273 STRIDE
+reports this moved the completed findings by at most two at any budget (2,029
+to 2,031 at 5 choices, 4,213 to 4,212 at 20), and ASVS did not move: the
+order reads the same facets as the page, with no measured gain.
 
 The live effect on owners is unmeasured. Source-to-facet binding (#1347) stays
 deferred: a facet that a source states is not shown as known.
@@ -64,4 +66,7 @@ deferred: a facet that a source states is not shown as known.
 ## Evidence
 
 `TestTheFacetsAPageAsks` in `tests/test_facet_dependencies.py` and in
-`tests/test_webapp_questions.py`.
+`tests/test_webapp_questions.py`, `TestThePageAndTheServiceCoverAlike` in
+`tests/test_webapp_questions.py`, and
+`test_the_nearest_finding_counts_only_the_facets_it_needs` in
+`tests/test_questions.py`.
