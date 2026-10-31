@@ -493,10 +493,16 @@ one. With the `memory` store, a restart of the app loses it.
 **Reuse the answers of an earlier analysis.** With questions on, choose an
 earlier analysis under **Reuse answers from**, then click **Prepare
 analysis**. The new analysis takes each earlier answer that one of its own
-questions still asks. It lists the other answers as answers that do not fit
-this system model. An answer about a part of your system carries only where
-the new description gives that part the same name. The list shows each
-analysis that the app holds. With the `memory` store, a restart clears it.
+questions still asks. An answer about a part of your system carries where the
+new description gives that part the same name. Where the new system model
+does not have the part, the page lists its answers under the part's earlier
+ID. If the part now has another name, choose it from the list beside them and
+click **Keep these answers**. The answers then belong to that part, and so do
+the answers about its connections. **Undo** takes the choice back. The app
+never matches a part by a similar name. The page lists each other answer it
+does not keep, because this system model states the fact or does not ask it.
+The list under **Reuse answers from** shows each analysis that the app holds.
+With the `memory` store, a restart clears it.
 
 ## Next steps
 

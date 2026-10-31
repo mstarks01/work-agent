@@ -29,6 +29,12 @@ from pathlib import Path
 import pytest
 
 from analysis_service.assertions import ABSENT, Assertion, AssertionCatalog, Subject
+from analysis_service.jobs import Checkpoint, PipelineAwaiting
+from analysis_service.system_model import (
+    SystemModel,
+    derive_element_id,
+    make_element_id,
+)
 from tests import test_webapp_questions as web
 
 tiers = web.tiers
@@ -348,6 +354,87 @@ def test_a_new_analysis_reuses_the_answers_of_an_earlier_one(page):
     page.click("#earlier summary")
     assert "yes" in page.inner_text("#earlier")
     assert page.locator(f'#list select[aria-label="{label}"]').count() == 0
+
+
+def _renamed_store_model():
+    """The paused model with its store named "Orders Database", and each flow
+    ID built again from the renamed endpoint."""
+    model = web.HELD.system_model.model_copy(deep=True)
+    old = model.data_stores[0].id
+    model.data_stores[0].name = "Orders Database"
+    model.data_stores[0].id = make_element_id("store", "Orders Database")
+    for flow in model.data_flows:
+        if flow.source == old:
+            flow.source = model.data_stores[0].id
+        if flow.destination == old:
+            flow.destination = model.data_stores[0].id
+        flow.id = derive_element_id(flow)
+    return SystemModel.model_validate(model.model_dump())
+
+
+class RenamingRunner(web.PausingRunner):
+    """Pauses the second job on a model whose store has another name."""
+
+    def __init__(self) -> None:
+        super().__init__(catalog=False)
+        self.pauses = 0
+
+    async def run(self, job, on_node):
+        if job.pauses():
+            self.pauses += 1
+            if self.pauses == 2:
+                renamed = Checkpoint(
+                    system_model=_renamed_store_model(), assertions=None
+                )
+                return PipelineAwaiting(checkpoint=renamed)
+        return await super().run(job, on_node)
+
+
+def test_an_owner_maps_a_carried_answer_to_the_renamed_part(browser, tiers):
+    """The earlier analysis answered a fact about "Orders DB". The new one
+    names the store "Orders Database", so the answer waits until the owner
+    says which part it is now (ADR 0116)."""
+    errors: list[str] = []
+    for base in serve(web.app_for(tiers, RenamingRunner(), catalog=False)):
+        context = browser.new_context(base_url=base)
+        page = context.new_page()
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto("/")
+        pause(page)
+        page.goto("/")
+        page.wait_for_selector("#answers-from-field", state="visible")
+        earlier = page.locator("#answers-from option").nth(1).get_attribute("value")
+        key = [
+            web.HELD.system_model.data_stores[0].id,
+            "encryption_at_rest",
+            "",
+            "",
+            "",
+            "",
+        ]
+        status = page.evaluate(
+            """async ([run, key]) => (await fetch("/answer/" + run, {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({links: [], facts: [{key, value: "AES-256"}],
+                  save: true, skip: [], presented: [], revision: 0})})).status""",
+            [earlier, key],
+        )
+        assert status < 300
+        page.select_option("#answers-from", earlier)
+        pause(page)
+        box = page.locator("div.rename")
+        box.wait_for(state="visible")
+        assert "AES-256" in box.inner_text()
+        box.locator("select").select_option("store:orders-database")
+        with page.expect_response(_post_to_answer) as done:
+            box.get_by_role("button", name="Keep these answers").click()
+        assert done.value.ok, done.value.text()
+        page.wait_for_selector("div.rename", state="detached")
+        assert "now belong to Orders Database" in page.inner_text("#questions")
+        row = page.locator("#list .question", has_text="data stored in Orders Database")
+        assert "AES-256" in row.inner_text(), "the row shows the carried answer"
+        context.close()
+        assert errors == [], f"the page raised: {errors}"
 
 
 class HeldRunner(web.PausingRunner):
