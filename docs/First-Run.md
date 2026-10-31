@@ -497,8 +497,11 @@ one. With the `memory` store, a restart of the app loses it.
 **Reuse the answers of an earlier analysis.** With questions on, choose an
 earlier analysis under **Reuse answers from**, then click **Prepare
 analysis**. The new analysis takes each earlier answer that one of its own
-questions still asks. An answer about a part of your system carries where the
-new description gives that part the same name. Where the new system model
+questions still asks. A line above the list counts the earlier answers it
+kept, those it did not keep, and those that wait for you to choose a part.
+**Your answers** marks each kept one "(from the earlier analysis)"; change it
+there to make it this analysis's own answer. An answer about a part of your
+system carries where the new description gives that part the same name. Where the new system model
 does not have the part, the page lists its answers under the part's earlier
 ID. If the part now has another name, choose it from the list beside them and
 click **Keep these answers**. The answers then belong to that part, and so do

@@ -1493,10 +1493,12 @@ class Carried:
     #: the elements a rename can map it to.
     choices: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
-    def dropped_json(self, model: SystemModel) -> dict[str, list[dict[str, object]]]:
-        """The answers its questions do not take, as every surface lists them:
-        each fact with the label its question shows and why it is not taken,
-        each link, the renames, and what each missing element can map to.
+    def to_json(self, model: SystemModel) -> dict[str, list[Any]]:
+        """The carried answers as every surface lists them for review: the key
+        of each fact and of each link question the job's questions take,
+        each fact they do not take with the label its question shows and why,
+        each link they do not take, the renames, and what each missing
+        element can map to.
 
         A fact is ``missing-element`` where it names an element the model
         does not have, and ``not-taken`` where the job's questions refuse it:
@@ -1508,6 +1510,10 @@ class Carried:
             return {"element": element_id, "name": names.get(element_id, element_id)}
 
         return {
+            "carried_kept": [list(fact.key) for fact in self.taken.facts],
+            "carried_kept_links": [
+                fold_principal(link.principal) for link in self.taken.links
+            ],
             "carried_dropped": [
                 {
                     "label": fact_label(fact.key, model),

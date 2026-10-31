@@ -979,6 +979,20 @@
     const dropped = data.carried_dropped || [];
     const renames = (data.carried_renames || []).map(({ earlier, element }) => ({ earlier, element }));
     carried.replaceChildren();
+    // The change review: what this run kept from the earlier analysis, what
+    // it did not keep, and what waits for the submitter to choose a part.
+    const kept = (data.carried_kept || []).length + (data.carried_kept_links || []).length;
+    const waiting = dropped.filter((a) => a.reason === "missing-element").length;
+    const notKept = dropped.length - waiting + (data.carried_dropped_links || []).length;
+    if (kept + waiting + notKept) {
+      const parts = [`${counted(kept, "answer is", "answers are")} kept and marked under Your answers`];
+      if (notKept) parts.push(`${counted(notKept, "answer is", "answers are")} not kept`);
+      if (waiting) parts.push(`${counted(waiting, "answer waits", "answers wait")} for you to choose a part`);
+      const review = document.createElement("p");
+      review.className = "carried-review";
+      review.textContent = `From the earlier analysis: ${parts.join(", ")}.`;
+      carried.append(review);
+    }
     for (const [index, rename] of (data.carried_renames || []).entries()) {
       const line = document.createElement("p");
       line.className = "hint";
@@ -1089,6 +1103,11 @@
   const drawBoxes = (data) => {
     const held = answersOf(data);
     const covered = sharedKeys(data.answered_shares || []);
+    // The answers the earlier analysis gave, which this run kept (ADR 0079).
+    const carriedKeys = new Set([
+      ...(data.carried_kept || []).map(questionKey),
+      ...(data.carried_kept_links || []).map(questionKey),
+    ]);
     // A question the list holds, compact or open, is not drawn in a box too.
     const inList = (key) => {
       const row = rows.get(key);
@@ -1105,6 +1124,8 @@
         kept.textContent = ` — ${kind === "link" ? linkAnswerText(before) : answerText(before)}`;
         // Changing it here makes it this part's own answer (ADR 0114).
         if (covered.has(key)) kept.textContent += " (shared answer)";
+        // Changing it here makes it this run's own answer.
+        if (carriedKeys.has(key)) kept.textContent += " (from the earlier analysis)";
       }
       row.append(kept);
       const open = button(before ? "Change" : "Answer it", () => {

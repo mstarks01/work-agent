@@ -4024,6 +4024,59 @@ calls.push({ said: text(ids.questions) });
         assert "batch loader \u2014 none of these" in said, "a link answer is listed"
 
 
+def test_the_page_reviews_what_it_kept_from_the_earlier_analysis():
+    """A kept answer is marked under Your answers, and one line counts what
+    was kept, not kept, and waits for a part (#2029 package 7)."""
+    flow = valid_model().data_flows[0]
+    key = [flow.id, "encryption_in_transit", "", "", "", ""]
+    answered = {
+        "key": key,
+        "kind": "attribute",
+        "label": "login: encryption in transit",
+        "reasons": [],
+        "choices": [],
+        "form": "control",
+        "suggestions": [],
+        "max_length": 200,
+        "group": "encryption",
+        "group_heading": "encryption?",
+        "element": flow.name,
+        "answer": {"key": key, "value": "TLS 1.3"},
+    }
+    payload = {
+        "run": "r1",
+        "link_questions": [],
+        "early_questions": [],
+        "early_stop": "nothing-left",
+        "framework_gates": {"asvs": "refuted"},
+        "answered_early": [answered],
+        "answered_links": [],
+        "revision": 0,
+        "carried_kept": [key],
+        "carried_dropped": [
+            {
+                "label": "Old DB: encryption at rest",
+                "value": "AES",
+                "reason": "not-taken",
+                "key": ["store:old", "encryption_at_rest", "", "", "", ""],
+            }
+        ],
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({json.dumps(payload)}) }});
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({{ said: text(ids.questions), earlier: text(ids.earlier) }});
+"""
+    seen = next(c for c in _run_form_script(steps)["calls"] if "said" in c)
+    assert (
+        "From the earlier analysis: 1 answer is kept and marked under Your answers,"
+        " 1 answer is not kept." in seen["said"]
+    )
+    assert "TLS 1.3 (from the earlier analysis)" in seen["earlier"]
+
+
 class TestTheRenameOfACarriedElement:
     """The owner says which part a missing element is now (ADR 0116)."""
 

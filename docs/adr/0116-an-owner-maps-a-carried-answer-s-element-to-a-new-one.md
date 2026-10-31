@@ -57,9 +57,11 @@ answers under its renames.
 A save that sends only renames keeps the job's own answers. Only a save to a
 waiting job sends renames.
 
-This step does not show the kept answers as a review, and it does not take
-back a carried answer when the facts it depends on change. Those are the next
-steps of package 7.
+The questions route lists the kept answers in `carried_kept` and
+`carried_kept_links`. The first-run page marks each one under "Your answers"
+and counts the answers kept, not kept and waiting for a part, as one change
+review. A carried answer is not taken back when the facts it depends on
+change; that is the next step of package 7.
 
 ## Evidence
 
