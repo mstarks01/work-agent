@@ -4077,6 +4077,53 @@ calls.push({{ said: text(ids.questions), earlier: text(ids.earlier) }});
     assert "TLS 1.3 (from the earlier analysis)" in seen["earlier"]
 
 
+def test_the_pause_lists_what_the_description_says():
+    """Each part with its stated facts and the words they came from, above
+    the amendment box (#2029 package 8)."""
+    payload = {
+        "run": "r1",
+        "link_questions": [],
+        "early_questions": [],
+        "early_stop": "nothing-left",
+        "framework_gates": {"asvs": "refuted"},
+        "answered_early": [],
+        "answered_links": [],
+        "revision": 0,
+        "detected_facts": [
+            {
+                "element": "process:web-app",
+                "name": "Web App",
+                "type": "Process",
+                "excerpt": "the web app runs on Cloud Run",
+                "source_label": "System description",
+                "facts": [
+                    {"attribute": "technology", "value": "FastAPI", "inferred": ""},
+                    {
+                        "attribute": "exposure",
+                        "value": "internet-facing",
+                        "inferred": "customers reach it",
+                    },
+                ],
+            }
+        ],
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({json.dumps(payload)}) }});
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+const box = ids.questions.querySelectorAll("details").find(d => d.className === "detected");
+calls.push({{ said: text(box) }});
+"""
+    said = next(c["said"] for c in _run_form_script(steps)["calls"] if "said" in c)
+    assert "What your description says (1 part)" in said
+    assert (
+        "Web App (process) \u2014 technology: FastAPI; exposure: internet-facing"
+        " (inferred: customers reach it)" in said
+    )
+    assert "From System description: \u201cthe web app runs on Cloud Run\u201d" in said
+
+
 class TestTheRenameOfACarriedElement:
     """The owner says which part a missing element is now (ADR 0116)."""
 

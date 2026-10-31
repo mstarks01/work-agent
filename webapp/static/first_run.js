@@ -1054,6 +1054,34 @@
   const drawTail = (data) => {
     if (tailDrawn) return;
     tailDrawn = true;
+    // What the extraction read from the description (detected_facts): each
+    // part with the facts stated about it and the words they came from, so a
+    // wrong fact is seen before the analysis. Read only: the amendment below
+    // corrects one.
+    const detected = data.detected_facts || [];
+    if (detected.length) {
+      const TYPES = {
+        Process: "process", DataStore: "data store", DataFlow: "data flow",
+        ExternalEntity: "external party", TrustBoundary: "trust zone",
+      };
+      const review = document.createElement("details");
+      review.className = "detected";
+      const title = document.createElement("summary");
+      title.textContent = `What your description says (${counted(detected.length, "part", "parts")})`;
+      review.append(title, hint("These facts were read from your description. Where one is wrong, or"
+        + " a part is missing, say so in the box below."));
+      for (const part of detected) {
+        const line = document.createElement("p");
+        const name = document.createElement("b");
+        name.textContent = part.name;
+        const facts = part.facts.map((fact) => `${fact.attribute.replaceAll("_", " ")}: ${fact.value}`
+          + (fact.inferred ? ` (inferred: ${fact.inferred})` : ""));
+        line.append(name, ` (${TYPES[part.type] || part.type})`, facts.length ? ` — ${facts.join("; ")}` : "");
+        review.append(line);
+        if (part.excerpt) review.append(hint(`From ${part.source_label}: “${part.excerpt}”`));
+      }
+      tail.append(review);
+    }
     // An amendment to the description itself: a part missing, or a fact read
     // wrongly. The service reads the description again with it, asks again,
     // and keeps every answer that still fits (ADR 0072).

@@ -51,7 +51,7 @@ token whose principal does not exist yet gets the same `404` as a missing job.
 | `POST` | `/v1/jobs/{id}/corrections` | Correct a final report's answers, as `{"facts": [...], "revision"}`: a changed value, or `unknown`. `200` with `{"job_id", "revision", "corrections", "corrected_findings"}`. No job starts, and the report is not rewritten. `400` where the report is not final, `facts` is empty, a correction names no answer the report read, or changes none. `409` where another correction moved the revision. `422` where `revision` is missing. |
 | `POST` | `/v1/jobs/{id}/answers` | Answer the questions of a completed job or a job in `awaiting-answers`. Starts a **new** job that resumes from this one's model and catalog; `201` with its `job_id`. With `"save": true`, a waiting job keeps the answers, and a completed job keeps a draft of its follow-up; either answers `200` with its own `job_id`, and a save never starts a job. `409` where a save moved the answers after this request read them. |
 | `POST` | `/v1/jobs/{id}/amendments` | Amend a job in `awaiting-answers`, as `{"text", "revision"}`: what is true that its model misses or reads wrongly. Starts a **new** job that extracts the job's sources again with the amendment added, and pauses again; `201` with its `job_id`. `400` where the job does not wait on answers or `text` is blank. `409` where the revision has moved, before or while the request reads it, a job already locks this one, or the job selects a framework that this deployment no longer carries; that message names the framework. `422` where `revision` is missing. |
-| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "early_blocked", "early_unnecessary", "policy_version", "fallback", "final", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits", "carried_kept", "carried_kept_links", "carried_dropped", "carried_dropped_links", "carried_renames", "rename_choices"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
+| `GET` | `/v1/jobs/{id}/questions` | What the job asks you, as `{"job_id", "link_questions", "fact_questions", "early_questions", "early_blocked", "early_unnecessary", "policy_version", "fallback", "final", "early_stop", "early_held_back", "early_below_floor", "early_summary", "framework_gates", "skipped_early", "skipped_links", "answered_early", "answered_links", "revision", "resumed_by", "draft_links", "draft_facts", "answer_limits", "carried_kept", "carried_kept_links", "carried_dropped", "carried_dropped_links", "carried_renames", "rename_choices", "detected_facts"}`: a finished report's questions, or a waiting job's link and early questions. `resumed_by` names the job this job's answers started while that job is in flight or has its report; the job then asks nothing until that job fails. Derived from the report when you ask, under the report's own rules: `409` before completion and `409` when the report is withheld. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -366,6 +366,15 @@ decide it, first and outside the limits; each such question lists the
 framework in `gates`. The questions an undecidable framework would ask once
 its gate is satisfied, at or above the floor, are in `early_blocked` with the
 `reason` `gate-undecided`, so a client can say what a gate answer unlocks.
+
+**Review what the extraction read.** A waiting job's `detected_facts` lists
+each element of its model, in model order, with `name`, `type`, the
+`excerpt` and `source_label` it was read from, and `facts`: each attribute
+the model states, as `{"attribute", "value", "inferred"}`. An attribute the
+model leaves `unknown` is an open fact and is asked, so it is not listed.
+`inferred` holds the basis where extraction recorded the value as an
+assumption, and is empty where a source states it. A finished report lists
+none: its model is in the report. Correct a wrong fact with an amendment.
 
 **An amendment corrects the model itself**
 ([ADR 0072](adr/0072-a-paused-job-s-description-can-be-amended.md)). An answer

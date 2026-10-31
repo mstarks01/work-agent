@@ -486,6 +486,13 @@ The app can ask you questions before the analysis, and after the report.
   corrected answer. The analysis does not run again, and the verdicts do not
   change. This works on every install, with or without an assertion catalog.
 
+**Check what the app read.** Under the questions, **What your description
+says** lists each part of your system with the facts read about it and the
+words they came from. A value marked "inferred" is one your description did
+not state. Where a fact is wrong or a part is missing, write what is true
+under **Is a part of your system missing, or described wrongly?**, and the
+app reads your description again with it.
+
 Where your description names a protocol that is secure by its own definition, such as SFTP's encryption or WireGuard's peer authentication, the app records that property and does not ask about it. An answer settles its fact, even where your description said otherwise. A run
 that waits for your answers is kept in the app's job store, like every other
 run, and the app never removes it to make room. A run that you answered or

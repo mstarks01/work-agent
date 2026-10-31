@@ -54,6 +54,7 @@ from analysis_service.claims import (
     UnknownRef,
 )
 from analysis_service.deployment import FrameworkNotCarried
+from analysis_service.detected_facts import detected_facts
 from analysis_service.errors import ConfigError, refusal_text
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import LineageConflict
@@ -292,6 +293,9 @@ class Answerable:
                         self.analyses, record.answers.facts, record.corrections
                     )
                 ),
+                # What the extraction read, for a person to review at the
+                # pause; a finished report shows its model itself.
+                "detected_facts": detected_facts(self.model) if state.waiting else [],
             }
         )
 
