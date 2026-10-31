@@ -547,6 +547,19 @@ question, with the facets it needs; a finding not listed needs every facet
 Each question also carries `asks`: the facets that its waiting findings
 need, which the web app shows as inputs. You can still answer any facet
 ([ADR 0112](adr/0112-the-report-page-asks-only-the-facets-its-findings-need.md)).
+A body may carry `shares`: each one answer for every element it covers, as
+`{"answer": {"key": [...], ...}, "covers": ["<element id>", ...]}`. The
+answer's key is the key of each element's question with the element left
+empty. The service writes the answer as each covered element's own answer and
+checks each one as any other. A body that gives a covered element its own
+answer as well is refused with `400`, and so is a body with two shares of one
+question. A share replaces the earlier share of its question, so an element
+that leaves `covers` loses the answer the share wrote; an empty `covers` takes
+the share back. A later answer of an element's own takes it out of the share.
+Each covered element counts toward the bound of fact answers in one request.
+The questions route returns the held shares as `answered_shares` and a
+report's draft shares as `draft_shares`
+([ADR 0114](adr/0114-a-shared-answer-is-stored-with-the-parts-it-covers.md)).
 A fact answer may carry a `detail`: one line, at most 300 characters, in your
 own words, such as an exception to a "yes". It follows the answer on its line
 of the answers source, and no code reads a fact out of it. Each fact question

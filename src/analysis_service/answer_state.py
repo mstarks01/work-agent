@@ -59,6 +59,7 @@ from pydantic import Field
 
 from analysis_service.answer_effects import Effect, capability_effects
 from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
+from analysis_service.answer_shares import check_shares, merged_shares
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.bands import UNRANKED
 from analysis_service.capabilities import CapabilityFact, lineage, resolve
@@ -572,14 +573,29 @@ class QuestionSet:
         refused where its answers add no information
         (:func:`_adds_information`), so it does not go to a run that reads
         nothing new.
+
+        **Each share writes one answer for each part it covers** (ADR 0114),
+        and that answer is admitted as any other. A share that takes a part
+        back removes the answer it wrote (:func:`~analysis_service.answer_shares.merged_shares`).
         """
         if self.resumed_by is not None:
             raise AlreadyResumed(
                 f"job {self.resumed_by} locks this job;"
                 " read that job, and answer here again only if it fails"
             )
-        links, facts = given.links, given.facts
-        if save and not (links or facts or skips):
+        links = given.links
+        check_shares(given.shares, given.facts)
+        shares, taken_back = merged_shares(earlier.shares, given.shares, given.facts)
+        facts = (
+            *given.facts,
+            *(fact for share in given.shares for fact in share.facts()),
+        )
+        earlier = AnswerSet(
+            links=earlier.links,
+            facts=tuple(fact for fact in earlier.facts if fact.key not in taken_back),
+            shares=earlier.shares,
+        )
+        if save and not (links or facts or given.shares or skips):
             raise ValueError("a save answers or skips at least one question")
         merged = merged_facts(earlier.facts, facts)
         complete: frozenset[SkipKey] = answered_keys(merged) & {
@@ -591,7 +607,7 @@ class QuestionSet:
             raise ValueError(
                 "this report is final: its follow-up has run, so it takes no answers"
             )
-        if not (links or facts or self.waiting):
+        if not (links or facts or given.shares or self.waiting):
             raise ValueError(
                 "no answers were sent; only a job waiting on answers can continue"
                 " without them"
@@ -609,7 +625,10 @@ class QuestionSet:
             earlier_links=earlier.links,
             reopen=self.waiting,
         )
-        if not self.waiting and not save and not _adds_information(earlier, given):
+        adds = taken_back or _adds_information(
+            earlier, AnswerSet(links=links, facts=facts)
+        )
+        if not self.waiting and not save and not adds:
             raise ValueError(
                 "these answers add nothing the analysis can use: each one is"
                 ' "I don\'t know" or repeats an earlier answer. The follow-up'
@@ -620,7 +639,9 @@ class QuestionSet:
         )
         return AdmittedAnswers(
             sources=composed,
-            answers=AnswerSet(links=tuple(all_links), facts=tuple(all_facts)),
+            answers=AnswerSet(
+                links=tuple(all_links), facts=tuple(all_facts), shares=shares
+            ),
             shown=tuple(dict.fromkeys([*self.shown, *shown])),
             skipped=tuple(
                 dict.fromkeys(

@@ -276,6 +276,12 @@ class Answerable:
                 "draft_facts": [
                     fact.model_dump(mode="json") for fact in record.draft.facts
                 ],
+                "answered_shares": [
+                    share.model_dump(mode="json") for share in record.answers.shares
+                ],
+                "draft_shares": [
+                    share.model_dump(mode="json") for share in record.draft.shares
+                ],
                 "answer_limits": dict(ANSWER_LIMITS),
                 "corrections": [
                     fact.model_dump(mode="json") for fact in record.corrections

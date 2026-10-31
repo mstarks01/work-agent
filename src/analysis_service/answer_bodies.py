@@ -26,9 +26,17 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    ValidationError,
+    model_validator,
+)
 
 from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import MAX_SKIPS, Answers, Revision
 from analysis_service.claims import UnknownKey
 from analysis_service.errors import refusal_text
@@ -65,20 +73,35 @@ class AnswersSubmission(BaseModel):
     its ``key`` (:data:`SkipKey`). ``presented`` names the early questions
     the page showed: the job records them as shown, and a skip is taken only
     of one of them (ADR 0069). ``revision`` is the revision the answers
-    were read against, which a waiting job and every save require. One
-    request carries at most the ``answer_limits`` the questions route
-    publishes; a follow-up larger than that saves its draft in batches.
+    were read against, which a waiting job and every save require. ``shares``
+    answers a question once for each part it covers (ADR 0114); each covered
+    part counts as one fact answer toward the bound. One request carries at
+    most the ``answer_limits`` the questions route publishes; a follow-up
+    larger than that saves its draft in batches.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
     facts: list[FactAnswer] = Field(default_factory=list, max_length=MAX_FACT_ANSWERS)
+    shares: list[SharedAnswer] = Field(
+        default_factory=list, max_length=MAX_FACT_ANSWERS
+    )
     # Strict, so that ``true`` is no revision and ``"yes"`` is no save.
     save: bool = Field(default=False, strict=True)
     skip: list[SkipKey] = Field(default_factory=list, max_length=MAX_SKIPS)
     presented: list[UnknownKey] = Field(default_factory=list, max_length=MAX_HELD_FACTS)
     revision: Revision | None = None
+
+    @model_validator(mode="after")
+    def _within_the_fact_bound(self) -> AnswersSubmission:
+        parts = len(self.facts) + sum(len(share.covers) for share in self.shares)
+        if parts > MAX_FACT_ANSWERS:
+            raise ValueError(
+                f"one request answers at most {MAX_FACT_ANSWERS} facts, each part"
+                f" a shared answer covers counted; this one answers {parts}"
+            )
+        return self
 
 
 class AmendmentSubmission(BaseModel):
@@ -165,7 +188,9 @@ def read_answers(raw: object) -> Answers:
     """The answers a body carries, or a :class:`BodyRefused`."""
     body = _read(AnswersSubmission, raw)
     return Answers(
-        given=AnswerSet(links=tuple(body.links), facts=tuple(body.facts)),
+        given=AnswerSet(
+            links=tuple(body.links), facts=tuple(body.facts), shares=tuple(body.shares)
+        ),
         save=body.save,
         skips=tuple(body.skip),
         presented=tuple(body.presented),

@@ -519,7 +519,9 @@ class JobRecord(BaseModel):
         against its own questions.
         """
         corrected = AnswerSet(facts=tuple(self.corrections))
-        return corrected.over(self.draft.over(self.answers.over(self.carried)))
+        return corrected.over(
+            self.draft.expanded().over(self.answers.over(self.carried))
+        )
 
     def selection(self) -> tuple[FrameworkName, ...]:
         """This job's frameworks by name, in selection order.
