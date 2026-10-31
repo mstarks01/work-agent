@@ -4074,6 +4074,82 @@ calls.push(seen());
         assert page["hidden"][4:] == [True, False, True, True, False, False, True, True]
 
 
+#: The key of every capacity-limits question with the element left empty.
+_LIMITS_SHAPE = ["", "", "", "", "capacity-limits", ""]
+
+
+class TestTheReportPageSendsShares:
+    """The report page saves a shared box's answer as one share, and a share
+    keeps the parts the saved one covers outside the box (ADR 0114)."""
+
+    def payloads(self, earlier):
+        store, flow = valid_model().data_stores[0], valid_model().data_flows[0]
+        questions = [
+            TestTheFacetsAPageAsks().question(element, finding, ["rate"])
+            for element, finding in ((store, "stride/D-01"), (flow, "stride/D-02"))
+        ]
+        return (
+            {
+                "report": {"system_model": valid_model().model_dump(mode="json")},
+                "link_questions": [],
+                "fact_questions": questions,
+                "final": False,
+                "earlier": earlier,
+            },
+            store,
+            flow,
+        )
+
+    STEPS = """
+for (const tick of box.all("input").filter(i => i.className === "share-answer")) {
+  if (TICK.includes(box.all("input").filter(i => i.className === "share-answer").indexOf(tick))) {
+    tick.checked = true; tick.listeners.change();
+  }
+}
+const [rate] = box.all("select");
+if (!rate.value) { rate.value = "yes"; rate.listeners.change(); }
+await box.all("button").find(b => b.textContent === "Save draft").listeners.click();
+"""
+
+    def sent(self, earlier, tick):
+        payloads, store, flow = self.payloads(earlier)
+        steps = self.STEPS.replace("TICK", json.dumps(tick))
+        calls = _run_answer_block(payloads, steps)["calls"]
+        return [c["body"] for c in calls if "body" in c], store, flow
+
+    def test_a_shared_box_saves_one_share(self):
+        bodies, store, flow = self.sent(
+            {"draft": {"links": [], "facts": [], "shares": []}, "revision": 0}, [0, 1]
+        )
+        [body] = bodies
+        assert body["facts"] == []
+        assert body["shares"] == [
+            {
+                "answer": {"key": _LIMITS_SHAPE, "facets": {"rate": "yes"}},
+                "covers": [store.id, flow.id],
+            }
+        ]
+
+    def test_a_share_keeps_the_parts_the_saved_one_covers(self):
+        held = {
+            "answer": {"key": _LIMITS_SHAPE, "facets": {"rate": "yes"}},
+            "covers": ["process:worker"],
+        }
+        earlier = {
+            "draft": {"links": [], "facts": [], "shares": []},
+            "shares": [held],
+            "revision": 0,
+        }
+        bodies, store, _ = self.sent(earlier, [0])
+        [body] = bodies
+        assert body["shares"] == [
+            {
+                "answer": {"key": _LIMITS_SHAPE, "facets": {"rate": "yes"}},
+                "covers": ["process:worker", store.id],
+            }
+        ]
+
+
 class TestFacetNeedsAndDetails:
     """The report page counts a finding covered by the facets it needs, and
     both pages send a detail beside a closed answer (#1542 F6, ADR 0073)."""

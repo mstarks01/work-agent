@@ -1087,7 +1087,11 @@ def _draft_payload(state: AnswerState) -> dict[str, object]:
                 for link in state.draft.links
             ],
             "facts": [fact.model_dump(mode="json") for fact in state.draft.facts],
+            "shares": [share.model_dump(mode="json") for share in state.draft.shares],
         },
+        # The shares the report's run read, which a follow-up share of the
+        # same question replaces (ADR 0114).
+        "shares": [share.model_dump(mode="json") for share in state.answers.shares],
         "revision": state.revision,
     }
 

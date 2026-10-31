@@ -152,7 +152,8 @@ over the words.
 **Questions** asks the facts that the conditional findings need, in the same
 list as the questions before the analysis: a group for each kind of question,
 an index of the groups, typed answers, and one shared answer for the parts you tick where a
-question asks about several parts. Each question says what became of it before, names
+question asks about several parts. The service keeps which parts that
+answer covers. Each question says what became of it before, names
 the findings that use it, and explains under its **?** what the answer informs.
 A link from a finding opens its question, and a link from a question opens its
 finding. **Save draft** keeps the answers and runs nothing. **Update report**

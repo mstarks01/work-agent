@@ -47,10 +47,15 @@
   const RETAINED = new Map((EARLIER.retained || []).map(a => [questionKey(a.key), a]));
   // The follow-up's saved draft (ADR 0070): answers saved in batches that no
   // run has read yet. Every editor starts from its draft answer.
-  const DRAFT = EARLIER.draft || { links: [], facts: [] };
+  const DRAFT = EARLIER.draft || { links: [], facts: [], shares: [] };
   const DRAFT_FACTS = new Map(DRAFT.facts.map(a => [questionKey(a.key), a]));
   // Keyed by the principal's fold, as every other link map.
   const DRAFT_LINKS = new Map(DRAFT.links.map(a => [a.key, a.element]));
+  // The saved shares by `shareKey` (ADR 0114): the draft's over those the
+  // report's run read. A follow-up share replaces the saved one of its
+  // question, so a box sends the parts that one covers too.
+  const SAVED_SHARES = new Map([...(EARLIER.shares || []), ...(DRAFT.shares || [])]
+    .map(share => [shareKey(share.answer.key), share]));
   // An answer to start an editor from: the draft's, over a kept answer's.
   const startFrom = (kept, key) => {
     const drafted = DRAFT_FACTS.get(questionKey(key));
@@ -908,6 +913,7 @@
     $("question-layout").hidden = false;
     indexGroups($("question-index"), $("list"), selectGroup);
     if ($("list").children.length) selectGroup($("list").children[0]);
+    return list;
   };
   // A link question as a row of the list: its options with their names.
   const linkQuestion = (q) => ({
@@ -1093,7 +1099,7 @@
           "The follow-up then runs the whole analysis once, and its report is final."
         : "No answer given yet.";
     };
-    drawList(ENTRIES, {
+    const list = drawList(ENTRIES, {
       reopen: false,
       onEdit: () => {
         showState();
@@ -1106,6 +1112,7 @@
         return lines;
       },
     });
+    list.restoreShares([...SAVED_SHARES.values()], () => false);
 
     const post = async (body) => {
       let response;
@@ -1124,26 +1131,38 @@
       if (!response.ok) throw new Error(reply.message);
       return reply;
     };
+    // A part that holds its box's shared answer sends no answer of its own:
+    // the box's share carries it (ADR 0114).
     const entered = () => {
       const edited = changes();
       return {
         edited,
         links: edited.filter(({ row }) => row.kind === "link").map(({ answer }) => answer),
-        facts: edited.filter(({ row }) => row.kind !== "link").map(({ answer }) => answer),
+        facts: edited.filter(({ row }) => row.kind !== "link" && !row.inherited)
+          .map(({ answer }) => answer),
+        shares: list.changedShares((key) => SAVED_SHARES.get(key) || null),
       };
     };
+    // Each part a share covers counts as one fact answer in a request.
+    const coveredParts = (shares) => shares.reduce((n, share) => n + share.covers.length, 0);
+    const fitsOne = ({ links, facts, shares }) => links.length <= ANSWER_LIMITS.links
+      && facts.length + coveredParts(shares) <= ANSWER_LIMITS.facts;
     // Save the answers in as many requests as the limits need, each naming
-    // the revision the last one returned. A row then starts from what it saved.
-    const saveInParts = async ({ edited, links, facts }) => {
+    // the revision the last one returned: the answers in parts, then each
+    // share. A row then starts from what it saved.
+    const saveInParts = async ({ edited, links, facts, shares }) => {
       const parts = Math.max(Math.ceil(facts.length / ANSWER_LIMITS.facts),
-        Math.ceil(links.length / ANSWER_LIMITS.links), 1);
+        Math.ceil(links.length / ANSWER_LIMITS.links), shares.length ? 0 : 1);
+      const requests = [];
       for (let part = 0; part < parts; part += 1) {
-        const reply = await post({
+        requests.push({
           links: links.slice(part * ANSWER_LIMITS.links, (part + 1) * ANSWER_LIMITS.links),
           facts: facts.slice(part * ANSWER_LIMITS.facts, (part + 1) * ANSWER_LIMITS.facts),
-          save: true,
-          revision,
         });
+      }
+      for (const share of shares) requests.push({ links: [], facts: [], shares: [share] });
+      for (const request of requests) {
+        const reply = await post({ ...request, save: true, revision });
         revision = reply.revision;
       }
       edited.forEach(({ row, answer }) => {
@@ -1151,6 +1170,7 @@
         if (row.kind === "link") DRAFT_LINKS.set(row.q.key, answer.element);
         else DRAFT_FACTS.set(questionKey(answer.key), answer);
       });
+      for (const share of shares) SAVED_SHARES.set(shareKey(share.answer.key), share);
     };
     const setBusy = (on) => {
       busy = on;
@@ -1159,7 +1179,7 @@
     save.addEventListener("click", async () => {
       if (busy) return;
       const answers = entered();
-      if (!answers.edited.length) {
+      if (!answers.edited.length && !answers.shares.length) {
         showState("No new answers to save.");
         return;
       }
@@ -1184,13 +1204,18 @@
       showState("Starting the follow-up…");
       try {
         let answers = entered();
-        if (answers.links.length > ANSWER_LIMITS.links || answers.facts.length > ANSWER_LIMITS.facts) {
+        if (!fitsOne(answers)) {
           // More than one request carries: save them all first, then run on
           // the draft.
           await saveInParts(answers);
-          answers = { links: [], facts: [] };
+          answers = { links: [], facts: [], shares: [] };
         }
-        const reply = await post({ links: answers.links, facts: answers.facts, revision });
+        const reply = await post({
+          links: answers.links,
+          facts: answers.facts,
+          ...(answers.shares.length ? { shares: answers.shares } : {}),
+          revision,
+        });
         // The form page follows a run's progress and opens its report.
         location.href = "/?follow=" + encodeURIComponent(reply.run);
       } catch (error) {
@@ -1202,7 +1227,7 @@
     });
     // Leaving with answers that are not saved asks first.
     window.addEventListener("beforeunload", (event) => {
-      if (busy || !changes().length) return;
+      if (busy || (!changes().length && !list.changedShares((key) => SAVED_SHARES.get(key) || null).length)) return;
       event.preventDefault();
       event.returnValue = "";
     });
