@@ -55,8 +55,10 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** The last map, [#1991](https://github.com/mstarks01/work-agent/issues/1991), is under
-Completed maps. Chart a new one only against the bar at the end of this file.
+- [#2057](https://github.com/mstarks01/work-agent/issues/2057) — Store supporting files that an
+  owner adds to an analysis. Charted 2026-10-31. A planning map: it ends in a build spec for a
+  Files section in the web app, where an owner keeps **Owner File**s, such as call transcripts and
+  Mermaid diagrams. The branch `docs/wayfinder-live-map-2057` carries its glossary entry and ADRs.
 
 ### Completed maps
 
