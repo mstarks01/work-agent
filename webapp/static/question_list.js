@@ -1,8 +1,8 @@
 // The question list as every page that asks open facts draws it: the early
 // list at a run's pause, and a report's Questions section. Each row sits in a
 // box for its group, in the service's order. A box whose rows ask one kind of
-// two or more elements asks it once, with the rows under "Answer each one
-// separately" (ADR 0081). A facets question is a table: a column per facet
+// two or more elements asks it once, and a person ticks each part the answer
+// covers (ADR 0081, ADR 0113). A facets question is a table: a column per facet
 // and a row per element. A row asks only the facets in its question's `asks`
 // (ADR 0112), and "Additional details" shows the rest.
 //
@@ -75,7 +75,29 @@ const questionList = ({
   const edited = (row, event) => {
     if (!sharing && row.box && row.box.shared) {
       row.exception = true;
+      row.inherited = false;
       if (row.tick) row.tick.checked = false;
+    }
+    onEdit(row, event);
+  };
+  // A part a person ticks takes the shared answer. Unticking it takes back
+  // only what the shared answer wrote, so the part's own answer stays
+  // (ADR 0113).
+  const tickChanged = (row, event) => {
+    const box = row.box;
+    if (!box || !box.shared || row.compact) return;
+    sharing = true;
+    try {
+      if (row.tick.checked) {
+        row.exception = false;
+        box.sharedWrite(row);
+        row.inherited = true;
+      } else if (row.inherited) {
+        box.sharedClear(row);
+        row.inherited = false;
+      }
+    } finally {
+      sharing = false;
     }
     onEdit(row, event);
   };
@@ -240,7 +262,7 @@ const questionList = ({
     const q = row.q;
     const grid = row.grid;
     const name = document.createElement("td");
-    name.append(questionTitle(q, q.element), ...notes(row));
+    name.append(...(row.tick ? [row.tick] : []), questionTitle(q, q.element), ...notes(row));
     // A facet answered before offers no blank where the page cannot reopen
     // it: the service keeps the earlier answer to a facet left out.
     const selects = q.facets.map((facet) => {
@@ -366,14 +388,10 @@ const questionList = ({
     box.title.replaceChildren(heading, box.applies);
   };
   // A box whose rows ask one attribute or kind of two or more elements asks
-  // it once (ADR 0081): one answer for every element it lists, sent as each
-  // element's own answer. The rows stay under "Answer each one separately",
-  // and a row edited there is an exception the shared answer leaves alone. A
-  // capability asks about the whole application, so it never shares.
-  const shareable = (a, b) =>
-    a.key[0] && b.key[0] && a.key[1] === b.key[1] && a.key[4] === b.key[4]
-    && a.form === b.form
-    && JSON.stringify(a.choices) === JSON.stringify(b.choices);
+  // it once (ADR 0081): one answer for each part a person ticks, sent as that
+  // element's own answer (ADR 0113). A row edited by hand is an exception the
+  // shared answer leaves alone. A capability asks about the whole
+  // application, so it never shares.
   const applyShared = (box, write) => {
     sharing = true;
     try {
@@ -381,6 +399,7 @@ const questionList = ({
         if (row.kind !== "fact" || row.compact || row.exception) continue;
         if (row.tick && !row.tick.checked) continue;
         write(row);
+        row.inherited = true;
         edited(row);
       }
     } finally {
@@ -391,6 +410,7 @@ const questionList = ({
     const line = document.createElement("p");
     if (q.form === "facets") {
       line.className = "shared-facets";
+      const selects = [];
       box.grid.shared = q.facets.map((facet) => {
         const label = document.createElement("label");
         label.className = "shared-facet";
@@ -398,17 +418,28 @@ const questionList = ({
         select.dataset.facet = facet.id;
         select.addEventListener("change", () =>
           applyShared(box, (row) => row.setFacet && row.setFacet(facet.id, select.value)));
+        selects.push(select);
         const prompt = document.createElement("span");
         prompt.textContent = facet.question;
         label.append(prompt, select);
         line.append(label);
         return label;
       });
+      box.sharedWrite = (row) => {
+        for (const select of selects) if (select.value) row.setFacet(select.dataset.facet, select.value);
+      };
+      box.sharedClear = (row) => {
+        for (const select of selects) if (select.value) row.setFacet(select.dataset.facet, "");
+      };
       showFacets(box.grid);
       return line;
     }
     const shared = inputFor(q, null, () =>
       applyShared(box, (row) => row.set({ value: shared.read() })));
+    box.sharedWrite = (row) => {
+      if (shared.read()) row.set({ value: shared.read() });
+    };
+    box.sharedClear = (row) => row.set({ value: "" });
     // The box's heading asks the question for every part it lists, so it
     // names each control; a second control adds what it takes.
     shared.controls.forEach((control, at) => control.setAttribute("aria-label",
@@ -422,7 +453,7 @@ const questionList = ({
       && members.every((row) => shareable(row.q, members[0].q));
     box.eachTitle.hidden = !one;
     box.applies.hidden = !one;
-    box.eachTitle.textContent = `Answer each one separately (${members.length})`;
+    box.eachTitle.textContent = `Parts the answer can cover (${members.length})`;
     if (!one) {
       box.top.className = "";
       box.top.replaceChildren();
@@ -431,29 +462,33 @@ const questionList = ({
       box.each.open = true;
       return;
     }
-    if (!box.shared) {
-      box.shared = sharedControl(box, members[0].q);
-      box.each.open = false;
-    }
-    box.applies.textContent = "Applies to: " + members.map((row) => row.q.element).join(", ");
+    if (!box.shared) box.shared = sharedControl(box, members[0].q);
+    box.each.open = true;
+    box.applies.textContent = "Parts: " + members.map((row) => row.q.element).join(", ");
     const hint = document.createElement("p");
     hint.className = "hint";
-    hint.textContent = "One answer covers every part listed. Where one differs,"
-      + " open \"Answer each one separately\" and change it there.";
+    hint.textContent = "Tick each part this answer covers. A part left unticked keeps"
+      + " its own answer, or none.";
     box.top.className = "shared-controls";
     box.top.replaceChildren(box.shared, hint);
-    for (const row of members) if (row.q.form !== "facets") addTick(row);
+    for (const row of members) addTick(row);
   };
-  // Ticked rows take the shared answer; an unticked row is an exception.
+  // A part starts unticked: the same question does not prove that one control
+  // covers every part (ADR 0113). A ticked part takes the shared answer.
   const addTick = (row) => {
     if (row.tick) return;
     const tick = document.createElement("input");
     tick.type = "checkbox";
-    tick.checked = true;
-    tick.title = "Take the answer under \"Same for all\"";
+    tick.checked = false;
+    tick.title = "Covered by the answer above";
+    tick.setAttribute("aria-label", `${row.q.element}: covered by the answer above`);
     tick.className = "share-answer";
+    tick.addEventListener("change", (event) => tickChanged(row, event));
     row.tick = tick;
-    if (!row.compact) row.node.replaceChildren(tick, ...[...row.node.children]);
+    if (row.compact || !row.node.children.length) return;
+    // A facets row holds the tick in its first cell, beside the element's name.
+    const holder = row.grid ? row.node.children[0] : row.node;
+    holder.replaceChildren(tick, ...[...holder.children]);
   };
   // Put a new row after `prev`, the listed row before it in the service's
   // order, or first where there is none. A row joins `prev`'s box where the
@@ -531,6 +566,14 @@ const questionList = ({
 const questionKey = (key) => JSON.stringify(key);
 // A row's key is its question's key.
 const rowKey = (row) => questionKey(row.q.key);
+// Whether a page asks two questions once (ADR 0081): one attribute or kind,
+// each of an element, with one form and one set of choices. The
+// `shared-answers` instrument reads the same rule, and a test holds the two to
+// each other.
+const shareable = (a, b) =>
+  Boolean(a.key[0] && b.key[0]) && a.key[1] === b.key[1] && a.key[4] === b.key[4]
+  && a.form === b.form
+  && JSON.stringify(a.choices) === JSON.stringify(b.choices);
 // The heading of the box of link questions, on both pages and in the export.
 const LINK_GROUP_HEADING = "Match each user, team or account to a part of your system";
 // A link answer as one line of text: the element, or "none of these".

@@ -401,9 +401,13 @@ The app can ask you questions before the analysis, and after the report.
 
   The page lists the recommended questions at once, the most useful first.
   The help beside each prompt explains what its answers may change. Where one question asks about several
-  parts of your system, the page asks it once and lists the parts it applies
-  to; one answer is saved for each of them. Where a part differs, open
-  **Answer each one separately** and change that part, or untick it. The help also quotes the words of your description that the part was read
+  parts of your system, the page asks it once and lists the parts under it,
+  each unticked. Tick each part that the answer covers, and the answer is
+  saved for each part you tick. A part you leave unticked keeps its own
+  answer, or none, and you can answer it on its own. Untick a part to take
+  back the shared answer from it. A matching question does not prove that
+  one control covers every part, so the page ticks none for you. The help
+  also quotes the words of your description that the part was read
   from. A line at the top explains that your answers can add questions as well as remove
   them, and the page says when they do. Each answer is saved as you give
   it: a chosen option at once, typed text a moment after you stop. The line
@@ -444,8 +448,8 @@ The app can ask you questions before the analysis, and after the report.
   offers **Add information**, and the **Questions** tab shows how many
   questions it asks. The questions use the same list as the questions before
   the analysis: a group for each kind of question, an index of the groups on
-  the left, typed answers, and one shared answer where a question asks about
-  several parts. Each question says what became of it before the analysis: new
+  the left, typed answers, and one shared answer for the parts you tick where a question
+  asks about several parts. Each question says what became of it before the analysis: new
   from this analysis, left blank, skipped, answered in part, or answered "I
   don't know". **Used by** names the findings that use it; click an ID to open
   that finding. The help under **?** says what the answer informs and that a
