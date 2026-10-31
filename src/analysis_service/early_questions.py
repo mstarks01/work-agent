@@ -113,6 +113,7 @@ from analysis_service.system_model import Element, SystemModel
 
 __all__ = [
     "GATE_REASON",
+    "KIND_REASON",
     "PRIOR_REASON",
     "QUESTION_PRIOR",
     "QUESTION_PRIOR_PATH",
@@ -132,9 +133,14 @@ __all__ = [
 QUESTION_PRIOR_PATH = Path(__file__).with_name("question_prior.json")
 
 
-#: The reason a field question gives where no rule reads its fact: the prior,
-#: which is why it is asked at all.
+#: The reason an attribute question gives where no rule reads its fact: the
+#: prior, which is why it is asked at all.
 PRIOR_REASON = "Findings in earlier analyses often depend on this fact."
+
+#: The reason a question kind gives where no rule reads its fact: what the
+#: kind covers (:attr:`~analysis_service.question_kinds.QuestionKind.covers`),
+#: which names the findings an answer decides.
+KIND_REASON = "An answer decides which findings about {covers} the analysis reports for {element}."
 
 #: The reason a gate question gives, once for each framework it decides.
 GATE_REASON = "Whether the {framework} analysis runs depends on this fact."
@@ -236,7 +242,8 @@ class EarlyQuestion:
     #: question about the element.
     label: str
     #: Why the fact matters before any finding exists: the questions of the
-    #: rules that read this fact on this element, or :data:`PRIOR_REASON`
+    #: rules that read this fact on this element, :data:`KIND_REASON` for a
+    #: question kind no rule reads, or :data:`PRIOR_REASON`
     #: where no rule reads it. Never a rule that only names the element.
     reasons: tuple[str, ...]
     #: The selected frameworks an answer serves, by name, in name order.
@@ -476,7 +483,7 @@ def _early_questions(
             model,
             catalog,
             names,
-            reasons=tuple(reasons[key]) or (PRIOR_REASON,),
+            reasons=tuple(reasons[key]) or (_unread_reason(key, names),),
             frameworks=tuple(helps[key]),
             score=value,
             relevance=relevance[key],
@@ -487,6 +494,17 @@ def _early_questions(
         key=lambda question: (-question.relevance / question.decisions, question.key)
     )
     return (*deciding, *capability_questions(model, runnable), *asked)
+
+
+def _unread_reason(key: UnknownKey, names: Mapping[str, str]) -> str:
+    """The reason a question gives where no rule reads its fact."""
+    if fact_kind(key) != "question":
+        return PRIOR_REASON
+    ref = key_ref(key)
+    return KIND_REASON.format(
+        covers=QUESTION_KINDS[ref.question].covers,
+        element=names.get(ref.element_id, ref.element_id),
+    )
 
 
 def _question(
