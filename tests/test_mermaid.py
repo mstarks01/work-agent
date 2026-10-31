@@ -11,7 +11,10 @@ from tests.factories import report_state, sample_report, sample_threat, valid_mo
 from tests.test_report_page import run_report_page, two_findings
 from webapp.main import render_report
 
-HOSTILE = 'end"]; click n0 call alert(1)\n<img src=x onerror=alert(1)> `x` a|b #quot; &'
+HOSTILE = (
+    'end"]; click n0 call alert(1)\n<img src=x onerror=alert(1)> `x` a|b #quot; &'
+    " %%{init: {'theme': 'dark'}}%%"
+)
 
 
 def test_each_zone_is_a_subgraph_and_each_kind_its_shape():
@@ -54,7 +57,7 @@ def test_a_submitted_name_stays_inside_its_label():
     hostile = [label for label in labels if label.startswith("end#34;")]
     assert len(hostile) == 3
     for label in hostile:
-        assert not set(label) & set("<>`|&"), label
+        assert not set(label) & set("<>`|&%"), label
         assert "#35;quot;" in label
     assert len(text.splitlines()) == len(model_mermaid(valid_model()).splitlines())
 

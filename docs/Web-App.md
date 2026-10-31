@@ -180,9 +180,10 @@ service inferred says "zone assumed". Hover over an element or a flow to see
 its whole name. **Download as Mermaid**, in the caption, saves the same model
 as a Mermaid flowchart (`system-model.mmd`) to paste into a document that
 renders Mermaid. Each trust zone is a subgraph, and a flow that crosses a
-boundary, or may cross one, takes a link style. Under the diagram, a table for each element kind (external
-entities, processes, data stores and data flows) lists the same elements in
-words, with a column for each attribute. Hover over a name to see its ID.
+boundary, or may cross one, takes a link style. Under the diagram, a table for
+each element kind (external entities, processes, data stores and data flows)
+lists the same elements in words, with a column for each attribute. Hover over
+a name to see its ID.
 
 **Gaps in the system model**, in About the analysis, is a table of each
 attribute that the description leaves unstated, with the count and the

@@ -27,8 +27,9 @@ __all__ = ["model_mermaid"]
 
 #: The characters a label writes as an entity code: the quote that closes the
 #: label, the start of an entity code, the edge label delimiter, the backtick
-#: that opens a Markdown string, and the characters HTML reads.
-_ENCODED = frozenset('"#&<>`|')
+#: that opens a Markdown string, the percent sign that opens a directive, and
+#: the characters HTML reads.
+_ENCODED = frozenset('"#%&<>`|')
 
 #: The link style of a flow that crosses a boundary, and of one that may cross
 #: one because a zone is not stated, as the report page draws them.
