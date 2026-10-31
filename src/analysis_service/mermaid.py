@@ -1,10 +1,16 @@
 """The System Model as a Mermaid flowchart, for a person to paste elsewhere.
 
 The report page draws the model itself. :func:`model_mermaid` writes the same
-facts as Mermaid text: a ``subgraph`` for each trust zone that holds an element,
-an element with no stated zone outside every subgraph, and an edge for each
-data flow. A flow that crosses a boundary, or may cross one, takes a link
-style, read from :func:`~analysis_service.analysis.crossings_by_flow`.
+facts as Mermaid text: a ``subgraph`` labelled ``Trust zone: <name>`` for each
+trust zone that holds an element, an element with no stated zone outside every
+subgraph, and an edge for each data flow, labelled with its name and the
+protocol where the model states one. A flow that crosses a boundary, or may
+cross one, takes a link style, read from
+:func:`~analysis_service.analysis.crossings_by_flow`.
+
+**The text reads back as a ``diagram`` Source.** That register takes a
+subgraph as a trust zone only where its label says so, so the label says so.
+``evals/diagrams/`` holds this text for the corpus cases, as extraction input.
 
 **Every name is submitted text.** A name reaches Mermaid only inside a quoted
 label, and each character that Mermaid or HTML reads as syntax is written as a
@@ -17,6 +23,8 @@ from __future__ import annotations
 
 from analysis_service.analysis import crossings_by_flow
 from analysis_service.system_model import (
+    UNKNOWN,
+    DataFlow,
     DataStore,
     ExternalEntity,
     SystemModel,
@@ -58,6 +66,13 @@ def _node(node_id: str, element: ZonedElement) -> str:
     return f"{node_id}({label})"
 
 
+def _flow_label(flow: DataFlow) -> str:
+    """A flow's name, with its protocol where the model states one."""
+    if flow.protocol in ("", UNKNOWN):
+        return flow.name
+    return f"{flow.name} ({flow.protocol})"
+
+
 def model_mermaid(model: SystemModel) -> str:
     """``model`` as Mermaid ``flowchart`` text, or ``""`` for a model with no
     element to draw."""
@@ -71,7 +86,7 @@ def model_mermaid(model: SystemModel) -> str:
         members = [element for element in elements if element.trust_zone == zone.id]
         if not members:
             continue
-        lines.append(f"    subgraph z{at}[{_label(zone.name)}]")
+        lines.append(f"    subgraph z{at}[{_label(f'Trust zone: {zone.name}')}]")
         lines.extend(f"        {_node(ids[each.id], each)}" for each in members)
         lines.append("    end")
         zoned.update(each.id for each in members)
@@ -81,7 +96,8 @@ def model_mermaid(model: SystemModel) -> str:
     crossings = crossings_by_flow(model)
     for at, flow in enumerate(model.data_flows):
         lines.append(
-            f"    {ids[flow.source]} -->|{_label(flow.name)}| {ids[flow.destination]}"
+            f"    {ids[flow.source]} -->|{_label(_flow_label(flow))}|"
+            f" {ids[flow.destination]}"
         )
         if flow.id in crossings:
             style = _CROSSING_STYLE[crossings[flow.id].decided]

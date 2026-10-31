@@ -1,0 +1,21 @@
+flowchart LR
+    subgraph z0["Trust zone: public internet"]
+        n0["shopper"]
+        n1["card processor"]
+    end
+    subgraph z1["Trust zone: storefront dmz"]
+        n2("storefront API")
+    end
+    subgraph z2["Trust zone: core services"]
+        n3("order service")
+        n4[("orders db")]
+        n5[("receipt archive")]
+    end
+    n0 -->|"place order"| n2
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n1 -->|"settlement webhook"| n2
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n2 -->|"submit order (gRPC)"| n3
+    linkStyle 2 stroke:#c0392b,stroke-width:2px
+    n3 -->|"read write orders"| n4
+    n3 -->|"append receipt"| n5

@@ -1,0 +1,29 @@
+flowchart LR
+    subgraph z0["Trust zone: internet"]
+        n0["company user"]
+        n1["payer"]
+    end
+    subgraph z1["Trust zone: cloud platform"]
+        n3("billing app")
+        n4("pdf renderer")
+        n5("admin console")
+        n6[("tenant database")]
+        n7[("render queue")]
+        n8[("pdf bucket")]
+    end
+    subgraph z2["Trust zone: support office network"]
+        n2["support agent"]
+    end
+    n0 -->|"manage invoices (HTTPS)"| n3
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n1 -->|"open payment page (HTTPS)"| n3
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n3 -->|"read and write tenant data"| n6
+    n3 -->|"queue render job"| n7
+    n4 -->|"take render jobs"| n7
+    n4 -->|"read invoice"| n6
+    n4 -->|"write pdf"| n8
+    n3 -->|"fetch pdfs"| n8
+    n2 -->|"use admin console"| n5
+    linkStyle 8 stroke:#c0392b,stroke-width:2px
+    n5 -->|"open session as customer user"| n3

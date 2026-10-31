@@ -1,0 +1,22 @@
+flowchart LR
+    subgraph z0["Trust zone: public internet"]
+        n0["calling service"]
+    end
+    subgraph z1["Trust zone: serving edge"]
+        n2("inference gateway")
+        n6[("inference log")]
+    end
+    subgraph z2["Trust zone: model network"]
+        n1["ml engineer"]
+        n3("model server")
+        n4[("model registry bucket")]
+        n5[("Redis feature store")]
+    end
+    n0 -->|"submit inference request"| n2
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n2 -->|"forward request"| n3
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n3 -->|"load artifact (object storage API)"| n4
+    n3 -->|"read features (Redis protocol)"| n5
+    n2 -->|"write request log (BigQuery API)"| n6
+    n1 -->|"publish artifact (object storage API)"| n4

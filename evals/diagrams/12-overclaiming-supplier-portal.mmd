@@ -1,0 +1,26 @@
+flowchart LR
+    subgraph z0["Trust zone: public internet"]
+        n0["supplier"]
+    end
+    subgraph z1["Trust zone: corporate network"]
+        n1["category manager"]
+    end
+    subgraph z2["Trust zone: vendor platform"]
+        n2["portal vendor"]
+        n3("supplier portal")
+        n5[("document store")]
+    end
+    subgraph z3["Trust zone: cloud account"]
+        n4("supplier master service")
+        n6[("landing bucket")]
+        n7[("supplier database")]
+    end
+    n0 -->|"upload documents"| n3
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n1 -->|"review documents"| n3
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n3 -->|"store documents"| n5
+    n2 -->|"push nightly extract"| n6
+    linkStyle 3 stroke:#c0392b,stroke-width:2px
+    n4 -->|"load extract"| n6
+    n4 -->|"write supplier records"| n7

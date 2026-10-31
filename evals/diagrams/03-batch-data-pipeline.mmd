@@ -1,0 +1,22 @@
+flowchart LR
+    subgraph z0["Trust zone: partner network"]
+        n0["insurance partner"]
+    end
+    subgraph z1["Trust zone: landing network"]
+        n2("ingest scheduler")
+        n4[("landing bucket")]
+        n5[("Airflow metadata database")]
+    end
+    subgraph z2["Trust zone: warehouse network"]
+        n1["data analyst"]
+        n3("Spark transform job")
+        n6[("claims warehouse")]
+    end
+    n0 -->|"push daily extract (SFTP)"| n4
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    n2 -->|"list and read files (object storage API)"| n4
+    n2 -->|"read connections"| n5
+    n2 -->|"trigger transform"| n3
+    linkStyle 3 stroke:#c0392b,stroke-width:2px
+    n3 -->|"load records (BigQuery API)"| n6
+    n1 -->|"run queries (BigQuery API)"| n6
