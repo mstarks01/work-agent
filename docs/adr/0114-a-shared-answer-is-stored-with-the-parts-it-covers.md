@@ -54,11 +54,11 @@ answer, such as `held_answers`.
 
 ## Consequences
 
-The first-run page sends a box's answer as one share of the parts ticked, and
-a part the held share covers keeps holding it while the box does not list it.
-It shows a covered part under "Your answers", marked as a shared answer. The
-report page still sends one answer for each ticked part, and does not read
-`draft_shares` yet.
+Both pages send a box's answer as one share of the parts ticked, and a part
+the saved share covers keeps holding it while the box does not list it. The
+first-run page shows a covered part under "Your answers", marked as a shared
+answer. The report page restores each box from the draft's shares over the
+shares its run read.
 
 A job that carries another job's answers (ADR 0079) or an amendment's new job
 (ADR 0072) carries each covered element's answer, not the share. A correction

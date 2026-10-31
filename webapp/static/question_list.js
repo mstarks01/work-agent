@@ -614,7 +614,22 @@ const questionList = ({
       }
     }
   };
-  return { place, removeRow, drawOpen, drawSaved, drawAlone, button, shareOf, restoreShares };
+  // Each box's share that differs from the saved one, `baseOf(key)` by its
+  // `shareKey`. A box that shares nothing, or shares nothing new, adds none.
+  const changedShares = (baseOf) => {
+    const changed = [];
+    for (const box of boxes) {
+      const members = box.rows.filter((row) => row.kind === "fact");
+      if (!box.shared || !members.length) continue;
+      const base = baseOf(shareKey(members[0].q.key));
+      const share = shareOf(box, base);
+      if (share && !sameShare(share, base) && (share.covers.length || base)) changed.push(share);
+    }
+    return changed;
+  };
+  return {
+    place, removeRow, drawOpen, drawSaved, drawAlone, button, shareOf, restoreShares, changedShares,
+  };
 };
 
 // Two rules both pages read, so neither keeps its own copy.
