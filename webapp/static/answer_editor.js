@@ -34,8 +34,9 @@ const optionOf = (label, value) => {
 };
 // The submitter's own words beside a closed answer: an exception or a scope the
 // answer alone would overstate (FactAnswer.detail, ADR 0073).
-const answerDetail = (value) => {
+const answerDetail = (value, subject) => {
   const detail = document.createElement("input");
+  detail.setAttribute("aria-label", `${subject}: exceptions or detail`);
   detail.type = "text";
   detail.maxLength = ANSWER_LIMITS.detail;
   detail.className = "answer-detail";
@@ -62,6 +63,9 @@ let suggestLists = 0;
 // `prefill` is an earlier answer to start from, or null; `changed` runs on
 // every edit.
 //
+// Each control names its question in `aria-label`, so a screen reader says
+// which question it answers on every page that builds one.
+//
 // `nodes` follow the label, and `controls` are the selects and text inputs
 // among them, in order. `read` is the answer's value, or "" for none;
 // `set` writes a value into the input; `answer` is the answer as the service
@@ -78,12 +82,13 @@ const answerEditor = (q, { choices, prefill, reopen, changed = () => {} }) => {
   let detail = null;
   if (choices.length) {
     input = document.createElement("select");
+    input.setAttribute("aria-label", q.label);
     input.append(optionOf("(leave unanswered)", ""));
     for (const { id, name } of choices) input.append(optionOf(name ? `${name} (${id})` : id, id));
     if (dontKnowOffered) input.append(optionOf("I don't know", DONT_KNOW));
     input.addEventListener("change", changed);
     set = (next) => { input.value = next; };
-    detail = answerDetail((prefill && prefill.detail) || "");
+    detail = answerDetail((prefill && prefill.detail) || "", q.label);
     detail.addEventListener("input", changed);
     nodes = [input, " ", detail];
     controls = [input, detail];
@@ -98,7 +103,9 @@ const answerEditor = (q, { choices, prefill, reopen, changed = () => {} }) => {
     list.id = `answer-suggest-${suggestLists++}`;
     for (const suggestion of q.suggestions) list.append(optionOf(suggestion, suggestion));
     input.setAttribute("list", list.id);
+    input.setAttribute("aria-label", `${q.label}: the mechanism`);
     const state = document.createElement("select");
+    state.setAttribute("aria-label", q.label);
     state.append(optionOf("(leave unanswered)", ""), optionOf("There is none", "none"));
     if (dontKnowOffered) state.append(optionOf("I don't know", DONT_KNOW));
     state.append(optionOf("A mechanism, in my own words:", "mechanism"));
@@ -127,6 +134,7 @@ const answerEditor = (q, { choices, prefill, reopen, changed = () => {} }) => {
     input.type = "text";
     input.maxLength = q.max_length;
     input.placeholder = "(leave unanswered)";
+    input.setAttribute("aria-label", q.label);
     const box = document.createElement("input");
     box.type = "checkbox";
     box.addEventListener("change", () => {
