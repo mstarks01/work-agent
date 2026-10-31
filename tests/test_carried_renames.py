@@ -42,7 +42,7 @@ def _saved(state, renames):
 
 class TestTheRename:
     def test_a_missing_element_is_listed_with_the_elements_of_its_type(self):
-        listed = _state(ENCRYPTED).carried.dropped_json(MODEL)
+        listed = _state(ENCRYPTED).carried.to_json(MODEL)
 
         (dropped,) = listed["carried_dropped"]
         assert dropped["reason"] == "missing-element"
@@ -65,7 +65,7 @@ class TestTheRename:
             "store:orders-db",
             STORE,
         }
-        assert after.carried.dropped_json(MODEL)["carried_renames"] == [
+        assert after.carried.to_json(MODEL)["carried_renames"] == [
             {"earlier": OLD_STORE, "element": "store:orders-db", "name": "Orders DB"}
         ]
 

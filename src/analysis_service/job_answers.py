@@ -267,7 +267,7 @@ class Answerable:
         state = self.state()
         return (
             state.questions.to_json()
-            | state.carried.dropped_json(self.model)
+            | state.carried.to_json(self.model)
             | {
                 "fallback": question_fallback(self.analyses).to_json(),
                 "revision": record.revision,

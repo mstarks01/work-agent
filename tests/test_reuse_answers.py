@@ -146,6 +146,7 @@ class TestTheRoute:
         read = client.get(f"/v1/jobs/{child_id}/questions", headers=auth()).json()
 
         assert [a["key"] for a in read["carried_dropped"]] == [list(GONE.key)]
+        assert read["carried_kept"] == [key], "a page can mark what it kept"
         assert key in [q["key"] for q in read["answered_early"]]
         assert key not in [q["key"] for q in read["early_questions"]]
 
