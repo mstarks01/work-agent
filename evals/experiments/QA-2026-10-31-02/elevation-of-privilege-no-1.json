@@ -1,0 +1,121 @@
+{
+  "claims": [
+    {
+      "title": "A shopper session is treated as authority over another shopper's order",
+      "description": "An authenticated attacker starting as `entity:shopper` can submit a request on `flow:entity:shopper>process:storefront-api>place-order` using another shopper's identifier. `process:storefront-api` does not check each request against caller permissions or verify ownership of the named object, even though this flow carries shopper identifiers and crosses into `boundary:storefront-dmz`. The attacker thereby abuses the broadly effective session access to create or act on orders under another shopper's identity. Second-order, the storefront forwards order contents and shopper identifiers on `flow:process:storefront-api>process:order-service>submit-order`, after which `process:order-service` persists order records containing addresses and card last-four in `store:orders-db`.",
+      "affected_element_ids": [
+        "entity:shopper",
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "process:storefront-api"
+      ],
+      "verb": "abuse-grant",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order"
+      ],
+      "quotes": [
+        {
+          "text": "Does it check each request against what the caller may do? no; Are permissions narrower than full access, such as roles or scopes? no; Does it check that the caller owns the object it names? no",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high because an authenticated `entity:shopper` normally reaches `process:storefront-api` through `flow:entity:shopper>process:storefront-api>place-order`, and the stated per-request permission and ownership checks are absent. Impact is high because the flow carries `pii` and `financial` data and reaches `store:orders-db`, which holds shopper addresses and card last-four and is classified confidential."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce server-side object ownership checks",
+          "detail": "At `process:storefront-api`, derive the shopper identity from the verified session and reject requests whose order or shopper identifier is not owned by that subject."
+        },
+        {
+          "summary": "Apply deny-by-default authorization to storefront operations",
+          "detail": "Use centralized authorization middleware for every route in `process:storefront-api`, with narrowly scoped roles or permissions rather than treating a session cookie as broad order authority."
+        }
+      ]
+    },
+    {
+      "title": "A foothold in the storefront tier can cross into unauthenticated core order processing",
+      "description": "An attacker who gains control of `process:storefront-api` in `boundary:storefront-dmz` inherits its ability to originate `flow:process:storefront-api>process:order-service>submit-order` across the decided crossing into `boundary:core-services`. That flow has no authentication, and `process:order-service` accepts anything that can reach it. The attacker can therefore escalate from the storefront tier to the core order-processing surface without holding a core-service credential, submitting arbitrary order-capture requests as the storefront. The storefront DMZ placement is an inferred endpoint placement in the derived crossing, but the absent authentication on the crossing flow is stated. Second-order, the reached `process:order-service` reads and writes `store:orders-db`, containing confidential shopper addresses and card last-four, using its application database account.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "process:order-service"
+      ],
+      "verb": "escalate",
+      "evidence_refs": [
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication",
+        "crossing:flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "quotes": [
+        {
+          "text": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because exploiting the crossing requires a foothold in `process:storefront-api` or its DMZ position, but `flow:process:storefront-api>process:order-service>submit-order` has authentication stated absent. Impact is high because the crossing reaches `process:order-service`, whose downstream `store:orders-db` holds confidential `pii` and `financial` order data."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and authorize the DMZ-to-core call",
+          "detail": "Require `process:order-service` to authenticate the caller on `flow:process:storefront-api>process:order-service>submit-order` and authorize the propagated shopper or workload identity for each requested operation."
+        },
+        {
+          "summary": "Enforce the core boundary at the receiving service",
+          "detail": "Restrict ingress to `process:order-service` to the expected workload identity and network path, while treating any request arriving across the storefront-to-core boundary as untrusted until it passes service-side authorization."
+        }
+      ]
+    },
+    {
+      "title": "The order service's full database account can be abused for arbitrary submitted orders",
+      "description": "A caller that can reach `process:order-service` can supply order operations that the service does not check against caller permissions, roles, scopes, or object ownership. `process:order-service` then exercises the single application account on `flow:process:order-service>store:orders-db>read-write-orders`, which has full read/write access to `store:orders-db`. This is a confused-deputy authorization failure: the caller does not need the database account, but causes the privileged service to use it on the caller's chosen order and shopper identifiers. Second-order, the resulting authority covers the confidential orders database holding shopper addresses and card last-four, so the caller's scope expands from its own permitted orders to records across the database.",
+      "affected_element_ids": [
+        "process:order-service",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "store:orders-db"
+      ],
+      "verb": "abuse-grant",
+      "evidence_refs": [
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "Does it check each request against what the caller may do? no; Are permissions narrower than full access, such as roles or scopes? no; Does it check that the caller owns the object it names? no",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "a single application account that has full read/write",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because an attacker must first reach `process:order-service`, which the model describes as internal, but the service's stated authorization checks are absent once reached. Impact is high because the application account has the stated full read/write grant on `store:orders-db`, which is confidential and holds `pii` and `financial` data."
+      },
+      "mitigations": [
+        {
+          "summary": "Re-authorize the original caller at the order service",
+          "detail": "Propagate a verifiable caller identity over `flow:process:storefront-api>process:order-service>submit-order` and make `process:order-service` enforce operation and object ownership checks before invoking the database account."
+        },
+        {
+          "summary": "Narrow database authority by operation and scope",
+          "detail": "Replace the full read/write application account on `flow:process:order-service>store:orders-db>read-write-orders` with narrowly scoped, short-lived privileges and database enforcement that prevents one caller context from operating on another shopper's records."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

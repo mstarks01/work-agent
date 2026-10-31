@@ -1,0 +1,119 @@
+{
+  "claims": [
+    {
+      "title": "Conflicting database access statements leave a direct order-rewrite path unresolved",
+      "description": "`flow:process:order-service>store:orders-db>read-write-orders` is stated in the system description to use a single application account with full read/write access and a password held in the worker environment. However, the later answer for that same flow states that permissions are narrower than full access. If the original full read/write grant and environment-held password remain accurate, an attacker who obtains that credential can alter order rows, addresses, payment-status records, or card-last-four-associated records directly in `store:orders-db`, bypassing validation in `process:order-service`. This is conditional on resolving the conflicting source statements. Second-order, `process:order-service` consumes the altered records through `flow:process:order-service>store:orders-db>read-write-orders` and can act on corrupted order state.",
+      "affected_element_ids": [
+        "store:orders-db",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "process:order-service"
+      ],
+      "verb": "alter",
+      "evidence_refs": [
+        "assertion:credential-custody~credential:order-service-database-password~any~v.c4f5cadf8e5c",
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "single application account that has full read/write. The password comes from an environment variable on the worker.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Asked \"Who may do what on flow:process:order-service>store:orders-db>read-write-orders, and does it check each request against that?\", the answer is \"Does it check each request against what the caller may do? yes; Are permissions narrower than full access, such as roles or scopes? yes; Does it check that the caller owns the object it names? yes\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the contradictory credential and authorization statements: a static environment-held credential is cheap to use once obtained, but the attacker must first obtain it. Impact is high because `store:orders-db` is confidential and holds `pii` and `financial` data, while `process:order-service` reads and writes its order records."
+      },
+      "mitigations": [
+        {
+          "summary": "Resolve and remove the contradictory database access model",
+          "detail": "Confirm whether the application account has full read/write authority or a narrowed role, then document the effective table-, statement-, and operation-level grants on `flow:process:order-service>store:orders-db>read-write-orders`."
+        },
+        {
+          "summary": "Replace the environment password with scoped workload identity",
+          "detail": "Use short-lived workload-federated database credentials for `process:order-service`, and grant only the statements and tables required for order processing."
+        }
+      ]
+    },
+    {
+      "title": "Physical access can tamper with confidential order records",
+      "description": "The submitted answer states that someone with physical access to `store:orders-db` can change it. An attacker who obtains that access can alter stored order rows, shipping addresses, payment-related state, or card-last-four-associated data outside the normal `process:order-service` write path. `store:orders-db` has `encryption_at_rest: unknown`, so the primary store's protection state remains unverified even though the answers state that backups and restores are protected and checked. Second-order, `process:order-service` reads the altered records through `flow:process:order-service>store:orders-db>read-write-orders` and may process corrupted orders as authoritative state.",
+      "affected_element_ids": [
+        "store:orders-db",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "process:order-service"
+      ],
+      "verb": "alter",
+      "evidence_refs": [
+        "unknown:store:orders-db:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "Asked \"Can someone with physical access to store:orders-db read its secrets or change it?\", the answer is \"yes\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low because the attack requires physical access to `store:orders-db`, a substantial prerequisite. Impact is high because the store is classified confidential, contains `pii` and `financial` data, and its altered records are subsequently consumed by `process:order-service`."
+      },
+      "mitigations": [
+        {
+          "summary": "Prevent and detect offline modification of the primary database",
+          "detail": "Restrict physical and administrative access to database media, use authenticated encryption and managed keys, and monitor privileged storage and database-administration actions."
+        },
+        {
+          "summary": "Verify database integrity before processing records",
+          "detail": "Maintain tamper-evident integrity controls for critical order and payment-state records and verify them when `process:order-service` reads or restores data."
+        }
+      ]
+    },
+    {
+      "title": "Physical access can alter archived order receipts",
+      "description": "The submitted answer states that someone with physical access to `store:receipt-archive` can change it. An attacker with that access can modify receipt objects so archived evidence of completed orders no longer matches the order that `process:order-service` wrote through `flow:process:order-service>store:receipt-archive>append-receipt`. The model states that the archive uses a customer-managed key and that backup and restore checks exist, but those facts do not negate the stated ability to alter the archive under physical access; the affected integrity property is the receipt archive itself.",
+      "affected_element_ids": [
+        "store:receipt-archive",
+        "flow:process:order-service>store:receipt-archive>append-receipt",
+        "process:order-service"
+      ],
+      "verb": "alter",
+      "evidence_refs": [],
+      "quotes": [
+        {
+          "text": "Asked \"Can someone with physical access to store:receipt-archive read its secrets or change it?\", the answer is \"yes\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low because the attacker must obtain physical access to `store:receipt-archive`. Impact is medium because the archive holds one receipt per completed order and is tagged `business-critical-data`, so modification undermines the integrity of completed-order records."
+      },
+      "mitigations": [
+        {
+          "summary": "Make receipt objects tamper-evident and recoverable",
+          "detail": "Use object versioning, retention or write-once controls, and signed receipt payloads so altered objects are rejected or recoverable to a verified version."
+        },
+        {
+          "summary": "Restrict and monitor physical and privileged archive access",
+          "detail": "Limit access to archive media and key-management operations to named operators, and alert on privileged object modification, deletion, or key-use events."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

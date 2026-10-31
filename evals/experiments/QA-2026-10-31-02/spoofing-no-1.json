@@ -1,0 +1,285 @@
+{
+  "claims": [
+    {
+      "title": "Credential stuffing can create shopper sessions without a second factor",
+      "description": "An internet attacker can guess or replay breached passwords for `entity:shopper` on `flow:entity:shopper>process:storefront-api>place-order`. The flow presents a session cookie after email-and-password authentication and the asserted MFA requirement is absent, so a successful password login makes the attacker indistinguishable from the shopper to `process:storefront-api`. Second-order, submitted orders are forwarded through `flow:process:storefront-api>process:order-service>submit-order` and persisted to `store:orders-db`, reaching shopper addresses, card last-four data, and financial order records.",
+      "affected_element_ids": [
+        "entity:shopper",
+        "process:storefront-api",
+        "flow:entity:shopper>process:storefront-api>place-order"
+      ],
+      "verb": "guess-credential",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "assertion:credential-presented~principal:shopper-accounts~any~credential:session-cookie",
+        "assertion:mfa-requirement~flow:entity:shopper>process:storefront-api>place-order~any~absent"
+      ],
+      "quotes": [
+        {
+          "text": "Shoppers sign in with email and password and get a session cookie; we have not rolled out MFA for shopper accounts yet.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db)",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high because `flow:entity:shopper>process:storefront-api>place-order` is a crossing from the public-internet zone and the catalog records password-backed session-cookie presentation with MFA explicitly absent. Impact is high because impersonation submits orders that reach `store:orders-db`, which holds shopper addresses and card-last-four data alongside financial order records."
+      },
+      "mitigations": [
+        {
+          "summary": "Require phishing-resistant shopper MFA",
+          "detail": "Require WebAuthn/passkeys on `flow:entity:shopper>process:storefront-api>place-order` so possession of a password alone cannot establish a shopper session."
+        },
+        {
+          "summary": "Harden password authentication against stuffing",
+          "detail": "Screen breached passwords and rate-limit and monitor authentication attempts per account and source at `process:storefront-api`."
+        }
+      ]
+    },
+    {
+      "title": "A stolen shopper session cookie can be replayed as the shopper",
+      "description": "An attacker who obtains a session cookie issued for `entity:shopper` can present it to `process:storefront-api` over `flow:entity:shopper>process:storefront-api>place-order` and act as that shopper without needing to defeat the password login again. The submitted answers state that the cookie is not Secure, HttpOnly, or SameSite, increasing exposure to theft and browser-mediated replay. Second-order, the impersonated shopper can submit orders that `process:storefront-api` forwards to `process:order-service` and that reach the PII and financial records in `store:orders-db`.",
+      "affected_element_ids": [
+        "entity:shopper",
+        "process:storefront-api",
+        "flow:entity:shopper>process:storefront-api>place-order"
+      ],
+      "verb": "use-credential",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "assertion:credential-presented~principal:shopper-accounts~any~credential:session-cookie"
+      ],
+      "quotes": [
+        {
+          "text": "Are its cookies set Secure, HttpOnly and SameSite? no",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Shoppers sign in with email and password and get a session cookie",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because the crossed shopper flow uses a session cookie and the source states that Secure, HttpOnly, and SameSite attributes are not set, but the attacker must first obtain a victim cookie. Impact is high because replayed shopper sessions can submit orders that reach `store:orders-db` containing PII and financial order data."
+      },
+      "mitigations": [
+        {
+          "summary": "Harden and bind shopper sessions",
+          "detail": "Set Secure, HttpOnly, and appropriate SameSite attributes on the session cookie, use short idle and absolute expirations, rotate the session after authentication, and revoke sessions on suspicious activity."
+        },
+        {
+          "summary": "Reduce the value of stolen browser sessions",
+          "detail": "Bind high-risk order actions to a fresh phishing-resistant authentication step and provide server-side session revocation for `process:storefront-api`."
+        }
+      ]
+    },
+    {
+      "title": "Unauthenticated settlement callbacks can forge payment confirmation",
+      "description": "An attacker able to send a request to `process:storefront-api` can impersonate `entity:card-processor` by posting a fabricated settlement event through `flow:entity:card-processor>process:storefront-api>settlement-webhook`. The submitter states that the webhook does not check who sent its input, and the flow crosses from the public-internet zone. The attacker can therefore cause the storefront to treat an order as paid. Second-order, that false settlement state is acted on by the order-processing path and can affect financial order records in `store:orders-db`.",
+      "affected_element_ids": [
+        "entity:card-processor",
+        "process:storefront-api",
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook"
+      ],
+      "verb": "forge",
+      "evidence_refs": [
+        "crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:authentication",
+        "assertion:origin-verification~flow:entity:card-processor>process:storefront-api>settlement-webhook~any~unknown"
+      ],
+      "quotes": [
+        {
+          "text": "After they settle a payment they POST a webhook back to the storefront API to tell us the order is paid.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Does it check who sent what it takes, such as by a signature or an authenticated sender? no",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high because `flow:entity:card-processor>process:storefront-api>settlement-webhook` is a public-boundary crossing and the submitter states that sender identity is not checked. Impact is high because a forged callback asserts that an order is paid and affects financial order processing and records in `store:orders-db`."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and replay-protect processor callbacks",
+          "detail": "Require a per-processor HMAC or asymmetric signature over the full callback body, with timestamp and nonce verification, on `flow:entity:card-processor>process:storefront-api>settlement-webhook`."
+        },
+        {
+          "summary": "Make settlement state changes idempotent and attributable",
+          "detail": "Persist a verified processor event identifier and reject stale, duplicate, or unverified settlement transitions in `process:storefront-api`."
+        }
+      ]
+    },
+    {
+      "title": "A storefront-zone foothold can submit orders as the storefront API",
+      "description": "`process:order-service` accepts calls on `flow:process:storefront-api>process:order-service>submit-order`, a crossing into the core-services zone whose authentication is explicitly absent. An attacker with a foothold in the storefront DMZ can send an order submission as though it came from `process:storefront-api`; `process:order-service` has no caller identity with which to distinguish the impostor. Second-order, the order service uses its application account to read and write `store:orders-db`, so the spoofed caller can cause processing of attacker-selected order content against PII and financial order records.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "process:order-service",
+        "flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication",
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it",
+          "source_label": "System description"
+        },
+        {
+          "text": "the order service reads and writes with a single application account that has full read/write",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because no credential is required on the crossed DMZ-to-core flow, but the attacker needs a foothold that can reach the core-facing order-service interface. Impact is high because the order service has full read/write authority over `store:orders-db`, which holds PII and financial order data."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate the storefront API to the order service",
+          "detail": "Require mTLS or workload-identity tokens with audience and expiry on `flow:process:storefront-api>process:order-service>submit-order`, and reject callers whose workload identity is not `process:storefront-api`."
+        },
+        {
+          "summary": "Constrain the order-service database authority",
+          "detail": "Replace the full read/write application account with narrowly scoped service credentials so spoofed order-processing requests have a smaller downstream blast radius."
+        }
+      ]
+    },
+    {
+      "title": "A fake storefront endpoint could harvest shopper credentials if transport authentication is absent",
+      "description": "`flow:entity:shopper>process:storefront-api>place-order` crosses from the shopper zone to `process:storefront-api`, but its protocol and encryption-in-transit attributes are unknown. If those unknowns resolve to plaintext transport or TLS without server certificate validation, an attacker able to redirect or position themselves on the shopper's path can impersonate `process:storefront-api` and collect the shopper's email/password or session cookie. This is conditional: the model does not establish that transport protection is absent. Second-order, a stolen credential or cookie can then be used to act as `entity:shopper` on the genuine order-placement flow and reach order processing and `store:orders-db`.",
+      "affected_element_ids": [
+        "entity:shopper",
+        "process:storefront-api",
+        "flow:entity:shopper>process:storefront-api>place-order"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "unknown:flow:entity:shopper>process:storefront-api>place-order:protocol",
+        "unknown:flow:entity:shopper>process:storefront-api>place-order:encryption_in_transit",
+        "assertion:credential-presented~principal:shopper-accounts~any~credential:session-cookie"
+      ],
+      "quotes": [
+        {
+          "text": "Shoppers sign in with email and password and get a session cookie",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because the crossed flow's protocol and transport encryption are unstated, and an attacker also needs a routing or on-path position. Impact is high because the flow carries shopper authentication material whose compromise permits shopper impersonation and reaches financial and PII order records."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify storefront server identity on every shopper connection",
+          "detail": "Set `flow:entity:shopper>process:storefront-api>place-order` to TLS 1.2+ or later with full certificate-chain and hostname validation, then record the verified protocol and transport protection in the model."
+        }
+      ]
+    },
+    {
+      "title": "A fake callback endpoint could impersonate the storefront to the card processor if transport authentication is absent",
+      "description": "`flow:entity:card-processor>process:storefront-api>settlement-webhook` has unknown protocol and encryption-in-transit attributes. If those unknowns resolve to plaintext transport or missing certificate validation, an attacker who can redirect the processor's callback connection can impersonate `process:storefront-api` to `entity:card-processor` and receive settlement confirmations intended for the storefront. This is conditional on the unresolved transport attributes, not an assertion that TLS is absent. Second-order, settlement information can help an attacker target payment and order-processing activity associated with the financial records handled by `process:storefront-api`.",
+      "affected_element_ids": [
+        "entity:card-processor",
+        "process:storefront-api",
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:protocol",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "After they settle a payment they POST a webhook back to the storefront API to tell us the order is paid.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 6,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the protocol and encryption state of this boundary-crossing callback are unstated and the attack also requires control of callback routing or an on-path position. Impact is medium because a successful fake endpoint receives payment-settlement information associated with financial order processing."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate the storefront endpoint to the processor",
+          "detail": "Use TLS with complete certificate and hostname validation for `flow:entity:card-processor>process:storefront-api>settlement-webhook`; where supported, constrain the processor to a private CA, pinned identity, or mutual TLS identity for the storefront."
+        }
+      ]
+    },
+    {
+      "title": "A fake order service could receive orders if gRPC server identity is not verified",
+      "description": "`flow:process:storefront-api>process:order-service>submit-order` crosses into the core-services zone with encryption-in-transit unknown. If the gRPC transport lacks authenticated encryption or the storefront does not validate the order service's server identity, an attacker with routing control in the storefront-to-core path can impersonate `process:order-service` to `process:storefront-api` and receive submitted order contents. This draft is conditional on the unresolved encryption-in-transit attribute; it does not assert that gRPC is plaintext. Second-order, intercepted order content includes shopper identifiers and shipping-address information intended for the order-processing path and is normally persisted to `store:orders-db`.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "process:order-service",
+        "flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "verb": "impersonate",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "unknown:flow:process:storefront-api>process:order-service>submit-order:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "When a shopper submits an order the storefront API calls the order service over gRPC.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db)",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 7,
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because the flow's encryption-in-transit state is unstated and exploitation requires an attacker-controlled routing or on-path position between the DMZ and core services. Impact is high because the order-processing flow carries shopper order data that is persisted alongside PII and financial records in `store:orders-db`."
+      },
+      "mitigations": [
+        {
+          "summary": "Mutually authenticate the storefront and order service",
+          "detail": "Use mTLS with full certificate validation, preferably workload identities such as SPIFFE, on `flow:process:storefront-api>process:order-service>submit-order` and record the verified transport state."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

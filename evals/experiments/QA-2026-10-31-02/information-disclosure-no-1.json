@@ -1,0 +1,330 @@
+{
+  "claims": [
+    {
+      "title": "Shopper order data may be intercepted on the public-to-storefront path",
+      "description": "`flow:entity:shopper>process:storefront-api>place-order` crosses from `boundary:public-internet` to `boundary:storefront-dmz` while its `encryption_in_transit` and protocol are unverified. If the transport protection is absent or ineffective, an observer positioned on that path can intercept order contents, shipping addresses, and card last-four data sent by `entity:shopper` to `process:storefront-api`. The disclosed shopper identifiers and order details can then be correlated with records subsequently sent to `process:order-service` and retained in `store:orders-db`. This is conditional on the unresolved transport attributes, not an assertion that the flow is cleartext.",
+      "affected_element_ids": [
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "entity:shopper",
+        "process:storefront-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "unknown:flow:entity:shopper>process:storefront-api>place-order:protocol",
+        "unknown:flow:entity:shopper>process:storefront-api>place-order:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `flow:entity:shopper>process:storefront-api>place-order` is a boundary crossing but its transport protocol and encryption are unstated. Impact is high because the flow carries `pii` and `financial` data, including shipping addresses and card last-four information, for shopper orders."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and require TLS for shopper order submission",
+          "detail": "Set and enforce TLS 1.2+ for `flow:entity:shopper>process:storefront-api>place-order`, validate certificates, and record the verified transport protocol and `encryption_in_transit` state."
+        },
+        {
+          "summary": "Minimize payment-related data in the request",
+          "detail": "Avoid carrying payment-adjacent fields unless required for order capture, and use opaque payment references where possible."
+        }
+      ]
+    },
+    {
+      "title": "Settlement information may be intercepted on the processor webhook path",
+      "description": "`flow:entity:card-processor>process:storefront-api>settlement-webhook` crosses from `boundary:public-internet` to `boundary:storefront-dmz`, carries financial settlement confirmations, and has unknown protocol and `encryption_in_transit` attributes. If its transport is not confidential, a network-path observer can intercept payment-settlement status for orders delivered to `process:storefront-api`. That information enables targeted fraud and social-engineering attempts against shoppers whose orders are known to have been paid. This is conditional on resolving the unstated transport controls.",
+      "affected_element_ids": [
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "entity:card-processor",
+        "process:storefront-api"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:protocol",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the processor webhook crosses a trust boundary and no transport protocol or encryption state is stated. Impact is medium because the flow is tagged `financial` and reveals order-payment status, but the model describes settlement confirmations rather than the full order corpus."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated TLS for settlement callbacks",
+          "detail": "Require TLS 1.2+ with certificate validation on `flow:entity:card-processor>process:storefront-api>settlement-webhook` and record the verified protocol and encryption state."
+        },
+        {
+          "summary": "Minimize webhook contents",
+          "detail": "Send an opaque settlement reference rather than unnecessary order or customer information, and resolve details only within the trusted service path."
+        }
+      ]
+    },
+    {
+      "title": "Order and address data may be intercepted between the storefront and core service",
+      "description": "`flow:process:storefront-api>process:order-service>submit-order` crosses from `boundary:storefront-dmz` to `boundary:core-services`, carries shopper identifiers, shipping addresses, order contents, and financial data, but has unverified `encryption_in_transit`. If this gRPC path lacks effective TLS, an attacker with a foothold able to observe the DMZ-to-core path can intercept every submitted order before it reaches `process:order-service`. The exposed identifiers and order data can be matched to the confidential records written through the order service to `store:orders-db`.",
+      "affected_element_ids": [
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "process:storefront-api",
+        "process:order-service"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "unknown:flow:process:storefront-api>process:order-service>submit-order:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional: the flow crosses from the DMZ to core services, so an observer needs a foothold on that path, while encryption is not stated. Impact is high because the flow carries both `pii` and `financial` order data, including shopper identifiers and shipping addresses."
+      },
+      "mitigations": [
+        {
+          "summary": "Use mTLS on the storefront-to-order-service call",
+          "detail": "Require TLS with mutual service authentication for `flow:process:storefront-api>process:order-service>submit-order` and reject plaintext or unauthenticated gRPC connections."
+        },
+        {
+          "summary": "Reduce sensitive payload fields",
+          "detail": "Pass opaque order references where `process:order-service` can resolve the required data internally instead of sending full shopper details on every call."
+        }
+      ]
+    },
+    {
+      "title": "Database traffic may expose the confidential order corpus if transport encryption is absent",
+      "description": "`flow:process:order-service>store:orders-db>read-write-orders` carries order rows, shipping addresses, and card last-four data to and from confidential `store:orders-db`, but its protocol and `encryption_in_transit` are unknown. If the database connection is not encrypted, an attacker with access to the core-services network path can intercept queries and result sets, reading shopper PII and financial order data. The attacker can use the captured records to target individual shoppers and correlate them with order-service activity. This draft is conditional on the unresolved database-transport controls.",
+      "affected_element_ids": [
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "process:order-service",
+        "store:orders-db"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:order-service>store:orders-db>read-write-orders:protocol",
+        "unknown:flow:process:order-service>store:orders-db>read-write-orders:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because an attacker needs a foothold on the internal core-services path and both the database protocol and transport-encryption state are unstated. Impact is high because `store:orders-db` is confidential and holds `pii` and `financial` data for the order corpus."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce encrypted database connections",
+          "detail": "Require TLS for `flow:process:order-service>store:orders-db>read-write-orders`, validate the database certificate, and configure the client to fail closed when encryption cannot be established."
+        },
+        {
+          "summary": "Restrict database network reachability",
+          "detail": "Allow the database interface only from the narrowly identified order-service workload and monitor for unexpected connection sources."
+        }
+      ]
+    },
+    {
+      "title": "Unencrypted and broadly obtainable order-database backups expose customer records",
+      "description": "`store:orders-db` is confidential and holds shopper addresses and card last-four data. Its primary `encryption_at_rest` posture remains unknown, while the submitted answers state that its backups and snapshots are not encrypted and are not limited to named operators. An attacker or over-privileged insider who obtains a disk, backup, or snapshot copy can read the order corpus outside `process:order-service` and its normal database authentication path. The raw copy exposes the same PII and financial data used by downstream order processing, enabling bulk targeting of affected shoppers.",
+      "affected_element_ids": [
+        "store:orders-db",
+        "flow:process:order-service>store:orders-db>read-write-orders"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:orders-db:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "Asked \"Who can obtain a disk, backup or snapshot copy of store:orders-db?\", the answer is \"Are its backups and snapshots encrypted? no; Can only named operators get its disks, backups or snapshots? no\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because the stated lack of backup encryption and named-operator restriction gives storage-layer readers a practical route, though they must obtain an operational copy. Impact is high because `store:orders-db` is classified confidential and tagged `pii` and `financial`, so one copy yields bulk, irreversible disclosure."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and restrict all orders-db operational copies",
+          "detail": "Use managed encryption with controlled keys for `store:orders-db` and explicitly require it for backups, snapshots, exports, and restores; permit retrieval only to named operational principals."
+        },
+        {
+          "summary": "Audit and limit copy operations",
+          "detail": "Log and alert on backup creation, snapshot export, restore, and media access, and routinely remove stale copies under an enforced retention policy."
+        }
+      ]
+    },
+    {
+      "title": "Broad order-service database access can disclose every shopper's orders",
+      "description": "The single application account used on `flow:process:order-service>store:orders-db>read-write-orders` has full read/write access to `store:orders-db`, and the submitted answers state that the store does not perform request authorization, use narrower roles or scopes, or verify ownership of named objects. A malicious insider using that account, or an attacker who obtains its access path, can read the full confidential order corpus rather than only records needed for one operation. This reaches all shopper addresses and card last-four data in `store:orders-db`, not merely the order associated with an individual request.",
+      "affected_element_ids": [
+        "store:orders-db",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "process:order-service"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "Asked \"Who may do what on store:orders-db, and does it check each request against that?\", the answer is \"Does it check each request against what the caller may do? no; Are permissions narrower than full access, such as roles or scopes? no; Does it check that the caller owns the object it names? no\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 6,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because an attacker must obtain the application account or an internal execution position, but the stated account grant is full read/write and no narrower authorization checks are described. Impact is high because the grant reaches confidential `pii` and `financial` records for the entire `store:orders-db` corpus."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace the shared full-access account with least-privilege access",
+          "detail": "Give `process:order-service` narrowly scoped database roles, separate read and write duties, and restrict access to the tables, rows, and columns its defined operations require."
+        },
+        {
+          "summary": "Enforce authorization at the data-access boundary",
+          "detail": "Bind order and shopper ownership to the authenticated principal server-side and audit bulk reads or queries inconsistent with ordinary order processing."
+        }
+      ]
+    },
+    {
+      "title": "Static database credentials in the order-service environment can be recovered and reused",
+      "description": "The database password for the full-access order-service application account is stored in an environment variable on `process:order-service`, rather than in a dedicated secret store. An attacker or unauthorized operator able to read an environment dump, deployment configuration, diagnostic output, or the worker runtime can recover that long-lived credential and then use the database read path to access `store:orders-db`. Because that account has full read/write access, disclosure of one secret enables corpus-scale exposure of shopper addresses and card last-four data.",
+      "affected_element_ids": [
+        "process:order-service",
+        "flow:process:order-service>store:orders-db>read-write-orders",
+        "store:orders-db"
+      ],
+      "verb": "recover-credential",
+      "evidence_refs": [
+        "assertion:credential-custody~credential:order-service-database-password~any~v.c4f5cadf8e5c",
+        "assertion:authorization-grant~principal:order-service-application-account~s.96924e46de53~v.a0d2e84b8161"
+      ],
+      "quotes": [
+        {
+          "text": "The password comes from an environment variable on the worker.",
+          "source_label": "System description"
+        },
+        {
+          "text": "Asked \"Which security settings does flow:process:order-service>store:orders-db>read-write-orders use, such as cookie attributes, response headers, cross-origin rules or secret storage?\", the answer is \"Are its cookies set Secure, HttpOnly and SameSite? no; Does it send security headers such as CSP and HSTS? no; Does it limit cross-origin requests to named origins? no; Are its secrets kept in a secret store, not in code or files? no\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 7,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because recovering an environment-held secret requires access to worker configuration, runtime state, or diagnostics, but the credential is static rather than short-lived. Impact is high because the account has full read/write access to confidential `pii` and `financial` data in `store:orders-db`."
+      },
+      "mitigations": [
+        {
+          "summary": "Move database authentication to short-lived workload credentials",
+          "detail": "Replace the environment-variable password with workload identity or short-lived credentials issued by a dedicated secret manager, and rotate the existing password."
+        },
+        {
+          "summary": "Constrain the credential's authority",
+          "detail": "Reduce the database principal to the minimum tables, columns, rows, and operations required by `process:order-service` so a recovered value cannot expose the complete corpus."
+        }
+      ]
+    },
+    {
+      "title": "Storefront and order-service logs can disclose shopper data to unauthorized readers",
+      "description": "`process:storefront-api` receives shopper order data on `flow:entity:shopper>process:storefront-api>place-order` and passes it to `process:order-service` on `flow:process:storefront-api>process:order-service>submit-order`. The answers state that both processes neither keep secrets and personal data out of logs nor limit log readers to authorized parties. An unauthorized log reader, including an over-privileged operator or an attacker who reaches logging output, can read logged shopper PII and order-related financial data without querying `store:orders-db`. Those records can be used to identify shoppers and correlate their purchases with stored order records.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "process:order-service",
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "verb": "read",
+      "evidence_refs": [],
+      "quotes": [
+        {
+          "text": "Asked \"Which data does process:storefront-api return or record, and who can see it?\", the answer is \"Does it return only the fields the caller needs? no; Does it keep secrets and personal data out of its logs? no; Can only authorised readers see what it records? no\".",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Asked \"Which data does process:order-service return or record, and who can see it?\", the answer is \"Does it return only the fields the caller needs? no; Does it keep secrets and personal data out of its logs? no; Can only authorised readers see what it records? no\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 8,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because the submitted answers explicitly state that personal data is not kept out of the two processes' logs and that recorded data is not restricted to authorized readers. Impact is high because the implicated flows carry `pii` and `financial` information, including shipping addresses and order details."
+      },
+      "mitigations": [
+        {
+          "summary": "Redact sensitive fields before logging",
+          "detail": "Remove or tokenize shipping addresses, shopper identifiers, card-related fields, session material, and complete order payloads at logging call sites in `process:storefront-api` and `process:order-service`."
+        },
+        {
+          "summary": "Apply source-equivalent access controls to logs",
+          "detail": "Restrict log access to named, least-privilege principals; segregate sensitive operational logs; and audit or alert on log searches and bulk export."
+        }
+      ]
+    },
+    {
+      "title": "Receipt-archive backup copies can be read without encryption or named-operator restrictions",
+      "description": "`store:receipt-archive` holds one receipt per completed order, and `flow:process:order-service>store:receipt-archive>append-receipt` records the order written and the order-service identity. Although the live archive uses a customer-managed key, the submitted answers state that its backups and snapshots are unencrypted and not restricted to named operators. An attacker or unauthorized insider who obtains one such operational copy can read receipt records outside the live bucket's service-account access path, revealing order activity and operational metadata that can be correlated with orders processed by `process:order-service`.",
+      "affected_element_ids": [
+        "store:receipt-archive",
+        "flow:process:order-service>store:receipt-archive>append-receipt"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:receipt-archive:data_classification"
+      ],
+      "quotes": [
+        {
+          "text": "Asked \"Who can obtain a disk, backup or snapshot copy of store:receipt-archive?\", the answer is \"Are its backups and snapshots encrypted? no; Can only named operators get its disks, backups or snapshots? no\".",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 9,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium because unencrypted, broadly obtainable backup or snapshot copies provide a storage-layer disclosure route, although an attacker must obtain a copy. Impact is medium because the archive contains a receipt for every completed order and reveals order activity, while its data classification is currently unknown."
+      },
+      "mitigations": [
+        {
+          "summary": "Extend archive encryption and access restrictions to copies",
+          "detail": "Require customer-managed encryption and named-principal authorization for every backup, snapshot, export, and restore of `store:receipt-archive`."
+        },
+        {
+          "summary": "Minimize receipt contents and retention",
+          "detail": "Store only the receipt fields required for operational and legal purposes, avoid unnecessary shopper detail, and expire operational copies under a defined retention policy."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

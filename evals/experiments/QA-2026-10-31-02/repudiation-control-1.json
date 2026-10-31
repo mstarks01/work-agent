@@ -1,0 +1,80 @@
+{
+  "claims": [
+    {
+      "title": "A shopper can deny an order because the receipt names only the order service",
+      "description": "A shopper who placed an order through `flow:entity:shopper>process:storefront-api>place-order` can dispute having submitted or authorized it. Although the storefront terminates the shopper session, `flow:process:storefront-api>process:order-service>submit-order` carries no authentication, so `process:order-service` receives no authenticated shopper identity to associate with capture. The completed-order receipt written through `flow:process:order-service>store:receipt-archive>append-receipt` records the order service rather than the originating shopper. Consequently, the evidence at `store:receipt-archive` can show that the service wrote a receipt but cannot rebut a shopper's denial of the financial order. This also leaves subsequent order rows in `store:orders-db` without an attributable originating identity for dispute handling.",
+      "affected_element_ids": [
+        "entity:shopper",
+        "process:order-service",
+        "store:receipt-archive",
+        "flow:process:order-service>store:receipt-archive>append-receipt"
+      ],
+      "verb": "unattributable",
+      "evidence_refs": [
+        "crossing:flow:entity:shopper>process:storefront-api>place-order",
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "The receipt records which order was written and that the order service wrote it.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high because every shopper order crosses from `boundary:public-internet` and the stated absent authentication on `flow:process:storefront-api>process:order-service>submit-order` structurally prevents `process:order-service` from receiving an authenticated shopper identity. Impact is medium because the disputed actions concern `financial` order data and affect confidential `store:orders-db`, but the described harm is an evidentiary and financial-dispute loss rather than loss of the order corpus."
+      },
+      "mitigations": [
+        {
+          "summary": "Propagate the authenticated shopper identity to order capture and receipts",
+          "detail": "Pass a verified, integrity-protected shopper subject from `process:storefront-api` to `process:order-service`, and record that subject, action, order identifier, timestamp, and outcome in each receipt or dedicated audit record."
+        },
+        {
+          "summary": "Create independently useful order-audit evidence",
+          "detail": "Record immutable security events for order submission and capture, retaining the authenticated actor alongside the service identity so the receipt is not the sole evidence of who initiated the action."
+        }
+      ]
+    },
+    {
+      "title": "Settlement callbacks may be deniable by the card processor",
+      "description": "`entity:card-processor` can deny having sent a settlement confirmation acted on by `process:storefront-api` through `flow:entity:card-processor>process:storefront-api>settlement-webhook`. That flow crosses from `boundary:public-internet`, but its authentication and origin verification are unstated. If those unknowns resolve to an unsigned or otherwise non-verifiable callback, the received confirmation cannot prove that `entity:card-processor` originated the message, leaving settlement disputes over financial orders as competing assertions. This is conditional on the unresolved authentication and origin-verification facts; it does not assert that the callback is unsigned.",
+      "affected_element_ids": [
+        "entity:card-processor",
+        "process:storefront-api",
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook"
+      ],
+      "verb": "unattributable",
+      "evidence_refs": [
+        "crossing:flow:entity:card-processor>process:storefront-api>settlement-webhook",
+        "unknown:flow:entity:card-processor>process:storefront-api>settlement-webhook:authentication",
+        "assertion:origin-verification~flow:entity:card-processor>process:storefront-api>settlement-webhook~any~unknown"
+      ],
+      "quotes": [
+        {
+          "text": "I would have to check how that callback is authenticated.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `flow:entity:card-processor>process:storefront-api>settlement-webhook` is a crossing from `boundary:public-internet` while both authentication and origin verification are unknown, though a compensating signature may exist. Impact is medium because the callback marks an order paid and carries `financial` data, so an unresolved settlement dispute can cause direct payment and reconciliation loss."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and retain verifiable settlement callbacks",
+          "detail": "Require signed webhook requests with a processor-specific key, timestamp, and replay protection on `flow:entity:card-processor>process:storefront-api>settlement-webhook`; retain the raw signed payload and verification result for the dispute-retention period."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

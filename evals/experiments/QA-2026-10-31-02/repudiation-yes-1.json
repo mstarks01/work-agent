@@ -1,0 +1,47 @@
+{
+  "claims": [
+    {
+      "title": "Unauthenticated order submissions may not yield defensible actor attribution",
+      "description": "`flow:process:storefront-api>process:order-service>submit-order` crosses from `process:storefront-api` into `process:order-service` with authentication explicitly absent, while the submitted answers state that the flow records who acted and checks the sender. These statements conflict on the mechanism that would bind an order-capture action to a verified principal. If the affirmative answers do not represent an independently verified and propagated originating identity, an actor able to reach `process:order-service` through this path can submit or cause an order capture and later deny it; a record of the service, network source, or self-asserted shopper identifier would not rebut that denial. This affects disputed writes subsequently made through `flow:process:order-service>store:orders-db>read-write-orders` to `store:orders-db`, which holds `financial` order data. The draft is conditional on resolving the contradictory evidence: establish exactly which authenticated principal the order-service record retains and how it is verified on this hop.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "process:order-service",
+        "flow:process:storefront-api>process:order-service>submit-order"
+      ],
+      "verb": "unattributable",
+      "evidence_refs": [
+        "crossing:flow:process:storefront-api>process:order-service>submit-order",
+        "absent:flow:process:storefront-api>process:order-service>submit-order:authentication"
+      ],
+      "quotes": [
+        {
+          "text": "Does it record who performed each action? yes; Is that record kept where the people it records cannot change or delete it? yes",
+          "source_label": "Answers to link questions"
+        },
+        {
+          "text": "Does it check who sent what it takes, such as by a signature or an authenticated sender? yes; Does it check that what it takes was not altered? yes",
+          "source_label": "Answers to link questions"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium: `flow:process:storefront-api>process:order-service>submit-order` crosses from the DMZ to the core service and has authentication stated absent, but exploiting it requires reaching that internal hop or controlling its upstream caller. Impact is medium because resulting order writes reach `store:orders-db`, whose assets include `financial` data and whose classification is confidential."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and preserve the originating principal on the order-service hop",
+          "detail": "Require a verifiable workload credential or signed service-to-service token on `flow:process:storefront-api>process:order-service>submit-order`, and propagate the authenticated shopper subject and request identifier so `process:order-service` records both the originating actor and the calling service."
+        },
+        {
+          "summary": "Make the audit evidence mechanism explicit and independently verifiable",
+          "detail": "Document and retain the record fields, verified identity source, action, target, timestamp, and outcome for order capture; keep the record in the stated protected location so it can rebut a dispute rather than merely record an unverified caller claim."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}
