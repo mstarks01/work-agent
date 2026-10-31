@@ -4093,6 +4093,42 @@ await keep.listeners.click(); await settle();
         assert not [c for c in seen["calls"] if c.get("url") == "/answer/r1"]
 
 
+class TestEveryControlIsNamed:
+    """Each control on the report page names its question for a screen
+    reader, built once in the shared editors (#2029 package 8)."""
+
+    def test_each_select_and_input_has_an_accessible_name(self):
+        store = valid_model().data_stores[0]
+        facets = {
+            **facet_fact(store),
+            "basis": "critic",
+            "cited_by": 1,
+            "covered_so_far": 1,
+            "findings": ["stride/D-01"],
+            "needs": {},
+            "history": "open",
+            "max_length": 500,
+        }
+        payloads = {
+            "report": {"system_model": valid_model().model_dump(mode="json")},
+            "link_questions": [],
+            "fact_questions": [CONTROL, facets],
+            "final": False,
+        }
+        steps = """
+calls.push(box.all("select").concat(box.all("input"))
+  .filter(c => c.type !== "checkbox")
+  .map(c => c.attributes["aria-label"] || ""));
+calls.push(box.all("th").map(h => h.scope || ""));
+"""
+        names, scopes = _run_answer_block(payloads, steps)["calls"]
+        assert names and all(names), names
+        assert "login: encryption in transit" in names
+        assert "login: encryption in transit: the mechanism" in names
+        assert f"{store.name}: {facets['facets'][0]['question']}" in names
+        assert set(scopes) == {"col"}
+
+
 class TestTheFacetsAPageAsks:
     """The report page shows an input for each facet a waiting finding needs,
     and the rest under "Additional details" (#2029 package 1, ADR 0112)."""

@@ -321,6 +321,18 @@ def test_a_focused_editor_survives_another_answer_s_save(page):
     assert typed.input_value() == "the platform tea"
 
 
+def test_each_question_control_names_its_question(page):
+    """A screen reader names every input of the list by its question, from the
+    shared editors and not from a patch after the list is drawn."""
+    pause(page)
+    unnamed = page.evaluate(
+        """() => [...document.querySelectorAll("#list select, #list input")]
+          .filter((c) => !c.labels?.length && !c.getAttribute("aria-label"))
+          .map((c) => c.outerHTML.slice(0, 80))"""
+    )
+    assert unnamed == []
+
+
 def test_a_reload_shows_the_saved_answers(page):
     pause(page)
     control = page.locator('#list select:has(option[value="yes"])').first

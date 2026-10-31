@@ -249,15 +249,18 @@ const questionList = ({
     const head = document.createElement("tr");
     const corner = document.createElement("th");
     corner.textContent = "Part of your system";
+    corner.scope = "col";
     head.append(corner);
     const heads = q.facets.map((facet) => {
       const cell = document.createElement("th");
       cell.textContent = facet.question;
+      cell.scope = "col";
       head.append(cell);
       return cell;
     });
     const detailHead = document.createElement("th");
     detailHead.textContent = "Exceptions or detail (optional)";
+    detailHead.scope = "col";
     head.append(detailHead);
     table.append(head);
     const grid = { table, facets: q.facets, heads, rows: new Set(), shared: [], more: false, count: 0 };
@@ -309,12 +312,13 @@ const questionList = ({
       const select = facetSelect(reopen || !before ? "(leave unanswered)" : null, before, reopen);
       select.dataset.key = questionKey(q.key);
       select.dataset.facet = facet.id;
+      select.setAttribute("aria-label", `${q.element}: ${facet.question}`);
       select.addEventListener("change", (event) => edited(row, event));
       const cell = document.createElement("td");
       cell.append(select);
       return cell;
     });
-    const detail = answerDetail((prefill && prefill.detail) || "");
+    const detail = answerDetail((prefill && prefill.detail) || "", q.label);
     detail.addEventListener("input", (event) => edited(row, event));
     const detailCell = document.createElement("td");
     detailCell.append(detail, " ", ...extras(row));
