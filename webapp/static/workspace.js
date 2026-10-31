@@ -39,7 +39,8 @@ const workspace = (() => {
     el("load").hidden = true;
     el("upload").hidden = true;
     el("transcript-note").hidden = true;
-    el("transcript-file").disabled = true;
+    el("diagram-note").hidden = true;
+    el("upload-file").disabled = true;
     el("ask").disabled = true;
     current = data;
     el("analysis-header").hidden = false;

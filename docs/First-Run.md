@@ -372,6 +372,12 @@ than one analysis can carry, is not UTF-8, or holds control characters. The
 service reads the transcript as a conversation, beside the description where
 you type one. **Remove** takes the transcript off the form.
 
+To add a diagram, click the same **+** button and choose a Mermaid file that
+ends in `.mmd` or `.mermaid`, such as a `flowchart`. The service reads it as a
+diagram of the system: a node can be a component and an arrow a data flow. A
+subgraph is a trust zone only where its label says so. The page holds one
+transcript and one diagram, and **Remove** takes each one off the form.
+
 Then replace the example with your own description. State security controls
 that are actually known. When the input does not state an attribute, extraction
 uses `unknown`; code turns a claim resting on such an attribute into

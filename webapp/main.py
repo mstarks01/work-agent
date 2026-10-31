@@ -50,10 +50,10 @@ The security posture is deliberate throughout:
   uses one. This is the primary control, and the CSP
   below is defence in depth behind it. The form page is included: a source label
   and a validator message both carry submitter bytes onto it over SSE, and both
-  land as text nodes. An uploaded transcript is a file only inside the
-  browser: the page checks its size, decodes it as strict UTF-8 and refuses a
-  control character before it keeps the text, and ``/analyze`` receives that
-  text as a ``transcript`` source in the JSON body. No route takes a file, so
+  land as text nodes. An uploaded transcript or diagram is a file only inside
+  the browser: the page checks its size, decodes it as strict UTF-8 and refuses
+  a control character before it keeps the text, and ``/analyze`` receives that
+  text as a ``transcript`` or ``diagram`` source in the JSON body. No route takes a file, so
   no file name, content type or multipart body reaches the server.
   Server-side, the two f-string pages escape through
   :func:`~webapp.page.escape`, which is quote-safe, so where a value lands is

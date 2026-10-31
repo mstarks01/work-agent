@@ -226,8 +226,9 @@ billed.
 
 The report answers exactly this set, one block per framework, in this order.
 
-Each source is `{kind, label, text}`. `kind` is `description` or `transcript`
-and selects the guidance extraction reads the text under. A third kind,
+Each source is `{kind, label, text}`. `kind` is `description`, `transcript` or
+`diagram`, and selects the guidance extraction reads the text under. A
+`diagram` source holds Mermaid text, such as a `flowchart`. A third kind,
 `answers`, is composed by the service from `links` (below); a submission that
 sends one itself is refused. `label` is yours: it
 must be unique within the job, at most 200 characters and single-line, and it

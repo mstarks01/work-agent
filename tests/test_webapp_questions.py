@@ -564,13 +564,14 @@ const ids = {};
 for (const id of ["analyze","description","problem","go","load","ask",
                   "asked","questions","list","earlier","save","continue","status",
                   "status-text","answer-problem","skip","no-rest","no-rest-hint","skipped","more",
-                  "answer_limits","save-status","changes","upload","transcript-file",
-                  "transcript-note","transcript-name","transcript-remove","analysis-name",
+                  "answer_limits","save-status","changes","upload","upload-file",
+                  "transcript-note","transcript-name","transcript-remove","diagram-note",
+                  "diagram-name","diagram-remove","analysis-name",
                   "description-remaining"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
-ids["transcript-file"].dataset.maxBytes = "64";
-ids["transcript-file"].files = [];
+ids["upload-file"].dataset.maxBytes = "64";
+ids["upload-file"].files = [];
 ids.description.dataset.maxBytes = "1000000";
 ids["analysis-name"].value = "Test analysis";
 ids.ask.checked = true;
@@ -853,15 +854,16 @@ if (!ids.problem.hidden) calls.push({{ url: "problem", body: ids.problem.childre
         assert [entry["name"] for entry in sent[0]] == names
 
 
-# Picks a stand-in file of ``bytes`` in the transcript input. A read of its
-# content records a "read" call, and each refusal records a "problem" call.
+# Picks a stand-in file of ``bytes``, named ``name``, in the upload input. A
+# read of its content records a "read" call, and each refusal records a
+# "problem" call.
 _PICK = """
-const pick = async (bytes) => {
-  ids["transcript-file"].files = [{ name: "call.txt", size: bytes.length,
+const pick = async (bytes, name = "call.txt") => {
+  ids["upload-file"].files = [{ name, size: bytes.length,
     arrayBuffer: async () => { calls.push({ url: "read" });
       return Uint8Array.from(bytes).buffer; } }];
   ids.problem.hidden = true;
-  await ids["transcript-file"].listeners.change(); await settle();
+  await ids["upload-file"].listeners.change(); await settle();
   if (!ids.problem.hidden) calls.push({ url: "problem", body: ids.problem.children.join("") });
 };
 const submit = async () => {
@@ -894,6 +896,30 @@ await submit();
     assert alone == [TRANSCRIPT]
     assert beside == [description | {"text": "A shop."}, TRANSCRIPT]
     assert removed == [description | {"text": "A shop."}]
+
+
+DIAGRAM = {"kind": "diagram", "label": "Uploaded diagram", "text": "flowchart LR"}
+
+
+def test_a_mermaid_file_posts_as_a_diagram_source_beside_a_transcript():
+    """A ``.mmd`` or ``.mermaid`` file goes as a ``diagram`` source. The page
+    holds one transcript and one diagram, and Remove takes off only its own."""
+    steps = """
+await pick([...new TextEncoder().encode("flowchart LR")], "model.mmd");
+await submit();
+await pick([...new TextEncoder().encode("Ana: hi")]);
+await submit();
+await pick([...new TextEncoder().encode("flowchart LR")], "Model.MERMAID");
+await submit();
+await ids["diagram-remove"].listeners.click();
+await submit();
+"""
+    alone, both, replaced, removed = _posted_sources(steps)
+
+    assert alone == [DIAGRAM]
+    assert both == [TRANSCRIPT, DIAGRAM]
+    assert replaced == [TRANSCRIPT, DIAGRAM]
+    assert removed == [TRANSCRIPT]
 
 
 @pytest.mark.parametrize(

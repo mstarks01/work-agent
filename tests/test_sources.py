@@ -11,6 +11,7 @@ rule. One case in ``test_execution`` proves the executor actually calls this.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import get_args
 
 import pytest
 from pydantic import ValidationError
@@ -19,10 +20,12 @@ from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import compose_extract_prompt, compose_repair_prompt
 from analysis_service.sources import (
+    _REGISTERS,
     DEFAULT_DESCRIPTION_LABEL,
     DEFAULT_TRANSCRIPT_LABEL,
     MAX_LABEL_CHARS,
     Source,
+    SourceKind,
     render_sources,
     total_bytes,
 )
@@ -188,6 +191,21 @@ class TestRender:
         )
         assert "written description" in described
         assert "transcribed conversation" in transcribed
+
+    def test_a_diagram_register_says_how_to_read_mermaid(self):
+        diagram = Source(kind="diagram", label="Model", text="flowchart LR")
+        outside = "\n".join(lines_outside_fences(render_sources([diagram])))
+        assert "Mermaid" in outside
+        assert "trust zone only where its label says so" in outside
+
+    def test_a_job_with_no_diagram_renders_no_diagram_guidance(self):
+        """The diagram guidance rides on its own source's header, so a job
+        without one sends the extraction prompt it sent before the kind."""
+        document = render_sources([Source.description("x"), Source.transcript("y")])
+        assert "Mermaid" not in document
+
+    def test_every_kind_has_a_register(self):
+        assert set(_REGISTERS) == set(get_args(SourceKind))
 
     def test_the_label_rides_inside_the_fence(self):
         # It is caller-controlled, so it can never sit on the marker line.
