@@ -21,7 +21,7 @@ attention.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -37,6 +37,7 @@ __all__ = [
     "Rule",
     "clip_fact",
     "generate_candidates",
+    "with_effects",
 ]
 
 # How much of a caller-authored attribute value a fact carries. Facts exist to
@@ -75,6 +76,21 @@ class Candidate(BaseModel):
     facts: dict[str, Fact] = Field(default_factory=dict)
 
 
+def with_effects(rules: Sequence[Rule], effects: Mapping[str, str]) -> tuple[Rule, ...]:
+    """``rules``, each with its sentence from a package's ``effects`` table.
+
+    The table is checked against the rules: a rule with no sentence, or a
+    sentence for no rule, raises, so a new rule cannot reach the early list
+    with the analyst's question as its reason.
+    """
+    ids = {rule.rule_id for rule in rules}
+    if missing := sorted(ids - effects.keys()):
+        raise ValueError(f"no effect sentence for the rules {missing}")
+    if extra := sorted(effects.keys() - ids):
+        raise ValueError(f"effect sentences for no rule: {extra}")
+    return tuple(replace(rule, effect=effects[rule.rule_id]) for rule in rules)
+
+
 class CandidateSet(BaseModel):
     """One lane's candidates, plus the questions their rules put.
 
@@ -103,6 +119,10 @@ class Rule:
     lane: str
     question: str
     find: Callable[[SystemModel, AssertionCatalog], Iterator[Match]]
+    #: What an answer about a fact the rule reads informs, as the early list
+    #: shows it to the owner (:func:`with_effects`). ``question`` is what the
+    #: lane reads.
+    effect: str = ""
 
     def fire(self, model: SystemModel, catalog: AssertionCatalog) -> list[Candidate]:
         """Every candidate this rule produces for this model, in model order."""
