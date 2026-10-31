@@ -30,6 +30,10 @@ of a list once for every element it lists (ADR 0081): one charge for the
 group's parts answers each of its rows. A capability question is charged on
 its own, because every capability shares one group.
 
+``element-count`` is the shipped list ranked by the score the floor reads,
+where every candidate on an element counts toward each of its fields, and not
+only a candidate whose rule reads the field (ADR 0115).
+
 The ``no-to-the-rest`` policies keep each capability question at its place
 and answer "yes" to some of them, each on its own; one choice then answers
 "no" to every capability question of the list left. The walk does not know
@@ -49,7 +53,9 @@ from functools import partial
 from itertools import groupby
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
+import analysis_service.early_questions as early_module
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import passes_floor, question_set, whose_turn
 from analysis_service.claims import FrameworkName, UnknownKey
@@ -219,6 +225,13 @@ def _merge(
                 charged[holder] += question.decisions
 
 
+def _element_count(model: SystemModel, chosen: Selection) -> list[Charge]:
+    """The shipped list ranked by the score, as the floor reads it: every
+    candidate on an element counts toward each of its fields (ADR 0115)."""
+    with mock.patch.object(early_module, "reads", lambda candidate, field: True):
+        return _each(_shipped_list(model, chosen))
+
+
 #: Every order compared, by name.
 POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[Charge]]] = {
     "shipped-list": lambda model, chosen: _each(_shipped_list(model, chosen)),
@@ -227,6 +240,7 @@ POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[Charge]]] = {
     ),
     "grouped-merge": lambda model, chosen: _each(_merge(model, chosen, grouped=True)),
     "group-question": _group_question,
+    "element-count": _element_count,
     **{
         f"no-to-the-rest-{name}": partial(_group_question, yes_share=share)
         for name, share in YES_SHARES.items()

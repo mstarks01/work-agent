@@ -42,6 +42,12 @@ def test_the_shipped_order_starts_with_the_pause_s_first_list():
     assert order[: len(first)] == [q.key for q in first]
 
 
+def test_the_element_count_order_asks_the_same_questions():
+    shipped = keys_of(POLICIES["shipped-list"](valid_model(), BOTH))
+    every = keys_of(POLICIES["element-count"](valid_model(), BOTH))
+    assert sorted(every) == sorted(shipped)
+
+
 @pytest.mark.parametrize("policy", ["framework-merge", "grouped-merge"])
 class TestTheMerge:
     def test_a_shared_question_is_asked_once(self, policy):

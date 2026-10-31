@@ -7,8 +7,6 @@ for a row per framework, and against the questions route for a paused job.
 
 from __future__ import annotations
 
-from collections import Counter
-
 import pytest
 
 from analysis_service.answer_forms import YES_NO, answer_choices
@@ -22,8 +20,9 @@ from analysis_service.early_questions import (
     PriorRow,
     early_questions,
     element_type,
+    reads,
 )
-from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import group_of
@@ -147,21 +146,48 @@ class TestWhatIsAsked:
 
 
 class TestTheOrder:
-    def test_the_rules_that_fire_on_an_element_raise_its_questions(self):
-        """Equal rates, so the element more candidates name is asked first."""
+    def candidates_on(self, element_id):
         stride = PACKAGES["stride"]
         found = generate_candidates(valid_model(), stride.lanes, stride.rules)
-        named = Counter(
-            element_id
+        return [
+            candidate
             for group in found.values()
             for candidate in group.candidates
-            for element_id in set(candidate.element_ids)
+            if element_id in candidate.element_ids
+        ]
+
+    def test_every_rule_that_fires_on_an_element_raises_its_score(self):
+        """The floor reads the score, so each candidate keeps a question eligible."""
+        asked = early_questions(
+            valid_model(),
+            {"stride": {}},
+            None,
+            prior_of({"DataFlow": {"audit-evidence": 1.0}}),
         )
-        flows = [flow.id for flow in valid_model().data_flows]
-        assert len({named[flow] for flow in flows}) == len(flows)
-        asked = keys({"DataFlow": {"audit-evidence": 1.0}})
-        expected = sorted(flows, key=lambda element: -named[element])
-        assert [key[0] for key in asked] == expected
+        assert {q.key[0]: q.score for q in asked} == {
+            flow.id: 1 + len(self.candidates_on(flow.id))
+            for flow in valid_model().data_flows
+        }
+
+    def test_only_a_rule_that_reads_the_fact_raises_its_rank(self):
+        """A candidate that reads another fact of the element does not move
+        the question up, and no rule reads a question kind (ADR 0115)."""
+        asked = early_questions(
+            valid_model(),
+            {"stride": {}},
+            None,
+            prior_of({"DataFlow": {"audit-evidence": 1.0, "authentication": 1.0}}),
+        )
+        unrelated = 0
+        for question in asked:
+            ref = key_ref(question.key)
+            found = self.candidates_on(ref.element_id)
+            reading = [c for c in found if ref.attribute and reads(c, ref.attribute)]
+            assert question.relevance == 1 + len(reading)
+            unrelated += len(found) - len(reading)
+        assert unrelated, "the fixture holds candidates that read another fact"
+        relevance = [q.relevance / q.decisions for q in asked]
+        assert relevance == sorted(relevance, reverse=True)
 
     def test_a_question_says_which_rules_read_its_fact(self):
         (question,) = early_questions(
@@ -419,7 +445,7 @@ class TestCapabilityBands:
         assert any(q.parent for q in asked), "a control: some question has a parent"
 
 
-def test_a_field_question_ranks_by_its_score_per_choice():
+def test_a_field_question_ranks_by_its_relevance_per_choice():
     """Ranked by score alone, a STRIDE-only pause opened with facet tables, and
     ten choices completed 517 findings on the archive; per choice, 1,488
     (QA-2026-09-26-03-E33)."""
@@ -428,7 +454,7 @@ def test_a_field_question_ranks_by_its_score_per_choice():
         for q in early_questions(valid_model(), {"stride": {}}, None)
         if q.kind != "capability"
     ]
-    per_choice = [q.score / q.decisions for q in fields]
+    per_choice = [q.relevance / q.decisions for q in fields]
     assert per_choice == sorted(per_choice, reverse=True)
     assert len({q.decisions for q in fields}) > 1, "the fixture mixes costs"
 
