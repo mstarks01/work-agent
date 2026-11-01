@@ -20,13 +20,34 @@
   const atLimit = () => files.length >= limits.max_owner_files;
   const limitText = () => `Files holds ${limits.max_owner_files} files, the most it can keep. Delete a file before you add another.`;
 
+  // The filters, as on the Analyses page: the search reads the name, and
+  // each select lists the values of the format table.
+  const option = (value, text) => {
+    const item = document.createElement("option");
+    item.value = value;
+    item.textContent = text;
+    return item;
+  };
+  el("files-kind").append(...[...new Set(textFile.rows.flatMap((row) => row.kinds))]
+    .map((kind) => option(kind, textFile.kindLabel(kind))));
+  el("files-format").append(...textFile.rows.map((row) => option(row.format, row.label)));
+
   const draw = () => {
     el("files-count").textContent = `${files.length} of ${limits.max_owner_files} files`;
     el("upload-file-button").disabled = atLimit();
     if (atLimit()) show("files-problem", limitText());
-    el("files-table").hidden = !files.length;
-    el("files-empty").hidden = Boolean(files.length);
-    el("files-list").replaceChildren(...files.map((file) => {
+    const text = el("files-search").value.toLocaleLowerCase();
+    const kind = el("files-kind").value;
+    const format = el("files-format").value;
+    const shown = files.filter((file) => file.name.toLocaleLowerCase().includes(text)
+      && (!kind || file.kind === kind)
+      && (!format || file.format === format));
+    el("files-table").hidden = !shown.length;
+    el("files-empty").hidden = Boolean(shown.length);
+    el("files-empty").textContent = files.length
+      ? "No files match your filters."
+      : "No files yet. Upload a transcript or a Mermaid diagram.";
+    el("files-list").replaceChildren(...shown.map((file) => {
       const row = document.createElement("tr");
       const added = document.createElement("time");
       added.dateTime = file.created_at;
@@ -167,6 +188,10 @@
     show("files-notice", `“${file.name}” is deleted. The analyses that used it keep their copy.`);
     await load();
   });
+
+  el("files-search").addEventListener("input", draw);
+  el("files-kind").addEventListener("change", draw);
+  el("files-format").addEventListener("change", draw);
 
   load();
 })();

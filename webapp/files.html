@@ -6,7 +6,7 @@
 <title>Files · Work Agent</title>
 <style nonce="__CSP_NONCE__"><!--workspace_style-->
   .files-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
-  .files-table-wrap { overflow-x:auto; }
+  .files-table-wrap { overflow-x:auto; margin-top:16px; }
   table.files { display:table; width:100%; border-collapse:collapse; font-size:14px; }
   table.files th, table.files td { text-align:left; padding:8px; border-bottom:1px solid var(--line); vertical-align:middle; }
   table.files td.name { overflow-wrap:anywhere; }
@@ -34,13 +34,14 @@
       <p id="files-count" class="hint"></p>
       <div id="files-notice" class="notice" role="status" hidden></div>
       <div id="files-problem" class="problem" role="alert" hidden></div>
+      <div class="analysis-filters"><div><label class="field-label" for="files-search">Find a file</label><input type="search" id="files-search" placeholder="Search by name"></div><div><label class="field-label" for="files-kind">Kind</label><select id="files-kind"><option value="">All kinds</option></select></div><div><label class="field-label" for="files-format">Format</label><select id="files-format"><option value="">All formats</option></select></div></div>
       <div class="files-table-wrap">
         <table class="files" id="files-table" hidden>
           <thead><tr><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Format</th><th scope="col">Size</th><th scope="col">Added</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
           <tbody id="files-list"></tbody>
         </table>
       </div>
-      <p id="files-empty" class="muted" hidden>No files yet. Upload a transcript or a Mermaid diagram.</p>
+      <p id="files-empty" class="muted" hidden></p>
       <dialog id="upload-dialog" class="upload" aria-labelledby="upload-heading">
         <h2 id="upload-heading">Upload a file</h2>
         <p id="upload-facts" class="hint"></p>
