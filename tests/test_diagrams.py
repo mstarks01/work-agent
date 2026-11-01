@@ -10,6 +10,7 @@ import pytest
 
 from analysis_service import deployment
 from analysis_service.diagrams import (
+    Arrow,
     DiagramEdge,
     DiagramGroup,
     DiagramNode,
@@ -148,7 +149,7 @@ def _node(id_: str, label: str) -> DiagramNode:
     return DiagramNode(id=id_, label=label, shape="square", group=None, line=1)
 
 
-def _edge(source: str, target: str, arrow: str = "forward") -> DiagramEdge:
+def _edge(source: str, target: str, arrow: Arrow = "forward") -> DiagramEdge:
     return DiagramEdge(source=source, target=target, label="", arrow=arrow, line=2)
 
 
