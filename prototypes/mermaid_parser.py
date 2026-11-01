@@ -159,7 +159,7 @@ def main() -> None:
         parsed, refused, guessed = parse(text)
         blessed = json.loads(Path(f"evals/corpus/{path.stem}/model.json").read_text())
         diff = compare(parsed, blessed)
-        model, issues = parse_and_validate(parsed, sources={LABEL: text})
+        _, issues = parse_and_validate(parsed, sources={LABEL: text})
         n = sum(
             len(blessed[g])
             for g in (
