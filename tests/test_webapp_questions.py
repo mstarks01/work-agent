@@ -569,7 +569,9 @@ for (const id of ["analyze","description","problem","go","load","ask",
                   "answer_limits","save-status","changes","upload","upload-file",
                   "transcript-note","transcript-name","transcript-remove","diagram-note",
                   "diagram-name","diagram-remove","analysis-name",
-                  "description-remaining","source_formats","file_refusals","page_labels"])
+                  "description-remaining","source_formats","file_refusals","page_labels",
+                  "files-rows","chosen-files","files-dialog","files-cancel","files-select",
+                  "upload-menu","upload-computer","upload-files"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
 ids["upload-file"].dataset.maxBytes = "64";
@@ -588,6 +590,7 @@ globalThis.document = {
   getElementById: (id) => ids[id] || null,
   createElement: (tag) => new Node(tag),
   querySelectorAll: (selector) => selector === "input[name=framework]" ? [framework] : [],
+  addEventListener() {},
   activeElement: null,
 };
 globalThis.location = { href: "", search: SEARCH };
