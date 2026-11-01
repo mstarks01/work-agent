@@ -13,6 +13,7 @@
     A: "Files page, form above a table; menu picker",
     B: "Files list with a detail panel; checklist picker",
     C: "No Files page: one Files dialog from the form",
+    D: "A's table, B's upload button and dialog, B's checklist",
   };
   const SCENARIOS = {
     normal: "Five files",
@@ -375,16 +376,8 @@
 
   // ---- variant A: a Files page, the upload form above a table ---------------
 
-  const filesA = () => {
-    const upload = S.draft
-      ? h("div", { class: "upload-form" }, h("h2", {}, "Add a file"), draftFields("a"),
-        h("div", { class: "line" },
-          h("button", { type: "button", class: "primary", on: { click: () => save() } }, "Save to Files"),
-          h("button", { type: "button", class: "quiet", on: { click: () => { S.draft = null; S.problem = null; render(); } } }, "Cancel")),
-        problemBox("files"))
-      : h("div", { class: "upload-form" }, h("h2", {}, "Add a file"),
-        h("div", { class: "line" }, chooseButton("Choose a file", (file) => choose(file), { disabled: atLimit() })),
-        formatHint(), atLimit() ? h("div", { class: "refusal" }, LIMIT_TEXT()) : problemBox("files"));
+  // The table of variant A, shared with variant D.
+  const filesTable = (empty) => {
     const rows = S.files.map((file) => h("tr", {},
       h("td", { class: "name" }, file.name),
       h("td", {}, KIND_LABEL[file.kind]),
@@ -395,14 +388,28 @@
         type: "button", class: "quiet", "aria-label": `Delete ${file.name}`,
         on: { click: () => { S.confirm = file.id; render(); } },
       }, "Delete"))));
+    return S.files.length
+      ? h("div", { class: "analysis-table-wrap" }, h("table", { class: "files-table" },
+        h("thead", {}, h("tr", {}, ["Name", "Kind", "Format", "Size", "Added", ""].map((t) => h("th", { scope: "col" }, t)))),
+        h("tbody", {}, rows)))
+      : h("p", { class: "muted" }, empty);
+  };
+
+
+  const filesA = () => {
+    const upload = S.draft
+      ? h("div", { class: "upload-form" }, h("h2", {}, "Add a file"), draftFields("a"),
+        h("div", { class: "line" },
+          h("button", { type: "button", class: "primary", on: { click: () => save() } }, "Save to Files"),
+          h("button", { type: "button", class: "quiet", on: { click: () => { S.draft = null; S.problem = null; render(); } } }, "Cancel")),
+        problemBox("files"))
+      : h("div", { class: "upload-form" }, h("h2", {}, "Add a file"),
+        h("div", { class: "line" }, chooseButton("Choose a file", (file) => choose(file), { disabled: atLimit() })),
+        formatHint(), atLimit() ? h("div", { class: "refusal" }, LIMIT_TEXT()) : problemBox("files"));
     return [
       h("div", { class: "count-line" }, h("h1", {}, "Files"), countLine()),
       intro(), noticeBox(), upload,
-      S.files.length
-        ? h("div", { class: "analysis-table-wrap" }, h("table", { class: "files-table" },
-          h("thead", {}, h("tr", {}, ["Name", "Kind", "Format", "Size", "Added", ""].map((t) => h("th", { scope: "col" }, t)))),
-          h("tbody", {}, rows)))
-        : h("p", { class: "muted" }, "No files yet. Add a transcript or a Mermaid diagram above."),
+      filesTable("No files yet. Add a transcript or a Mermaid diagram above."),
       confirmDialog(),
     ];
   };
@@ -551,6 +558,18 @@
     beforeActions: filesDialogC(),
   });
 
+  // ---- variant D: A's table, B's upload button and dialog, B's checklist ---
+
+  const filesD = () => [
+    h("div", { class: "count-line" }, h("h1", {}, "Files"),
+      h("span", {}, chooseButton("Upload a file", (f) => choose(f, "dialog"), { class: "primary", disabled: atLimit() }))),
+    intro(), countLine(),
+    atLimit() ? h("div", { class: "refusal" }, LIMIT_TEXT()) : null,
+    noticeBox(), problemBox("files"),
+    filesTable("No files yet. Upload a transcript or a Mermaid diagram."),
+    confirmDialog(), uploadDialogB(),
+  ];
+
   // ---- switcher and state ---------------------------------------------------
 
   const link = (change) => {
@@ -562,6 +581,7 @@
     A: { files: filesA, form: formA },
     B: { files: filesB, form: formB },
     C: { files: formC, form: formC },
+    D: { files: filesD, form: formB },
   };
 
   const render = () => {
