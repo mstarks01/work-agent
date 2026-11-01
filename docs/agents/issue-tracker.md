@@ -55,16 +55,31 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-- [#2057](https://github.com/mstarks01/work-agent/issues/2057) — Store supporting files that an
-  owner adds to an analysis. Charted 2026-10-31. A planning map: it ends in a build spec for a
-  Files section in the web app, where an owner keeps **Owner File**s, such as call transcripts and
-  Mermaid diagrams. The branch `docs/wayfinder-live-map-2057` carries its glossary entry and ADRs.
+**None.** The last map, [#2057](https://github.com/mstarks01/work-agent/issues/2057), is under
+Completed maps. Chart a new one only against the bar at the end of this file.
 
 ### Completed maps
 
 A completed map lives as a closed GitHub issue. Its tickets' resolution comments hold the reasoning,
 and the code holds the current state, so read the code first. Each map below settles the rules named
 beside it.
+
+- [#2057](https://github.com/mstarks01/work-agent/issues/2057) — a Files section in the web app,
+  where an owner keeps **Owner File**s, such as call transcripts and Mermaid diagrams. The spec
+  [#2073](https://github.com/mstarks01/work-agent/issues/2073) holds the build, as the tickets
+  #2074 to #2077.
+  - Files belongs to the owner and is in the web app only. `/v1` refuses a Source that carries
+    `owner_file_id`.
+  - An Owner File is an object under `<owner-id>/<file-id>` and a row in `owner_files`. The name
+    is unique for each owner, and `max_owner_files` bounds the count. A delete keeps nothing
+    (ADR 0118).
+  - A job copies each chosen Owner File as a Source with `owner_file_id`, so a delete changes no
+    job and no report. The report does not change (ADR 0119).
+  - One format table in `sources.py` serves both uploads. Each `diagram` Source starts with
+    `flowchart`, `graph` or `architecture-beta` (ADR 0120).
+  - The page is variant D of the prototype, the tag `archive/prototype/files-page-2062`.
+  - Image formats, a route for bytes, Files on `/v1`, an edit of a name or a kind, sharing and
+    retention are out of scope.
 
 - [#1991](https://github.com/mstarks01/work-agent/issues/1991) — Google Cloud Storage as an
   object store. The spec [#1998](https://github.com/mstarks01/work-agent/issues/1998) holds the
