@@ -261,6 +261,9 @@ transcripts and Mermaid diagrams that you add to any of your analyses
 - **The list.** A table gives the name, the kind, the format, the size and the
   date of each file, the newest first. A line above it gives the count against
   `max_owner_files`.
+- **Search and filters.** As on the Analyses page, a search box filters the
+  list by name, and two selects filter it by kind and by format. The selects
+  list the values of the format table.
 - **Upload a file.** The page reads the file in the browser with the checks of
   the direct upload, then a dialog asks for the name and the kind. The name
   starts as the file name. A plain text file is a "Transcript" or a
@@ -275,13 +278,16 @@ transcripts and Mermaid diagrams that you add to any of your analyses
   own copy. `DELETE /workspace/files/{file_id}` removes the row and the text,
   and keeps nothing.
 
-The analysis form shows "Files for this analysis": a checklist of your files,
-a "Manage files" link and a size meter. The submission sends the chosen IDs
-in `owner_files`, and the server copies each file's text into the job as a
-Source with the file's name as its label (ADR 0119). A later delete or a new
-upload changes no job and no report. When a chosen file is gone, the
-submission is refused and the checklist shows the file as "Missing". An
-analysis that you open again lists "Files used" from its own copies.
+The plus button under the description opens a menu with two items. "Upload
+from computer" reads a file from your computer. "Select
+from Files" opens a dialog with a checklist of your files and a "Manage
+files" link. The form lists each chosen file with a Remove button. The
+submission sends the chosen IDs in `owner_files`, and the server copies each
+file's text into the job as a Source with the file's name as its label
+(ADR 0119). A later delete or a new upload changes no job and no report. When
+a chosen file is gone, the submission is refused and the form shows the file
+as "Missing". An analysis that you open again lists "Files used" from its own
+copies.
 
 ## The Settings page
 
