@@ -1,0 +1,11 @@
+{
+  "name": "analysis-service-diagram-reader",
+  "private": true,
+  "type": "module",
+  "description": "Reads a Mermaid diagram's structure with Mermaid's own parsers (ADR 0121).",
+  "dependencies": {
+    "@mermaid-js/parser": "0.6.3",
+    "jsdom": "26.1.0",
+    "mermaid": "11.12.0"
+  }
+}

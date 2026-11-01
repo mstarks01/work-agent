@@ -48,6 +48,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # The diagram reader runs Mermaid's own parsers in Node (ADR 0121). npm ci
+      # installs the reviewed package-lock.json exactly, and no package runs an
+      # install script.
+      - name: Install the diagram reader
+        run: npm ci --ignore-scripts --prefix diagram_reader
+
       # The browser tests' dependency group, and headless Chromium with the
       # system libraries it needs. REQUIRE_BROWSER on the test step makes a
       # missing browser fail the suite rather than skip its tests.

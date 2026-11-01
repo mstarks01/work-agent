@@ -1,0 +1,28 @@
+flowchart LR
+    %% Shapes: id[name] is an external entity, id(name) a process, id[(name)] a data store.
+    subgraph z0["Trust zone: corporate network"]
+        n0["duty engineer"]
+        n2("dispatch console")
+        n4("schedule importer")
+        n5("corporate web host")
+        n7[("schedule archive")]
+    end
+    subgraph z1["Trust zone: production control plane"]
+        n3("dispatch API")
+        n6[("dispatch database")]
+    end
+    subgraph z2["Trust zone: scheduling partner platform"]
+        n1["scheduling partner"]
+    end
+    n0 -->|"open console"| n2
+    n2 -->|"dispatch requests"| n3
+    linkStyle 1 stroke:#c0392b,stroke-width:2px
+    n2 -->|"live job status (WebSocket)"| n3
+    linkStyle 2 stroke:#c0392b,stroke-width:2px
+    n4 -->|"pull schedule feed (SOAP over HTTPS)"| n1
+    linkStyle 3 stroke:#c0392b,stroke-width:2px
+    n4 -->|"store schedule documents"| n7
+    n4 -->|"post work orders"| n3
+    linkStyle 5 stroke:#c0392b,stroke-width:2px
+    n3 -->|"read write job orders"| n6
+    n0 -->|"load console"| n5

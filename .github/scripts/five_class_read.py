@@ -39,8 +39,8 @@ CLASSES = (
 
 #: The paths that hold code or model content, as ``fnmatch`` patterns, where
 #: ``*`` also matches ``/``. ``tests/`` is one: the lints and gates live there,
-#: and a test can pass on broken code (#1824). ``config/`` and ``domains/`` are
-#: read by the analysis, and each path that a live workflow sweeps must be one
+#: and a test can pass on broken code (#1824). ``config/``, ``domains/`` and
+#: ``diagram_reader/`` are read by the analysis, and each path that a live workflow sweeps must be one
 #: (``tests/test_five_class_read.py`` holds them together). A change to any
 #: other path, such as a doc or a ledger row, needs no five-class read.
 CODE_PATHS = (
@@ -52,6 +52,7 @@ CODE_PATHS = (
     "frameworks/*",
     "domains/*",
     "config/*",
+    "diagram_reader/*",
     "tests/*",
     ".githooks/*",
     ".github/workflows/*",

@@ -38,8 +38,9 @@ import hashlib
 import json
 import re
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -132,9 +133,14 @@ _REGISTERS: dict[SourceKind, str] = {
     "diagram": (
         "a diagram of the system in Mermaid text. A node can be an element, and"
         " an arrow can be a data flow in the direction of the arrow. A subgraph"
-        " is a trust zone only where its label says so. The shape of a node"
-        " states no attribute. An excerpt quotes the line of the diagram as"
-        " written"
+        " is a trust zone only where its label says so. Where a comment in the"
+        " diagram states its shape convention, a node's shape states its type"
+        " as the comment says. Otherwise the shape of a node states no"
+        " attribute. An excerpt quotes the line of the diagram as written."
+        " Where the block below the diagram gives the structure Mermaid's"
+        " parser read, model each of its nodes as an element named with the"
+        " node's label, and each of its edges as a data flow between those"
+        " elements in the direction of its arrow"
     ),
     "answers": "the submitter's answers to questions this service asked",
 }
@@ -495,7 +501,21 @@ def render_fenced(value: Any) -> str:
     return fenced(render(value))
 
 
-def render_sources(sources: Sequence[Source]) -> str:
+#: The line above a diagram's reading, by whether the parser read it. This
+#: module's bytes: the reading itself is caller words, so it sits in a fence.
+_READING_LINES = {
+    True: "Mermaid's parser read this structure from the diagram above:",
+    False: (
+        "Mermaid's parser did not read the diagram above, so read it as text."
+        " The parser said:"
+    ),
+}
+
+
+def render_sources(
+    sources: Sequence[Source],
+    diagrams: Mapping[str, Mapping[str, Any]] = MappingProxyType({}),
+) -> str:
     """Render the job's sources as the untrusted-data section of a prompt.
 
     One block per source. The marker line carries only the position and the
@@ -503,9 +523,15 @@ def render_sources(sources: Sequence[Source]) -> str:
     sized to that block's own content, so nothing submitted can escape into
     instruction position (OWASP LLM01).
 
+    ``diagrams`` maps each ``diagram`` Source's label to its reading as JSON,
+    a :class:`~analysis_service.diagrams.DiagramReading` dumped (ADR 0121). The
+    reading follows the diagram in its own block, in a fence of its own.
+
     Raises :class:`ValueError` on an empty sequence: a job always has at least
     one source, and rendering nothing would hand a model a prompt whose input
-    section is silently absent.
+    section is silently absent. It raises too for a ``diagram`` Source with no
+    reading, because that diagram would reach a model without the block its
+    register names.
     """
     if not sources:
         raise ValueError("a job carries at least one source")
@@ -514,8 +540,13 @@ def render_sources(sources: Sequence[Source]) -> str:
     blocks = []
     for index, source in enumerate(sources, start=1):
         body = f"label: {source.label}\n{_HEADER_RULE}\n{source.text}"
-        blocks.append(
-            f"### Source {index} of {total} — {_REGISTERS[source.kind]}\n\n"
-            f"{fenced(body)}"
-        )
+        block = f"### Source {index} of {total} — {_REGISTERS[source.kind]}\n\n{fenced(body)}"
+        if source.kind == "diagram":
+            if source.label not in diagrams:
+                raise ValueError(f"the diagram {source.label!r} has no reading")
+            reading = diagrams[source.label]
+            read = "refused" not in reading
+            shown = reading if read else reading["refused"]
+            block += f"\n\n{_READING_LINES[read]}\n\n{render_fenced(shown)}"
+        blocks.append(block)
     return "\n\n".join(blocks)

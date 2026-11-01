@@ -1,0 +1,27 @@
+flowchart LR
+    subgraph sites[Customer sites]
+        nodes[Sensor nodes]
+        tech[Field technician]
+    end
+    subgraph gke[GKE]
+        gw[Device gateway]
+    end
+    registry[(Device registry)]
+    pubsub["Pub/Sub"]
+    subgraph analytics[Analytics network]
+        normalizer[Telemetry normalizer]
+    end
+    lake[(Telemetry lake)]
+    fw[(Firmware bucket)]
+    subgraph corp[Corporate network]
+        ops[Fleet operators]
+    end
+
+    nodes -->|"readings (MQTT)"| gw
+    gw -->|device lookup| registry
+    gw -->|readings| pubsub
+    pubsub -->|readings| normalizer
+    normalizer -->|readings| lake
+    fw -->|firmware image| nodes
+    tech -->|serial console| nodes
+    ops -->|dashboards| lake

@@ -208,6 +208,7 @@ def test_every_bundled_root_is_one_the_service_reads():
         module.DEFAULT_PROMPTS_DIR.name,
         module.DEFAULT_DOMAINS_DIR.name,
         module.DEFAULT_FRAMEWORKS_DIR.name,
+        module.DEFAULT_DIAGRAM_READER_DIR.name,
         module.DEFAULT_SAMPLING_PATH.parent.name,
     }
 

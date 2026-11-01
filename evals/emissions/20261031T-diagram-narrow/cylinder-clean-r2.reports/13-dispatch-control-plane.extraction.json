@@ -1,0 +1,832 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:duty-engineer",
+        "name": "duty engineer",
+        "description": "A duty engineer interacting with the dispatch system.",
+        "assets": [],
+        "source_excerpt": "n0[\"duty engineer\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:scheduling-partner",
+        "name": "scheduling partner",
+        "description": "The scheduling partner platform actor.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n1[\"scheduling partner\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:scheduling-partner-platform"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:dispatch-console",
+        "name": "dispatch console",
+        "description": "A console used to initiate dispatch requests and receive live job status.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2(\"dispatch console\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:schedule-importer",
+        "name": "schedule importer",
+        "description": "A process that pulls schedule feeds, stores schedule documents, and posts work orders.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"schedule importer\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:corporate-web-host",
+        "name": "corporate web host",
+        "description": "A corporate web host loaded by the duty engineer.",
+        "assets": [],
+        "source_excerpt": "n5(\"corporate web host\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:dispatch-api",
+        "name": "dispatch API",
+        "description": "The API receiving dispatch requests, live job status interactions, and work orders.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3(\"dispatch API\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-control-plane",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:schedule-archive",
+        "name": "schedule archive",
+        "description": "A store for schedule documents.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n7[(\"schedule archive\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:dispatch-database",
+        "name": "dispatch database",
+        "description": "A database containing job orders.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n6[(\"dispatch database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-control-plane",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:duty-engineer>process:dispatch-console>open-console",
+        "name": "open console",
+        "description": "The duty engineer opens the dispatch console.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n0 -->|\"open console\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:duty-engineer",
+        "destination": "process:dispatch-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+        "name": "dispatch requests",
+        "description": "The dispatch console sends dispatch requests to the dispatch API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"dispatch requests\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:dispatch-console",
+        "destination": "process:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dispatch requests",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:dispatch-console>process:dispatch-api>live-job-status",
+        "name": "live job status",
+        "description": "The dispatch console exchanges live job status with the dispatch API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"live job status (WebSocket)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:dispatch-console",
+        "destination": "process:dispatch-api",
+        "protocol": "WebSocket",
+        "authentication": "unknown",
+        "data_description": "live job status",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
+        "name": "pull schedule feed",
+        "description": "The schedule importer pulls a schedule feed from the scheduling partner.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"pull schedule feed (SOAP over HTTPS)\"| n1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:schedule-importer",
+        "destination": "entity:scheduling-partner",
+        "protocol": "SOAP over HTTPS",
+        "authentication": "unknown",
+        "data_description": "schedule feed",
+        "encryption_in_transit": "HTTPS",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
+        "name": "store schedule documents",
+        "description": "The schedule importer stores schedule documents in the schedule archive.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"store schedule documents\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:schedule-importer",
+        "destination": "store:schedule-archive",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "schedule documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
+        "name": "post work orders",
+        "description": "The schedule importer posts work orders to the dispatch API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"post work orders\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:schedule-importer",
+        "destination": "process:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "work orders",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
+        "name": "read write job orders",
+        "description": "The dispatch API reads and writes job orders in the dispatch database.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"read write job orders\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:dispatch-api",
+        "destination": "store:dispatch-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job orders",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:entity:duty-engineer>process:corporate-web-host>load-console",
+        "name": "load console",
+        "description": "The duty engineer loads the console from the corporate web host.",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"load console\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:duty-engineer",
+        "destination": "process:corporate-web-host",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "The corporate network trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:production-control-plane",
+        "name": "production control plane",
+        "description": "The production control plane trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: production control plane\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "privilege"
+      },
+      {
+        "id": "boundary:scheduling-partner-platform",
+        "name": "scheduling partner platform",
+        "description": "The scheduling partner platform trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: scheduling partner platform\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The scheduling partner platform is controlled by a different party from the corporate and production zones.",
+        "element_id": "boundary:scheduling-partner-platform",
+        "attribute": "kind",
+        "basis": "The zone is named \"scheduling partner platform\", indicating a partner-controlled platform."
+      },
+      {
+        "assumption": "The production control plane holds greater authority than the corporate network.",
+        "element_id": "boundary:production-control-plane",
+        "attribute": "kind",
+        "basis": "The zone is named \"production control plane\", indicating a privileged control-plane zone."
+      },
+      {
+        "assumption": "The corporate network is a network-location boundary under the same organisational control.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The zone is named \"corporate network\" and no separate party or authority distinction is stated."
+      },
+      {
+        "assumption": "The schedule archive holds operating schedule records.",
+        "element_id": "store:schedule-archive",
+        "attribute": "assets",
+        "basis": "The diagram states that the schedule importer stores schedule documents in the schedule archive."
+      },
+      {
+        "assumption": "The dispatch database holds operating job-order records.",
+        "element_id": "store:dispatch-database",
+        "attribute": "assets",
+        "basis": "The diagram states that the dispatch API reads and writes job orders in the dispatch database."
+      },
+      {
+        "assumption": "The schedule importer handles operating schedule and work-order records.",
+        "element_id": "process:schedule-importer",
+        "attribute": "assets",
+        "basis": "The diagram shows it pulling schedule feeds, storing schedule documents, and posting work orders."
+      },
+      {
+        "assumption": "The dispatch API handles operating dispatch, status, and job-order records.",
+        "element_id": "process:dispatch-api",
+        "attribute": "assets",
+        "basis": "The diagram shows dispatch requests, live job status, work orders, and job orders associated with the dispatch API."
+      },
+      {
+        "assumption": "The dispatch console handles operating dispatch and job-status records.",
+        "element_id": "process:dispatch-console",
+        "attribute": "assets",
+        "basis": "The diagram shows dispatch requests and live job status associated with the dispatch console."
+      },
+      {
+        "assumption": "The scheduling partner presents operating schedule records.",
+        "element_id": "entity:scheduling-partner",
+        "attribute": "assets",
+        "basis": "The diagram shows the scheduling importer pulling a schedule feed from the scheduling partner."
+      },
+      {
+        "assumption": "The open-console interaction carries operating dispatch-system information.",
+        "element_id": "flow:entity:duty-engineer>process:dispatch-console>open-console",
+        "attribute": "assets",
+        "basis": "The flow opens the dispatch console, which is used for dispatch operations."
+      },
+      {
+        "assumption": "The dispatch-requests flow carries operating dispatch records.",
+        "element_id": "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"dispatch requests\"."
+      },
+      {
+        "assumption": "The live-job-status flow carries operating job-status records.",
+        "element_id": "flow:process:dispatch-console>process:dispatch-api>live-job-status",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"live job status\"."
+      },
+      {
+        "assumption": "The pull-schedule-feed flow carries operating schedule records.",
+        "element_id": "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"pull schedule feed\"."
+      },
+      {
+        "assumption": "The store-schedule-documents flow carries operating schedule records.",
+        "element_id": "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"store schedule documents\"."
+      },
+      {
+        "assumption": "The post-work-orders flow carries operating work-order records.",
+        "element_id": "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"post work orders\"."
+      },
+      {
+        "assumption": "The read-write-job-orders flow carries operating job-order records.",
+        "element_id": "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"read write job orders\"."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:duty-engineer",
+        "name": "duty engineer",
+        "description": "A duty engineer interacting with the dispatch system.",
+        "assets": [],
+        "source_excerpt": "n0[\"duty engineer\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:scheduling-partner",
+        "name": "scheduling partner",
+        "description": "The scheduling partner platform actor.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n1[\"scheduling partner\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:scheduling-partner-platform"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:dispatch-console",
+        "name": "dispatch console",
+        "description": "A console used to initiate dispatch requests and receive live job status.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2(\"dispatch console\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:schedule-importer",
+        "name": "schedule importer",
+        "description": "A process that pulls schedule feeds, stores schedule documents, and posts work orders.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"schedule importer\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:corporate-web-host",
+        "name": "corporate web host",
+        "description": "A corporate web host loaded by the duty engineer.",
+        "assets": [],
+        "source_excerpt": "n5(\"corporate web host\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:dispatch-api",
+        "name": "dispatch API",
+        "description": "The API receiving dispatch requests, live job status interactions, and work orders.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3(\"dispatch API\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-control-plane",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:schedule-archive",
+        "name": "schedule archive",
+        "description": "A store for schedule documents.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n7[(\"schedule archive\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:dispatch-database",
+        "name": "dispatch database",
+        "description": "A database containing job orders.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n6[(\"dispatch database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-control-plane",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:duty-engineer>process:dispatch-console>open-console",
+        "name": "open console",
+        "description": "The duty engineer opens the dispatch console.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n0 -->|\"open console\"| n2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:duty-engineer",
+        "destination": "process:dispatch-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+        "name": "dispatch requests",
+        "description": "The dispatch console sends dispatch requests to the dispatch API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"dispatch requests\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:dispatch-console",
+        "destination": "process:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dispatch requests",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:dispatch-console>process:dispatch-api>live-job-status",
+        "name": "live job status",
+        "description": "The dispatch console exchanges live job status with the dispatch API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n2 -->|\"live job status (WebSocket)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:dispatch-console",
+        "destination": "process:dispatch-api",
+        "protocol": "WebSocket",
+        "authentication": "unknown",
+        "data_description": "live job status",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
+        "name": "pull schedule feed",
+        "description": "The schedule importer pulls a schedule feed from the scheduling partner.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"pull schedule feed (SOAP over HTTPS)\"| n1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:schedule-importer",
+        "destination": "entity:scheduling-partner",
+        "protocol": "SOAP over HTTPS",
+        "authentication": "unknown",
+        "data_description": "schedule feed",
+        "encryption_in_transit": "HTTPS",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
+        "name": "store schedule documents",
+        "description": "The schedule importer stores schedule documents in the schedule archive.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"store schedule documents\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:schedule-importer",
+        "destination": "store:schedule-archive",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "schedule documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
+        "name": "post work orders",
+        "description": "The schedule importer posts work orders to the dispatch API.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"post work orders\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:schedule-importer",
+        "destination": "process:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "work orders",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
+        "name": "read write job orders",
+        "description": "The dispatch API reads and writes job orders in the dispatch database.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n3 -->|\"read write job orders\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:dispatch-api",
+        "destination": "store:dispatch-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job orders",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:entity:duty-engineer>process:corporate-web-host>load-console",
+        "name": "load console",
+        "description": "The duty engineer loads the console from the corporate web host.",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"load console\"| n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:duty-engineer",
+        "destination": "process:corporate-web-host",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "The corporate network trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:production-control-plane",
+        "name": "production control plane",
+        "description": "The production control plane trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: production control plane\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "privilege"
+      },
+      {
+        "id": "boundary:scheduling-partner-platform",
+        "name": "scheduling partner platform",
+        "description": "The scheduling partner platform trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: scheduling partner platform\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The scheduling partner platform is controlled by a different party from the corporate and production zones.",
+        "element_id": "boundary:scheduling-partner-platform",
+        "attribute": "kind",
+        "basis": "The zone is named \"scheduling partner platform\", indicating a partner-controlled platform."
+      },
+      {
+        "assumption": "The production control plane holds greater authority than the corporate network.",
+        "element_id": "boundary:production-control-plane",
+        "attribute": "kind",
+        "basis": "The zone is named \"production control plane\", indicating a privileged control-plane zone."
+      },
+      {
+        "assumption": "The corporate network is a network-location boundary under the same organisational control.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The zone is named \"corporate network\" and no separate party or authority distinction is stated."
+      },
+      {
+        "assumption": "The schedule archive holds operating schedule records.",
+        "element_id": "store:schedule-archive",
+        "attribute": "assets",
+        "basis": "The diagram states that the schedule importer stores schedule documents in the schedule archive."
+      },
+      {
+        "assumption": "The dispatch database holds operating job-order records.",
+        "element_id": "store:dispatch-database",
+        "attribute": "assets",
+        "basis": "The diagram states that the dispatch API reads and writes job orders in the dispatch database."
+      },
+      {
+        "assumption": "The schedule importer handles operating schedule and work-order records.",
+        "element_id": "process:schedule-importer",
+        "attribute": "assets",
+        "basis": "The diagram shows it pulling schedule feeds, storing schedule documents, and posting work orders."
+      },
+      {
+        "assumption": "The dispatch API handles operating dispatch, status, and job-order records.",
+        "element_id": "process:dispatch-api",
+        "attribute": "assets",
+        "basis": "The diagram shows dispatch requests, live job status, work orders, and job orders associated with the dispatch API."
+      },
+      {
+        "assumption": "The dispatch console handles operating dispatch and job-status records.",
+        "element_id": "process:dispatch-console",
+        "attribute": "assets",
+        "basis": "The diagram shows dispatch requests and live job status associated with the dispatch console."
+      },
+      {
+        "assumption": "The scheduling partner presents operating schedule records.",
+        "element_id": "entity:scheduling-partner",
+        "attribute": "assets",
+        "basis": "The diagram shows the scheduling importer pulling a schedule feed from the scheduling partner."
+      },
+      {
+        "assumption": "The open-console interaction carries operating dispatch-system information.",
+        "element_id": "flow:entity:duty-engineer>process:dispatch-console>open-console",
+        "attribute": "assets",
+        "basis": "The flow opens the dispatch console, which is used for dispatch operations."
+      },
+      {
+        "assumption": "The dispatch-requests flow carries operating dispatch records.",
+        "element_id": "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"dispatch requests\"."
+      },
+      {
+        "assumption": "The live-job-status flow carries operating job-status records.",
+        "element_id": "flow:process:dispatch-console>process:dispatch-api>live-job-status",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"live job status\"."
+      },
+      {
+        "assumption": "The pull-schedule-feed flow carries operating schedule records.",
+        "element_id": "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"pull schedule feed\"."
+      },
+      {
+        "assumption": "The store-schedule-documents flow carries operating schedule records.",
+        "element_id": "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"store schedule documents\"."
+      },
+      {
+        "assumption": "The post-work-orders flow carries operating work-order records.",
+        "element_id": "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"post work orders\"."
+      },
+      {
+        "assumption": "The read-write-job-orders flow carries operating job-order records.",
+        "element_id": "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labelled \"read write job orders\"."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

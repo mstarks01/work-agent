@@ -1,0 +1,964 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "member",
+        "assets": [],
+        "source_excerpt": "n0[\"member\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:member-devices"
+      },
+      {
+        "id": "entity:partner-app",
+        "name": "partner app",
+        "description": "partner app",
+        "assets": [],
+        "source_excerpt": "n1[\"partner app\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:partner-servers"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:authorization-server",
+        "name": "authorization server",
+        "description": "authorization server",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n3(\"authorization server\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:rewards-api",
+        "name": "rewards api",
+        "description": "rewards api",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"rewards api\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:support-console",
+        "name": "support console",
+        "description": "support console",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n5(\"support console\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:mobile-app",
+        "name": "mobile app",
+        "description": "mobile app",
+        "assets": [],
+        "source_excerpt": "n2(\"mobile app\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:member-devices",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:identity-database",
+        "name": "identity database",
+        "description": "identity database",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n6[(\"identity database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:points-ledger",
+        "name": "points ledger",
+        "description": "points ledger",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n7[(\"points ledger\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:api-log-store",
+        "name": "api log store",
+        "description": "api log store",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n8[(\"api log store\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:authorization-server>sign-in-and-consent-https",
+        "name": "sign in and consent (HTTPS)",
+        "description": "sign in and consent",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"sign in and consent (HTTPS)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "sign in and consent",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:member>entity:partner-app>return-with-authorization-code-https",
+        "name": "return with authorization code (HTTPS)",
+        "description": "return with authorization code",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "n0 -->|\"return with authorization code (HTTPS)\"| n1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "entity:partner-app",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "return with authorization code",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:authorization-server>token-requests-https",
+        "name": "token requests (HTTPS)",
+        "description": "token requests",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "n2 -->|\"token requests (HTTPS)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "token requests",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:partner-app>process:authorization-server>token-requests-https",
+        "name": "token requests (HTTPS)",
+        "description": "token requests",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "n1 -->|\"token requests (HTTPS)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:partner-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "token requests",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:rewards-api>call-rewards-api-https",
+        "name": "call rewards api (HTTPS)",
+        "description": "call rewards api",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"call rewards api (HTTPS)\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "call rewards api",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:partner-app>process:rewards-api>call-rewards-api-https",
+        "name": "call rewards api (HTTPS)",
+        "description": "call rewards api",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"call rewards api (HTTPS)\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:partner-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "call rewards api",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants",
+        "name": "read and write accounts and grants",
+        "description": "read and write accounts and grants",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n3 -->|\"read and write accounts and grants\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accounts and grants",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:rewards-api>store:points-ledger>read-and-write-points",
+        "name": "read and write points",
+        "description": "read and write points",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"read and write points\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:points-ledger",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "points",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:rewards-api>store:api-log-store>write-request-log",
+        "name": "write request log",
+        "description": "write request log",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"write request log\"| n8",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:api-log-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "request log",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:support-console>store:identity-database>close-accounts",
+        "name": "close accounts",
+        "description": "close accounts",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n5 -->|\"close accounts\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accounts",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:rewards-cloud",
+        "name": "rewards cloud",
+        "description": "Trust zone: rewards cloud",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: rewards cloud\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:member-devices",
+        "name": "member devices",
+        "description": "Trust zone: member devices",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: member devices\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:partner-servers",
+        "name": "partner servers",
+        "description": "Trust zone: partner servers",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: partner servers\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The member is a human external entity.",
+        "element_id": "entity:member",
+        "attribute": "kind",
+        "basis": "The node is named \"member\"."
+      },
+      {
+        "assumption": "The partner app is an external system.",
+        "element_id": "entity:partner-app",
+        "attribute": "kind",
+        "basis": "The node is named \"partner app\" and is represented as an external entity."
+      },
+      {
+        "assumption": "The member devices trust zone is controlled by a different party from the rewards cloud.",
+        "element_id": "boundary:member-devices",
+        "attribute": "kind",
+        "basis": "The zone is named \"member devices\", indicating devices belonging to members rather than the rewards cloud."
+      },
+      {
+        "assumption": "The partner servers trust zone is controlled by a different party from the rewards cloud.",
+        "element_id": "boundary:partner-servers",
+        "attribute": "kind",
+        "basis": "The zone is named \"partner servers\", indicating servers belonging to a partner rather than the rewards cloud."
+      },
+      {
+        "assumption": "The support console presents a web interface.",
+        "element_id": "process:support-console",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named a console."
+      },
+      {
+        "assumption": "The identity database contains personally identifying identity information.",
+        "element_id": "store:identity-database",
+        "attribute": "assets",
+        "basis": "The store is explicitly named \"identity database\"."
+      },
+      {
+        "assumption": "The identity database contains confidential data because it contains identity information.",
+        "element_id": "store:identity-database",
+        "attribute": "data_classification",
+        "basis": "The store is named \"identity database\"; identity information is personal data."
+      },
+      {
+        "assumption": "The points ledger contains business-critical operating records.",
+        "element_id": "store:points-ledger",
+        "attribute": "assets",
+        "basis": "The store is explicitly named \"points ledger\"."
+      },
+      {
+        "assumption": "The API log store contains business-critical operating records.",
+        "element_id": "store:api-log-store",
+        "attribute": "assets",
+        "basis": "The store is explicitly named \"api log store\"."
+      },
+      {
+        "assumption": "The authorization server handles personally identifying identity information.",
+        "element_id": "process:authorization-server",
+        "attribute": "assets",
+        "basis": "It reads and writes accounts through the identity database."
+      },
+      {
+        "assumption": "The rewards API handles business-critical points records.",
+        "element_id": "process:rewards-api",
+        "attribute": "assets",
+        "basis": "It reads and writes points in the points ledger."
+      },
+      {
+        "assumption": "The support console handles personally identifying account information.",
+        "element_id": "process:support-console",
+        "attribute": "assets",
+        "basis": "It closes accounts in the identity database."
+      },
+      {
+        "assumption": "The return flow carries an authorization credential.",
+        "element_id": "flow:entity:member>entity:partner-app>return-with-authorization-code-https",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"return with authorization code\"."
+      },
+      {
+        "assumption": "The token request flows carry credentials.",
+        "element_id": "flow:process:mobile-app>process:authorization-server>token-requests-https",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"token requests\"."
+      },
+      {
+        "assumption": "The token request flows carry credentials.",
+        "element_id": "flow:entity:partner-app>process:authorization-server>token-requests-https",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"token requests\"."
+      },
+      {
+        "assumption": "The authorization-server-to-identity-database flow carries personally identifying account information.",
+        "element_id": "flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"read and write accounts and grants\"."
+      },
+      {
+        "assumption": "The rewards-api-to-points-ledger flow carries business-critical points records.",
+        "element_id": "flow:process:rewards-api>store:points-ledger>read-and-write-points",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"read and write points\"."
+      },
+      {
+        "assumption": "The rewards-api-to-api-log-store flow carries business-critical request log records.",
+        "element_id": "flow:process:rewards-api>store:api-log-store>write-request-log",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"write request log\"."
+      },
+      {
+        "assumption": "The support-console-to-identity-database flow carries personally identifying account information.",
+        "element_id": "flow:process:support-console>store:identity-database>close-accounts",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"close accounts\"."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "member",
+        "assets": [],
+        "source_excerpt": "n0[\"member\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:member-devices"
+      },
+      {
+        "id": "entity:partner-app",
+        "name": "partner app",
+        "description": "partner app",
+        "assets": [],
+        "source_excerpt": "n1[\"partner app\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:partner-servers"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:authorization-server",
+        "name": "authorization server",
+        "description": "authorization server",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n3(\"authorization server\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:rewards-api",
+        "name": "rewards api",
+        "description": "rewards api",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4(\"rewards api\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:support-console",
+        "name": "support console",
+        "description": "support console",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n5(\"support console\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:mobile-app",
+        "name": "mobile app",
+        "description": "mobile app",
+        "assets": [],
+        "source_excerpt": "n2(\"mobile app\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:member-devices",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:identity-database",
+        "name": "identity database",
+        "description": "identity database",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n6[(\"identity database\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:points-ledger",
+        "name": "points ledger",
+        "description": "points ledger",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n7[(\"points ledger\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:api-log-store",
+        "name": "api log store",
+        "description": "api log store",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n8[(\"api log store\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:rewards-cloud",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:authorization-server>sign-in-and-consent-https",
+        "name": "sign in and consent (HTTPS)",
+        "description": "sign in and consent",
+        "assets": [],
+        "source_excerpt": "n0 -->|\"sign in and consent (HTTPS)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "sign in and consent",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:member>entity:partner-app>return-with-authorization-code-https",
+        "name": "return with authorization code (HTTPS)",
+        "description": "return with authorization code",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "n0 -->|\"return with authorization code (HTTPS)\"| n1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "entity:partner-app",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "return with authorization code",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:authorization-server>token-requests-https",
+        "name": "token requests (HTTPS)",
+        "description": "token requests",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "n2 -->|\"token requests (HTTPS)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "token requests",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:partner-app>process:authorization-server>token-requests-https",
+        "name": "token requests (HTTPS)",
+        "description": "token requests",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "n1 -->|\"token requests (HTTPS)\"| n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:partner-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "token requests",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:rewards-api>call-rewards-api-https",
+        "name": "call rewards api (HTTPS)",
+        "description": "call rewards api",
+        "assets": [],
+        "source_excerpt": "n2 -->|\"call rewards api (HTTPS)\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "call rewards api",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:partner-app>process:rewards-api>call-rewards-api-https",
+        "name": "call rewards api (HTTPS)",
+        "description": "call rewards api",
+        "assets": [],
+        "source_excerpt": "n1 -->|\"call rewards api (HTTPS)\"| n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:partner-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "call rewards api",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants",
+        "name": "read and write accounts and grants",
+        "description": "read and write accounts and grants",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n3 -->|\"read and write accounts and grants\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accounts and grants",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:rewards-api>store:points-ledger>read-and-write-points",
+        "name": "read and write points",
+        "description": "read and write points",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"read and write points\"| n7",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:points-ledger",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "points",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:rewards-api>store:api-log-store>write-request-log",
+        "name": "write request log",
+        "description": "write request log",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "n4 -->|\"write request log\"| n8",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:api-log-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "request log",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:support-console>store:identity-database>close-accounts",
+        "name": "close accounts",
+        "description": "close accounts",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "n5 -->|\"close accounts\"| n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accounts",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:rewards-cloud",
+        "name": "rewards cloud",
+        "description": "Trust zone: rewards cloud",
+        "assets": [],
+        "source_excerpt": "subgraph z0[\"Trust zone: rewards cloud\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:member-devices",
+        "name": "member devices",
+        "description": "Trust zone: member devices",
+        "assets": [],
+        "source_excerpt": "subgraph z1[\"Trust zone: member devices\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:partner-servers",
+        "name": "partner servers",
+        "description": "Trust zone: partner servers",
+        "assets": [],
+        "source_excerpt": "subgraph z2[\"Trust zone: partner servers\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The member is a human external entity.",
+        "element_id": "entity:member",
+        "attribute": "kind",
+        "basis": "The node is named \"member\"."
+      },
+      {
+        "assumption": "The partner app is an external system.",
+        "element_id": "entity:partner-app",
+        "attribute": "kind",
+        "basis": "The node is named \"partner app\" and is represented as an external entity."
+      },
+      {
+        "assumption": "The member devices trust zone is controlled by a different party from the rewards cloud.",
+        "element_id": "boundary:member-devices",
+        "attribute": "kind",
+        "basis": "The zone is named \"member devices\", indicating devices belonging to members rather than the rewards cloud."
+      },
+      {
+        "assumption": "The partner servers trust zone is controlled by a different party from the rewards cloud.",
+        "element_id": "boundary:partner-servers",
+        "attribute": "kind",
+        "basis": "The zone is named \"partner servers\", indicating servers belonging to a partner rather than the rewards cloud."
+      },
+      {
+        "assumption": "The support console presents a web interface.",
+        "element_id": "process:support-console",
+        "attribute": "interface_kind",
+        "basis": "The process is explicitly named a console."
+      },
+      {
+        "assumption": "The identity database contains personally identifying identity information.",
+        "element_id": "store:identity-database",
+        "attribute": "assets",
+        "basis": "The store is explicitly named \"identity database\"."
+      },
+      {
+        "assumption": "The identity database contains confidential data because it contains identity information.",
+        "element_id": "store:identity-database",
+        "attribute": "data_classification",
+        "basis": "The store is named \"identity database\"; identity information is personal data."
+      },
+      {
+        "assumption": "The points ledger contains business-critical operating records.",
+        "element_id": "store:points-ledger",
+        "attribute": "assets",
+        "basis": "The store is explicitly named \"points ledger\"."
+      },
+      {
+        "assumption": "The API log store contains business-critical operating records.",
+        "element_id": "store:api-log-store",
+        "attribute": "assets",
+        "basis": "The store is explicitly named \"api log store\"."
+      },
+      {
+        "assumption": "The authorization server handles personally identifying identity information.",
+        "element_id": "process:authorization-server",
+        "attribute": "assets",
+        "basis": "It reads and writes accounts through the identity database."
+      },
+      {
+        "assumption": "The rewards API handles business-critical points records.",
+        "element_id": "process:rewards-api",
+        "attribute": "assets",
+        "basis": "It reads and writes points in the points ledger."
+      },
+      {
+        "assumption": "The support console handles personally identifying account information.",
+        "element_id": "process:support-console",
+        "attribute": "assets",
+        "basis": "It closes accounts in the identity database."
+      },
+      {
+        "assumption": "The return flow carries an authorization credential.",
+        "element_id": "flow:entity:member>entity:partner-app>return-with-authorization-code-https",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"return with authorization code\"."
+      },
+      {
+        "assumption": "The token request flows carry credentials.",
+        "element_id": "flow:process:mobile-app>process:authorization-server>token-requests-https",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"token requests\"."
+      },
+      {
+        "assumption": "The token request flows carry credentials.",
+        "element_id": "flow:entity:partner-app>process:authorization-server>token-requests-https",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"token requests\"."
+      },
+      {
+        "assumption": "The authorization-server-to-identity-database flow carries personally identifying account information.",
+        "element_id": "flow:process:authorization-server>store:identity-database>read-and-write-accounts-and-grants",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"read and write accounts and grants\"."
+      },
+      {
+        "assumption": "The rewards-api-to-points-ledger flow carries business-critical points records.",
+        "element_id": "flow:process:rewards-api>store:points-ledger>read-and-write-points",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"read and write points\"."
+      },
+      {
+        "assumption": "The rewards-api-to-api-log-store flow carries business-critical request log records.",
+        "element_id": "flow:process:rewards-api>store:api-log-store>write-request-log",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"write request log\"."
+      },
+      {
+        "assumption": "The support-console-to-identity-database flow carries personally identifying account information.",
+        "element_id": "flow:process:support-console>store:identity-database>close-accounts",
+        "attribute": "assets",
+        "basis": "The flow is explicitly labeled \"close accounts\"."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

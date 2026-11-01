@@ -103,6 +103,7 @@ from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.diagrams import DiagramReading
 from analysis_service.sources import MAX_LABEL_CHARS
 from analysis_service.system_model import (
     CONTROL_VALUE_MAX_CHARS,
@@ -428,6 +429,7 @@ def parse_extraction(
     extraction_format: str,
     *,
     sources: Mapping[str, str],
+    diagrams: Mapping[str, DiagramReading] = MappingProxyType({}),
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """The one reader of "what extraction emitted" against "a validated model".
 
@@ -456,7 +458,7 @@ def parse_extraction(
     elif extraction_format != FULL_FORMAT:
         raise ValueError(f"unknown extraction format: {extraction_format!r}")
     model, gate_issues = parse_and_validate(
-        payload, normalize_ids=True, sources=sources
+        payload, normalize_ids=True, sources=sources, diagrams=diagrams
     )
     return model, issues + gate_issues
 

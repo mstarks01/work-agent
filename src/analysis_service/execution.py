@@ -37,11 +37,13 @@ from analysis_service.claims import (
     Claim,
     FrameworkName,
 )
+from analysis_service.diagrams import read_diagram
 from analysis_service.frameworks import package_for
 from analysis_service.graph import (
     LANE_ARTIFACTS,
     LANE_SHARED_KEYS,
     PREPARE_NODE,
+    STATE_DIAGRAM_READINGS,
     STATE_INPUT_TEXT,
     STATE_SOURCE_TEXTS,
     FrameworkNodes,
@@ -162,7 +164,7 @@ def emitted_state(state: Mapping[str, Any]) -> dict[str, Any]:
     return {
         key: value
         for key, value in state.items()
-        if key not in (STATE_INPUT_TEXT, STATE_SOURCE_TEXTS)
+        if key not in (STATE_INPUT_TEXT, STATE_SOURCE_TEXTS, STATE_DIAGRAM_READINGS)
     }
 
 
@@ -182,7 +184,15 @@ def seed_state(
             f"{STATE_INPUT_TEXT} is rendered from the job's sources, "
             "not seeded by the caller"
         )
-    seed[STATE_INPUT_TEXT] = render_sources(sources)
+    # Each diagram is read once, here, and the reading travels both ways the
+    # sources do: rendered for the model, structured for the gate (ADR 0121).
+    readings = {
+        source.label: read_diagram(source.text).model_dump(mode="json")
+        for source in sources
+        if source.kind == "diagram"
+    }
+    seed[STATE_INPUT_TEXT] = render_sources(sources, readings)
+    seed[STATE_DIAGRAM_READINGS] = readings
     # The same bytes, structured: the validity gate checks each element's
     # citation against these labels, and the draft fan-in checks each
     # finding's quote against the text under the label it names. Both travel

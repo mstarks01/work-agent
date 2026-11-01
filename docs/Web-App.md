@@ -179,9 +179,11 @@ zone, in a column named **Zone not stated**, and an element whose zone the
 service inferred says "zone assumed". Hover over an element or a flow to see
 its whole name. **Download as Mermaid**, in the caption, saves the same model
 as a Mermaid flowchart (`system-model.mmd`) to paste into a document that
-renders Mermaid. Each trust zone is a subgraph, and a flow that crosses a
-boundary, or may cross one, takes a link style. Under the diagram, a table for
-each element kind (external entities, processes, data stores and data flows)
+renders Mermaid. A comment on its first line states which shape names which
+element type. Each trust zone is a subgraph labelled "Trust zone", each arrow
+names its flow and the protocol where the model states one, and a flow that
+crosses a boundary, or may cross one, takes a link style. The file reads back
+as a `diagram` source. Under the diagram, a table for each element kind (external entities, processes, data stores and data flows)
 lists the same elements in words, with a column for each attribute. Hover over
 a name to see its ID.
 

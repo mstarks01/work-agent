@@ -11,7 +11,11 @@ You need Python 3.11 or newer and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/mstarks01/work-agent.git
 cd work-agent
 uv sync
+npm ci --ignore-scripts --prefix diagram_reader
 ```
+
+The last line installs the diagram reader, which needs Node 20 or newer. Only
+an analysis with a Mermaid diagram uses it.
 
 ## 2. Select models and provide credentials
 
@@ -375,8 +379,16 @@ you type one. **Remove** takes the transcript off the form.
 To add a diagram, click the same **+** button and choose a Mermaid file that
 ends in `.mmd` or `.mermaid`, such as a `flowchart`. The service reads it as a
 diagram of the system: a node can be a component and an arrow a data flow. A
-subgraph is a trust zone only where its label says so. The page holds one
-transcript and one diagram, and **Remove** takes each one off the form.
+subgraph is a trust zone only where its label says so. A node's shape states
+its type only where a comment in the diagram states the shape convention, as
+the line `%% Shapes: ...` in a diagram from **Download as Mermaid** does. The
+page holds one transcript and one diagram, and **Remove** takes each one off
+the form.
+
+The service reads a flowchart or an `architecture-beta` diagram with
+Mermaid's own parsers. Extraction then models every node as an element and
+every edge as a flow, and the model decides what each one is. A diagram that
+Mermaid cannot read, such as one with a syntax error, is read as text.
 
 Then replace the example with your own description. State security controls
 that are actually known. When the input does not state an attribute, extraction

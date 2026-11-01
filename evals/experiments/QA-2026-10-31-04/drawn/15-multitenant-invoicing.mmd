@@ -1,0 +1,28 @@
+flowchart LR
+    user("Customer company user (browser)")
+    payer(Payer)
+    admin[Admin console]
+
+    subgraph office["Support office network"]
+        agent(Support agent)
+    end
+
+    subgraph cloud["Cloud platform"]
+        billing[Billing app]
+        db[("Tenant database (PostgreSQL): invoices, customers, payout bank details")]
+        queue[Render queue]
+        renderer[PDF renderer]
+        bucket[(PDF bucket)]
+    end
+
+    user -->|"invoices (HTTPS)"| billing
+    billing <-->|"invoices, customers, bank details"| db
+    billing -->|invoice email with link| payer
+    payer -->|open payment page| billing
+    billing -->|"render job: company ID, invoice number"| queue
+    renderer -->|take job| queue
+    renderer -->|read invoice| db
+    renderer -->|PDF| bucket
+    billing -->|fetch PDFs| bucket
+    agent --> admin
+    admin -->|session as customer user| billing
