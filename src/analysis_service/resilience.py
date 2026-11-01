@@ -122,7 +122,7 @@ from analysis_service.vendors import UPSTREAM_SLUG
 # guide asks for a timeout above ten minutes, so the shipped row states thirty
 # minutes for both bounds. The table is required, and a deployment that wants
 # no per-upstream bound writes an empty one and means it.
-SUPPORTED_VERSION = 8
+SUPPORTED_VERSION = 9
 
 _ENV_PREFIX = "ANALYSIS_"
 
@@ -130,6 +130,7 @@ ATTEMPTS_VAR = f"{_ENV_PREFIX}RETRY_ATTEMPTS"
 TIMEOUT_MS_VAR = f"{_ENV_PREFIX}TIMEOUT_MS"
 MAX_SOURCE_BYTES_VAR = f"{_ENV_PREFIX}MAX_SOURCE_BYTES"
 MAX_SOURCES_VAR = f"{_ENV_PREFIX}MAX_SOURCES"
+MAX_OWNER_FILES_VAR = f"{_ENV_PREFIX}MAX_OWNER_FILES"
 JOB_DEADLINE_MS_VAR = f"{_ENV_PREFIX}JOB_DEADLINE_MS"
 RETRY_BUDGET_RATIO_VAR = f"{_ENV_PREFIX}RETRY_BUDGET_RATIO"
 MAX_ACTIVE_JOBS_VAR = f"{_ENV_PREFIX}MAX_ACTIVE_JOBS"
@@ -146,6 +147,7 @@ ENV_OVERRIDES: dict[str, tuple[str, Callable[[str], float]]] = {
     "timeout_ms": (TIMEOUT_MS_VAR, int),
     "max_source_bytes": (MAX_SOURCE_BYTES_VAR, int),
     "max_sources": (MAX_SOURCES_VAR, int),
+    "max_owner_files": (MAX_OWNER_FILES_VAR, int),
     "job_deadline_ms": (JOB_DEADLINE_MS_VAR, int),
     "retry_budget_ratio": (RETRY_BUDGET_RATIO_VAR, float),
     "max_active_jobs": (MAX_ACTIVE_JOBS_VAR, int),
@@ -208,6 +210,9 @@ class ResilienceConfig(BaseModel):
     bounds_by_upstream: dict[str, UpstreamBounds]
     max_source_bytes: int = Field(gt=0)
     max_sources: int = Field(ge=1)
+    #: How many Owner Files one owner keeps (ADR 0118). Owner Files do not
+    #: expire, so this bound keeps one owner's store finite.
+    max_owner_files: int = Field(ge=1)
     job_deadline_ms: int = Field(gt=0)
     retry_budget_ratio: float = Field(gt=0, le=1)
     max_active_jobs: int = Field(ge=1)

@@ -24,7 +24,7 @@ from analysis_service.graph import STATE_DIAGRAM_READINGS, STATE_INPUT_TEXT
 from analysis_service.sources import Source, render_sources
 from analysis_service.validation import validate
 from tests.factories import valid_model
-from tests.test_sources import lines_outside_fences
+from tests.test_sources import DIAGRAM_HEADERS, lines_outside_fences
 
 ARCHITECTURE = """architecture-beta
     group api(cloud)[API]
@@ -138,6 +138,14 @@ class TestTheReader:
         reading = read_diagram(text)
         assert isinstance(reading, DiagramRefusal)
         assert reading.refused
+
+    @pytest.mark.parametrize(("text", "read"), DIAGRAM_HEADERS)
+    def test_the_reader_and_the_source_rule_agree_on_the_type(self, text, read):
+        reading = read_diagram(text)
+        refused_type = isinstance(reading, DiagramRefusal) and (
+            "not a flowchart or an architecture-beta diagram" in reading.refused
+        )
+        assert refused_type is not read
 
     def test_missing_packages_raise_with_the_install_step(self, tmp_path, monkeypatch):
         shutil.copy(deployment.DEFAULT_DIAGRAM_READER_DIR / "read.mjs", tmp_path)

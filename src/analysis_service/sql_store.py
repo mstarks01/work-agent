@@ -76,13 +76,14 @@ from sqlalchemy import (
     event,
     func,
     insert,
+    inspect,
     or_,
     select,
     union_all,
     update,
 )
 from sqlalchemy.engine import URL, make_url
-from sqlalchemy.exc import ArgumentError, SQLAlchemyError
+from sqlalchemy.exc import ArgumentError, IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool, Pool
 from sqlalchemy.types import TypeDecorator
@@ -122,12 +123,15 @@ from analysis_service.jobs import (
     stored_report,
 )
 from analysis_service.objects import (
+    FileKey,
     ObjectName,
     ObjectStore,
     check_private,
+    file_key,
     key_parts,
     object_key,
 )
+from analysis_service.owner_files import FileAdmission, OwnerFile
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import Report
 from analysis_service.sources import Source
@@ -269,6 +273,30 @@ usage_rows = Table(
     Column("measured_tokens", BigInteger),
     Column("status", String(32), nullable=False),
     Column("parent_id", String(64), index=True),
+)
+
+#: The ``owner_files`` table (ADR 0118): one row for each Owner File, which
+#: names the object of its text.
+owner_files = Table(
+    "owner_files",
+    METADATA,
+    Column("id", String(64), primary_key=True),
+    Column(
+        "owner_id",
+        String(64),
+        ForeignKey("principals.owner_id"),
+        nullable=False,
+        index=True,
+    ),
+    Column("name", Text, nullable=False),
+    Column("kind", String(32), nullable=False),
+    Column("format", String(64), nullable=False),
+    Column("sha256", String(64), nullable=False),
+    Column("size_bytes", BigInteger, nullable=False),
+    Column("created_at", _UtcTime, nullable=False),
+    # The one reader of a name's uniqueness: two names are one where the
+    # strings are equal.
+    UniqueConstraint("owner_id", "name"),
 )
 
 #: The column of a job row that holds the digest of each object. The table
@@ -756,9 +784,33 @@ async def _held_by_begin_immediate(connection: AsyncConnection) -> None:
     """Take no lock: ``BEGIN IMMEDIATE`` took the write lock of the database."""
 
 
+async def _owner_held_by_begin_immediate(
+    connection: AsyncConnection, owner_id: str
+) -> None:
+    """Take no lock: ``BEGIN IMMEDIATE`` took the write lock of the database."""
+
+
 #: The key of the advisory lock that admission takes on PostgreSQL. The value
 #: is arbitrary, and no other lock in the database uses it.
 _ADMISSION_LOCK_KEY = 1525
+
+#: The first key of the per-owner advisory lock of an Owner File upload. The
+#: second key is a hash of the owner ID.
+_OWNER_FILES_LOCK_KEY = 2059
+
+
+async def _owner_advisory_lock(connection: AsyncConnection, owner_id: str) -> None:
+    """Take the owner's Owner File lock until the transaction ends (ADR 0118).
+
+    The count of an owner's files and the insert need one owner's lock, so
+    two owners' uploads do not wait on each other. Two owner IDs with one
+    hash share a lock, which only makes their uploads wait.
+    """
+    await connection.execute(
+        select(
+            func.pg_advisory_xact_lock(_OWNER_FILES_LOCK_KEY, func.hashtext(owner_id))
+        )
+    )
 
 
 async def _advisory_lock(connection: AsyncConnection) -> None:
@@ -789,6 +841,9 @@ class Database:
     #: Takes the global lock of admission, in the write transaction of
     #: admission.
     admission_lock: Callable[[AsyncConnection], Awaitable[None]]
+    #: Takes one owner's lock of an Owner File upload, in its write
+    #: transaction.
+    owner_files_lock: Callable[[AsyncConnection, str], Awaitable[None]]
     #: Makes the database where there is none. Only a migration calls it,
     #: through :func:`create_database`; the service never makes one.
     create: Callable[[URL], None]
@@ -814,6 +869,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         prepare=_prepare_sqlite,
         connect=_sqlite,
         admission_lock=_held_by_begin_immediate,
+        owner_files_lock=_owner_held_by_begin_immediate,
         create=_create_sqlite,
         first_run_migrates=True,
         reads=(DATABASE_URL_VAR,),
@@ -826,6 +882,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         prepare=_no_preparation,
         connect=_postgres,
         admission_lock=_advisory_lock,
+        owner_files_lock=_owner_advisory_lock,
         create=_no_creation,
         first_run_migrates=False,
         reads=(DATABASE_URL_VAR, DATABASE_CREDENTIALS_VAR, DATABASE_CA_FILE_VAR),
@@ -1018,6 +1075,7 @@ class SqlJobStore:
         self._engine = engine
         self._objects = objects
         self._admission_lock = _database(engine.url).admission_lock
+        self._owner_files_lock = _database(engine.url).owner_files_lock
 
     @classmethod
     def from_env(cls, env: Mapping[str, str], objects: ObjectStore) -> SqlJobStore:
@@ -1043,6 +1101,19 @@ class SqlJobStore:
             raise StoreConfigError(
                 f"the database schema is at revision {current}, and this service"
                 f" needs {head}: run python -m analysis_service.migrations first"
+            )
+        async with self._transaction() as connection:
+            held = set(
+                await connection.run_sync(lambda sync: inspect(sync).get_table_names())
+            )
+        missing = sorted(set(METADATA.tables) - held)
+        if missing:
+            # A schema change edits revision 0001 in place, so a database made
+            # before it is at the head revision and lacks the new table.
+            raise StoreConfigError(
+                f"the database has no {', '.join(missing)} table: it was made"
+                " before a schema change, so make it again with"
+                " python -m analysis_service.migrations"
             )
         await self._objects.check()
 
@@ -1679,19 +1750,41 @@ class SqlJobStore:
         """Delete each object last written before ``before`` that no job row
         keeps, and return how many the store removed.
 
-        The sweep lists every key first. A key that :func:`object_key` cannot
-        give stays, because the service never writes one. Then one read
-        transaction finds the keys that the rows of the listed job IDs keep
-        (:meth:`_kept_keys`). A row keeps a key only under its own owner ID.
-        The sweep deletes each other listed key.
+        The sweep lists every key first. A key that neither
+        :func:`object_key` nor :func:`file_key` can give stays, because the
+        service never writes one. Then it finds the keys that the rows of the
+        listed job IDs keep (:meth:`_kept_keys`) and the keys that the rows of
+        the listed Owner File IDs keep (:meth:`_kept_file_keys`). A row keeps
+        a key only under its own owner ID. The sweep deletes each other listed
+        key.
         """
         listed = []
         async for key, modified in self._objects.list():
             parts = key_parts(key)
             if parts is not None and modified < before:
-                listed.append((key, parts[1]))
-        kept = await self._kept_keys(sorted({job_id for _, job_id in listed}))
+                listed.append((key, parts))
+        job_ids = {
+            parts.job_id for _, parts in listed if not isinstance(parts, FileKey)
+        }
+        file_ids = {parts.file_id for _, parts in listed if isinstance(parts, FileKey)}
+        kept = await self._kept_keys(sorted(job_ids))
+        kept |= await self._kept_file_keys(sorted(file_ids))
         return await self._remove([key for key, _ in listed if key not in kept])
+
+    async def _kept_file_keys(self, file_ids: Sequence[str]) -> set[str]:
+        """The key of each Owner File object that a row of ``file_ids`` names,
+        under the row's own owner ID. One read transaction, with
+        :data:`_ID_BATCH` file IDs in each query."""
+        query = select(owner_files.c.id, owner_files.c.owner_id)
+        kept: set[str] = set()
+        async with self._transaction() as connection:
+            for start in range(0, len(file_ids), _ID_BATCH):
+                batch = file_ids[start : start + _ID_BATCH]
+                rows = await connection.execute(
+                    query.where(owner_files.c.id.in_(batch))
+                )
+                kept.update(file_key(row.owner_id, row.id) for row in rows)
+        return kept
 
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
         async with self._transaction() as connection:
@@ -1739,3 +1832,134 @@ class SqlJobStore:
             )
             failed.append(job_id)
         return failed
+
+    async def add_file(
+        self,
+        file: OwnerFile,
+        text: str,
+        *,
+        limit: int,
+        principal: Principal | None,
+    ) -> FileAdmission:
+        """Put the text, then count and insert the row in one write
+        transaction (ADR 0118).
+
+        The object goes first, so a row never names a missing one, and it
+        goes again at once where the insert is refused or raises.
+        """
+        if principal is not None and principal.owner_id != file.owner_id:
+            raise ValueError(f"file {file.id} names another owner than its principal")
+        data = text.encode("utf-8")
+        if file.sha256 != object_digest(data):
+            raise ValueError(f"file {file.id} holds another digest than its text")
+        key = file_key(file.owner_id, file.id)
+        await self._objects.put(key, data)
+        try:
+            outcome = await self._insert_file(file, limit=limit, principal=principal)
+        except BaseException:
+            await self._remove([key])
+            raise
+        if outcome != "added":
+            await self._remove([key])
+        return outcome
+
+    async def _insert_file(
+        self, file: OwnerFile, *, limit: int, principal: Principal | None
+    ) -> FileAdmission:
+        """Count the owner's files and insert the row under the owner's lock.
+
+        ``UNIQUE (owner_id, name)`` is the one reader of a name's uniqueness.
+        Its refusal ends the transaction, so the store reads the name again
+        after the rollback, and raises the error where no row holds it.
+        """
+        owned = owner_files.c.owner_id == file.owner_id
+        try:
+            async with self._transaction(writes=True) as connection:
+                await self._owner_files_lock(connection, file.owner_id)
+                if principal is None:
+                    holder = select(principals.c.owner_id).where(
+                        principals.c.owner_id == file.owner_id
+                    )
+                    if await connection.scalar(holder) is None:
+                        raise ValueError(f"owner {file.owner_id} holds no principal")
+                elif await self._principal(connection, principal.identity) is not None:
+                    return "principal_exists"
+                count = select(func.count()).select_from(owner_files).where(owned)
+                if (await connection.scalar(count) or 0) >= limit:
+                    return "over_limit"
+                if principal is not None:
+                    await connection.execute(
+                        insert(principals).values(
+                            owner_id=principal.owner_id,
+                            issuer=principal.issuer,
+                            sub=principal.sub,
+                            created_at=principal.created_at,
+                        )
+                    )
+                await connection.execute(insert(owner_files).values(file.model_dump()))
+        except IntegrityError:
+            named = select(owner_files.c.id).where(
+                owned, owner_files.c.name == file.name
+            )
+            async with self._transaction() as connection:
+                if await connection.scalar(named) is None:
+                    raise
+            return "name_in_use"
+        return "added"
+
+    async def owned_files(self, owner_id: str) -> list[OwnerFile]:
+        async with self._transaction() as connection:
+            rows = await connection.execute(
+                select(owner_files)
+                .where(owner_files.c.owner_id == owner_id)
+                .order_by(owner_files.c.created_at.desc(), owner_files.c.id.desc())
+            )
+            return [OwnerFile(**row._mapping) for row in rows]
+
+    async def _file_row(self, file_id: str, owner_id: str) -> OwnerFile | None:
+        async with self._transaction() as connection:
+            row = (
+                await connection.execute(
+                    select(owner_files).where(
+                        owner_files.c.id == file_id, owner_files.c.owner_id == owner_id
+                    )
+                )
+            ).one_or_none()
+        return None if row is None else OwnerFile(**row._mapping)
+
+    async def file_text(
+        self, file_id: str, owner_id: str
+    ) -> tuple[OwnerFile, str] | None:
+        """The row first, by the file ID and the owner ID, then the object
+        that the row names, checked against the row's digest."""
+        file = await self._file_row(file_id, owner_id)
+        if file is None:
+            return None
+        data = await self._objects.get(file_key(file.owner_id, file.id))
+        if data is None and await self._file_row(file_id, owner_id) is None:
+            # A delete removed the row after this read found it.
+            return None
+        if data is None or not hmac.compare_digest(object_digest(data), file.sha256):
+            logger.error(
+                "Owner File %s of owner %s: its object is missing or fails its"
+                " digest check",
+                file.id,
+                file.owner_id,
+            )
+            raise CorruptObject(file.id)
+        return file, data.decode("utf-8")
+
+    async def delete_file(self, file_id: str, owner_id: str) -> bool:
+        """Delete the row, then the object. An object whose delete fails
+        stays for the orphan sweep."""
+        async with self._transaction(writes=True) as connection:
+            removed = await connection.execute(
+                delete(owner_files).where(
+                    owner_files.c.id == file_id, owner_files.c.owner_id == owner_id
+                )
+            )
+            held = removed.rowcount == 1
+        if not held:
+            return False
+        await self._remove([file_key(owner_id, file_id)])
+        return True

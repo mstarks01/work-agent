@@ -1,4 +1,5 @@
-"""Create the tables of the sql job store: principals, jobs, job_events, usage_rows.
+"""Create the tables of the sql job store: principals, jobs, job_events,
+usage_rows and owner_files.
 
 Revision ID: 0001
 Revises:
@@ -88,8 +89,26 @@ def upgrade() -> None:
         sa.Column("status", sa.String(32), nullable=False),
         sa.Column("parent_id", sa.String(64), index=True),
     )
+    op.create_table(
+        "owner_files",
+        sa.Column("id", sa.String(64), primary_key=True),
+        sa.Column(
+            "owner_id",
+            sa.String(64),
+            sa.ForeignKey("principals.owner_id"),
+            nullable=False,
+            index=True,
+        ),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("kind", sa.String(32), nullable=False),
+        sa.Column("format", sa.String(64), nullable=False),
+        sa.Column("sha256", sa.String(64), nullable=False),
+        sa.Column("size_bytes", sa.BigInteger(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.UniqueConstraint("owner_id", "name"),
+    )
 
 
 def downgrade() -> None:
-    for table in ("usage_rows", "job_events", "jobs", "principals"):
+    for table in ("owner_files", "usage_rows", "job_events", "jobs", "principals"):
         op.drop_table(table)

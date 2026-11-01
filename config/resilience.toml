@@ -57,7 +57,7 @@
 # down still works and is still the blunt instrument; the budget is what makes
 # reaching for it rare.
 
-version = 8
+version = 9
 attempts = 3
 timeout_ms = 300000
 
@@ -131,6 +131,12 @@ retry_budget_ratio = 0.1
 # at either number: they move on evidence, not on taste.
 max_source_bytes = 102400
 max_sources = 10
+
+# How many Owner Files one owner keeps in the web app's Files section. An
+# upload over it is refused. Owner Files do not expire, so this bound keeps
+# one owner's store finite: one Owner File is at most `max_source_bytes`, so
+# an owner holds at most `max_owner_files` times that many bytes of them.
+max_owner_files = 100
 
 # THE ONLY BOUND ON A CALLER (#113). Everything else in this file bounds one
 # request, one job's input, or one job's duration. None of them bounds the

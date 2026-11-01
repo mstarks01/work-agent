@@ -41,7 +41,13 @@ from analysis_service.jobs import (
     readable,
     same_schema,
 )
-from analysis_service.objects import ObjectStore, build_object_store, object_key
+from analysis_service.objects import (
+    ObjectStore,
+    build_object_store,
+    file_key,
+    object_key,
+)
+from analysis_service.owner_files import OwnerFile
 from analysis_service.principals import Identity, Principal
 from analysis_service.report import SCHEMA_VERSION, NodeRun, TokenUsage
 from analysis_service.sources import Source
@@ -1997,3 +2003,227 @@ class TestPrincipals:
                 store.reserve(record, ceiling=100, budget=POLICY, principal=principal)
             )
         assert asyncio.run(store.principal(self.identity())) is None
+
+
+def owner_file(
+    owner: str = "alice", name: str = "Call notes", text: str = "Ana: hi"
+) -> tuple[OwnerFile, str]:
+    """A new Owner File row of ``owner`` and its text."""
+    file = OwnerFile.create(
+        owner_id=owner, name=name, kind="transcript", format="text/plain", text=text
+    )
+    return file, text
+
+
+def add(
+    store, owner: str = "alice", *, limit: int = 100, **made
+) -> tuple[OwnerFile, str]:
+    """Add a new Owner File of ``owner``, with a principal where it holds none."""
+    file, text = owner_file(owner, **made)
+    outcome = asyncio.run(
+        store.add_file(
+            file, text, limit=limit, principal=asyncio.run(new_principal(store, owner))
+        )
+    )
+    assert outcome == "added"
+    return file, text
+
+
+class TestOwnerFiles:
+    """ADR 0118: an Owner File is a row and its text, under one owner."""
+
+    def test_an_added_file_reads_back_with_its_text(self, store):
+        file, text = add(store)
+        assert asyncio.run(store.file_text(file.id, "alice")) == (file, text)
+        assert asyncio.run(store.owned_files("alice")) == [file]
+
+    def test_the_list_is_the_newest_first_and_only_the_owners(self, store):
+        older, _ = add(store, name="Older")
+        newer, text = owner_file(name="Newer")
+        newer = newer.model_copy(
+            update={"created_at": older.created_at + timedelta(hours=1)}
+        )
+        assert (
+            asyncio.run(store.add_file(newer, text, limit=100, principal=None))
+            == "added"
+        )
+        add(store, "bob")
+        assert [held.name for held in asyncio.run(store.owned_files("alice"))] == [
+            "Newer",
+            "Older",
+        ]
+
+    def test_another_owners_file_reads_as_missing_and_stays(self, store):
+        file, text = add(store)
+        add(store, "bob", name="Other")
+        assert asyncio.run(store.file_text(file.id, "bob")) is None
+        assert asyncio.run(store.delete_file(file.id, "bob")) is False
+        assert asyncio.run(store.file_text(file.id, "alice")) == (file, text)
+
+    def test_a_delete_keeps_nothing(self, store):
+        file, _ = add(store)
+        assert asyncio.run(store.delete_file(file.id, "alice")) is True
+        assert asyncio.run(store.file_text(file.id, "alice")) is None
+        assert asyncio.run(store.owned_files("alice")) == []
+        assert asyncio.run(store.delete_file(file.id, "alice")) is False
+
+    def test_a_name_the_owner_uses_is_refused(self, store):
+        first, _ = add(store)
+        again, _ = owner_file(name=first.name, text="other text")
+        outcome = asyncio.run(
+            store.add_file(again, "other text", limit=100, principal=None)
+        )
+        assert outcome == "name_in_use"
+        assert asyncio.run(store.owned_files("alice")) == [first]
+        assert asyncio.run(store.file_text(again.id, "alice")) is None
+
+    @pytest.mark.parametrize("other", ["call notes", "Call notes ", "Call notes"])
+    def test_names_are_one_only_where_the_strings_are_equal(self, store, other):
+        add(store)
+        add(store, name=other)
+        assert len(asyncio.run(store.owned_files("alice"))) == 2
+
+    def test_another_owner_may_use_the_name(self, store):
+        add(store)
+        add(store, "bob")
+
+    def test_the_count_limit_refuses_one_more_file(self, store):
+        add(store, name="One", limit=2)
+        add(store, name="Two", limit=2)
+        file, text = owner_file(name="Three")
+        outcome = asyncio.run(store.add_file(file, text, limit=2, principal=None))
+        assert outcome == "over_limit"
+        assert len(asyncio.run(store.owned_files("alice"))) == 2
+
+    def test_the_count_comes_before_the_name(self, store):
+        first, _ = add(store, limit=1)
+        again, text = owner_file(name=first.name)
+        assert (
+            asyncio.run(store.add_file(again, text, limit=1, principal=None))
+            == "over_limit"
+        )
+
+    def test_a_first_upload_creates_the_principal(self, store):
+        principal = Principal.new(Identity(issuer="https://one.example", sub="carol"))
+        file, text = owner_file(principal.owner_id)
+        assert (
+            asyncio.run(store.add_file(file, text, limit=100, principal=principal))
+            == "added"
+        )
+        assert asyncio.run(store.principal(principal.identity)) == principal
+        late = Principal.new(principal.identity)
+        second, text = owner_file(late.owner_id, name="Second")
+        assert (
+            asyncio.run(store.add_file(second, text, limit=100, principal=late))
+            == "principal_exists"
+        )
+        assert asyncio.run(store.owned_files(late.owner_id)) == []
+
+    def test_a_refused_upload_keeps_no_new_principal(self, store):
+        principal = Principal.new(Identity(issuer="https://one.example", sub="carol"))
+        file, text = owner_file(principal.owner_id)
+        assert (
+            asyncio.run(store.add_file(file, text, limit=0, principal=principal))
+            == "over_limit"
+        )
+        assert asyncio.run(store.principal(principal.identity)) is None
+
+    def test_a_file_whose_owner_holds_no_principal_is_a_defect(self, store):
+        file, text = owner_file("nobody")
+        with pytest.raises(ValueError, match="holds no principal"):
+            asyncio.run(store.add_file(file, text, limit=100, principal=None))
+
+    def test_a_file_of_another_owner_than_its_principal_is_a_defect(self, store):
+        principal = Principal.new(Identity(issuer="https://one.example", sub="carol"))
+        file, text = owner_file("nobody")
+        with pytest.raises(ValueError, match="another owner"):
+            asyncio.run(store.add_file(file, text, limit=100, principal=principal))
+
+    def test_a_text_with_another_digest_is_a_defect(self, store):
+        add(store, name="Seed")
+        file, _ = owner_file()
+        with pytest.raises(ValueError, match="another digest"):
+            asyncio.run(store.add_file(file, "changed", limit=100, principal=None))
+        assert asyncio.run(store.file_text(file.id, "alice")) is None
+
+    def test_simultaneous_uploads_never_exceed_the_limit(self, store):
+        add(store, name="Seed", limit=3)
+
+        async def scenario():
+            start = asyncio.Event()
+
+            async def contend(at: int):
+                await start.wait()
+                file, text = owner_file(name=f"Racer {at}")
+                return await store.add_file(file, text, limit=3, principal=None)
+
+            racers = [asyncio.create_task(contend(at)) for at in range(12)]
+            start.set()
+            return await asyncio.gather(*racers)
+
+        outcomes = asyncio.run(scenario())
+        assert outcomes.count("added") == 2
+        assert len(asyncio.run(store.owned_files("alice"))) == 3
+
+
+class TestOwnerFileObjects:
+    """The text is an object that one row names (ADR 0118)."""
+
+    def keys(self, objects) -> set[str]:
+        async def listed():
+            return {key async for key, _ in objects.list()}
+
+        return asyncio.run(listed())
+
+    def test_the_text_is_an_object_under_the_file_key(self, held):
+        store, objects = held
+        file, text = add(store)
+        assert asyncio.run(objects.get(file_key("alice", file.id))) == text.encode()
+
+    def test_a_refused_upload_leaves_no_object(self, held):
+        store, objects = held
+        add(store)
+        before = self.keys(objects)
+        again, text = owner_file(text="other")
+        assert (
+            asyncio.run(store.add_file(again, text, limit=100, principal=None))
+            == "name_in_use"
+        )
+        over, text = owner_file(name="Over")
+        assert (
+            asyncio.run(store.add_file(over, text, limit=1, principal=None))
+            == "over_limit"
+        )
+        assert self.keys(objects) == before
+
+    def test_a_delete_removes_the_object(self, held):
+        store, objects = held
+        file, _ = add(store)
+        asyncio.run(store.delete_file(file.id, "alice"))
+        assert asyncio.run(objects.get(file_key("alice", file.id))) is None
+
+    def test_a_text_that_fails_its_digest_raises(self, held):
+        store, objects = held
+        file, _ = add(store)
+        key = file_key("alice", file.id)
+        asyncio.run(objects.delete(key))
+        asyncio.run(objects.put(key, b"changed"))
+        with pytest.raises(sql_store.CorruptObject):
+            asyncio.run(store.file_text(file.id, "alice"))
+
+    def test_the_sweep_deletes_a_file_object_that_no_row_names(self, held):
+        store, objects = held
+        named, _ = add(store)
+        orphan = file_key("alice", owner_file()[0].id)
+        foreign = file_key("bob", named.id)
+        asyncio.run(objects.put(orphan, b"x"))
+        asyncio.run(objects.put(foreign, b"x"))
+        assert asyncio.run(store.sweep_orphans(later())) == 2
+        assert asyncio.run(objects.get(orphan)) is None
+        assert asyncio.run(store.file_text(named.id, "alice")) is not None
+
+    def test_the_sweep_keeps_a_young_file_object(self, held):
+        store, objects = held
+        orphan = file_key("alice", owner_file()[0].id)
+        asyncio.run(objects.put(orphan, b"x"))
+        assert asyncio.run(store.sweep_orphans(earlier())) == 0

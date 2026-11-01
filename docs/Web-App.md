@@ -252,6 +252,37 @@ builds at once and the form shows, with no restart. The app does not watch its
 files or its environment: after a hand edit of a config file or of
 `settings.env`, or a change to the process environment, restart the app.
 
+## The Files page
+
+**Files**, between **Analyses** and **Settings**, keeps **Owner File**s: call
+transcripts and Mermaid diagrams that you add to any of your analyses
+(ADR 0118). Each file stays until you delete it. Retention does not remove it.
+
+- **The list.** A table gives the name, the kind, the format, the size and the
+  date of each file, the newest first. A line above it gives the count against
+  `max_owner_files`.
+- **Upload a file.** The page reads the file in the browser with the checks of
+  the direct upload, then a dialog asks for the name and the kind. The name
+  starts as the file name. A plain text file is a "Transcript" or a
+  "Description", and a Mermaid file is always a "Diagram". `POST
+  /workspace/files` receives the text in JSON, with the name, the kind and the
+  format, and checks it again: the kind that the format's row allows, the byte
+  limit of one job, the control characters, the name rule of a Source label,
+  and the diagram type. It refuses a name that the page gives its own
+  Sources, such as "Uploaded transcript", a name you already use, and an
+  upload over the count limit.
+- **Delete.** A dialog says that each analysis that used the file keeps its
+  own copy. `DELETE /workspace/files/{file_id}` removes the row and the text,
+  and keeps nothing.
+
+The analysis form shows "Files for this analysis": a checklist of your files,
+a "Manage files" link and a size meter. The submission sends the chosen IDs
+in `owner_files`, and the server copies each file's text into the job as a
+Source with the file's name as its label (ADR 0119). A later delete or a new
+upload changes no job and no report. When a chosen file is gone, the
+submission is refused and the checklist shows the file as "Missing". An
+analysis that you open again lists "Files used" from its own copies.
+
 ## The Settings page
 
 **Settings**, beside **Analyses**, shows each Deployment Setting in one table
@@ -468,10 +499,14 @@ what makes forgetting one impossible rather than merely unlikely.
 file.** The form page reads the file in the browser. It refuses a file larger
 than the deployment's `max_source_bytes` before it reads a byte, then refuses
 bytes that are not strict UTF-8, then refuses any control character other than
-a tab or a line break. `POST /analyze` receives the text as a `transcript`
-source, or as a `diagram` source for a `.mmd` or `.mermaid` file, in its JSON
-body, the same shape as a pasted description, so no route parses a file,
-a file name or a content type.
+a tab or a line break. The file's extension finds its row in the format
+table, `analysis_service.sources.FORMATS`, which the server renders into the
+page with the `accept` value of the file field. A file with no row is refused,
+and the upload takes the row's default kind: a `.txt`, `.vtt` or `.srt` file is
+a `transcript`, and a `.mmd` or `.mermaid` file is a `diagram` (ADR 0120).
+`POST /analyze` receives the text as a source in its JSON body, the same shape
+as a pasted description, so no route parses a file, a file name or a content
+type.
 
 **Every page carries a strict nonce CSP,** `default-src 'none'` with a fresh
 per-response nonce on each inline block and no `'unsafe-inline'` anywhere. A
@@ -482,9 +517,10 @@ Each policy grants only what its own page does:
 | Page | Grants beyond `default-src 'none'` |
 | --- | --- |
 | Report | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/answer/{run}` and `/correct/{run}`. It loads nothing. |
-| Form | the same, for `/example`, `/analyze`, `/answer/{run}`, `/amend/{run}`, `/events/{run}` and `/workspace/runs`. |
+| Form | the same, for `/example`, `/analyze`, `/answer/{run}`, `/amend/{run}`, `/events/{run}`, `/workspace/runs` and `/workspace/files`. |
 | Diagnostic | `style-src` nonce only — it runs no script, so it is granted none. |
 | Settings | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/settings` and `/settings/rows`. It draws its table from the data in the page. |
+| Files | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/workspace/files`. |
 
 `base-uri` and `form-action` are `'none'` everywhere; the form posts through
 fetch, so a navigation away from it would be something going wrong. A page and

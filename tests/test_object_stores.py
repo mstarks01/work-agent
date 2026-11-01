@@ -27,9 +27,14 @@ from analysis_service.aws_identity import PLATFORM_METHODS, platform_session
 from analysis_service.objects import (
     OBJECT_STORES,
     S3_KEY_FILES,
+    FileKey,
+    FilesystemObjectStore,
+    JobKey,
     ObjectStore,
     ObjectStoreName,
     build_object_store,
+    file_key,
+    key_parts,
     object_key,
 )
 from analysis_service.store_backends import build_store
@@ -512,3 +517,56 @@ def test_without_boto3_the_startup_names_the_aws_extra(tmp_path, monkeypatch):
 def test_s3_env_refuses_to_run_without_moto(tmp_path):
     with pytest.raises(AssertionError, match="moto_s3"):
         s3_env(tmp_path)
+
+
+class TestTheKeyRules:
+    """A job key has three parts and a file key two (ADR 0118)."""
+
+    JOB = "job-" + "a" * 32
+    FILE = "file-" + "b" * 32
+
+    def test_each_shape_round_trips_with_its_type(self):
+        assert key_parts(object_key("alice", self.JOB, "sources.json")) == JobKey(
+            "alice", self.JOB, "sources.json"
+        )
+        assert key_parts(file_key("alice", self.FILE)) == FileKey("alice", self.FILE)
+
+    @pytest.mark.parametrize(
+        ("owner_id", "file_id"),
+        [
+            ("Alice", "file-" + "b" * 32),
+            ("../alice", "file-" + "b" * 32),
+            ("alice", "file-" + "B" * 32),
+            ("alice", "file-" + "b" * 31),
+            ("alice", "job-" + "b" * 32),
+            ("alice", "file-" + "b" * 32 + "/x"),
+        ],
+    )
+    def test_a_file_key_refuses_each_part_outside_its_shape(self, owner_id, file_id):
+        with pytest.raises(ValueError):
+            file_key(owner_id, file_id)
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "alice",
+            "alice/notes.txt",
+            "alice/" + "job-" + "a" * 32,
+            "alice/" + "file-" + "b" * 32 + "/sources.json",
+            "alice/" + "file-" + "b" * 32 + "/",
+            "tenant/alice/" + "file-" + "b" * 32,
+        ],
+    )
+    def test_a_key_no_builder_gives_has_no_parts(self, key):
+        assert key_parts(key) is None
+
+
+def test_a_file_delete_keeps_the_owner_directory(tmp_path):
+    """Another write of the owner can need the directory at the same time."""
+    root = tmp_path / "objects"
+    root.mkdir(mode=0o700)
+    store = FilesystemObjectStore(root)
+    key = file_key("alice", "file-" + "b" * 32)
+    asyncio.run(store.put(key, b"x"))
+    assert asyncio.run(store.delete(key)) is True
+    assert (root / "alice").is_dir()

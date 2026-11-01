@@ -52,6 +52,75 @@ from analysis_service.grounding import normalize
 # prompts/extract.md where the register alone does not say how to read it.
 SourceKind = Literal["description", "transcript", "diagram", "answers"]
 
+#: The shape of an Owner File ID: it carries its type, as a job ID does.
+OWNER_FILE_ID = r"^file-[0-9a-f]{32}$"
+
+#: What an uploaded file is written in. Each value is a row of :data:`FORMATS`.
+SourceFormat = Literal["text/plain", "text/vnd.mermaid"]
+
+
+@dataclass(frozen=True)
+class FormatRow:
+    """One format that an upload reads: how a page names it, the file
+    extensions that select it, the Source kinds it allows, and the kind an
+    upload takes where the person chooses none."""
+
+    label: str
+    extensions: tuple[str, ...]
+    kinds: tuple[SourceKind, ...]
+    default_kind: SourceKind
+
+
+#: **The one format table** (ADR 0120). The direct upload and the Files upload
+#: both read it: the web app renders it into each page that uploads, so no
+#: page keeps a copy of the extensions. A new format is a new row.
+FORMATS: dict[SourceFormat, FormatRow] = {
+    "text/plain": FormatRow(
+        label="Plain text",
+        extensions=(".txt", ".vtt", ".srt"),
+        kinds=("description", "transcript"),
+        default_kind="transcript",
+    ),
+    "text/vnd.mermaid": FormatRow(
+        label="Mermaid",
+        extensions=(".mmd", ".mermaid"),
+        kinds=("diagram",),
+        default_kind="diagram",
+    ),
+}
+
+#: The Mermaid diagram types that the reader of ADR 0121 reads, as the first
+#: word of a diagram's first line. ``diagram_reader/read.mjs`` holds the same
+#: test in Node, and ``tests/test_sources.py`` runs both on one set of headers.
+DIAGRAM_TYPES = ("flowchart", "graph", "architecture-beta")
+
+# ASCII, as JavaScript's ``\b`` is, so the two header tests agree on a word.
+_DIAGRAM_TYPE = re.compile(
+    "(?:" + "|".join(map(re.escape, DIAGRAM_TYPES)) + r")\b", re.ASCII
+)
+
+
+def diagram_header(text: str) -> str:
+    """The first diagram line of Mermaid ``text``, stripped, or ``""``.
+
+    A blank line, a ``%%`` comment and a line between two ``---`` lines of
+    front matter are not diagram lines.
+    """
+    in_front_matter = False
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if line == "---":
+            in_front_matter = not in_front_matter
+        elif line and not in_front_matter and not line.startswith("%%"):
+            return line
+    return ""
+
+
+def is_read_diagram_type(text: str) -> bool:
+    """Whether Mermaid ``text`` is one of :data:`DIAGRAM_TYPES`."""
+    return _DIAGRAM_TYPE.match(diagram_header(text)) is not None
+
+
 # What a caller gets when they use the convenience constructors rather than
 # naming a source themselves. The wire never defaults a label — an unnamed
 # source there is a caller error, because the label is a citation key and
@@ -204,6 +273,11 @@ class Source(BaseModel):
     kind: SourceKind
     label: str = Field(max_length=MAX_LABEL_CHARS)
     text: str
+    #: The Owner File that this Source copies, or ``None`` (ADR 0119). Only
+    #: the service sets it, from the store, and
+    #: :func:`~analysis_service.links.refuse_owner_file_sources` refuses a
+    #: caller's. The copy's digest is :meth:`digest`, so no field holds it.
+    owner_file_id: str | None = Field(default=None, pattern=OWNER_FILE_ID)
 
     @field_validator("label")
     @classmethod
@@ -234,6 +308,21 @@ class Source(BaseModel):
             raise ValueError(
                 f"only the answers source carries the label {ANSWERS_LABEL!r},"
                 " and this service composes it"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _read_diagram_type(self) -> Self:
+        """A ``diagram`` Source is a type that the reader reads (ADR 0120).
+
+        **The one rule of a diagram's type**, on every route. The message
+        names the types and never repeats the text.
+        """
+        if self.kind == "diagram" and not is_read_diagram_type(self.text):
+            types = ", ".join(f"'{name}'" for name in DIAGRAM_TYPES)
+            raise ValueError(
+                "a diagram source must be a Mermaid flowchart or architecture-beta"
+                f" diagram: its first diagram line must start with one of {types}"
             )
         return self
 

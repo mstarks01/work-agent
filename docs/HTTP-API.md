@@ -228,12 +228,16 @@ The report answers exactly this set, one block per framework, in this order.
 
 Each source is `{kind, label, text}`. `kind` is `description`, `transcript` or
 `diagram`, and selects the guidance extraction reads the text under. A
-`diagram` source holds Mermaid text. The service reads a `flowchart` or an
-`architecture-beta` diagram with Mermaid's own parsers, and the validity gate
-then requires an element for each node and a flow for each edge. Any other
-diagram, or one with a syntax error, is read as text (ADR 0121). A third kind,
+`diagram` source holds Mermaid text, and its first diagram line must start
+with `flowchart`, `graph` or `architecture-beta`. Blank lines, `%%` comments
+and front matter come before it. A diagram of another type is refused with
+`422` (ADR 0120). The service reads the diagram with Mermaid's own parsers,
+and the validity gate then requires an element for each node and a flow for
+each edge. A diagram with a syntax error is read as text (ADR 0121). A third kind,
 `answers`, is composed by the service from `links` (below); a submission that
-sends one itself is refused. `label` is yours: it
+sends one itself is refused. A source carries no `owner_file_id`: only the
+web app sets it, on the copy of a file from its Files section, so a submission
+that sends one is refused with `400` (ADR 0119). `label` is yours: it
 must be unique within the job, at most 200 characters and single-line, and it
 is the key every `source_excerpt` in the report cites, so pick something you
 will recognise. Order is presentation only — **sources carry equal weight**, and

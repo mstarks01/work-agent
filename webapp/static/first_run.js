@@ -58,43 +58,112 @@
     }
   });
 
-  // An uploaded transcript or diagram, checked here so that only text leaves
-  // the page. The server never receives the file: the body carries the decoded
-  // text as a JSON string, as it does for a pasted description, so no file
-  // name, content type or multipart body reaches the server. The checks run
-  // before the text is kept, cheapest first: the size before a byte is read,
-  // then a strict UTF-8 decode, then no control character other than a tab or
-  // a line break. A refused file leaves the uploads the page holds as they were.
-  // The file name's extension decides the kind: a Mermaid file is a diagram,
-  // and every other file is a transcript. The page holds one file of each kind.
+  // An uploaded transcript or diagram, checked by text_file.js so that only
+  // text leaves the page: the body carries the decoded text as a JSON string,
+  // as it does for a pasted description. A refused file leaves the uploads the
+  // page holds as they were. The upload takes the default kind of the file's
+  // row in the format table (ADR 0120). The page holds one file of each kind,
+  // under the label the server names for it.
   const uploadFile = document.getElementById("upload-file");
+  const PAGE_LABELS = JSON.parse(document.getElementById("page_labels").textContent);
   const maxUploadBytes = Number(uploadFile.dataset.maxBytes);
   const maxDescriptionBytes = Number(box.dataset.maxBytes);
   const remainingNote = document.getElementById("description-remaining");
-  const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/;
-  const DIAGRAM_FILE = /\.(mmd|mermaid)$/i;
   const UPLOADS = {
-    transcript: { label: "Uploaded transcript", text: null },
-    diagram: { label: "Uploaded diagram", text: null },
+    transcript: { label: PAGE_LABELS.transcript, text: null },
+    diagram: { label: PAGE_LABELS.diagram, text: null },
   };
   const held = () => Object.entries(UPLOADS).filter(([, upload]) => upload.text !== null);
+
+  // The Owner Files this analysis copies (ADR 0119). The checklist lists the
+  // files in Files, and the submission sends only the chosen IDs: the server
+  // reads each text from the store. A chosen file that the list no longer
+  // holds stays on the form as "Missing" until it is removed.
+  const filesRows = document.getElementById("files-rows");
+  let ownerFiles = [];
+  const chosen = new Set();
+  const chosenFiles = () => ownerFiles.filter((file) => chosen.has(file.id));
   const updateDescriptionRemaining = () => {
     const used = [box.value, ...held().map(([, upload]) => upload.text)]
-      .reduce((sum, text) => sum + new TextEncoder().encode(text).length, 0);
+      .reduce((sum, text) => sum + new TextEncoder().encode(text).length, 0)
+      + chosenFiles().reduce((sum, file) => sum + file.size_bytes, 0);
     const remaining = maxDescriptionBytes - used;
     remainingNote.textContent = remaining < 0
-      ? "The description and the uploaded files are too long. Shorten them to continue."
+      ? "The description and the files are too long. Remove a file or shorten the description."
       : `Up to ${remaining.toLocaleString()} bytes remaining`;
     remainingNote.classList.toggle("field-error", remaining < 0);
+    const meter = document.getElementById("bytes-meter");
+    if (meter) {
+      meter.value = Math.min(used, maxDescriptionBytes);
+      document.getElementById("bytes-label").textContent =
+        `Size: ${used.toLocaleString()} of ${maxDescriptionBytes.toLocaleString()} bytes`;
+    }
     return remaining;
   };
+  const needsDescription = () => !held().length && !chosen.size;
+  const drawFiles = () => {
+    if (!filesRows) return;
+    const present = new Set(ownerFiles.map((file) => file.id));
+    const rows = ownerFiles.map((file) => {
+      const row = document.createElement("label");
+      const tick = document.createElement("input");
+      tick.type = "checkbox";
+      tick.checked = chosen.has(file.id);
+      tick.addEventListener("change", () => {
+        if (tick.checked) chosen.add(file.id);
+        else chosen.delete(file.id);
+        box.required = needsDescription();
+        updateDescriptionRemaining();
+      });
+      const name = document.createElement("span");
+      name.className = "file-name";
+      name.textContent = file.name;
+      const facts = document.createElement("span");
+      facts.className = "hint";
+      facts.textContent = `${textFile.kindLabel(file.kind)} · ${textFile.formatLabel(file.format)} · ${textFile.size(file.size_bytes)}`;
+      row.append(tick, name, facts);
+      return row;
+    });
+    const missing = [...chosen].filter((id) => !present.has(id)).map((id) => {
+      const line = document.createElement("p");
+      line.className = "hint";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "quiet";
+      remove.textContent = "Remove";
+      remove.addEventListener("click", () => { chosen.delete(id); drawFiles(); });
+      line.append("Missing: a file you chose is no longer in Files. ", remove);
+      return line;
+    });
+    if (!rows.length && !missing.length) {
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "Files is empty.";
+      rows.push(empty);
+    }
+    filesRows.replaceChildren(...rows, ...missing);
+    box.required = needsDescription();
+    updateDescriptionRemaining();
+  };
+  const loadFiles = async () => {
+    try {
+      const listed = await fetch("/workspace/files");
+      const body = listed.ok ? await listed.json() : [];
+      ownerFiles = Array.isArray(body) ? body : [];
+    } catch {
+      ownerFiles = [];
+    }
+    drawFiles();
+  };
+  if (filesRows) loadFiles();
+
   box.addEventListener("input", updateDescriptionRemaining);
   updateDescriptionRemaining();
   const hold = (kind, text, name) => {
     UPLOADS[kind].text = text;
     document.getElementById(`${kind}-name`).textContent = name;
     document.getElementById(`${kind}-note`).hidden = text === null;
-    box.required = !held().length;
+    box.required = needsDescription();
     updateDescriptionRemaining();
   };
   document.getElementById("upload").addEventListener("click", () => uploadFile.click());
@@ -104,34 +173,20 @@
     const [file] = uploadFile.files;
     uploadFile.value = "";
     if (!file) return;
-    if (file.size > maxUploadBytes) {
-      fail(`This file is larger than the ${maxUploadBytes} bytes that one analysis can carry.`);
-      return;
-    }
-    let text;
-    try {
-      text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
-    } catch {
-      fail("The page could not read this file as UTF-8 text. Upload a plain text file.");
-      return;
-    }
-    if (CONTROL.test(text)) {
-      fail("This file holds control characters, so it is not a plain text file.");
-      return;
-    }
-    if (!text.trim()) {
-      fail("This file holds no text.");
+    const read = await textFile.read(file, maxUploadBytes, "The page reads");
+    if (read.error) {
+      fail(read.error);
       return;
     }
     problem.hidden = true;
-    hold(DIAGRAM_FILE.test(file.name) ? "diagram" : "transcript", text, file.name);
+    hold(read.row.default_kind, read.text, file.name);
   });
 
-  // The description goes with an upload only where it holds text, and always
-  // where there is no upload, so the service says what is missing.
+  // The description goes with an upload or a file only where it holds text,
+  // and always where there is neither, so the service says what is missing.
   const sources = () => [
-    ...(box.value.trim() || !held().length
-      ? [{ kind: "description", label: "Pasted description", text: box.value }]
+    ...(box.value.trim() || needsDescription()
+      ? [{ kind: "description", label: PAGE_LABELS.description, text: box.value }]
       : []),
     ...held().map(([kind, upload]) => ({ kind, label: upload.label, text: upload.text })),
   ];
@@ -181,7 +236,7 @@
       return;
     }
     if (updateDescriptionRemaining() < 0) {
-      fail("The description and the uploaded files are too long. Shorten them to continue.");
+      fail("The description and the files are too long. Remove a file or shorten the description.");
       return;
     }
 
@@ -195,10 +250,13 @@
           frameworks,
           questions: Boolean(ask && ask.checked),
           answers_from: document.getElementById("answers-from")?.value || undefined,
+          owner_files: chosen.size ? [...chosen] : undefined,
         }),
       });
       if (!started.ok) {
         fail((await started.json()).message);
+        // A chosen file can be gone: the list shows it as missing.
+        if (chosen.size) loadFiles();
         return;
       }
       follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean(ask && ask.checked));

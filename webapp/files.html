@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Files · Work Agent</title>
+<style nonce="__CSP_NONCE__"><!--workspace_style-->
+  .files-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .files-table-wrap { overflow-x:auto; }
+  table.files { display:table; width:100%; border-collapse:collapse; font-size:14px; }
+  table.files th, table.files td { text-align:left; padding:8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  table.files td.name { overflow-wrap:anywhere; }
+  table.files td.size { text-align:right; white-space:nowrap; }
+  .notice { border-left:3px solid var(--accent); background:var(--soft); padding:10px 14px; margin:12px 0; border-radius:4px; }
+  dialog.upload { width:min(40rem, 94vw); }
+  dialog.upload input[type=text] { width:100%; }
+  .kind-choice { border:0; padding:0; margin:8px 0; display:flex; gap:16px; flex-wrap:wrap; }
+  .kind-choice label { display:flex; align-items:center; gap:6px; }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="workspace">
+  <aside class="sidebar">
+    <!--sidebar-->
+  </aside>
+  <div class="workspace-body">
+    <main id="main">
+      <div class="files-head">
+        <h1>Files</h1>
+        <span><button type="button" id="upload-file-button" class="primary">Upload a file</button><input type="file" id="file-input" accept="<!--upload_accept-->" hidden></span>
+      </div>
+      <p class="muted">Keep transcripts and diagrams here, and add them to any of your analyses. An analysis keeps its own copy of each file it uses.</p>
+      <p id="files-count" class="hint"></p>
+      <div id="files-notice" class="notice" role="status" hidden></div>
+      <div id="files-problem" class="problem" role="alert" hidden></div>
+      <div class="files-table-wrap">
+        <table class="files" id="files-table" hidden>
+          <thead><tr><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Format</th><th scope="col">Size</th><th scope="col">Added</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody id="files-list"></tbody>
+        </table>
+      </div>
+      <p id="files-empty" class="muted" hidden>No files yet. Upload a transcript or a Mermaid diagram.</p>
+      <dialog id="upload-dialog" class="upload" aria-labelledby="upload-heading">
+        <h2 id="upload-heading">Upload a file</h2>
+        <p id="upload-facts" class="hint"></p>
+        <label class="field-label" for="upload-name">Name</label>
+        <input type="text" id="upload-name" autocomplete="off">
+        <p class="hint">An analysis shows this name as the source of each quote it takes from the file.</p>
+        <fieldset id="upload-kinds" class="kind-choice"><legend class="field-label">Kind</legend></fieldset>
+        <p id="upload-fixed-kind" hidden></p>
+        <div id="upload-problem" class="problem" role="alert" hidden></div>
+        <div class="dialog-actions"><button type="button" id="upload-cancel">Cancel</button><button type="button" id="upload-save" class="primary">Save to Files</button></div>
+      </dialog>
+      <dialog id="delete-dialog" aria-labelledby="delete-question">
+        <p id="delete-question"></p>
+        <p>This removes it from Files. Each analysis that already used it keeps its own copy, and its reports do not change. You cannot undo a delete.</p>
+        <div class="dialog-actions"><button type="button" id="delete-cancel">Cancel</button><button type="button" id="delete-go" class="danger">Delete</button></div>
+      </dialog>
+    </main>
+  </div>
+</div>
+<script type="application/json" id="source_formats" nonce="__CSP_NONCE__"><!--source_formats--></script>
+<script type="application/json" id="files_limits" nonce="__CSP_NONCE__"><!--files_limits--></script>
+<script nonce="__CSP_NONCE__"><!--script--></script>
+</body>
+</html>

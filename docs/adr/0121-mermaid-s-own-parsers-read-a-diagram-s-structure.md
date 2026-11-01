@@ -5,8 +5,8 @@
 - **Effort**: the `diagram` Source (#2056) and QA-2026-10-31-03 to -06
 - **Relates to**: [ADR 0001](0001-sources-replace-description.md), whose
   Sources carry equal weight and whose extraction alone writes elements;
-  [ADR 0120](0120-one-format-table-serves-both-uploads.md) (on the Owner File
-  map, not yet on `main`), whose check admits only a flowchart as a `diagram`
+  [ADR 0120](0120-one-format-table-serves-both-uploads.md), whose check admits
+  a flowchart and an `architecture-beta` diagram as a `diagram`
 
 ## Context
 
@@ -75,8 +75,7 @@ not start Node.
 - The model input changes only for a job with a `diagram` Source. A job
   without one renders the same bytes as before.
 - Each diagram costs one Node start, about 0.7 s.
-- ADR 0120's check must also admit `architecture-beta`, when the Owner File
-  map reaches `main`.
+- ADR 0120's check admits the two diagram types that the reader reads.
 - QA-2026-11-01-01 measured the structure against a text reading. On
   `architecture-beta` diagrams written from the corpus models, elements lost
   fell from 8.75 to 5.0 a sweep. On loose flowcharts, the first design raised

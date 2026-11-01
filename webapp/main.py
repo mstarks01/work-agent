@@ -113,11 +113,11 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import asynccontextmanager, nullcontext
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -127,7 +127,7 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from analysis_service import (
@@ -225,7 +225,14 @@ from analysis_service.open_facts import (
     gaps,
     reference_labels,
 )
-from analysis_service.principals import Identity
+from analysis_service.owner_files import (
+    OWNER_FILE_ID_PATTERN,
+    OwnerFile,
+    name_in_use,
+    over_limit,
+    upload_refusal,
+)
+from analysis_service.principals import Identity, Principal, log_created
 from analysis_service.questions import question_fallback
 from analysis_service.report_changes import report_changes
 from analysis_service.report_conditions import conditions, corrected_findings
@@ -233,7 +240,12 @@ from analysis_service.selection import SelectionError
 from analysis_service.settings_variables import deployment_env
 from analysis_service.sources import (
     ANSWERS_LABEL,
+    FORMATS,
+    MAX_LABEL_CHARS,
     MAX_SYSTEM_NAME_CHARS,
+    OWNER_FILE_ID,
+    SourceFormat,
+    SourceKind,
     SourceLimits,
     clean_system_name,
 )
@@ -319,6 +331,22 @@ _DIAGNOSTIC_GRANTS = Grants(style=True)
 #: save to ``/settings``.
 _SETTINGS_GRANTS = Grants(script=True, style=True, connect=True)
 
+#: The Files page calls ``/workspace/files`` to list, add and delete files.
+_FILES_GRANTS = Grants(script=True, style=True, connect=True)
+
+#: The label of each Source that a job of this app gets beside its Owner
+#: Files, by kind: the three that the form page makes, which it reads from
+#: here, and the answers Source that the service composes. An upload to Files
+#: refuses each one as a name, because a job that held both would repeat a
+#: label (#2062).
+PAGE_SOURCE_LABELS: dict[SourceKind, str] = {
+    "description": "Pasted description",
+    "transcript": "Uploaded transcript",
+    "diagram": "Uploaded diagram",
+    "answers": ANSWERS_LABEL,
+}
+_RESERVED_NAMES = frozenset(PAGE_SOURCE_LABELS.values())
+
 #: The identity of this app's one local operator, who owns every job it holds.
 #: It is the caller the engine names for an in-process run, under the reserved
 #: local issuer, so no bearer token can name it.
@@ -340,6 +368,8 @@ class Settings:
     budget: BudgetPolicy
     deadline_seconds: float
     carries_catalog: bool
+    #: How many Owner Files the operator keeps in Files (ADR 0118).
+    max_owner_files: int
     gate: CertificationGate | None = None
 
 
@@ -617,6 +647,7 @@ class Current:
 
     answers: JobAnswers
     deadline_seconds: float
+    max_owner_files: int
 
 
 class CellEmpty(Exception):
@@ -691,6 +722,44 @@ class _Submission(BaseModel):
     questions: bool = _as_v1("questions")
     answers_from: str | None = _as_v1("answers_from")
     name: str | None = None
+    #: The Owner Files whose text the new job copies (ADR 0119). Only this
+    #: route takes them: ``POST /v1/jobs`` has no Files.
+    #: :meth:`~analysis_service.job_answers.JobAnswers.owner_file_sources`
+    #: refuses more of them than the deployment's source limit.
+    owner_files: list[Annotated[str, Field(pattern=OWNER_FILE_ID)]] = Field(
+        default_factory=list
+    )
+
+
+class _FileUpload(BaseModel):
+    """The body of ``POST /workspace/files``: an upload to Files.
+
+    The browser reads the file and sends its text, so no route takes a file.
+    :func:`~analysis_service.owner_files.upload_refusal` checks the content.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    kind: SourceKind
+    format: SourceFormat
+    text: str
+
+
+def _file_view(file: OwnerFile) -> dict[str, object]:
+    """What the pages show of an Owner File: no owner ID and no text."""
+    return {
+        "id": file.id,
+        "name": file.name,
+        "kind": file.kind,
+        "format": file.format,
+        "size_bytes": file.size_bytes,
+        "created_at": file.created_at.isoformat(),
+    }
+
+
+#: The answer to a delete of a file the operator does not hold.
+_NO_SUCH_FILE = "This file is no longer in Files."
 
 
 class _UnknownKey(Exception):
@@ -784,6 +853,7 @@ class Startup:
                 gate=settings.gate,
             ),
             deadline_seconds=settings.deadline_seconds,
+            max_owner_files=settings.max_owner_files,
         )
 
 
@@ -824,6 +894,7 @@ def build_startup(env: Mapping[str, str]) -> Startup:
             runner_for=deployment.runner,
             limits=deployment.resilience.source_limits(),
             budget=deployment.resilience.budget_policy(),
+            max_owner_files=deployment.resilience.max_owner_files,
             deadline_seconds=deployment.job_deadline_seconds(),
             carries_catalog=deployment.carries_catalog,
             gate=deployment.gate,
@@ -1346,6 +1417,7 @@ def create_app(
                         "workspace.js",
                         "answer_editor.js",
                         "question_list.js",
+                        "text_file.js",
                         "first_run.js",
                     )
                 ),
@@ -1356,6 +1428,9 @@ def create_app(
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 source_limit=str(current.answers.limits.max_total_bytes),
+                source_formats=_SOURCE_FORMATS,
+                upload_accept=_UPLOAD_ACCEPT,
+                page_labels=script_json(PAGE_SOURCE_LABELS),
                 store_note=""
                 if workspace.store.durable
                 else escape(_MEMORY_STORE_NOTE),
@@ -1460,6 +1535,110 @@ def create_app(
         """The sample description, read from the file the examples also run."""
         return PlainTextResponse(SAMPLE.read_text(encoding="utf-8"))
 
+    @app.get("/files", response_class=HTMLResponse)
+    async def files_page() -> Response:
+        """The Files section: the operator's Owner Files (ADR 0118)."""
+        current = cell.read(
+            lambda: response(diagnostic_page(state, env), status_code=503)
+        )
+        limits = {
+            "max_owner_files": current.max_owner_files,
+            "max_bytes": current.answers.limits.max_total_bytes,
+            "name_chars": MAX_LABEL_CHARS,
+        }
+        return response(
+            render(
+                _FILES_PAGE,
+                _FILES_GRANTS,
+                script="\n".join(
+                    client_script(name)
+                    for name in ("sidebar.js", "text_file.js", "files.js")
+                ),
+                workspace_style=WORKSPACE_STYLE,
+                sidebar=_SIDEBAR,
+                source_formats=_SOURCE_FORMATS,
+                upload_accept=_UPLOAD_ACCEPT,
+                files_limits=script_json(limits),
+            )
+        )
+
+    @app.get("/workspace/files")
+    async def workspace_files() -> Response:
+        """The operator's Owner Files, the newest first, with no text."""
+        held = await workspace.store.principal(OPERATOR)
+        files = [] if held is None else await workspace.store.owned_files(held.owner_id)
+        return JSONResponse([_file_view(file) for file in files])
+
+    @app.post("/workspace/files")
+    async def upload_file(request: Request) -> Response:
+        """Keep an uploaded file in Files. The first upload of an operator
+        who holds no principal creates it, as a first job does (ADR 0064)."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        current = cell.read(unavailable)
+        try:
+            body = _body_of(await request.json(), _FileUpload)
+            upload = _FileUpload.model_validate(body)
+        except _UnknownKey as exc:
+            return _message(400, str(exc))
+        except TypeError:
+            return _message(
+                400, "Expected a JSON object with a name, a kind, a format and a text."
+            )
+        except ValueError as exc:
+            return _message(400, refusal_text(exc))
+        refusal = upload_refusal(
+            upload.name,
+            upload.kind,
+            upload.format,
+            upload.text,
+            max_bytes=current.answers.limits.max_total_bytes,
+            page_labels=_RESERVED_NAMES,
+        )
+        if refusal is not None:
+            return _message(400, refusal)
+        held = await workspace.store.principal(OPERATOR)
+        principal = held or Principal.new(OPERATOR)
+        new = None if held is not None else principal
+        file = OwnerFile.create(
+            owner_id=principal.owner_id,
+            name=upload.name,
+            kind=upload.kind,
+            format=upload.format,
+            text=upload.text,
+        )
+        outcome = await workspace.store.add_file(
+            file, upload.text, limit=current.max_owner_files, principal=new
+        )
+        match outcome:
+            case "added":
+                if new is not None:
+                    log_created(new)
+                return JSONResponse(_file_view(file), status_code=201)
+            case "name_in_use":
+                return _message(409, name_in_use(upload.name))
+            case "over_limit":
+                return _message(409, over_limit(current.max_owner_files))
+            case "principal_exists":
+                return _message(
+                    409, "Another upload started at the same time. Try again."
+                )
+
+    @app.delete("/workspace/files/{file_id}")
+    async def delete_owner_file(file_id: str, request: Request) -> Response:
+        """Delete an Owner File and keep nothing. Each job that used it keeps
+        its own copy (ADR 0119)."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        if not OWNER_FILE_ID_PATTERN.fullmatch(file_id):
+            return _message(404, _NO_SUCH_FILE)
+        held = await workspace.store.principal(OPERATOR)
+        if held is None or not await workspace.store.delete_file(
+            file_id, held.owner_id
+        ):
+            return _message(404, _NO_SUCH_FILE)
+        return Response(status_code=204)
+
     @app.get("/workspace/runs")
     async def workspace_runs() -> Response:
         current = cell.read(lambda: JSONResponse([]))
@@ -1495,9 +1674,18 @@ def create_app(
         sources = await store.sources(record.id, owner_id)
         if sources is None:
             await answers.missing(record, "sources")
+        # The text of an Owner File's copy stays out of the description; the
+        # page lists each copy under "Files used" (ADR 0119).
         payload["description"] = "\n\n".join(
-            source.text for source in sources if source.kind != "answers"
+            source.text
+            for source in sources
+            if source.kind != "answers" and source.owner_file_id is None
         )
+        payload["owner_files"] = [
+            {"id": source.owner_file_id, "label": source.label, "kind": source.kind}
+            for source in sources
+            if source.owner_file_id is not None
+        ]
         payload["error"] = record.error
         payload["issues"] = [
             {"code": issue.code, "message": issue.message}
@@ -1622,6 +1810,7 @@ def create_app(
                         system_name=name,
                         questions=submission.questions,
                         answers_from=submission.answers_from,
+                        owner_files=submission.owner_files,
                     ),
                     start=workspace.start(current.deadline_seconds),
                 )
@@ -2050,6 +2239,13 @@ _STYLE = """
 
 _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-8")
 _SETTINGS_PAGE = (Path(__file__).parent / "settings.html").read_text(encoding="utf-8")
+_FILES_PAGE = (Path(__file__).parent / "files.html").read_text(encoding="utf-8")
+#: The format table as each page that uploads reads it, and the ``accept``
+#: attribute of its file field: both from :data:`FORMATS` (ADR 0120).
+_SOURCE_FORMATS = script_json({name: asdict(row) for name, row in FORMATS.items()})
+_UPLOAD_ACCEPT = escape(
+    ",".join(extension for row in FORMATS.values() for extension in row.extensions)
+)
 #: The sidebar of every workspace page: the form, Settings and the report.
 #: Static markup, so it takes no escape.
 _SIDEBAR = (Path(__file__).parent / "sidebar.html").read_text(encoding="utf-8")

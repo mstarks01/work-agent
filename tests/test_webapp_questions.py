@@ -13,7 +13,7 @@ import json
 import re
 import shutil
 import subprocess
-from dataclasses import replace
+from dataclasses import asdict, replace
 from types import MappingProxyType
 
 import pytest
@@ -40,6 +40,7 @@ from analysis_service.links import NONE_OF_THESE, LinkAnswer, fold_principal
 from analysis_service.open_facts import group_of
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.selection import SelectionError, resolve_names
+from analysis_service.sources import FORMATS
 from tests import test_open_facts, test_questions, test_webapp
 from tests.factories import (
     asking_threat,
@@ -55,7 +56,7 @@ from tests.test_webapp import (
     posted,
     startup_for,
 )
-from webapp.main import create_app
+from webapp.main import PAGE_SOURCE_LABELS, create_app
 
 #: The shipped tier config, as the webapp tests build it: one fixture, used here.
 tiers = test_webapp.tiers
@@ -567,7 +568,7 @@ for (const id of ["analyze","description","problem","go","load","ask",
                   "answer_limits","save-status","changes","upload","upload-file",
                   "transcript-note","transcript-name","transcript-remove","diagram-note",
                   "diagram-name","diagram-remove","analysis-name",
-                  "description-remaining"])
+                  "description-remaining","source_formats","page_labels"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
 ids["upload-file"].dataset.maxBytes = "64";
@@ -576,6 +577,8 @@ ids.description.dataset.maxBytes = "1000000";
 ids["analysis-name"].value = "Test analysis";
 ids.ask.checked = true;
 ids.answer_limits.textContent = LIMITS;
+ids.source_formats.textContent = FORMATS;
+ids.page_labels.textContent = PAGE_LABELS;
 const framework = new Node("input");
 framework.value = "stride";
 framework.checked = true;
@@ -606,18 +609,28 @@ def _presented(rows: list[dict]) -> list[list[str]]:
     return [row["key"] for row in rows if row.get("parent") not in keys]
 
 
+#: The format table as the server renders it into the form page.
+_FORMAT_TABLE = {name: asdict(row) for name, row in FORMATS.items()}
+
+
 def _run_form_script(steps: str, search: str = "") -> dict:
     node = shutil.which("node")
     if node is None:
         pytest.skip("no node on PATH to run the form page's script")
     script = "\n".join(
         (PROJECT_ROOT / "webapp" / "static" / name).read_text()
-        for name in ("answer_editor.js", "question_list.js", "first_run.js")
+        for name in (
+            "answer_editor.js",
+            "question_list.js",
+            "text_file.js",
+            "first_run.js",
+        )
     )
     program = (
-        _FORM_HARNESS.replace("SEARCH", json.dumps(search)).replace(
-            "LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS)))
-        )
+        _FORM_HARNESS.replace("SEARCH", json.dumps(search))
+        .replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
+        .replace("FORMATS", json.dumps(json.dumps(_FORMAT_TABLE)))
+        .replace("PAGE_LABELS", json.dumps(json.dumps(PAGE_SOURCE_LABELS)))
         + script
         + "\n(async () => {\n"
         + steps
@@ -944,6 +957,31 @@ def test_a_file_that_is_not_text_is_refused_before_it_is_kept(data, refusal, rea
     assert refusal in problems[0]
     assert ({"url": "read"} in calls) is read
     assert [source["kind"] for source in posted[0]] == ["description"]
+
+
+@pytest.mark.parametrize("name", ["notes.md", "call", "model.mmd.bak"])
+def test_a_file_with_no_format_row_is_refused_before_it_is_read(name):
+    """The format table decides what the direct upload reads (ADR 0120), and
+    the refusal names each supported extension."""
+    steps = f"await pick([0x41], {json.dumps(name)});\nawait submit();"
+    calls = _run_form_script(_PICK + steps)["calls"]
+    [problem] = [call["body"] for call in calls if call["url"] == "problem"]
+    posted = [call["body"]["sources"] for call in calls if call["url"] == "/analyze"]
+
+    for row in FORMATS.values():
+        assert row.label in problem
+        assert all(extension in problem for extension in row.extensions)
+    assert {"url": "read"} not in calls
+    assert [source["kind"] for source in posted[0]] == ["description"]
+
+
+@pytest.mark.parametrize(
+    ("name", "kind"), [("call.VTT", "transcript"), ("notes.srt", "transcript")]
+)
+def test_the_direct_upload_takes_the_default_kind_of_its_row(name, kind):
+    steps = f"await pick([0x41], {json.dumps(name)});\nawait submit();"
+    [sources] = _posted_sources(steps)
+    assert [source["kind"] for source in sources] == [kind]
 
 
 def test_a_refused_file_keeps_the_transcript_the_page_holds():
