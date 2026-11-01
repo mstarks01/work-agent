@@ -65,6 +65,7 @@ from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, load_case, refuse_holdout
+from evals.harness.run_record import run_record
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,8 @@ class Archived:
     #: The fact catalog the critic's drafts cited, or ``None`` where the run
     #: had no assertion pass.
     assertions: AssertionRecord | None
+    #: The sweep's files this material was read from.
+    files: tuple[Path, ...]
 
 
 def load(artifact: EvalArtifact, case_id: str, framework: FrameworkName) -> Archived:
@@ -119,6 +122,7 @@ def load(artifact: EvalArtifact, case_id: str, framework: FrameworkName) -> Arch
         shared=shared,
         model=report.system_model,
         assertions=report.assertions,
+        files=(report_path, drafts_path, lanes_path),
     )
 
 
@@ -157,6 +161,7 @@ def _from_failure(
             if state.get(STATE_ASSERTION_CATALOG) is None
             else AssertionRecord.model_validate(state[STATE_ASSERTION_CATALOG])
         ),
+        files=(dump,),
     )
 
 
@@ -239,18 +244,6 @@ async def replay(
     return parse(await call(instruction, turn), archived.framework)
 
 
-def write_rulings(path: Path, archived: Archived, rulings: Sequence[Ruling]) -> None:
-    """The replayed rulings, completed as the graph completes them, as JSON.
-
-    The status a comparison prints says what moved and not why. The reason and
-    the open facts on each ruling say why, and a replay that kept only the
-    status needed a second paid call to find out.
-    """
-    settled = complete_rulings(archived.drafts, rulings)
-    payload = {"claims": [ruling.model_dump(mode="json") for ruling in settled]}
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
-
 def arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("artifact", type=Path, help="the sweep whose critic to replay")
     parser.add_argument("--case", required=True, help="the case the critic ran on")
@@ -285,6 +278,15 @@ def command_critic_replay(args: argparse.Namespace) -> int:
         check_out(args.out, args.raw)
         artifact = load_artifact(args.artifact)
         archived = load(artifact, args.case, args.framework)
+        record = (
+            None
+            if args.out is None and args.raw is None
+            else run_record(
+                "critic-replay",
+                {"case": args.case, "framework": args.framework},
+                {path: {} for path in (artifact.path, *archived.files)},
+            )
+        )
     except (CorpusError, EvalRunError, ProvenanceError, FileNotFoundError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -310,9 +312,18 @@ def command_critic_replay(args: argparse.Namespace) -> int:
         )
     )
     if args.raw is not None:
-        args.raw.write_text(json.dumps(seen, indent=2) + "\n", encoding="utf-8")
+        raw = {"record": record, "answers": seen}
+        args.raw.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
     if args.out is not None:
-        write_rulings(args.out, archived, rulings)
+        # The status a comparison prints says what moved and not why. The
+        # reason and the open facts on each ruling, completed as the graph
+        # completes them, say why without a second paid call.
+        settled = complete_rulings(archived.drafts, rulings)
+        payload = {
+            "record": record,
+            "claims": [ruling.model_dump(mode="json") for ruling in settled],
+        }
+        args.out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     rows = compare(archived, rulings)
     same = sum(row.archived == row.replayed for row in rows)
     for row in rows:

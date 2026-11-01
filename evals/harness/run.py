@@ -173,6 +173,7 @@ from evals.harness.reference import (
     flows_by_case,
     load_corpus,
 )
+from evals.harness.run_record import run_record, sweep_inputs
 from evals.harness.scorer import CaseScore
 from evals.harness.stability import (
     Band,
@@ -1584,9 +1585,22 @@ def command_price_verbs(args: argparse.Namespace) -> int:
     ]
     verb_pricing.render(shipped, priced)
     if args.out is not None:
+        record = run_record(
+            "price-verbs",
+            {
+                "equivalent": args.equivalent,
+                "together": args.together,
+                "corpus_digest": corpus_digest(Path(args.corpus)),
+            },
+            {
+                Path(args.pairs): {},
+                **sweep_inputs([] if args.artifact is None else [Path(args.artifact)]),
+            },
+        )
         Path(args.out).write_text(
             json.dumps(
                 {
+                    "record": record,
                     "shipped": shipped.to_json(),
                     "candidates": [p.to_json() for p in priced],
                 },
@@ -1672,7 +1686,19 @@ def command_stability(args: argparse.Namespace) -> int:
     _print_stability(runs, stability)
     _print_band(measured, bool(args.row))
     if args.out:
+        record = run_record(
+            "stability",
+            {"calibrate": args.calibrate, "rows": args.row},
+            {
+                Path(path): {}
+                for path in (
+                    *args.artifact,
+                    *(p for paths in args.calibrate for p in paths),
+                )
+            },
+        )
         report = {
+            "record": record,
             "runs": [
                 {"artifact": run.label, "mode": run.mode, "models": run.models}
                 for run in runs
@@ -1712,7 +1738,13 @@ def command_extraction_losses(args: argparse.Namespace) -> int:
     warnings = extraction_losses.warnings_for(end_to_end, analysis)
     extraction_losses.render(rows, warnings)
     if args.out:
+        record = run_record(
+            "extraction-losses",
+            {"corpus_digest": corpus_digest(Path(args.corpus))},
+            {**sweep_inputs([Path(args.end_to_end)]), Path(args.analysis): {}},
+        )
         report = {
+            "record": record,
             "runs": {
                 "end_to_end": {
                     "artifact": end_to_end.label,
@@ -1747,10 +1779,12 @@ def command_replay(args: argparse.Namespace) -> int:
         return 1
     replay.render(sweeps, args.targets)
     if args.out:
-        commit = repo_commit()
-        report = replay.artifact(
-            sweeps, commit.commit, commit.clean, corpus_digest(corpus_dir)
+        record = run_record(
+            "replay",
+            {"targets": args.targets, "corpus_digest": corpus_digest(corpus_dir)},
+            sweep_inputs(map(Path, args.artifact)),
         )
+        report = replay.artifact(sweeps, record)
         Path(args.out).write_text(archive_bytes("artifact", report), encoding="utf-8")
         print(f"\nreplay written to {args.out}")
     return 0
@@ -1845,10 +1879,12 @@ def command_bind(args: argparse.Namespace) -> int:
         return 1
     replay.render_bindings(sweeps, args.targets)
     if args.out:
-        commit = repo_commit()
-        report = replay.binding_artifact(
-            sweeps, commit.commit, commit.clean, corpus_digest(corpus_dir)
+        record = run_record(
+            "bind",
+            {"targets": args.targets, "corpus_digest": corpus_digest(corpus_dir)},
+            sweep_inputs(map(Path, [*args.proposals, *args.graphs])),
         )
+        report = replay.binding_artifact(sweeps, record)
         Path(args.out).write_text(archive_bytes("artifact", report), encoding="utf-8")
         print(f"\nbindings written to {args.out}")
     return 0
@@ -2107,7 +2143,17 @@ def command_calibrate(args: argparse.Namespace) -> int:
         f" {result.total} pairs (bar {AGREEMENT_BAR:.0%})"
     )
     if args.out:
-        payload = result.to_json() | {"corpus_merges": merges.to_json()}
+        record = run_record(
+            "calibrate",
+            {
+                "agreement_bar": AGREEMENT_BAR,
+                "corpus_digest": corpus_digest(Path(args.corpus)),
+            },
+            {DEFAULT_PAIRS_PATH: {}},
+        )
+        payload = (
+            {"record": record} | result.to_json() | {"corpus_merges": merges.to_json()}
+        )
         Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", "utf-8")
     if result.meets_bar:
         return 0

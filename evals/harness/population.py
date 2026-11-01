@@ -50,10 +50,11 @@ from analysis_service.reassess import ReviewerAssessment, reassess
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
-from evals.harness.artifact import load_artifact
+from evals.harness.artifact import corpus_digest, load_artifact
 from evals.harness.bundle import assertions_from_reports
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
+from evals.harness.run_record import run_record, sweep_inputs
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 
@@ -266,11 +267,17 @@ def command_freeze_population(args: argparse.Namespace) -> int:
         if not reports:
             raise PopulationError("name at least one report or assertion sweep")
         frozen = freeze(reports)
+        record = run_record(
+            "freeze-population",
+            {"corpus_digest": corpus_digest(args.corpus) if args.assertions else None},
+            {path: {} for path in args.reports} | sweep_inputs(args.assertions),
+        )
     except (OSError, ValueError, EvalRunError) as error:
         print(f"cannot freeze: {error}", file=sys.stderr)
         return 1
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(frozen, indent=2) + "\n", encoding="utf-8")
+    written = {"record": record, **frozen}
+    args.out.write_text(json.dumps(written, indent=2) + "\n", encoding="utf-8")
     print(
         f"froze {len(reached(frozen))} row(s) a lane read, across"
         f" {len(frozen['cases'])} case(s), to {args.out}"
@@ -329,16 +336,18 @@ def command_reassess(args: argparse.Namespace) -> int:
                 f" ({review.get('catalog_digest')!r}, this report's is {digest!r})"
             )
         result = reassess(report, parsed_verdicts(review.get("verdicts")))
+        record = run_record("reassess", {}, {args.report: {}, args.verdicts: {}})
     except (OSError, ValueError) as error:
         print(f"cannot reassess: {error}", file=sys.stderr)
         return 1
     written = {
+        "record": record,
         "catalog_digest": digest,
         "rejected": list(result.rejected),
         "withdrawn": [asdict(row) for row in result.withdrawn],
         "reopened": list(result.reopened),
         "projections": [asdict(row) for row in result.projections],
-        "record": result.record.model_dump(mode="json"),
+        "assertions": result.record.model_dump(mode="json"),
         "system_model": result.model.model_dump(mode="json"),
     }
     args.out.write_text(json.dumps(written, indent=2) + "\n", encoding="utf-8")

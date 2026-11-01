@@ -30,6 +30,7 @@ from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
 from evals.critic_review.loading import (
+    CASES,
     REPO_ROOT,
     corpus_model,
     corpus_sources,
@@ -37,9 +38,11 @@ from evals.critic_review.loading import (
 )
 from evals.critic_review.model import CriticFixture
 from evals.critic_review.replay import replay
+from evals.harness.artifact import ProvenanceError, corpus_digest
 from evals.harness.bundle import check_out
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import node_call
+from evals.harness.run_record import run_record
 
 
 def _one_framework(fixtures: list[CriticFixture]) -> FrameworkName:
@@ -83,7 +86,9 @@ def main(argv: list[str] | None = None) -> int:
         help="the spend you accept for one critic call, or 'unknown' on a"
         " gateway route that prices nothing before the call",
     )
-    parser.add_argument("--out", help="write the full per-fixture record here")
+    parser.add_argument(
+        "--out", help="write the run record and the full per-fixture record here"
+    )
     args = parser.parse_args(argv)
     try:
         check_out(args.out)
@@ -107,6 +112,23 @@ def main(argv: list[str] | None = None) -> int:
     framework = _one_framework(fixtures)
     package = PACKAGES[framework]
     case_id = _one_case(fixtures)
+    try:
+        record = (
+            None
+            if args.out is None
+            else run_record(
+                "critic-review",
+                {
+                    "framework": framework,
+                    "case": case_id,
+                    "corpus_digest": corpus_digest(),
+                },
+                {CASES: {}},
+            )
+        )
+    except ProvenanceError as error:
+        print(error, file=sys.stderr)
+        return 1
     model = corpus_model(case_id)
     # The node's own route, sampling and output schema, through the one helper
     # every replay uses. The request it sends is the graph's, instruction and
@@ -179,8 +201,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"REVIEW PROBLEM: {problem}", file=sys.stderr)
 
     if args.out:
+        written = {"record": record, **score.to_json()}
         Path(args.out).write_text(
-            json.dumps(score.to_json(), indent=2) + "\n", encoding="utf-8"
+            json.dumps(written, indent=2) + "\n", encoding="utf-8"
         )
         print(f"record written to {args.out}")
     return 0 if all(outcome.passes for outcome in score.outcomes) else 1

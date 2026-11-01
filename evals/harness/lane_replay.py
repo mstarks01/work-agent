@@ -68,6 +68,7 @@ from analysis_service.prompts import lane_closing
 from evals.harness.artifact import (
     EvalArtifact,
     ProvenanceError,
+    corpus_digest,
     load_artifact,
     repo_commit,
 )
@@ -84,6 +85,7 @@ from evals.harness.reference import (
     load_case,
     refuse_holdout,
 )
+from evals.harness.run_record import Selections, run_record
 from evals.reference_facts import load_facts, signed_proposal
 
 #: What ``--prepare-today`` hands ``prepare`` as the catalog: none, which is a
@@ -101,11 +103,11 @@ def lane_of(framework: FrameworkName, name: str) -> Lane:
     return lanes[name]
 
 
-def load_material(artifact: EvalArtifact, case_id: str) -> dict[str, Any]:
-    """One case's captured lane material, or a refusal saying why there is none.
+def lanes_file(artifact: EvalArtifact, case_id: str) -> Path:
+    """One case's ``<case>.lanes.json``, or a refusal saying why there is none.
 
-    The file is read through :func:`~evals.harness.bundle.finished_file`, so a
-    lost file of a finished case is refused by name. A failed case wrote no
+    The file is found through :func:`~evals.harness.bundle.finished_file`, so
+    a lost file of a finished case is refused by name. A failed case wrote no
     lane material, so it is refused too.
     """
     path = finished_file(artifact, case_id, "lanes")
@@ -114,7 +116,7 @@ def load_material(artifact: EvalArtifact, case_id: str) -> dict[str, Any]:
             f"{case_id}: the artifact records the case as failed, so the sweep"
             " wrote no lane material for it"
         )
-    return material_at(path)
+    return path
 
 
 def material_at(path: Path) -> dict[str, Any]:
@@ -288,12 +290,15 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         help="build the request with today's prepare over the case's blessed"
         " model, with no catalog or the case's signed facts, and score the drafts",
     )
-    parser.add_argument("--out", type=Path, help="write the lane's proposals here")
+    parser.add_argument(
+        "--out", type=Path, help="write the run record and the lane's proposals here"
+    )
 
 
 def command_lane_replay(args: argparse.Namespace) -> int:
     """Send one lane request again, and print what the lane proposed."""
     prepared = None
+    inputs: dict[Path, Selections] = {}
     try:
         refuse_holdout(args.case)
         if (args.artifact is None) == (args.prepare_today is None):
@@ -314,7 +319,9 @@ def command_lane_replay(args: argparse.Namespace) -> int:
             )
         else:
             artifact = load_artifact(args.artifact)
-            material = load_material(artifact, args.case)
+            lanes = lanes_file(artifact, args.case)
+            material = material_at(lanes)
+            inputs = {artifact.path: {}, lanes: {}}
             if args.fresh_leads:
                 material = fresh_leads(
                     material,
@@ -327,6 +334,24 @@ def command_lane_replay(args: argparse.Namespace) -> int:
                 f"material from {artifact.commit.commit}; prompt files"
                 f" from {repo_commit().commit}"
             )
+        if args.append is not None:
+            inputs[args.append] = {}
+        record = (
+            None
+            if args.out is None
+            else run_record(
+                "lane-replay",
+                {
+                    "case": args.case,
+                    "lane": args.lane,
+                    "framework": args.framework,
+                    "fresh_leads": args.fresh_leads,
+                    "prepare_today": args.prepare_today,
+                    "corpus_digest": corpus_digest(),
+                },
+                inputs,
+            )
+        )
     except (CorpusError, EvalRunError, ProvenanceError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -358,7 +383,8 @@ def command_lane_replay(args: argparse.Namespace) -> int:
         + ("" if len(charged) == len(spent) else "; the provider reported no charge")
     )
     if args.out:
-        args.out.write_text(json.dumps(dumped, indent=2) + "\n", encoding="utf-8")
+        written = {"record": record, **dumped}
+        args.out.write_text(json.dumps(written, indent=2) + "\n", encoding="utf-8")
     if prepared is not None and args.framework == SCORED:
         matched = lane_must_finds(case, prepared.state, args.lane, batch)
         print(f"must-finds matched: {list(matched)}")

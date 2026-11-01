@@ -1496,7 +1496,7 @@ class TestTheArchivedEmissionsReplay:
         printed = capsys.readouterr().out
         assert "targets" in printed
         written = json.loads(out.read_text("utf-8"))
-        assert set(written) == {"coordinates", "arms", "sweeps"}
+        assert list(written) == ["record", "arms", "sweeps"]
         assert len(written["sweeps"]) == 2
 
     def test_a_sweep_of_another_mode_is_refused_by_name(
@@ -1755,5 +1755,5 @@ class TestBindingAProposalToAnExtractedGraph:
         assert code == 0
         assert "bound" in capsys.readouterr().out
         written = json.loads(out.read_text("utf-8"))
-        assert set(written) == {"coordinates", "arms", "bindings"}
+        assert list(written) == ["record", "arms", "bindings"]
         assert written["bindings"]
