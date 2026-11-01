@@ -1,0 +1,11 @@
+{
+  "name": "mermaid-structure-prototype",
+  "private": true,
+  "type": "module",
+  "description": "PROTOTYPE, throwaway: Mermaid's own parsers, called from Python.",
+  "dependencies": {
+    "@mermaid-js/parser": "0.6.3",
+    "jsdom": "26.1.0",
+    "mermaid": "11.12.0"
+  }
+}
