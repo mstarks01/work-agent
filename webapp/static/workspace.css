@@ -1260,3 +1260,23 @@ a.analysis-row:hover {
 @media (max-width:580px) {
   #list .each-one { margin-left:16px; margin-right:16px; }
 }
+.files-checklist {
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:6px 12px 12px;
+  margin:12px 0
+}
+#files-rows label {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  gap:8px;
+  align-items:center;
+  padding:6px 0;
+  border-bottom:1px solid var(--line)
+}
+#files-rows .file-name {
+  overflow-wrap:anywhere
+}
+.files-checklist meter {
+  width:100%
+}

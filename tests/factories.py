@@ -26,7 +26,7 @@ import inspect
 import json
 import shutil
 import tempfile
-from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from functools import partial
@@ -447,13 +447,14 @@ def assert_each_route_checks_the_job_id(
     foreign: str,
     bodies: Mapping[tuple[str, str], object],
     headers: Mapping[str, str],
+    others: Collection[str] = (),
 ) -> None:
     """Apply :func:`assert_job_ids_read_as_missing` to each route of the app
-    that has a path parameter.
+    that has the path parameter ``parameter``.
 
-    Every path parameter of the app must be ``parameter``, so a route that
-    takes a job ID under another name fails here. ``bodies`` holds the body
-    that a route validates before its lookup.
+    Every other path parameter of the app must be in ``others``, which a test
+    of its own checks, so a route that takes a job ID under another name fails
+    here. ``bodies`` holds the body that a route validates before its lookup.
     """
     app = client.app
     assert isinstance(app, FastAPI)
@@ -464,7 +465,8 @@ def assert_each_route_checks_the_job_id(
         for name in route.param_convertors
         for method in sorted(route.methods or ())
     ]
-    assert {name for _, _, name in routes} == {parameter}
+    assert {name for _, _, name in routes} == {parameter, *others}
+    routes = [route for route in routes if route[2] == parameter]
 
     def send(method: str, path: str, job: str) -> httpx.Response:
         return client.request(
