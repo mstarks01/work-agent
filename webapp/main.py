@@ -1604,7 +1604,6 @@ def create_app(
             owner_id=principal.owner_id,
             name=upload.name,
             kind=upload.kind,
-            format=upload.format,
             text=upload.text,
         )
         outcome = await workspace.store.add_file(

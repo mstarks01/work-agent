@@ -1250,6 +1250,15 @@ creates the database file with mode `0600` where there is none. A migration chan
 tables only. It never changes a stored report, checkpoint or sources object.
 The startup stops when the schema is not at the latest revision.
 
+A schema change edits the first revision in place, so it adds no revision.
+A database made before the change is at the latest revision, and the command
+does not change it. The startup compares each table and column with the ones
+the service needs, and it stops on a difference. To repair the database,
+remove it and make it again. For SQLite, delete the file. For PostgreSQL,
+drop the database and create it again. Then run the command. The new
+database holds no jobs. A database at a revision that this build does not
+hold, such as one from a later build, takes the same repair.
+
 ### The startup
 
 The service starts in this order, and a failure at a step stops the startup:
@@ -1257,7 +1266,9 @@ The service starts in this order, and a failure at a step stops the startup:
 1. It reads the backend settings and builds the store. For SQLite, it checks
    the database file and its directory.
 2. It reads `ANALYSIS_RETENTION_DAYS`.
-3. The `sql` store checks that the schema is at the latest revision.
+3. The `sql` store checks that the schema is at the latest revision and
+   that it holds each table and column that the service needs, and no other
+   column.
 4. The `sql` store checks the object store: for `filesystem`, the root, and
    for `s3`, `HeadBucket` and `GetBucketVersioning` on the bucket, and for
    `gcs`, `buckets.get` on the bucket.
@@ -1347,7 +1358,7 @@ pair, so a new row runs every contract test. A new job store implements the
 | --- | --- |
 | `reserve` | **Counts and inserts in one atomic operation.** Every bound admission enforces — the concurrency ceiling, the per-owner rate, the per-owner token budget and the deployment's global token budget — is enforced here and nowhere else. A backend that checks and then inserts has put the race back: two submissions that each read the count before either inserts both pass a ceiling of one. The same operation creates the **Principal** of a first submission, and only where it admits the job. It refuses with `principal_exists` where the identity already holds one. |
 | `principal` | The principal of an issuer and a `sub`, or nothing. It creates nothing. |
-| `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision and then its object store. The app calls it before the restart scan. |
+| `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision, its tables and columns, and then its object store. The app calls it before the restart scan. |
 | `get` | The whole record, for the driver that runs the job. |
 | `owned` | The record an owner ID owns, as an envelope: without the sources, the report, the checkpoint and the resumption. For a job of another schema version, it also leaves out the answers, the fact keys, the framework selection and the node runs. These are the parts the schema version covers, so it reads a job of any version. Where a stored part of the envelope does not parse, it returns an `UnreadableRecord`, so one row never stops a list. It reads a stored facet answer with the value the service wrote when it admitted the answer. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
 | `sources` | The owned job's sources. A route reads them after it checks that the job is readable. Raises `UnreadableSchema` where they do not parse. |

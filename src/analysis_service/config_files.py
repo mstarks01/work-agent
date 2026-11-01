@@ -109,9 +109,7 @@ def settings_dir(env: Mapping[str, str]) -> Path:
     """
     if chosen := env.get(SETTINGS_DIR_VAR):
         return Path(chosen)
-    xdg = env.get("XDG_CONFIG_HOME", "")
-    base = Path(xdg) if os.path.isabs(xdg) else Path.home() / ".config"
-    return base / "work-agent"
+    return xdg_dir(env, "XDG_CONFIG_HOME", ".config")
 
 
 def data_dir(env: Mapping[str, str]) -> Path:
@@ -121,8 +119,15 @@ def data_dir(env: Mapping[str, str]) -> Path:
     ``$XDG_DATA_HOME/work-agent``, else ``~/.local/share/work-agent`` where
     ``XDG_DATA_HOME`` is unset or not an absolute path.
     """
-    xdg = env.get("XDG_DATA_HOME", "")
-    base = Path(xdg) if os.path.isabs(xdg) else Path.home() / ".local" / "share"
+    return xdg_dir(env, "XDG_DATA_HOME", ".local/share")
+
+
+def xdg_dir(env: Mapping[str, str], var: str, default: str) -> Path:
+    """The ``work-agent`` directory under the XDG base directory ``var``, or
+    under ``default`` in the home directory where ``var`` is unset or not an
+    absolute path, as the XDG Base Directory Specification says."""
+    xdg = env.get(var, "")
+    base = Path(xdg) if os.path.isabs(xdg) else Path.home() / default
     return base / "work-agent"
 
 

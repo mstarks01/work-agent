@@ -17,6 +17,7 @@ from typing import get_args
 
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
+from pydantic import ValidationError
 from sqlalchemy.pool import NullPool
 
 from analysis_service import jobs, sql_store, store_backends
@@ -2009,9 +2010,7 @@ def owner_file(
     owner: str = "alice", name: str = "Call notes", text: str = "Ana: hi"
 ) -> tuple[OwnerFile, str]:
     """A new Owner File row of ``owner`` and its text."""
-    file = OwnerFile.create(
-        owner_id=owner, name=name, kind="transcript", format="text/plain", text=text
-    )
+    file = OwnerFile.create(owner_id=owner, name=name, kind="transcript", text=text)
     return file, text
 
 
@@ -2031,6 +2030,23 @@ def add(
 
 class TestOwnerFiles:
     """ADR 0118: an Owner File is a row and its text, under one owner."""
+
+    @pytest.mark.parametrize(
+        ("kind", "file_format"),
+        [
+            ("description", "text/plain"),
+            ("transcript", "text/plain"),
+            ("diagram", "text/vnd.mermaid"),
+        ],
+    )
+    def test_the_kind_gives_the_format(self, kind, file_format):
+        file = OwnerFile.create(owner_id="alice", name="A file", kind=kind, text="x")
+        assert file.format == file_format
+        assert "format" not in file.model_dump()
+
+    def test_a_kind_that_no_format_allows_is_refused(self):
+        with pytest.raises(ValidationError, match="no upload format allows"):
+            OwnerFile.create(owner_id="alice", name="A file", kind="answers", text="x")
 
     def test_an_added_file_reads_back_with_its_text(self, store):
         file, text = add(store)

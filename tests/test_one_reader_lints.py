@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import importlib
 import re
 from collections.abc import Callable, Iterable, Iterator
 from functools import partial
@@ -100,11 +101,105 @@ def test_each_store_choice_has_one_reader():
     ]
 
 
-def test_the_object_store_variable_is_spelled_once():
-    def spells(node: ast.AST) -> bool:
-        return isinstance(node, ast.Constant) and node.value == "ANALYSIS_OBJECT_STORE"
+def _variable_definitions(path: Path) -> list[ast.expr]:
+    """The value of each module-level ``*_VAR`` assignment in ``path``."""
+    found = []
+    for node in parse(path).body:
+        match node:
+            case (
+                ast.Assign(targets=[ast.Name(id=name)], value=value)
+                | ast.AnnAssign(target=ast.Name(id=name), value=ast.expr() as value)
+            ) if name.endswith("_VAR"):
+                found.append(value)
+    return found
 
-    assert _sites(spells) == [("src/analysis_service/objects.py", "<module>")]
+
+def _variable_names() -> set[str]:
+    """The value of each module-level ``*_VAR`` constant. The module is
+    imported, because a value can be an f-string over a prefix."""
+    names = set()
+    for path in FILES:
+        if not _variable_definitions(path):
+            continue
+        parts = path.relative_to(REPO_ROOT).with_suffix("").parts
+        module = importlib.import_module(
+            ".".join(parts[1:] if parts[0] == "src" else parts)
+        )
+        names |= {
+            value
+            for name, value in vars(module).items()
+            if name.endswith("_VAR") and isinstance(value, str)
+        }
+    return names
+
+
+def _docstrings(tree: ast.Module) -> set[int]:
+    """The id of each docstring node in ``tree``: prose, which a lint of code
+    does not read."""
+    return {
+        id(node.body[0].value)
+        for node in ast.walk(tree)
+        if isinstance(
+            node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
+        )
+        and node.body
+        and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+    }
+
+
+def test_each_variable_name_is_spelled_once():
+    """A string spells the name of an environment variable only in the
+    ``*_VAR`` constant that holds it. A message and a table read the constant,
+    so a rename moves every site. A docstring is prose and is not read."""
+    names = _variable_names()
+    assert "ANALYSIS_OBJECT_STORE" in names
+    spelled = re.compile(
+        r"\b(?:"
+        + "|".join(map(re.escape, sorted(names, key=len, reverse=True)))
+        + r")\b"
+    )
+    sites = []
+    for path in FILES:
+        tree = parse(path)
+        skipped = _docstrings(tree) | {id(node) for node in _variable_definitions(path)}
+        sites += [
+            f"{path.relative_to(REPO_ROOT).as_posix()}:{node.lineno}: {node.value!r}"
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in skipped
+            and spelled.search(node.value)
+        ]
+    assert not sites
+
+
+#: A string that names an XDG base directory or the home directory default
+#: of one: an ``XDG_`` variable, or a ``.config`` or ``.local`` path part.
+_XDG_PLACE = re.compile(r"^XDG_|(?:^|[/~])\.(?:config|local)(?:/|$)")
+
+
+def test_an_xdg_variable_has_one_reader():
+    """Only ``xdg_dir`` reads an XDG base directory variable or picks its
+    default in the home directory: each other site passes both to it."""
+    sites = []
+    for path in FILES:
+        tree = parse(path)
+        skipped = _docstrings(tree) | {
+            id(arg)
+            for node in ast.walk(tree)
+            if _calls(node, "xdg_dir")
+            for arg in node.args
+        }
+        sites += [
+            f"{path.relative_to(REPO_ROOT).as_posix()}:{node.lineno}"
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and _XDG_PLACE.search(node.value)
+            and id(node) not in skipped
+        ]
+    assert not sites
 
 
 def test_the_store_defaults_have_one_merge():

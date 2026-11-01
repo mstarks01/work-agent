@@ -101,7 +101,6 @@ def upgrade() -> None:
         ),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("kind", sa.String(32), nullable=False),
-        sa.Column("format", sa.String(64), nullable=False),
         sa.Column("sha256", sa.String(64), nullable=False),
         sa.Column("size_bytes", sa.BigInteger(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),

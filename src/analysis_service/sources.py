@@ -89,6 +89,13 @@ FORMATS: dict[SourceFormat, FormatRow] = {
     ),
 }
 
+#: The format of each kind that an upload allows: the one row of
+#: :data:`FORMATS` whose kinds hold it. ``tests/test_sources.py`` holds each
+#: kind to one row, so the kind gives the format.
+KIND_FORMATS: dict[SourceKind, SourceFormat] = {
+    kind: name for name, row in FORMATS.items() for kind in row.kinds
+}
+
 #: The Mermaid diagram types that the reader of ADR 0121 reads, as the first
 #: word of a diagram's first line. ``diagram_reader/read.mjs`` holds the same
 #: test in Node, and ``tests/test_sources.py`` runs both on one set of headers.

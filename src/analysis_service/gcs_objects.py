@@ -97,7 +97,7 @@ def _no_key(env: Mapping[str, str]) -> NoReturn:
     """``api_key``: the row has no key mode (ADR 0105)."""
     raise StoreConfigError(
         "the gcs object store has no api_key mode, because a key file and an"
-        " HMAC key are out of scope; set ANALYSIS_OBJECT_CREDENTIALS=iam"
+        f" HMAC key are out of scope; set {OBJECT_CREDENTIALS_VAR}=iam"
     )
 
 
