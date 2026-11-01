@@ -1,9 +1,9 @@
-"""How often one shared answer is wrong for a part its box lists (#2029 package 2).
+"""How often one shared answer is wrong for an element its box lists (#2029 package 2).
 
 The early list asks a box of same-shape questions once (ADR 0081): two or more
 rows of one attribute or kind, with one form and one set of choices. Matching
-shape does not prove that one control covers every part. This command reads,
-over the corpus, how often the parts of such a box have different true values.
+shape does not prove that one control covers every element. This command reads,
+over the corpus, how often the elements of such a box have different true values.
 
 **The truth is the case's blessed model.** Each attribute the early list can
 ask of an element (a field the prior rates for its type, read from
@@ -20,11 +20,11 @@ two or more rows that :func:`shareable` pairs. :func:`shareable` is the page's
 to each other.
 
 **Two owners are read.** One answers the box once with the most common true
-value and opens no exception, as the box offers (ADR 0081): each part with
-another true value is an over-claim. One picks the parts each answer covers
-(ADR 0113): the shared answer covers the parts with the most common value, one
-tick each, and every other part takes its own answer. Effort is choices: one
-for the shared answer, one a tick, one a part answered on its own.
+value and opens no exception, as the box offers (ADR 0081): each element with
+another true value is an over-claim. One picks the elements each answer covers
+(ADR 0113): the shared answer covers the elements with the most common value,
+one tick each, and every other element takes its own answer. Effort is choices:
+one for the shared answer, one a tick, one an element answered on its own.
 """
 
 from __future__ import annotations
@@ -42,6 +42,7 @@ from typing import Any
 from analysis_service.analysis import control_state
 from analysis_service.claims import FrameworkName
 from analysis_service.early_questions import QUESTION_PRIOR, EarlyQuestion
+from analysis_service.fact_answers import attribute_place, key_ref
 from analysis_service.frameworks import PACKAGES
 from analysis_service.system_model import SystemModel
 from evals.harness.early_rounds import paused_state
@@ -63,11 +64,12 @@ SELECTIONS: Mapping[str, Mapping[FrameworkName, Mapping[str, Any]]] = {
 
 def shareable(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
     """Whether a page asks the two served questions once: the page's rule."""
+    one, other = key_ref(tuple(a["key"])), key_ref(tuple(b["key"]))
     return (
-        bool(a["key"][0])
-        and bool(b["key"][0])
-        and a["key"][1] == b["key"][1]
-        and a["key"][4] == b["key"][4]
+        bool(one.element_id)
+        and bool(other.element_id)
+        and one.attribute == other.attribute
+        and one.question == other.question
         and a["form"] == b["form"]
         and a["choices"] == b["choices"]
     )
@@ -110,13 +112,13 @@ class Box:
     case: str
     selected: str
     group: str
-    parts: int
-    #: Parts with a true value; the rest are question kinds or unstated.
+    elements: int
+    #: Elements with a true value; the rest are question kinds or unstated.
     known: int
     distinct: int
-    #: Parts whose true value is not the most common one.
+    #: Elements whose true value is not the most common one.
     unlike: int
-    #: Choices each owner spends on the parts with a true value.
+    #: Choices each owner spends on the elements with a true value.
     choices_shared: int
     choices_picked: int
 
@@ -131,7 +133,7 @@ def boxes(case: str, blessed: SystemModel) -> list[Box]:
             values = [
                 truth[place]
                 for row in rows
-                if (place := (row.key[0], row.key[1])) in truth
+                if (place := attribute_place(row.key)) in truth
             ]
             top = Counter(values).most_common(1)[0][1] if values else 0
             unlike = len(values) - top
@@ -140,7 +142,7 @@ def boxes(case: str, blessed: SystemModel) -> list[Box]:
                     case=case,
                     selected=selected,
                     group=rows[0].group,
-                    parts=len(rows),
+                    elements=len(rows),
                     known=len(values),
                     distinct=len(set(values)),
                     unlike=unlike,
@@ -166,7 +168,7 @@ def sweep(corpus: Path) -> tuple[list[Box], list[Path]]:
 
 
 #: The counts a summary sums over boxes.
-SUMMED = ("parts", "known", "unlike", "choices_shared", "choices_picked")
+SUMMED = ("elements", "known", "unlike", "choices_shared", "choices_picked")
 
 
 def summary(found: Sequence[Box]) -> dict[str, dict[str, int]]:

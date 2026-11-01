@@ -22,7 +22,7 @@ from typing import TypeGuard
 import pytest
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES
-from analysis_service.claims import Ruling
+from analysis_service.claims import UNKNOWN_KEY_FIELDS, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
 from evals.harness.prices import UnitPrices
 from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
@@ -379,6 +379,60 @@ def test_the_kind_of_an_open_fact_is_not_read_from_two_fields():
     """
     readers = set(_sites(_tests_two_spelling_fields)) - FIELD_PAIR_READERS.keys()
     assert readers == set()
+
+
+#: The reason of each validator that reads the parts of a key a caller sent.
+_SENT_KEY = (
+    "it reads a key before validation, where a part need not hash, so the"
+    " cached ``key_ref`` cannot take it"
+)
+
+#: Each function that reads which part of an open fact's key is which, and
+#: why. Every other site asks ``key_ref``.
+KEY_LAYOUT_READERS: dict[Site, str] = {
+    ("src/analysis_service/fact_answers.py", "key_ref"): (
+        "it is the one reader of which part of a key is which"
+    ),
+    ("src/analysis_service/fact_answers.py", "_facet_value"): _SENT_KEY,
+    ("src/analysis_service/fact_answers.py", "_one_spelling"): _SENT_KEY,
+}
+
+
+def _is_a_key(node: ast.AST) -> bool:
+    """``x.key`` or ``x["key"]``: an open fact's key on a model or a served row."""
+    match node:
+        case ast.Attribute(attr="key") | ast.Subscript(slice=ast.Constant(value="key")):
+            return True
+    return False
+
+
+def _reads_a_key_by_position(node: ast.AST) -> bool:
+    match node:
+        case ast.Subscript(value=value, slice=ast.Slice() | ast.Constant(value=int())):
+            return _is_a_key(value)
+        case ast.Assign(targets=[ast.Tuple(elts=parts) | ast.List(elts=parts)]):
+            six = len(parts) == len(UNKNOWN_KEY_FIELDS) or any(
+                isinstance(part, ast.Starred) for part in parts
+            )
+            return _is_a_key(node.value) or (_is_name(node.value, "key") and six)
+        case ast.Call(func=ast.Name(id="zip"), args=args):
+            return any(_is_name(arg, "UNKNOWN_KEY_FIELDS") for arg in args)
+    return False
+
+
+def test_the_layout_of_an_open_facts_key_has_one_reader():
+    """Only ``key_ref`` says which part of a key is which; a caller reads a
+    part by name.
+
+    The lint refuses an index or a slice of a key, an unpack of a key, and a
+    ``zip`` with :data:`~analysis_service.claims.UNKNOWN_KEY_FIELDS`. A local
+    named ``key`` counts where it is unpacked into six names, because other
+    keys share the name. The test modules stay out: a test reads a part of a
+    key to state what it expects of a fixture, and no running code follows it.
+    """
+    sites = set(_sites(_reads_a_key_by_position))
+    assert sites - KEY_LAYOUT_READERS.keys() == set(), "read a key's parts by key_ref"
+    assert KEY_LAYOUT_READERS.keys() <= sites
 
 
 def test_the_place_of_a_pydantic_error_has_one_reader():

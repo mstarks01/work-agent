@@ -53,7 +53,7 @@
   const DRAFT_LINKS = new Map(DRAFT.links.map(a => [a.key, a.element]));
   // The saved shares by `shareKey` (ADR 0114): the draft's over those the
   // report's run read. A follow-up share replaces the saved one of its
-  // question, so a box sends the parts that one covers too.
+  // question, so a box sends the elements that one covers too.
   const SAVED_SHARES = new Map([...(EARLIER.shares || []), ...(DRAFT.shares || [])]
     .map(share => [shareKey(share.answer.key), share]));
   // An answer to start an editor from: the draft's, over a kept answer's.
@@ -1131,7 +1131,7 @@
       if (!response.ok) throw new Error(reply.message);
       return reply;
     };
-    // A part that holds its box's shared answer sends no answer of its own:
+    // An element that holds its box's shared answer sends no answer of its own:
     // the box's share carries it (ADR 0114).
     const entered = () => {
       const edited = changes();
@@ -1143,10 +1143,8 @@
         shares: list.changedShares((key) => SAVED_SHARES.get(key) || null),
       };
     };
-    // Each part a share covers counts as one fact answer in a request.
-    const coveredParts = (shares) => shares.reduce((n, share) => n + share.covers.length, 0);
     const fitsOne = ({ links, facts, shares }) => links.length <= ANSWER_LIMITS.links
-      && facts.length + coveredParts(shares) <= ANSWER_LIMITS.facts;
+      && facts.length + coveredCount(shares) <= ANSWER_LIMITS.facts;
     // Save the answers in as many requests as the limits need, each naming
     // the revision the last one returned: the answers in parts, then each
     // share. A row then starts from what it saved.
@@ -2001,11 +1999,9 @@
   // The rows the Questions section draws, under their group headings. An
   // earlier answer prints as its text; an open question prints its history
   // and the findings it informs.
-  // An answer a share wrote prints so, with how many parts the share covers
-  // (ADR 0114). A corrected answer is its part's own.
-  const sharesRead = FINAL ? (CORRECTIONS.shares || []) : [...SAVED_SHARES.values()];
-  const shareOfKey = new Map(sharesRead.flatMap(share => share.covers
-    .map(element => [questionKey([element, ...share.answer.key.slice(1)]), share])));
+  // An answer a share wrote prints so, with how many elements the share covers
+  // (ADR 0114). A corrected answer is its element's own.
+  const shareOfKey = sharesByKey(FINAL ? (CORRECTIONS.shares || []) : [...SAVED_SHARES.values()]);
   const byGroup = new Map();
   ENTRIES.forEach(entry => {
     const group = entry.q.group_heading;
@@ -2020,7 +2016,7 @@
       if (q.answer) {
         item.append(el("div", "meta", `Answer: ${kind === "link" ? linkAnswerText(q.answer) : answerText(q.answer)}`));
         const share = kind === "fact" && !q.corrected && shareOfKey.get(questionKey(q.key));
-        if (share) item.append(el("div", "meta", `One shared answer for ${counted(share.covers.length, "part", "parts")}`));
+        if (share) item.append(el("div", "meta", `One shared answer for ${counted(coveredCount([share]), "part", "parts")}`));
       }
       item.append(...correctionNote(q));
       if (q.history) item.append(el("div", "meta", HISTORY[q.history] || q.history));

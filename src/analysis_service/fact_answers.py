@@ -99,6 +99,7 @@ __all__ = [
     "needed_facets",
     "needs_of",
     "refuse_repeated_facts",
+    "with_element",
 ]
 
 
@@ -291,6 +292,12 @@ def key_ref(key: UnknownKey) -> UnknownRef:
     return UnknownRef.model_construct(
         None, **dict(zip(UNKNOWN_KEY_FIELDS, key, strict=True))
     )
+
+
+def with_element(key: UnknownKey, element_id: str) -> UnknownKey:
+    """``key`` with its element part replaced by ``element_id``, read through
+    :func:`key_ref`."""
+    return key_ref(key).model_copy(update={"element_id": element_id}).key
 
 
 def attribute_place(key: UnknownKey) -> tuple[str, str]:

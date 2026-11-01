@@ -34,10 +34,13 @@ from analysis_service import (
     SourceLimits,
     StubPipelineRunner,
 )
+from analysis_service.answer_shares import SharedAnswer
 from analysis_service.api import JOB_REFUSAL_STATUS
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.claims import UNKNOWN_KEY_FIELDS
 from analysis_service.compact import FULL_FORMAT
 from analysis_service.deployment import Deployment
+from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.job_answers import OWNER_FILE_GONE
 from analysis_service.jobs import (
     JOB_ID_PATTERN,
@@ -52,6 +55,7 @@ from analysis_service.owner_files import (
     over_limit,
 )
 from analysis_service.principals import LOCAL_ISSUER, Principal
+from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import ANSWERS_LABEL, FORMATS
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
@@ -275,7 +279,6 @@ def test_the_only_controls_are_the_picker_and_the_description(client):
 def _reusing(tiers):
     """A client, and a finished run of its own that holds one answer."""
     from analysis_service.answer_sets import AnswerSet
-    from analysis_service.fact_answers import FactAnswer
 
     startup = startup_for(tiers)
     workspace = Workspace()
@@ -1824,31 +1827,103 @@ def test_a_page_builds_an_answer_input_with_the_shared_builder(page):
     )
 
 
-#: The rules the question list's pages share, as question_list.js spells each
-#: one's definition.
-SHARED_ROW_RULES = (
-    "const questionKey = ",
-    "const rowKey = ",
-    "const sameAnswer = ",
-    "const linkAnswerText = ",
+#: Every client script the app serves.
+STATIC_SCRIPTS = sorted(
+    path.name for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
 )
 
 
-@pytest.mark.parametrize("rule", SHARED_ROW_RULES)
-def test_a_row_rule_is_defined_once_and_read_by_both_pages(rule):
-    """A row's key and whether two answers are one answer have one definition.
+#: The rules the question list's pages share, each with the pages that read
+#: it. question_list.js defines each one.
+SHARED_ROW_RULES: dict[str, tuple[str, ...]] = {
+    "questionKey": ("report_view.js", "first_run.js"),
+    "rowKey": ("report_view.js", "first_run.js"),
+    "sameAnswer": ("report_view.js", "first_run.js"),
+    "linkAnswerText": ("report_view.js", "first_run.js"),
+    "keyRef": ("question_list.js", "first_run.js"),
+    "shareKey": ("question_list.js", "report_view.js", "first_run.js"),
+    "sharesByKey": ("report_view.js", "first_run.js"),
+    "coveredCount": ("report_view.js", "first_run.js"),
+    "shareChanged": ("question_list.js", "first_run.js"),
+    "sameShare": ("question_list.js", "first_run.js"),
+    "shareable": ("question_list.js",),
+}
 
-    question_list.js holds it, and the report page and the first-run page call
-    it, because two copies drift.
+
+@pytest.mark.parametrize("rule", SHARED_ROW_RULES)
+def test_a_row_rule_is_defined_once_and_read_by_its_pages(rule):
+    """A row's key, a share's key and whether two answers are one answer have
+    one definition.
+
+    question_list.js holds it, and each page that needs it calls it, because
+    two copies drift.
     """
-    name = rule.removeprefix("const ").strip(" =")
-    definitions = [page for page in ANSWER_PAGES if rule in page_javascript(page)]
+    definitions = [
+        page for page in STATIC_SCRIPTS if f"const {rule} = " in page_javascript(page)
+    ]
 
     assert definitions == ["question_list.js"], (
-        f"{name} is defined in {definitions}; define it once, in question_list.js."
+        f"{rule} is defined in {definitions}; define it once, in question_list.js."
     )
-    for page in ("report_view.js", "first_run.js"):
-        assert f"{name}(" in page_javascript(page), f"{page} does not call {name}"
+    for page in SHARED_ROW_RULES[rule]:
+        assert f"{rule}(" in page_javascript(page), f"{page} does not call {rule}"
+
+
+def run_list_rules(program: str) -> object:
+    """The JSON ``program`` prints, run in node after the rules
+    question_list.js shares with both pages.
+
+    Skipped where ``node`` is absent.
+    """
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the page's script")
+    javascript = page_javascript("question_list.js")
+    rules = javascript[javascript.index("const questionKey = ") :]
+    done = subprocess.run(
+        [node, "-"], input=rules + program, capture_output=True, text=True, check=True
+    )
+    return json.loads(done.stdout)
+
+
+def test_the_page_reads_a_key_and_a_share_as_the_service_does():
+    """``keyRef``, ``shapeOf`` and ``sharesByKey`` in question_list.js are
+    second readers of ``UNKNOWN_KEY_FIELDS`` and :class:`SharedAnswer`,
+    because the page reads a served key. Each is put to both."""
+    question = next(iter(QUESTION_KINDS))
+    shares = [
+        SharedAnswer(
+            answer=FactAnswer(key=("", "authentication", "", "", "", ""), value="mTLS"),
+            covers=("flow:a>b", "process:api"),
+        ),
+        SharedAnswer(
+            answer=FactAnswer(key=("", "", "", "", question, ""), value="yes"),
+            covers=("datastore:db",),
+        ),
+    ]
+    served = [share.model_dump(mode="json") for share in shares]
+    keys = [key for share in shares for key in sorted(share.keys())]
+    page = run_list_rules(
+        f"const shares = {json.dumps(served)};\n"
+        f"const keys = {json.dumps(keys)};\n"
+        "console.log(JSON.stringify({\n"
+        "  fields: KEY_FIELDS,\n"
+        "  refs: keys.map(keyRef),\n"
+        "  shapes: keys.map(shapeOf),\n"
+        "  covered: shares.map((share) => [...sharesByKey([share]).keys()]"
+        ".map((key) => JSON.parse(key)).sort()),\n"
+        "}));"
+    )
+
+    assert page == {
+        "fields": list(UNKNOWN_KEY_FIELDS),
+        "refs": [
+            {field: getattr(key_ref(key), field) for field in UNKNOWN_KEY_FIELDS}
+            for key in keys
+        ],
+        "shapes": [list(share.shape) for share in shares for _ in share.covers],
+        "covered": [sorted(map(list, share.keys())) for share in shares],
+    }
 
 
 #: Every script the two pages that take answers load.
@@ -1866,6 +1941,24 @@ def test_a_question_key_is_spelled_by_question_key_only(page):
     definition = ["JSON.stringify(key)"] if page == "question_list.js" else []
 
     assert spellings == definition, f"{page} spells a question key as {spellings}"
+
+
+@pytest.mark.parametrize("page", STATIC_SCRIPTS)
+def test_a_key_and_a_share_are_read_by_the_shared_rules_only(page):
+    """``keyRef`` is the one reader of which part of a key is which, and
+    ``coveredCount`` the one count of a share's elements.
+
+    An index or a slice of a key beside ``keyRef`` reads the layout a second
+    time. The rules in question_list.js read a key part by name, so the lint
+    holds for that file too.
+    """
+    javascript = page_javascript(page)
+    positions = re.findall(r"\bkey\[[0-5]\]|\bkey\.slice\(", javascript)
+    counts = re.findall(r"\.covers\.length", javascript)
+
+    assert positions == [], f"{page} reads a key by position; read it with keyRef"
+    if page != "question_list.js":
+        assert counts == [], f"{page} counts a share's elements; call coveredCount"
 
 
 def test_the_shared_modules_load_before_the_page_script_that_draws_the_list():
