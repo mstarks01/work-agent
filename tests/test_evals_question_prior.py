@@ -123,10 +123,6 @@ UNRECORDED_ROWS = {
         " no report for it, so the command refuses the sweep and cannot count"
         " the row again"
     ),
-    "stride": (
-        "a recount reproduces the rates, but its record would name a branch"
-        " commit that the squash merge leaves off main; count it again on main"
-    ),
 }
 
 
