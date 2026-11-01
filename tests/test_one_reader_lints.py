@@ -1403,3 +1403,50 @@ def test_a_page_parses_its_own_path_once():
         if _PATH_PARSE.search(line)
     ]
     assert [name for name, _ in sites] == ["webapp/static/report_view.js"], sites
+
+
+# The facets a need names: a need that names none of a kind's facets, or a
+# finding absent from a question's ``needs``, needs every facet (ADR 0112).
+
+#: The calls whose value is every facet of a question kind, or their count.
+_EVERY_FACET = ("answer_facets", "choices_of")
+
+
+def _falls_back_to_every_facet(node: ast.AST) -> bool:
+    """Whether ``node`` is a function with an ``or`` that falls back to every
+    facet of a kind: a later operand that is a call holding a call of
+    :data:`_EVERY_FACET`, or names a variable the function binds from one. A
+    comparison with every facet, as in ``answered_keys``, is not a value."""
+    if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+        return False
+
+    def every(value: ast.AST) -> bool:
+        return any(
+            _calls(inner, name) for inner in ast.walk(value) for name in _EVERY_FACET
+        )
+
+    bound = {
+        target.id
+        for inner in ast.walk(node)
+        if isinstance(inner, ast.Assign) and every(inner.value)
+        for target in inner.targets
+        if isinstance(target, ast.Name)
+    }
+    return any(
+        (isinstance(operand, ast.Call) and every(operand))
+        or (isinstance(operand, ast.Name) and operand.id in bound)
+        for inner in ast.walk(node)
+        if isinstance(inner, ast.BoolOp) and isinstance(inner.op, ast.Or)
+        for operand in inner.values[1:]
+    )
+
+
+def test_a_need_that_names_no_facet_has_one_reader():
+    """Only ``needed_facets`` turns a need that names no facet into every facet.
+
+    ``asked_facets`` and the order's count of a finding's choices once applied
+    the rule again, each to a finding absent from a question's ``needs``.
+    """
+    assert _sites(_falls_back_to_every_facet) == [
+        ("src/analysis_service/fact_answers.py", "needed_facets")
+    ]

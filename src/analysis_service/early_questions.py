@@ -150,6 +150,11 @@ GATE_REASON = "Whether the {framework} analysis runs depends on this fact."
 class PriorRow:
     """One framework's prior, and the runs it was counted from."""
 
+    #: The run record of the command that counted the rates
+    #: (``evals/harness/run_record.py``): the commit, whether the tree was
+    #: clean, the command's options and the sha256 of each file it read.
+    #: ``None`` where no recorded run counted them.
+    record: Mapping[str, Any] | None
     #: The archived runs the rates were counted from, as ``run.py`` was given them.
     runs: tuple[str, ...]
     #: The commit the command ran at, or ``None`` where no run was counted.
@@ -161,6 +166,7 @@ class PriorRow:
 
     def to_json(self) -> dict[str, object]:
         return {
+            "record": None if self.record is None else dict(self.record),
             "runs": list(self.runs),
             "revision": self.revision,
             "cases": self.cases,
@@ -180,14 +186,19 @@ def _refuse_prior(path: Path, raw: object) -> None:
     """Refuse a prior a list could not be ranked from, naming the file and the key.
 
     A framework outside ``PACKAGES`` or an element type no model holds would
-    load and then rank nothing, so the list would shrink without a word.
+    load and then rank nothing, so the list would shrink without a word. A row
+    with no ``record`` would hide whether a recorded run counted it.
     """
     if not isinstance(raw, dict):
         raise PriorError(f"{path}: the prior is not a JSON object")
     for name, row in raw.items():
         if name not in PACKAGES:
             raise PriorError(f"{path}: {name!r} is not a framework package")
-        rates = row.get("rates") if isinstance(row, dict) else None
+        if not isinstance(row, dict):
+            raise PriorError(f"{path}: {name}: the row is not an object")
+        if "record" not in row or not isinstance(row["record"], dict | None):
+            raise PriorError(f"{path}: {name}: record is not an object or null")
+        rates = row.get("rates")
         if not isinstance(rates, dict):
             raise PriorError(f"{path}: {name}: rates is not an object")
         for kind, fields in rates.items():
@@ -209,6 +220,7 @@ def load_prior(path: Path = QUESTION_PRIOR_PATH) -> Mapping[FrameworkName, Prior
     return MappingProxyType(
         {
             name: PriorRow(
+                record=row["record"],
                 runs=tuple(row["runs"]),
                 revision=row["revision"],
                 cases=row["cases"],
@@ -241,10 +253,11 @@ class EarlyQuestion:
     #: What a reader sees: an element's name and the attribute, or the kind's
     #: question about the element.
     label: str
-    #: Why the fact matters before any finding exists: the questions of the
-    #: rules that read this fact on this element, :data:`KIND_REASON` for a
-    #: question kind no rule reads, or :data:`PRIOR_REASON`
-    #: where no rule reads it. Never a rule that only names the element.
+    #: Why the fact matters before any finding exists: the effect sentence
+    #: (:attr:`~analysis_service.candidates.Rule.effect`) of each rule
+    #: that reads this fact on this element, :data:`KIND_REASON` for a
+    #: question kind no rule reads, or :data:`PRIOR_REASON` where no rule
+    #: reads it. Never a rule that only names the element.
     reasons: tuple[str, ...]
     #: The selected frameworks an answer serves, by name, in name order.
     frameworks: tuple[FrameworkName, ...]
@@ -452,7 +465,7 @@ def _early_questions(
     reasons: dict[UnknownKey, list[str]] = {}
     for name in runnable:
         package = PACKAGES[name]
-        asks = {rule.rule_id: rule.effect for rule in package.rules}
+        effects = {rule.rule_id: rule.effect for rule in package.rules}
         named: dict[str, list[Candidate]] = {}
         for lane, found in generate_candidates(
             model, package.lanes, package.rules, catalog
@@ -475,8 +488,8 @@ def _early_questions(
                 helps.setdefault(key, []).append(name)
                 said = reasons.setdefault(key, [])
                 for candidate in reading:
-                    if asks[candidate.rule_id] not in said:
-                        said.append(asks[candidate.rule_id])
+                    if effects[candidate.rule_id] not in said:
+                        said.append(effects[candidate.rule_id])
     asked = [
         _question(
             key,

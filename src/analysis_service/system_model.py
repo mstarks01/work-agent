@@ -429,6 +429,9 @@ DATA_CLASSIFICATION_FIELD = Field(
     json_schema_extra={"enum": [*get_args(DataClassification)]},
 )
 BoundaryKind = Literal["network", "privilege", "tenant", "other"]
+#: The ``id_prefix`` of each element class, which also names its type where a
+#: page shows an element.
+ElementPrefix = Literal["entity", "process", "store", "flow", "boundary"]
 
 
 class _Element(BaseModel):
@@ -460,7 +463,7 @@ class _Element(BaseModel):
 class ExternalEntity(_Element):
     """An actor outside the system's control: users, third-party systems."""
 
-    id_prefix: ClassVar[str] = "entity"
+    id_prefix: ClassVar[ElementPrefix] = "entity"
 
     kind: EntityKind
     trust_zone: str
@@ -484,7 +487,7 @@ class Process(_Element):
     does not say, exactly as it is for every other attribute here.
     """
 
-    id_prefix: ClassVar[str] = "process"
+    id_prefix: ClassVar[ElementPrefix] = "process"
 
     technology: str = Field(max_length=200)
     trust_zone: str
@@ -495,7 +498,7 @@ class Process(_Element):
 class DataStore(_Element):
     """Where data rests: databases, buckets, queues-at-rest."""
 
-    id_prefix: ClassVar[str] = "store"
+    id_prefix: ClassVar[ElementPrefix] = "store"
 
     technology: str = Field(max_length=200)
     trust_zone: str
@@ -506,7 +509,7 @@ class DataStore(_Element):
 class DataFlow(_Element):
     """A directed connection carrying data. Direction = who initiates."""
 
-    id_prefix: ClassVar[str] = "flow"
+    id_prefix: ClassVar[ElementPrefix] = "flow"
 
     source: str
     destination: str
@@ -566,7 +569,7 @@ class TrustBoundary(_Element):
         zone typed ``other`` tells a downstream rule nothing at all.
     """
 
-    id_prefix: ClassVar[str] = "boundary"
+    id_prefix: ClassVar[ElementPrefix] = "boundary"
 
     kind: BoundaryKind
 

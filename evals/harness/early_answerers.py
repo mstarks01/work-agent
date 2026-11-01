@@ -52,7 +52,7 @@ from typing import Any
 from unittest import mock
 
 from analysis_service import answer_state
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import SentAnswers
 from analysis_service.answer_state import Answers, AnswerState, SavedAnswers
 from analysis_service.capabilities import lineage
 from analysis_service.claims import FrameworkName, UnknownKey
@@ -153,7 +153,7 @@ def _save(
     """One save through the service's own admission, which runs no model."""
     saved = state.answer(
         Answers(
-            given=AnswerSet(facts=tuple(given)),
+            given=SentAnswers(facts=tuple(given)),
             save=True,
             skips=skips,
             presented=presented,

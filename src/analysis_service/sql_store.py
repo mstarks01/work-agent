@@ -90,7 +90,7 @@ from sqlalchemy.types import TypeDecorator
 from typing_extensions import override
 
 from analysis_service import migrations
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.aws_identity import platform_session
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.carried_renames import ElementRename
@@ -1645,7 +1645,7 @@ class SqlJobStore:
         self,
         job_id: str,
         owner_id: str,
-        draft: AnswerSet,
+        draft: SentAnswers,
         revision: int,
     ) -> bool:
         """Keep a finished report's draft answers, as one conditional

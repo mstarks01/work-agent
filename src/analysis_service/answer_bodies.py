@@ -35,7 +35,7 @@ from pydantic import (
     model_validator,
 )
 
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import SentAnswers
 from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import MAX_SKIPS, Answers, Revision
 from analysis_service.carried_renames import MAX_RENAMES, ElementRename
@@ -193,7 +193,7 @@ def read_answers(raw: object) -> Answers:
     """The answers a body carries, or a :class:`BodyRefused`."""
     body = _read(AnswersSubmission, raw)
     return Answers(
-        given=AnswerSet(
+        given=SentAnswers(
             links=tuple(body.links), facts=tuple(body.facts), shares=tuple(body.shares)
         ),
         save=body.save,

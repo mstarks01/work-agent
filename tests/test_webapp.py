@@ -1014,6 +1014,25 @@ def test_the_first_run_page_words_each_stop():
     assert _table_keys("first_run.js", "stops") == set(get_args(Stop))
 
 
+def test_the_first_run_page_reads_each_carried_reason():
+    """``first_run.js`` says for each
+    :data:`~analysis_service.answer_state.CarriedReason` whether a dropped
+    answer waits for a part, and for no other reason."""
+    from analysis_service.answer_state import CarriedReason
+
+    assert _table_keys("first_run.js", "waitsForPart") == set(get_args(CarriedReason))
+
+
+def test_the_first_run_page_names_each_element_type():
+    """``first_run.js`` names each
+    :data:`~analysis_service.system_model.ElementPrefix` that
+    ``detected_facts`` sends as an element's type, and no other. A type the
+    table lacks renders as ``undefined``."""
+    from analysis_service.system_model import ElementPrefix
+
+    assert _table_keys("first_run.js", "TYPES") == set(get_args(ElementPrefix))
+
+
 def test_the_settings_page_shows_each_source():
     """``settings.js`` shows each :data:`~webapp.settings_view.ValueOrigin` and no
     other. A source the table lacks throws, and the row does not render."""
@@ -1807,6 +1826,15 @@ ANSWER_INPUT_MARKERS = (
     "datalist",
     "offersDontKnow",
 )
+
+
+def test_no_page_gives_a_finding_absent_from_needs_a_default():
+    """``FactQuestion.to_json`` sends each waiting finding's facets as
+    ``needed_facets`` reads them, so no page decides what a finding that
+    names no facet needs."""
+    for page in ANSWER_PAGES:
+        source = page_javascript(page)
+        assert not re.search(r"\.needs\s*\|\||!facets\.length", source), page
 
 
 @pytest.mark.parametrize("page", ANSWER_PAGES)

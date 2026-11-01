@@ -20,7 +20,7 @@ from analysis_service.answer_forms import (
     answer_form,
     answer_suggestions,
 )
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
 from analysis_service.answer_state import question_set
 from analysis_service.assertions import (
     UNKNOWN,
@@ -871,7 +871,7 @@ class TestTheAdmissionCheck:
             questions.admit(
                 sources=[],
                 earlier=NO_ANSWERS,
-                given=AnswerSet(links=(link,)),
+                given=SentAnswers(links=(link,)),
             )
 
     def test_an_earlier_link_answer_may_be_answered_again(self):

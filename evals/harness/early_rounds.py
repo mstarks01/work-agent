@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.analysis import control_state
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.answer_state import (
     Answers,
     AnswerState,
@@ -229,7 +229,7 @@ def _saved(
     sources, so no source limit applies."""
     saved = state.answer(
         Answers(
-            given=AnswerSet(facts=tuple(facts)),
+            given=SentAnswers(facts=tuple(facts)),
             save=True,
             skips=skips,
             presented=[question.key for question in state.questions.early],

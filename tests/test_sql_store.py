@@ -28,7 +28,7 @@ from sqlalchemy import create_engine
 
 from analysis_service import jobs as jobs_module
 from analysis_service import store_backends
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.api import create_app
 from analysis_service.carried_renames import ElementRename
 from analysis_service.certification import CertifyResult
@@ -530,7 +530,7 @@ def every_field(owner_id: str = "alice") -> JobRecord:
     record.transition("running")
     record.record_node("extract")
     record.corrections = [FactAnswer(key=KEY, value="TLS 1.2")]
-    record.draft = AnswerSet(facts=(FactAnswer(key=KEY, value="none"),))
+    record.draft = SentAnswers(facts=(FactAnswer(key=KEY, value="none"),))
     record.revision = 2
     record.carried_renames = [
         ElementRename(earlier="store:orders-database", element="store:orders-db")

@@ -109,13 +109,7 @@ NOT_A_MEASUREMENT = {
 }
 
 #: The measurements whose file holds no record yet, each with the reason.
-UNRECORDED = {
-    "harness.question_prior.command_question_prior": (
-        "the service loads question_prior.json, and its loader refuses a key"
-        " that is not a framework package, so a record needs a field on"
-        " PriorRow first"
-    ),
-}
+UNRECORDED: dict[str, str] = {}
 
 WRITES = {"write_text", "write_bytes"}
 
