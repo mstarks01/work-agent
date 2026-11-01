@@ -48,6 +48,7 @@ from analysis_service.claims import (
     Ruling,
 )
 from analysis_service.critic_round import CriticRound, Failed
+from analysis_service.errors import error_place
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
@@ -105,8 +106,7 @@ def rulings_from_report(
             rulings.append(record.model_validate(values))
         except ValidationError as error:
             problems = "; ".join(
-                f"{'.'.join(map(str, problem['loc']))} holds {problem['input']!r}:"
-                f" {problem['msg']}"
+                f"{error_place(problem)} holds {problem['input']!r}: {problem['msg']}"
                 for problem in error.errors()
             )
             raise ArchivedRulingError(
