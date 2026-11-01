@@ -1,0 +1,552 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:insurance-partner",
+        "name": "Insurance partner",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "partners[Insurance partners]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram labels this node \"Insurance partners\".",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:analyst",
+        "name": "Analyst",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "analysts[Analysts]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram labels this node \"Analysts\".",
+        "kind": "human",
+        "trust_zone": "boundary:warehouse-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:airflow-scheduler",
+        "name": "Airflow scheduler",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow[Airflow scheduler]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Airflow",
+        "trust_zone": "boundary:landing-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:spark-transform",
+        "name": "Spark transform",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "spark[Spark transform]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Spark",
+        "trust_zone": "boundary:warehouse-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "Landing bucket",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "bucket[(Landing bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:airflow-metadata-db",
+        "name": "Airflow metadata DB",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "meta[(Airflow metadata DB)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:bigquery",
+        "name": "BigQuery",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "bq[(BigQuery)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "BigQuery",
+        "trust_zone": "boundary:warehouse-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:insurance-partner>store:landing-bucket>daily-extract-sftp",
+        "name": "daily extract (SFTP)",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "partners -->|\"daily extract (SFTP)\"| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:insurance-partner",
+        "destination": "store:landing-bucket",
+        "protocol": "SFTP",
+        "authentication": "unknown",
+        "data_description": "daily extract",
+        "encryption_in_transit": "SFTP",
+        "operations": "write"
+      },
+      {
+        "id": "flow:store:landing-bucket>process:airflow-scheduler>files",
+        "name": "files",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "bucket -->|files| airflow",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:landing-bucket",
+        "destination": "process:airflow-scheduler",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "files",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>store:airflow-metadata-db>connection-strings-partner-keys",
+        "name": "connection strings, partner keys",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow <-->|\"connection strings, partner keys\"| meta",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "store:airflow-metadata-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "connection strings, partner keys",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:airflow-metadata-db>process:airflow-scheduler>connection-strings-partner-keys",
+        "name": "connection strings, partner keys",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow <-->|\"connection strings, partner keys\"| meta",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:airflow-metadata-db",
+        "destination": "process:airflow-scheduler",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "connection strings, partner keys",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>process:spark-transform>trigger-job",
+        "name": "trigger job",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "airflow -->|trigger job| spark",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "process:spark-transform",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "trigger job",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:spark-transform>store:bigquery>normalized-records",
+        "name": "normalized records",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "spark -->|normalized records| bq",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:spark-transform",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "normalized records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:analyst>store:bigquery>queries",
+        "name": "queries",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "analysts -->|queries| bq",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:analyst",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "queries",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:landing-network",
+        "name": "Landing network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph landing[Landing network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:warehouse-network",
+        "name": "Warehouse network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph warehouse[Warehouse network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Airflow metadata DB data is confidential because it contains connection strings and partner keys.",
+        "element_id": "store:airflow-metadata-db",
+        "attribute": "data_classification",
+        "basis": "The diagram states that the Airflow metadata DB contains \"connection strings, partner keys\"."
+      },
+      {
+        "assumption": "SFTP provides intrinsic encryption in transit for the daily extract flow.",
+        "element_id": "flow:entity:insurance-partner>store:landing-bucket>daily-extract-sftp",
+        "attribute": "encryption_in_transit",
+        "basis": "The flow is explicitly labeled \"daily extract (SFTP)\"; the extraction rule states that SFTP encryption is intrinsic."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:insurance-partner",
+        "name": "Insurance partner",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "partners[Insurance partners]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram labels this node \"Insurance partners\".",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:analyst",
+        "name": "Analyst",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "analysts[Analysts]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram labels this node \"Analysts\".",
+        "kind": "human",
+        "trust_zone": "boundary:warehouse-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:airflow-scheduler",
+        "name": "Airflow scheduler",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow[Airflow scheduler]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Airflow",
+        "trust_zone": "boundary:landing-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:spark-transform",
+        "name": "Spark transform",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "spark[Spark transform]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Spark",
+        "trust_zone": "boundary:warehouse-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "Landing bucket",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "bucket[(Landing bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:airflow-metadata-db",
+        "name": "Airflow metadata DB",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "meta[(Airflow metadata DB)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:bigquery",
+        "name": "BigQuery",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "bq[(BigQuery)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "BigQuery",
+        "trust_zone": "boundary:warehouse-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:insurance-partner>store:landing-bucket>daily-extract-sftp",
+        "name": "daily extract (SFTP)",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "partners -->|\"daily extract (SFTP)\"| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:insurance-partner",
+        "destination": "store:landing-bucket",
+        "protocol": "SFTP",
+        "authentication": "unknown",
+        "data_description": "daily extract",
+        "encryption_in_transit": "SFTP",
+        "operations": "write"
+      },
+      {
+        "id": "flow:store:landing-bucket>process:airflow-scheduler>files",
+        "name": "files",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "bucket -->|files| airflow",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:landing-bucket",
+        "destination": "process:airflow-scheduler",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "files",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>store:airflow-metadata-db>connection-strings-partner-keys",
+        "name": "connection strings, partner keys",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow <-->|\"connection strings, partner keys\"| meta",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "store:airflow-metadata-db",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "connection strings, partner keys",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:airflow-metadata-db>process:airflow-scheduler>connection-strings-partner-keys",
+        "name": "connection strings, partner keys",
+        "description": "unknown",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "airflow <-->|\"connection strings, partner keys\"| meta",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:airflow-metadata-db",
+        "destination": "process:airflow-scheduler",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "connection strings, partner keys",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>process:spark-transform>trigger-job",
+        "name": "trigger job",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "airflow -->|trigger job| spark",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "process:spark-transform",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "trigger job",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:spark-transform>store:bigquery>normalized-records",
+        "name": "normalized records",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "spark -->|normalized records| bq",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:spark-transform",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "normalized records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:analyst>store:bigquery>queries",
+        "name": "queries",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "analysts -->|queries| bq",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:analyst",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "queries",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:landing-network",
+        "name": "Landing network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph landing[Landing network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:warehouse-network",
+        "name": "Warehouse network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "subgraph warehouse[Warehouse network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Airflow metadata DB data is confidential because it contains connection strings and partner keys.",
+        "element_id": "store:airflow-metadata-db",
+        "attribute": "data_classification",
+        "basis": "The diagram states that the Airflow metadata DB contains \"connection strings, partner keys\"."
+      },
+      {
+        "assumption": "SFTP provides intrinsic encryption in transit for the daily extract flow.",
+        "element_id": "flow:entity:insurance-partner>store:landing-bucket>daily-extract-sftp",
+        "attribute": "encryption_in_transit",
+        "basis": "The flow is explicitly labeled \"daily extract (SFTP)\"; the extraction rule states that SFTP encryption is intrinsic."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

@@ -1,0 +1,1004 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:members-browser",
+        "name": "Member's browser",
+        "description": "The member's browser used for sign-in, consent, and authorization-code redirect interactions.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "browser(\"Member's browser\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The browser is outside the system's control; the text does not identify the member separately.",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "Mobile app",
+        "description": "Mobile application used for sign-in and requests to the Rewards API.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app[Mobile app]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:members-phone",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:partner-app",
+        "name": "Partner app (e.g. meal-planning service)",
+        "description": "Partner application that performs token requests and requests to the Rewards API.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp[\"Partner app (e.g. meal-planning service)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:partner-servers",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:authorization-server",
+        "name": "Authorization server",
+        "description": "Authorization service handling sign-in, consent, authorization codes, tokens, and public-key downloads.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "authz[Authorization server]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:rewards-api",
+        "name": "Rewards API",
+        "description": "API receiving authorized requests and handling points and gift card redemptions.",
+        "assets": [
+          "credentials",
+          "financial"
+        ],
+        "source_excerpt": "rewards[Rewards API]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:support-console",
+        "name": "Support console",
+        "description": "Console receiving access tokens and closing accounts.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "support[Support console]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:identity-database",
+        "name": "Identity database",
+        "description": "Accounts, emails, password hashes, codes, refresh tokens, and consents.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "iddb[(\"Identity database: accounts, emails, password hashes, codes, refresh tokens, consents\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:points-ledger",
+        "name": "Points ledger",
+        "description": "Points balances and transactions.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "ledger[(\"Points ledger: balances, transactions\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:api-log-store",
+        "name": "API log store",
+        "description": "Stores every Rewards API request with headers.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "logs[(API log store)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:process:mobile-app>process:authorization-server>sign-in-authorization-code-flow-https",
+        "name": "sign in authorization code flow (HTTPS)",
+        "description": "Mobile app sign-in and authorization-code-flow interaction with the Authorization server.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app -->|\"sign in, authorization code flow (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "sign in, authorization code flow",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>process:mobile-app>access-token-refresh-token",
+        "name": "access token refresh token",
+        "description": "Authorization server sends access and refresh tokens to the Mobile app.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "authz -->|\"access token, refresh token\"| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "access token, refresh token",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:mobile-app>process:rewards-api>requests-with-access-token-https",
+        "name": "make authorized requests",
+        "description": "Mobile app makes requests to the Rewards API using an access token.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app -->|\"requests with access token (HTTPS)\"| rewards",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "access token",
+        "data_description": "requests with access token",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:members-browser>process:authorization-server>sign-in-consent-https",
+        "name": "sign in consent (HTTPS)",
+        "description": "Member's browser initiates sign-in and consent with the Authorization server.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "browser -->|\"sign-in, consent (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:members-browser",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "sign-in, consent",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:members-browser>process:partner-app>redirect-authorization-code",
+        "name": "redirect authorization code",
+        "description": "Member's browser redirects an authorization code to the Partner app.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "browser -->|\"redirect with authorization code\"| papp",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:members-browser",
+        "destination": "process:partner-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "authorization code",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:partner-app>process:authorization-server>token-requests-https",
+        "name": "make token requests",
+        "description": "Partner app makes token requests to the Authorization server.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp -->|\"token requests (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:partner-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "token requests",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:partner-app>process:rewards-api>requests-with-access-token-https",
+        "name": "make authorized requests",
+        "description": "Partner app makes requests to the Rewards API using an access token.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp -->|\"requests with access token (HTTPS)\"| rewards",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:partner-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "access token",
+        "data_description": "requests with access token",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>store:identity-database>accounts-codes-tokens-consents",
+        "name": "store identity records",
+        "description": "Authorization server reads and writes accounts, codes, tokens, and consents in the Identity database.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "authz <-->|\"accounts, codes, tokens, consents\"| iddb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accounts, codes, tokens, consents",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:rewards-api>process:authorization-server>download-public-key",
+        "name": "download public key",
+        "description": "Rewards API downloads a public key from the Authorization server at startup.",
+        "assets": [],
+        "source_excerpt": "rewards -->|public key download at start| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "public key",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:rewards-api>store:points-ledger>points-gift-card-redemptions",
+        "name": "record points redemptions",
+        "description": "Rewards API reads and writes points and gift card redemptions in the Points ledger.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "rewards <-->|\"points, gift card redemptions\"| ledger",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:points-ledger",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "points, gift card redemptions",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:rewards-api>store:api-log-store>log-requests-headers",
+        "name": "log requests headers",
+        "description": "Rewards API sends every request with headers to the API log store.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "rewards -->|\"every request, with headers\"| logs",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:api-log-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "every request, with headers",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:authorization-server>process:support-console>send-access-tokens",
+        "name": "send access tokens",
+        "description": "Authorization server sends access tokens to the Support console.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "authz -->|access tokens| support",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "process:support-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "access tokens",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:support-console>store:identity-database>close-account",
+        "name": "close account",
+        "description": "Support console requests account closure in the Identity database.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "support -->|close account| iddb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "close account",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:members-phone",
+        "name": "Member's phone",
+        "description": "The member's phone zone containing the Mobile app.",
+        "assets": [],
+        "source_excerpt": "subgraph phone[\"Member's phone\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:partner-servers",
+        "name": "Partner servers",
+        "description": "Partner server zone containing the Partner app.",
+        "assets": [],
+        "source_excerpt": "subgraph partner[\"Partner servers\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "name": "Our cloud account",
+        "description": "Our cloud-account zone containing the Authorization server, Rewards API, Support console, and data stores.",
+        "assets": [],
+        "source_excerpt": "subgraph cloud[\"Our cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Identity database is confidential because it contains accounts, emails, password hashes, codes, refresh tokens, and consents.",
+        "element_id": "store:identity-database",
+        "attribute": "data_classification",
+        "basis": "The diagram explicitly lists personal account data and credential material in the database."
+      },
+      {
+        "assumption": "The Points ledger is confidential because it contains points balances and transactions, including gift card redemptions.",
+        "element_id": "store:points-ledger",
+        "attribute": "data_classification",
+        "basis": "The diagram explicitly identifies balances, transactions, and gift card redemptions."
+      },
+      {
+        "assumption": "The Mobile app carries credentials because its flows include authorization codes, access tokens, and refresh tokens.",
+        "element_id": "process:mobile-app",
+        "attribute": "assets",
+        "basis": "The diagram explicitly shows authorization-code flow and access and refresh tokens involving the Mobile app."
+      },
+      {
+        "assumption": "The Partner app carries credentials because its flows include authorization codes, token requests, and access tokens.",
+        "element_id": "process:partner-app",
+        "attribute": "assets",
+        "basis": "The diagram explicitly shows authorization codes, token requests, and access-token requests involving the Partner app."
+      },
+      {
+        "assumption": "The Authorization server handles credentials and personal information because it handles accounts, emails, codes, tokens, and consents.",
+        "element_id": "process:authorization-server",
+        "attribute": "assets",
+        "basis": "The diagram explicitly lists these records and artifacts in its interactions with the Identity database."
+      },
+      {
+        "assumption": "The Rewards API handles credentials and financial data because it accepts access tokens and handles points and gift card redemptions.",
+        "element_id": "process:rewards-api",
+        "attribute": "assets",
+        "basis": "The diagram explicitly shows access-token requests and points and gift card redemptions."
+      },
+      {
+        "assumption": "The Support console handles credentials and personal information because it receives access tokens and closes accounts.",
+        "element_id": "process:support-console",
+        "attribute": "assets",
+        "basis": "The diagram explicitly shows access tokens sent to the console and account closure against the Identity database."
+      },
+      {
+        "assumption": "The Identity database stores credentials and personal information because it contains password hashes, codes, refresh tokens, accounts, emails, and consents.",
+        "element_id": "store:identity-database",
+        "attribute": "assets",
+        "basis": "The diagram explicitly lists these contents."
+      },
+      {
+        "assumption": "The Points ledger stores financial data because it contains points, balances, transactions, and gift card redemptions.",
+        "element_id": "store:points-ledger",
+        "attribute": "assets",
+        "basis": "The diagram explicitly lists these contents and interactions."
+      },
+      {
+        "assumption": "The API log store may hold credentials because it stores every request with headers, including requests shown elsewhere with access tokens.",
+        "element_id": "store:api-log-store",
+        "attribute": "assets",
+        "basis": "The diagram states that every request is logged with headers and separately shows access tokens in Rewards API requests."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:members-browser",
+        "name": "Member's browser",
+        "description": "The member's browser used for sign-in, consent, and authorization-code redirect interactions.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "browser(\"Member's browser\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The browser is outside the system's control; the text does not identify the member separately.",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "Mobile app",
+        "description": "Mobile application used for sign-in and requests to the Rewards API.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app[Mobile app]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:members-phone",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:partner-app-e-g-meal-planning-service",
+        "name": "Partner app (e.g. meal-planning service)",
+        "description": "Partner application that performs token requests and requests to the Rewards API.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp[\"Partner app (e.g. meal-planning service)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:partner-servers",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:authorization-server",
+        "name": "Authorization server",
+        "description": "Authorization service handling sign-in, consent, authorization codes, tokens, and public-key downloads.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "authz[Authorization server]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:rewards-api",
+        "name": "Rewards API",
+        "description": "API receiving authorized requests and handling points and gift card redemptions.",
+        "assets": [
+          "credentials",
+          "financial"
+        ],
+        "source_excerpt": "rewards[Rewards API]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:support-console",
+        "name": "Support console",
+        "description": "Console receiving access tokens and closing accounts.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "support[Support console]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:identity-database",
+        "name": "Identity database",
+        "description": "Accounts, emails, password hashes, codes, refresh tokens, and consents.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "iddb[(\"Identity database: accounts, emails, password hashes, codes, refresh tokens, consents\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:points-ledger",
+        "name": "Points ledger",
+        "description": "Points balances and transactions.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "ledger[(\"Points ledger: balances, transactions\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:api-log-store",
+        "name": "API log store",
+        "description": "Stores every Rewards API request with headers.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "logs[(API log store)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:process:mobile-app>process:authorization-server>sign-in-authorization-code-flow-https",
+        "name": "sign in authorization code flow (HTTPS)",
+        "description": "Mobile app sign-in and authorization-code-flow interaction with the Authorization server.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app -->|\"sign in, authorization code flow (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "sign in, authorization code flow",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>process:mobile-app>access-token-refresh-token",
+        "name": "access token refresh token",
+        "description": "Authorization server sends access and refresh tokens to the Mobile app.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "authz -->|\"access token, refresh token\"| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "access token, refresh token",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:mobile-app>process:rewards-api>make-authorized-requests",
+        "name": "make authorized requests",
+        "description": "Mobile app makes requests to the Rewards API using an access token.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "app -->|\"requests with access token (HTTPS)\"| rewards",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "access token",
+        "data_description": "requests with access token",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:members-browser>process:authorization-server>sign-in-consent-https",
+        "name": "sign in consent (HTTPS)",
+        "description": "Member's browser initiates sign-in and consent with the Authorization server.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "browser -->|\"sign-in, consent (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:members-browser",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "sign-in, consent",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:members-browser>process:partner-app-e-g-meal-planning-service>redirect-authorization-code",
+        "name": "redirect authorization code",
+        "description": "Member's browser redirects an authorization code to the Partner app.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "browser -->|\"redirect with authorization code\"| papp",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:members-browser",
+        "destination": "process:partner-app-e-g-meal-planning-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "authorization code",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:partner-app-e-g-meal-planning-service>process:authorization-server>make-token-requests",
+        "name": "make token requests",
+        "description": "Partner app makes token requests to the Authorization server.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp -->|\"token requests (HTTPS)\"| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:partner-app-e-g-meal-planning-service",
+        "destination": "process:authorization-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "token requests",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:partner-app-e-g-meal-planning-service>process:rewards-api>make-authorized-requests",
+        "name": "make authorized requests",
+        "description": "Partner app makes requests to the Rewards API using an access token.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "papp -->|\"requests with access token (HTTPS)\"| rewards",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:partner-app-e-g-meal-planning-service",
+        "destination": "process:rewards-api",
+        "protocol": "HTTPS",
+        "authentication": "access token",
+        "data_description": "requests with access token",
+        "encryption_in_transit": "HTTPS",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>store:identity-database>store-identity-records",
+        "name": "store identity records",
+        "description": "Authorization server reads and writes accounts, codes, tokens, and consents in the Identity database.",
+        "assets": [
+          "credentials",
+          "pii"
+        ],
+        "source_excerpt": "authz <-->|\"accounts, codes, tokens, consents\"| iddb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accounts, codes, tokens, consents",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:rewards-api>process:authorization-server>download-public-key",
+        "name": "download public key",
+        "description": "Rewards API downloads a public key from the Authorization server at startup.",
+        "assets": [],
+        "source_excerpt": "rewards -->|public key download at start| authz",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "public key",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:rewards-api>store:points-ledger>record-points-redemptions",
+        "name": "record points redemptions",
+        "description": "Rewards API reads and writes points and gift card redemptions in the Points ledger.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "rewards <-->|\"points, gift card redemptions\"| ledger",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:points-ledger",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "points, gift card redemptions",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:rewards-api>store:api-log-store>log-requests-headers",
+        "name": "log requests headers",
+        "description": "Rewards API sends every request with headers to the API log store.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "rewards -->|\"every request, with headers\"| logs",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:api-log-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "every request, with headers",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:authorization-server>process:support-console>send-access-tokens",
+        "name": "send access tokens",
+        "description": "Authorization server sends access tokens to the Support console.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "authz -->|access tokens| support",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "process:support-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "access tokens",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:support-console>store:identity-database>close-account",
+        "name": "close account",
+        "description": "Support console requests account closure in the Identity database.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "support -->|close account| iddb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "close account",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:members-phone",
+        "name": "Member's phone",
+        "description": "The member's phone zone containing the Mobile app.",
+        "assets": [],
+        "source_excerpt": "subgraph phone[\"Member's phone\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:partner-servers",
+        "name": "Partner servers",
+        "description": "Partner server zone containing the Partner app.",
+        "assets": [],
+        "source_excerpt": "subgraph partner[\"Partner servers\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "name": "Our cloud account",
+        "description": "Our cloud-account zone containing the Authorization server, Rewards API, Support console, and data stores.",
+        "assets": [],
+        "source_excerpt": "subgraph cloud[\"Our cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Identity database is confidential because it contains accounts, emails, password hashes, codes, refresh tokens, and consents.",
+        "element_id": "store:identity-database",
+        "attribute": "data_classification",
+        "basis": "The diagram explicitly lists personal account data and credential material in the database."
+      },
+      {
+        "assumption": "The Points ledger is confidential because it contains points balances and transactions, including gift card redemptions.",
+        "element_id": "store:points-ledger",
+        "attribute": "data_classification",
+        "basis": "The diagram explicitly identifies balances, transactions, and gift card redemptions."
+      },
+      {
+        "assumption": "The Mobile app carries credentials because its flows include authorization codes, access tokens, and refresh tokens.",
+        "element_id": "process:mobile-app",
+        "attribute": "assets",
+        "basis": "The diagram explicitly shows authorization-code flow and access and refresh tokens involving the Mobile app."
+      },
+      {
+        "assumption": "The Partner app carries credentials because its flows include authorization codes, token requests, and access tokens.",
+        "element_id": "process:partner-app-e-g-meal-planning-service",
+        "attribute": "assets",
+        "basis": "The diagram explicitly shows authorization codes, token requests, and access-token requests involving the Partner app."
+      },
+      {
+        "assumption": "The Authorization server handles credentials and personal information because it handles accounts, emails, codes, tokens, and consents.",
+        "element_id": "process:authorization-server",
+        "attribute": "assets",
+        "basis": "The diagram explicitly lists these records and artifacts in its interactions with the Identity database."
+      },
+      {
+        "assumption": "The Rewards API handles credentials and financial data because it accepts access tokens and handles points and gift card redemptions.",
+        "element_id": "process:rewards-api",
+        "attribute": "assets",
+        "basis": "The diagram explicitly shows access-token requests and points and gift card redemptions."
+      },
+      {
+        "assumption": "The Support console handles credentials and personal information because it receives access tokens and closes accounts.",
+        "element_id": "process:support-console",
+        "attribute": "assets",
+        "basis": "The diagram explicitly shows access tokens sent to the console and account closure against the Identity database."
+      },
+      {
+        "assumption": "The Identity database stores credentials and personal information because it contains password hashes, codes, refresh tokens, accounts, emails, and consents.",
+        "element_id": "store:identity-database",
+        "attribute": "assets",
+        "basis": "The diagram explicitly lists these contents."
+      },
+      {
+        "assumption": "The Points ledger stores financial data because it contains points, balances, transactions, and gift card redemptions.",
+        "element_id": "store:points-ledger",
+        "attribute": "assets",
+        "basis": "The diagram explicitly lists these contents and interactions."
+      },
+      {
+        "assumption": "The API log store may hold credentials because it stores every request with headers, including requests shown elsewhere with access tokens.",
+        "element_id": "store:api-log-store",
+        "attribute": "assets",
+        "basis": "The diagram states that every request is logged with headers and separately shows access tokens in Rewards API requests."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

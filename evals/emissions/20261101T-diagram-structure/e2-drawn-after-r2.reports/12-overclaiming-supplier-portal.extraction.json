@@ -1,0 +1,579 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:supplier",
+        "name": "Supplier",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supplier(Supplier)",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier-document-portal",
+        "name": "Supplier document portal",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "portal[Supplier document portal]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform-saas",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "name": "Supplier master service",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master[Supplier master service]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "Category manager",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "catmgr(Category manager)",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "Landing bucket",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "bucket[(Landing bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "Supplier database",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supdb[(Supplier database)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:supplier>process:supplier-document-portal>insurance-certificates-food-safety-audits-staff-contact-details",
+        "name": "insurance certificates, food safety audits, staff contact details",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supplier -->|\"insurance certificates, food safety audits, staff contact details\"| portal",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:supplier",
+        "destination": "process:supplier-document-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "insurance certificates, food safety audits, staff contact details",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:category-manager>process:supplier-document-portal>review-approve-or-reject",
+        "name": "review, approve or reject",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "catmgr -->|\"review, approve or reject\"| portal",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:category-manager",
+        "destination": "process:supplier-document-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "review, approve or reject",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-document-portal>store:landing-bucket>nightly-supplier-data-extract-csv",
+        "name": "nightly supplier data extract (CSV)",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "portal -->|\"nightly supplier data extract (CSV)\"| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-document-portal",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "nightly supplier data extract (CSV)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:landing-bucket>load-file",
+        "name": "load file",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master -->|load file| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "load file",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:supplier-database>supplier-records",
+        "name": "supplier records",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master -->|supplier records| supdb",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "supplier records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:vendor-platform-saas",
+        "name": "Vendor platform (SaaS)",
+        "description": "Vendor platform (SaaS)",
+        "assets": [],
+        "source_excerpt": "subgraph vendor[\"Vendor platform (SaaS)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "Corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph corp[\"Corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "name": "Our cloud account",
+        "description": "Our cloud account",
+        "assets": [],
+        "source_excerpt": "subgraph cloud[\"Our cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Supplier is modeled as a human external entity because the diagram names it as an actor providing documents.",
+        "element_id": "entity:supplier",
+        "attribute": "kind",
+        "basis": "The node is labeled \"Supplier\" and initiates the document flow; no external system behavior is stated."
+      },
+      {
+        "assumption": "Category manager is modeled as a human external entity because the diagram names a person role that initiates review actions.",
+        "element_id": "entity:category-manager",
+        "attribute": "kind",
+        "basis": "The node is labeled \"Category manager\" and initiates review, approval, or rejection actions."
+      },
+      {
+        "assumption": "The supplier document portal presents a web interface.",
+        "element_id": "process:supplier-document-portal",
+        "attribute": "interface_kind",
+        "basis": "The component is explicitly named a \"portal\"."
+      },
+      {
+        "assumption": "The Vendor platform (SaaS) is controlled by a different party and is therefore a tenant boundary.",
+        "element_id": "boundary:vendor-platform-saas",
+        "attribute": "kind",
+        "basis": "The zone is explicitly labeled \"Vendor platform (SaaS).\""
+      },
+      {
+        "assumption": "The cloud account is modeled as a network boundary because it is a distinct cloud environment from the corporate network.",
+        "element_id": "boundary:our-cloud-account",
+        "attribute": "kind",
+        "basis": "The zone is explicitly labeled \"Our cloud account\" and is distinct from \"Corporate network.\""
+      },
+      {
+        "assumption": "The Landing bucket contains confidential data because it receives a supplier data extract containing business and personal information.",
+        "element_id": "store:landing-bucket",
+        "attribute": "data_classification",
+        "basis": "The bucket receives \"nightly supplier data extract (CSV)\" and the supplier flow includes staff contact details, insurance certificates, and food safety audits."
+      },
+      {
+        "assumption": "The Supplier database contains confidential data because it stores supplier records associated with supplier information and staff contact details.",
+        "element_id": "store:supplier-database",
+        "attribute": "data_classification",
+        "basis": "The database receives \"supplier records\" and the diagram shows supplier information including staff contact details."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:supplier",
+        "name": "Supplier",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supplier(Supplier)",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier-document-portal",
+        "name": "Supplier document portal",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "portal[Supplier document portal]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform-saas",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "name": "Supplier master service",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master[Supplier master service]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:category-manager",
+        "name": "Category manager",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "catmgr(Category manager)",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "Landing bucket",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "bucket[(Landing bucket)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "Supplier database",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supdb[(Supplier database)]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:supplier>process:supplier-document-portal>insurance-certificates-food-safety-audits-staff-contact-details",
+        "name": "insurance certificates, food safety audits, staff contact details",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "supplier -->|\"insurance certificates, food safety audits, staff contact details\"| portal",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:supplier",
+        "destination": "process:supplier-document-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "insurance certificates, food safety audits, staff contact details",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:category-manager>process:supplier-document-portal>review-approve-or-reject",
+        "name": "review, approve or reject",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "catmgr -->|\"review, approve or reject\"| portal",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:category-manager",
+        "destination": "process:supplier-document-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "review, approve or reject",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-document-portal>store:landing-bucket>nightly-supplier-data-extract-csv",
+        "name": "nightly supplier data extract (CSV)",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "portal -->|\"nightly supplier data extract (CSV)\"| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-document-portal",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "nightly supplier data extract (CSV)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:landing-bucket>load-file",
+        "name": "load file",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master -->|load file| bucket",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "load file",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:supplier-database>supplier-records",
+        "name": "supplier records",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "master -->|supplier records| supdb",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "supplier records",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:vendor-platform-saas",
+        "name": "Vendor platform (SaaS)",
+        "description": "Vendor platform (SaaS)",
+        "assets": [],
+        "source_excerpt": "subgraph vendor[\"Vendor platform (SaaS)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "Corporate network",
+        "assets": [],
+        "source_excerpt": "subgraph corp[\"Corporate network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "name": "Our cloud account",
+        "description": "Our cloud account",
+        "assets": [],
+        "source_excerpt": "subgraph cloud[\"Our cloud account\"]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Supplier is modeled as a human external entity because the diagram names it as an actor providing documents.",
+        "element_id": "entity:supplier",
+        "attribute": "kind",
+        "basis": "The node is labeled \"Supplier\" and initiates the document flow; no external system behavior is stated."
+      },
+      {
+        "assumption": "Category manager is modeled as a human external entity because the diagram names a person role that initiates review actions.",
+        "element_id": "process:category-manager",
+        "attribute": "kind",
+        "basis": "The node is labeled \"Category manager\" and initiates review, approval, or rejection actions."
+      },
+      {
+        "assumption": "The supplier document portal presents a web interface.",
+        "element_id": "process:supplier-document-portal",
+        "attribute": "interface_kind",
+        "basis": "The component is explicitly named a \"portal\"."
+      },
+      {
+        "assumption": "The Vendor platform (SaaS) is controlled by a different party and is therefore a tenant boundary.",
+        "element_id": "boundary:vendor-platform-saas",
+        "attribute": "kind",
+        "basis": "The zone is explicitly labeled \"Vendor platform (SaaS).\""
+      },
+      {
+        "assumption": "The cloud account is modeled as a network boundary because it is a distinct cloud environment from the corporate network.",
+        "element_id": "boundary:our-cloud-account",
+        "attribute": "kind",
+        "basis": "The zone is explicitly labeled \"Our cloud account\" and is distinct from \"Corporate network.\""
+      },
+      {
+        "assumption": "The Landing bucket contains confidential data because it receives a supplier data extract containing business and personal information.",
+        "element_id": "store:landing-bucket",
+        "attribute": "data_classification",
+        "basis": "The bucket receives \"nightly supplier data extract (CSV)\" and the supplier flow includes staff contact details, insurance certificates, and food safety audits."
+      },
+      {
+        "assumption": "The Supplier database contains confidential data because it stores supplier records associated with supplier information and staff contact details.",
+        "element_id": "store:supplier-database",
+        "attribute": "data_classification",
+        "basis": "The database receives \"supplier records\" and the diagram shows supplier information including staff contact details."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [
+    {
+      "code": "invalid-reference",
+      "message": "assumption names attribute 'kind', which 'process:category-manager' does not carry; it declares ['technology', 'trust_zone', 'exposure', 'interface_kind', 'assets']",
+      "element_id": "process:category-manager",
+      "field": "assumptions"
+    }
+  ],
+  "repair": null
+}

@@ -1,0 +1,21 @@
+architecture-beta
+    group z0(cloud)[Trust zone player local machine]
+    group z1(cloud)[Trust zone corporate network]
+    group z2(cloud)[Trust zone production network]
+    service n0(internet)[player] in z0
+    service n1(internet)[customer support staff] in z1
+    service n2(server)[game client] in z0
+    service n3(server)[lobby] in z2
+    service n4(server)[game server] in z2
+    service n5(server)[moderation website] in z2
+    service n6(database)[player database] in z2
+    service n7(database)[stats database] in z2
+    n0:R --> L:n2
+    n2:R --> L:n3
+    n2:R --> L:n4
+    n3:R --> L:n4
+    n3:R --> L:n6
+    n4:R --> L:n7
+    n4:R --> L:n6
+    n1:R --> L:n5
+    n5:R --> L:n6

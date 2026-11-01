@@ -1,0 +1,17 @@
+architecture-beta
+    group z0(cloud)[Trust zone public internet]
+    group z1(cloud)[Trust zone web tier]
+    group z2(cloud)[Trust zone backend tier]
+    service n0(internet)[browser] in z0
+    service n1(server)[web application] in z1
+    service n2(server)[background worker process] in z2
+    service n3(database)[message queue] in z2
+    service n4(database)[database] in z2
+    service n5(database)[web application config] in z1
+    service n6(database)[worker config] in z2
+    n0:R --> L:n1
+    n1:R --> L:n3
+    n2:R --> L:n3
+    n2:R --> L:n4
+    n1:R --> L:n5
+    n2:R --> L:n6
