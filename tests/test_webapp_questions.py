@@ -1668,9 +1668,9 @@ def test_the_workspace_deletes_a_run_that_waits_for_answers_last(tiers):
 
 
 def test_a_full_workspace_of_waiting_runs_refuses_a_new_one(tiers):
-    """A third run evicted the oldest paused one while it still waited
-    (#1289, F4). Now it is refused, and an answer to a held run still starts,
-    one place over the bound."""
+    """A third run is refused while two paused runs wait, rather than
+    evicting the oldest one (#1289, F4), and an answer to a held run still
+    starts, one place over the bound."""
     with _bounded(tiers, PausingRunner(catalog=False), max_jobs=2) as client:
         held = [_paused(client) for _ in range(2)]
 
@@ -2104,7 +2104,7 @@ calls.push({ heading: title.children[0].textContent,
     assert seen[2] == {"heading": heading, "names": [heading + name for name in names]}
 
 
-def test_one_shared_answer_fills_only_the_parts_a_person_ticks():
+def test_one_shared_answer_fills_only_the_elements_a_person_ticks():
     """A box asks its question once, every element starts unticked, and the
     answer reaches only the elements a person ticks (ADR 0081, ADR 0113)."""
     first, second = valid_model().data_flows[:2]
@@ -2237,10 +2237,10 @@ calls.push({ line: line() });
     ]
 
 
-def test_cover_every_part_ticks_each_part_with_no_answer_of_its_own():
-    """A chosen answer with no part ticked says how to cover parts. Cover
-    every part ticks each blank part and gives it the answer, and leaves a
-    part answered by hand unticked (ADR 0113)."""
+def test_cover_every_part_ticks_each_element_with_no_answer_of_its_own():
+    """A chosen answer with no element ticked says how to cover elements.
+    "Cover every part" ticks each blank element and gives it the answer, and
+    leaves an element answered by hand unticked (ADR 0113)."""
     first, second = valid_model().data_flows[:2]
     third = first.model_copy(
         update={"id": "flow:process:web-app>store:orders-db>read", "name": "read"}
@@ -2302,7 +2302,7 @@ calls.push({ shown: !undo.hidden, shared: state.value, rows: rowsOf().map(r => o
     ]
 
 
-def test_unticking_a_part_takes_back_only_the_shared_answer():
+def test_unticking_an_element_takes_back_only_the_shared_answer():
     """An element unticked after the shared answer reached it loses that
     value, and an element a person answered by hand after it keeps its own
     (ADR 0113)."""

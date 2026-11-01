@@ -20,7 +20,7 @@ link answers. The two bounds did not agree.
 The audit of 7 October 2026 built 201 schema-valid conditional threats with
 distinct open facts. The follow-up asked 201 questions, and a request with
 one answer for each was refused. A report could not save a batch without
-running, because only a waiting job saved, and the first run spent the one
+running, because only a waiting job saved, and the first run used the one
 follow-up. Changes to earlier answers took places in the same request, so the
 failure did not need 201 new questions.
 
@@ -31,7 +31,7 @@ its saves broke its own record.
 ## Decision
 
 **A report's follow-up keeps a draft.** A save to a finished, not final,
-report keeps the answers as a draft on the job (`JobRecord.draft`). It runs no model and does not spend the follow-up. A later
+report keeps the answers as a draft on the job (`JobRecord.draft`). It runs no model and does not use the follow-up. A later
 batch replaces an earlier draft answer to the same fact or principal.
 
 **The run composes the draft with what it is sent.** A run without `"save"`

@@ -407,7 +407,7 @@ over a finished sweep's saved reports.
 python -m evals.harness.run score baseline-1.json
 ```
 
-A vote hangs on a finding's fingerprint, so tuning does not re-spend it: after
+A vote hangs on a finding's fingerprint, so tuning does not ask for it again: after
 the first sitting, a configuration change puts only its *new* findings in the
 queue. That is what makes this affordable per experiment rather than per
 session.

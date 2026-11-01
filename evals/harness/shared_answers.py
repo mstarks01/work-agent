@@ -118,7 +118,7 @@ class Box:
     distinct: int
     #: Elements whose true value is not the most common one.
     unlike: int
-    #: Choices each owner spends on the elements with a true value.
+    #: Choices each owner makes on the elements with a true value.
     choices_shared: int
     choices_picked: int
 

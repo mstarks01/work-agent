@@ -57,7 +57,7 @@ unlisted finding is not counted wrong. The `volume` gate catches that offline,
 and the `reviewed` and `rejected-rate` gates wait for votes on what the
 candidate added. A gate that reads `inconclusive` leaves the gain unconfirmed.
 
-Each rung-5 reading spends one of the holdout's `HOLDOUT_READS`, so confirm
+Each rung-5 reading uses one of the holdout's `HOLDOUT_READS`, so confirm
 only a gain that rung 4 already measured. Record each case the reading names in
 the row's `holdout_reads`. `run.py gain --held-out` reads the rung-4 gates on
 the held-out cases alone. It refuses a case that is exhausted: a case read

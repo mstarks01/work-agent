@@ -75,8 +75,8 @@ class AnswersSubmission(BaseModel):
     the page showed: the job records them as shown, and a skip is taken only
     of one of them (ADR 0069). ``revision`` is the revision the answers
     were read against, which a waiting job and every save require. ``shares``
-    answers a question once for each part it covers (ADR 0114); each covered
-    part counts as one fact answer toward the bound. ``renames`` is every
+    answers a question once for each element it covers (ADR 0114); each
+    covered element counts as one fact answer toward the bound. ``renames`` is every
     rename a waiting job holds after a save: each maps an element a carried
     answer names to an element of this model (ADR 0116). Left out, the job
     keeps the renames it holds. One request carries at

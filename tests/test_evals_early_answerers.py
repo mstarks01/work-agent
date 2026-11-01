@@ -33,22 +33,22 @@ BASELINE = next(
 
 @pytest.mark.parametrize("who", sorted(ANSWERERS))
 @pytest.mark.parametrize("effects", [True, False], ids=["effects", "no-effects"])
-def test_a_walk_spends_at_most_its_budget_one_question_a_save(who, effects):
+def test_a_walk_takes_at_most_its_budget_one_question_a_save(who, effects):
     walked = walk(valid_model(), LEVEL_2, ANSWERERS[who], effects=effects, budget=10)
     assert walked.steps, "a control: the list asks something"
-    spent = [step.spent for step in walked.steps]
-    assert spent == sorted(set(spent)), "each save spends at least one choice"
-    assert spent[-1] >= 10 or walked.ended
-    assert spent[-2] < 10 or len(spent) == 1, "the walk stops once it spends 10"
+    taken = [step.choices for step in walked.steps]
+    assert taken == sorted(set(taken)), "each save takes at least one choice"
+    assert taken[-1] >= 10 or walked.ended
+    assert taken[-2] < 10 or len(taken) == 1, "the walk stops once it takes 10"
     assert len(walked.within(5)) <= len(walked.within(10)) <= len(walked.steps)
     assert len({step.key for step in walked.steps}) == len(walked.steps), (
         "one save each"
     )
 
 
-def test_a_skip_spends_one_choice_and_answers_nothing():
+def test_a_skip_takes_one_choice_and_answers_nothing():
     walked = walk(valid_model(), LEVEL_2, ANSWERERS["skip"], effects=True, budget=5)
-    assert [step.spent for step in walked.steps] == [1, 2, 3, 4, 5]
+    assert [step.choices for step in walked.steps] == [1, 2, 3, 4, 5]
     assert all(step.answer is None for step in walked.steps)
 
 

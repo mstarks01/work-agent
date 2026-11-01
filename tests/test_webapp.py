@@ -1076,13 +1076,15 @@ def _table_keys(page: str, table: str) -> set[str]:
     return set(re.findall(r'^\s*"([\w-]+)"\s*:', body.group(1), re.MULTILINE))
 
 
-def test_the_first_run_page_words_each_stop():
+def test_the_first_run_page_words_each_empty_list_reason():
     """``first_run.js`` has a sentence for each
-    :data:`~analysis_service.answer_state.Stop` and no other. A stop the table
-    lacks renders as ``undefined``."""
-    from analysis_service.answer_state import Stop
+    :data:`~analysis_service.answer_state.EmptyListReason` and no other. A
+    reason the table lacks renders as ``undefined``."""
+    from analysis_service.answer_state import EmptyListReason
 
-    assert _table_keys("first_run.js", "stops") == set(get_args(Stop))
+    assert _table_keys("first_run.js", "emptyListReasons") == set(
+        get_args(EmptyListReason)
+    )
 
 
 def test_the_first_run_page_reads_each_carried_reason():
@@ -1401,7 +1403,7 @@ def test_the_viewer_leaves_an_unpaired_backtick_alone():
 
 
 def test_the_viewer_renders_a_span_as_text_not_as_markup():
-    """`prose` is new text handling, so it gets #86's payload too.
+    """`prose` handles text, so it gets #86's payload too.
 
     A code span is still built as a `code` element with its content set as
     text. The payload must come back as the characters a reader sees, which is

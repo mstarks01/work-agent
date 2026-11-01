@@ -24,7 +24,7 @@ spread nobody has measured reads ``inconclusive``, and a gain with an unread
 gate is not a promotion.
 
 ``--held-out`` is rung 5 of the experiment protocol, held-out confirmation:
-the same gates over the held-out cases alone. Each case it reads spends one of
+the same gates over the held-out cases alone. Each case it reads uses one of
 that case's ``HOLDOUT_READS``, so the reading names each case for the row's
 ``holdout_reads``, and it refuses a case the ledger has exhausted, which is a
 development case now (:func:`~evals.harness.audit.held_out`).
@@ -220,9 +220,9 @@ def split(
             f"the {' and the '.join(empty)} {verb} no case that is still held"
             " out, so no held-out case is left to confirm a gain on"
         )
-    spent = audit.exhausted(ledger)
+    exhausted = audit.exhausted(ledger)
     still = audit.still_held_out(flagged, ledger)
-    refused = {case: spent[case] for case in sorted(flagged - still)}
+    refused = {case: exhausted[case] for case in sorted(flagged - still)}
     reads = audit.exposure(ledger)
     read = sorted(held["baseline"] | held["candidate"])
     notes = [
@@ -232,7 +232,7 @@ def split(
         for case, count in refused.items()
     ]
     notes.append(
-        "Each case read here spends one of its reads. Record every one in the"
+        "Each case read here uses one of its reads. Record every one in the"
         " experiment row's `holdout_reads`: "
         + ", ".join(
             f"{case} (read {len(reads.get(case, ()))} of {audit.HOLDOUT_READS}"
@@ -409,7 +409,7 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         "--held-out",
         action="store_true",
         help="rung 5, held-out confirmation: read the gates on the held-out"
-        " cases alone. Each case read spends one of its HOLDOUT_READS; record"
+        " cases alone. Each case read uses one of its HOLDOUT_READS; record"
         " it in the experiment row's holdout_reads",
     )
 

@@ -25,6 +25,7 @@ from evals.harness.modes import AttributeCheck, ExtractionScore, render_extracti
 from evals.harness.reference import CorpusError
 from evals.harness.run import _models_record, _print_certification
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
+from tests.source_tree import REPO_ROOT
 
 BLESSED = "a" * 64
 
@@ -281,6 +282,25 @@ class TestTheCommandTable:
         printed = capsys.readouterr()
         assert printed.err.startswith("cannot read the corpus:")
         assert "03-batch-data-pipeline" in printed.err
+
+    def test_a_sweep_a_command_cannot_read_ends_in_one_line(self, capsys):
+        """``score`` read an extraction sweep's missing reports into a
+        traceback; every command refuses an unreadable sweep in one line."""
+        sweep = REPO_ROOT / "evals/emissions/20260914T2205Z-extract-sweep.json"
+
+        assert run.main(["score", str(sweep), "--out", "/dev/null"]) == 1
+        printed = capsys.readouterr().err
+        assert printed.startswith("cannot read the sweep: 01-payments-checkout:")
+        assert "Traceback" not in printed
+
+    def test_an_artifact_of_another_version_ends_in_one_line(self, tmp_path, capsys):
+        """``load_artifact`` raises a ``ProvenanceError``, and ``score`` does
+        not catch it itself."""
+        sweep = tmp_path / "old.json"
+        sweep.write_text(json.dumps({"artifact_version": 1}), encoding="utf-8")
+
+        assert run.main(["score", str(sweep), "--out", str(tmp_path / "o")]) == 1
+        assert capsys.readouterr().err.startswith("cannot read the sweep: ")
 
     @pytest.mark.parametrize("name", sorted(run.COMMANDS))
     def test_each_command_parses_its_own_help(self, name, capsys):

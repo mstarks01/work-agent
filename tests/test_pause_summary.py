@@ -76,7 +76,9 @@ def _bands(asked):
 class TestTheStopSaysWhatIsLeft:
     def test_a_level_1_pause_discloses_the_requirements_it_leaves_unknown(self):
         asked = _all_yes(1)
-        assert asked.stop == "below-floor", "not nothing-left: questions remain"
+        assert asked.empty_list_reason == "below-floor", (
+            "not nothing-left: questions remain"
+        )
         assert len(asked.below_floor) == 24 and asked.held_back == ()
         assert _bands(asked) == {"level 1": ({"applicable": 48, "unknown": 22}, 0)}
         summary = asked.summary.to_json()
@@ -89,7 +91,7 @@ class TestTheStopSaysWhatIsLeft:
         the most parts, whose "yes" lists parts that take the thirty places
         (ADR 0078). The summary discloses them."""
         asked = _all_yes(2)
-        assert asked.stop == "budget-exhausted"
+        assert asked.empty_list_reason == "budget-exhausted"
         bands = _bands(asked)
         assert list(bands) == ["level 1", "level 2"], "the highest band first"
         assert bands["level 1"][0]["unknown"] == 18
@@ -191,4 +193,4 @@ def test_a_pause_whose_questions_left_were_all_skipped_says_so():
         pytest.fail("the saves never ended")
     assert (asked.held_back, asked.below_floor) == ((), ()), "a control"
     assert asked.summary.skipped > 0
-    assert asked.stop == "skipped"
+    assert asked.empty_list_reason == "skipped"

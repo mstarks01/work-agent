@@ -990,7 +990,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
         assert deferred == {"V1.2.4": "code"}
 
     def test_a_ruled_proposal_is_kept(self):
-        """Empty means the agent ruled, and the critic judges it as before."""
+        """Empty means the agent ruled, and the critic judges it."""
         kept, deferred = PACKAGES["asvs"].record.partition_proposals(
             [self._proposal("2.6", "")], "encoding-and-sanitization", ["prose"]
         )

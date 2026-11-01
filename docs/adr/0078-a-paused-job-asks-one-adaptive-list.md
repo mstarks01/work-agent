@@ -55,7 +55,7 @@ answer would do to the other questions.
 The maintainer asked on 2026-10-12 for one page that lists the recommended
 questions at once, with no visible round, and that asks first the questions
 whose answer settles the most other questions, so a submitter resolves the broad
-dependencies early and spends less on the details. The safeguards that make
+dependencies early and makes fewer choices on the details. The safeguards that make
 an answer trustworthy stay: a save runs no model, a skip is explicit, the
 limits and the floors hold, the frameworks take fair turns, and a question
 hidden from the submitter is never recorded as seen or skipped.
@@ -141,7 +141,7 @@ not claim that the work only shrinks.
 
 **The limits and the floors are unchanged.** Each framework has its own limit
 of each kind (ADR 0074), and a limit counts saved answers, not requests,
-edits, facets or rendered rows. A skip spends no place. A read or a save with
+edits, facets or rendered rows. A skip takes no place. A read or a save with
 unchanged inputs changes nothing.
 
 > **Amended by [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md).**

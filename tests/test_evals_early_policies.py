@@ -8,7 +8,7 @@ from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import question_set
 from analysis_service.report import Report
 from evals.harness import audit, early_policies
-from evals.harness.early_policies import POLICIES, _spend, needs_of, readings
+from evals.harness.early_policies import POLICIES, _answer_within, needs_of, readings
 from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT
 
@@ -76,15 +76,15 @@ class TestTheMerge:
 def test_a_submitter_stops_before_the_choice_that_passes_the_budget():
     order = POLICIES["framework-merge"](valid_model(), BOTH)
     for budget in (1, 5, 10):
-        answered, spent = _spend(order, budget)
-        assert spent <= budget
+        answered, choices = _answer_within(order, budget)
+        assert choices <= budget
         taken, total = set(), 0
         for charge in order:
             if total + charge.choices > budget:
                 break
             total += charge.choices
             taken |= charge.keys
-        assert (answered, spent) == (taken, total)
+        assert (answered, choices) == (taken, total)
 
 
 def test_a_group_is_one_charge_for_its_rows_and_a_capability_its_own():

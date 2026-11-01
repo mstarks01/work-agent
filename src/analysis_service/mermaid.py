@@ -74,8 +74,9 @@ def _node(node_id: str, element: ZonedElement) -> str:
     return f"{node_id}({label})"
 
 
-def _flow_label(flow: DataFlow) -> str:
-    """A flow's name, with its protocol where the model states one."""
+def _edge_text(flow: DataFlow) -> str:
+    """The text on a flow's edge: its name, with its protocol where the model
+    states one."""
     if flow.protocol in ("", UNKNOWN):
         return flow.name
     return f"{flow.name} ({flow.protocol})"
@@ -104,7 +105,7 @@ def model_mermaid(model: SystemModel) -> str:
     crossings = crossings_by_flow(model)
     for at, flow in enumerate(model.data_flows):
         lines.append(
-            f"    {ids[flow.source]} -->|{_label(_flow_label(flow))}|"
+            f"    {ids[flow.source]} -->|{_label(_edge_text(flow))}|"
             f" {ids[flow.destination]}"
         )
         if flow.id in crossings:

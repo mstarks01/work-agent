@@ -24,7 +24,7 @@ the band and the units a capability could settle, the prior per choice for a
 field question. What each answer would settle breaks a tie, and is published
 on the row (:mod:`analysis_service.answer_effects`). A question answered in part is
 listed before any new question, outside the limit, and where the limits hold
-questions back the job says so (:attr:`QuestionSet.stop`). A question that
+questions back the job says so (:attr:`QuestionSet.empty_list_reason`). A question that
 decides whether a selected framework runs at all comes first, outside the
 limits (ADR 0067), and the set says what each framework's precondition reads
 now (:attr:`QuestionSet.gates`). A part of a capability waits on its parent
@@ -138,6 +138,7 @@ __all__ = [
     "BandApplicability",
     "Carried",
     "EarlyRule",
+    "EmptyListReason",
     "MissingRevision",
     "PauseSummary",
     "PolicyVersion",
@@ -149,7 +150,6 @@ __all__ = [
     "SavedDraft",
     "SourcesOverLimit",
     "StaleRevision",
-    "Stop",
     "by_turn",
     "passes_floor",
     "question_set",
@@ -190,8 +190,8 @@ EARLY_RULES: Mapping[str, EarlyRule] = {
 }
 
 
-#: Why a waiting job asks nothing more (:attr:`QuestionSet.stop`, ADR 0068).
-Stop = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
+#: Why a waiting job asks nothing more (:attr:`QuestionSet.empty_list_reason`, ADR 0068).
+EmptyListReason = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
 
 #: Why a carried fact answer is not taken (:meth:`Carried.reason`, ADR 0116).
 CarriedReason = Literal["missing-element", "not-taken"]
@@ -317,9 +317,9 @@ class BandApplicability:
 class PauseSummary:
     """What a waiting job asked, and what it leaves open (#1542 F2, F5).
 
-    **No count here says a fact is settled that is not.** A stop of
-    :attr:`QuestionSet.stop` says why the list asks nothing more; this says
-    what remains. The counts are of different things, kept apart:
+    **No count here says a fact is settled that is not.**
+    :attr:`QuestionSet.empty_list_reason` says why the list asks nothing more;
+    this says what remains. The counts are of different things, kept apart:
 
     * ``recommended`` is the questions the list holds now, and
       ``recommended_choices`` the choices left to answer them: one a facet
@@ -438,10 +438,10 @@ class QuestionSet:
     effects: Mapping[UnknownKey, Effect] = field(default_factory=dict)
 
     @property
-    def stop(self) -> Stop | None:
+    def empty_list_reason(self) -> EmptyListReason | None:
         """Why a waiting job asks nothing more, or ``None`` while it asks.
 
-        **No stop says every fact is settled.** ``budget-exhausted`` where the
+        **No reason says every fact is settled.** ``budget-exhausted`` where the
         limits hold questions back, ``below-floor`` where only questions under
         a floor are left, ``skipped`` where every question left was skipped,
         and ``nothing-left`` where no open question is left to ask. In each
@@ -525,7 +525,7 @@ class QuestionSet:
             "final": self.final,
             "resumed_by": self.resumed_by,
             "policy_version": POLICY_VERSION,
-            "early_stop": self.stop,
+            "early_stop": self.empty_list_reason,
             "early_blocked": [listed(*blocked) for blocked in self.blocked],
             "early_unnecessary": [listed(*moot) for moot in self.unnecessary],
             "early_held_back": [
@@ -590,9 +590,9 @@ class QuestionSet:
         (:func:`_adds_information`), so it does not go to a run that reads
         nothing new.
 
-        **Each share writes one answer for each part it covers** (ADR 0114),
-        and that answer is admitted as any other. A share that takes a part
-        back removes the answer it wrote (:func:`~analysis_service.answer_shares.merged_shares`).
+        **Each share writes one answer for each element it covers** (ADR
+        0114), and that answer is admitted as any other. A share that takes an
+        element back removes the answer it wrote (:func:`~analysis_service.answer_shares.merged_shares`).
         """
         if self.resumed_by is not None:
             raise AlreadyResumed(
@@ -1222,10 +1222,10 @@ def recommended(
     place = {question.key: index for index, question in enumerate(listed)}
     # What the saved answers charged each framework: a question's choices,
     # to every framework it served. The turns start from here, not from zero.
-    spent: Counter[str] = Counter()
+    charged: Counter[str] = Counter()
     for key, served in answered_for.items():
         for name in served:
-            spent[name] += len(answer_facets(key)) or 1
+            charged[name] += len(answer_facets(key)) or 1
 
     def rank(question: EarlyQuestion) -> tuple[float, float, float, int, int]:
         # The list's own order first: a capability's standing, a field
@@ -1259,7 +1259,7 @@ def recommended(
             (question for question in eligible if question.key not in answered_for),
             key=rank,
         )
-        for question in by_turn(fresh, spent):
+        for question in by_turn(fresh, charged):
             slot = limit_place(question.key)
             if rule.limit is None or any(
                 slot in counted[name] or len(counted[name]) < rule.limit
@@ -1273,7 +1273,11 @@ def recommended(
         shown += [*started, *taken]
         for question in started:
             again.update(dict.fromkeys(question.frameworks, question.decisions))
-    return grouped((*gates, *by_turn(shown, spent - again))), blocked, tuple(held_back)
+    return (
+        grouped((*gates, *by_turn(shown, charged - again))),
+        blocked,
+        tuple(held_back),
+    )
 
 
 def limit_place(key: UnknownKey) -> UnknownKey | str:

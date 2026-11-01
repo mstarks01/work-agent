@@ -45,7 +45,7 @@ where things go to be forgotten.
 
 `UNREVIEWED` keeps only the first half. A sitting pull request carries one
 file under `evals/review/submissions` and cannot delete the entry for its
-case, so a spent entry does not fail. Delete it in the next pull request.
+case, so an entry for a read case does not fail. Delete it in the next pull request.
 
 One distinction the entries have to make, and `UNREVIEWED` states it: `UNEXERCISED`
 means *the omission is correct*, while `UNREVIEWED` means *nobody has read this

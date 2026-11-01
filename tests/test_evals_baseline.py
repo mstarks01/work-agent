@@ -616,7 +616,7 @@ class TestAGatewayRouteCarriesNoUnitPrice:
         """The rule answers for a route, and declines to invent a vendor.
 
         A bare build identifier and a prefix no vendor claims both reach the
-        map as before. Refusing them here would un-price the fallback that
+        map. Refusing them here would un-price the fallback that
         :func:`prices._bare_name` exists to serve.
         """
         assert not prices._routes_to_many_providers("gemini-2.5-pro")

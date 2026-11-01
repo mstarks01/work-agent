@@ -265,9 +265,9 @@ def test_the_readers_path_is_repo_relative():
     )
 
 
-#: The case the reclassification tests spend. The corpus holds it out, and
+#: The case the reclassification tests exhaust. The corpus holds it out, and
 #: the tests read only its flag and a synthetic ledger, never its outputs.
-SPENT = "14-loyalty-oauth-platform"
+EXHAUSTED = "14-loyalty-oauth-platform"
 
 
 def _reads(case: str, count: int) -> list[audit.Experiment]:
@@ -295,9 +295,9 @@ def _reads(case: str, count: int) -> list[audit.Experiment]:
 
 @pytest.fixture
 def exhausted(tmp_path, monkeypatch):
-    """A ledger that read :data:`SPENT` the full ``HOLDOUT_READS`` times."""
+    """A ledger that read :data:`EXHAUSTED` the full ``HOLDOUT_READS`` times."""
     ledger = tmp_path / "experiments"
-    for row in _reads(SPENT, audit.HOLDOUT_READS):
+    for row in _reads(EXHAUSTED, audit.HOLDOUT_READS):
         audit.append(row, ledger)
     monkeypatch.setattr(audit, "EXPERIMENTS_DIR", ledger)
     return ledger
@@ -320,44 +320,44 @@ class TestTheOneReader:
         self, flagged, reads, expected
     ):
         assert (
-            audit.held_out(SPENT, flagged=flagged, ledger=_reads(SPENT, reads))
+            audit.held_out(EXHAUSTED, flagged=flagged, ledger=_reads(EXHAUSTED, reads))
             is expected
         )
 
     def test_exhaustion_counts_each_case_apart(self):
-        ledger = _reads(SPENT, audit.HOLDOUT_READS)
+        ledger = _reads(EXHAUSTED, audit.HOLDOUT_READS)
 
-        assert audit.exhausted(ledger) == {SPENT: audit.HOLDOUT_READS}
-        assert audit.still_held_out({SPENT, "15-multitenant-invoicing"}, ledger) == {
-            "15-multitenant-invoicing"
-        }
+        assert audit.exhausted(ledger) == {EXHAUSTED: audit.HOLDOUT_READS}
+        assert audit.still_held_out(
+            {EXHAUSTED, "15-multitenant-invoicing"}, ledger
+        ) == {"15-multitenant-invoicing"}
 
 
 class TestEverySiteAsksTheOneReader:
     """Each site that splits development from held-out agrees with ``held_out``.
 
-    Each test drives one site over a ledger that exhausted :data:`SPENT`, so a
+    Each test drives one site over a ledger that exhausted :data:`EXHAUSTED`, so a
     site that reads the corpus flag alone keeps the case held out and fails.
     """
 
     def test_the_reader_itself(self, exhausted):
-        assert not audit.held_out(SPENT, flagged=True)
+        assert not audit.held_out(EXHAUSTED, flagged=True)
 
     def test_a_diagnosis_reads_an_exhausted_case(self, exhausted):
-        case = load_case(CORPUS / SPENT)
+        case = load_case(CORPUS / EXHAUSTED)
 
         assert diagnosable(case)
-        assert SPENT in {one.id for one in development_cases(load_corpus(CORPUS))}
-        refuse_holdout(SPENT)
+        assert EXHAUSTED in {one.id for one in development_cases(load_corpus(CORPUS))}
+        refuse_holdout(EXHAUSTED)
 
     def test_the_corpus_still_names_its_flagged_holdouts(self, exhausted):
         """The flag is the corpus's fact, and the ledger never rewrites it."""
-        assert SPENT in audit.holdout_cases()
+        assert EXHAUSTED in audit.holdout_cases()
 
     def test_the_stride_split_counts_it_as_development(self, exhausted):
         scores = [
             _stride("a", False, 0.8),
-            _stride(SPENT, True, 0.2),
+            _stride(EXHAUSTED, True, 0.2),
             _stride("c", True, 0.3),
         ]
 
@@ -374,7 +374,7 @@ class TestEverySiteAsksTheOneReader:
 
         scores = [
             Score("a", False, 0.5),
-            Score(SPENT, True, 1.0),
+            Score(EXHAUSTED, True, 1.0),
             Score("c", True, 0.25),
         ]
 
@@ -386,7 +386,7 @@ class TestEverySiteAsksTheOneReader:
     def test_an_artifact_split_counts_it_as_development(self, exhausted):
         blocks = {
             "scores": [
-                {"case": SPENT, "holdout": True},
+                {"case": EXHAUSTED, "holdout": True},
                 {"case": "c", "holdout": True},
             ]
         }
@@ -397,21 +397,21 @@ class TestEverySiteAsksTheOneReader:
 
     def test_a_paired_reading_opens_an_exhausted_case(self, exhausted, tmp_path):
         """``paired`` skips a held-out report unopened; an exhausted one is read."""
-        (tmp_path / f"{SPENT}.report.json").write_text("not JSON")
+        (tmp_path / f"{EXHAUSTED}.report.json").write_text("not JSON")
 
         with pytest.raises(ValueError):
             early_policies.paired(tmp_path)
 
     def test_the_exposure_listing_says_exhausted(self, exhausted):
-        printed = "\n".join(audit.render_exposure({SPENT}, audit.load()))
+        printed = "\n".join(audit.render_exposure({EXHAUSTED}, audit.load()))
 
         assert f"read {audit.HOLDOUT_READS} of {audit.HOLDOUT_READS} times" in printed
         assert "exhausted" in printed
         assert "development" in printed
 
     def test_the_scorer_prints_it_as_exhausted(self, exhausted, capsys):
-        scorer.render([_stride("a", False, 0.8), _stride(SPENT, True, 0.2)])
+        scorer.render([_stride("a", False, 0.8), _stride(EXHAUSTED, True, 0.2)])
 
         printed = capsys.readouterr().out
-        assert SPENT in printed
+        assert EXHAUSTED in printed
         assert f"read {audit.HOLDOUT_READS} times" in printed

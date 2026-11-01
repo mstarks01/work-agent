@@ -385,7 +385,7 @@ the line `%% Shapes: ...` in a diagram from **Download as Mermaid** does. The
 page holds one transcript and one diagram, and **Remove** takes each one off
 the form.
 
-The service reads a flowchart or an `architecture-beta` diagram with
+The service reads a `flowchart`, `graph` or `architecture-beta` diagram with
 Mermaid's own parsers. Extraction then models every node as an element and
 every edge as a flow, and the model decides what each one is. An element
 takes its node's label as its name, or the part of the label before a colon

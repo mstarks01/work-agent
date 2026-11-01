@@ -959,16 +959,16 @@
     if (!left) {
       const ready = document.createElement("p");
       ready.className = "hint";
-      // The service's own stop reason decides the sentence (QuestionSet.stop).
-      // No stop says every fact is settled, so the page lists what stays open.
-      const stops = {
+      // The service's own reason decides the sentence (QuestionSet.empty_list_reason).
+      // No reason says every fact is settled, so the page lists what stays open.
+      const emptyListReasons = {
         "budget-exhausted": `The question limit is reached, so ${counted((data.early_held_back || []).length,
           "more question is", "more questions are")} not in the list. `,
         "below-floor": "No recommended question is left. ",
         "skipped": "You skipped every question that is left. ",
         "nothing-left": "No question is left to ask. ",
       };
-      ready.textContent = stops[data.early_stop]
+      ready.textContent = emptyListReasons[data.early_stop]
         + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
       intro.append(ready);
     }
@@ -1025,7 +1025,7 @@
   // FIRST_BATCH choices, once, and leaves the rest closed with their counts.
   // A prototype (#2029 package 8): owner testing (#1286) decides the size. It
   // hides no row, so a skip, "no to the rest" and the questions recorded as
-  // shown read the same rows as before.
+  // shown read every row of the list.
   const FIRST_BATCH = 3;
   let batchOpened = false;
   const openFirstBatch = () => {
@@ -1339,7 +1339,7 @@
 
   // ---- Showing the list ---------------------------------------------------
   const showQuestions = (data) => {
-    // The service says whether the pause asks anything more (QuestionSet.stop).
+    // The service says whether the pause asks anything more (QuestionSet.empty_list_reason).
     const left = data.early_stop == null;
     const saved = (data.answered_early || []).length || (data.answered_links || []).length
       || (data.skipped_early || []).length || (data.skipped_links || []).length;

@@ -813,7 +813,7 @@ def _claim_order(claim: RuledClaim) -> tuple[int, str]:
 
 #: Draft fields no critic rules on, so no critic is shown them. **Empty**, and
 #: the constant stays because what belongs in it is a live question: every field
-#: here is prompt budget spent on judgement nobody asked for, and every field
+#: here takes prompt space for a judgement nobody asked for, and every field
 #: wrongly here is a judgement nobody can make.
 #:
 #: ``mitigations`` sat here while the critic ruled only on a draft's argument.

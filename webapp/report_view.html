@@ -291,10 +291,10 @@
   #nodes th:nth-child(3) { width: 14%; }
   #question-refs th:first-child { width: 8%; }
 
-  /* Spacing that used to ride in style="" attributes. The report page runs
+  /* Spacing as classes, never as style="" attributes. The report page runs
      under a strict nonce CSP with no 'unsafe-inline', which blocks inline
-     style attributes; a class costs nothing and a generated one-off colour
-     goes through element.style.* instead, which CSP does not govern. */
+     style attributes, so a fixed spacing is a class and a generated one-off
+     colour goes through element.style.*, which CSP does not govern. */
   .about-list { margin: 0 0 14px; padding-left: 20px; font-size: 0.88rem; color: var(--ink-2); }
   .about-list li { margin: 4px 0; }
   #model-gaps th:nth-child(1) { width: 26%; }

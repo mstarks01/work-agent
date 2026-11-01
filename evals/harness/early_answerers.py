@@ -22,7 +22,7 @@ without an answer to the part, which is what the effects count. Both are
 counts of dependency sets, never of findings an answer changes.
 
 **Effort is choices**: one for each facet of a question with facets, one for
-every other question, and one for a skip. Each save spends at least one
+every other question, and one for a skip. Each save takes at least one
 choice, so the largest budget bounds the walk, and each smaller budget reads a
 prefix of the same walk.
 
@@ -169,11 +169,11 @@ def _save(
 @dataclass(frozen=True)
 class Step:
     """One listed question of a walk, its answer or ``None`` for a skip, and
-    the choices spent with it."""
+    the choices the walk took up to and with it."""
 
     key: UnknownKey
     answer: FactAnswer | None
-    spent: int
+    choices: int
 
 
 @dataclass(frozen=True)
@@ -181,12 +181,12 @@ class Walk:
     """One list answered from the top, one question a save."""
 
     steps: tuple[Step, ...]
-    #: The list asked nothing more before the walk spent its budget.
+    #: The list asked nothing more before the walk reached its budget.
     ended: bool
 
     def within(self, budget: int) -> tuple[Step, ...]:
         """The steps taken within ``budget`` choices."""
-        return tuple(step for step in self.steps if step.spent <= budget)
+        return tuple(step for step in self.steps if step.choices <= budget)
 
 
 def walk(
@@ -198,14 +198,14 @@ def walk(
     budget: int = max(BUDGETS),
 ) -> Walk:
     """Answer or skip the first listed question and save, until ``budget``
-    choices are spent or the list ends. Each save reads the list again, as the
-    page does, and spends at least one choice, so ``budget`` bounds the saves."""
+    choices are taken or the list ends. Each save reads the list again, as the
+    page does, and takes at least one choice, so ``budget`` bounds the saves."""
     answered: list[FactAnswer] = []
     skipped: list[SkipKey] = []
     steps: list[Step] = []
-    spent = 0
+    choices = 0
     with policy(effects):
-        while spent < budget:
+        while choices < budget:
             state = paused_state(model, frameworks, answered, skipped)
             asked = state.questions
             if asked.done:
@@ -214,13 +214,13 @@ def walk(
             reply = answerer(question)
             if reply is None:
                 saved = _save(state, [], skips=[question.key], presented=[question.key])
-                spent += 1
+                choices += 1
             else:
                 saved = _save(state, [reply], presented=[question.key])
-                spent += question.decisions
+                choices += question.decisions
             answered = list(saved.answers.facts)
             skipped = list(saved.skipped)
-            steps.append(Step(key=question.key, answer=reply, spent=spent))
+            steps.append(Step(key=question.key, answer=reply, choices=choices))
     return Walk(steps=tuple(steps), ended=False)
 
 
@@ -235,7 +235,7 @@ class Reading:
     answerer: str
     selected: str
     budget: int
-    #: The choices spent, the questions answered and the questions skipped
+    #: The choices taken, the questions answered and the questions skipped
     #: within the budget.
     choices: int
     asked: int
@@ -356,7 +356,7 @@ def _read(
     unnecessary = {question.key for question, _ in before.unnecessary}
     unnecessary_after = {question.key for question, _ in after.unnecessary}
     return {
-        "choices": steps[-1].spent if steps else 0,
+        "choices": steps[-1].choices if steps else 0,
         "asked": len(answers),
         "skipped": len(skips),
         "findings": len(needs.findings),

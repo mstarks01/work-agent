@@ -56,12 +56,11 @@
 # so a deployment still carrying v2's ANALYSIS_MODEL_FLASH fails loudly instead of
 # being silently ignored.
 #
-# NOTHING IS SELECTED BY DEFAULT, and that is the point. Earlier versions of
-# this file shipped two Gemini models on Vertex, which made "no privileged
-# default" true of the *mechanism* while the values said otherwise — the vendor
-# you got by doing nothing was Google's. Both tier tables are now absent, so a
-# run that has not chosen stops and says so rather than reaching a vendor nobody
-# picked. Every vendor is reached through one adapter and they differ only in
+# NOTHING IS SELECTED BY DEFAULT, and that is the point. A default model would
+# make "no privileged default" true of the *mechanism* while the values said
+# otherwise: the vendor you got by doing nothing would be that model's vendor.
+# The file holds no tier table, so a run that has not chosen stops and says so
+# rather than reaching a vendor nobody picked. Every vendor is reached through one adapter and they differ only in
 # the credential mode each implies; none is cheaper to select than the others.
 
 version = 9

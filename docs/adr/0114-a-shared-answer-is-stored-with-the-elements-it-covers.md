@@ -1,21 +1,21 @@
-# 114. A shared answer is stored with the parts it covers
+# 114. A shared answer is stored with the elements it covers
 
 - **Status**: accepted
 - **Date**: 2026-10-31
 - **Effort**: [#2029](https://github.com/mstarks01/work-agent/issues/2029) (package 2, second step)
 - **Relates to**: [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md),
-  [ADR 0113](0113-a-shared-answer-covers-the-parts-a-person-ticks.md), whose
-  ticked parts this stores, and
+  [ADR 0113](0113-a-shared-answer-covers-the-elements-a-person-ticks.md), whose
+  ticked elements this stores, and
   [ADR 0070](0070-a-follow-up-saves-a-draft-in-batches.md), whose draft holds
   shares too
 
 ## Context
 
-A page asks a box of same-shape questions once, and a person ticks the parts
+A page asks a box of same-shape questions once, and a person ticks the elements
 the answer covers (ADR 0113). The page sent one ordinary answer for each
-ticked part. After a save, the service could not tell a shared answer from
+ticked element. After a save, the service could not tell a shared answer from
 separate answers, so a reload, a resume, the API and an export lost which
-parts the answer covered and which parts were exceptions.
+elements the answer covered and which elements were exceptions.
 
 A job's fact answers have 37 readers in 8 files: admission, a report's
 conditions, the answers Source, carried answers, the API and others.
@@ -28,7 +28,7 @@ key is the question's shape with the element left empty, and `covers`, the
 exact elements it covers. A request body carries `shares`, and the questions
 route returns `answered_shares` and `draft_shares`.
 
-**The service writes each covered part's answer when it admits the share.**
+**The service writes each covered element's answer when it admits the share.**
 Admission expands each share into one fact answer for each covered element,
 and checks each one as any other answer. So the 37 readers stay as they are,
 and each reads a covered element's answer as that element's own. The other
@@ -54,15 +54,15 @@ answer, such as `held_answers`.
 
 ## Consequences
 
-Both pages send a box's answer as one share of the parts ticked, and a part
-the saved share covers keeps holding it while the box does not list it. The
-first-run page shows a covered part under "Your answers", marked as a shared
+Both pages send a box's answer as one share of the elements ticked, and an
+element the saved share covers keeps holding it while the box does not list it. The
+first-run page shows a covered element under "Your answers", marked as a shared
 answer. The report page restores each box from the draft's shares over the
-shares its run read. Beside each shared answer a line names the parts it
-covers, and "Undo" puts back the answer before its last change and each part
+shares its run read. Beside each shared answer a line names the elements it
+covers, and "Undo" puts back the answer before its last change and each element
 that change wrote. The report export prints an answer a share wrote as one
-shared answer with its count of parts; a correction to a final report is its
-part's own answer.
+shared answer with its count of elements; a correction to a final report is its
+element's own answer.
 
 A job that carries another job's answers (ADR 0079) or an amendment's new job
 (ADR 0072) carries each covered element's answer, not the share. A correction

@@ -938,9 +938,9 @@ def render(scores: Sequence[CaseScore]) -> None:
                 f" {split['holdout_must_find_coverage']:.2f}"
                 f" vs development {split['development_must_find_coverage']:.2f}"
             )
-        spent = audit.exhausted_line(score.case_id for score in scores if score.holdout)
-        if spent:
-            print(spent)
+        line = audit.exhausted_line(score.case_id for score in scores if score.holdout)
+        if line:
+            print(line)
 
 
 def published(blocks: Mapping[str, Any], metric: str, cases: Cases) -> float | None:

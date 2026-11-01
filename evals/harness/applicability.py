@@ -440,8 +440,8 @@ def satisfies(
     may hold that a response header is settled by application code or by
     infrastructure configuration; either reading is right, and scoring the one
     the corpus did not write down as wrong punishes a defensible run (#659).
-    Every route is tried, and one hit is enough. A record naming none behaves
-    exactly as before.
+    Every route is tried, and one hit is enough. A record naming none is scored on
+    its one route.
 
     **``carried`` is read, never assumed**, and that is the whole reason this is
     a function rather than a lookup table. Which kinds of evidence become a

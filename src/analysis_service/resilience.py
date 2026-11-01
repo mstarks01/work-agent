@@ -79,7 +79,7 @@ one process-wide token bucket that successful requests credit, so the service
 caps them at a share of working traffic rather than at a count per node.
 Correlated failure is the only kind that storms, and it empties the bucket once
 for everyone, after which the service stops retrying. An isolated failure sees a
-full bucket and is retried as before. Turning ``attempts`` down during an
+full bucket and is retried. Turning ``attempts`` down during an
 incident still works and is still the blunt instrument. The budget is what makes
 that rarely necessary.
 

@@ -167,13 +167,10 @@ jobs:
     # a resolved identity alone is not enough, because `vertex_project` and
     # `vertex_location` address the request and LiteLlm needs both.
     #
-    # These replace GOOGLE_CLOUD_PROJECT / GOOGLE_CLOUD_LOCATION /
-    # GOOGLE_GENAI_USE_VERTEXAI, which this workflow set from 2026-07-21 until
-    # this commit. Those configured ADK's *native* Gemini client; the
-    # multi-vendor cutover (#8, #9, 2026-07-28) replaced it with the sole
-    # LiteLlm adapter reading the registry, so nothing has read them since.
-    # Setting three variables no code reads while omitting the two it requires
-    # is why the sweep has never completed a run.
+    # Do not set GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION or
+    # GOOGLE_GENAI_USE_VERTEXAI. They configure ADK's *native* Gemini client,
+    # and every vendor runs through the one LiteLlm adapter that reads the
+    # registry (#8, #9), so no code reads them.
     #
     # Those two are the whole required set. Vertex runs under the `iam`
     # credential mode and passes no credential material: the auth action below

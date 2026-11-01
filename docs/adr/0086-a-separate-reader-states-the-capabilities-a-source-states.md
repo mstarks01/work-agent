@@ -61,7 +61,7 @@ case (`14-loyalty-oauth-platform` and `15-multitenant-invoicing`), **at least
 maintainer rules every statement in a ballot of the same form as
 `QA-2026-10-14-01`'s. A run that states nothing on a holdout case leaves the
 gate unread, never passed. Each holdout case has one read left, and this read
-spends it.
+uses it.
 
 ## Consequences
 

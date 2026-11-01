@@ -594,7 +594,7 @@ unfindable quote is: merge has no re-ask path, and a whole report is too much to
 trade for a mistyped ID in a sentence.
 
 The mark is worth more than typo-catching. The analyze prompt is built around a
-single worked exemplar system and spends a section telling the agent never to
+single worked exemplar system and uses a section to tell the agent never to
 cite that system's IDs. A description arguing about `process:web-api` in a job
 whose model has no such element is that contamination reaching the one field a
 reader reads as ordinary analysis.
@@ -648,7 +648,7 @@ every `ValidationIssue` is fatal, and an empty list *is* the definition of
 ready-for-analysis the graph routes on — and this does not deserve that,
 because it is not always wrong. A system can legitimately run a process and
 keep a store of the same name. Failing extraction on the pair would reject a
-valid model, and would spend `repair`'s single pass telling a transcriber to
+valid model, and would use `repair`'s single pass to tell a transcriber to
 rename something correct. So it is reported to the reader and to nobody else:
 it never reaches `repair`, which is told to change nothing the issues do not
 cite.
