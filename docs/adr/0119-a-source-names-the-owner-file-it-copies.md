@@ -54,8 +54,11 @@ Each keeps `owner_file_id` and the copied text, and neither reads the store
 again. A follow-up job with `answers_from` carries no Sources, so an Owner
 File that the owner selects again gives the current text. When the web app
 opens an analysis again, the payload does not join an Owner File Source's
-text into `description`. It lists the IDs of those Sources under
-`owner_files`.
+text into `description`. It lists the ID, the label and the kind of each of
+those Sources under `owner_files`, and the read-only form shows the label and
+the kind of each one under "Files used". The list comes from the job's own
+Sources, so it stays correct after the owner deletes or replaces the Owner
+File.
 
 ## Considered options
 
@@ -78,5 +81,6 @@ text into `description`. It lists the IDs of those Sources under
 A delete or a new upload of an Owner File changes no job, no Resumed Job and
 no Amendment. A Submission that names a deleted Owner File is refused. `/v1`
 can get `owner_files` later as a thin route, because the reader lives in
-`analysis_service`. The prototype of the page (#2062) decides how the form
-shows the selected Owner Files of an analysis that opens again.
+`analysis_service`. An analysis that opens again shows the name that each
+Owner File had when its job ran, which can differ from the current name in
+Files.

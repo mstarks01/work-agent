@@ -6,7 +6,9 @@
   Owner File map [#2057](https://github.com/mstarks01/work-agent/issues/2057)
 - **Relates to**: [ADR 0118](0118-an-owner-file-is-an-object-and-a-row.md), which
   stores the format of an **Owner File**; [ADR 0119](0119-a-source-names-the-owner-file-it-copies.md),
-  which gives a **Source** no format field
+  which gives a **Source** no format field;
+  [ADR 0121](0121-mermaid-s-own-parsers-read-a-diagram-s-structure.md), whose
+  reader reads a flowchart and an `architecture-beta` diagram
 
 ## Context
 
@@ -55,12 +57,15 @@ refuses a value that is not in the table. The server then refuses a kind that
 the row does not allow. The direct upload sends a kind and no format, the same
 as today.
 
-**A `diagram` Source must be a Mermaid flowchart.** The check finds the first
-line that is not blank, does not start with `%%` and is not in a leading `---`
-front matter block. The first word of that line must be `flowchart` or
-`graph`. The `Source` model runs the check for each `diagram` Source, so the
-direct upload, the Files upload and `/v1` read one rule. The JS has no copy of
-the check, and the page shows the server's message.
+**A `diagram` Source must be a diagram type that the reader of ADR 0121
+reads.** The check finds the first line that is not blank, does not start
+with `%%` and is not in a leading `---` front matter block. The first word of
+that line must be `flowchart`, `graph` or `architecture-beta`. The `Source`
+model runs the check for each `diagram` Source, so the direct upload, the
+Files upload and `/v1` read one rule. The JS has no copy of the check, and the
+page shows the server's message. `diagram_reader/read.mjs` holds the same
+header test, because the reader runs in Node. A test runs both on one set of
+headers and checks that they agree.
 
 **The extension rule moves into the table.** The JS finds the row from the
 file extension, without regard to case. The direct upload uses the default
@@ -74,14 +79,14 @@ hand-written `accept` value go away.
   Python table.** Rejected: each copy is a second reader, and the `accept`
   attribute is then a third copy.
 - **A new module for the table.** Rejected: the table reads `SourceKind`, and
-  the flowchart check sits beside the `diagram` register.
+  the diagram type check sits beside the `diagram` register.
 - **The browser sends the extension, and the server finds the row.**
   Rejected: then the extension lookup runs in the JS and in the Python.
 - **The format with no syntax check.** Rejected: the server then stores a
   `diagram` that the register cannot read.
-- **Any Mermaid diagram type passes.** Rejected: the register and
-  QA-2026-10-31-03 cover flowcharts only.
-- **Only the Files upload runs the flowchart check.** Rejected: that is a
+- **Any Mermaid diagram type passes.** Rejected: the reader of ADR 0121 reads
+  the structure of a flowchart and an `architecture-beta` diagram only.
+- **Only the Files upload runs the diagram type check.** Rejected: that is a
   second rule, and a direct upload then carries a text that Files refuses.
 - **A file with no row falls back to `text/plain`.** Rejected: the table is
   then not a closed set, and each text file passes without a row.
@@ -97,14 +102,14 @@ UTF-8 text. So the format check only finds a request where the kind and the
 format disagree. A later image format needs a byte check on the server, and
 that row adds it.
 
-`/v1` refuses a `diagram` Source that is not a flowchart. The `diagram` kind
-merged in #2056 on 2026-10-31, and the build changes `docs/HTTP-API.md`. A
+`/v1` refuses a `diagram` Source that is neither a flowchart nor an
+`architecture-beta` diagram, and the build changes `docs/HTTP-API.md`. A
 stored `diagram` Source that fails the check also fails to parse when a job
-reads it. Only a record from 2026-10-31 can hold such a Source. A test runs
-the check on each file in `evals/diagrams/` and on the output of
+reads it. Only a record made before the check can hold such a Source. A test
+runs the check on each file in `evals/diagrams/` and on the output of
 `mermaid.py`.
 
 The direct upload refuses a file that it accepts today, such as `notes.md` or
-a file with no extension. The direct upload shows a flowchart error when the
+a file with no extension. The direct upload shows a diagram type error when the
 person selects "Prepare analysis", not when the person selects the file. The
 Files upload shows the error at the upload.
