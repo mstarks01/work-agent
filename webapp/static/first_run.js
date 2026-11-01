@@ -309,7 +309,7 @@
     const active = document.activeElement;
     return Boolean(active && typeof node.contains === "function" && node.contains(active));
   };
-  // A part that holds its box's shared answer waits on the box's share.
+  // An element that holds its box's shared answer waits on the box's share.
   const dirty = (row) => edits.has(rowKey(row))
     || Boolean(row.inherited && edits.has(shareKey(row.q.key)));
   // A row the page must not rebuild: the submitter is editing it, or its edit is
@@ -358,7 +358,7 @@
     return parts.length ? parts.join("; ") : null;
   };
   // The lines under a question's "?": why it is asked, what it serves, what
-  // each answer does, and the submitter's own words about the part.
+  // each answer does, and the submitter's own words about the element.
   const contextOf = (q) => {
     const parts = [];
     if ((q.reasons || []).length) parts.push(`Why: ${q.reasons[0]}`);
@@ -437,8 +437,7 @@
     const count = { facts: 0, links: 0, skips: 0 };
     for (const [key, edit] of sendable()) {
       const need = { facts: 0, links: 0, skips: edit.skip ? 1 : 0 };
-      // Each part a share covers counts as one fact answer (ADR 0114).
-      if (edit.kind === "share") need.facts = edit.answer.covers.length;
+      if (edit.kind === "share") need.facts = coveredCount([edit.answer]);
       else if (edit.answer) need[edit.kind === "link" ? "links" : "facts"] = 1;
       const over = Object.keys(need).some((kind) => count[kind] + need[kind] > ANSWER_LIMITS[kind]);
       if (over) continue;
@@ -639,7 +638,7 @@
     const key = shareKey(row.q.key);
     const base = answersOf(view || {}).get(key) || null;
     const share = shareOf(row.box, base);
-    if (!share || sameShare(share, base) || (!share.covers.length && !base)) {
+    if (!shareChanged(share, base)) {
       edits.delete(key);
       return false;
     }
@@ -651,7 +650,7 @@
   const registerEdit = (row) => {
     const shared = Boolean(row.kind === "fact" && row.box && row.box.shared);
     const boxChanged = shared && registerShare(row);
-    // A part that holds the shared answer sends no answer of its own: the
+    // An element that holds the shared answer sends no answer of its own: the
     // box's share carries it.
     if (row.inherited) {
       edits.delete(rowKey(row));
@@ -995,9 +994,9 @@
 
   // ---- Carried answers ----------------------------------------------------
   // Answers this run carried from an earlier one and could not take
-  // (AnswerState.carried, ADRs 0072 and 0079). An answer about a part this
-  // model does not have can follow the part to its new name, where the
-  // submitter says which part it is now (ADR 0116). Nothing is matched by a
+  // (AnswerState.carried, ADRs 0072 and 0079). An answer about an element this
+  // model does not have can follow the element to its new name, where the
+  // submitter says which element it is now (ADR 0116). Nothing is matched by a
   // similar name.
   const plainList = (lines) => {
     const items = document.createElement("ul");
@@ -1041,7 +1040,7 @@
     const renames = (data.carried_renames || []).map(({ earlier, element }) => ({ earlier, element }));
     carried.replaceChildren();
     // The change review: what this run kept from the earlier analysis, what
-    // it did not keep, and what waits for the submitter to choose a part.
+    // it did not keep, and what waits for the submitter to choose an element.
     const kept = (data.carried_kept || []).length + (data.carried_kept_links || []).length;
     const waiting = dropped.filter((a) => a.reason === "missing-element").length;
     const notKept = dropped.length - waiting + (data.carried_dropped_links || []).length;
@@ -1064,7 +1063,7 @@
       carried.append(line);
     }
     for (const { earlier, choices } of data.rename_choices || []) {
-      const about = dropped.filter((a) => a.key[0] === earlier);
+      const about = dropped.filter((a) => keyRef(a.key).element_id === earlier);
       if (!about.length) continue;
       const box = document.createElement("div");
       box.className = "rename";
@@ -1116,7 +1115,7 @@
     if (tailDrawn) return;
     tailDrawn = true;
     // What the extraction read from the description (detected_facts): each
-    // part with the facts stated about it and the words they came from, so a
+    // element with the facts stated about it and the words they came from, so a
     // wrong fact is seen before the analysis. Read only: the amendment below
     // corrects one.
     const detected = data.detected_facts || [];
@@ -1143,7 +1142,7 @@
       }
       tail.append(review);
     }
-    // An amendment to the description itself: a part missing, or a fact read
+    // An amendment to the description itself: an element missing, or a fact read
     // wrongly. The service reads the description again with it, asks again,
     // and keeps every answer that still fits (ADR 0072).
     const fix = document.createElement("details");
@@ -1191,7 +1190,7 @@
   // "Answer it" and "Change" build an editor only when pressed.
   const drawBoxes = (data) => {
     const held = answersOf(data);
-    const covered = sharedKeys(data.answered_shares || []);
+    const covered = sharesByKey(data.answered_shares || []);
     // The answers the earlier analysis gave, which this run kept (ADR 0079).
     const carriedKeys = new Set([
       ...(data.carried_kept || []).map(questionKey),
@@ -1211,7 +1210,7 @@
       const kept = document.createElement("span");
       if (before) {
         kept.textContent = ` — ${kind === "link" ? linkAnswerText(before) : answerText(before)}`;
-        // Changing it here makes it this part's own answer (ADR 0114).
+        // Changing it here makes it this element's own answer (ADR 0114).
         if (covered.has(key)) kept.textContent += " (shared answer)";
         // Changing it here makes it this run's own answer.
         if (carriedKeys.has(key)) kept.textContent += " (from the earlier analysis)";

@@ -1,22 +1,22 @@
-"""A shared answer: one answer a person gives once for each part it covers (ADR 0114).
+"""A shared answer: one answer a person gives once for each element it covers (ADR 0114).
 
-A page asks a box of same-shape questions once, and a person ticks the parts
+A page asks a box of same-shape questions once, and a person ticks the elements
 the answer covers (ADR 0113). :class:`SharedAnswer` stores that answer with
-the exact parts it covers, so a reload, a resume, the API and the export keep
+the exact elements it covers, so a reload, a resume, the API and the export keep
 the coverage and its exceptions.
 
-**The service writes each covered part's answer when it admits the share.**
-:meth:`SharedAnswer.facts` gives one fact answer for each covered part, and
+**The service writes each covered element's answer when it admits the share.**
+:meth:`SharedAnswer.facts` gives one fact answer for each covered element, and
 admission checks each one as it checks any other. So every reader of a job's
-fact answers reads a covered part's answer as that part's own, and nothing
+fact answers reads a covered element's answer as that element's own, and nothing
 else reads a share to learn a fact.
 
-**A covered part holds the share's answer and nothing else.** A submission
-that gives a covered part its own answer as well is refused
-(:func:`check_shares`). A later answer of a part's own takes the part out of
-every earlier share: the exception wins in its own scope
-(:func:`merged_shares`). A part that leaves a share loses only the answer the
-share wrote.
+**A covered element holds the share's answer and nothing else.** A submission
+that gives a covered element its own answer as well is refused
+(:func:`check_shares`). A later answer of an element's own takes the element out
+of every earlier share: the exception wins in its own scope
+(:func:`merged_shares`). An element that leaves a share loses only the answer
+the share wrote.
 """
 
 from __future__ import annotations
@@ -27,17 +27,22 @@ from collections.abc import Sequence
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from analysis_service.claims import UnknownKey
-from analysis_service.fact_answers import MAX_FACT_ANSWERS, FactAnswer
+from analysis_service.fact_answers import (
+    MAX_FACT_ANSWERS,
+    FactAnswer,
+    key_ref,
+    with_element,
+)
 
 __all__ = ["SharedAnswer", "check_shares", "merged_shares"]
 
 
 class SharedAnswer(BaseModel):
-    """One answer and the parts it covers.
+    """One answer and the elements it covers.
 
-    ``answer`` carries the question's shape as its key: the key of each part's
-    question with the element left empty. ``covers`` names the elements, each
-    once. An empty ``covers`` takes the share back from every part it covered.
+    ``answer`` carries the question's shape as its key: the key of each
+    element's question with the element left empty. ``covers`` names the elements, each
+    once. An empty ``covers`` takes the share back from every element it covered.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -48,8 +53,8 @@ class SharedAnswer(BaseModel):
     @field_validator("answer")
     @classmethod
     def _a_shape(cls, answer: FactAnswer) -> FactAnswer:
-        element, attribute, *_, kind, _ = answer.key
-        if element or not (attribute or kind):
+        ref = key_ref(answer.key)
+        if ref.element_id or not {"attribute", "question"} & set(ref.spellings):
             raise ValueError(
                 "a shared answer's key names an attribute or a question kind"
                 " and leaves the element empty"
@@ -58,7 +63,7 @@ class SharedAnswer(BaseModel):
 
     @field_validator("covers")
     @classmethod
-    def _each_part_once(cls, covers: tuple[str, ...]) -> tuple[str, ...]:
+    def _each_element_once(cls, covers: tuple[str, ...]) -> tuple[str, ...]:
         if any(not element for element in covers):
             raise ValueError("a shared answer covers named elements")
         twice = sorted(element for element, n in Counter(covers).items() if n > 1)
@@ -73,15 +78,14 @@ class SharedAnswer(BaseModel):
 
     def key_of(self, element: str) -> UnknownKey:
         """The key of ``element``'s question of this shape."""
-        _, attribute, assertion, subject, kind, capability = self.shape
-        return (element, attribute, assertion, subject, kind, capability)
+        return with_element(self.shape, element)
 
     def keys(self) -> frozenset[UnknownKey]:
-        """The key of each covered part's question."""
+        """The key of each covered element's question."""
         return frozenset(self.key_of(element) for element in self.covers)
 
     def facts(self) -> tuple[FactAnswer, ...]:
-        """One fact answer for each covered part: the share's answer, as its own."""
+        """One fact answer for each covered element: the share's answer, as its own."""
         return tuple(
             self.answer.model_copy(update={"key": self.key_of(element)})
             for element in self.covers
@@ -91,7 +95,7 @@ class SharedAnswer(BaseModel):
 def check_shares(shares: Sequence[SharedAnswer], facts: Sequence[FactAnswer]) -> None:
     """Raise a ``ValueError`` where one submission's shares and answers clash.
 
-    Two shares of one shape, or a part a share covers that the submission
+    Two shares of one shape, or an element a share covers that the submission
     also answers on its own, each leave which answer holds to the order of a
     list, so the service refuses them and names the clash.
     """
@@ -103,7 +107,8 @@ def check_shares(shares: Sequence[SharedAnswer], facts: Sequence[FactAnswer]) ->
     both = sorted(fact.key for fact in facts if fact.key in covered)
     if both:
         raise ValueError(
-            f"a part takes either a shared answer or its own answer, not both: {both}"
+            f"an element takes either a shared answer or its own answer, not both:"
+            f" {both}"
         )
 
 
@@ -114,9 +119,9 @@ def merged_shares(
 ) -> tuple[tuple[SharedAnswer, ...], frozenset[UnknownKey]]:
     """The shares after a submission, and the keys whose shared answer it takes back.
 
-    A submitted share replaces the earlier share of its shape; a part the
+    A submitted share replaces the earlier share of its shape; an element the
     earlier share covered and the new one does not loses the answer the share
-    wrote. An answer ``facts`` gives a part of its own takes the part out of
+    wrote. An answer ``facts`` gives an element of its own takes the element out of
     every earlier share, and keeps its own answer. A share that covers nothing
     is dropped.
     """

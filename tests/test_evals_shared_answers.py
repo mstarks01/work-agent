@@ -3,12 +3,7 @@
 from __future__ import annotations
 
 import json
-import re
-import shutil
-import subprocess
 from itertools import product
-
-import pytest
 
 from evals.harness.early_rounds import paused_state
 from evals.harness.shared_answers import blanked, boxes, shareable
@@ -25,24 +20,12 @@ def _served():
 def test_the_instrument_and_the_page_share_one_rule():
     """``shareable`` has two readers, the page and the instrument, so each
     pair of served questions is put to both."""
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("no node on PATH to run the page's script")
-    rule = re.search(
-        r"const shareable = .*?;\n",
-        test_webapp.page_javascript("question_list.js"),
-        re.DOTALL,
-    )[0]
     served = _served()
     pairs = list(product(served, repeat=2))
-    program = (
-        f"{rule}const pairs = {json.dumps(pairs)};\n"
+    page = test_webapp.run_list_rules(
+        f"const pairs = {json.dumps(pairs)};\n"
         "console.log(JSON.stringify(pairs.map(([a, b]) => shareable(a, b))));"
     )
-    done = subprocess.run(
-        [node, "-"], input=program, capture_output=True, text=True, check=True
-    )
-    page = json.loads(done.stdout)
     assert page == [shareable(a, b) for a, b in pairs]
     assert True in page and False in page, "a control: both answers occur"
 

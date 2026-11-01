@@ -76,22 +76,21 @@ def answer_choices(
     key: UnknownKey, model: SystemModel, catalog: AssertionCatalog | None
 ) -> tuple[str, ...]:
     """The values an answer to this fact may take, or empty for free text."""
-    element_id, attribute, assertion, _, question, _ = key
-    kind = fact_kind(key)
-    if kind == "capability":
+    ref = key_ref(key)
+    if ref.kind == "capability":
         return YES_NO
-    if kind == "question":
-        asked = QUESTION_KINDS.get(question)
+    if ref.kind == "question":
+        asked = QUESTION_KINDS.get(ref.question)
         return YES_NO if asked is not None and asked.answer == "yes-no" else ()
-    if kind == "attribute":
-        special = _ATTRIBUTE_CHOICES.get(attribute)
+    if ref.kind == "attribute":
+        special = _ATTRIBUTE_CHOICES.get(ref.attribute)
         return (
-            special(model, element_id)
+            special(model, ref.element_id)
             if special
-            else _closed(model, element_id, attribute)
+            else _closed(model, ref.element_id, ref.attribute)
         )
-    if kind == "assertion" and catalog is not None:
-        row = answered_row(catalog, assertion)
+    if ref.kind == "assertion" and catalog is not None:
+        row = answered_row(catalog, ref.assertion)
         if row is None:
             return ()
         predicate = REGISTRY.get(row.predicate)

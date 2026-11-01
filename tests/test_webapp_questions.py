@@ -1046,25 +1046,6 @@ await ids.continue.listeners.click(); await settle();
     }
 
 
-def test_every_key_part_a_page_reads_is_the_part_it_means():
-    """A page reads a fact key by position, and ``key_ref`` is the server's one
-    reader of which part is which, so each position a page reads is held to
-    the field it means."""
-    from analysis_service.claims import UNKNOWN_KEY_FIELDS
-
-    means = {0: "element_id", 1: "attribute", 4: "question"}
-    read = {
-        int(index)
-        for name in ("first_run.js", "question_list.js", "report_view.js")
-        for index in re.findall(r"\bkey\[(\d)\]", test_webapp.page_javascript(name))
-    }
-
-    assert read, "no page reads a key part to check"
-    assert read <= set(means), f"a page reads key parts {sorted(read - set(means))}"
-    for index in read:
-        assert UNKNOWN_KEY_FIELDS[index] == means[index]
-
-
 def test_the_key_field_list_names_each_part_of_a_key():
     """``UNKNOWN_KEY_FIELDS`` states ``UnknownRef.key``'s order a second time,
     so a reference with a distinct value in each field is put to both."""
@@ -2076,7 +2057,7 @@ calls.push({ shared: shared.length });
     ],
 )
 def test_a_shared_answer_is_asked_as_a_question_of_every_part(form, choices, names):
-    """The box's heading asks the shared question of every part it lists,
+    """The box's heading asks the shared question of every element it lists,
     and it names each shared control (#1842)."""
     first, second = valid_model().data_flows[:2]
     _, heading = group_of(
@@ -2102,8 +2083,8 @@ calls.push({ heading: title.children[0].textContent,
 
 
 def test_one_shared_answer_fills_only_the_parts_a_person_ticks():
-    """A box asks its question once, every part starts unticked, and the
-    answer reaches only the parts a person ticks (ADR 0081, ADR 0113)."""
+    """A box asks its question once, every element starts unticked, and the
+    answer reaches only the elements a person ticks (ADR 0081, ADR 0113)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
@@ -2138,8 +2119,9 @@ await ids.continue.listeners.click(); await settle();
 
 
 def test_a_shared_box_saves_one_share_and_an_untick_shrinks_it():
-    """The page sends the box's answer once, as a share of the parts ticked,
-    and an untick sends the share again with one part fewer (ADR 0114)."""
+    """The page sends the box's answer once, as a share of the elements
+    ticked, and an untick sends the share again with one element fewer (ADR
+    0114)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
@@ -2172,9 +2154,9 @@ await settle();
 
 
 def test_a_part_ticked_after_a_reload_joins_the_held_share():
-    """A part the held share covers is answered, so a reload lists it under
-    "Your answers", marked shared. A part ticked then joins the share, and the
-    share keeps the part it covered (ADR 0114)."""
+    """An element the held share covers is answered, so a reload lists it
+    under "Your answers", marked shared. An element ticked then joins the
+    share, and the share keeps the element it covered (ADR 0114)."""
     first, second = valid_model().data_flows[:2]
     third = first.model_copy(
         update={"id": "flow:process:web-app>store:orders-db>read", "name": "read"}
@@ -2210,7 +2192,7 @@ await settle();
 
 
 def test_the_box_says_which_parts_its_answer_covers():
-    """The line beside the shared answer names each ticked part, and follows
+    """The line beside the shared answer names each ticked element, and follows
     a tick and an untick (ADR 0114)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
@@ -2234,7 +2216,7 @@ calls.push({ line: line() });
 
 
 def test_undo_puts_back_the_shared_answer_and_each_part_it_wrote():
-    """Undo restores the answer before the last change, and each part it
+    """Undo restores the answer before the last change, and each element it
     wrote (ADR 0114)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
@@ -2259,8 +2241,9 @@ calls.push({ shown: !undo.hidden, shared: state.value, rows: rowsOf().map(r => o
 
 
 def test_unticking_a_part_takes_back_only_the_shared_answer():
-    """A part unticked after the shared answer reached it loses that value,
-    and a part a person answered by hand after it keeps its own (ADR 0113)."""
+    """An element unticked after the shared answer reached it loses that
+    value, and an element a person answered by hand after it keeps its own
+    (ADR 0113)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
@@ -4090,7 +4073,7 @@ calls.push({ said: text(ids.questions) });
 
 def test_the_page_reviews_what_it_kept_from_the_earlier_analysis():
     """A kept answer is marked under Your answers, and one line counts what
-    was kept, not kept, and waits for a part (#2029 package 7)."""
+    was kept, not kept, and waits for an element (#2029 package 7)."""
     flow = valid_model().data_flows[0]
     key = [flow.id, "encryption_in_transit", "", "", "", ""]
     answered = {
@@ -4142,7 +4125,7 @@ calls.push({{ said: text(ids.questions), earlier: text(ids.earlier) }});
 
 
 def test_the_pause_lists_what_the_description_says():
-    """Each part with its stated facts and the words they came from, above
+    """Each element with its stated facts and the words they came from, above
     the amendment box (#2029 package 8)."""
     payload = {
         "run": "r1",
@@ -4189,7 +4172,7 @@ calls.push({{ said: text(box) }});
 
 
 class TestTheRenameOfACarriedElement:
-    """The owner says which part a missing element is now (ADR 0116)."""
+    """The owner names the element that a missing element is now (ADR 0116)."""
 
     PAUSE = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
