@@ -1238,13 +1238,14 @@ def test_a_saved_vendor_that_names_an_object_key_still_draws_the_table(
 
 
 def test_an_uploaded_transcript_alone_starts_an_analysis(page):
-    """The button opens a file chooser, a binary file is refused on the page,
-    and a text file goes to ``/analyze`` as the one source, as text."""
+    """The menu's upload opens a file chooser, a binary file is refused on the
+    page, and a text file goes to ``/analyze`` as the one source, as text."""
     page.locator('input[name="framework"]').first.check()
 
     def upload(name: str, data: bytes) -> None:
+        page.click("#upload")
         with page.expect_file_chooser() as chosen:
-            page.click("#upload")
+            page.click("#upload-computer")
         chosen.value.set_files({"name": name, "mimeType": "text/plain", "buffer": data})
 
     upload("call.txt", b"\x89PNG\r\n\x1a\n\x00\x00")
@@ -1273,8 +1274,9 @@ def test_an_uploaded_mermaid_file_starts_an_analysis_as_a_diagram(page):
     server accepts it."""
     page.locator('input[name="framework"]').first.check()
     diagram = "flowchart LR\n    user[Customer] -->|HTTPS| app(Web App)\n"
+    page.click("#upload")
     with page.expect_file_chooser() as chosen:
-        page.click("#upload")
+        page.click("#upload-computer")
     chosen.value.set_files(
         {"name": "model.mmd", "mimeType": "text/plain", "buffer": diagram.encode()}
     )
@@ -1982,6 +1984,40 @@ def test_the_files_page_keeps_lists_and_deletes_a_file_as_text(page):
     assert "keep their copy" in page.inner_text("#files-notice")
 
 
+def choose_from_files(page):
+    """Tick the first file in the "Select from Files" dialog and select it."""
+    page.click("#upload")
+    page.click("#upload-files")
+    page.wait_for_selector("#files-dialog[open] #files-rows label")
+    page.check("#files-rows input[type=checkbox]")
+    page.click("#files-select")
+    page.wait_for_selector("#chosen-files li")
+
+
+def test_the_plus_button_offers_an_upload_and_a_choice_from_files(page):
+    page.goto("/")
+    assert page.get_attribute("#upload", "aria-expanded") == "false"
+    page.click("#upload")
+    assert page.get_attribute("#upload", "aria-expanded") == "true"
+    assert page.inner_text("#upload-menu") == "Upload from computer\nSelect from Files"
+    page.keyboard.press("Escape")
+    assert page.is_hidden("#upload-menu")
+    page.click("#upload")
+    with page.expect_file_chooser() as chooser:
+        page.click("#upload-computer")
+    chooser.value.set_files(
+        {"name": "call.vtt", "mimeType": "text/vtt", "buffer": b"Ana: hi"}
+    )
+    page.wait_for_selector("#transcript-note:not([hidden])")
+    assert page.inner_text("#transcript-name") == "call.vtt"
+    page.click("#upload")
+    page.click("#upload-files")
+    page.wait_for_selector("#files-dialog[open]")
+    assert "Files is empty." in page.inner_text("#files-rows")
+    page.click("#files-cancel")
+    assert page.is_hidden("#chosen-files")
+
+
 def test_a_chosen_file_goes_into_the_analysis_and_shows_when_it_opens_again(page):
     diagram = "flowchart LR\n    user[Customer] -->|HTTPS| app(Web App)\n"
     page.goto("/files")
@@ -1994,9 +2030,9 @@ def test_a_chosen_file_goes_into_the_analysis_and_shows_when_it_opens_again(page
     file_id = page.evaluate("fetch('/workspace/files').then((r) => r.json())")[0]["id"]
 
     page.goto("/")
-    page.wait_for_selector("#files-rows label")
-    page.check("#files-rows input[type=checkbox]")
-    assert "of 102,400 bytes" in page.inner_text("#bytes-label")
+    choose_from_files(page)
+    assert page.inner_text("#chosen-files").startswith("File: network.mmd · Diagram")
+    assert "Up to 102,3" in page.inner_text("#description-remaining")
     page.locator('input[name="framework"]').first.check()
     page.fill("#analysis-name", "Files analysis")
     with page.expect_response("**/analyze") as answered:
@@ -2012,7 +2048,7 @@ def test_a_chosen_file_goes_into_the_analysis_and_shows_when_it_opens_again(page
     page.click("#description-nav")
     page.wait_for_selector("#files-used", state="visible")
     assert page.inner_text("#files-used-list") == "network.mmd (diagram)"
-    assert page.is_hidden("#files-checklist")
+    assert page.is_hidden("#chosen-files")
 
 
 def test_a_file_deleted_before_the_submission_shows_as_missing(page):
@@ -2022,8 +2058,7 @@ def test_a_file_deleted_before_the_submission_shows_as_missing(page):
     page.click("#upload-save")
     page.wait_for_selector("#files-list tr")
     page.goto("/")
-    page.wait_for_selector("#files-rows label")
-    page.check("#files-rows input[type=checkbox]")
+    choose_from_files(page)
     file_id = page.evaluate("fetch('/workspace/files').then((r) => r.json())")[0]["id"]
     page.evaluate(f"fetch('/workspace/files/{file_id}', {{method: 'DELETE'}})")
     page.locator('input[name="framework"]').first.check()
@@ -2031,4 +2066,4 @@ def test_a_file_deleted_before_the_submission_shows_as_missing(page):
     page.click("#go")
     page.wait_for_selector("#problem:not([hidden])")
     assert "no longer in Files" in page.inner_text("#problem")
-    page.wait_for_selector("#files-rows .hint >> text=Missing")
+    page.wait_for_selector("#chosen-files li >> text=Missing")

@@ -75,11 +75,13 @@
   };
   const held = () => Object.entries(UPLOADS).filter(([, upload]) => upload.text !== null);
 
-  // The Owner Files this analysis copies (ADR 0119). The checklist lists the
-  // files in Files, and the submission sends only the chosen IDs: the server
-  // reads each text from the store. A chosen file that the list no longer
-  // holds stays on the form as "Missing" until it is removed.
+  // The Owner Files this analysis copies (ADR 0119). "Select from Files"
+  // lists the files in Files in a dialog, and the form lists the chosen ones.
+  // The submission sends only the chosen IDs: the server reads each text from
+  // the store. A chosen file that the list no longer holds stays on the form
+  // as "Missing" until it is removed.
   const filesRows = document.getElementById("files-rows");
+  const chosenList = document.getElementById("chosen-files");
   let ownerFiles = [];
   const chosen = new Set();
   const chosenFiles = () => ownerFiles.filter((file) => chosen.has(file.id));
@@ -92,56 +94,30 @@
       ? "The description and the files are too long. Remove a file or shorten the description."
       : `Up to ${remaining.toLocaleString()} bytes remaining`;
     remainingNote.classList.toggle("field-error", remaining < 0);
-    const meter = document.getElementById("bytes-meter");
-    if (meter) {
-      meter.value = Math.min(used, maxDescriptionBytes);
-      document.getElementById("bytes-label").textContent =
-        `Size: ${used.toLocaleString()} of ${maxDescriptionBytes.toLocaleString()} bytes`;
-    }
     return remaining;
   };
   const needsDescription = () => !held().length && !chosen.size;
-  const drawFiles = () => {
-    if (!filesRows) return;
+  const removeButton = (id) => {
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "quiet";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", () => { chosen.delete(id); drawChosen(); });
+    return remove;
+  };
+  const drawChosen = () => {
     const present = new Set(ownerFiles.map((file) => file.id));
-    const rows = ownerFiles.map((file) => {
-      const row = document.createElement("label");
-      const tick = document.createElement("input");
-      tick.type = "checkbox";
-      tick.checked = chosen.has(file.id);
-      tick.addEventListener("change", () => {
-        if (tick.checked) chosen.add(file.id);
-        else chosen.delete(file.id);
-        box.required = needsDescription();
-        updateDescriptionRemaining();
-      });
-      const name = document.createElement("span");
-      name.className = "file-name";
-      name.textContent = file.name;
-      const facts = document.createElement("span");
-      facts.className = "hint";
-      facts.textContent = `${textFile.kindLabel(file.kind)} · ${textFile.formatLabel(file.format)} · ${textFile.size(file.size_bytes)}`;
-      row.append(tick, name, facts);
-      return row;
-    });
-    const missing = [...chosen].filter((id) => !present.has(id)).map((id) => {
-      const line = document.createElement("p");
+    const lines = [...chosen].map((id) => {
+      const line = document.createElement("li");
       line.className = "hint";
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "quiet";
-      remove.textContent = "Remove";
-      remove.addEventListener("click", () => { chosen.delete(id); drawFiles(); });
-      line.append("Missing: a file you chose is no longer in Files. ", remove);
+      const file = ownerFiles.find((each) => each.id === id);
+      line.append(present.has(id)
+        ? `File: ${file.name} · ${textFile.kindLabel(file.kind)} · ${textFile.size(file.size_bytes)} `
+        : "Missing: a file you chose is no longer in Files. ", removeButton(id));
       return line;
     });
-    if (!rows.length && !missing.length) {
-      const empty = document.createElement("p");
-      empty.className = "hint";
-      empty.textContent = "Files is empty.";
-      rows.push(empty);
-    }
-    filesRows.replaceChildren(...rows, ...missing);
+    chosenList.replaceChildren(...lines);
+    chosenList.hidden = !lines.length;
     box.required = needsDescription();
     updateDescriptionRemaining();
   };
@@ -153,9 +129,80 @@
     } catch {
       ownerFiles = [];
     }
-    drawFiles();
+    drawChosen();
   };
-  if (filesRows) loadFiles();
+  // The dialog ticks the chosen files. Select makes the ticked files the
+  // chosen ones, and Cancel changes nothing.
+  const filesDialog = document.getElementById("files-dialog");
+  const openFiles = async () => {
+    await loadFiles();
+    const rows = ownerFiles.map((file) => {
+      const row = document.createElement("label");
+      const tick = document.createElement("input");
+      tick.type = "checkbox";
+      tick.value = file.id;
+      tick.checked = chosen.has(file.id);
+      const name = document.createElement("span");
+      name.className = "file-name";
+      name.textContent = file.name;
+      const facts = document.createElement("span");
+      facts.className = "hint";
+      facts.textContent = `${textFile.kindLabel(file.kind)} · ${textFile.formatLabel(file.format)} · ${textFile.size(file.size_bytes)}`;
+      row.append(tick, name, facts);
+      return row;
+    });
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "Files is empty.";
+      rows.push(empty);
+    }
+    filesRows.replaceChildren(...rows);
+    filesDialog.showModal();
+  };
+  document.getElementById("files-cancel").addEventListener("click", () => filesDialog.close());
+  document.getElementById("files-select").addEventListener("click", () => {
+    for (const tick of filesRows.querySelectorAll("input[type=checkbox]")) {
+      if (tick.checked) chosen.add(tick.value);
+      else chosen.delete(tick.value);
+    }
+    filesDialog.close();
+    drawChosen();
+  });
+
+  // The plus button opens a menu of the two ways to add a file. A click
+  // outside it or Escape closes it, and the focus returns to the button.
+  const uploadButton = document.getElementById("upload");
+  const uploadMenu = document.getElementById("upload-menu");
+  const menuItems = [...uploadMenu.querySelectorAll("[role=menuitem]")];
+  const showMenu = (open) => {
+    uploadMenu.hidden = !open;
+    uploadButton.setAttribute("aria-expanded", String(open));
+    if (open) menuItems[0].focus();
+  };
+  uploadButton.addEventListener("click", () => showMenu(uploadMenu.hidden));
+  uploadMenu.addEventListener("keydown", (event) => {
+    const at = menuItems.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+      showMenu(false);
+      uploadButton.focus();
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      menuItems[(at + step + menuItems.length) % menuItems.length].focus();
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (!uploadMenu.hidden && !uploadMenu.parentElement.contains(event.target)) showMenu(false);
+  });
+  document.getElementById("upload-computer").addEventListener("click", () => {
+    showMenu(false);
+    uploadFile.click();
+  });
+  document.getElementById("upload-files").addEventListener("click", () => {
+    showMenu(false);
+    openFiles();
+  });
 
   box.addEventListener("input", updateDescriptionRemaining);
   updateDescriptionRemaining();
@@ -166,7 +213,6 @@
     box.required = needsDescription();
     updateDescriptionRemaining();
   };
-  document.getElementById("upload").addEventListener("click", () => uploadFile.click());
   Object.keys(UPLOADS).forEach(kind => document.getElementById(`${kind}-remove`)
     .addEventListener("click", () => hold(kind, null, "")));
   uploadFile.addEventListener("change", async () => {
