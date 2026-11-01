@@ -1,0 +1,15 @@
+architecture-beta
+    group z0(cloud)[Trust zone public internet]
+    group z1(cloud)[Trust zone storefront dmz]
+    group z2(cloud)[Trust zone core services]
+    service n0(internet)[shopper] in z0
+    service n1(internet)[card processor] in z0
+    service n2(server)[storefront API] in z1
+    service n3(server)[order service] in z2
+    service n4(database)[orders db] in z2
+    service n5(database)[receipt archive] in z2
+    n0:R --> L:n2
+    n1:R --> L:n2
+    n2:R --> L:n3
+    n3:R --> L:n4
+    n3:R --> L:n5

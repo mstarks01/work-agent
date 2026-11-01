@@ -1,0 +1,734 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:customer",
+        "name": "Customer",
+        "description": "Customer",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "customer(Customer)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "Mobile app",
+        "description": "Mobile app",
+        "assets": [],
+        "source_excerpt": "app[Mobile app]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:web-api",
+        "name": "Web API",
+        "description": "Web API",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "api[Web API]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:sims-stock-and-inventory",
+        "name": "SIMS stock and inventory",
+        "description": "SIMS stock and inventory",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "sims[SIMS stock and inventory]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:fax-gateway",
+        "name": "Fax gateway",
+        "description": "Fax gateway",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "fax[Fax gateway]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:user-database",
+        "name": "User database",
+        "description": "User database",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "userdb[(User database)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:address-flat-file",
+        "name": "Address flat file",
+        "description": "Address flat file",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "flatfile[(Address flat file)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:catalogue-spreadsheet-marketing-laptop",
+        "name": "Catalogue spreadsheet (marketing laptop)",
+        "description": "Catalogue spreadsheet (marketing laptop)",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "sheet[\"Catalogue spreadsheet (marketing laptop)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:office",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:customer>process:mobile-app>browse-order",
+        "name": "browse, order",
+        "description": "browse, order",
+        "assets": [],
+        "source_excerpt": "customer -->|browse, order| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:customer",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "browse, order",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:web-api>orders-http",
+        "name": "orders (HTTP)",
+        "description": "orders (HTTP)",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "app -->|\"orders (HTTP)\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:web-api",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "orders",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>store:user-database>name-address-card",
+        "name": "name, address, card",
+        "description": "name, address, card",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "api -->|\"name, address, card\"| userdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-api",
+        "destination": "store:user-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "name, address, card",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>process:sims-stock-and-inventory>order",
+        "name": "order",
+        "description": "order",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api -->|order| sims",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-api",
+        "destination": "process:sims-stock-and-inventory",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "order",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:sims-stock-and-inventory>store:address-flat-file>delivery-address",
+        "name": "delivery address",
+        "description": "delivery address",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "sims -->|delivery address| flatfile",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:sims-stock-and-inventory",
+        "destination": "store:address-flat-file",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "delivery address",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:sims-stock-and-inventory>process:fax-gateway>dispatch-note",
+        "name": "dispatch note",
+        "description": "dispatch note",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "sims -->|dispatch note| fax",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:sims-stock-and-inventory",
+        "destination": "process:fax-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dispatch note",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:fax-gateway>entity:customer>fax-confirmation-name-address",
+        "name": "fax confirmation: name, address",
+        "description": "fax confirmation: name, address",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "fax -->|\"fax confirmation: name, address\"| customer",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:fax-gateway",
+        "destination": "entity:customer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "fax confirmation: name, address",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:catalogue-spreadsheet-marketing-laptop>process:web-api>sql-statements-prices-product-copy",
+        "name": "SQL statements: prices, product copy",
+        "description": "SQL statements: prices, product copy",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "sheet -->|\"SQL statements: prices, product copy\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:catalogue-spreadsheet-marketing-laptop",
+        "destination": "process:web-api",
+        "protocol": "SQL",
+        "authentication": "unknown",
+        "data_description": "prices, product copy",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:office",
+        "name": "Office",
+        "description": "Office",
+        "assets": [],
+        "source_excerpt": "subgraph office[\"Office\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Mobile app presents a non-web interface.",
+        "element_id": "process:mobile-app",
+        "attribute": "interface_kind",
+        "basis": "The element is explicitly named \"Mobile app\", distinguishing it from a web interface."
+      },
+      {
+        "assumption": "The User database contains confidential data.",
+        "element_id": "store:user-database",
+        "attribute": "data_classification",
+        "basis": "It receives a person's name and address and a payment card."
+      },
+      {
+        "assumption": "The Address flat file contains confidential data.",
+        "element_id": "store:address-flat-file",
+        "attribute": "data_classification",
+        "basis": "It stores delivery addresses, which identify or describe people."
+      },
+      {
+        "assumption": "The Customer carries personally identifiable information.",
+        "element_id": "entity:customer",
+        "attribute": "assets",
+        "basis": "Customer is a human external entity."
+      },
+      {
+        "assumption": "The Web API holds personally identifiable, financial, and business-critical data.",
+        "element_id": "process:web-api",
+        "attribute": "assets",
+        "basis": "It handles name, address, card, orders, prices, and product copy."
+      },
+      {
+        "assumption": "SIMS stock and inventory holds business-critical data.",
+        "element_id": "process:sims-stock-and-inventory",
+        "attribute": "assets",
+        "basis": "Its name identifies stock and inventory operating records."
+      },
+      {
+        "assumption": "The Fax gateway carries personally identifiable and business-critical data.",
+        "element_id": "process:fax-gateway",
+        "attribute": "assets",
+        "basis": "It handles dispatch notes and confirmations containing name and address."
+      },
+      {
+        "assumption": "The User database holds personally identifiable and financial data.",
+        "element_id": "store:user-database",
+        "attribute": "assets",
+        "basis": "It receives name, address, and card data."
+      },
+      {
+        "assumption": "The Address flat file holds personally identifiable data.",
+        "element_id": "store:address-flat-file",
+        "attribute": "assets",
+        "basis": "It receives delivery addresses."
+      },
+      {
+        "assumption": "The Catalogue spreadsheet holds business-critical data.",
+        "element_id": "store:catalogue-spreadsheet-marketing-laptop",
+        "attribute": "assets",
+        "basis": "It contains prices and product copy used by the system."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:customer",
+        "name": "Customer",
+        "description": "Customer",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "customer(Customer)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "Mobile app",
+        "description": "Mobile app",
+        "assets": [],
+        "source_excerpt": "app[Mobile app]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:web-api",
+        "name": "Web API",
+        "description": "Web API",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "api[Web API]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:sims-stock-and-inventory",
+        "name": "SIMS stock and inventory",
+        "description": "SIMS stock and inventory",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "sims[SIMS stock and inventory]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:fax-gateway",
+        "name": "Fax gateway",
+        "description": "Fax gateway",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "fax[Fax gateway]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:user-database",
+        "name": "User database",
+        "description": "User database",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "userdb[(User database)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:address-flat-file",
+        "name": "Address flat file",
+        "description": "Address flat file",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "flatfile[(Address flat file)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:catalogue-spreadsheet-marketing-laptop",
+        "name": "Catalogue spreadsheet (marketing laptop)",
+        "description": "Catalogue spreadsheet (marketing laptop)",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "sheet[\"Catalogue spreadsheet (marketing laptop)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:office",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:customer>process:mobile-app>browse-order",
+        "name": "browse, order",
+        "description": "browse, order",
+        "assets": [],
+        "source_excerpt": "customer -->|browse, order| app",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:customer",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "browse, order",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:web-api>orders-http",
+        "name": "orders (HTTP)",
+        "description": "orders (HTTP)",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "app -->|\"orders (HTTP)\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:web-api",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "orders",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>store:user-database>name-address-card",
+        "name": "name, address, card",
+        "description": "name, address, card",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "api -->|\"name, address, card\"| userdb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-api",
+        "destination": "store:user-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "name, address, card",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>process:sims-stock-and-inventory>order",
+        "name": "order",
+        "description": "order",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "api -->|order| sims",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-api",
+        "destination": "process:sims-stock-and-inventory",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "order",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:sims-stock-and-inventory>store:address-flat-file>delivery-address",
+        "name": "delivery address",
+        "description": "delivery address",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "sims -->|delivery address| flatfile",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:sims-stock-and-inventory",
+        "destination": "store:address-flat-file",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "delivery address",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:sims-stock-and-inventory>process:fax-gateway>dispatch-note",
+        "name": "dispatch note",
+        "description": "dispatch note",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "sims -->|dispatch note| fax",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:sims-stock-and-inventory",
+        "destination": "process:fax-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dispatch note",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:fax-gateway>entity:customer>fax-confirmation-name-address",
+        "name": "fax confirmation: name, address",
+        "description": "fax confirmation: name, address",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "fax -->|\"fax confirmation: name, address\"| customer",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:fax-gateway",
+        "destination": "entity:customer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "fax confirmation: name, address",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:store:catalogue-spreadsheet-marketing-laptop>process:web-api>sql-statements-prices-product-copy",
+        "name": "SQL statements: prices, product copy",
+        "description": "SQL statements: prices, product copy",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "sheet -->|\"SQL statements: prices, product copy\"| api",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:catalogue-spreadsheet-marketing-laptop",
+        "destination": "process:web-api",
+        "protocol": "SQL",
+        "authentication": "unknown",
+        "data_description": "prices, product copy",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:office",
+        "name": "Office",
+        "description": "Office",
+        "assets": [],
+        "source_excerpt": "subgraph office[\"Office\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Mobile app presents a non-web interface.",
+        "element_id": "process:mobile-app",
+        "attribute": "interface_kind",
+        "basis": "The element is explicitly named \"Mobile app\", distinguishing it from a web interface."
+      },
+      {
+        "assumption": "The User database contains confidential data.",
+        "element_id": "store:user-database",
+        "attribute": "data_classification",
+        "basis": "It receives a person's name and address and a payment card."
+      },
+      {
+        "assumption": "The Address flat file contains confidential data.",
+        "element_id": "store:address-flat-file",
+        "attribute": "data_classification",
+        "basis": "It stores delivery addresses, which identify or describe people."
+      },
+      {
+        "assumption": "The Customer carries personally identifiable information.",
+        "element_id": "entity:customer",
+        "attribute": "assets",
+        "basis": "Customer is a human external entity."
+      },
+      {
+        "assumption": "The Web API holds personally identifiable, financial, and business-critical data.",
+        "element_id": "process:web-api",
+        "attribute": "assets",
+        "basis": "It handles name, address, card, orders, prices, and product copy."
+      },
+      {
+        "assumption": "SIMS stock and inventory holds business-critical data.",
+        "element_id": "process:sims-stock-and-inventory",
+        "attribute": "assets",
+        "basis": "Its name identifies stock and inventory operating records."
+      },
+      {
+        "assumption": "The Fax gateway carries personally identifiable and business-critical data.",
+        "element_id": "process:fax-gateway",
+        "attribute": "assets",
+        "basis": "It handles dispatch notes and confirmations containing name and address."
+      },
+      {
+        "assumption": "The User database holds personally identifiable and financial data.",
+        "element_id": "store:user-database",
+        "attribute": "assets",
+        "basis": "It receives name, address, and card data."
+      },
+      {
+        "assumption": "The Address flat file holds personally identifiable data.",
+        "element_id": "store:address-flat-file",
+        "attribute": "assets",
+        "basis": "It receives delivery addresses."
+      },
+      {
+        "assumption": "The Catalogue spreadsheet holds business-critical data.",
+        "element_id": "store:catalogue-spreadsheet-marketing-laptop",
+        "attribute": "assets",
+        "basis": "It contains prices and product copy used by the system."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

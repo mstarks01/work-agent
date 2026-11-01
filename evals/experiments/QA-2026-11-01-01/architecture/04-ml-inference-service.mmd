@@ -1,0 +1,17 @@
+architecture-beta
+    group z0(cloud)[Trust zone public internet]
+    group z1(cloud)[Trust zone serving edge]
+    group z2(cloud)[Trust zone model network]
+    service n0(internet)[calling service] in z0
+    service n1(internet)[ml engineer] in z2
+    service n2(server)[inference gateway] in z1
+    service n3(server)[model server] in z2
+    service n4(database)[model registry bucket] in z2
+    service n5(database)[Redis feature store] in z2
+    service n6(database)[inference log] in z1
+    n0:R --> L:n2
+    n2:R --> L:n3
+    n3:R --> L:n4
+    n3:R --> L:n5
+    n2:R --> L:n6
+    n1:R --> L:n4

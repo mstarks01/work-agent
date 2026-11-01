@@ -1,0 +1,636 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:customer",
+        "name": "Customer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[Customer] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:customer-device"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "Mobile app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(server)[Mobile app] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:customer-device",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:web-api",
+        "name": "Web API",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[Web API] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:sims",
+        "name": "SIMS",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[SIMS] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:fax-gateway",
+        "name": "Fax gateway",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(server)[Fax gateway] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:catalogue-spreadsheet",
+        "name": "Catalogue spreadsheet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(server)[Catalogue spreadsheet] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:marketing-office",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:user-database",
+        "name": "User database",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "service n6(database)[User database] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:delivery-address-flat-file",
+        "name": "Delivery address flat file",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "service n7(database)[Delivery address flat file] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:customer>process:mobile-app>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:customer",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:web-api>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:mobile-app",
+        "destination": "process:web-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:catalogue-spreadsheet>process:web-api>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n5:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:catalogue-spreadsheet",
+        "destination": "process:web-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>store:user-database>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-api",
+        "destination": "store:user-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>process:sims>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-api",
+        "destination": "process:sims",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:sims>store:delivery-address-flat-file>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n7",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:sims",
+        "destination": "store:delivery-address-flat-file",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:sims>process:fax-gateway>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:sims",
+        "destination": "process:fax-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:fax-gateway>entity:customer>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:fax-gateway",
+        "destination": "entity:customer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:customer-device",
+        "name": "Customer device",
+        "description": "Trust zone Customer device",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone Customer device]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:sokify-internal-systems",
+        "name": "Sokify internal systems",
+        "description": "Trust zone Sokify internal systems",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone Sokify internal systems]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:marketing-office",
+        "name": "Marketing office",
+        "description": "Trust zone Marketing office",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone Marketing office]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Customer is a human external entity.",
+        "element_id": "entity:customer",
+        "attribute": "kind",
+        "basis": "The element is named \"Customer\"."
+      },
+      {
+        "assumption": "The User database holds personally identifiable information.",
+        "element_id": "store:user-database",
+        "attribute": "assets",
+        "basis": "The element is named \"User database\"."
+      },
+      {
+        "assumption": "The Delivery address flat file holds personally identifiable information.",
+        "element_id": "store:delivery-address-flat-file",
+        "attribute": "assets",
+        "basis": "The element is named \"Delivery address flat file\"."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:customer",
+        "name": "Customer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[Customer] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:customer-device"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "Mobile app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(server)[Mobile app] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:customer-device",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:web-api",
+        "name": "Web API",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[Web API] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:sims",
+        "name": "SIMS",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[SIMS] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:fax-gateway",
+        "name": "Fax gateway",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(server)[Fax gateway] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:catalogue-spreadsheet",
+        "name": "Catalogue spreadsheet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(server)[Catalogue spreadsheet] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:marketing-office",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:user-database",
+        "name": "User database",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "service n6(database)[User database] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:delivery-address-flat-file",
+        "name": "Delivery address flat file",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "service n7(database)[Delivery address flat file] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:sokify-internal-systems",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:customer>process:mobile-app>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:customer",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:web-api>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:mobile-app",
+        "destination": "process:web-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:catalogue-spreadsheet>process:web-api>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n5:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:catalogue-spreadsheet",
+        "destination": "process:web-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>store:user-database>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-api",
+        "destination": "store:user-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-api>process:sims>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:web-api",
+        "destination": "process:sims",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:sims>store:delivery-address-flat-file>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n7",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:sims",
+        "destination": "store:delivery-address-flat-file",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:sims>process:fax-gateway>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:sims",
+        "destination": "process:fax-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:fax-gateway>entity:customer>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:fax-gateway",
+        "destination": "entity:customer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:customer-device",
+        "name": "Customer device",
+        "description": "Trust zone Customer device",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone Customer device]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:sokify-internal-systems",
+        "name": "Sokify internal systems",
+        "description": "Trust zone Sokify internal systems",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone Sokify internal systems]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:marketing-office",
+        "name": "Marketing office",
+        "description": "Trust zone Marketing office",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone Marketing office]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Customer is a human external entity.",
+        "element_id": "entity:customer",
+        "attribute": "kind",
+        "basis": "The element is named \"Customer\"."
+      },
+      {
+        "assumption": "The User database holds personally identifiable information.",
+        "element_id": "store:user-database",
+        "attribute": "assets",
+        "basis": "The element is named \"User database\"."
+      },
+      {
+        "assumption": "The Delivery address flat file holds personally identifiable information.",
+        "element_id": "store:delivery-address-flat-file",
+        "attribute": "assets",
+        "basis": "The element is named \"Delivery address flat file\"."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

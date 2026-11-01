@@ -1,0 +1,524 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:store-manager",
+        "name": "Store manager",
+        "description": "A store manager using the scheduling web app.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "manager(Store manager)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:colleague-own-phone",
+        "name": "Colleague (own phone)",
+        "description": "A colleague using their own phone to view shifts.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "colleague(\"Colleague (own phone)\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:payroll-system-other-team",
+        "name": "Payroll system (other team)",
+        "description": "A payroll system operated by another team.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "payroll[\"Payroll system (other team)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:scheduling-web-app",
+        "name": "Scheduling web app",
+        "description": "A web application used to build and view weekly rotas and shifts.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "webapp[Scheduling web app]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:scheduling-service",
+        "name": "Scheduling service",
+        "description": "A service that interacts with the rota database and produces a weekly payroll export.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "sched[Scheduling service]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:rota-database-rotas-names-contact-details-availability",
+        "name": "Rota database: rotas, names, contact details, availability",
+        "description": "A database containing rotas, names, contact details, and availability.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "rotadb[(\"Rota database: rotas, names, contact details, availability\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:file-share",
+        "name": "File share",
+        "description": "A file share used for a weekly payroll export collected by the payroll system.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "share[(File share)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:store-manager>process:scheduling-web-app>build-weekly-rota",
+        "name": "build weekly rota",
+        "description": "The store manager builds a weekly rota in the scheduling web app.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "manager -->|build weekly rota| webapp",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:store-manager",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "weekly rota",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:colleague-own-phone>process:scheduling-web-app>view-shifts",
+        "name": "view shifts",
+        "description": "A colleague views shifts in the scheduling web app.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "colleague -->|view shifts| webapp",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:colleague-own-phone",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "shifts",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:scheduling-web-app>process:scheduling-service>interaction",
+        "name": "interaction",
+        "description": "The scheduling web app interacts with the scheduling service.",
+        "assets": [],
+        "source_excerpt": "webapp --> sched",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-web-app",
+        "destination": "process:scheduling-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-service>store:rota-database-rotas-names-contact-details-availability>rotas",
+        "name": "rotas",
+        "description": "The scheduling service exchanges rotas with the rota database.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "sched <-->|rotas| rotadb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-service",
+        "destination": "store:rota-database-rotas-names-contact-details-availability",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "rotas",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-service>store:file-share>weekly-payroll-export",
+        "name": "weekly payroll export",
+        "description": "The scheduling service writes a weekly payroll export to the file share.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "sched -->|weekly payroll export| share",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-service",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "weekly payroll export",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:payroll-system-other-team>store:file-share>collect-export",
+        "name": "collect export",
+        "description": "The payroll system collects the export from the file share.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "payroll -->|collect export| share",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:payroll-system-other-team",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "export",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:internal-network",
+        "name": "Internal network",
+        "description": "The internal network containing the scheduling service, rota database, and file share.",
+        "assets": [],
+        "source_excerpt": "subgraph internal[\"Internal network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The rota database's contents are confidential because they include names, contact details, and availability.",
+        "element_id": "store:rota-database-rotas-names-contact-details-availability",
+        "attribute": "data_classification",
+        "basis": "The source describes the database as containing names, contact details, and availability."
+      },
+      {
+        "assumption": "The file share's contents are confidential because it stores a weekly payroll export.",
+        "element_id": "store:file-share",
+        "attribute": "data_classification",
+        "basis": "The source describes the file share as receiving a weekly payroll export."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:store-manager",
+        "name": "Store manager",
+        "description": "A store manager using the scheduling web app.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "manager(Store manager)",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:colleague-own-phone",
+        "name": "Colleague (own phone)",
+        "description": "A colleague using their own phone to view shifts.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "colleague(\"Colleague (own phone)\")",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:payroll-system-other-team",
+        "name": "Payroll system (other team)",
+        "description": "A payroll system operated by another team.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "payroll[\"Payroll system (other team)\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:scheduling-web-app",
+        "name": "Scheduling web app",
+        "description": "A web application used to build and view weekly rotas and shifts.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "webapp[Scheduling web app]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:scheduling-service",
+        "name": "Scheduling service",
+        "description": "A service that interacts with the rota database and produces a weekly payroll export.",
+        "assets": [
+          "business-critical-data",
+          "financial",
+          "pii"
+        ],
+        "source_excerpt": "sched[Scheduling service]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:rota-database-rotas-names-contact-details-availability",
+        "name": "Rota database: rotas, names, contact details, availability",
+        "description": "A database containing rotas, names, contact details, and availability.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "rotadb[(\"Rota database: rotas, names, contact details, availability\")]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:file-share",
+        "name": "File share",
+        "description": "A file share used for a weekly payroll export collected by the payroll system.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "share[(File share)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:store-manager>process:scheduling-web-app>build-weekly-rota",
+        "name": "build weekly rota",
+        "description": "The store manager builds a weekly rota in the scheduling web app.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "manager -->|build weekly rota| webapp",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:store-manager",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "weekly rota",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:colleague-own-phone>process:scheduling-web-app>view-shifts",
+        "name": "view shifts",
+        "description": "A colleague views shifts in the scheduling web app.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "colleague -->|view shifts| webapp",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:colleague-own-phone",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "shifts",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:scheduling-web-app>process:scheduling-service>interaction",
+        "name": "interaction",
+        "description": "The scheduling web app interacts with the scheduling service.",
+        "assets": [],
+        "source_excerpt": "webapp --> sched",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-web-app",
+        "destination": "process:scheduling-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-service>store:rota-database-rotas-names-contact-details-availability>rotas",
+        "name": "rotas",
+        "description": "The scheduling service exchanges rotas with the rota database.",
+        "assets": [
+          "business-critical-data",
+          "pii"
+        ],
+        "source_excerpt": "sched <-->|rotas| rotadb",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-service",
+        "destination": "store:rota-database-rotas-names-contact-details-availability",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "rotas",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-service>store:file-share>weekly-payroll-export",
+        "name": "weekly payroll export",
+        "description": "The scheduling service writes a weekly payroll export to the file share.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "sched -->|weekly payroll export| share",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:scheduling-service",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "weekly payroll export",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:payroll-system-other-team>store:file-share>collect-export",
+        "name": "collect export",
+        "description": "The payroll system collects the export from the file share.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "payroll -->|collect export| share",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:payroll-system-other-team",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "export",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:internal-network",
+        "name": "Internal network",
+        "description": "The internal network containing the scheduling service, rota database, and file share.",
+        "assets": [],
+        "source_excerpt": "subgraph internal[\"Internal network\"]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The rota database's contents are confidential because they include names, contact details, and availability.",
+        "element_id": "store:rota-database-rotas-names-contact-details-availability",
+        "attribute": "data_classification",
+        "basis": "The source describes the database as containing names, contact details, and availability."
+      },
+      {
+        "assumption": "The file share's contents are confidential because it stores a weekly payroll export.",
+        "element_id": "store:file-share",
+        "attribute": "data_classification",
+        "basis": "The source describes the file share as receiving a weekly payroll export."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

@@ -1,0 +1,622 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:supplier",
+        "name": "supplier",
+        "description": "An external supplier.",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[supplier] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "category manager",
+        "description": "A category manager.",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[category manager] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:portal-vendor",
+        "name": "portal vendor",
+        "description": "An external portal vendor.",
+        "assets": [],
+        "source_excerpt": "service n2(internet)[portal vendor] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:vendor-platform"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier-portal",
+        "name": "supplier portal",
+        "description": "A supplier portal.",
+        "assets": [],
+        "source_excerpt": "service n3(server)[supplier portal] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "name": "supplier master service",
+        "description": "A supplier master service.",
+        "assets": [],
+        "source_excerpt": "service n4(server)[supplier master service] in z3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:document-store",
+        "name": "document store",
+        "description": "A document store.",
+        "assets": [],
+        "source_excerpt": "service n5(database)[document store] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "A landing bucket.",
+        "assets": [],
+        "source_excerpt": "service n6(database)[landing bucket] in z3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "supplier database",
+        "description": "A supplier database.",
+        "assets": [],
+        "source_excerpt": "service n7(database)[supplier database] in z3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:supplier>process:supplier-portal>portal-access",
+        "name": "portal access",
+        "description": "Access from supplier to supplier portal.",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:supplier",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:category-manager>process:supplier-portal>portal-access",
+        "name": "portal access",
+        "description": "Access from category manager to supplier portal.",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:category-manager",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:supplier-portal>store:document-store>documents",
+        "name": "documents",
+        "description": "Documents carried to the document store.",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-portal",
+        "destination": "store:document-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:portal-vendor>store:landing-bucket>landing-data",
+        "name": "landing data",
+        "description": "Data carried to the landing bucket.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:portal-vendor",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:landing-bucket>landing-data",
+        "name": "landing data",
+        "description": "Data carried to the landing bucket.",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:supplier-database>database-data",
+        "name": "database data",
+        "description": "Data carried to the supplier database.",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n7",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone public internet.",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Trust zone corporate network.",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone corporate network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:vendor-platform",
+        "name": "vendor platform",
+        "description": "Trust zone vendor platform.",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone vendor platform]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:cloud-account",
+        "name": "cloud account",
+        "description": "Trust zone cloud account.",
+        "assets": [],
+        "source_excerpt": "group z3(cloud)[Trust zone cloud account]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The supplier is an external system rather than a human.",
+        "element_id": "entity:supplier",
+        "attribute": "kind",
+        "basis": "The diagram names the external entity 'supplier' without identifying a human actor."
+      },
+      {
+        "assumption": "The portal vendor is an external system rather than a human.",
+        "element_id": "entity:portal-vendor",
+        "attribute": "kind",
+        "basis": "The diagram names 'portal vendor' as an external portal-related entity."
+      },
+      {
+        "assumption": "The supplier portal presents a web interface.",
+        "element_id": "process:supplier-portal",
+        "attribute": "interface_kind",
+        "basis": "The component is explicitly named 'supplier portal'; a portal presents a web interface."
+      },
+      {
+        "assumption": "The public internet, corporate network, and cloud account are network trust zones.",
+        "element_id": "boundary:public-internet",
+        "attribute": "kind",
+        "basis": "The zone is named 'public internet', describing a network location."
+      },
+      {
+        "assumption": "The corporate network is a network trust zone.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The zone is named 'corporate network', describing a network location."
+      },
+      {
+        "assumption": "The vendor platform is a tenant trust zone.",
+        "element_id": "boundary:vendor-platform",
+        "attribute": "kind",
+        "basis": "The zone is named 'vendor platform', indicating a platform controlled by another party."
+      },
+      {
+        "assumption": "The cloud account is a network trust zone.",
+        "element_id": "boundary:cloud-account",
+        "attribute": "kind",
+        "basis": "The zone is named 'cloud account' and no separate authority or controlling-party distinction is stated."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:supplier",
+        "name": "supplier",
+        "description": "An external supplier.",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[supplier] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "category manager",
+        "description": "A category manager.",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[category manager] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:portal-vendor",
+        "name": "portal vendor",
+        "description": "An external portal vendor.",
+        "assets": [],
+        "source_excerpt": "service n2(internet)[portal vendor] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:vendor-platform"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier-portal",
+        "name": "supplier portal",
+        "description": "A supplier portal.",
+        "assets": [],
+        "source_excerpt": "service n3(server)[supplier portal] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "name": "supplier master service",
+        "description": "A supplier master service.",
+        "assets": [],
+        "source_excerpt": "service n4(server)[supplier master service] in z3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:document-store",
+        "name": "document store",
+        "description": "A document store.",
+        "assets": [],
+        "source_excerpt": "service n5(database)[document store] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-platform",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "A landing bucket.",
+        "assets": [],
+        "source_excerpt": "service n6(database)[landing bucket] in z3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "supplier database",
+        "description": "A supplier database.",
+        "assets": [],
+        "source_excerpt": "service n7(database)[supplier database] in z3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:cloud-account",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:supplier>process:supplier-portal>portal-access",
+        "name": "portal access",
+        "description": "Access from supplier to supplier portal.",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:supplier",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:category-manager>process:supplier-portal>portal-access",
+        "name": "portal access",
+        "description": "Access from category manager to supplier portal.",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:category-manager",
+        "destination": "process:supplier-portal",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:supplier-portal>store:document-store>documents",
+        "name": "documents",
+        "description": "Documents carried to the document store.",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-portal",
+        "destination": "store:document-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:portal-vendor>store:landing-bucket>landing-data",
+        "name": "landing data",
+        "description": "Data carried to the landing bucket.",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:portal-vendor",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:landing-bucket>landing-data",
+        "name": "landing data",
+        "description": "Data carried to the landing bucket.",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:supplier-database>database-data",
+        "name": "database data",
+        "description": "Data carried to the supplier database.",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n7",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Trust zone public internet.",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone public internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Trust zone corporate network.",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone corporate network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:vendor-platform",
+        "name": "vendor platform",
+        "description": "Trust zone vendor platform.",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone vendor platform]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:cloud-account",
+        "name": "cloud account",
+        "description": "Trust zone cloud account.",
+        "assets": [],
+        "source_excerpt": "group z3(cloud)[Trust zone cloud account]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The supplier is an external system rather than a human.",
+        "element_id": "entity:supplier",
+        "attribute": "kind",
+        "basis": "The diagram names the external entity 'supplier' without identifying a human actor."
+      },
+      {
+        "assumption": "The portal vendor is an external system rather than a human.",
+        "element_id": "entity:portal-vendor",
+        "attribute": "kind",
+        "basis": "The diagram names 'portal vendor' as an external portal-related entity."
+      },
+      {
+        "assumption": "The supplier portal presents a web interface.",
+        "element_id": "process:supplier-portal",
+        "attribute": "interface_kind",
+        "basis": "The component is explicitly named 'supplier portal'; a portal presents a web interface."
+      },
+      {
+        "assumption": "The public internet, corporate network, and cloud account are network trust zones.",
+        "element_id": "boundary:public-internet",
+        "attribute": "kind",
+        "basis": "The zone is named 'public internet', describing a network location."
+      },
+      {
+        "assumption": "The corporate network is a network trust zone.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The zone is named 'corporate network', describing a network location."
+      },
+      {
+        "assumption": "The vendor platform is a tenant trust zone.",
+        "element_id": "boundary:vendor-platform",
+        "attribute": "kind",
+        "basis": "The zone is named 'vendor platform', indicating a platform controlled by another party."
+      },
+      {
+        "assumption": "The cloud account is a network trust zone.",
+        "element_id": "boundary:cloud-account",
+        "attribute": "kind",
+        "basis": "The zone is named 'cloud account' and no separate authority or controlling-party distinction is stated."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

@@ -1,0 +1,654 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:developer",
+        "name": "developer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[developer] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-corporate-network"
+      },
+      {
+        "id": "entity:public-package-registry",
+        "name": "public package registry",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[public package registry] in z3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:build-runner",
+        "name": "build runner",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[build runner] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-build-environment",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:deploy-controller",
+        "name": "deploy controller",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[deploy controller] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-server",
+        "name": "store server",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(server)[store server] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-store-estate",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:git-server",
+        "name": "git server",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[git server] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:image-registry",
+        "name": "image registry",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n6(database)[image registry] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-build-environment",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:developer>store:git-server>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:developer",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:developer>process:build-runner>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:developer",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:build-runner>store:git-server>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:build-runner",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:build-runner>entity:public-package-registry>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:build-runner",
+        "destination": "entity:public-package-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:build-runner>store:image-registry>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:build-runner",
+        "destination": "store:image-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:build-runner>process:deploy-controller>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:build-runner",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:store-server>process:deploy-controller>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:store-server",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:store-server>store:image-registry>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:store-server",
+        "destination": "store:image-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-corporate-network",
+        "name": "Trust zone corporate network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone corporate network]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-build-environment",
+        "name": "Trust zone build environment",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone build environment]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-store-estate",
+        "name": "Trust zone store estate",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone store estate]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-internet",
+        "name": "Trust zone internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z3(cloud)[Trust zone internet]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The node named developer represents a human external entity.",
+        "element_id": "entity:developer",
+        "attribute": "kind",
+        "basis": "The element is named 'developer' in the system diagram."
+      },
+      {
+        "assumption": "The node named public package registry represents an external system.",
+        "element_id": "entity:public-package-registry",
+        "attribute": "kind",
+        "basis": "The element is named 'public package registry' and is placed in the trust zone internet."
+      },
+      {
+        "assumption": "The corporate network trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-corporate-network",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone corporate network'."
+      },
+      {
+        "assumption": "The build environment trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-build-environment",
+        "attribute": "kind",
+        "basis": "The element is represented as a named trust zone in the architecture diagram."
+      },
+      {
+        "assumption": "The store estate trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-store-estate",
+        "attribute": "kind",
+        "basis": "The element is represented as a named trust zone in the architecture diagram."
+      },
+      {
+        "assumption": "The internet trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-internet",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone internet'."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:developer",
+        "name": "developer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[developer] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-corporate-network"
+      },
+      {
+        "id": "entity:public-package-registry",
+        "name": "public package registry",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[public package registry] in z3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:build-runner",
+        "name": "build runner",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[build runner] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-build-environment",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:deploy-controller",
+        "name": "deploy controller",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[deploy controller] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-server",
+        "name": "store server",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(server)[store server] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-store-estate",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:git-server",
+        "name": "git server",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(database)[git server] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:image-registry",
+        "name": "image registry",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n6(database)[image registry] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-build-environment",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:developer>store:git-server>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:developer",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:developer>process:build-runner>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n2",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "entity:developer",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:build-runner>store:git-server>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n5",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:build-runner",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:build-runner>entity:public-package-registry>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n1",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:build-runner",
+        "destination": "entity:public-package-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:build-runner>store:image-registry>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:build-runner",
+        "destination": "store:image-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:build-runner>process:deploy-controller>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:build-runner",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:store-server>process:deploy-controller>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:store-server",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:store-server>store:image-registry>data-transfer",
+        "name": "data transfer",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "source": "process:store-server",
+        "destination": "store:image-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-corporate-network",
+        "name": "Trust zone corporate network",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone corporate network]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-build-environment",
+        "name": "Trust zone build environment",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone build environment]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-store-estate",
+        "name": "Trust zone store estate",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone store estate]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-internet",
+        "name": "Trust zone internet",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z3(cloud)[Trust zone internet]",
+        "source_label": "System diagram",
+        "source_speaker": "unknown",
+        "notes": "unknown",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The node named developer represents a human external entity.",
+        "element_id": "entity:developer",
+        "attribute": "kind",
+        "basis": "The element is named 'developer' in the system diagram."
+      },
+      {
+        "assumption": "The node named public package registry represents an external system.",
+        "element_id": "entity:public-package-registry",
+        "attribute": "kind",
+        "basis": "The element is named 'public package registry' and is placed in the trust zone internet."
+      },
+      {
+        "assumption": "The corporate network trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-corporate-network",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone corporate network'."
+      },
+      {
+        "assumption": "The build environment trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-build-environment",
+        "attribute": "kind",
+        "basis": "The element is represented as a named trust zone in the architecture diagram."
+      },
+      {
+        "assumption": "The store estate trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-store-estate",
+        "attribute": "kind",
+        "basis": "The element is represented as a named trust zone in the architecture diagram."
+      },
+      {
+        "assumption": "The internet trust zone is a network boundary.",
+        "element_id": "boundary:trust-zone-internet",
+        "attribute": "kind",
+        "basis": "The boundary is explicitly named 'Trust zone internet'."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}

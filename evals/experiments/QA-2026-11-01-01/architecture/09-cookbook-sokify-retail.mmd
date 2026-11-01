@@ -1,0 +1,20 @@
+architecture-beta
+    group z0(cloud)[Trust zone Customer device]
+    group z1(cloud)[Trust zone Sokify internal systems]
+    group z2(cloud)[Trust zone Marketing office]
+    service n0(internet)[Customer] in z0
+    service n1(server)[Mobile app] in z0
+    service n2(server)[Web API] in z1
+    service n3(server)[SIMS] in z1
+    service n4(server)[Fax gateway] in z1
+    service n5(server)[Catalogue spreadsheet] in z2
+    service n6(database)[User database] in z1
+    service n7(database)[Delivery address flat file] in z1
+    n0:R --> L:n1
+    n1:R --> L:n2
+    n5:R --> L:n2
+    n2:R --> L:n6
+    n2:R --> L:n3
+    n3:R --> L:n7
+    n3:R --> L:n4
+    n4:R --> L:n0

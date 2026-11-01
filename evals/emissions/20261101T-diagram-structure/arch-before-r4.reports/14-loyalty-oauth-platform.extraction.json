@@ -1,0 +1,776 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[member] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-member-devices"
+      },
+      {
+        "id": "entity:partner-app",
+        "name": "partner app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[partner app] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-partner-servers"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "mobile app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[mobile app] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-member-devices",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:authorization-server",
+        "name": "authorization server",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[authorization server] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:rewards-api",
+        "name": "rewards api",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(server)[rewards api] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:support-console",
+        "name": "support console",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(server)[support console] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:identity-database",
+        "name": "identity database",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "service n6(database)[identity database] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:points-ledger",
+        "name": "points ledger",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "service n7(database)[points ledger] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:api-log-store",
+        "name": "api log store",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n8(database)[api log store] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:authorization-server>member-request",
+        "name": "member request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:member>entity:partner-app>member-request",
+        "name": "member request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "entity:partner-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:authorization-server>mobile-app-request",
+        "name": "mobile app request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:partner-app>process:authorization-server>partner-app-request",
+        "name": "partner app request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:partner-app",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:rewards-api>mobile-app-request",
+        "name": "mobile app request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:rewards-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:partner-app>process:rewards-api>partner-app-request",
+        "name": "partner app request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:partner-app",
+        "destination": "process:rewards-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>store:identity-database>identity-records",
+        "name": "identity records",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:rewards-api>store:points-ledger>points-records",
+        "name": "points records",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n7",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:points-ledger",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:rewards-api>store:api-log-store>api-logs",
+        "name": "api logs",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n8",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:api-log-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:support-console>store:identity-database>identity-records",
+        "name": "identity records",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n5:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-rewards-cloud",
+        "name": "Trust zone rewards cloud",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone rewards cloud]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-member-devices",
+        "name": "Trust zone member devices",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone member devices]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:trust-zone-partner-servers",
+        "name": "Trust zone partner servers",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone partner servers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The member is a human external entity.",
+        "element_id": "entity:member",
+        "attribute": "kind",
+        "basis": "The element is named \"member\" and is placed in the \"Trust zone member devices\" zone."
+      },
+      {
+        "assumption": "The partner app is an external system.",
+        "element_id": "entity:partner-app",
+        "attribute": "kind",
+        "basis": "The element is named \"partner app\" and is placed in the \"Trust zone partner servers\" zone."
+      },
+      {
+        "assumption": "The rewards cloud is a network trust boundary.",
+        "element_id": "boundary:trust-zone-rewards-cloud",
+        "attribute": "kind",
+        "basis": "The diagram names it as a cloud trust zone without indicating a different controlling party or authority level."
+      },
+      {
+        "assumption": "The member devices zone is controlled by a different party and is therefore a tenant boundary.",
+        "element_id": "boundary:trust-zone-member-devices",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"Trust zone member devices,\" indicating customer-owned devices outside the rewards cloud's control."
+      },
+      {
+        "assumption": "The partner servers zone is controlled by a different party and is therefore a tenant boundary.",
+        "element_id": "boundary:trust-zone-partner-servers",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"Trust zone partner servers,\" indicating partner-controlled servers outside the rewards cloud's control."
+      },
+      {
+        "assumption": "The identity database holds personally identifying information.",
+        "element_id": "store:identity-database",
+        "attribute": "assets",
+        "basis": "The store is explicitly named \"identity database\"; identity information describes or identifies people."
+      },
+      {
+        "assumption": "The points ledger holds business-critical operating records.",
+        "element_id": "store:points-ledger",
+        "attribute": "assets",
+        "basis": "The store is explicitly named \"points ledger,\" indicating operating records maintained by the rewards system."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:member",
+        "name": "member",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n0(internet)[member] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:trust-zone-member-devices"
+      },
+      {
+        "id": "entity:partner-app",
+        "name": "partner app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n1(internet)[partner app] in z2",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:trust-zone-partner-servers"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "mobile app",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n2(server)[mobile app] in z1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-member-devices",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:authorization-server",
+        "name": "authorization server",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n3(server)[authorization server] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:rewards-api",
+        "name": "rewards api",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n4(server)[rewards api] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:support-console",
+        "name": "support console",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n5(server)[support console] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:identity-database",
+        "name": "identity database",
+        "description": "unknown",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "service n6(database)[identity database] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:points-ledger",
+        "name": "points ledger",
+        "description": "unknown",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "service n7(database)[points ledger] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:api-log-store",
+        "name": "api log store",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "service n8(database)[api log store] in z0",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:trust-zone-rewards-cloud",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:member>process:authorization-server>member-request",
+        "name": "member request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:member>entity:partner-app>member-request",
+        "name": "member request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n0:R --> L:n1",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:member",
+        "destination": "entity:partner-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:authorization-server>mobile-app-request",
+        "name": "mobile app request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:partner-app>process:authorization-server>partner-app-request",
+        "name": "partner app request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n3",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:partner-app",
+        "destination": "process:authorization-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:mobile-app>process:rewards-api>mobile-app-request",
+        "name": "mobile app request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n2:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:rewards-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:partner-app>process:rewards-api>partner-app-request",
+        "name": "partner app request",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n1:R --> L:n4",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:partner-app",
+        "destination": "process:rewards-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:authorization-server>store:identity-database>identity-records",
+        "name": "identity records",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n3:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:authorization-server",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:rewards-api>store:points-ledger>points-records",
+        "name": "points records",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n7",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:points-ledger",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:rewards-api>store:api-log-store>api-logs",
+        "name": "api logs",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n4:R --> L:n8",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:rewards-api",
+        "destination": "store:api-log-store",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:support-console>store:identity-database>identity-records",
+        "name": "identity records",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "n5:R --> L:n6",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:support-console",
+        "destination": "store:identity-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:trust-zone-rewards-cloud",
+        "name": "Trust zone rewards cloud",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z0(cloud)[Trust zone rewards cloud]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:trust-zone-member-devices",
+        "name": "Trust zone member devices",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z1(cloud)[Trust zone member devices]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:trust-zone-partner-servers",
+        "name": "Trust zone partner servers",
+        "description": "unknown",
+        "assets": [],
+        "source_excerpt": "group z2(cloud)[Trust zone partner servers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The member is a human external entity.",
+        "element_id": "entity:member",
+        "attribute": "kind",
+        "basis": "The element is named \"member\" and is placed in the \"Trust zone member devices\" zone."
+      },
+      {
+        "assumption": "The partner app is an external system.",
+        "element_id": "entity:partner-app",
+        "attribute": "kind",
+        "basis": "The element is named \"partner app\" and is placed in the \"Trust zone partner servers\" zone."
+      },
+      {
+        "assumption": "The rewards cloud is a network trust boundary.",
+        "element_id": "boundary:trust-zone-rewards-cloud",
+        "attribute": "kind",
+        "basis": "The diagram names it as a cloud trust zone without indicating a different controlling party or authority level."
+      },
+      {
+        "assumption": "The member devices zone is controlled by a different party and is therefore a tenant boundary.",
+        "element_id": "boundary:trust-zone-member-devices",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"Trust zone member devices,\" indicating customer-owned devices outside the rewards cloud's control."
+      },
+      {
+        "assumption": "The partner servers zone is controlled by a different party and is therefore a tenant boundary.",
+        "element_id": "boundary:trust-zone-partner-servers",
+        "attribute": "kind",
+        "basis": "The zone is explicitly named \"Trust zone partner servers,\" indicating partner-controlled servers outside the rewards cloud's control."
+      },
+      {
+        "assumption": "The identity database holds personally identifying information.",
+        "element_id": "store:identity-database",
+        "attribute": "assets",
+        "basis": "The store is explicitly named \"identity database\"; identity information describes or identifies people."
+      },
+      {
+        "assumption": "The points ledger holds business-critical operating records.",
+        "element_id": "store:points-ledger",
+        "attribute": "assets",
+        "basis": "The store is explicitly named \"points ledger,\" indicating operating records maintained by the rewards system."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}
