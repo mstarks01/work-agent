@@ -5,10 +5,12 @@ write a parser: ``diagram_reader/read.mjs`` runs Mermaid's flowchart grammar
 or the ``architecture-beta`` grammar of ``@mermaid-js/parser`` in Node, and
 :func:`read_diagram` calls it as a subprocess.
 
-**The structure is syntax, never meaning.** A node keeps its shape or icon as
-written. Whether a rectangle is an External Entity, or a group a trust zone,
-is extraction's judgement, because a person can draw the wrong shape as they
-can write the wrong word.
+**The structure is syntax, never meaning.** An architecture service keeps its
+icon as written. A flowchart node carries no shape, because a flowchart shape
+is a drawing choice with no fixed meaning, and the diagram text still shows
+it. Whether a node is an External Entity, or a group a trust zone, is
+extraction's judgement, because a person can draw the wrong shape as they can
+write the wrong word.
 
 **Two readings, and an install fault that is neither.** A diagram the parsers
 read is a :class:`DiagramStructure`. One they cannot read, through a syntax
@@ -21,6 +23,7 @@ make the same job run two ways on two deployments.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from typing import Literal
 
@@ -36,6 +39,7 @@ __all__ = [
     "DiagramReading",
     "DiagramRefusal",
     "DiagramStructure",
+    "node_names",
     "read_diagram",
 ]
 
@@ -67,11 +71,11 @@ class DiagramGroup(_Reading):
 
 class DiagramNode(_Reading):
     """A flowchart node or an architecture service. ``shape`` is the
-    flowchart shape or the architecture icon, as written."""
+    architecture icon as written, and ``None`` for a flowchart node."""
 
     id: str
     label: str
-    shape: str
+    shape: str | None
     group: str | None
     line: int | None
 
@@ -111,6 +115,17 @@ class DiagramRefusal(_Reading):
 
 
 DiagramReading = DiagramStructure | DiagramRefusal
+
+#: Where a label's detail starts: its first colon or opening bracket.
+_DETAIL = re.compile(r"[:(\[]")
+
+
+def node_names(label: str) -> tuple[str, ...]:
+    """The names an element drawn as this node may take: the whole label, or
+    the part before its first colon or bracket, as in ``Orders DB (Postgres)``.
+    """
+    head = _DETAIL.split(label, maxsplit=1)[0].strip()
+    return tuple(dict.fromkeys(name for name in (label, head) if name))
 
 
 class DiagramReaderMissing(RuntimeError):

@@ -1,8 +1,9 @@
 // Reads one Mermaid diagram on stdin and prints its structure as one JSON line
 // (ADR 0121). A flowchart goes through Mermaid's flowchart grammar, an
 // architecture-beta diagram through the Langium grammar in @mermaid-js/parser.
-// A shape or an icon is printed as written: what it means is extraction's
-// judgement.
+// An architecture icon is printed as written: what it means is extraction's
+// judgement. A flowchart shape is not printed: it is a drawing choice with no
+// fixed meaning, and the diagram text above the structure still shows it.
 //
 // Output: {"structure": {...}} for a diagram it read, {"refused": "..."} for
 // one it cannot read. Exit code 3 means a package is missing, so the caller can
@@ -70,7 +71,7 @@ async function flowchart() {
       id: subgraph.id, label: plain(subgraph.title) || subgraph.id,
       parent: parentOf.get(subgraph.id) ?? null, line: lineOf(subgraph.id) })),
     nodes: [...db.getVertices().values()].filter((vertex) => !groupIds.has(vertex.id)).map((vertex) => ({
-      id: vertex.id, label: plain(vertex.text) || vertex.id, shape: vertex.type || "square",
+      id: vertex.id, label: plain(vertex.text) || vertex.id, shape: null,
       group: parentOf.get(vertex.id) ?? null, line: lineOf(vertex.id) })),
     edges: db.getEdges().map((edge) => ({
       source: edge.start, target: edge.end, label: plain(edge.text),

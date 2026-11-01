@@ -140,7 +140,8 @@ _REGISTERS: dict[SourceKind, str] = {
         " attribute. An excerpt quotes the line of the diagram as written."
         " Where the block below the diagram gives the structure Mermaid's"
         " parser read, model each of its nodes as an element named with the"
-        " node's label, and each of its edges as a data flow between those"
+        " node's label, or with the part of the label before its first colon"
+        " or bracket, and each of its edges as a data flow between those"
         " elements in the direction of its arrow"
     ),
     "answers": "the submitter's answers to questions this service asked",

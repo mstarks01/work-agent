@@ -50,7 +50,7 @@ class TestTheReader:
             "orders db",
             "receipt archive",
         ]
-        assert {n.shape for n in reading.nodes} == {"square", "round", "cylinder"}
+        assert {n.shape for n in reading.nodes} == {None}
         assert len(reading.edges) == 5
         assert reading.edges[2].label == "submit order (gRPC)"
         assert [g.label for g in reading.groups] == [
@@ -60,16 +60,16 @@ class TestTheReader:
         ]
         assert text.splitlines()[reading.nodes[0].line - 1].strip() == 'n0["shopper"]'
 
-    def test_a_loose_flowchart_keeps_its_shapes_as_drawn(self):
+    def test_a_loose_flowchart_gives_no_shape(self):
         reading = read_diagram(
             "flowchart LR\n  a[Web<br>App] --> b[(DB)]\n  c --- a\n  d <--> b\n"
         )
         assert isinstance(reading, DiagramStructure)
         assert [(n.id, n.label, n.shape) for n in reading.nodes] == [
-            ("a", "Web App", "square"),
-            ("b", "DB", "cylinder"),
-            ("c", "c", "square"),
-            ("d", "d", "square"),
+            ("a", "Web App", None),
+            ("b", "DB", None),
+            ("c", "c", None),
+            ("d", "d", None),
         ]
         assert [e.arrow for e in reading.edges] == ["forward", "none", "both"]
 
@@ -218,6 +218,17 @@ class TestTheGate:
         issues = validate(valid_model(), diagrams={"Model": _structure(nodes=nodes)})
         assert [i.code for i in issues] == ["diagram-node-missing"]
         assert "'Payment Gateway'" in issues[0].message
+
+    @pytest.mark.parametrize(
+        "drawn", ["Orders DB: orders, customers", "Orders DB (PostgreSQL)", "Orders DB"]
+    )
+    def test_a_node_may_be_named_with_the_label_before_its_detail(self, drawn):
+        nodes = (_node("c", "Customer"), _node("d", drawn))
+        assert _codes(_structure(nodes=nodes)) == []
+
+    def test_a_label_or_a_name_with_no_slug_is_an_issue_and_not_a_crash(self):
+        nodes = (_node("c", "Customer"), _node("x", "🙂"))
+        assert _codes(_structure(nodes=nodes)) == ["diagram-node-missing"]
 
     def test_an_edge_must_run_in_its_arrow_s_direction(self):
         assert _codes(_structure(_edge("w", "c"))) == ["diagram-edge-missing"]
