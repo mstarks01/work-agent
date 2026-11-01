@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 from analysis_service import StubPipelineRunner
 from analysis_service.analysis import ABSENT_WORD
 from analysis_service.answer_bodies import BodyRefused, read_answers
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.assertions import AssertionRecord
@@ -32,6 +32,7 @@ from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     FactAnswer,
     merged_facts,
+    needed_facets,
 )
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
@@ -1184,7 +1185,23 @@ def _report_payloads(payloads: dict) -> dict:
         for block in report["analyses"]
     ]
     merged["report"] = report
+    merged["fact_questions"] = [_as_served(q) for q in merged["fact_questions"]]
     return {name: json.dumps(value) for name, value in merged.items()}
+
+
+def _as_served(question: dict) -> dict:
+    """A fact question fixture with ``needs`` as
+    :meth:`~analysis_service.questions.FactQuestion.to_json` sends it: each
+    waiting finding's facets, read by
+    :func:`~analysis_service.fact_answers.needed_facets`."""
+    key = tuple(question["key"])
+    named = question.get("needs", {})
+    return question | {
+        "needs": {
+            finding: list(needed_facets(key, named.get(finding, ())))
+            for finding in question["findings"]
+        }
+    }
 
 
 def _run_answer_block(payloads: dict, steps: str) -> dict:
@@ -1405,7 +1422,7 @@ def test_the_served_draft_keys_each_link_by_its_fold():
 
     report = sample_report()
     link = LinkAnswer(principal="Customer Account", element="entity:customer")
-    state = replace(report_state(report), draft=AnswerSet(links=(link,)))
+    state = replace(report_state(report), draft=SentAnswers(links=(link,)))
     served = test_report_page.payloads_of(
         render_report(report, state, previous=None, parent=None).html
     )
@@ -4125,8 +4142,8 @@ calls.push({{ said: text(ids.questions), earlier: text(ids.earlier) }});
 
 
 def test_the_pause_lists_what_the_description_says():
-    """Each element with its stated facts and the words they came from, above
-    the amendment box (#2029 package 8)."""
+    """Each element with its stated facts and the words they came from, open
+    and above the question list (#2029 package 8, ruled 2026-11-01)."""
     payload = {
         "run": "r1",
         "link_questions": [],
@@ -4140,7 +4157,7 @@ def test_the_pause_lists_what_the_description_says():
             {
                 "element": "process:web-app",
                 "name": "Web App",
-                "type": "Process",
+                "type": "process",
                 "excerpt": "the web app runs on Cloud Run",
                 "source_label": "System description",
                 "facts": [
@@ -4160,9 +4177,15 @@ streams[0].listeners.questions({{ data: JSON.stringify({json.dumps(payload)}) }}
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
 const box = ids.questions.querySelectorAll("details").find(d => d.className === "detected");
-calls.push({{ said: text(box) }});
+const order = ids.questions.children.map(part => part.className);
+calls.push({{ said: text(box), open: box.open, order }});
 """
-    said = next(c["said"] for c in _run_form_script(steps)["calls"] if "said" in c)
+    seen = next(c for c in _run_form_script(steps)["calls"] if "said" in c)
+    said = seen["said"]
+    assert seen["open"] is True
+    assert seen["order"][:2] == ["detected-facts", "list-intro"], (
+        "the facts come before the list"
+    )
     assert "What your description says (1 part)" in said
     assert (
         "Web App (process) \u2014 technology: FastAPI; exposure: internet-facing"

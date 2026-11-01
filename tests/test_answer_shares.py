@@ -9,7 +9,12 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from analysis_service.answer_bodies import BodyRefused, read_answers
-from analysis_service.answer_sets import AnswerSet, HeldAnswerSet, within_held_limits
+from analysis_service.answer_sets import (
+    AnswerSet,
+    HeldAnswerSet,
+    HeldSentAnswers,
+    SentAnswers,
+)
 from analysis_service.answer_shares import SharedAnswer, check_shares
 from analysis_service.answer_state import Answers, SavedAnswers
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
@@ -54,7 +59,7 @@ def _share(value: str, *covers: str) -> SharedAnswer:
     return SharedAnswer(answer=FactAnswer(key=AUTH, value=value), covers=covers)
 
 
-def _save(held: AnswerSet, given: AnswerSet) -> AnswerSet:
+def _save(held: AnswerSet, given: SentAnswers) -> AnswerSet:
     state = replace(paused_state(MODEL, {"stride": {}}, (), ()), answers=held)
     presented = [q.key for q in state.questions.early]
     saved = state.answer(
@@ -69,17 +74,17 @@ def _values(answers: AnswerSet) -> dict[str, str]:
 
 
 def test_one_answer_covers_two_parts_and_leaves_a_third_unknown():
-    held = _save(AnswerSet(), AnswerSet(shares=(_share("mutual TLS", STORE, READ),)))
+    held = _save(AnswerSet(), SentAnswers(shares=(_share("mutual TLS", STORE, READ),)))
     assert _values(held) == {STORE: "mutual TLS", READ: "mutual TLS"}
     assert held.shares == (_share("mutual TLS", STORE, READ),)
 
 
 def test_a_later_shared_edit_keeps_an_exception():
-    held = _save(AnswerSet(), AnswerSet(shares=(_share("mutual TLS", STORE, READ),)))
+    held = _save(AnswerSet(), SentAnswers(shares=(_share("mutual TLS", STORE, READ),)))
     own = FactAnswer(key=_key(READ), value="none; accepted by network position")
-    held = _save(held, AnswerSet(facts=(own,)))
+    held = _save(held, SentAnswers(facts=(own,)))
     assert held.shares == (_share("mutual TLS", STORE),)
-    held = _save(held, AnswerSet(shares=(_share("API key", STORE),)))
+    held = _save(held, SentAnswers(shares=(_share("API key", STORE),)))
     assert _values(held) == {
         STORE: "API key",
         READ: "none; accepted by network position",
@@ -90,14 +95,14 @@ def test_taking_a_part_out_takes_back_only_the_shared_answer():
     own = FactAnswer(key=_key(LOGIN), value="password and session cookie")
     held = _save(
         AnswerSet(),
-        AnswerSet(facts=(own,), shares=(_share("mutual TLS", STORE, READ),)),
+        SentAnswers(facts=(own,), shares=(_share("mutual TLS", STORE, READ),)),
     )
-    held = _save(held, AnswerSet(shares=(_share("mutual TLS", STORE),)))
+    held = _save(held, SentAnswers(shares=(_share("mutual TLS", STORE),)))
     assert _values(held) == {
         STORE: "mutual TLS",
         LOGIN: "password and session cookie",
     }
-    held = _save(held, AnswerSet(shares=(_share("mutual TLS"),)))
+    held = _save(held, SentAnswers(shares=(_share("mutual TLS"),)))
     assert _values(held) == {LOGIN: "password and session cookie"}
     assert held.shares == ()
 
@@ -105,7 +110,7 @@ def test_taking_a_part_out_takes_back_only_the_shared_answer():
 def test_a_share_writes_only_its_own_question():
     """An authentication share writes no other attribute of the parts it
     covers, such as who may do what at a service."""
-    held = _save(AnswerSet(), AnswerSet(shares=(_share("company SSO", STORE, READ),)))
+    held = _save(AnswerSet(), SentAnswers(shares=(_share("company SSO", STORE, READ),)))
     assert {fact.key[1] for fact in held.facts} == {"authentication"}
     assert {fact.key[4] for fact in held.facts} == {""}
 
@@ -113,11 +118,11 @@ def test_a_share_writes_only_its_own_question():
 def test_a_part_takes_a_shared_answer_or_its_own_not_both():
     own = FactAnswer(key=_key(STORE), value="API key")
     with pytest.raises(ValueError, match="not both"):
-        _save(AnswerSet(), AnswerSet(facts=(own,), shares=(_share("mTLS", STORE),)))
+        _save(AnswerSet(), SentAnswers(facts=(own,), shares=(_share("mTLS", STORE),)))
     with pytest.raises(ValueError, match="once"):
         _save(
             AnswerSet(),
-            AnswerSet(shares=(_share("mTLS", STORE), _share("API key", READ))),
+            SentAnswers(shares=(_share("mTLS", STORE), _share("API key", READ))),
         )
 
 
@@ -129,7 +134,7 @@ def test_a_share_names_a_shape_and_each_part_once():
 
 
 def test_a_share_survives_the_store_and_the_request_body():
-    held = _save(AnswerSet(), AnswerSet(shares=(_share("mutual TLS", STORE, READ),)))
+    held = _save(AnswerSet(), SentAnswers(shares=(_share("mutual TLS", STORE, READ),)))
     adapter: TypeAdapter[AnswerSet] = TypeAdapter(HeldAnswerSet)
     assert adapter.validate_json(adapter.dump_json(held)) == held
     body = {
@@ -155,7 +160,7 @@ def test_one_request_counts_each_covered_part_toward_its_bound():
 
 def test_the_questions_route_returns_the_held_shares():
     """A reload and an API client read the coverage back (ADR 0114)."""
-    held = _save(AnswerSet(), AnswerSet(shares=(_share("mutual TLS", STORE, READ),)))
+    held = _save(AnswerSet(), SentAnswers(shares=(_share("mutual TLS", STORE, READ),)))
     client, store = make_client()
     record = JobRecord.create(
         owner_id="alice",
@@ -175,8 +180,8 @@ def test_the_questions_route_returns_the_held_shares():
 def test_a_later_share_replaces_an_earlier_answer_of_a_part_it_covers():
     """A report's draft composes each save over the last (ADR 0070): a part
     answered on its own, then ticked, takes the share and is no clash."""
-    own = AnswerSet(facts=(FactAnswer(key=_key(STORE), value="API key"),))
-    later = AnswerSet(shares=(_share("mutual TLS", STORE, READ),)).over(own)
+    own = SentAnswers(facts=(FactAnswer(key=_key(STORE), value="API key"),))
+    later = SentAnswers(shares=(_share("mutual TLS", STORE, READ),)).over(own)
     assert later.facts == ()
     check_shares(later.shares, later.facts)
 
@@ -190,7 +195,7 @@ def test_a_draft_share_reaches_what_a_new_analysis_carries():
         frameworks=sample_selection(),
     )
     record = record.model_copy(
-        update={"draft": AnswerSet(shares=(_share("mutual TLS", STORE, READ),))}
+        update={"draft": SentAnswers(shares=(_share("mutual TLS", STORE, READ),))}
     )
     assert _values(record.held_answers()) == {STORE: "mutual TLS", READ: "mutual TLS"}
 
@@ -205,7 +210,7 @@ def test_a_draft_counts_each_covered_part_toward_the_held_limit():
         "exposure",
     )
     covers = tuple(f"process:p{n}" for n in range(MAX_FACT_ANSWERS))
-    draft = AnswerSet(
+    draft = SentAnswers(
         shares=tuple(
             SharedAnswer(
                 answer=FactAnswer(key=("", name, "", "", "", ""), value="x"),
@@ -216,4 +221,4 @@ def test_a_draft_counts_each_covered_part_toward_the_held_limit():
     )
     assert len(attributes) * MAX_FACT_ANSWERS > MAX_HELD_FACTS
     with pytest.raises(ValueError, match="each part"):
-        within_held_limits(draft)
+        TypeAdapter(HeldSentAnswers).validate_python(draft)

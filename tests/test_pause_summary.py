@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.answer_state import question_set
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.system_model import SystemModel
@@ -40,7 +40,7 @@ def _save(asked, earlier=(), facts=(), skips=(), presented=None):
     return asked.admit(
         sources=(),
         earlier=AnswerSet(facts=tuple(earlier)),
-        given=AnswerSet(facts=tuple(facts)),
+        given=SentAnswers(facts=tuple(facts)),
         save=True,
         skips=list(skips),
         presented=list(presented),

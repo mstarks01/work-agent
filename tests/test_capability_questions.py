@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
 from analysis_service.answer_state import question_set
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import UnknownRef
@@ -106,7 +106,7 @@ class TestWhatIsAsked:
         admitted = asked.admit(
             sources=[Source.description("A system.")],
             earlier=NO_ANSWERS,
-            given=AnswerSet(facts=(_answer("oauth", "no"),)),
+            given=SentAnswers(facts=(_answer("oauth", "no"),)),
         )
         assert [fact.key for fact in admitted.answers.facts] == [_key("oauth")]
 
@@ -161,7 +161,7 @@ class TestTheAnswerCheck:
             asked.admit(
                 sources=[Source.description("A system.")],
                 earlier=AnswerSet(facts=tuple(earlier)),
-                given=AnswerSet(facts=(_answer("oauth", "no"),)),
+                given=SentAnswers(facts=(_answer("oauth", "no"),)),
             )
 
     def test_a_revision_that_answers_both_is_admitted(self):

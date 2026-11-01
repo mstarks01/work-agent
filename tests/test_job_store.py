@@ -20,7 +20,12 @@ from botocore.exceptions import ClientError, EndpointConnectionError
 from sqlalchemy.pool import NullPool
 
 from analysis_service import jobs, sql_store, store_backends
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import (
+    NO_ANSWERS,
+    NO_SENT_ANSWERS,
+    AnswerSet,
+    SentAnswers,
+)
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import (
@@ -920,19 +925,19 @@ class TestTheSaves:
 
     def test_a_draft_lands_once_for_each_revision(self, store):
         job = completed(store)
-        draft = AnswerSet(facts=(FactAnswer(key=KEY, value="TLS 1.3"),))
+        draft = SentAnswers(facts=(FactAnswer(key=KEY, value="TLS 1.3"),))
         assert asyncio.run(store.save_draft(job, "alice", draft, 0))
-        assert not asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
+        assert not asyncio.run(store.save_draft(job, "alice", NO_SENT_ANSWERS, 0))
         saved = asyncio.run(store.get(job))
         assert saved.revision == 1
         assert saved.draft == draft
 
     def test_a_draft_is_refused_on_a_foreign_final_or_locked_report(self, store):
         job = completed(store)
-        assert not asyncio.run(store.save_draft(job, "mallory", NO_ANSWERS, 0))
+        assert not asyncio.run(store.save_draft(job, "mallory", NO_SENT_ANSWERS, 0))
         final_job = final(store, job)
-        assert not asyncio.run(store.save_draft(final_job, "alice", NO_ANSWERS, 0))
-        assert not asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
+        assert not asyncio.run(store.save_draft(final_job, "alice", NO_SENT_ANSWERS, 0))
+        assert not asyncio.run(store.save_draft(job, "alice", NO_SENT_ANSWERS, 0))
 
     def test_a_correction_lands_only_on_a_final_report(self, store):
         corrections = [FactAnswer(key=KEY, value="TLS 1.2")]
@@ -1144,7 +1149,7 @@ class ChangedAfterListing:
     async def expired(self, before: datetime) -> list[tuple[str, str]]:
         listed = await self._store.expired(before)
         for job_id, owner_id in listed:
-            assert await self._store.save_draft(job_id, owner_id, NO_ANSWERS, 0)
+            assert await self._store.save_draft(job_id, owner_id, NO_SENT_ANSWERS, 0)
         return listed
 
 
@@ -1160,7 +1165,7 @@ class TestTheRetentionSweep:
     def test_a_delete_with_a_cutoff_keeps_a_job_updated_since(self, store):
         job = last_updated(store, "completed", days_ago=2)
         cutoff = datetime.now(UTC) - timedelta(days=1)
-        assert asyncio.run(store.save_draft(job, "alice", NO_ANSWERS, 0))
+        assert asyncio.run(store.save_draft(job, "alice", NO_SENT_ANSWERS, 0))
         refused = asyncio.run(store.delete(job, "alice", updated_before=cutoff))
         assert refused == DeleteRefusal("changed")
         assert asyncio.run(store.get(job)) is not None
@@ -1173,7 +1178,7 @@ class TestTheRetentionSweep:
         async def race():
             return await asyncio.gather(
                 store.delete(job, "alice", updated_before=cutoff),
-                store.save_draft(job, "alice", NO_ANSWERS, 0),
+                store.save_draft(job, "alice", NO_SENT_ANSWERS, 0),
             )
 
         removed, saved = asyncio.run(race())

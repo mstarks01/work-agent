@@ -864,7 +864,7 @@ _RULES: tuple[Rule, ...] = (
 
 
 #: What an answer about a fact each rule reads informs, as the early list shows
-#: it to the owner. The maintainer reviews each sentence.
+#: it to the owner.
 EFFECTS: Mapping[str, str] = MappingProxyType(
     {
         "spoofing-unverified-boundary-auth": (

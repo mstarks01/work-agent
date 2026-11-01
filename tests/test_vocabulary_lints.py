@@ -40,11 +40,12 @@ from __future__ import annotations
 
 import ast
 import importlib
+import re
 from typing import get_args
 
 import pytest
 
-from tests.source_tree import PYTHON, module_name, parse, source_files
+from tests.source_tree import PYTHON, REPO_ROOT, module_name, parse, source_files
 
 pytestmark = pytest.mark.lint
 
@@ -228,4 +229,51 @@ def test_every_declaration_names_a_constant_that_exists():
     assert not unknown, (
         f"PARTIAL names {unknown}, which this sweep does not find. The constant"
         " was renamed, moved, or lost its annotation."
+    )
+
+
+# A claim of review needs the field that records it (docs/agents/provenance.md).
+
+#: A sentence that says the maintainer reviews, or reviewed, a text.
+_REVIEW_CLAIM = re.compile(r"\bthe maintainer review(?:s|ed)\b", re.IGNORECASE)
+
+#: The names of a field that records who reviewed a row.
+_REVIEW_FIELDS = frozenset({"reviewed_by", "REVIEWED_BY"})
+
+
+def _defines_a_review_field(tree: ast.Module) -> bool:
+    """Whether ``tree`` declares a field or a constant named in :data:`_REVIEW_FIELDS`."""
+    return any(
+        (isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name))
+        and node.target.id in _REVIEW_FIELDS
+        or isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id in _REVIEW_FIELDS
+            for target in node.targets
+        )
+        for node in ast.walk(tree)
+    )
+
+
+def test_a_review_claim_sits_beside_the_field_that_records_it():
+    """A file that says the maintainer reviews its text defines ``reviewed_by``.
+
+    A sentence is true only while somebody remembers it; a field that names
+    the reviewer, or ``None``, is a value the code can count.
+    """
+    claims = [
+        path
+        for path in source_files(*PYTHON)
+        if _REVIEW_CLAIM.search(path.read_text(encoding="utf-8"))
+    ]
+    assert claims, "no review claim found; the sentence shape has probably moved"
+    unrecorded = sorted(
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in claims
+        if not _defines_a_review_field(parse(path))
+    )
+    assert not unrecorded, (
+        f"{unrecorded} say the maintainer reviews a text and define no"
+        " reviewed_by or REVIEWED_BY field; record the review in a field, or"
+        " remove the sentence"
     )

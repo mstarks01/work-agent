@@ -18,7 +18,7 @@ import pytest
 from pydantic import ValidationError
 
 from analysis_service.answer_forms import answer_choices, answer_limit
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet
+from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
 from analysis_service.answer_state import question_set
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.capabilities import lineage
@@ -326,7 +326,7 @@ def admit(questions, links=(), facts=(), save=False, skips=(), presented=None):
     return questions.admit(
         sources=[],
         earlier=NO_ANSWERS,
-        given=AnswerSet(links=tuple(links), facts=tuple(facts)),
+        given=SentAnswers(links=tuple(links), facts=tuple(facts)),
         save=save,
         skips=skips,
         presented=presented,
@@ -903,7 +903,7 @@ class TestTakingAnAnswerBack:
         admitted = _asked_after(earlier).admit(
             sources=[],
             earlier=AnswerSet(facts=tuple(earlier)),
-            given=AnswerSet(facts=(back,)),
+            given=SentAnswers(facts=(back,)),
             save=True,
         )
         assert admitted.answers.facts == (back,)
@@ -940,7 +940,9 @@ class TestTakingAnAnswerBack:
             finished.admit(
                 sources=[],
                 earlier=AnswerSet(facts=tuple(earlier)),
-                given=AnswerSet(facts=(FactAnswer(key=question.key, value="unknown"),)),
+                given=SentAnswers(
+                    facts=(FactAnswer(key=question.key, value="unknown"),)
+                ),
             )
 
 

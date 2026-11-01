@@ -8,7 +8,7 @@ from dataclasses import replace
 import pytest
 
 from analysis_service.answer_bodies import read_answers
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.answer_state import Answers
 from analysis_service.carried_renames import ElementRename, renamed
 from analysis_service.fact_answers import FactAnswer, key_ref
@@ -74,7 +74,7 @@ class TestTheRename:
     def test_a_save_without_renames_keeps_the_ones_the_job_holds(self):
         state = _state(ENCRYPTED, renames=(TO_STORE,))
         asked = state.questions.early[1]
-        given = AnswerSet(facts=(FactAnswer(key=asked.key, value="password"),))
+        given = SentAnswers(facts=(FactAnswer(key=asked.key, value="password"),))
         saved = state.answer(
             Answers(given=given, save=True, revision=0, presented=(asked.key,)),
             limits=None,

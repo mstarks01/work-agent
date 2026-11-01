@@ -1072,7 +1072,9 @@
       waitsOn.get(finding).push(index);
     }));
     const factRow = index => QUESTION_ROWS.get(questionKey(FACT_QUESTIONS[index].key));
-    const needOf = (index, finding) => (FACT_QUESTIONS[index].needs || {})[finding] || [];
+    // The service sends the facets each waiting finding needs, every facet
+    // included (FactQuestion.to_json), so the page reads them as sent.
+    const needOf = (index, finding) => FACT_QUESTIONS[index].needs[finding];
     const knownFor = (index, facets) => {
       const row = factRow(index);
       return row.knownFor ? row.knownFor(facets) : row.known();

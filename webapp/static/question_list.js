@@ -343,12 +343,11 @@ const questionList = ({
         ? withDetail({ key: q.key, facets: given }, detail.value.trim())
         : null;
     };
-    // The critic names the kind, not a facet, so a finding waiting on it is
-    // covered only once every facet says more than "I don't know". A finding
-    // that needs only some facets is covered once those are known (ADR 0073);
-    // `facets` lists them, or is empty for every facet.
+    // A finding is covered once each facet it needs says more than "I don't
+    // know" (ADR 0073). `facets` lists them as the service sent them: every
+    // facet where the finding names none (needed_facets).
     row.knownFor = (facets) => inputs
-      .filter((select) => !facets.length || facets.includes(select.dataset.facet))
+      .filter((select) => facets.includes(select.dataset.facet))
       .every((select) => select.value && select.value !== DONT_KNOW);
     row.known = () => row.knownFor(q.asks);
     // Whether a facet it asks is still blank, which a skip sets aside.

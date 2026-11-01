@@ -22,7 +22,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service import migrations
-from analysis_service.answer_sets import NO_ANSWERS
+from analysis_service.answer_sets import NO_SENT_ANSWERS
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import RESTART_FAILURE_MESSAGE, InMemoryJobStore, JobRecord
 from analysis_service.sources import Source
@@ -576,7 +576,7 @@ class ChangesTheOldestOnAdmission:
     async def reserve(self, record, **bounds):
         if self.oldest is not None:
             assert await self._store.save_draft(
-                self.oldest, record.owner_id, NO_ANSWERS, 0
+                self.oldest, record.owner_id, NO_SENT_ANSWERS, 0
             )
         return await self._store.reserve(record, **bounds)
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.claims import UnknownRef
-from analysis_service.early_questions import PriorError, load_prior
+from analysis_service.early_questions import QUESTION_PRIOR, PriorError, load_prior
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import reports_dir
 from evals.harness.modes import EvalRunError
@@ -47,6 +47,7 @@ def test_the_command_writes_one_row_and_keeps_the_others(tmp_path):
         json.dumps(
             {
                 "asvs": {
+                    "record": None,
                     "runs": ["kept"],
                     "revision": "r",
                     "cases": 1,
@@ -65,7 +66,13 @@ def test_the_command_writes_one_row_and_keeps_the_others(tmp_path):
     assert command_question_prior(args) == 0
     table = load_prior(out)
     assert table["asvs"].runs == ("kept",)
+    assert table["asvs"].record is None
     assert table["stride"].runs == (BASELINE,)
+    record = table["stride"].record
+    assert record is not None
+    assert record["command"] == "question-prior"
+    assert record["commit"] == table["stride"].revision
+    assert BASELINE in {entry["path"] for entry in record["inputs"]}
     assert table["stride"].cases == 13
     assert table["stride"].rates["DataFlow"]["authentication"] > 0
 
@@ -81,11 +88,23 @@ def test_a_finished_case_with_no_report_is_named(archive, case):  # noqa: F811
 @pytest.mark.parametrize(
     ("table", "named"),
     [
-        ({"strid": {"rates": {}}}, "'strid'"),
-        ({"stride": {"rates": {"Datastore": {"technology": 0.1}}}}, "'Datastore'"),
-        ({"stride": {"rates": {"DataStore": {"technology": "0.1"}}}}, "DataStore"),
-        ({"stride": {"rates": {"DataStore": {"technology": -0.1}}}}, "DataStore"),
-        ({"stride": {"rates": ["DataStore"]}}, "rates"),
+        ({"strid": {"record": None, "rates": {}}}, "'strid'"),
+        ({"stride": {"rates": {}}}, "record"),
+        ({"stride": {"record": "r", "rates": {}}}, "record"),
+        ({"stride": ["rates"]}, "row"),
+        (
+            {"stride": {"record": None, "rates": {"Datastore": {"technology": 0.1}}}},
+            "'Datastore'",
+        ),
+        (
+            {"stride": {"record": None, "rates": {"DataStore": {"technology": "0.1"}}}},
+            "DataStore",
+        ),
+        (
+            {"stride": {"record": None, "rates": {"DataStore": {"technology": -0.1}}}},
+            "DataStore",
+        ),
+        ({"stride": {"record": None, "rates": ["DataStore"]}}, "rates"),
     ],
 )
 def test_a_prior_no_list_can_be_ranked_from_is_refused(tmp_path, table, named):
@@ -95,3 +114,24 @@ def test_a_prior_no_list_can_be_ranked_from_is_refused(tmp_path, table, named):
     with pytest.raises(PriorError, match=named) as raised:
         load_prior(path)
     assert str(path) in str(raised.value)
+
+
+#: The rows of the shipped prior that no recorded run counted, with the reason.
+UNRECORDED_ROWS = {
+    "asvs": (
+        "the archived sweep records 03-batch-data-pipeline as finished and holds"
+        " no report for it, so the command refuses the sweep and cannot count"
+        " the row again"
+    ),
+    "stride": (
+        "a recount reproduces the rates, but its record would name a branch"
+        " commit that the squash merge leaves off main; count it again on main"
+    ),
+}
+
+
+def test_each_shipped_row_without_a_record_is_declared():
+    """A row with no record is declared with the reason, and a declared row
+    that gains a record fails, so the list holds only rows still unrecorded."""
+    unrecorded = {name for name, row in QUESTION_PRIOR.items() if row.record is None}
+    assert unrecorded == UNRECORDED_ROWS.keys()

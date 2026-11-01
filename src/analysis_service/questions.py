@@ -45,6 +45,7 @@ from analysis_service.fact_answers import (
     asked_facets,
     covers,
     fact_kind,
+    needed_facets,
     needs_of,
 )
 from analysis_service.frameworks import PACKAGES
@@ -128,7 +129,9 @@ class FactQuestion:
     history: FactStatus = "open"
     #: For each finding that waits on only some facets of this question, as
     #: ``framework/claim``, the facets it needs (ADR 0073). A finding absent
-    #: here needs every facet.
+    #: here needs every facet. :meth:`to_json` sends each waiting finding's
+    #: facets as :func:`~analysis_service.fact_answers.needed_facets` reads
+    #: them, so a page applies no rule of its own.
     needs: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     @property
@@ -156,7 +159,10 @@ class FactQuestion:
             "element": self.element,
             "band": self.band,
             "findings": list(self.findings),
-            "needs": {finding: list(need) for finding, need in self.needs.items()},
+            "needs": {
+                finding: list(needed_facets(self.key, self.needs.get(finding, ())))
+                for finding in self.findings
+            },
         }
 
 
@@ -178,7 +184,9 @@ def _by_band(
     the most in each band below. Where none does, the next are the facts of
     that band's finding with the fewest choices left, the most cited first,
     asked together. A finding's choices are the facets it needs of each fact
-    (``needed``, ADR 0073), or every facet where it names none (ADR 0112). A lower band never comes before a higher one that still
+    (``needed``, ADR 0073), as :func:`~analysis_service.fact_answers.needed_facets`
+    reads them, and one for a fact with no facets. A lower band never comes
+    before a higher one that still
     waits: a critical finding that waits on two facts comes before a low one
     that waits on one. A tie goes to more citations, then to the lower key,
     so one input always gives one order (``QA-2026-09-26-03-E35``).
@@ -186,7 +194,7 @@ def _by_band(
     left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
 
     def choices(finding: Finding, key: UnknownKey) -> int:
-        return len(needed.get(finding, {}).get(key, ())) or choices_of(key)
+        return len(needed_facets(key, needed.get(finding, {}).get(key, ()))) or 1
 
     order: list[UnknownKey] = []
     while left:
