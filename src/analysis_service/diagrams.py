@@ -151,4 +151,6 @@ def read_diagram(text: str) -> DiagramReading:
         )
     if "structure" in found:
         return DiagramStructure.model_validate(found["structure"])
-    return DiagramRefusal(refused=str(found["refused"]))
+    return DiagramRefusal(
+        refused=str(found.get("refused", "the reader gave no reading"))
+    )
