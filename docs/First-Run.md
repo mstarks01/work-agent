@@ -375,8 +375,11 @@ you type one. **Remove** takes the transcript off the form.
 To add a diagram, click the same **+** button and choose a Mermaid file that
 ends in `.mmd` or `.mermaid`, such as a `flowchart`. The service reads it as a
 diagram of the system: a node can be a component and an arrow a data flow. A
-subgraph is a trust zone only where its label says so. The page holds one
-transcript and one diagram, and **Remove** takes each one off the form.
+subgraph is a trust zone only where its label says so. A node's shape states
+its type only where a comment in the diagram states the shape convention, as
+the line `%% Shapes: ...` in a diagram from **Download as Mermaid** does. The
+page holds one transcript and one diagram, and **Remove** takes each one off
+the form.
 
 Then replace the example with your own description. State security controls
 that are actually known. When the input does not state an attribute, extraction

@@ -10,6 +10,8 @@ cross one, takes a link style, read from
 
 **The text reads back as a ``diagram`` Source.** That register takes a
 subgraph as a trust zone only where its label says so, so the label says so.
+It takes a node's shape as its type only where a comment states the shape
+convention, so the text opens with :data:`SHAPE_CONVENTION`.
 ``evals/diagrams/`` holds this text for the corpus cases, as extraction input.
 
 **Every name is submitted text.** A name reaches Mermaid only inside a quoted
@@ -38,6 +40,12 @@ __all__ = ["model_mermaid"]
 #: that opens a Markdown string, the percent sign that opens a directive, and
 #: the characters HTML reads.
 _ENCODED = frozenset('"#%&<>`|')
+
+#: The comment that states which shape names which element type.
+SHAPE_CONVENTION = (
+    "%% Shapes: id[name] is an external entity, id(name) a process,"
+    " id[(name)] a data store."
+)
 
 #: The link style of a flow that crosses a boundary, and of one that may cross
 #: one because a zone is not stated, as the report page draws them.
@@ -80,7 +88,7 @@ def model_mermaid(model: SystemModel) -> str:
     if not elements:
         return ""
     ids = {element.id: f"n{at}" for at, element in enumerate(elements)}
-    lines = ["flowchart LR"]
+    lines = ["flowchart LR", f"    {SHAPE_CONVENTION}"]
     zoned: set[str] = set()
     for at, zone in enumerate(model.trust_boundaries):
         members = [element for element in elements if element.trust_zone == zone.id]

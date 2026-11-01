@@ -20,6 +20,8 @@ HOSTILE = (
 def test_each_zone_is_a_subgraph_and_each_kind_its_shape():
     assert model_mermaid(valid_model()) == (
         "flowchart LR\n"
+        "    %% Shapes: id[name] is an external entity, id(name) a process,"
+        " id[(name)] a data store.\n"
         '    subgraph z0["Trust zone: Internet"]\n'
         '        n0["Customer"]\n'
         "    end\n"
