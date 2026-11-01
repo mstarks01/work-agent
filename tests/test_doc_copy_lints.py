@@ -59,8 +59,11 @@ from analysis_service.sources import (
     MAX_SYSTEM_NAME_CHARS,
     SourceKind,
 )
+from analysis_service.system_model import ElementPrefix
 from analysis_service.validation import MAX_ELEMENTS
 from analysis_service.vendors import VENDORS, CredentialMode
+from evals.harness.early_rounds import paused_state
+from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT, guide_files
 from tests.test_api import make_client
 
@@ -478,6 +481,36 @@ def test_the_question_limits_are_the_early_rules():
     assert int(limit[1]) == capability.limit
     assert field.limit is None
     assert int(links[1]) == MAX_LINK_ANSWERS
+
+
+# The early entry: the keys a waiting job's early question carries.
+
+
+def test_the_early_entry_names_every_key_the_service_sends():
+    """The documented keys of an ``early_questions`` entry are the keys of a
+    served one: :meth:`~analysis_service.early_questions.EarlyQuestion.to_json`
+    and what the question set adds beside it."""
+    text = flat(HTTP_API.read_text(encoding="utf-8"))
+    entry = re.search(
+        r"A waiting job also lists `early_questions`:.*?Each entry is `\{([^}]*)\}`",
+        text,
+    )
+    assert entry is not None
+    documented = {key.strip() for key in entry[1].split(",")}
+    state = paused_state(valid_model(), {"stride": {}}, (), ())
+    served = state.questions.to_json()["early_questions"]
+    assert served
+    assert documented == set(served[0])
+
+
+def test_the_detected_type_list_is_every_element_prefix():
+    """``detected_facts`` sends an element's ``id_prefix`` as its ``type``."""
+    text = flat(HTTP_API.read_text(encoding="utf-8"))
+    listed = re.search(
+        r"`type` is the prefix of the element's ID: one of ([^.]*)\.", text
+    )
+    assert listed is not None
+    assert set(re.findall(r"`([a-z]+)`", listed[1])) == set(get_args(ElementPrefix))
 
 
 # Fact questions and answers: the key and the kinds that FactAnswer reads.

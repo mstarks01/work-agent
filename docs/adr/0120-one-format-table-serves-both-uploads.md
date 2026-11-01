@@ -4,8 +4,8 @@
 - **Date**: 2026-10-31
 - **Effort**: [#2061](https://github.com/mstarks01/work-agent/issues/2061), on the
   Owner File map [#2057](https://github.com/mstarks01/work-agent/issues/2057)
-- **Relates to**: [ADR 0118](0118-an-owner-file-is-an-object-and-a-row.md), which
-  stores the format of an **Owner File**; [ADR 0119](0119-a-source-names-the-owner-file-it-copies.md),
+- **Relates to**: [ADR 0118](0118-an-owner-file-is-an-object-and-a-row.md), whose
+  **Owner File** takes its format from its kind; [ADR 0119](0119-a-source-names-the-owner-file-it-copies.md),
   which gives a **Source** no format field;
   [ADR 0121](0121-mermaid-s-own-parsers-read-a-diagram-s-structure.md), whose
   reader reads a flowchart and an `architecture-beta` diagram
@@ -43,7 +43,8 @@ value, its extensions, the kinds it allows and its default kind:
 | `text/vnd.mermaid` | `.mmd`, `.mermaid` | `diagram` | `diagram` |
 
 A test checks that the default kind of each row is one of its kinds, that no
-row allows `answers`, and that no extension is in two rows.
+row allows `answers`, that no kind is in two rows, and that no extension is in
+two rows.
 
 **The server renders the table into the page.** The web app renders the table
 as JSON into the workspace page with `script_json`, the same as

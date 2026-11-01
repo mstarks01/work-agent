@@ -14,6 +14,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sqlite3
 import stat
 from datetime import UTC, datetime, timedelta
@@ -27,7 +28,7 @@ from sqlalchemy import create_engine
 
 from analysis_service import jobs as jobs_module
 from analysis_service import store_backends
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.api import create_app
 from analysis_service.carried_renames import ElementRename
 from analysis_service.certification import CertifyResult
@@ -239,21 +240,62 @@ class TestTheStartupRefusals:
 
     def test_a_schema_that_is_not_at_the_latest_revision(self, env, tmp_path):
         env["ANALYSIS_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
-        with pytest.raises(StoreConfigError, match="revision None"):
+        with pytest.raises(
+            StoreConfigError, match="revision None.*run python -m .* first$"
+        ):
             start(env)
 
-    def test_a_database_made_before_a_schema_change(self, env):
-        """A schema change edits revision 0001 in place, so a database made
-        before it is at the head revision and lacks the new table."""
+    def test_a_revision_this_build_does_not_hold(self, env):
+        """No migration reaches the head from a revision the tree does not
+        hold, so the refusal names the remedy that works."""
         database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
         engine = create_engine(f"sqlite:///{database}")
         with engine.begin() as connection:
-            connection.exec_driver_sql("DROP TABLE owner_files")
+            connection.exec_driver_sql(
+                "UPDATE alembic_version SET version_num = 'r9999'"
+            )
         engine.dispose()
         with pytest.raises(
-            StoreConfigError, match="no owner_files table.*make it again"
-        ):
+            StoreConfigError, match="holds no revision r9999.*delete its file"
+        ) as refused:
             start(env)
+        assert database not in str(refused.value)
+
+    @pytest.mark.parametrize(
+        ("change", "difference"),
+        [
+            ("DROP TABLE owner_files", "no owner_files table"),
+            (
+                "ALTER TABLE jobs DROP COLUMN carried_renames",
+                "no jobs.carried_renames column",
+            ),
+            (
+                (
+                    "ALTER TABLE owner_files ADD COLUMN format VARCHAR(64) NOT NULL"
+                    " DEFAULT 'text/plain'"
+                ),
+                "an unknown owner_files.format column",
+            ),
+        ],
+    )
+    def test_a_database_made_before_a_schema_change(self, env, change, difference):
+        """A schema change edits revision 0001 in place, so a database made
+        before it is at the head revision, and the migration changes nothing
+        in it. The refusal names the remedy that works, and no path."""
+        database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        engine = create_engine(f"sqlite:///{database}")
+        with engine.begin() as connection:
+            connection.exec_driver_sql(change)
+        engine.dispose()
+        migrate(Path(database))
+        with pytest.raises(StoreConfigError, match=re.escape(difference)) as refused:
+            start(env)
+        assert "delete its file" in str(refused.value)
+        assert "drop the database and create it again" in str(refused.value)
+        assert database not in str(refused.value)
+
+    def test_a_current_database_starts(self, env):
+        start(env)
 
     def test_a_missing_database_file(self, env, tmp_path):
         """The service never makes the file: only the migration step does."""
@@ -488,7 +530,7 @@ def every_field(owner_id: str = "alice") -> JobRecord:
     record.transition("running")
     record.record_node("extract")
     record.corrections = [FactAnswer(key=KEY, value="TLS 1.2")]
-    record.draft = AnswerSet(facts=(FactAnswer(key=KEY, value="none"),))
+    record.draft = SentAnswers(facts=(FactAnswer(key=KEY, value="none"),))
     record.revision = 2
     record.carried_renames = [
         ElementRename(earlier="store:orders-database", element="store:orders-db")

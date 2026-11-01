@@ -195,10 +195,10 @@ class FilesystemObjectStore:
         )
         value = env.get(OBJECT_ROOT_VAR, "")
         if not value:
-            raise StoreConfigError("set ANALYSIS_OBJECT_ROOT for the filesystem store")
+            raise StoreConfigError(f"set {OBJECT_ROOT_VAR} for the filesystem store")
         root = Path(value)
         if not root.is_absolute():
-            raise StoreConfigError("ANALYSIS_OBJECT_ROOT must be an absolute path")
+            raise StoreConfigError(f"{OBJECT_ROOT_VAR} must be an absolute path")
         return cls(root)
 
     async def check(self) -> None:
@@ -206,7 +206,7 @@ class FilesystemObjectStore:
         or open to a group or to others."""
         check_private(
             self._root,
-            "the object root that ANALYSIS_OBJECT_ROOT names",
+            f"the object root that {OBJECT_ROOT_VAR} names",
             directory=True,
         )
 
@@ -392,7 +392,7 @@ OBJECT_ROOT_VAR = "ANALYSIS_OBJECT_ROOT"
 OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
     "filesystem": ObjectStoreBackend(
         build=FilesystemObjectStore.from_env,
-        reads=(OBJECT_STORE_VAR, "ANALYSIS_OBJECT_ROOT"),
+        reads=(OBJECT_STORE_VAR, OBJECT_ROOT_VAR),
         mode_reads={},
     ),
     "s3": ObjectStoreBackend(

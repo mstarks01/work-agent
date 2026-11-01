@@ -14,8 +14,8 @@
 An **Owner File** is a supporting file that an **Owner** keeps in the Files
 section of the web app. It does not expire, and it stays until the owner
 deletes it. Today each format is text, and one Owner File is at most
-`max_source_bytes`. Each Owner File stores its format, so that a later format
-of bytes, such as an image, needs no migration of the stored files.
+`max_source_bytes`. Each kind belongs to one row of the format table
+(ADR 0120), so the kind of an Owner File gives its format.
 
 The store keeps a job in rows and two objects (ADR 0065). `object_key` is the
 one rule for a key, and the orphan sweep reads each key with `key_parts`.
@@ -23,8 +23,9 @@ one rule for a key, and the orphan sweep reads each key with `key_parts`.
 ## Decision
 
 **The text is an object, and one row in `owner_files` names it.** The row
-holds the ID, the owner ID, the name, the kind, the format, the SHA-256 of
-the object, the size in bytes and the time of the upload. An upload writes
+holds the ID, the owner ID, the name, the kind, the SHA-256 of the object,
+the size in bytes and the time of the upload. The row stores no format,
+because the kind gives it. An upload writes
 the object first and the row second, and a read checks the digest. The store
 checks the owner on the row before it reads the object.
 

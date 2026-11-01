@@ -90,7 +90,7 @@ from sqlalchemy.types import TypeDecorator
 from typing_extensions import override
 
 from analysis_service import migrations
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.aws_identity import platform_session
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.carried_renames import ElementRename
@@ -290,7 +290,6 @@ owner_files = Table(
     ),
     Column("name", Text, nullable=False),
     Column("kind", String(32), nullable=False),
-    Column("format", String(64), nullable=False),
     Column("sha256", String(64), nullable=False),
     Column("size_bytes", BigInteger, nullable=False),
     Column("created_at", _UtcTime, nullable=False),
@@ -780,14 +779,12 @@ def _no_preparation(engine: AsyncEngine) -> None:
     """Set nothing on a new engine."""
 
 
-async def _held_by_begin_immediate(connection: AsyncConnection) -> None:
-    """Take no lock: ``BEGIN IMMEDIATE`` took the write lock of the database."""
+async def _held_by_begin_immediate(connection: AsyncConnection, *_: str) -> None:
+    """Take no lock: ``BEGIN IMMEDIATE`` took the write lock of the database.
 
-
-async def _owner_held_by_begin_immediate(
-    connection: AsyncConnection, owner_id: str
-) -> None:
-    """Take no lock: ``BEGIN IMMEDIATE`` took the write lock of the database."""
+    It serves as the admission lock and as each owner's Owner File lock, so it
+    takes the owner ID of the second and reads nothing past the connection.
+    """
 
 
 #: The key of the advisory lock that admission takes on PostgreSQL. The value
@@ -869,7 +866,7 @@ DATABASES: dict[DatabaseDriver, Database] = {
         prepare=_prepare_sqlite,
         connect=_sqlite,
         admission_lock=_held_by_begin_immediate,
-        owner_files_lock=_owner_held_by_begin_immediate,
+        owner_files_lock=_held_by_begin_immediate,
         create=_create_sqlite,
         first_run_migrates=True,
         reads=(DATABASE_URL_VAR,),
@@ -1017,6 +1014,39 @@ def _revision(connection: Connection) -> str | None:
     return MigrationContext.configure(connection).get_current_revision()
 
 
+#: The remedy for a database that no migration can bring to the latest
+#: revision. It names no path, so the refusal that holds it names none.
+_REMAKE = (
+    "remove the database (for SQLite, delete its file; for PostgreSQL, drop the"
+    " database and create it again), then run python -m analysis_service.migrations"
+)
+
+
+def _schema_differences(connection: Connection) -> list[str]:
+    """Each table of :data:`METADATA` that the database lacks, and each column
+    that one of its tables lacks or holds beyond :data:`METADATA`.
+
+    An insert into a table that holds a column the service does not know
+    fails where that column takes no null.
+    """
+    inspector = inspect(connection)
+    held_tables = set(inspector.get_table_names())
+    differences = []
+    for name, table in sorted(METADATA.tables.items()):
+        if name not in held_tables:
+            differences.append(f"no {name} table")
+            continue
+        needed = set(table.columns.keys())
+        held = {column["name"] for column in inspector.get_columns(name)}
+        differences += [
+            f"no {name}.{column} column" for column in sorted(needed - held)
+        ]
+        differences += [
+            f"an unknown {name}.{column} column" for column in sorted(held - needed)
+        ]
+    return differences
+
+
 def _held(job_id: str) -> CompoundSelect:
     """The ID ``job_id`` where a job row or a usage row holds it. A deleted
     job keeps its ID, so a new job never takes it."""
@@ -1092,28 +1122,32 @@ class SqlJobStore:
                 yield connection
 
     async def startup_check(self) -> None:
-        """Refuse a schema that is not at the latest revision, then check the
-        object store. The service never migrates."""
+        """Refuse a schema that is not at the latest revision, or that differs
+        from :data:`METADATA` in a table or a column, then check the object
+        store. The service never migrates."""
         async with self._transaction() as connection:
             current = await connection.run_sync(_revision)
         head = migrations.head()
         if current != head:
+            remedy = (
+                "run python -m analysis_service.migrations first"
+                if migrations.holds(current)
+                else f"this build holds no revision {current}, so {_REMAKE}"
+            )
             raise StoreConfigError(
                 f"the database schema is at revision {current}, and this service"
-                f" needs {head}: run python -m analysis_service.migrations first"
+                f" needs {head}: {remedy}"
             )
         async with self._transaction() as connection:
-            held = set(
-                await connection.run_sync(lambda sync: inspect(sync).get_table_names())
-            )
-        missing = sorted(set(METADATA.tables) - held)
-        if missing:
+            differences = await connection.run_sync(_schema_differences)
+        if differences:
             # A schema change edits revision 0001 in place, so a database made
-            # before it is at the head revision and lacks the new table.
+            # before it is at the head revision, and a migration changes
+            # nothing in it.
             raise StoreConfigError(
-                f"the database has no {', '.join(missing)} table: it was made"
-                " before a schema change, so delete it and make it again with"
-                " python -m analysis_service.migrations"
+                f"the database schema differs from the one this service needs"
+                f" ({'; '.join(differences)}): the database was made before a"
+                f" schema change, and a migration does not change it, so {_REMAKE}"
             )
         await self._objects.check()
 
@@ -1611,7 +1645,7 @@ class SqlJobStore:
         self,
         job_id: str,
         owner_id: str,
-        draft: AnswerSet,
+        draft: SentAnswers,
         revision: int,
     ) -> bool:
         """Keep a finished report's draft answers, as one conditional

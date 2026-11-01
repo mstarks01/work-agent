@@ -73,6 +73,9 @@ eval(scriptText + `
   assert(item);
   assert(text(item).includes("stays pending"));
   assert(!text(item).includes("private-key"));
+  const restartHint = (row) => notes(row).some((note) => note && text(note).includes("after a restart"));
+  assert.strictEqual(restartHint({ ...rowOf("tiers.base.vendor"), store: true }), true);
+  assert.strictEqual(restartHint(rowOf("tiers.base.vendor")), false);
   const pendingSave = save();
   assert.strictEqual(layout.inert, true);
   assert.strictEqual(document.getElementById("unknown-lines").inert, true);

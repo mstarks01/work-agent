@@ -355,19 +355,23 @@
     const active = document.activeElement;
     return Boolean(active && typeof node.contains === "function" && node.contains(active));
   };
-  // A part that holds its box's shared answer waits on the box's share.
+  // An element that holds its box's shared answer waits on the box's share.
   const dirty = (row) => edits.has(rowKey(row))
     || Boolean(row.inherited && edits.has(shareKey(row.q.key)));
   // A row the page must not rebuild: the submitter is editing it, or its edit is
   // not acknowledged yet.
   const busy = (row) => dirty(row) || focused(row.node);
 
-  // The intro, the list and the tail of the question area. The intro and the
-  // tail are redrawn from each payload; the list is reconciled by key.
+  // The parts of the question area. The intro is redrawn from each payload,
+  // what the description says and the tail once for each run, and the list
+  // is reconciled by key.
   const intro = document.createElement("div");
   intro.className = "list-intro";
   const tail = document.createElement("div");
   tail.className = "list-tail";
+  // What the description says, drawn once for each run (drawDetected).
+  const detectedBox = document.createElement("div");
+  detectedBox.className = "detected-facts";
   // The answers this run carried from an earlier one and could not take,
   // redrawn from each payload (drawCarried).
   const carried = document.createElement("div");
@@ -375,7 +379,7 @@
   let framed = false;
   const frame = () => {
     if (framed) return;
-    questions.replaceChildren(intro, list, carried, tail);
+    questions.replaceChildren(detectedBox, intro, list, carried, tail);
     framed = true;
   };
 
@@ -404,7 +408,7 @@
     return parts.length ? parts.join("; ") : null;
   };
   // The lines under a question's "?": why it is asked, what it serves, what
-  // each answer does, and the submitter's own words about the part.
+  // each answer does, and the submitter's own words about the element.
   const contextOf = (q) => {
     const parts = [];
     if ((q.reasons || []).length) parts.push(`Why: ${q.reasons[0]}`);
@@ -483,8 +487,7 @@
     const count = { facts: 0, links: 0, skips: 0 };
     for (const [key, edit] of sendable()) {
       const need = { facts: 0, links: 0, skips: edit.skip ? 1 : 0 };
-      // Each part a share covers counts as one fact answer (ADR 0114).
-      if (edit.kind === "share") need.facts = edit.answer.covers.length;
+      if (edit.kind === "share") need.facts = coveredCount([edit.answer]);
       else if (edit.answer) need[edit.kind === "link" ? "links" : "facts"] = 1;
       const over = Object.keys(need).some((kind) => count[kind] + need[kind] > ANSWER_LIMITS[kind]);
       if (over) continue;
@@ -685,7 +688,7 @@
     const key = shareKey(row.q.key);
     const base = answersOf(view || {}).get(key) || null;
     const share = shareOf(row.box, base);
-    if (!share || sameShare(share, base) || (!share.covers.length && !base)) {
+    if (!shareChanged(share, base)) {
       edits.delete(key);
       return false;
     }
@@ -697,7 +700,7 @@
   const registerEdit = (row) => {
     const shared = Boolean(row.kind === "fact" && row.box && row.box.shared);
     const boxChanged = shared && registerShare(row);
-    // A part that holds the shared answer sends no answer of its own: the
+    // An element that holds the shared answer sends no answer of its own: the
     // box's share carries it.
     if (row.inherited) {
       edits.delete(rowKey(row));
@@ -900,6 +903,7 @@
     openFirstBatch();
     drawIntro(data);
     drawCarried(data);
+    drawDetected(data);
     drawTail(data);
     drawBoxes(data);
     announce(before, data);
@@ -1041,9 +1045,9 @@
 
   // ---- Carried answers ----------------------------------------------------
   // Answers this run carried from an earlier one and could not take
-  // (AnswerState.carried, ADRs 0072 and 0079). An answer about a part this
-  // model does not have can follow the part to its new name, where the
-  // submitter says which part it is now (ADR 0116). Nothing is matched by a
+  // (AnswerState.carried, ADRs 0072 and 0079). An answer about an element this
+  // model does not have can follow the element to its new name, where the
+  // submitter says which element it is now (ADR 0116). Nothing is matched by a
   // similar name.
   const plainList = (lines) => {
     const items = document.createElement("ul");
@@ -1082,14 +1086,20 @@
     answerProblem.hidden = true;
     if (data.early_questions) reconcile(data);
   });
+  // Whether a dropped answer waits for the submitter to choose an element, by its
+  // reason (CarriedReason).
+  const waitsForPart = {
+    "missing-element": true,
+    "not-taken": false,
+  };
   const drawCarried = (data) => {
     const dropped = data.carried_dropped || [];
     const renames = (data.carried_renames || []).map(({ earlier, element }) => ({ earlier, element }));
     carried.replaceChildren();
     // The change review: what this run kept from the earlier analysis, what
-    // it did not keep, and what waits for the submitter to choose a part.
+    // it did not keep, and what waits for the submitter to choose an element.
     const kept = (data.carried_kept || []).length + (data.carried_kept_links || []).length;
-    const waiting = dropped.filter((a) => a.reason === "missing-element").length;
+    const waiting = dropped.filter((a) => waitsForPart[a.reason]).length;
     const notKept = dropped.length - waiting + (data.carried_dropped_links || []).length;
     if (kept + waiting + notKept) {
       const parts = [`${counted(kept, "answer is", "answers are")} kept and marked under Your answers`];
@@ -1110,7 +1120,7 @@
       carried.append(line);
     }
     for (const { earlier, choices } of data.rename_choices || []) {
-      const about = dropped.filter((a) => a.key[0] === earlier);
+      const about = dropped.filter((a) => keyRef(a.key).element_id === earlier);
       if (!about.length) continue;
       const box = document.createElement("div");
       box.className = "rename";
@@ -1144,7 +1154,7 @@
       carried.append(box);
     }
     const others = [
-      ...dropped.filter((a) => a.reason !== "missing-element").map((a) => `${a.label} — ${answerText(a)}`),
+      ...dropped.filter((a) => !waitsForPart[a.reason]).map((a) => `${a.label} — ${answerText(a)}`),
       ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${linkAnswerText(a)}`),
     ];
     if (others.length) {
@@ -1156,40 +1166,50 @@
     }
   };
 
-  // The tail: answers an amendment could not carry, and the amendment itself.
+  // What the extraction read from the description (detected_facts), open
+  // above the questions: each element with the facts stated about it and the
+  // words they came from, so a wrong fact is seen before any answer. Read
+  // only: the amendment after the questions corrects one.
+  let detectedDrawn = false;
+  const drawDetected = (data) => {
+    if (detectedDrawn) return;
+    detectedDrawn = true;
+    const detected = data.detected_facts || [];
+    if (!detected.length) return;
+    // Each element's type, by its ID prefix (ElementPrefix).
+    const TYPES = {
+      "entity": "external party",
+      "process": "process",
+      "store": "data store",
+      "flow": "data flow",
+      "boundary": "trust zone",
+    };
+    const review = document.createElement("details");
+    review.className = "detected";
+    review.open = true;
+    const title = document.createElement("summary");
+    title.textContent = `What your description says (${counted(detected.length, "part", "parts")})`;
+    review.append(title, hint("These facts were read from your description. Where one is wrong, or"
+      + " a part is missing, say so in the box after the questions."));
+    for (const part of detected) {
+      const line = document.createElement("p");
+      const name = document.createElement("b");
+      name.textContent = part.name;
+      const facts = part.facts.map((fact) => `${fact.attribute.replaceAll("_", " ")}: ${fact.value}`
+        + (fact.inferred ? ` (inferred: ${fact.inferred})` : ""));
+      line.append(name, ` (${TYPES[part.type]})`, facts.length ? ` — ${facts.join("; ")}` : "");
+      review.append(line);
+      if (part.excerpt) review.append(hint(`From ${part.source_label}: “${part.excerpt}”`));
+    }
+    detectedBox.append(review);
+  };
+
+  // The tail: the amendment.
   let tailDrawn = false;
   const drawTail = (data) => {
     if (tailDrawn) return;
     tailDrawn = true;
-    // What the extraction read from the description (detected_facts): each
-    // part with the facts stated about it and the words they came from, so a
-    // wrong fact is seen before the analysis. Read only: the amendment below
-    // corrects one.
-    const detected = data.detected_facts || [];
-    if (detected.length) {
-      const TYPES = {
-        Process: "process", DataStore: "data store", DataFlow: "data flow",
-        ExternalEntity: "external party", TrustBoundary: "trust zone",
-      };
-      const review = document.createElement("details");
-      review.className = "detected";
-      const title = document.createElement("summary");
-      title.textContent = `What your description says (${counted(detected.length, "part", "parts")})`;
-      review.append(title, hint("These facts were read from your description. Where one is wrong, or"
-        + " a part is missing, say so in the box below."));
-      for (const part of detected) {
-        const line = document.createElement("p");
-        const name = document.createElement("b");
-        name.textContent = part.name;
-        const facts = part.facts.map((fact) => `${fact.attribute.replaceAll("_", " ")}: ${fact.value}`
-          + (fact.inferred ? ` (inferred: ${fact.inferred})` : ""));
-        line.append(name, ` (${TYPES[part.type] || part.type})`, facts.length ? ` — ${facts.join("; ")}` : "");
-        review.append(line);
-        if (part.excerpt) review.append(hint(`From ${part.source_label}: “${part.excerpt}”`));
-      }
-      tail.append(review);
-    }
-    // An amendment to the description itself: a part missing, or a fact read
+    // An amendment to the description itself: an element missing, or a fact read
     // wrongly. The service reads the description again with it, asks again,
     // and keeps every answer that still fits (ADR 0072).
     const fix = document.createElement("details");
@@ -1237,7 +1257,7 @@
   // "Answer it" and "Change" build an editor only when pressed.
   const drawBoxes = (data) => {
     const held = answersOf(data);
-    const covered = sharedKeys(data.answered_shares || []);
+    const covered = sharesByKey(data.answered_shares || []);
     // The answers the earlier analysis gave, which this run kept (ADR 0079).
     const carriedKeys = new Set([
       ...(data.carried_kept || []).map(questionKey),
@@ -1257,7 +1277,7 @@
       const kept = document.createElement("span");
       if (before) {
         kept.textContent = ` — ${kind === "link" ? linkAnswerText(before) : answerText(before)}`;
-        // Changing it here makes it this part's own answer (ADR 0114).
+        // Changing it here makes it this element's own answer (ADR 0114).
         if (covered.has(key)) kept.textContent += " (shared answer)";
         // Changing it here makes it this run's own answer.
         if (carriedKeys.has(key)) kept.textContent += " (from the earlier analysis)";
@@ -1341,8 +1361,10 @@
       edits.clear();
       list.replaceChildren();
       tailDrawn = false;
+      detectedDrawn = false;
       batchOpened = false;
       tail.replaceChildren();
+      detectedBox.replaceChildren();
       view = null;
     }
     pausedRun = data.run;

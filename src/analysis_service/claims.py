@@ -453,7 +453,8 @@ class UnknownRef(BaseModel):
 #: The fields of :class:`UnknownRef` in :attr:`UnknownRef.key` order, for a
 #: reader that holds a key and not its reference. A test holds the two equal.
 #: :func:`~analysis_service.fact_answers.key_ref` and two
-#: :class:`~analysis_service.fact_answers.FactAnswer` validators use it.
+#: :class:`~analysis_service.fact_answers.FactAnswer` validators use it, and a
+#: lint in ``tests/test_one_reader_lints.py`` refuses any other reader.
 UNKNOWN_KEY_FIELDS = (
     "element_id",
     "attribute",
@@ -583,7 +584,7 @@ class Ground(BaseModel):
       agent's argument and the critic's to rule on.
     * ``absent-element`` — ``term`` alone: a word a submitter writes for a
       thing, which no element's free text names. **The only branch whose
-      referent is the whole model rather than a part of it**, and the one a
+      referent is the whole model rather than an element of it**, and the one a
       framework needs to justify a claim about what a system does not have. A
       requirement about LDAP injection does not apply to a system that never
       mentions a directory service, and the fact that rules it out is the
@@ -674,7 +675,7 @@ class Ground(BaseModel):
         credential the graph has no node for, and which element it is about is
         the catalog's to answer, not this record's.
 
-        Read wherever a caller needs "which part of the model is this about",
+        Read wherever a caller needs "which element of the model is this about",
         so a sixth branch answers here once instead of in each caller's own
         ``or`` chain.
         """

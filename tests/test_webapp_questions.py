@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 from analysis_service import StubPipelineRunner
 from analysis_service.analysis import ABSENT_WORD
 from analysis_service.answer_bodies import BodyRefused, read_answers
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.assertions import AssertionRecord
@@ -32,6 +32,7 @@ from analysis_service.fact_answers import (
     MAX_FACT_ANSWERS,
     FactAnswer,
     merged_facts,
+    needed_facets,
 )
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
@@ -56,7 +57,7 @@ from tests.test_webapp import (
     posted,
     startup_for,
 )
-from webapp.main import PAGE_SOURCE_LABELS, create_app
+from webapp.main import PAGE_SOURCE_LABELS, create_app, file_refusals
 
 #: The shipped tier config, as the webapp tests build it: one fixture, used here.
 tiers = test_webapp.tiers
@@ -568,7 +569,7 @@ for (const id of ["analyze","description","problem","go","load","ask",
                   "answer_limits","save-status","changes","upload","upload-file",
                   "transcript-note","transcript-name","transcript-remove","diagram-note",
                   "diagram-name","diagram-remove","analysis-name",
-                  "description-remaining","source_formats","page_labels",
+                  "description-remaining","source_formats","file_refusals","page_labels",
                   "files-rows","chosen-files","files-dialog","files-cancel","files-select",
                   "upload-menu","upload-computer","upload-files"])
   ids[id] = new Node(id);
@@ -580,6 +581,7 @@ ids["analysis-name"].value = "Test analysis";
 ids.ask.checked = true;
 ids.answer_limits.textContent = LIMITS;
 ids.source_formats.textContent = FORMATS;
+ids.file_refusals.textContent = REFUSALS;
 ids.page_labels.textContent = PAGE_LABELS;
 const framework = new Node("input");
 framework.value = "stride";
@@ -633,6 +635,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         _FORM_HARNESS.replace("SEARCH", json.dumps(search))
         .replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
         .replace("FORMATS", json.dumps(json.dumps(_FORMAT_TABLE)))
+        .replace("REFUSALS", json.dumps(json.dumps(file_refusals(64))))
         .replace("PAGE_LABELS", json.dumps(json.dumps(PAGE_SOURCE_LABELS)))
         + script
         + "\n(async () => {\n"
@@ -1049,25 +1052,6 @@ await ids.continue.listeners.click(); await settle();
     }
 
 
-def test_every_key_part_a_page_reads_is_the_part_it_means():
-    """A page reads a fact key by position, and ``key_ref`` is the server's one
-    reader of which part is which, so each position a page reads is held to
-    the field it means."""
-    from analysis_service.claims import UNKNOWN_KEY_FIELDS
-
-    means = {0: "element_id", 1: "attribute", 4: "question"}
-    read = {
-        int(index)
-        for name in ("first_run.js", "question_list.js", "report_view.js")
-        for index in re.findall(r"\bkey\[(\d)\]", test_webapp.page_javascript(name))
-    }
-
-    assert read, "no page reads a key part to check"
-    assert read <= set(means), f"a page reads key parts {sorted(read - set(means))}"
-    for index in read:
-        assert UNKNOWN_KEY_FIELDS[index] == means[index]
-
-
 def test_the_key_field_list_names_each_part_of_a_key():
     """``UNKNOWN_KEY_FIELDS`` states ``UnknownRef.key``'s order a second time,
     so a reference with a distinct value in each field is put to both."""
@@ -1206,7 +1190,23 @@ def _report_payloads(payloads: dict) -> dict:
         for block in report["analyses"]
     ]
     merged["report"] = report
+    merged["fact_questions"] = [_as_served(q) for q in merged["fact_questions"]]
     return {name: json.dumps(value) for name, value in merged.items()}
+
+
+def _as_served(question: dict) -> dict:
+    """A fact question fixture with ``needs`` as
+    :meth:`~analysis_service.questions.FactQuestion.to_json` sends it: each
+    waiting finding's facets, read by
+    :func:`~analysis_service.fact_answers.needed_facets`."""
+    key = tuple(question["key"])
+    named = question.get("needs", {})
+    return question | {
+        "needs": {
+            finding: list(needed_facets(key, named.get(finding, ())))
+            for finding in question["findings"]
+        }
+    }
 
 
 def _run_answer_block(payloads: dict, steps: str) -> dict:
@@ -1427,7 +1427,7 @@ def test_the_served_draft_keys_each_link_by_its_fold():
 
     report = sample_report()
     link = LinkAnswer(principal="Customer Account", element="entity:customer")
-    state = replace(report_state(report), draft=AnswerSet(links=(link,)))
+    state = replace(report_state(report), draft=SentAnswers(links=(link,)))
     served = test_report_page.payloads_of(
         render_report(report, state, previous=None, parent=None).html
     )
@@ -2079,7 +2079,7 @@ calls.push({ shared: shared.length });
     ],
 )
 def test_a_shared_answer_is_asked_as_a_question_of_every_part(form, choices, names):
-    """The box's heading asks the shared question of every part it lists,
+    """The box's heading asks the shared question of every element it lists,
     and it names each shared control (#1842)."""
     first, second = valid_model().data_flows[:2]
     _, heading = group_of(
@@ -2105,8 +2105,8 @@ calls.push({ heading: title.children[0].textContent,
 
 
 def test_one_shared_answer_fills_only_the_parts_a_person_ticks():
-    """A box asks its question once, every part starts unticked, and the
-    answer reaches only the parts a person ticks (ADR 0081, ADR 0113)."""
+    """A box asks its question once, every element starts unticked, and the
+    answer reaches only the elements a person ticks (ADR 0081, ADR 0113)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
@@ -2141,8 +2141,9 @@ await ids.continue.listeners.click(); await settle();
 
 
 def test_a_shared_box_saves_one_share_and_an_untick_shrinks_it():
-    """The page sends the box's answer once, as a share of the parts ticked,
-    and an untick sends the share again with one part fewer (ADR 0114)."""
+    """The page sends the box's answer once, as a share of the elements
+    ticked, and an untick sends the share again with one element fewer (ADR
+    0114)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
@@ -2175,9 +2176,9 @@ await settle();
 
 
 def test_a_part_ticked_after_a_reload_joins_the_held_share():
-    """A part the held share covers is answered, so a reload lists it under
-    "Your answers", marked shared. A part ticked then joins the share, and the
-    share keeps the part it covered (ADR 0114)."""
+    """An element the held share covers is answered, so a reload lists it
+    under "Your answers", marked shared. An element ticked then joins the
+    share, and the share keeps the element it covered (ADR 0114)."""
     first, second = valid_model().data_flows[:2]
     third = first.model_copy(
         update={"id": "flow:process:web-app>store:orders-db>read", "name": "read"}
@@ -2213,7 +2214,7 @@ await settle();
 
 
 def test_the_box_says_which_parts_its_answer_covers():
-    """The line beside the shared answer names each ticked part, and follows
+    """The line beside the shared answer names each ticked element, and follows
     a tick and an untick (ADR 0114)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
@@ -2237,7 +2238,7 @@ calls.push({ line: line() });
 
 
 def test_undo_puts_back_the_shared_answer_and_each_part_it_wrote():
-    """Undo restores the answer before the last change, and each part it
+    """Undo restores the answer before the last change, and each element it
     wrote (ADR 0114)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
@@ -2262,8 +2263,9 @@ calls.push({ shown: !undo.hidden, shared: state.value, rows: rowsOf().map(r => o
 
 
 def test_unticking_a_part_takes_back_only_the_shared_answer():
-    """A part unticked after the shared answer reached it loses that value,
-    and a part a person answered by hand after it keeps its own (ADR 0113)."""
+    """An element unticked after the shared answer reached it loses that
+    value, and an element a person answered by hand after it keeps its own
+    (ADR 0113)."""
     first, second = valid_model().data_flows[:2]
     facts = [_control_row(first), _control_row(second)]
     steps = (
@@ -4093,7 +4095,7 @@ calls.push({ said: text(ids.questions) });
 
 def test_the_page_reviews_what_it_kept_from_the_earlier_analysis():
     """A kept answer is marked under Your answers, and one line counts what
-    was kept, not kept, and waits for a part (#2029 package 7)."""
+    was kept, not kept, and waits for an element (#2029 package 7)."""
     flow = valid_model().data_flows[0]
     key = [flow.id, "encryption_in_transit", "", "", "", ""]
     answered = {
@@ -4145,8 +4147,8 @@ calls.push({{ said: text(ids.questions), earlier: text(ids.earlier) }});
 
 
 def test_the_pause_lists_what_the_description_says():
-    """Each part with its stated facts and the words they came from, above
-    the amendment box (#2029 package 8)."""
+    """Each element with its stated facts and the words they came from, open
+    and above the question list (#2029 package 8, ruled 2026-11-01)."""
     payload = {
         "run": "r1",
         "link_questions": [],
@@ -4160,7 +4162,7 @@ def test_the_pause_lists_what_the_description_says():
             {
                 "element": "process:web-app",
                 "name": "Web App",
-                "type": "Process",
+                "type": "process",
                 "excerpt": "the web app runs on Cloud Run",
                 "source_label": "System description",
                 "facts": [
@@ -4180,9 +4182,15 @@ streams[0].listeners.questions({{ data: JSON.stringify({json.dumps(payload)}) }}
 const text = (n) => typeof n === "string" ? n
   : [n.textContent || "", ...(n.children || []).map(text)].join("");
 const box = ids.questions.querySelectorAll("details").find(d => d.className === "detected");
-calls.push({{ said: text(box) }});
+const order = ids.questions.children.map(part => part.className);
+calls.push({{ said: text(box), open: box.open, order }});
 """
-    said = next(c["said"] for c in _run_form_script(steps)["calls"] if "said" in c)
+    seen = next(c for c in _run_form_script(steps)["calls"] if "said" in c)
+    said = seen["said"]
+    assert seen["open"] is True
+    assert seen["order"][:2] == ["detected-facts", "list-intro"], (
+        "the facts come before the list"
+    )
     assert "What your description says (1 part)" in said
     assert (
         "Web App (process) \u2014 technology: FastAPI; exposure: internet-facing"
@@ -4192,7 +4200,7 @@ calls.push({{ said: text(box) }});
 
 
 class TestTheRenameOfACarriedElement:
-    """The owner says which part a missing element is now (ADR 0116)."""
+    """The owner names the element that a missing element is now (ADR 0116)."""
 
     PAUSE = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();

@@ -15,7 +15,7 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from analysis_service.answer_bodies import AnswersSubmission
-from analysis_service.answer_sets import AnswerSet, HeldAnswerSet
+from analysis_service.answer_sets import AnswerSet, HeldAnswerSet, SentAnswers
 from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.claims import UnknownRef, Verdict
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
@@ -295,7 +295,7 @@ class TestASaveDuringARunIsNotLost:
 
         async def racing(record, **bounds):
             # A second tab's save lands after the run composed its answers.
-            assert await store.save_draft(job, "alice", AnswerSet(facts=(late,)), 0)
+            assert await store.save_draft(job, "alice", SentAnswers(facts=(late,)), 0)
             return await reserve(record, **bounds)
 
         store.reserve = racing

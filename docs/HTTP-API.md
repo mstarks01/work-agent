@@ -270,9 +270,12 @@ asks no link question, and asks its early questions.
 
 A waiting job also lists `early_questions`: the open facts of its model, most
 likely needed first, before any finding exists. Each entry is
-`{key, kind, label, reasons, choices, form, suggestions, facets, max_length,
-group, group_heading, element, excerpt}`. `kind`, `form`, `suggestions`,
-`facets` and `max_length` are as they are for a report's open facts below.
+`{key, kind, label, reasons, frameworks, choices, form, suggestions, facets,
+asks, max_length, decisions, group, group_heading, element, parent, gates,
+excerpt, reason, rank}`. `kind`, `form`, `suggestions`, `facets`, `asks` and
+`max_length` are as they are for a report's open facts below. An early
+question asks every facet of its question. `frameworks` names the selected
+frameworks that an answer serves.
 `choices` lists each choice as `{id, name}`: `name` is the element's name
 where the choice is an element, and empty otherwise. `excerpt` is the words
 of the source the question's element was read from, and empty where the
@@ -280,8 +283,12 @@ question names no element. `group` is the question kind or the attribute, and
 `group_heading` is its question with no element named, so a page can ask each
 once and list the elements under it by their `element` name. The list keeps
 its order within and across groups.
-`reasons` gives the questions of the rules that fire on the element, which say
-why the fact matters. `score` is the value the list is ranked by. An attribute is asked only where the model, with the
+`reasons` gives the effect sentence of each rule that reads the fact on the
+element: what an answer informs. Where no rule reads the fact, it gives one
+sentence that says why the question is asked. The list ranks a field question
+by its relevance, and the floor reads its score; the entry sends neither
+value. `parent`, `gates`, `decisions`, `reason` and `rank` are described
+below. An attribute is asked only where the model, with the
 assertion catalog applied, leaves it open: `unknown`, possibly with a
 qualification after it, or a zone the service inferred. Answer them as `facts` on the route below. The analysis then
 reads your answers, so the findings rest on them.
@@ -378,7 +385,9 @@ its gate is satisfied, at or above the floor, are in `early_blocked` with the
 **Review what the extraction read.** A waiting job's `detected_facts` lists
 each element of its model, in model order, with `name`, `type`, the
 `excerpt` and `source_label` it was read from, and `facts`: each attribute
-the model states, as `{"attribute", "value", "inferred"}`. An attribute the
+the model states, as `{"attribute", "value", "inferred"}`. `type` is the
+prefix of the element's ID: one of `entity`, `process`, `store`, `flow` and
+`boundary`. An attribute the
 model leaves `unknown` is an open fact and is asked, so it is not listed.
 `inferred` holds the basis where extraction recorded the value as an
 assumption, and is empty where a source states it. A finished report lists
@@ -579,8 +588,9 @@ with `400`. The follow-up does not ask a fact that an earlier answer answered,
 and an "I don't know" answer counts. A question with facets is asked again
 only for the facets that no answer answered. You can still send a new answer
 to a fact that an earlier save answered, to change it. Each fact question
-carries `needs`: each finding that waits on only some facets of the
-question, with the facets it needs; a finding not listed needs every facet
+carries `needs`: each finding that waits on the question, with the facets it
+needs; a finding that names none of them needs every facet, and a fact
+answered in one value has none
 ([ADR 0073](adr/0073-a-finding-can-wait-on-some-facets-and-an-answer-can-carry-a-detail.md)).
 Each question also carries `asks`: the facets that its waiting findings
 need, which the web app shows as inputs. You can still answer any facet
@@ -1250,6 +1260,15 @@ creates the database file with mode `0600` where there is none. A migration chan
 tables only. It never changes a stored report, checkpoint or sources object.
 The startup stops when the schema is not at the latest revision.
 
+A schema change edits the first revision in place, so it adds no revision.
+A database made before the change is at the latest revision, and the command
+does not change it. The startup compares each table and column with the ones
+the service needs, and it stops on a difference. To repair the database,
+remove it and make it again. For SQLite, delete the file. For PostgreSQL,
+drop the database and create it again. Then run the command. The new
+database holds no jobs. A database at a revision that this build does not
+hold, such as one from a later build, takes the same repair.
+
 ### The startup
 
 The service starts in this order, and a failure at a step stops the startup:
@@ -1257,7 +1276,9 @@ The service starts in this order, and a failure at a step stops the startup:
 1. It reads the backend settings and builds the store. For SQLite, it checks
    the database file and its directory.
 2. It reads `ANALYSIS_RETENTION_DAYS`.
-3. The `sql` store checks that the schema is at the latest revision.
+3. The `sql` store checks that the schema is at the latest revision and
+   that it holds each table and column that the service needs, and no other
+   column.
 4. The `sql` store checks the object store: for `filesystem`, the root, and
    for `s3`, `HeadBucket` and `GetBucketVersioning` on the bucket, and for
    `gcs`, `buckets.get` on the bucket.
@@ -1347,7 +1368,7 @@ pair, so a new row runs every contract test. A new job store implements the
 | --- | --- |
 | `reserve` | **Counts and inserts in one atomic operation.** Every bound admission enforces — the concurrency ceiling, the per-owner rate, the per-owner token budget and the deployment's global token budget — is enforced here and nowhere else. A backend that checks and then inserts has put the race back: two submissions that each read the count before either inserts both pass a ceiling of one. The same operation creates the **Principal** of a first submission, and only where it admits the job. It refuses with `principal_exists` where the identity already holds one. |
 | `principal` | The principal of an issuer and a `sub`, or nothing. It creates nothing. |
-| `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision and then its object store. The app calls it before the restart scan. |
+| `startup_check` | Raises where the store cannot serve. The `sql` store checks its schema revision, its tables and columns, and then its object store. The app calls it before the restart scan. |
 | `get` | The whole record, for the driver that runs the job. |
 | `owned` | The record an owner ID owns, as an envelope: without the sources, the report, the checkpoint and the resumption. For a job of another schema version, it also leaves out the answers, the fact keys, the framework selection and the node runs. These are the parts the schema version covers, so it reads a job of any version. Where a stored part of the envelope does not parse, it returns an `UnreadableRecord`, so one row never stops a list. It reads a stored facet answer with the value the service wrote when it admitted the answer. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
 | `sources` | The owned job's sources. A route reads them after it checks that the job is readable. Raises `UnreadableSchema` where they do not parse. |

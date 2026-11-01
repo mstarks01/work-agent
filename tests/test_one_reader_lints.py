@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import importlib
 import re
 from collections.abc import Callable, Iterable, Iterator
 from functools import partial
@@ -22,7 +23,7 @@ from typing import TypeGuard
 import pytest
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES
-from analysis_service.claims import Ruling
+from analysis_service.claims import UNKNOWN_KEY_FIELDS, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
 from evals.harness.prices import UnitPrices
 from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
@@ -100,11 +101,105 @@ def test_each_store_choice_has_one_reader():
     ]
 
 
-def test_the_object_store_variable_is_spelled_once():
-    def spells(node: ast.AST) -> bool:
-        return isinstance(node, ast.Constant) and node.value == "ANALYSIS_OBJECT_STORE"
+def _variable_definitions(path: Path) -> list[ast.expr]:
+    """The value of each module-level ``*_VAR`` assignment in ``path``."""
+    found = []
+    for node in parse(path).body:
+        match node:
+            case (
+                ast.Assign(targets=[ast.Name(id=name)], value=value)
+                | ast.AnnAssign(target=ast.Name(id=name), value=ast.expr() as value)
+            ) if name.endswith("_VAR"):
+                found.append(value)
+    return found
 
-    assert _sites(spells) == [("src/analysis_service/objects.py", "<module>")]
+
+def _variable_names() -> set[str]:
+    """The value of each module-level ``*_VAR`` constant. The module is
+    imported, because a value can be an f-string over a prefix."""
+    names = set()
+    for path in FILES:
+        if not _variable_definitions(path):
+            continue
+        parts = path.relative_to(REPO_ROOT).with_suffix("").parts
+        module = importlib.import_module(
+            ".".join(parts[1:] if parts[0] == "src" else parts)
+        )
+        names |= {
+            value
+            for name, value in vars(module).items()
+            if name.endswith("_VAR") and isinstance(value, str)
+        }
+    return names
+
+
+def _docstrings(tree: ast.Module) -> set[int]:
+    """The id of each docstring node in ``tree``: prose, which a lint of code
+    does not read."""
+    return {
+        id(node.body[0].value)
+        for node in ast.walk(tree)
+        if isinstance(
+            node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
+        )
+        and node.body
+        and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+    }
+
+
+def test_each_variable_name_is_spelled_once():
+    """A string spells the name of an environment variable only in the
+    ``*_VAR`` constant that holds it. A message and a table read the constant,
+    so a rename moves every site. A docstring is prose and is not read."""
+    names = _variable_names()
+    assert "ANALYSIS_OBJECT_STORE" in names
+    spelled = re.compile(
+        r"\b(?:"
+        + "|".join(map(re.escape, sorted(names, key=len, reverse=True)))
+        + r")\b"
+    )
+    sites = []
+    for path in FILES:
+        tree = parse(path)
+        skipped = _docstrings(tree) | {id(node) for node in _variable_definitions(path)}
+        sites += [
+            f"{path.relative_to(REPO_ROOT).as_posix()}:{node.lineno}: {node.value!r}"
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in skipped
+            and spelled.search(node.value)
+        ]
+    assert not sites
+
+
+#: A string that names an XDG base directory or the home directory default
+#: of one: an ``XDG_`` variable, or a ``.config`` or ``.local`` path part.
+_XDG_PLACE = re.compile(r"^XDG_|(?:^|[/~])\.(?:config|local)(?:/|$)")
+
+
+def test_an_xdg_variable_has_one_reader():
+    """Only ``xdg_dir`` reads an XDG base directory variable or picks its
+    default in the home directory: each other site passes both to it."""
+    sites = []
+    for path in FILES:
+        tree = parse(path)
+        skipped = _docstrings(tree) | {
+            id(arg)
+            for node in ast.walk(tree)
+            if _calls(node, "xdg_dir")
+            for arg in node.args
+        }
+        sites += [
+            f"{path.relative_to(REPO_ROOT).as_posix()}:{node.lineno}"
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and _XDG_PLACE.search(node.value)
+            and id(node) not in skipped
+        ]
+    assert not sites
 
 
 def test_the_store_defaults_have_one_merge():
@@ -379,6 +474,60 @@ def test_the_kind_of_an_open_fact_is_not_read_from_two_fields():
     """
     readers = set(_sites(_tests_two_spelling_fields)) - FIELD_PAIR_READERS.keys()
     assert readers == set()
+
+
+#: The reason of each validator that reads the parts of a key a caller sent.
+_SENT_KEY = (
+    "it reads a key before validation, where a part need not hash, so the"
+    " cached ``key_ref`` cannot take it"
+)
+
+#: Each function that reads which part of an open fact's key is which, and
+#: why. Every other site asks ``key_ref``.
+KEY_LAYOUT_READERS: dict[Site, str] = {
+    ("src/analysis_service/fact_answers.py", "key_ref"): (
+        "it is the one reader of which part of a key is which"
+    ),
+    ("src/analysis_service/fact_answers.py", "_facet_value"): _SENT_KEY,
+    ("src/analysis_service/fact_answers.py", "_one_spelling"): _SENT_KEY,
+}
+
+
+def _is_a_key(node: ast.AST) -> bool:
+    """``x.key`` or ``x["key"]``: an open fact's key on a model or a served row."""
+    match node:
+        case ast.Attribute(attr="key") | ast.Subscript(slice=ast.Constant(value="key")):
+            return True
+    return False
+
+
+def _reads_a_key_by_position(node: ast.AST) -> bool:
+    match node:
+        case ast.Subscript(value=value, slice=ast.Slice() | ast.Constant(value=int())):
+            return _is_a_key(value)
+        case ast.Assign(targets=[ast.Tuple(elts=parts) | ast.List(elts=parts)]):
+            six = len(parts) == len(UNKNOWN_KEY_FIELDS) or any(
+                isinstance(part, ast.Starred) for part in parts
+            )
+            return _is_a_key(node.value) or (_is_name(node.value, "key") and six)
+        case ast.Call(func=ast.Name(id="zip"), args=args):
+            return any(_is_name(arg, "UNKNOWN_KEY_FIELDS") for arg in args)
+    return False
+
+
+def test_the_layout_of_an_open_facts_key_has_one_reader():
+    """Only ``key_ref`` says which part of a key is which; a caller reads a
+    part by name.
+
+    The lint refuses an index or a slice of a key, an unpack of a key, and a
+    ``zip`` with :data:`~analysis_service.claims.UNKNOWN_KEY_FIELDS`. A local
+    named ``key`` counts where it is unpacked into six names, because other
+    keys share the name. The test modules stay out: a test reads a part of a
+    key to state what it expects of a fixture, and no running code follows it.
+    """
+    sites = set(_sites(_reads_a_key_by_position))
+    assert sites - KEY_LAYOUT_READERS.keys() == set(), "read a key's parts by key_ref"
+    assert KEY_LAYOUT_READERS.keys() <= sites
 
 
 def test_the_place_of_a_pydantic_error_has_one_reader():
@@ -1254,3 +1403,70 @@ def test_a_page_parses_its_own_path_once():
         if _PATH_PARSE.search(line)
     ]
     assert [name for name, _ in sites] == ["webapp/static/report_view.js"], sites
+
+
+# The facets a need names: a need that names none of a kind's facets, or a
+# finding absent from a question's ``needs``, needs every facet (ADR 0112).
+
+#: The calls whose value is every facet of a question kind, or their count.
+_EVERY_FACET = ("answer_facets", "choices_of")
+
+
+def _falls_back_to_every_facet(node: ast.AST) -> bool:
+    """Whether ``node`` is a function with an ``or`` that falls back to every
+    facet of a kind: a later operand that is a call holding a call of
+    :data:`_EVERY_FACET`, or names a variable the function binds from one. A
+    comparison with every facet, as in ``answered_keys``, is not a value."""
+    if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+        return False
+
+    def every(value: ast.AST) -> bool:
+        return any(
+            _calls(inner, name) for inner in ast.walk(value) for name in _EVERY_FACET
+        )
+
+    bound = {
+        target.id
+        for inner in ast.walk(node)
+        if isinstance(inner, ast.Assign) and every(inner.value)
+        for target in inner.targets
+        if isinstance(target, ast.Name)
+    }
+    return any(
+        (isinstance(operand, ast.Call) and every(operand))
+        or (isinstance(operand, ast.Name) and operand.id in bound)
+        for inner in ast.walk(node)
+        if isinstance(inner, ast.BoolOp) and isinstance(inner.op, ast.Or)
+        for operand in inner.values[1:]
+    )
+
+
+def test_a_need_that_names_no_facet_has_one_reader():
+    """Only ``needed_facets`` turns a need that names no facet into every facet.
+
+    ``asked_facets`` and the order's count of a finding's choices once applied
+    the rule again, each to a finding absent from a question's ``needs``.
+    """
+    assert _sites(_falls_back_to_every_facet) == [
+        ("src/analysis_service/fact_answers.py", "needed_facets")
+    ]
+
+
+def _reads_a_request_body(node: ast.AST) -> bool:
+    """Whether ``node`` reads a request's body or its media type by hand."""
+    body_read = isinstance(node, ast.Call) and any(
+        _is_attribute(node.func, method, "request")
+        for method in ("json", "body", "stream", "form")
+    )
+    media_type = (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and node.value.lower() == "content-type"
+    )
+    return body_read or media_type
+
+
+def test_a_request_body_has_one_reader():
+    """Only ``_json_body`` reads a write route's body, so each route has the
+    size cap and the media-type check."""
+    assert _sites(_reads_a_request_body) == [("webapp/main.py", "_json_body")]

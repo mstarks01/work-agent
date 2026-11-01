@@ -32,7 +32,7 @@ withheld.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, Literal, get_args
 
@@ -96,6 +96,9 @@ from webapp.settings_page import (
 #: Where a row's value comes from. ``refused`` is a file the loader refuses,
 #: which a row shows in place of a value. ``settings.js`` shows each one.
 ValueOrigin = Literal["process", "page", "file", "refused", "default"]
+
+#: The numbers a numeric row takes. ``settings.js`` checks each one.
+Numeric = Literal["integer", "decimal"]
 
 
 def store_defaults(env: Mapping[str, str]) -> dict[str, str]:
@@ -195,7 +198,8 @@ def settings_view(
             "mark": setting.mark,
             "reason": setting.reason,
             "note": setting.note,
-            "restart": var in stores,
+            # A store setting decides which store rows show, and it takes
+            # effect after a restart.
             "store": var in stores,
             "example": EXAMPLES.get(key),
             **_CONTROLS.get(key, {}),
@@ -292,6 +296,10 @@ def _store_keys(merged: Mapping[str, str]) -> list[str]:
     return [key for key, setting in SETTINGS.items() if setting.variable in shown]
 
 
+def _numeric(parser: Callable[[str], float]) -> Numeric:
+    return "integer" if parser is int else "decimal"
+
+
 def _controls() -> dict[str, dict[str, Any]]:
     """The closed set of each Deployment Setting whose loader holds one, from
     that loader's table, so the page offers a choice in place of free text.
@@ -321,8 +329,8 @@ def _controls() -> dict[str, dict[str, Any]]:
             if setting.variable in CLOSED_SETTINGS
         },
     }
-    numeric = {
-        f"resilience.{field}": {"numeric": "integer" if parser is int else "decimal"}
+    numeric: dict[str, dict[str, Numeric]] = {
+        f"resilience.{field}": {"numeric": _numeric(parser)}
         for field, (_, parser) in resilience.ENV_OVERRIDES.items()
     }
     numeric["store.retention_days"] = {"numeric": "integer"}

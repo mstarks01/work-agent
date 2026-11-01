@@ -1,6 +1,7 @@
 """Tests for the canonical System Model schema and derived boundary crossings."""
 
 import re
+from typing import get_args
 
 import pytest
 from pydantic import ValidationError
@@ -13,6 +14,8 @@ from analysis_service.system_model import (
     FLOW_ID_VERSION,
     Assumption,
     DataFlow,
+    Element,
+    ElementPrefix,
     EmittedSystemModel,
     ExternalEntity,
     FlowIdError,
@@ -634,3 +637,9 @@ class TestTheClassificationTierIsASchemaFact:
             SystemModel.model_validate(model).data_stores[0].data_classification
             == projected
         )
+
+
+def test_each_element_prefix_names_one_element_class():
+    """``ElementPrefix`` is the set of every element class's ``id_prefix``."""
+    prefixes = [element.id_prefix for element in get_args(Element)]
+    assert sorted(prefixes) == sorted(get_args(ElementPrefix))

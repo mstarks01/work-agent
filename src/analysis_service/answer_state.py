@@ -58,7 +58,13 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, TypeVar
 from pydantic import Field
 
 from analysis_service.answer_effects import Effect, capability_effects
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, within_held_limits
+from analysis_service.answer_sets import (
+    NO_ANSWERS,
+    NO_SENT_ANSWERS,
+    AnswerSet,
+    SentAnswers,
+    within_held_limits,
+)
 from analysis_service.answer_shares import check_shares, merged_shares
 from analysis_service.assertions import UNKNOWN, AssertionCatalog
 from analysis_service.bands import UNRANKED
@@ -186,6 +192,9 @@ EARLY_RULES: Mapping[str, EarlyRule] = {
 
 #: Why a waiting job asks nothing more (:attr:`QuestionSet.stop`, ADR 0068).
 Stop = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
+
+#: Why a carried fact answer is not taken (:meth:`Carried.reason`, ADR 0116).
+CarriedReason = Literal["missing-element", "not-taken"]
 
 #: Why a question is not in the recommended list (ADR 0078). A client maps
 #: each one to its own words. ``parent-undecided`` and ``gate-undecided``
@@ -561,7 +570,7 @@ class QuestionSet:
         *,
         sources: Sequence[Source],
         earlier: AnswerSet,
-        given: AnswerSet,
+        given: SentAnswers,
         save: bool = False,
         skips: Sequence[SkipKey] = (),
         presented: Sequence[UnknownKey] = (),
@@ -1445,7 +1454,7 @@ class Answers:
     were read with, which a waiting job and every save require.
     """
 
-    given: AnswerSet = NO_ANSWERS
+    given: SentAnswers = NO_SENT_ANSWERS
     save: bool = False
     skips: Sequence[SkipKey] = ()
     presented: Sequence[UnknownKey] = ()
@@ -1493,6 +1502,15 @@ class Carried:
     #: the elements a rename can map it to.
     choices: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
+    def reason(self, fact: FactAnswer) -> CarriedReason:
+        """Why a dropped fact is not taken: ``missing-element`` where it names
+        an element the model does not have, and ``not-taken`` where the job's
+        questions refuse it, because the sources state the fact or no
+        question asks it."""
+        if key_ref(fact.key).element_id in self.choices:
+            return "missing-element"
+        return "not-taken"
+
     def to_json(self, model: SystemModel) -> dict[str, list[Any]]:
         """The carried answers as every surface lists them for review: the key
         of each fact and of each link question the job's questions take,
@@ -1500,9 +1518,7 @@ class Carried:
         each link they do not take, the renames, and what each missing
         element can map to.
 
-        A fact is ``missing-element`` where it names an element the model
-        does not have, and ``not-taken`` where the job's questions refuse it:
-        the sources state the fact, or no question asks it.
+        Each dropped fact carries its :meth:`reason`.
         """
         names = element_names(model)
 
@@ -1517,11 +1533,7 @@ class Carried:
             "carried_dropped": [
                 {
                     "label": fact_label(fact.key, model),
-                    "reason": (
-                        "missing-element"
-                        if key_ref(fact.key).element_id in self.choices
-                        else "not-taken"
-                    ),
+                    "reason": self.reason(fact),
                 }
                 | fact.model_dump(mode="json")
                 for fact in self.dropped.facts
@@ -1562,7 +1574,7 @@ class SavedDraft:
     does a save's.
     """
 
-    draft: AnswerSet
+    draft: SentAnswers
     revision: int
 
 
@@ -1621,7 +1633,7 @@ class AnswerState:
     resumed_by: str | None
     #: A report's draft answers: what its follow-up saved in batches and has
     #: not yet run. Empty for a waiting job, whose saved answers are ``answers``.
-    draft: AnswerSet = NO_ANSWERS
+    draft: SentAnswers = NO_SENT_ANSWERS
     #: The answers a paused job held when its amendment started this job
     #: (ADR 0072). This job's questions take each one they still ask.
     carried_in: AnswerSet = NO_ANSWERS
@@ -1666,10 +1678,10 @@ class AnswerState:
             if fold_principal(link.principal) not in placed
         ]
         taken_facts = tuple(
-            a for a in facts if self._admits(base, AnswerSet(facts=(a,)))
+            a for a in facts if self._admits(base, SentAnswers(facts=(a,)))
         )
         taken_links = tuple(
-            link for link in links if self._admits(base, AnswerSet(links=(link,)))
+            link for link in links if self._admits(base, SentAnswers(links=(link,)))
         )
         return Carried(
             taken=AnswerSet(links=taken_links, facts=taken_facts),
@@ -1683,7 +1695,7 @@ class AnswerState:
             ),
         )
 
-    def _admits(self, base: QuestionSet, given: AnswerSet) -> bool:
+    def _admits(self, base: QuestionSet, given: SentAnswers) -> bool:
         try:
             base.admit(
                 sources=self.sources, earlier=self.answers, given=given, save=True

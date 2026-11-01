@@ -17,7 +17,7 @@ from uuid import UUID
 import pytest
 
 from analysis_service import budgets
-from analysis_service.answer_sets import AnswerSet
+from analysis_service.answer_sets import AnswerSet, SentAnswers
 from analysis_service.answer_state import (
     AlreadyResumed,
     Answers,
@@ -162,7 +162,7 @@ class TestAnsweringAWaitingJob:
                 job,
                 OWNER,
                 Answers(
-                    given=AnswerSet(facts=(FactAnswer(key=key, value="unknown"),)),
+                    given=SentAnswers(facts=(FactAnswer(key=key, value="unknown"),)),
                     save=True,
                     skips=(),
                     revision=0,
@@ -186,7 +186,7 @@ class TestAnsweringAWaitingJob:
             answers.answer(
                 job,
                 OWNER,
-                Answers(given=AnswerSet(), save=False, skips=(), revision=0),
+                Answers(given=SentAnswers(), save=False, skips=(), revision=0),
                 start=starts,
             )
         )
@@ -201,7 +201,7 @@ class TestAnsweringAWaitingJob:
     def test_a_link_answer_needs_a_catalog_before_any_read(self):
         store = InMemoryJobStore()
         answers = operations(store, catalog=False)
-        given = AnswerSet(
+        given = SentAnswers(
             links=(LinkAnswer(principal="shopper accounts", element="none"),)
         )
         with pytest.raises(NoCatalog):
@@ -222,7 +222,7 @@ class TestAnsweringAWaitingJob:
                 operations(store).answer(
                     job,
                     OWNER,
-                    Answers(given=AnswerSet(), save=True, skips=(), revision=0),
+                    Answers(given=SentAnswers(), save=True, skips=(), revision=0),
                     start=Starts(),
                 )
             )
@@ -233,7 +233,7 @@ class TestAnsweringAWaitingJob:
         answers = operations(store)
         key = first_early_key(answers, job)
         saved = Answers(
-            given=AnswerSet(facts=(FactAnswer(key=key, value="unknown"),)),
+            given=SentAnswers(facts=(FactAnswer(key=key, value="unknown"),)),
             save=True,
             skips=(),
             revision=0,
@@ -245,7 +245,7 @@ class TestAnsweringAWaitingJob:
                 answers.answer(
                     job,
                     OWNER,
-                    Answers(given=AnswerSet(), save=False, skips=(), revision=0),
+                    Answers(given=SentAnswers(), save=False, skips=(), revision=0),
                     start=starts,
                 )
             )
@@ -262,7 +262,7 @@ class TestAnsweringAWaitingJob:
                 job,
                 OWNER,
                 Answers(
-                    given=AnswerSet(),
+                    given=SentAnswers(),
                     save=True,
                     skips=(key,),
                     presented=(key,),
@@ -285,7 +285,7 @@ class TestAnsweringAWaitingJob:
             answers.answer(
                 job,
                 OWNER,
-                Answers(given=AnswerSet(), save=False, skips=(), revision=0),
+                Answers(given=SentAnswers(), save=False, skips=(), revision=0),
                 start=Starts(),
             )
         )
@@ -295,7 +295,7 @@ class TestAnsweringAWaitingJob:
                     job,
                     OWNER,
                     Answers(
-                        given=AnswerSet(),
+                        given=SentAnswers(),
                         save=True,
                         skips=(key,),
                         presented=(key,),
@@ -319,7 +319,9 @@ class TestAnsweringAWaitingJob:
                     job,
                     OWNER,
                     Answers(
-                        given=AnswerSet(facts=(FactAnswer(key=key, value="unknown"),)),
+                        given=SentAnswers(
+                            facts=(FactAnswer(key=key, value="unknown"),)
+                        ),
                         save=False,
                         skips=(),
                         revision=0,
@@ -340,7 +342,7 @@ class TestAnsweringAReport:
                 job,
                 OWNER,
                 Answers(
-                    given=AnswerSet(facts=(FactAnswer(key=ASKED, value="TLS 1.3"),)),
+                    given=SentAnswers(facts=(FactAnswer(key=ASKED, value="TLS 1.3"),)),
                     save=False,
                     skips=(),
                     revision=None,
@@ -360,7 +362,7 @@ class TestAnsweringAReport:
                 job,
                 OWNER,
                 Answers(
-                    given=AnswerSet(facts=(FactAnswer(key=ASKED, value="TLS 1.3"),)),
+                    given=SentAnswers(facts=(FactAnswer(key=ASKED, value="TLS 1.3"),)),
                     save=True,
                     skips=(),
                     revision=0,
@@ -393,7 +395,7 @@ class TestAnsweringAReport:
                     job,
                     OWNER,
                     Answers(
-                        given=AnswerSet(
+                        given=SentAnswers(
                             facts=(FactAnswer(key=wrong, value="internal"),)
                         ),
                         save=False,
@@ -418,7 +420,7 @@ class TestAmending:
                 job,
                 OWNER,
                 Answers(
-                    given=AnswerSet(facts=(FactAnswer(key=key, value="unknown"),)),
+                    given=SentAnswers(facts=(FactAnswer(key=key, value="unknown"),)),
                     save=True,
                     skips=(),
                     revision=0,
@@ -453,7 +455,7 @@ class TestAmending:
                 job,
                 OWNER,
                 Answers(
-                    given=AnswerSet(),
+                    given=SentAnswers(),
                     save=True,
                     skips=(key,),
                     presented=(key,),
@@ -695,9 +697,7 @@ def held_file(
     owner: str = OWNER,
 ) -> OwnerFile:
     """An Owner File of ``owner`` in ``store``, with a principal where none is held."""
-    file = OwnerFile.create(
-        owner_id=owner, name=name, kind="transcript", format="text/plain", text=text
-    )
+    file = OwnerFile.create(owner_id=owner, name=name, kind="transcript", text=text)
     principal = asyncio.run(new_principal(store, owner))
     assert (
         asyncio.run(store.add_file(file, text, limit=100, principal=principal))

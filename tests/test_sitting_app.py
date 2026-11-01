@@ -1894,12 +1894,17 @@ class TestTheDraftStore:
         with pytest.raises(sittings.DraftError):
             sittings.draft_states(self.store(tmp_path), login)
 
-    def test_the_default_root_is_outside_any_repository(self, tmp_path):
+    def test_the_default_root_is_outside_any_repository(self, monkeypatch):
         """Under the reader's own state directory, which is where a store
         that must never merge belongs."""
+        monkeypatch.delenv("XDG_STATE_HOME", raising=False)
         root = sittings.draft_root()
         assert root.parts[-4:] == (".local", "state", "work-agent", "sittings")
         assert root.is_absolute()
+
+    def test_the_default_root_follows_xdg_state_home(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+        assert sittings.draft_root() == tmp_path / "work-agent" / "sittings"
 
     def test_a_session_takes_the_root_its_caller_names(self, tree, tmp_path):
         """The whole reason the root is a field: a test points it at a

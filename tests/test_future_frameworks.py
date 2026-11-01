@@ -99,7 +99,7 @@ def third(monkeypatch):
 
 
 PRIOR: dict[str, PriorRow] = {name: row for name, row in QUESTION_PRIOR.items()}
-PRIOR[THIRD] = PriorRow(runs=(), revision=None, cases=0, rates={})
+PRIOR[THIRD] = PriorRow(record=None, runs=(), revision=None, cases=0, rates={})
 ALL = {"stride": {}, "asvs": {"level": 2}, THIRD: {"level": 2}}
 
 

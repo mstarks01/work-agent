@@ -47,7 +47,14 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, HeldAnswerSet
+from analysis_service.answer_sets import (
+    NO_ANSWERS,
+    NO_SENT_ANSWERS,
+    AnswerSet,
+    HeldAnswerSet,
+    HeldSentAnswers,
+    SentAnswers,
+)
 from analysis_service.assertion_use import assertion_use
 from analysis_service.assertions import AssertionRecord
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
@@ -378,8 +385,9 @@ class JobRecord(BaseModel):
         default_factory=list, max_length=MAX_HELD_FACTS
     )
     # A finished report's draft answers: what its follow-up saved in batches
-    # and has not run. The run composes them with what it is sent (ADR 0070).
-    draft: HeldAnswerSet = NO_ANSWERS
+    # and has not run, with its shares as sent. The run composes them with
+    # what it is sent (ADR 0070).
+    draft: HeldSentAnswers = NO_SENT_ANSWERS
     # How many saves a waiting job, drafts a finished report, or corrections a
     # final report has made. A save, a continue or a correction names the
     # revision it read, so a page left open on an earlier revision cannot write
@@ -528,7 +536,7 @@ class JobRecord(BaseModel):
         """
         corrected = AnswerSet(facts=tuple(self.corrections))
         carried = renamed(self.carried, self.carried_renames)
-        return corrected.over(self.draft.expanded().over(self.answers.over(carried)))
+        return corrected.over(self.draft.written().over(self.answers.over(carried)))
 
     def selection(self) -> tuple[FrameworkName, ...]:
         """This job's frameworks by name, in selection order.
@@ -870,7 +878,7 @@ class JobStore(Protocol):
         self,
         job_id: str,
         owner_id: str,
-        draft: AnswerSet,
+        draft: SentAnswers,
         revision: int,
     ) -> bool: ...
 
@@ -1416,7 +1424,7 @@ class InMemoryJobStore:
         self,
         job_id: str,
         owner_id: str,
-        draft: AnswerSet,
+        draft: SentAnswers,
         revision: int,
     ) -> bool:
         """Keep a finished report's draft answers, which run nothing (ADR 0070).

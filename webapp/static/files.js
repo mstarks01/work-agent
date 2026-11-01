@@ -18,12 +18,11 @@
     el(box).hidden = !text;
   };
   const atLimit = () => files.length >= limits.max_owner_files;
-  const limitText = () => `Files holds ${limits.max_owner_files} files, the most it can keep. Delete a file before you add another.`;
 
   const draw = () => {
     el("files-count").textContent = `${files.length} of ${limits.max_owner_files} files`;
     el("upload-file-button").disabled = atLimit();
-    if (atLimit()) show("files-problem", limitText());
+    if (atLimit()) show("files-problem", textFile.refusals.full);
     el("files-table").hidden = !files.length;
     el("files-empty").hidden = Boolean(files.length);
     el("files-list").replaceChildren(...files.map((file) => {
@@ -78,7 +77,7 @@
     if (!file) return;
     show("files-notice", "");
     if (atLimit()) {
-      show("files-problem", limitText());
+      show("files-problem", textFile.refusals.full);
       return;
     }
     const read = await textFile.read(file, limits.max_bytes, "Files keeps");

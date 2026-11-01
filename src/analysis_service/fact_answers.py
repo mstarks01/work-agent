@@ -99,6 +99,7 @@ __all__ = [
     "needed_facets",
     "needs_of",
     "refuse_repeated_facts",
+    "with_element",
 ]
 
 
@@ -291,6 +292,12 @@ def key_ref(key: UnknownKey) -> UnknownRef:
     return UnknownRef.model_construct(
         None, **dict(zip(UNKNOWN_KEY_FIELDS, key, strict=True))
     )
+
+
+def with_element(key: UnknownKey, element_id: str) -> UnknownKey:
+    """``key`` with its element part replaced by ``element_id``, read through
+    :func:`key_ref`."""
+    return key_ref(key).model_copy(update={"element_id": element_id}).key
 
 
 def attribute_place(key: UnknownKey) -> tuple[str, str]:
@@ -494,17 +501,17 @@ def fact_status(
     return "partial" if answer.known else "unknown"
 
 
-def needed_facets(ref: UnknownRef) -> tuple[str, ...]:
-    """The facets of its question kind a dependency waits on, in the kind's order.
+def needed_facets(key: UnknownKey, named: Collection[str]) -> tuple[str, ...]:
+    """The facets of ``key``'s question kind that a need names, in the kind's order.
 
     **The one reader of "which part of a question does a finding need"** (ADR
-    0073). The facets the reference names that its kind has; where it names
-    none of them, every facet the kind has, so the finding waits on the whole
-    question. Empty for a fact answered in one value.
+    0073). ``named`` is what a dependency or a finding names: the facets it
+    names that the kind has, or every facet the kind has where it names none
+    of them, so the finding waits on the whole question (ADR 0112). Empty for
+    a fact answered in one value.
     """
-    every = tuple(facet.id for facet in answer_facets(ref.key))
-    named = tuple(facet for facet in every if facet in ref.facets)
-    return named or every
+    every = tuple(facet.id for facet in answer_facets(key))
+    return tuple(facet for facet in every if facet in named) or every
 
 
 def needs_of(refs: Sequence[UnknownRef]) -> dict[UnknownKey, tuple[str, ...]]:
@@ -515,7 +522,7 @@ def needs_of(refs: Sequence[UnknownRef]) -> dict[UnknownKey, tuple[str, ...]]:
     """
     needs: dict[UnknownKey, set[str]] = {}
     for ref in refs:
-        needs.setdefault(ref.key, set()).update(needed_facets(ref))
+        needs.setdefault(ref.key, set()).update(needed_facets(ref.key, ref.facets))
     return {
         key: tuple(facet.id for facet in answer_facets(key) if facet.id in held)
         for key, held in needs.items()
@@ -530,16 +537,20 @@ def asked_facets(
     """The facets of ``key`` a page asks for: each facet a waiting finding needs.
 
     ``findings`` wait on the fact, and ``needs`` maps a finding that needs only
-    some facets to those facets (ADR 0073). A finding absent from ``needs``
-    needs every facet, and so does a fact no finding waits on, such as an early
-    question or an earlier answer (ADR 0112). Empty for a fact with no facets.
+    some facets to those facets (ADR 0073). :func:`needed_facets` reads each
+    finding's need, so a finding absent from ``needs`` needs every facet, and
+    so does a fact no finding waits on, such as an early question or an
+    earlier answer (ADR 0112). Empty for a fact with no facets.
     """
-    ids = tuple(facet.id for facet in answer_facets(key))
     needs = needs or {}
-    if not findings or any(finding not in needs for finding in findings):
-        return ids
-    needed = {facet for finding in findings for facet in needs[finding]}
-    return tuple(facet for facet in ids if facet in needed)
+    if not findings:
+        return needed_facets(key, ())
+    wanted = {
+        facet
+        for finding in findings
+        for facet in needed_facets(key, needs.get(finding, ()))
+    }
+    return tuple(facet.id for facet in answer_facets(key) if facet.id in wanted)
 
 
 def covers(answer: FactAnswer | None, facets: Sequence[str]) -> bool:

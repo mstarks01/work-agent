@@ -34,10 +34,13 @@ from analysis_service import (
     SourceLimits,
     StubPipelineRunner,
 )
-from analysis_service.api import JOB_REFUSAL_STATUS
+from analysis_service.answer_shares import SharedAnswer
+from analysis_service.api import JOB_REFUSAL_STATUS, max_body_bytes
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.claims import UNKNOWN_KEY_FIELDS
 from analysis_service.compact import FULL_FORMAT
 from analysis_service.deployment import Deployment
+from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.job_answers import OWNER_FILE_GONE
 from analysis_service.jobs import (
     JOB_ID_PATTERN,
@@ -47,11 +50,15 @@ from analysis_service.jobs import (
 )
 from analysis_service.owner_files import (
     CONTROL_CHARACTER,
+    NO_TEXT,
+    NOT_PLAIN_TEXT,
     OwnerFile,
     name_in_use,
     over_limit,
+    too_large,
 )
 from analysis_service.principals import LOCAL_ISSUER, Principal
+from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import ANSWERS_LABEL, FORMATS
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
@@ -74,6 +81,7 @@ from webapp.main import (
     create_app,
     render_report,
 )
+from webapp.settings_save import MAX_SAVE_BYTES
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -275,7 +283,6 @@ def test_the_only_controls_are_the_picker_and_the_description(client):
 def _reusing(tiers):
     """A client, and a finished run of its own that holds one answer."""
     from analysis_service.answer_sets import AnswerSet
-    from analysis_service.fact_answers import FactAnswer
 
     startup = startup_for(tiers)
     workspace = Workspace()
@@ -353,6 +360,73 @@ def test_every_write_route_refuses_a_request_that_is_not_same_origin(client):
         assert response.json() == {
             "message": "This request did not come from the app's own page."
         }
+
+
+#: The write routes that take no body.
+NO_BODY = {("POST", "/workspace/runs/{run_id}/stop")}
+
+
+def _body_routes(client) -> list[tuple[str, str, int]]:
+    """Each POST and PUT route that reads a body, as a request path, with the
+    most bytes it reads."""
+    limits = {"/settings": MAX_SAVE_BYTES, "/settings/rows": MAX_SAVE_BYTES}
+    return [
+        (
+            method,
+            route.path.replace("{run_id}", "job-missing"),
+            limits.get(route.path, max_body_bytes(WEBAPP_LIMITS)),
+        )
+        for route in client.app.routes
+        for method in sorted(getattr(route, "methods", None) or ())
+        if method in {"POST", "PUT"} and (method, route.path) not in NO_BODY
+    ]
+
+
+def test_each_body_route_is_counted(client):
+    assert len(_body_routes(client)) == 8
+
+
+def test_each_write_route_refuses_a_body_that_is_not_json(client):
+    """The one body reader refuses another media type before it reads a byte."""
+    for method, path, _ in _body_routes(client):
+        response = client.request(
+            method,
+            path,
+            content=b"{}",
+            headers=SAME_ORIGIN | {"Content-Type": "text/plain"},
+        )
+        assert response.status_code == 415, (method, path)
+        assert response.json() == {"message": "This request takes a JSON body."}
+
+
+def test_each_write_route_reads_a_body_at_its_limit_and_refuses_one_over(client):
+    """A body of the route's limit is read and refused because it is not an
+    object; one byte more is refused for its size."""
+    for method, path, limit in _body_routes(client):
+        at_limit = b'["' + b"a" * (limit - len(b'[""]')) + b'"]'
+        for body, status in ((at_limit, 400), (at_limit + b" ", 413)):
+            response = client.request(
+                method,
+                path,
+                content=body,
+                headers=SAME_ORIGIN | {"Content-Type": "application/json"},
+            )
+            assert response.status_code == status, (method, path, response.text)
+        assert response.json() == {
+            "message": f"This request is at most {limit:,} bytes."
+        }
+
+
+def test_each_write_route_refuses_a_body_too_deep_to_parse(client):
+    """A nesting past the parser's recursion limit is a body that is not JSON."""
+    for method, path, _ in _body_routes(client):
+        response = client.request(
+            method,
+            path,
+            content=b"[" * 10_000,
+            headers=SAME_ORIGIN | {"Content-Type": "application/json"},
+        )
+        assert response.status_code == 400, (method, path, response.text)
 
 
 def test_a_run_streams_one_tick_per_node_then_redirects(client):
@@ -1011,12 +1085,81 @@ def test_the_first_run_page_words_each_stop():
     assert _table_keys("first_run.js", "stops") == set(get_args(Stop))
 
 
+def test_the_first_run_page_reads_each_carried_reason():
+    """``first_run.js`` says for each
+    :data:`~analysis_service.answer_state.CarriedReason` whether a dropped
+    answer waits for a part, and for no other reason."""
+    from analysis_service.answer_state import CarriedReason
+
+    assert _table_keys("first_run.js", "waitsForPart") == set(get_args(CarriedReason))
+
+
+def test_the_first_run_page_names_each_element_type():
+    """``first_run.js`` names each
+    :data:`~analysis_service.system_model.ElementPrefix` that
+    ``detected_facts`` sends as an element's type, and no other. A type the
+    table lacks renders as ``undefined``."""
+    from analysis_service.system_model import ElementPrefix
+
+    assert _table_keys("first_run.js", "TYPES") == set(get_args(ElementPrefix))
+
+
 def test_the_settings_page_shows_each_source():
     """``settings.js`` shows each :data:`~webapp.settings_view.ValueOrigin` and no
     other. A source the table lacks throws, and the row does not render."""
     from webapp.settings_view import ValueOrigin
 
     assert _table_keys("settings.js", "sources") == set(get_args(ValueOrigin))
+
+
+def _compared(page: str, field: str) -> set[str]:
+    """Each string that a page's script compares ``.<field>`` with."""
+    return set(re.findall(rf'\.{field} [!=]== "([\w-]+)"', page_javascript(page)))
+
+
+def test_the_first_run_page_listens_for_each_end_of_a_stream():
+    """``first_run.js`` listens for each :data:`~webapp.main.EndFrame`, for
+    the node event, and for the connection's own ``error``. A frame it does
+    not listen for leaves the page waiting."""
+    from analysis_service.jobs import EventKind
+    from webapp.main import EndFrame
+
+    listened = set(
+        re.findall(
+            r'stream\.addEventListener\("(\w+)"', page_javascript("first_run.js")
+        )
+    )
+    assert "node" in get_args(EventKind)
+    assert listened == {*get_args(EndFrame), "node", "error"}
+
+
+def test_the_review_page_draws_each_reason_kind():
+    """``review_finding.js`` draws one group for each
+    :data:`~webapp.review.ReasonKind`. A reason of a kind it lacks shows no
+    button."""
+    from webapp.review import ReasonKind
+
+    drawn = re.search(
+        r"\[([^\]]*)\]\.forEach\(kind =>", page_javascript("review_finding.js")
+    )
+    assert drawn is not None, "review_finding.js draws no reason groups"
+    assert re.findall(r'"(\w+)"', drawn.group(1)) == list(get_args(ReasonKind))
+    assert _compared("review_finding.js", "kind") <= set(get_args(ReasonKind))
+
+
+def test_the_sitting_page_reads_only_a_contribution_mode():
+    from webapp.sitting import ContributionMode
+
+    assert _compared("sitting.js", "mode") == set(get_args(ContributionMode))
+
+
+def test_the_settings_page_reads_only_a_numeric_kind():
+    """``settings.js`` tests a row for ``integer`` and takes every other
+    numeric row as a decimal."""
+    from webapp.settings_view import Numeric
+
+    assert _compared("settings.js", "numeric") == {"integer"}
+    assert set(get_args(Numeric)) == {"integer", "decimal"}
 
 
 def _graph_node_names() -> set[str]:
@@ -1806,6 +1949,15 @@ ANSWER_INPUT_MARKERS = (
 )
 
 
+def test_no_page_gives_a_finding_absent_from_needs_a_default():
+    """``FactQuestion.to_json`` sends each waiting finding's facets as
+    ``needed_facets`` reads them, so no page decides what a finding that
+    names no facet needs."""
+    for page in ANSWER_PAGES:
+        source = page_javascript(page)
+        assert not re.search(r"\.needs\s*\|\||!facets\.length", source), page
+
+
 @pytest.mark.parametrize("page", ANSWER_PAGES)
 def test_a_page_builds_an_answer_input_with_the_shared_builder(page):
     """Two answer editors keep two sets of rules, so there is one builder.
@@ -1824,31 +1976,103 @@ def test_a_page_builds_an_answer_input_with_the_shared_builder(page):
     )
 
 
-#: The rules the question list's pages share, as question_list.js spells each
-#: one's definition.
-SHARED_ROW_RULES = (
-    "const questionKey = ",
-    "const rowKey = ",
-    "const sameAnswer = ",
-    "const linkAnswerText = ",
+#: Every client script the app serves.
+STATIC_SCRIPTS = sorted(
+    path.name for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
 )
 
 
-@pytest.mark.parametrize("rule", SHARED_ROW_RULES)
-def test_a_row_rule_is_defined_once_and_read_by_both_pages(rule):
-    """A row's key and whether two answers are one answer have one definition.
+#: The rules the question list's pages share, each with the pages that read
+#: it. question_list.js defines each one.
+SHARED_ROW_RULES: dict[str, tuple[str, ...]] = {
+    "questionKey": ("report_view.js", "first_run.js"),
+    "rowKey": ("report_view.js", "first_run.js"),
+    "sameAnswer": ("report_view.js", "first_run.js"),
+    "linkAnswerText": ("report_view.js", "first_run.js"),
+    "keyRef": ("question_list.js", "first_run.js"),
+    "shareKey": ("question_list.js", "report_view.js", "first_run.js"),
+    "sharesByKey": ("report_view.js", "first_run.js"),
+    "coveredCount": ("report_view.js", "first_run.js"),
+    "shareChanged": ("question_list.js", "first_run.js"),
+    "sameShare": ("question_list.js", "first_run.js"),
+    "shareable": ("question_list.js",),
+}
 
-    question_list.js holds it, and the report page and the first-run page call
-    it, because two copies drift.
+
+@pytest.mark.parametrize("rule", SHARED_ROW_RULES)
+def test_a_row_rule_is_defined_once_and_read_by_its_pages(rule):
+    """A row's key, a share's key and whether two answers are one answer have
+    one definition.
+
+    question_list.js holds it, and each page that needs it calls it, because
+    two copies drift.
     """
-    name = rule.removeprefix("const ").strip(" =")
-    definitions = [page for page in ANSWER_PAGES if rule in page_javascript(page)]
+    definitions = [
+        page for page in STATIC_SCRIPTS if f"const {rule} = " in page_javascript(page)
+    ]
 
     assert definitions == ["question_list.js"], (
-        f"{name} is defined in {definitions}; define it once, in question_list.js."
+        f"{rule} is defined in {definitions}; define it once, in question_list.js."
     )
-    for page in ("report_view.js", "first_run.js"):
-        assert f"{name}(" in page_javascript(page), f"{page} does not call {name}"
+    for page in SHARED_ROW_RULES[rule]:
+        assert f"{rule}(" in page_javascript(page), f"{page} does not call {rule}"
+
+
+def run_list_rules(program: str) -> object:
+    """The JSON ``program`` prints, run in node after the rules
+    question_list.js shares with both pages.
+
+    Skipped where ``node`` is absent.
+    """
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the page's script")
+    javascript = page_javascript("question_list.js")
+    rules = javascript[javascript.index("const questionKey = ") :]
+    done = subprocess.run(
+        [node, "-"], input=rules + program, capture_output=True, text=True, check=True
+    )
+    return json.loads(done.stdout)
+
+
+def test_the_page_reads_a_key_and_a_share_as_the_service_does():
+    """``keyRef``, ``shapeOf`` and ``sharesByKey`` in question_list.js are
+    second readers of ``UNKNOWN_KEY_FIELDS`` and :class:`SharedAnswer`,
+    because the page reads a served key. Each is put to both."""
+    question = next(iter(QUESTION_KINDS))
+    shares = [
+        SharedAnswer(
+            answer=FactAnswer(key=("", "authentication", "", "", "", ""), value="mTLS"),
+            covers=("flow:a>b", "process:api"),
+        ),
+        SharedAnswer(
+            answer=FactAnswer(key=("", "", "", "", question, ""), value="yes"),
+            covers=("datastore:db",),
+        ),
+    ]
+    served = [share.model_dump(mode="json") for share in shares]
+    keys = [key for share in shares for key in sorted(share.keys())]
+    page = run_list_rules(
+        f"const shares = {json.dumps(served)};\n"
+        f"const keys = {json.dumps(keys)};\n"
+        "console.log(JSON.stringify({\n"
+        "  fields: KEY_FIELDS,\n"
+        "  refs: keys.map(keyRef),\n"
+        "  shapes: keys.map(shapeOf),\n"
+        "  covered: shares.map((share) => [...sharesByKey([share]).keys()]"
+        ".map((key) => JSON.parse(key)).sort()),\n"
+        "}));"
+    )
+
+    assert page == {
+        "fields": list(UNKNOWN_KEY_FIELDS),
+        "refs": [
+            {field: getattr(key_ref(key), field) for field in UNKNOWN_KEY_FIELDS}
+            for key in keys
+        ],
+        "shapes": [list(share.shape) for share in shares for _ in share.covers],
+        "covered": [sorted(map(list, share.keys())) for share in shares],
+    }
 
 
 #: Every script the two pages that take answers load.
@@ -1866,6 +2090,24 @@ def test_a_question_key_is_spelled_by_question_key_only(page):
     definition = ["JSON.stringify(key)"] if page == "question_list.js" else []
 
     assert spellings == definition, f"{page} spells a question key as {spellings}"
+
+
+@pytest.mark.parametrize("page", STATIC_SCRIPTS)
+def test_a_key_and_a_share_are_read_by_the_shared_rules_only(page):
+    """``keyRef`` is the one reader of which part of a key is which, and
+    ``coveredCount`` the one count of a share's elements.
+
+    An index or a slice of a key beside ``keyRef`` reads the layout a second
+    time. The rules in question_list.js read a key part by name, so the lint
+    holds for that file too.
+    """
+    javascript = page_javascript(page)
+    positions = re.findall(r"\bkey\[[0-5]\]|\bkey\.slice\(", javascript)
+    counts = re.findall(r"\.covers\.length", javascript)
+
+    assert positions == [], f"{page} reads a key by position; read it with keyRef"
+    if page != "question_list.js":
+        assert counts == [], f"{page} counts a share's elements; call coveredCount"
 
 
 def test_the_shared_modules_load_before_the_page_script_that_draws_the_list():
@@ -2184,7 +2426,6 @@ class TestOwnerFilesInAnAnalysis:
             owner_id=principal.owner_id,
             name="Kickoff call",
             kind="transcript",
-            format="text/plain",
             text=self.TEXT,
         )
         added = asyncio.run(
@@ -2345,6 +2586,23 @@ def test_the_page_and_the_server_refuse_one_control_class():
     assert json.loads(done.stdout) == [
         point for point in range(0x2100) if CONTROL_CHARACTER.search(chr(point))
     ]
+
+
+def test_no_page_script_words_a_refusal_the_server_words():
+    """The server renders each refusal that the page's own checks of a file
+    show (:func:`~webapp.main.file_refusals`), so the two cannot word one
+    refusal two ways. A script that spells one again fails here."""
+    sentences = [too_large(7), NOT_PLAIN_TEXT, NO_TEXT, over_limit(7)]
+    fragments = [
+        part for sentence in sentences for part in sentence.split("7") if len(part) > 12
+    ]
+    spelled = [
+        (script.name, fragment)
+        for script in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
+        for fragment in fragments
+        if fragment in script.read_text(encoding="utf-8")
+    ]
+    assert not spelled
 
 
 def test_the_page_names_a_label_for_each_source_it_makes():

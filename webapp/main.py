@@ -162,6 +162,7 @@ from analysis_service.api import (
     JOB_REFUSAL_STATUS,
     FrameworkRequest,
     JobSubmission,
+    max_body_bytes,
 )
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
@@ -226,10 +227,13 @@ from analysis_service.open_facts import (
     reference_labels,
 )
 from analysis_service.owner_files import (
+    NO_TEXT,
+    NOT_PLAIN_TEXT,
     OWNER_FILE_ID_PATTERN,
     OwnerFile,
     name_in_use,
     over_limit,
+    too_large,
     upload_refusal,
 )
 from analysis_service.principals import Identity, Principal, log_created
@@ -1248,6 +1252,16 @@ _ADMISSION_MESSAGES: dict[str, str] = {
 }
 
 
+def file_refusals(max_bytes: int) -> dict[str, str]:
+    """The refusals that ``text_file.js`` shows for a file it checks before
+    the server does, in the server's words (:func:`upload_refusal`)."""
+    return {
+        "too_large": too_large(max_bytes),
+        "not_plain_text": NOT_PLAIN_TEXT,
+        "no_text": NO_TEXT,
+    }
+
+
 def _message(status: int, message: str) -> JSONResponse:
     return JSONResponse({"message": message}, status_code=status)
 
@@ -1307,15 +1321,40 @@ def _refused_save(found: Sequence[Refusal]) -> JSONResponse:
     )
 
 
-async def _limited_body(request: Request, limit: int) -> bytes | None:
-    """The request body, or ``None`` where it is longer than ``limit`` bytes.
-    It stops the read at the first byte over the limit."""
+class _BodyUnread(Exception):
+    """A write route's body that :func:`_json_body` does not read."""
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+async def _body_unread(request: Request, exc: _BodyUnread) -> JSONResponse:
+    return _message(exc.status, str(exc))
+
+
+async def _json_body(request: Request, limit: int) -> object:
+    """The request's body as JSON, or ``None`` for a body that is not JSON.
+
+    **The one reader of a write route's body.** It refuses a media type other
+    than ``application/json`` with a 415 and a body longer than ``limit``
+    bytes with a 413, and it stops the read at the first byte over the limit.
+    Each refusal raises :class:`_BodyUnread`, which the app answers. ``None``
+    is a body that each route's own reader refuses as it refuses every other
+    body that is not an object, so a page gets one refusal wording.
+    """
+    media_type = request.headers.get("content-type", "").partition(";")[0]
+    if media_type.strip().lower() != "application/json":
+        raise _BodyUnread(415, "This request takes a JSON body.")
     data = bytearray()
     async for chunk in request.stream():
         data += chunk
         if len(data) > limit:
-            return None
-    return bytes(data)
+            raise _BodyUnread(413, f"This request is at most {limit:,} bytes.")
+    try:
+        return json.loads(data)
+    except (ValueError, RecursionError):
+        return None
 
 
 _RELOAD_MESSAGE = (
@@ -1393,6 +1432,7 @@ def create_app(
     app.exception_handler(StaleRevision)(_stale)
     app.exception_handler(SourcesOverLimit)(_over_limit)
     app.exception_handler(CellEmpty)(_cell_empty)
+    app.exception_handler(_BodyUnread)(_body_unread)
 
     def unavailable() -> JSONResponse:
         """The app came up without a runner: the diagnostic page says why."""
@@ -1429,6 +1469,9 @@ def create_app(
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 source_limit=str(current.answers.limits.max_total_bytes),
                 source_formats=_SOURCE_FORMATS,
+                file_refusals=script_json(
+                    file_refusals(current.answers.limits.max_total_bytes)
+                ),
                 upload_accept=_UPLOAD_ACCEPT,
                 page_labels=script_json(PAGE_SOURCE_LABELS),
                 store_note=""
@@ -1468,15 +1511,9 @@ def create_app(
         """
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
-        media_type = request.headers.get("content-type", "").partition(";")[0]
-        if media_type.strip().lower() != "application/json":
-            return _message(415, "A save is a JSON body.")
-        body = await _limited_body(request, MAX_SAVE_BYTES)
-        if body is None:
-            return _message(413, f"A save is at most {MAX_SAVE_BYTES:,} bytes.")
         try:
-            save = parse_save(json.loads(body))
-        except (ValueError, RecursionError):
+            save = parse_save(await _json_body(request, MAX_SAVE_BYTES))
+        except ValueError:
             return _message(
                 400,
                 "Expected a JSON object with a 'revision', a 'changes' object and"
@@ -1518,15 +1555,9 @@ def create_app(
         """
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
-        media_type = request.headers.get("content-type", "").partition(";")[0]
-        if media_type.strip().lower() != "application/json":
-            return _message(415, "The changes are a JSON body.")
-        body = await _limited_body(request, MAX_SAVE_BYTES)
-        if body is None:
-            return _message(413, f"The changes are at most {MAX_SAVE_BYTES:,} bytes.")
         try:
-            changes = parse_changes(json.loads(body))
-        except (ValueError, RecursionError):
+            changes = parse_changes(await _json_body(request, MAX_SAVE_BYTES))
+        except ValueError:
             return _message(400, "Expected a JSON object with a 'changes' object.")
         return JSONResponse({"shown": store_shown(process_env, changes)})
 
@@ -1557,6 +1588,10 @@ def create_app(
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
                 source_formats=_SOURCE_FORMATS,
+                file_refusals=script_json(
+                    file_refusals(limits["max_bytes"])
+                    | {"full": over_limit(current.max_owner_files)}
+                ),
                 upload_accept=_UPLOAD_ACCEPT,
                 files_limits=script_json(limits),
             )
@@ -1576,8 +1611,9 @@ def create_app(
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
         current = cell.read(unavailable)
+        raw = await _json_body(request, max_body_bytes(current.answers.limits))
         try:
-            body = _body_of(await request.json(), _FileUpload)
+            body = _body_of(raw, _FileUpload)
             upload = _FileUpload.model_validate(body)
         except _UnknownKey as exc:
             return _message(400, str(exc))
@@ -1604,7 +1640,6 @@ def create_app(
             owner_id=principal.owner_id,
             name=upload.name,
             kind=upload.kind,
-            format=upload.format,
             text=upload.text,
         )
         outcome = await workspace.store.add_file(
@@ -1752,7 +1787,7 @@ def create_app(
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
         answers = cell.read(unavailable).answers
-        body = await _json(request)
+        body = await _json_body(request, max_body_bytes(answers.limits))
         sent = body.get("title") if isinstance(body, dict) else None
         if not isinstance(sent, str):
             return _message(400, _NAME_REFUSED)
@@ -1775,12 +1810,12 @@ def create_app(
             return forbidden
         current = cell.read(unavailable)
         answers = current.answers
-
+        raw = await _json_body(request, max_body_bytes(answers.limits))
         try:
-            body = _body_of(await request.json(), _Submission)
+            body = _body_of(raw, _Submission)
         except _UnknownKey as exc:
             return _message(400, str(exc))
-        except (ValueError, TypeError):
+        except TypeError:
             return _message(
                 400,
                 "Expected a JSON body with a 'sources' list and a 'frameworks'"
@@ -1834,7 +1869,9 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            submitted = read_answers(await _json(request))
+            submitted = read_answers(
+                await _json_body(request, max_body_bytes(answers.limits))
+            )
         except BodyRefused as refused:
             message = await _refusal_words(refused, workspace, answers, run_id)
             if refused.over_a_bound:
@@ -1875,7 +1912,9 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            amendment = read_amendment(await _json(request))
+            amendment = read_amendment(
+                await _json_body(request, max_body_bytes(answers.limits))
+            )
         except BodyRefused as refused:
             return _message(400, str(refused))
         owner_id = await workspace.owner_id(answers, run_id)
@@ -1950,7 +1989,9 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            corrections = read_corrections(await _json(request))
+            corrections = read_corrections(
+                await _json_body(request, max_body_bytes(answers.limits))
+            )
         except BodyRefused as refused:
             return _message(
                 400, await _refusal_words(refused, workspace, answers, run_id)
@@ -2032,18 +2073,6 @@ def _option_control(name: FrameworkName, field: str, annotation: object) -> str:
     )
 
 
-async def _json(request: Request) -> object:
-    """The request's body as JSON, or ``None`` for a body that is not JSON.
-
-    ``None`` is a body the reader refuses as it refuses every other body
-    that is not an object, so a page gets the one refusal wording.
-    """
-    try:
-        return await request.json()
-    except ValueError:
-        return None
-
-
 async def _refusal_words(
     refused: BodyRefused, workspace: Workspace, answers: JobAnswers, run_id: str
 ) -> str:
@@ -2069,7 +2098,12 @@ async def _refusal_words(
     return f'The answer to "{label}" was refused: {refused.reason}'
 
 
-def _frame(event: str, data: dict[str, object]) -> str:
+#: How a run's stream ends: the event of its last frame. ``first_run.js``
+#: listens for each one.
+EndFrame = Literal["failed", "questions", "done", "rejected", "stopped"]
+
+
+def _frame(event: EndFrame, data: dict[str, object]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
