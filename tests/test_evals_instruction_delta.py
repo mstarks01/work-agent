@@ -16,6 +16,7 @@ what happens when the two sweeps do not describe the same graph.
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from evals.harness.instruction_delta import (
     artifact as delta_artifact,
 )
 from evals.harness.instruction_delta import (
+    command_compare,
     measurement_deltas,
     node_deltas,
 )
@@ -209,3 +211,20 @@ class TestTheRecord:
         ]
         assert record["instruction_nodes"] == 3
         assert record["measurement_delta"]
+
+
+def test_the_out_file_starts_with_the_record_of_both_sweeps(one_lane_grew, tmp_path):
+    """Which sweep stood on which side is an option of the run (#2029)."""
+    before, after = one_lane_grew
+    out = tmp_path / "compare.json"
+    args = argparse.Namespace(before=before.path, after=after.path, out=out)
+
+    assert command_compare(args) == 0
+
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert next(iter(written)) == "record"
+    assert written["record"]["table"] == {
+        "before": str(before.path),
+        "after": str(after.path),
+    }
+    assert len(written["record"]["inputs"]) == 2

@@ -1500,17 +1500,14 @@ def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
 
 
 def binding_artifact(
-    sweeps: Sequence[BindingSweep], commit: str, clean: bool | None, corpus_digest: str
+    sweeps: Sequence[BindingSweep], record: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """The whole binding replay, with the coordinates it was scored under named first."""
+    """The whole binding replay, with the run record it was scored under first."""
     grouped: dict[Arm, list[BindingSweep]] = defaultdict(list)
     for sweep in sweeps:
         grouped[sweep.arm].append(sweep)
     return {
-        "coordinates": {
-            "repo_commit": {"commit": commit, "clean": clean},
-            "corpus_digest": corpus_digest,
-        },
+        "record": dict(record),
         "arms": [
             {"arm": arm.to_json(), "bindings": pooled_bindings(arm_sweeps)}
             for arm, arm_sweeps in grouped.items()
@@ -1633,15 +1630,12 @@ def _render_assertions(pool: dict[str, Any], targets: int) -> None:
 
 
 def artifact(
-    sweeps: Sequence[SweepReplay], commit: str, clean: bool | None, corpus_digest: str
+    sweeps: Sequence[SweepReplay], record: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """The whole replay, with the coordinates it was scored under named first."""
+    """The whole replay, with the run record it was scored under first."""
     arms = by_arm(sweeps)
     return {
-        "coordinates": {
-            "repo_commit": {"commit": commit, "clean": clean},
-            "corpus_digest": corpus_digest,
-        },
+        "record": dict(record),
         "arms": [
             {
                 "arm": arm.to_json(),

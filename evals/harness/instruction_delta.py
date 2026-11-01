@@ -46,6 +46,7 @@ from typing import Any
 
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
 from evals.harness.instruments import INSTRUMENTS
+from evals.harness.run_record import run_record
 
 #: What an instruction row is keyed by. The pair is unique within a sweep —
 #: :func:`~evals.harness.instruction.collect` raises if one node was built twice
@@ -263,9 +264,12 @@ def command_compare(args: argparse.Namespace) -> int:
     measurements = measurement_deltas(before, after)
     render(nodes, measurements)
     if args.out:
-        record = artifact(nodes, measurements)
-        record["before"] = str(before.path)
-        record["after"] = str(after.path)
-        Path(args.out).write_text(json.dumps(record, indent=2), encoding="utf-8")
+        record = run_record(
+            "compare",
+            {"before": str(before.path), "after": str(after.path)},
+            {before.path: {}, after.path: {}},
+        )
+        written = {"record": record, **artifact(nodes, measurements)}
+        Path(args.out).write_text(json.dumps(written, indent=2), encoding="utf-8")
         print(f"wrote {args.out}")
     return 0
