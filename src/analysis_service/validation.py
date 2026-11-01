@@ -31,6 +31,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state, leading_word
 from analysis_service.capabilities import CAPABILITIES
+from analysis_service.diagrams import DiagramReading, DiagramStructure
 from analysis_service.grounding import (
     PreparedSource,
     deadline_spent,
@@ -56,6 +57,7 @@ from analysis_service.system_model import (
     derive_element_id,
     duplicate_ids,
     normalize_element_ids,
+    normalize_name,
 )
 
 #: Every way an extraction is refused. All but one are this gate's own rules;
@@ -77,6 +79,8 @@ IssueCode = Literal[
     "assumption-on-unknown",
     "blank-control",
     "ambiguous-control",
+    "diagram-node-missing",
+    "diagram-edge-missing",
 ]
 
 # Admission cap on model size. Deliberately loose: it is a
@@ -131,8 +135,12 @@ def validate(
     model: SystemModel,
     max_elements: int = MAX_ELEMENTS,
     sources: Mapping[str, str] = MappingProxyType({}),
+    diagrams: Mapping[str, DiagramReading] = MappingProxyType({}),
 ) -> list[ValidationIssue]:
     """Run every gate rule; an empty result means the model is ready for analysis.
+
+    ``diagrams`` maps each ``diagram`` Source's label to its reading, and
+    :func:`_diagram_issues` holds the model to each structure it holds.
 
     The size cap is checked first and returns alone: a model too large to
     analyze cannot be made acceptable by fixing its IDs, and reporting the
@@ -266,6 +274,9 @@ def validate(
             )
 
     issues.extend(_citation_issues(elements, model.capabilities, sources))
+    for label, reading in diagrams.items():
+        if isinstance(reading, DiagramStructure):
+            issues.extend(_diagram_issues(model, label, reading))
     element_ids = {element.id for element in elements}
     issues += [
         ValidationIssue(
@@ -278,6 +289,61 @@ def validate(
         for repair in model.excerpt_repairs
         if repair.element_id not in element_ids
     ]
+    return issues
+
+
+def _diagram_issues(
+    model: SystemModel, label: str, structure: DiagramStructure
+) -> list[ValidationIssue]:
+    """Each node of a diagram is an element, and each edge a flow (ADR 0121).
+
+    A node is an External Entity, a Process or a Data Store whose name is the
+    node's label, compared as :func:`~analysis_service.system_model.normalize_name`
+    spells both. An edge is a Data Flow between the elements of its two nodes,
+    from source to target for a ``forward`` arrow, the other way for
+    ``backward``, and either way for ``both`` or ``none``. An edge with a group
+    at an end, and every group, is not checked: a group is a trust zone only
+    where its label says so, and that is extraction's judgement.
+    """
+    named: dict[str, set[str]] = {}
+    for element in model.zoned_elements():
+        named.setdefault(normalize_name(element.name), set()).add(element.id)
+    ends = {
+        node.id: named.get(normalize_name(node.label), set())
+        for node in structure.nodes
+    }
+    issues = [
+        ValidationIssue(
+            code="diagram-node-missing",
+            message=f"node {node.label!r} on line {node.line} of {label!r} is not an"
+            f" element; model it as an External Entity, a Process or a Data Store"
+            f" named {node.label!r}",
+        )
+        for node in structure.nodes
+        if not ends[node.id]
+    ]
+    pairs = {(flow.source, flow.destination) for flow in model.data_flows}
+    labels = {node.id: node.label for node in structure.nodes}
+    for edge in structure.edges:
+        sources, targets = ends.get(edge.source), ends.get(edge.target)
+        if not sources or not targets:
+            continue
+        ahead = any((a, b) in pairs for a in sources for b in targets)
+        behind = any((b, a) in pairs for a in sources for b in targets)
+        held = {"forward": ahead, "backward": behind}.get(edge.arrow, ahead or behind)
+        if not held:
+            start, end = labels[edge.source], labels[edge.target]
+            if edge.arrow == "backward":
+                start, end = end, start
+            either = " in either direction" if edge.arrow in ("both", "none") else ""
+            issues.append(
+                ValidationIssue(
+                    code="diagram-edge-missing",
+                    message=f"the edge on line {edge.line} of {label!r} has no data"
+                    f" flow from {start!r} to {end!r}{either}; model it as a flow"
+                    " between those elements",
+                )
+            )
     return issues
 
 
@@ -710,6 +776,7 @@ def parse_and_validate(
     max_elements: int = MAX_ELEMENTS,
     normalize_ids: bool = False,
     sources: Mapping[str, str] = MappingProxyType({}),
+    diagrams: Mapping[str, DiagramReading] = MappingProxyType({}),
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """Parse raw extraction output and run the validity gate.
 
@@ -776,7 +843,7 @@ def parse_and_validate(
             for before, element in zip(emitted, model.elements(), strict=True)
             if before.id in shared
         ]
-    return model, issues + validate(model, max_elements, sources)
+    return model, issues + validate(model, max_elements, sources, diagrams)
 
 
 #: The issue codes whose repair changes an element's *name*, and therefore its

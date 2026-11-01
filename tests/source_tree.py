@@ -34,7 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: Directory names the repository does not hold, wherever they sit inside it:
 #: build and tool caches, git's own store, a coverage report, and a virtual
-#: environment that may sit inside the tree. Matched against the path relative
+#: environment or an npm install that may sit inside the tree. Matched against the path relative
 #: to :data:`REPO_ROOT`, so a checkout that itself sits under a folder of one of
 #: these names still reads its own source.
 _SKIPPED = frozenset(
@@ -46,6 +46,7 @@ _SKIPPED = frozenset(
         ".ruff_cache",
         ".venv",
         "htmlcov",
+        "node_modules",
     }
 )
 

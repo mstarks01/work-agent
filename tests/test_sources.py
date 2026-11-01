@@ -194,9 +194,15 @@ class TestRender:
 
     def test_a_diagram_register_says_how_to_read_mermaid(self):
         diagram = Source(kind="diagram", label="Model", text="flowchart LR")
-        outside = "\n".join(lines_outside_fences(render_sources([diagram])))
+        document = render_sources([diagram], {"Model": {"refused": "empty"}})
+        outside = "\n".join(lines_outside_fences(document))
         assert "Mermaid" in outside
         assert "trust zone only where its label says so" in outside
+        assert (
+            "model each of its nodes as an element named with the node's label,"
+            " and each of its edges as a data flow between those elements in the"
+            " direction of its arrow" in " ".join(outside.split())
+        )
         assert "a comment in the diagram states its shape convention" in outside
 
     def test_a_job_with_no_diagram_renders_no_diagram_guidance(self):

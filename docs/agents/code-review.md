@@ -42,7 +42,7 @@ Write the result in the pull request body, under the heading
 below. Give each class its own entry with text after the name. CI requires the
 section on each pull request that changes a code path:
 `src/*`, `webapp/*`, `evals/harness/*`, `evals/*.py`, `prompts/*`,
-`frameworks/*`, `domains/*`, `config/*`, `tests/*`, `.githooks/*`,
+`frameworks/*`, `domains/*`, `config/*`, `diagram_reader/*`, `tests/*`, `.githooks/*`,
 `.github/workflows/*`, `.github/scripts/*`, `pyproject.toml` or `uv.lock`. An
 asterisk also matches a slash, and a rename counts as a change to its old and
 its new path.

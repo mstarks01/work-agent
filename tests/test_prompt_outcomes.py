@@ -71,7 +71,12 @@ CHECKS: dict[str, Callable[..., None]] = {}
 #: reason. A size ceiling admits or refuses on the count of elements, and no
 #: instruction keeps a large system small.
 UNWORDED_ISSUE_CODES: dict[str, str] = {
-    "too-many-elements": "an admission cap on model size, not a rule a model can follow"
+    "too-many-elements": "an admission cap on model size, not a rule a model can follow",
+    # The rule is worded in the diagram register, which renders only on a
+    # diagram Source's header; a prompt file holding it would change every
+    # job's prompt (ADR 0121). tests/test_sources.py pins the sentence.
+    "diagram-node-missing": "worded in the diagram register, not a prompt file",
+    "diagram-edge-missing": "worded in the diagram register, not a prompt file",
 }
 
 #: The one source every citing element of a test model quotes.

@@ -92,6 +92,7 @@ on:
       - "frameworks/**"
       - "domains/**"
       - "config/**"
+      - "diagram_reader/**"
       - "src/analysis_service/**"
       - "!src/analysis_service/answer_bodies.py"
       - "!src/analysis_service/api.py"
