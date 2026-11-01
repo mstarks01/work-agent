@@ -100,7 +100,9 @@ const questionList = ({
     ];
     box.coverLine.textContent = parts.length
       ? `This answer covers: ${parts.join(", ")}`
-      : "This answer covers no part yet.";
+      : box.sharedAnswer && box.sharedAnswer()
+        ? "This answer covers no part yet. Tick each part it covers, or use Cover every part."
+        : "This answer covers no part yet.";
   };
   // Undo the last change of a shared answer: the answer before it, and each
   // element it wrote as that element was. One step back.
@@ -144,6 +146,18 @@ const questionList = ({
     }
     showCovers(box);
     onEdit(row, event);
+  };
+
+  // Cover every part: tick each part that has no answer of its own, so one
+  // click gives the shared answer to every blank part. A part with its own
+  // answer, by hand or from before, stays as it is (ADR 0113).
+  const coverAll = (box) => {
+    for (const row of box.rows) {
+      if (row.kind !== "fact" || row.compact || !row.tick || row.tick.checked) continue;
+      if (row.exception || row.read()) continue;
+      row.tick.checked = true;
+      tickChanged(row);
+    }
   };
 
   // ---- Rows ---------------------------------------------------------------
@@ -547,9 +561,10 @@ const questionList = ({
       box.coverLine.setAttribute("aria-live", "polite");
       box.undoButton = button("Undo", () => undoShared(box));
       box.undoButton.hidden = !box.undo;
+      box.coverAllButton = button("Cover every part", () => coverAll(box));
     }
     box.top.className = "shared-controls";
-    box.top.replaceChildren(box.shared, hint, box.coverLine, box.undoButton);
+    box.top.replaceChildren(box.shared, hint, box.coverLine, box.coverAllButton, box.undoButton);
     for (const row of members) addTick(row);
     showCovers(box);
   };
