@@ -506,7 +506,15 @@ and the upload takes the row's default kind: a `.txt`, `.vtt` or `.srt` file is
 a `transcript`, and a `.mmd` or `.mermaid` file is a `diagram` (ADR 0120).
 `POST /analyze` receives the text as a source in its JSON body, the same shape
 as a pasted description, so no route parses a file, a file name or a content
-type.
+type. The server renders the words of each refusal that it also makes into the
+page, so the page and the server word a refusal in one way.
+
+**Each write route reads its body through one reader,** `_json_body` in
+`webapp/main.py`. It refuses a media type other than `application/json` with
+`415`. It refuses a body over the route's limit with `413`, and it stops the
+read at the first byte over the limit. The limit is `MAX_SAVE_BYTES` for the
+two Settings routes. For each other route, the limit is twice the deployment's
+`max_source_bytes`, the guard that `/v1` also applies.
 
 **Every page carries a strict nonce CSP,** `default-src 'none'` with a fresh
 per-response nonce on each inline block and no `'unsafe-inline'` anywhere. A

@@ -62,7 +62,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import get_args
+from typing import Literal, get_args
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -388,6 +388,15 @@ def _require_token(request: Request, session: Session) -> None:
         raise HTTPException(status_code=403, detail="wrong or missing page token")
 
 
+#: Which score a reason moves: the finding's substance, or only its style.
+#: ``review_finding.js`` draws one group of buttons for each.
+ReasonKind = Literal["substance", "style"]
+
+
+def _reason_kind(code: str) -> ReasonKind:
+    return "substance" if code in SUBSTANCE_REASONS else "style"
+
+
 def _reason_payload() -> list[dict[str, str]]:
     """The reason buttons, each carrying which score it moves.
 
@@ -399,7 +408,7 @@ def _reason_payload() -> list[dict[str, str]]:
         {
             "code": code,
             "gloss": REASON_GLOSS[code],
-            "kind": "substance" if code in SUBSTANCE_REASONS else "style",
+            "kind": _reason_kind(code),
         }
         for code in sorted(SUBSTANCE_REASONS) + sorted(STYLE_REASONS)
     ]

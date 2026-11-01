@@ -57,7 +57,7 @@ from tests.test_webapp import (
     posted,
     startup_for,
 )
-from webapp.main import PAGE_SOURCE_LABELS, create_app
+from webapp.main import PAGE_SOURCE_LABELS, create_app, file_refusals
 
 #: The shipped tier config, as the webapp tests build it: one fixture, used here.
 tiers = test_webapp.tiers
@@ -569,7 +569,7 @@ for (const id of ["analyze","description","problem","go","load","ask",
                   "answer_limits","save-status","changes","upload","upload-file",
                   "transcript-note","transcript-name","transcript-remove","diagram-note",
                   "diagram-name","diagram-remove","analysis-name",
-                  "description-remaining","source_formats","page_labels"])
+                  "description-remaining","source_formats","file_refusals","page_labels"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
 ids["upload-file"].dataset.maxBytes = "64";
@@ -579,6 +579,7 @@ ids["analysis-name"].value = "Test analysis";
 ids.ask.checked = true;
 ids.answer_limits.textContent = LIMITS;
 ids.source_formats.textContent = FORMATS;
+ids.file_refusals.textContent = REFUSALS;
 ids.page_labels.textContent = PAGE_LABELS;
 const framework = new Node("input");
 framework.value = "stride";
@@ -631,6 +632,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         _FORM_HARNESS.replace("SEARCH", json.dumps(search))
         .replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
         .replace("FORMATS", json.dumps(json.dumps(_FORMAT_TABLE)))
+        .replace("REFUSALS", json.dumps(json.dumps(file_refusals(64))))
         .replace("PAGE_LABELS", json.dumps(json.dumps(PAGE_SOURCE_LABELS)))
         + script
         + "\n(async () => {\n"

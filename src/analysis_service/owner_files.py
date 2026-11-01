@@ -110,6 +110,20 @@ def name_in_use(name: str) -> str:
     return f"You already have a file named “{name}”. Give this file a different name."
 
 
+def too_large(max_bytes: int) -> str:
+    """The refusal of a file over the byte limit of one analysis."""
+    return (
+        f"This file is larger than the {max_bytes:,} bytes that one analysis can carry."
+    )
+
+
+#: The refusal of a file that holds a control character.
+NOT_PLAIN_TEXT = "This file holds control characters, so it is not a plain text file."
+
+#: The refusal of a file that holds no text.
+NO_TEXT = "This file holds no text."
+
+
 def over_limit(limit: int) -> str:
     """The refusal of an upload over the owner's count limit."""
     return (
@@ -141,9 +155,9 @@ def upload_refusal(
     if kind not in row.kinds:
         return f"A {row.label} file cannot be a {kind}."
     if len(text.encode("utf-8")) > max_bytes:
-        return f"This file is larger than the {max_bytes:,} bytes that one analysis can carry."
+        return too_large(max_bytes)
     if CONTROL_CHARACTER.search(text):
-        return "This file holds control characters, so it is not a plain text file."
+        return NOT_PLAIN_TEXT
     if name in page_labels:
         return (
             f"The page uses the name “{name}” for its own sources. Give this file a"
@@ -158,7 +172,7 @@ def upload_refusal(
         Source(kind=kind, label=name, text=text)
     except ValidationError as exc:
         if "text" in {error_place(error) for error in exc.errors()}:
-            return "This file holds no text."
+            return NO_TEXT
         return (
             f"Give the file a name of at most {MAX_LABEL_CHARS} characters, on one"
             " line, with no control or formatting characters."
