@@ -1112,7 +1112,7 @@ class SqlJobStore:
             # before it is at the head revision and lacks the new table.
             raise StoreConfigError(
                 f"the database has no {', '.join(missing)} table: it was made"
-                " before a schema change, so make it again with"
+                " before a schema change, so delete it and make it again with"
                 " python -m analysis_service.migrations"
             )
         await self._objects.check()
