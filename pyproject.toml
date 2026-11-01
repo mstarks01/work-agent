@@ -179,6 +179,7 @@ packages = ["src/analysis_service"]
 "domains" = "analysis_service/_bundled/domains"
 "frameworks" = "analysis_service/_bundled/frameworks"
 "config" = "analysis_service/_bundled/config"
+"diagram_reader" = "analysis_service/_bundled/diagram_reader"
 
 [tool.ruff]
 # Stated rather than inferred from `requires-python`, so raising the floor to

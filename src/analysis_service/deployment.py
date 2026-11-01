@@ -96,8 +96,8 @@ from analysis_service.sampling import SamplingConfig, load_sampling
 from analysis_service.selection import NotCarried, SelectionError, resolve_names
 
 # Two layouts resolve to the same defaults, not fetched at run time either way.
-# A wheel built from this project bundles prompts/, domains/, frameworks/ and
-# config/ under analysis_service/_bundled/ (see pyproject.toml's force-include),
+# A wheel built from this project bundles prompts/, domains/, frameworks/,
+# diagram_reader/ and config/ under analysis_service/_bundled/ (see pyproject.toml's force-include),
 # so an external `pip install analysis-service` needs nothing else. An editable/dev
 # install has no _bundled/ -- hatchling's editable mode links back to the
 # source tree rather than copying force-included data -- so this repo's own
@@ -122,6 +122,7 @@ def _default_config_path(filename: str) -> Path:
 DEFAULT_PROMPTS_DIR = _default_dir("prompts")
 DEFAULT_DOMAINS_DIR = _default_dir("domains")
 DEFAULT_FRAMEWORKS_DIR = _default_dir("frameworks")
+DEFAULT_DIAGRAM_READER_DIR = _default_dir("diagram_reader")
 DEFAULT_MODEL_TIERS_PATH = _default_config_path("model_tiers.toml")
 DEFAULT_SAMPLING_PATH = _default_config_path("sampling.toml")
 DEFAULT_RESILIENCE_PATH = _default_config_path("resilience.toml")

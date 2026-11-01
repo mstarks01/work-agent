@@ -95,7 +95,11 @@ Developer API or OpenRouter.
 git clone https://github.com/mstarks01/work-agent.git
 cd work-agent
 uv sync
+npm ci --ignore-scripts --prefix diagram_reader
 ```
+
+The last line installs the diagram reader, which needs Node 20 or newer. Only
+an analysis with a Mermaid diagram uses it.
 
 No model is selected in the shipped configuration. Choose both the `base` model
 (extraction and repair) and the `strong` model (framework analysis and review),

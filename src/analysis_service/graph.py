@@ -125,7 +125,7 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from analysis_service.assertions import (
     ANSWER_ISSUES,
@@ -171,6 +171,7 @@ from analysis_service.critic_round import (
     critic_instruction,
     recritic_instruction,
 )
+from analysis_service.diagrams import DiagramReading
 from analysis_service.domains import select_domain_packs
 from analysis_service.errors import error_place
 from analysis_service.evidence import (
@@ -694,6 +695,10 @@ STATE_INPUT_TEXT = "input_text"
 # bytes *rendered* — one key per view, under this module's rule that a rendered
 # key is written once and never read back by Python.
 STATE_SOURCE_TEXTS = "source_texts"
+# Each ``diagram`` Source's reading as JSON, by label (ADR 0121): the structure
+# rendered into :data:`STATE_INPUT_TEXT`, kept structured for the gate.
+STATE_DIAGRAM_READINGS = "diagram_readings"
+_READING: TypeAdapter[DiagramReading] = TypeAdapter(DiagramReading)
 STATE_SYSTEM_MODEL = "system_model"
 STATE_BOUNDARY_CROSSINGS = "boundary_crossings"
 STATE_EVIDENCE_CATALOG = "evidence_catalog"
@@ -847,6 +852,7 @@ SHARED_RENDERED_KEYS: frozenset[str] = frozenset(
 SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
     {
         STATE_SOURCE_TEXTS,
+        STATE_DIAGRAM_READINGS,
         STATE_EXTRACTED_MODEL,
         STATE_FIRST_PASS,
         STATE_ASSERTION_PROPOSAL,
@@ -1348,8 +1354,15 @@ def validate_extraction(
         # The first gate, on every route out of it: what arrived is kept
         # before ``repair`` can write over the key it arrived in.
         state.put(STATE_FIRST_PASS, extracted_model)
+    diagrams = {
+        label: _READING.validate_python(reading)
+        for label, reading in (state.get(STATE_DIAGRAM_READINGS) or {}).items()
+    }
     model, issues = parse_extraction(
-        extracted_model, extraction_format, sources=source_texts or {}
+        extracted_model,
+        extraction_format,
+        sources=source_texts or {},
+        diagrams=diagrams,
     )
     if model is None and extraction_format != FULL_FORMAT:
         # The emission was not a compact model at all, so there is nothing for
@@ -1376,7 +1389,10 @@ def validate_extraction(
             )
             repair = repair.model_copy(update={"restored": restored})
             model, issues = parse_and_validate(
-                overlaid, normalize_ids=True, sources=source_texts or {}
+                overlaid,
+                normalize_ids=True,
+                sources=source_texts or {},
+                diagrams=diagrams,
             )
         state.put(STATE_MODEL_REPAIR, repair.model_dump(mode="json"))
     if issues or model is None:
