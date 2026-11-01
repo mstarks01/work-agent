@@ -36,8 +36,9 @@ a process as a rectangle, as a person can use the wrong word in prose.
 **Mermaid's own parsers read the structure.** `diagram_reader/read.mjs` runs
 in Node. It reads a flowchart through Mermaid's flowchart grammar and an
 `architecture-beta` diagram through `@mermaid-js/parser`, and prints each
-group, node and edge with the diagram line it came from. A node keeps its
-shape or icon as written. The versions are pinned in
+group, node, junction and edge with the diagram line it came from. A node
+keeps its shape or icon as written. An edge end marked `{group}` is the group
+that holds the node. The versions are pinned in
 `diagram_reader/package-lock.json`. `analysis_service.diagrams` calls the
 reader as a subprocess with a time and memory limit.
 
@@ -53,7 +54,9 @@ whose name is the node's label, and each edge must be a flow between the
 elements of its two nodes, in the direction of its arrow. An edge with no
 arrow, or with two, takes either direction. A gap is a validity issue, so the
 repair pass gets it as it gets any other issue. Groups are not checked,
-because a group is a trust zone only where its label says so.
+because a group is a trust zone only where its label says so. An edge with a
+group or a junction at an end is not checked, because which elements a
+junction joins is extraction's judgement.
 
 **A diagram the parser refuses is read as text.** A syntax error, or a
 diagram type other than a flowchart or `architecture-beta`, gives no

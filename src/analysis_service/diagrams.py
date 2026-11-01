@@ -30,6 +30,7 @@ __all__ = [
     "Arrow",
     "DiagramEdge",
     "DiagramGroup",
+    "DiagramJunction",
     "DiagramNode",
     "DiagramReaderMissing",
     "DiagramReading",
@@ -75,8 +76,16 @@ class DiagramNode(_Reading):
     line: int | None
 
 
+class DiagramJunction(_Reading):
+    """An architecture junction: a point where edges meet, never an element."""
+
+    id: str
+    group: str | None
+    line: int | None
+
+
 class DiagramEdge(_Reading):
-    """An edge between two nodes or groups, by their diagram IDs."""
+    """An edge between two nodes, groups or junctions, by their diagram IDs."""
 
     source: str
     target: str
@@ -91,6 +100,7 @@ class DiagramStructure(_Reading):
     kind: Literal["flowchart", "architecture"]
     groups: tuple[DiagramGroup, ...]
     nodes: tuple[DiagramNode, ...]
+    junctions: tuple[DiagramJunction, ...]
     edges: tuple[DiagramEdge, ...]
 
 

@@ -75,24 +75,37 @@ async function flowchart() {
     edges: db.getEdges().map((edge) => ({
       source: edge.start, target: edge.end, label: plain(edge.text),
       arrow: arrowOf(edge.type || "arrow_point"), line: lineOf(edge.start, edge.end) })),
+    junctions: [],
   };
+}
+
+// The 1-based diagram line of an architecture AST node, from Langium's own
+// position.
+function astLine(node) {
+  const line = node.$cstNode?.range.start.line;
+  return line === undefined ? null : line + 1;
 }
 
 async function architecture() {
   const { parse } = await import("@mermaid-js/parser");
   const ast = await parse("architecture", text);
+  const parentOf = new Map([...ast.services, ...ast.junctions].map((item) => [item.id, item.in ?? null]));
+  // An end marked {group} is the group that holds the node, not the node.
+  const end = (id, group) => (group && parentOf.get(id)) || id;
   return {
     kind: "architecture",
     groups: ast.groups.map((group) => ({
       id: group.id, label: plain(group.title) || group.id, parent: group.in ?? null,
-      line: lineOf("group", group.id) })),
+      line: astLine(group) })),
     nodes: ast.services.map((service) => ({
       id: service.id, label: plain(service.title) || service.id, shape: service.icon ?? "",
-      group: service.in ?? null, line: lineOf("service", service.id) })),
+      group: service.in ?? null, line: astLine(service) })),
+    junctions: ast.junctions.map((junction) => ({
+      id: junction.id, group: junction.in ?? null, line: astLine(junction) })),
     edges: ast.edges.map((edge) => ({
-      source: edge.lhsId, target: edge.rhsId, label: "",
+      source: end(edge.lhsId, edge.lhsGroup), target: end(edge.rhsId, edge.rhsGroup), label: "",
       arrow: edge.lhsInto && edge.rhsInto ? "both" : edge.rhsInto ? "forward" : edge.lhsInto ? "backward" : "none",
-      line: lineOf(edge.lhsId, edge.rhsId) })),
+      line: astLine(edge) })),
   };
 }
 

@@ -87,6 +87,45 @@ class TestTheReader:
             ("gateway", "server", "forward"),
         ]
 
+    def test_an_architecture_line_is_the_parser_s_own(self):
+        reading = read_diagram(ARCHITECTURE)
+        assert isinstance(reading, DiagramStructure)
+        lines = ARCHITECTURE.splitlines()
+        for item in (*reading.groups, *reading.nodes, *reading.edges):
+            assert item.line is not None
+        assert [lines[e.line - 1].strip() for e in reading.edges] == [
+            "db:L -- R:server",
+            "gateway:R --> L:server",
+        ]
+
+    def test_a_junction_is_kept_apart_from_the_nodes(self):
+        reading = read_diagram(
+            "architecture-beta\n"
+            "    group g(cloud)[Zone]\n"
+            "    service a(server)[A]\n"
+            "    service b(disk)[B]\n"
+            "    junction j in g\n"
+            "    a:R -- L:j\n"
+            "    j:R --> L:b\n"
+        )
+        assert isinstance(reading, DiagramStructure)
+        assert [n.id for n in reading.nodes] == ["a", "b"]
+        assert [(j.id, j.group, j.line) for j in reading.junctions] == [("j", "g", 5)]
+        assert [(e.source, e.target) for e in reading.edges] == [("a", "j"), ("j", "b")]
+
+    def test_a_group_end_is_the_group_that_holds_the_node(self):
+        reading = read_diagram(
+            "architecture-beta\n"
+            "    group one(cloud)[One]\n"
+            "    service server(server)[Server] in one\n"
+            "    service subnet(server)[Subnet]\n"
+            "    server{group}:B --> T:subnet\n"
+        )
+        assert isinstance(reading, DiagramStructure)
+        assert [(e.source, e.target, e.line) for e in reading.edges] == [
+            ("one", "subnet", 5)
+        ]
+
     @pytest.mark.parametrize(
         "text",
         [
@@ -161,6 +200,7 @@ def _structure(*edges: DiagramEdge, nodes=None) -> DiagramStructure:
             nodes
             or (_node("c", "Customer"), _node("w", "web app"), _node("d", "Orders DB"))
         ),
+        junctions=(),
         edges=edges,
     )
 
@@ -187,7 +227,10 @@ class TestTheGate:
     def test_an_edge_with_two_arrows_or_none_takes_either_direction(self, arrow):
         assert _codes(_structure(_edge("w", "c", arrow))) == []
 
-    def test_an_edge_to_a_group_and_a_refused_diagram_are_not_checked(self):
+    def test_an_edge_to_a_group_or_a_junction_and_a_refused_diagram_are_not_checked(
+        self,
+    ):
         assert _codes(_structure(_edge("c", "g"))) == []
+        assert _codes(_structure(_edge("c", "j"))) == []
         refused = DiagramRefusal(refused="syntax error")
         assert validate(valid_model(), diagrams={"Model": refused}) == []

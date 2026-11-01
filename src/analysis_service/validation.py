@@ -302,8 +302,9 @@ def _diagram_issues(
     spells both. An edge is a Data Flow between the elements of its two nodes,
     from source to target for a ``forward`` arrow, the other way for
     ``backward``, and either way for ``both`` or ``none``. An edge with a group
-    at an end, and every group, is not checked: a group is a trust zone only
-    where its label says so, and that is extraction's judgement.
+    or a junction at an end, and every group, is not checked: a group is a
+    trust zone only where its label says so, and which elements a junction
+    joins is extraction's judgement.
     """
     named: dict[str, set[str]] = {}
     for element in model.zoned_elements():
