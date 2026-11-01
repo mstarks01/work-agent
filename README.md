@@ -99,7 +99,8 @@ npm ci --ignore-scripts --prefix diagram_reader
 ```
 
 The last line installs the diagram reader, which needs Node 20 or newer. Only
-an analysis with a Mermaid diagram uses it.
+an analysis with a Mermaid diagram uses it. Where the reader cannot run, the
+app logs a warning at startup that names this command.
 
 No model is selected in the shipped configuration. Choose both the `base` model
 (extraction and repair) and the `strong` model (framework analysis and review),

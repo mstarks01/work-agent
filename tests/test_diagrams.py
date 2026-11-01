@@ -18,6 +18,7 @@ from analysis_service.diagrams import (
     DiagramRefusal,
     DiagramStructure,
     read_diagram,
+    reader_missing,
 )
 from analysis_service.execution import seed_state
 from analysis_service.graph import STATE_DIAGRAM_READINGS, STATE_INPUT_TEXT
@@ -160,6 +161,14 @@ class TestTheReader:
         monkeypatch.setattr(subprocess, "run", no_node)
         with pytest.raises(DiagramReaderMissing, match="install Node"):
             read_diagram("flowchart LR\n  a --> b\n")
+
+    def test_the_startup_check_names_the_install_step(self, tmp_path, monkeypatch):
+        shutil.copy(deployment.DEFAULT_DIAGRAM_READER_DIR / "read.mjs", tmp_path)
+        monkeypatch.setattr(deployment, "DEFAULT_DIAGRAM_READER_DIR", tmp_path)
+        assert "npm ci" in reader_missing()
+
+    def test_the_startup_check_passes_where_the_reader_runs(self):
+        assert reader_missing() is None
 
 
 DIAGRAM = Source(kind="diagram", label="Model", text="flowchart LR\n  a --> b\n")

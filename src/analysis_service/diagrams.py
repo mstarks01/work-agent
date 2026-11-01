@@ -179,3 +179,16 @@ def read_diagram(text: str) -> DiagramReading:
     return DiagramRefusal(
         refused=str(found.get("refused", "the reader gave no reading"))
     )
+
+
+def reader_missing() -> str | None:
+    """Why the diagram reader cannot run, or ``None`` where it can.
+
+    It reads one small flowchart, so it asks :func:`read_diagram` the same
+    question that a diagram Source asks.
+    """
+    try:
+        read_diagram("flowchart LR\n  a --> b\n")
+    except DiagramReaderMissing as missing:
+        return str(missing)
+    return None
