@@ -1984,6 +1984,32 @@ def test_the_files_page_keeps_lists_and_deletes_a_file_as_text(page):
     assert "keep their copy" in page.inner_text("#files-notice")
 
 
+def test_the_files_page_filters_by_name_kind_and_format(page):
+    page.goto("/files")
+    for name, text in (
+        ("network.mmd", "flowchart LR\n  a --> b\n"),
+        ("call.vtt", "Ana: hi"),
+    ):
+        upload_to_files(page, name, text)
+        page.wait_for_selector("#upload-dialog[open]")
+        page.click("#upload-save")
+        page.wait_for_selector(f"#files-list td.name >> text={name}")
+
+    def names() -> list[str]:
+        return page.locator("#files-list td.name").all_inner_texts()
+
+    page.fill("#files-search", "NET")
+    assert names() == ["network.mmd"]
+    page.fill("#files-search", "")
+    page.select_option("#files-kind", "transcript")
+    assert names() == ["call.vtt"]
+    page.select_option("#files-format", "text/vnd.mermaid")
+    assert page.is_hidden("#files-table")
+    assert page.inner_text("#files-empty") == "No files match your filters."
+    page.select_option("#files-kind", "")
+    assert names() == ["network.mmd"]
+
+
 def choose_from_files(page):
     """Tick the first file in the "Select from Files" dialog and select it."""
     page.click("#upload")

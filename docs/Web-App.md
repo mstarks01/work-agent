@@ -261,6 +261,9 @@ transcripts and Mermaid diagrams that you add to any of your analyses
 - **The list.** A table gives the name, the kind, the format, the size and the
   date of each file, the newest first. A line above it gives the count against
   `max_owner_files`.
+- **Search and filters.** As on the Analyses page, a search box filters the
+  list by name, and two selects filter it by kind and by format. The selects
+  list the values of the format table.
 - **Upload a file.** The page reads the file in the browser with the checks of
   the direct upload, then a dialog asks for the name and the kind. The name
   starts as the file name. A plain text file is a "Transcript" or a
