@@ -16,8 +16,18 @@ from analysis_service.report import Report
 from evals.harness import assembly
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import reports_dir
+from evals.harness.reference import load_case
+from evals.harness.run import main
+from tests.source_tree import REPO_ROOT
 from tests.test_evals_descendants import archive  # noqa: F401  (fixture)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
+
+#: A committed Baseline whose critic rejected a claim as ``duplicate``, a step
+#: ADR 0059 removed, in case ``02-iot-fleet-telemetry`` on claim ``D-01``.
+OLD_BASELINE = (
+    REPO_ROOT / "evals/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.json"
+)
+DUPLICATE_CASE = "02-iot-fleet-telemetry"
 
 
 def _report_path(archive, case):  # noqa: F811
@@ -107,3 +117,34 @@ def test_a_finished_case_with_no_drafts_is_named(archive, case):  # noqa: F811
 
     with pytest.raises(assembly.EvalRunError, match=f"{case.id}: .* no drafts"):
         assembly.replay_artifact(load_artifact(archive), [case])
+
+
+def test_a_ruling_today_s_critic_may_not_write_refuses_its_block():
+    """A ``duplicate`` rejection rebuilds a ruling today's ``ThreatRuling`` refuses."""
+    old_case = load_case(REPO_ROOT / "evals/corpus" / DUPLICATE_CASE)
+
+    (row,) = assembly.replay_artifact(load_artifact(OLD_BASELINE), [old_case])
+
+    assert row.refused.startswith(
+        "D-01: today's ThreatRuling refuses verdict.rejected_because holds 'duplicate'"
+    )
+    assert (row.replayed, row.rejected_replayed) == ((), ())
+
+
+def test_the_command_names_the_refused_block_and_reads_the_rest(capsys):
+    code = main(
+        [
+            "assembly",
+            str(OLD_BASELINE),
+            "--case",
+            DUPLICATE_CASE,
+            "--case",
+            "01-payments-checkout",
+        ]
+    )
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert f"{DUPLICATE_CASE:34} stride refused by today's check:" in out
+    assert "01-payments-checkout" in out and " same" in out
+    assert out.splitlines()[-1] == "2 block(s), 0 differ, 1 refused by today's check"
