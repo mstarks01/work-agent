@@ -56,6 +56,7 @@ from analysis_service.graph import (
 from analysis_service.grounding import verify_quote
 from analysis_service.report import Report
 from analysis_service.sampling import load_sampling
+from analysis_service.sources import Source
 from analysis_service.system_model import (
     FLOW_DELIMITER,
     UNKNOWN,
@@ -1857,6 +1858,21 @@ def test_extraction_mode_checks_excerpts_against_the_sources(case):
 
     assert [issue.code for issue in result.issues] == ["unverifiable-excerpt"]
     assert result.issues[0].element_id == case.model.processes[0].id
+
+
+def test_extraction_mode_holds_the_model_to_each_diagram_s_structure(case):
+    """The diagram half of the gate runs here as it runs in a job (ADR 0121):
+    a node the extraction does not model is an issue on the score."""
+    diagram = Source(
+        kind="diagram",
+        label="Diagram",
+        text="flowchart LR\n  a[Payment Gateway] --> b[Ledger]\n",
+    )
+    drawn = replace(case, sources=(*case.sources, diagram))
+
+    result = _extraction_of(drawn, case.model)
+
+    assert [issue.code for issue in result.issues] == ["diagram-node-missing"] * 2
 
 
 def test_a_faithful_extraction_still_passes_the_citation_check(case):

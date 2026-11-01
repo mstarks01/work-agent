@@ -1302,6 +1302,17 @@ def after_gate(model: SystemModel) -> SystemModel:
     return with_field_capabilities(with_protocol_defaults(model))
 
 
+def diagram_readings(
+    stored: Mapping[str, Any] | None,
+) -> dict[str, DiagramReading]:
+    """Each diagram Source's reading, by label, from what
+    :data:`STATE_DIAGRAM_READINGS` holds, as the gate reads it."""
+    return {
+        label: _READING.validate_python(reading)
+        for label, reading in (stored or {}).items()
+    }
+
+
 def validate_extraction(
     ctx,
     keys: GraphKeys,
@@ -1354,10 +1365,7 @@ def validate_extraction(
         # The first gate, on every route out of it: what arrived is kept
         # before ``repair`` can write over the key it arrived in.
         state.put(STATE_FIRST_PASS, extracted_model)
-    diagrams = {
-        label: _READING.validate_python(reading)
-        for label, reading in (state.get(STATE_DIAGRAM_READINGS) or {}).items()
-    }
+    diagrams = diagram_readings(state.get(STATE_DIAGRAM_READINGS))
     model, issues = parse_extraction(
         extracted_model,
         extraction_format,
