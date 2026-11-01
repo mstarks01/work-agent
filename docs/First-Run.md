@@ -387,7 +387,9 @@ the form.
 
 The service reads a flowchart or an `architecture-beta` diagram with
 Mermaid's own parsers. Extraction then models every node as an element and
-every edge as a flow, and the model decides what each one is. A diagram that
+every edge as a flow, and the model decides what each one is. An element
+takes its node's label as its name, or the part of the label before a colon
+or a bracket, such as `Orders DB` for `Orders DB (PostgreSQL)`. A diagram that
 Mermaid cannot read, such as one with a syntax error, is read as text.
 
 Then replace the example with your own description. State security controls

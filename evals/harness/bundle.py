@@ -40,8 +40,10 @@ from analysis_service.assertions import (
 )
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.compact import FULL_FORMAT, parse_extraction
+from analysis_service.execution import seed_state
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
+from analysis_service.graph import STATE_DIAGRAM_READINGS, diagram_readings
 from analysis_service.report import Report
 from analysis_service.system_model import FLOW_ID_RULES
 from evals.harness import flow_ids, modes, replay
@@ -570,7 +572,10 @@ def extractions_from_reports(
     results = {}
     for case, written in _case_files(artifact, cases, "extraction"):
         model, issues = parse_extraction(
-            written["raw"], FULL_FORMAT, sources=_source_texts(case)
+            written["raw"],
+            FULL_FORMAT,
+            sources=_source_texts(case),
+            diagrams=diagram_readings(seed_state(case.sources)[STATE_DIAGRAM_READINGS]),
         )
         results[case.id] = modes.ExtractionResult(
             case_id=case.id,

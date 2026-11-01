@@ -50,7 +50,7 @@ class TestTheReader:
             "orders db",
             "receipt archive",
         ]
-        assert {n.shape for n in reading.nodes} == {"square", "round", "cylinder"}
+        assert {n.shape for n in reading.nodes} == {None}
         assert len(reading.edges) == 5
         assert reading.edges[2].label == "submit order (gRPC)"
         assert [g.label for g in reading.groups] == [
@@ -60,16 +60,16 @@ class TestTheReader:
         ]
         assert text.splitlines()[reading.nodes[0].line - 1].strip() == 'n0["shopper"]'
 
-    def test_a_loose_flowchart_keeps_its_shapes_as_drawn(self):
+    def test_a_loose_flowchart_gives_no_shape(self):
         reading = read_diagram(
             "flowchart LR\n  a[Web<br>App] --> b[(DB)]\n  c --- a\n  d <--> b\n"
         )
         assert isinstance(reading, DiagramStructure)
         assert [(n.id, n.label, n.shape) for n in reading.nodes] == [
-            ("a", "Web App", "square"),
-            ("b", "DB", "cylinder"),
-            ("c", "c", "square"),
-            ("d", "d", "square"),
+            ("a", "Web App", None),
+            ("b", "DB", None),
+            ("c", "c", None),
+            ("d", "d", None),
         ]
         assert [e.arrow for e in reading.edges] == ["forward", "none", "both"]
 
@@ -85,6 +85,45 @@ class TestTheReader:
         assert [(e.source, e.target, e.arrow) for e in reading.edges] == [
             ("db", "server", "none"),
             ("gateway", "server", "forward"),
+        ]
+
+    def test_an_architecture_line_is_the_parser_s_own(self):
+        reading = read_diagram(ARCHITECTURE)
+        assert isinstance(reading, DiagramStructure)
+        lines = ARCHITECTURE.splitlines()
+        for item in (*reading.groups, *reading.nodes, *reading.edges):
+            assert item.line is not None
+        assert [lines[e.line - 1].strip() for e in reading.edges] == [
+            "db:L -- R:server",
+            "gateway:R --> L:server",
+        ]
+
+    def test_a_junction_is_kept_apart_from_the_nodes(self):
+        reading = read_diagram(
+            "architecture-beta\n"
+            "    group g(cloud)[Zone]\n"
+            "    service a(server)[A]\n"
+            "    service b(disk)[B]\n"
+            "    junction j in g\n"
+            "    a:R -- L:j\n"
+            "    j:R --> L:b\n"
+        )
+        assert isinstance(reading, DiagramStructure)
+        assert [n.id for n in reading.nodes] == ["a", "b"]
+        assert [(j.id, j.group, j.line) for j in reading.junctions] == [("j", "g", 5)]
+        assert [(e.source, e.target) for e in reading.edges] == [("a", "j"), ("j", "b")]
+
+    def test_a_group_end_is_the_group_that_holds_the_node(self):
+        reading = read_diagram(
+            "architecture-beta\n"
+            "    group one(cloud)[One]\n"
+            "    service server(server)[Server] in one\n"
+            "    service subnet(server)[Subnet]\n"
+            "    server{group}:B --> T:subnet\n"
+        )
+        assert isinstance(reading, DiagramStructure)
+        assert [(e.source, e.target, e.line) for e in reading.edges] == [
+            ("one", "subnet", 5)
         ]
 
     @pytest.mark.parametrize(
@@ -169,6 +208,7 @@ def _structure(*edges: DiagramEdge, nodes=None) -> DiagramStructure:
             nodes
             or (_node("c", "Customer"), _node("w", "web app"), _node("d", "Orders DB"))
         ),
+        junctions=(),
         edges=edges,
     )
 
@@ -186,6 +226,18 @@ class TestTheGate:
         issues = validate(valid_model(), diagrams={"Model": _structure(nodes=nodes)})
         assert [i.code for i in issues] == ["diagram-node-missing"]
         assert "'Payment Gateway'" in issues[0].message
+        assert issues[0].is_diagram and not issues[0].is_citation
+
+    @pytest.mark.parametrize(
+        "drawn", ["Orders DB: orders, customers", "Orders DB (PostgreSQL)", "Orders DB"]
+    )
+    def test_a_node_may_be_named_with_the_label_before_its_detail(self, drawn):
+        nodes = (_node("c", "Customer"), _node("d", drawn))
+        assert _codes(_structure(nodes=nodes)) == []
+
+    def test_a_label_or_a_name_with_no_slug_is_an_issue_and_not_a_crash(self):
+        nodes = (_node("c", "Customer"), _node("x", "🙂"))
+        assert _codes(_structure(nodes=nodes)) == ["diagram-node-missing"]
 
     def test_an_edge_must_run_in_its_arrow_s_direction(self):
         assert _codes(_structure(_edge("w", "c"))) == ["diagram-edge-missing"]
@@ -195,7 +247,10 @@ class TestTheGate:
     def test_an_edge_with_two_arrows_or_none_takes_either_direction(self, arrow):
         assert _codes(_structure(_edge("w", "c", arrow))) == []
 
-    def test_an_edge_to_a_group_and_a_refused_diagram_are_not_checked(self):
+    def test_an_edge_to_a_group_or_a_junction_and_a_refused_diagram_are_not_checked(
+        self,
+    ):
         assert _codes(_structure(_edge("c", "g"))) == []
+        assert _codes(_structure(_edge("c", "j"))) == []
         refused = DiagramRefusal(refused="syntax error")
         assert validate(valid_model(), diagrams={"Model": refused}) == []

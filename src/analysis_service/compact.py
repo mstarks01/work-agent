@@ -429,7 +429,7 @@ def parse_extraction(
     extraction_format: str,
     *,
     sources: Mapping[str, str],
-    diagrams: Mapping[str, DiagramReading] = MappingProxyType({}),
+    diagrams: Mapping[str, DiagramReading],
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """The one reader of "what extraction emitted" against "a validated model".
 

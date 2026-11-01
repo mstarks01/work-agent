@@ -89,6 +89,7 @@ from analysis_service.graph import (
     EXTRACTING_ENTRIES,
     STATE_ASSERTION_CATALOG,
     STATE_ASSERTION_PROPOSAL,
+    STATE_DIAGRAM_READINGS,
     STATE_EXTRACTED_MODEL,
     STATE_FIRST_PASS,
     STATE_FRAMEWORK_OPTIONS,
@@ -100,6 +101,7 @@ from analysis_service.graph import (
     ModelResolver,
     Pipeline,
     Rejected,
+    diagram_readings,
     result_of,
     tier_node_by_graph_node,
 )
@@ -1440,6 +1442,7 @@ def _extraction_result(
         raw,
         pipeline.extraction_format or FULL_FORMAT,
         sources=state.get(STATE_SOURCE_TEXTS, {}),
+        diagrams=diagram_readings(state.get(STATE_DIAGRAM_READINGS)),
     )
     return ExtractionResult(
         case_id=case.id,

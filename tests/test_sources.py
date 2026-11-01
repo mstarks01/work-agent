@@ -206,6 +206,7 @@ class TestRender:
         assert "trust zone only where its label says so" in outside
         assert (
             "model each of its nodes as an element named with the node's label,"
+            " or with the part of the label before its first colon or bracket,"
             " and each of its edges as a data flow between those elements in the"
             " direction of its arrow" in " ".join(outside.split())
         )

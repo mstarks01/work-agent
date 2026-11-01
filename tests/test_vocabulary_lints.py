@@ -89,6 +89,10 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the statuses a resumed job ends in without a report, so every status"
         " that runs or ends in one is absent by construction"
     ),
+    ("analysis_service.validation", "DIAGRAM_CODES"): (
+        "the codes the rule that reads a diagram's structure writes, which is"
+        " fewer than the codes every gate rule writes"
+    ),
     ("evals.harness.bundle", "KEPT_WHEN_FAILED"): (
         "the case files a failed case may carry, which a report and the files"
         " written beside a report are not"

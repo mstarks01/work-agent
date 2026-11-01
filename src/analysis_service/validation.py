@@ -31,7 +31,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state, leading_word
 from analysis_service.capabilities import CAPABILITIES
-from analysis_service.diagrams import DiagramReading, DiagramStructure
+from analysis_service.diagrams import DiagramReading, DiagramStructure, node_names
 from analysis_service.grounding import (
     PreparedSource,
     deadline_spent,
@@ -110,11 +110,10 @@ class ValidationIssue(BaseModel):
 
     @property
     def is_citation(self) -> bool:
-        """Did this issue come from the one gate rule that reads the sources?
+        """Did this issue come from the gate rule that reads the sources' text?
 
-        :func:`_citation_issues` is the only rule taking data from outside the
-        model, and it is the only rule that can name either of these fields. A
-        caller that supplies no sources can never see one.
+        :func:`_citation_issues` is the only rule that can name either of these
+        fields. A caller that supplies no sources can never see one.
 
         The property exists so a caller asking *which half of the gate failed*
         reads the answer here rather than re-deriving it from a code. The eval
@@ -124,6 +123,20 @@ class ValidationIssue(BaseModel):
         """
         return self.field in CITATION_FIELDS
 
+    @property
+    def is_diagram(self) -> bool:
+        """Did this issue come from the rule that reads a diagram's structure?
+
+        Like a citation issue, it names a gap the repair pass exists to fix
+        (ADR 0121), so the eval harness grades it rather than failing the case.
+        """
+        return self.code in DIAGRAM_CODES
+
+
+#: The codes only :func:`_diagram_issues` writes.
+DIAGRAM_CODES: frozenset[IssueCode] = frozenset(
+    {"diagram-node-missing", "diagram-edge-missing"}
+)
 
 #: The fields only :func:`_citation_issues` writes. Named beside the rule so the
 #: rule and :attr:`ValidationIssue.is_citation` cannot drift apart;
@@ -297,19 +310,23 @@ def _diagram_issues(
 ) -> list[ValidationIssue]:
     """Each node of a diagram is an element, and each edge a flow (ADR 0121).
 
-    A node is an External Entity, a Process or a Data Store whose name is the
-    node's label, compared as :func:`~analysis_service.system_model.normalize_name`
-    spells both. An edge is a Data Flow between the elements of its two nodes,
+    A node is an External Entity, a Process or a Data Store whose name is one
+    of the node's :func:`~analysis_service.diagrams.node_names`, compared as
+    :func:`~analysis_service.system_model.normalize_name` spells both. An edge is a Data Flow between the elements of its two nodes,
     from source to target for a ``forward`` arrow, the other way for
     ``backward``, and either way for ``both`` or ``none``. An edge with a group
-    at an end, and every group, is not checked: a group is a trust zone only
-    where its label says so, and that is extraction's judgement.
+    or a junction at an end, and every group, is not checked: a group is a
+    trust zone only where its label says so, and which elements a junction
+    joins is extraction's judgement.
     """
-    named: dict[str, set[str]] = {}
+    named: dict[str | None, set[str]] = {}
     for element in model.zoned_elements():
-        named.setdefault(normalize_name(element.name), set()).add(element.id)
+        named.setdefault(_slug_or_none(element.name), set()).add(element.id)
+    named.pop(None, None)
     ends = {
-        node.id: named.get(normalize_name(node.label), set())
+        node.id: set().union(
+            *(named.get(_slug_or_none(name), set()) for name in node_names(node.label))
+        )
         for node in structure.nodes
     }
     issues = [
@@ -317,7 +334,7 @@ def _diagram_issues(
             code="diagram-node-missing",
             message=f"node {node.label!r} on line {node.line} of {label!r} is not an"
             f" element; model it as an External Entity, a Process or a Data Store"
-            f" named {node.label!r}",
+            f" named {' or '.join(map(repr, node_names(node.label)))}",
         )
         for node in structure.nodes
         if not ends[node.id]
@@ -345,6 +362,15 @@ def _diagram_issues(
                 )
             )
     return issues
+
+
+def _slug_or_none(name: str) -> str | None:
+    """``name`` as :func:`normalize_name` spells it, or ``None`` for a name
+    with no slug, which the ``empty-slug`` issue reports on its own."""
+    try:
+        return normalize_name(name)
+    except ValueError:
+        return None
 
 
 def _blank_control_issues(element: Element) -> list[ValidationIssue]:
