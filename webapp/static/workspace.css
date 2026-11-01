@@ -337,8 +337,34 @@ main {
 }
 .composer-tools {
   display:flex;
+  position:relative;
   padding:0 8px 8px
 }
+.upload-menu {
+  position:absolute;
+  top:100%;
+  left:8px;
+  z-index:5;
+  display:flex;
+  flex-direction:column;
+  min-width:14rem;
+  padding:6px 0;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--canvas);
+  box-shadow:0 4px 16px rgb(0 0 0 / 15%)
+}
+.upload-menu[hidden] { display:none; }
+.upload-menu button {
+  border:0;
+  border-radius:0;
+  background:transparent;
+  padding:8px 16px;
+  justify-content:flex-start;
+  text-align:left;
+  color:var(--text)
+}
+.upload-menu button:hover,.upload-menu button:focus-visible { background:var(--soft); }
 .upload-icon {
   width:42px;
   padding:8px;
@@ -1260,11 +1286,16 @@ a.analysis-row:hover {
 @media (max-width:580px) {
   #list .each-one { margin-left:16px; margin-right:16px; }
 }
-.files-checklist {
-  border:1px solid var(--line);
-  border-radius:8px;
-  padding:6px 12px 12px;
+.chosen-files {
+  list-style:none;
+  padding:0;
   margin:12px 0
+}
+.chosen-files li {
+  overflow-wrap:anywhere
+}
+.files-dialog {
+  width:min(36rem, 94vw)
 }
 #files-rows label {
   display:grid;
@@ -1276,7 +1307,4 @@ a.analysis-row:hover {
 }
 #files-rows .file-name {
   overflow-wrap:anywhere
-}
-.files-checklist meter {
-  width:100%
 }

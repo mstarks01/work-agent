@@ -278,13 +278,16 @@ transcripts and Mermaid diagrams that you add to any of your analyses
   own copy. `DELETE /workspace/files/{file_id}` removes the row and the text,
   and keeps nothing.
 
-The analysis form shows "Files for this analysis": a checklist of your files,
-a "Manage files" link and a size meter. The submission sends the chosen IDs
-in `owner_files`, and the server copies each file's text into the job as a
-Source with the file's name as its label (ADR 0119). A later delete or a new
-upload changes no job and no report. When a chosen file is gone, the
-submission is refused and the checklist shows the file as "Missing". An
-analysis that you open again lists "Files used" from its own copies.
+The plus button under the description opens a menu with two items. "Upload
+from computer" reads a file from your computer. "Select
+from Files" opens a dialog with a checklist of your files and a "Manage
+files" link. The form lists each chosen file with a Remove button. The
+submission sends the chosen IDs in `owner_files`, and the server copies each
+file's text into the job as a Source with the file's name as its label
+(ADR 0119). A later delete or a new upload changes no job and no report. When
+a chosen file is gone, the submission is refused and the form shows the file
+as "Missing". An analysis that you open again lists "Files used" from its own
+copies.
 
 ## The Settings page
 
