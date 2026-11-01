@@ -1934,3 +1934,101 @@ def test_the_diagram_s_flows_and_labels_stay_clear_on_every_archived_model(brows
             found[Path(path).name] = faults
 
     assert found == {}
+
+
+def upload_to_files(page, name: str, text: str) -> None:
+    """Choose a file on the Files page; the upload dialog opens on a pass."""
+    with page.expect_file_chooser() as chosen:
+        page.click("#upload-file-button")
+    chosen.value.set_files(
+        {"name": name, "mimeType": "text/plain", "buffer": text.encode()}
+    )
+
+
+def test_the_files_page_keeps_lists_and_deletes_a_file_as_text(page):
+    """A name and a text that spell markup stay text (OWASP A03)."""
+    page.goto("/files")
+    assert page.get_attribute("#files-nav", "aria-current") == "page"
+    assert page.is_visible("#files-empty")
+    hostile = '<img src=x onerror="window.ran=1">.txt'
+    upload_to_files(page, hostile, "<script>window.ran=1</script> Ana: hi")
+    page.wait_for_selector("#upload-dialog[open]")
+    assert page.input_value("#upload-name") == hostile
+    assert page.is_checked("input[name=upload-kind][value=transcript]")
+    page.check("input[name=upload-kind][value=description]")
+    page.click("#upload-save")
+    page.wait_for_selector("#files-list tr")
+    assert page.inner_text("#files-list td.name") == hostile
+    assert page.inner_text("#files-list tr td:nth-child(2)") == "Description"
+    assert page.locator("#files-list img").count() == 0
+    assert page.evaluate("window.ran") is None
+    assert "is in Files" in page.inner_text("#files-notice")
+
+    upload_to_files(page, hostile, "again")
+    page.wait_for_selector("#upload-dialog[open]")
+    page.click("#upload-save")
+    page.wait_for_selector("#upload-problem:not([hidden])")
+    assert "You already have a file named" in page.inner_text("#upload-problem")
+    page.click("#upload-cancel")
+
+    upload_to_files(page, "notes.md", "text")
+    assert "Files keeps only" in page.inner_text("#files-problem")
+
+    page.click("#files-list button")
+    page.wait_for_selector("#delete-dialog[open]")
+    assert "keeps its own copy" in page.inner_text("#delete-dialog")
+    page.click("#delete-go")
+    page.wait_for_selector("#files-empty:not([hidden])")
+    assert "keep their copy" in page.inner_text("#files-notice")
+
+
+def test_a_chosen_file_goes_into_the_analysis_and_shows_when_it_opens_again(page):
+    diagram = "flowchart LR\n    user[Customer] -->|HTTPS| app(Web App)\n"
+    page.goto("/files")
+    upload_to_files(page, "network.mmd", diagram)
+    page.wait_for_selector("#upload-dialog[open]")
+    assert page.is_hidden("#upload-kinds")
+    assert "always a diagram" in page.inner_text("#upload-fixed-kind")
+    page.click("#upload-save")
+    page.wait_for_selector("#files-list tr")
+    file_id = page.evaluate("fetch('/workspace/files').then((r) => r.json())")[0]["id"]
+
+    page.goto("/")
+    page.wait_for_selector("#files-rows label")
+    page.check("#files-rows input[type=checkbox]")
+    assert "of 102,400 bytes" in page.inner_text("#bytes-label")
+    page.locator('input[name="framework"]').first.check()
+    page.fill("#analysis-name", "Files analysis")
+    with page.expect_response("**/analyze") as answered:
+        page.click("#go")
+    request = answered.value.request
+    assert request.post_data_json["owner_files"] == [file_id]
+    assert request.post_data_json["sources"] == []
+    run = answered.value.json()["run"]
+    page.wait_for_selector("#asked", state="visible")
+
+    page.goto(f"/?run={run}")
+    page.wait_for_selector("#asked", state="visible")
+    page.click("#description-nav")
+    page.wait_for_selector("#files-used", state="visible")
+    assert page.inner_text("#files-used-list") == "network.mmd (diagram)"
+    assert page.is_hidden("#files-checklist")
+
+
+def test_a_file_deleted_before_the_submission_shows_as_missing(page):
+    page.goto("/files")
+    upload_to_files(page, "call.vtt", "Ana: hi")
+    page.wait_for_selector("#upload-dialog[open]")
+    page.click("#upload-save")
+    page.wait_for_selector("#files-list tr")
+    page.goto("/")
+    page.wait_for_selector("#files-rows label")
+    page.check("#files-rows input[type=checkbox]")
+    file_id = page.evaluate("fetch('/workspace/files').then((r) => r.json())")[0]["id"]
+    page.evaluate(f"fetch('/workspace/files/{file_id}', {{method: 'DELETE'}})")
+    page.locator('input[name="framework"]').first.check()
+    page.fill("#analysis-name", "Gone file")
+    page.click("#go")
+    page.wait_for_selector("#problem:not([hidden])")
+    assert "no longer in Files" in page.inner_text("#problem")
+    page.wait_for_selector("#files-rows .hint >> text=Missing")

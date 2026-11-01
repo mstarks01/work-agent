@@ -25,6 +25,8 @@
           <div id="answers-from-field" hidden><label class="field-label" for="answers-from">Reuse answers from</label><select id="answers-from"><option value="">No earlier analysis</option></select></div>
           <p id="transcript-note" class="hint" hidden>Transcript: <span id="transcript-name"></span> <button type="button" id="transcript-remove" class="quiet">Remove</button></p>
           <p id="diagram-note" class="hint" hidden>Diagram: <span id="diagram-name"></span> <button type="button" id="diagram-remove" class="quiet">Remove</button></p>
+          <fieldset id="files-checklist" class="files-checklist"><legend>Files for this analysis</legend><div id="files-rows"></div><p class="hint"><a href="/files">Manage files</a></p><label class="field-label" id="bytes-label" for="bytes-meter"></label><meter id="bytes-meter" min="0" max="<!--source_limit-->" value="0"></meter></fieldset>
+          <div id="files-used" class="files-used" hidden><h2>Files used</h2><p class="hint">The analysis keeps its own copy of each file.</p><ul id="files-used-list"></ul></div>
           <fieldset id="frameworks"><legend>Analysis frameworks</legend><!--frameworks--></fieldset>
           <div class="entry-actions"><button type="submit" id="go" class="primary">Prepare analysis</button></div>
         </form>
@@ -45,6 +47,7 @@
 </div>
 <script type="application/json" id="answer_limits" nonce="__CSP_NONCE__"><!--answer_limits--></script>
 <script type="application/json" id="source_formats" nonce="__CSP_NONCE__"><!--source_formats--></script>
+<script type="application/json" id="page_labels" nonce="__CSP_NONCE__"><!--page_labels--></script>
 <script nonce="__CSP_NONCE__"><!--script--></script>
 </body>
 </html>

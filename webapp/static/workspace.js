@@ -40,6 +40,11 @@ const workspace = (() => {
     el("upload").hidden = true;
     el("transcript-note").hidden = true;
     el("diagram-note").hidden = true;
+    // A reopened analysis lists the copies its job holds, by the names they
+    // had when it ran, and offers no choice (ADR 0119).
+    el("files-checklist").hidden = true;
+    el("files-used-list").replaceChildren(...(data.owner_files || []).map((file) => node("li", `${file.label} (${file.kind})`)));
+    el("files-used").hidden = !(data.owner_files || []).length;
     el("upload-file").disabled = true;
     el("ask").disabled = true;
     current = data;

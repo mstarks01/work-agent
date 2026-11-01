@@ -56,7 +56,7 @@ from tests.test_webapp import (
     posted,
     startup_for,
 )
-from webapp.main import create_app
+from webapp.main import PAGE_SOURCE_LABELS, create_app
 
 #: The shipped tier config, as the webapp tests build it: one fixture, used here.
 tiers = test_webapp.tiers
@@ -568,7 +568,7 @@ for (const id of ["analyze","description","problem","go","load","ask",
                   "answer_limits","save-status","changes","upload","upload-file",
                   "transcript-note","transcript-name","transcript-remove","diagram-note",
                   "diagram-name","diagram-remove","analysis-name",
-                  "description-remaining","source_formats"])
+                  "description-remaining","source_formats","page_labels"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
 ids["upload-file"].dataset.maxBytes = "64";
@@ -578,6 +578,7 @@ ids["analysis-name"].value = "Test analysis";
 ids.ask.checked = true;
 ids.answer_limits.textContent = LIMITS;
 ids.source_formats.textContent = FORMATS;
+ids.page_labels.textContent = PAGE_LABELS;
 const framework = new Node("input");
 framework.value = "stride";
 framework.checked = true;
@@ -618,12 +619,18 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         pytest.skip("no node on PATH to run the form page's script")
     script = "\n".join(
         (PROJECT_ROOT / "webapp" / "static" / name).read_text()
-        for name in ("answer_editor.js", "question_list.js", "first_run.js")
+        for name in (
+            "answer_editor.js",
+            "question_list.js",
+            "text_file.js",
+            "first_run.js",
+        )
     )
     program = (
         _FORM_HARNESS.replace("SEARCH", json.dumps(search))
         .replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
         .replace("FORMATS", json.dumps(json.dumps(_FORMAT_TABLE)))
+        .replace("PAGE_LABELS", json.dumps(json.dumps(PAGE_SOURCE_LABELS)))
         + script
         + "\n(async () => {\n"
         + steps

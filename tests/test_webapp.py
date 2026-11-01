@@ -45,7 +45,12 @@ from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
 )
-from analysis_service.owner_files import OwnerFile
+from analysis_service.owner_files import (
+    CONTROL_CHARACTER,
+    OwnerFile,
+    name_in_use,
+    over_limit,
+)
 from analysis_service.principals import LOCAL_ISSUER, Principal
 from analysis_service.sources import ANSWERS_LABEL, FORMATS
 from analysis_service.vendors import ProviderAuthError
@@ -62,6 +67,7 @@ from tests.factories import (
 )
 from webapp.main import (
     OPERATOR,
+    PAGE_SOURCE_LABELS,
     Settings,
     Startup,
     Workspace,
@@ -119,6 +125,7 @@ def stub_settings(runner=None, catalog: bool = False) -> Settings:
         budget=WEBAPP_BUDGET,
         deadline_seconds=TEST_DEADLINE,
         carries_catalog=catalog,
+        max_owner_files=WEBAPP_MAX_OWNER_FILES,
     )
 
 
@@ -154,6 +161,7 @@ def broken_client(tiers):
 # The demo app has one textarea, so it posts one description-kind source. Its
 # label is the app's, not the user's: the form asks for text, not a citation key.
 WEBAPP_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
+WEBAPP_MAX_OWNER_FILES = 3
 
 # The local operator's own spend: no test here is about a window, and the
 # descriptions some tests send are a hundred kilobytes.
@@ -326,12 +334,17 @@ def test_every_write_route_refuses_a_request_that_is_not_same_origin(client):
     """Each POST, PUT and DELETE route asks the one gate before it reads the
     body, so a new write route without it fails here."""
     writes = [
-        (method, route.path.replace("{run_id}", "job-missing"))
+        (
+            method,
+            route.path.replace("{run_id}", "job-missing").replace(
+                "{file_id}", "file-" + "0" * 32
+            ),
+        )
         for route in client.app.routes
         for method in sorted(getattr(route, "methods", None) or ())
         if method in {"POST", "PUT", "DELETE"}
     ]
-    assert len(writes) == 9, writes
+    assert len(writes) == 11, writes
     for method, path in writes:
         response = client.request(
             method, path, json={}, headers={"Sec-Fetch-Site": "cross-site"}
@@ -675,6 +688,7 @@ def test_each_run_route_answers_a_malformed_id_as_a_missing_run_before_the_store
                 ("PUT", "/workspace/runs/{run_id}/title"): {"title": "Orders"},
             },
             headers=SAME_ORIGIN,
+            others=("file_id",),
         )
 
 
@@ -1699,8 +1713,10 @@ PAGE_SCRIPTS = {
         "workspace.js",
         "answer_editor.js",
         "question_list.js",
+        "text_file.js",
         "first_run.js",
         "settings.js",
+        "files.js",
     ),
     "webapp/offline_sitting.py": "offline_sitting.js",
     "webapp/report_view.html": ("sidebar.js", "answer_editor.js", "report_view.js"),
@@ -2207,3 +2223,131 @@ class TestOwnerFilesInAnAnalysis:
         assert (
             client.post("/analyze", json=body, headers=SAME_ORIGIN).status_code == 400
         )
+
+
+def uploaded(name: str = "Kickoff call.vtt", **changes) -> dict:
+    """The body the Files page sends for a plain text upload."""
+    return {
+        "name": name,
+        "kind": "transcript",
+        "format": "text/plain",
+        "text": "Ana: the API uses mTLS.",
+    } | changes
+
+
+class TestTheFilesRoutes:
+    """The Files section's routes (ADR 0118, #2062)."""
+
+    def test_the_page_is_served_under_a_strict_policy(self, client):
+        page = client.get("/files")
+        assert page.status_code == 200
+        policy = page.headers["content-security-policy"]
+        assert "connect-src 'self'" in policy and "unsafe-inline" not in policy
+        assert 'id="files_limits"' in page.text
+
+    def test_an_upload_lists_and_deletes(self, client):
+        assert client.get("/workspace/files").json() == []
+        added = client.post("/workspace/files", json=uploaded(), headers=SAME_ORIGIN)
+        assert added.status_code == 201, added.text
+        view = added.json()
+        assert set(view) == {"id", "name", "kind", "format", "size_bytes", "created_at"}
+        assert client.get("/workspace/files").json() == [view]
+        gone = client.delete(f"/workspace/files/{view['id']}", headers=SAME_ORIGIN)
+        assert gone.status_code == 204
+        assert client.get("/workspace/files").json() == []
+        again = client.delete(f"/workspace/files/{view['id']}", headers=SAME_ORIGIN)
+        assert again.status_code == 404
+
+    def test_the_first_upload_and_the_first_analysis_share_one_owner(self, client):
+        file = client.post(
+            "/workspace/files", json=uploaded(), headers=SAME_ORIGIN
+        ).json()
+        body = posted("A web app.") | {"owner_files": [file["id"]]}
+        assert (
+            client.post("/analyze", json=body, headers=SAME_ORIGIN).status_code == 200
+        )
+
+    def test_a_name_in_use_and_the_count_limit_are_409(self, client):
+        client.post("/workspace/files", json=uploaded(), headers=SAME_ORIGIN)
+        repeated = client.post("/workspace/files", json=uploaded(), headers=SAME_ORIGIN)
+        assert repeated.status_code == 409
+        assert repeated.json()["message"] == name_in_use("Kickoff call.vtt")
+        for n in range(2, WEBAPP_MAX_OWNER_FILES + 1):
+            client.post(
+                "/workspace/files", json=uploaded(f"Call {n}"), headers=SAME_ORIGIN
+            )
+        over = client.post(
+            "/workspace/files", json=uploaded("One more"), headers=SAME_ORIGIN
+        )
+        assert over.status_code == 409
+        assert over.json()["message"] == over_limit(WEBAPP_MAX_OWNER_FILES)
+
+    @pytest.mark.parametrize(
+        ("changes", "phrase"),
+        [
+            ({"kind": "diagram"}, "cannot be a diagram"),
+            ({"format": "image/png"}, "format"),
+            ({"text": "x" * (WEBAPP_LIMITS.max_total_bytes + 1)}, "larger than"),
+            ({"text": "a\x00b"}, "control characters"),
+            ({"text": "  \n"}, "no text"),
+            ({"name": "Uploaded transcript"}, "for its own sources"),
+            ({"name": "Answers to link questions"}, "for its own sources"),
+            ({"name": "two\nlines"}, "on one line"),
+            ({"name": ""}, "on one line"),
+            (
+                {
+                    "format": "text/vnd.mermaid",
+                    "kind": "diagram",
+                    "text": "sequenceDiagram",
+                },
+                "architecture-beta",
+            ),
+            ({"owner_id": "someone"}, "only these fields"),
+        ],
+    )
+    def test_a_refused_upload_is_400_and_keeps_nothing(self, client, changes, phrase):
+        refused = client.post(
+            "/workspace/files", json=uploaded(**changes), headers=SAME_ORIGIN
+        )
+        assert refused.status_code == 400
+        assert phrase in refused.json()["message"]
+        assert client.get("/workspace/files").json() == []
+
+    @pytest.mark.parametrize(
+        "file_id", ["file-" + "0" * 31, "FILE-" + "0" * 32, "..", "job-" + "0" * 32]
+    )
+    def test_a_malformed_file_id_is_404_before_the_store(self, tiers, file_id):
+        store = LookupSpy()
+        with TestClient(
+            create_app(startup_for(tiers), Workspace(store=store)), base_url=LOOPBACK
+        ) as client:
+            gone = client.delete(f"/workspace/files/{file_id}", headers=SAME_ORIGIN)
+        assert gone.status_code == 404
+        assert file_id not in store.arguments
+
+
+def test_the_page_and_the_server_refuse_one_control_class():
+    """``text_file.js`` and ``owner_files.CONTROL_CHARACTER`` are two readers of
+    one rule, because the browser checks a file before the server does."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the page's script")
+    script = (PROJECT_ROOT / "webapp/static/text_file.js").read_text()
+    literal = re.search(r"const CONTROL = (/.*?/);", script).group(1)
+    program = (
+        f"const CONTROL = {literal};"
+        "console.log(JSON.stringify([...Array(0x2100).keys()]"
+        ".filter((c) => CONTROL.test(String.fromCharCode(c)))));"
+    )
+    done = subprocess.run(
+        [node, "-e", program], capture_output=True, text=True, check=True
+    )
+    assert json.loads(done.stdout) == [
+        point for point in range(0x2100) if CONTROL_CHARACTER.search(chr(point))
+    ]
+
+
+def test_the_page_names_a_label_for_each_source_it_makes():
+    """The description and the default kind of each format row."""
+    kinds = {"description", *(row.default_kind for row in FORMATS.values())}
+    assert kinds <= PAGE_SOURCE_LABELS.keys()
