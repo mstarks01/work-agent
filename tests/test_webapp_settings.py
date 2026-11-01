@@ -398,7 +398,7 @@ class TestWhatTheSelectionShows:
             for key, setting in SETTINGS.items()
             if setting.variable in store_variables() and setting.mark != "excluded"
         }
-        assert all(rows[key]["restart"] for key in store)
+        assert all("restart" not in row for row in rows.values())
 
     def test_the_sql_store_shows_the_reads_of_its_object_store(self, tmp_path):
         shown = store_shown_of(

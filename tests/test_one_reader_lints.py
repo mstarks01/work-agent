@@ -1450,3 +1450,23 @@ def test_a_need_that_names_no_facet_has_one_reader():
     assert _sites(_falls_back_to_every_facet) == [
         ("src/analysis_service/fact_answers.py", "needed_facets")
     ]
+
+
+def _reads_a_request_body(node: ast.AST) -> bool:
+    """Whether ``node`` reads a request's body or its media type by hand."""
+    body_read = isinstance(node, ast.Call) and any(
+        _is_attribute(node.func, method, "request")
+        for method in ("json", "body", "stream", "form")
+    )
+    media_type = (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and node.value.lower() == "content-type"
+    )
+    return body_read or media_type
+
+
+def test_a_request_body_has_one_reader():
+    """Only ``_json_body`` reads a write route's body, so each route has the
+    size cap and the media-type check."""
+    assert _sites(_reads_a_request_body) == [("webapp/main.py", "_json_body")]
