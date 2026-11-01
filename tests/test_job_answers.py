@@ -695,9 +695,7 @@ def held_file(
     owner: str = OWNER,
 ) -> OwnerFile:
     """An Owner File of ``owner`` in ``store``, with a principal where none is held."""
-    file = OwnerFile.create(
-        owner_id=owner, name=name, kind="transcript", format="text/plain", text=text
-    )
+    file = OwnerFile.create(owner_id=owner, name=name, kind="transcript", text=text)
     principal = asyncio.run(new_principal(store, owner))
     assert (
         asyncio.run(store.add_file(file, text, limit=100, principal=principal))

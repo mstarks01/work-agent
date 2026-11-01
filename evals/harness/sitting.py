@@ -60,6 +60,7 @@ from typing import Literal, get_args
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.claims import FrameworkName
+from analysis_service.config_files import xdg_dir
 from analysis_service.errors import error_place
 from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.system_model import ModelIndex
@@ -236,10 +237,13 @@ class DraftStatus:
 def draft_root() -> Path:
     """Where drafts live when a caller names nowhere else.
 
-    A function rather than a constant, so importing this module resolves no
-    home directory and a test can pass a temporary one instead.
+    ``sittings`` in the state directory of
+    :func:`~analysis_service.config_files.xdg_dir`: under ``XDG_STATE_HOME``,
+    else under ``~/.local/state``. A function rather than a constant, so
+    importing this module resolves no home directory and a test can pass a
+    temporary one instead.
     """
-    return Path.home() / ".local" / "state" / "work-agent" / "sittings"
+    return xdg_dir(os.environ, "XDG_STATE_HOME", ".local/state") / "sittings"
 
 
 def draft_path(root: Path, login: str, case_id: str) -> Path:

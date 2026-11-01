@@ -2184,7 +2184,6 @@ class TestOwnerFilesInAnAnalysis:
             owner_id=principal.owner_id,
             name="Kickoff call",
             kind="transcript",
-            format="text/plain",
             text=self.TEXT,
         )
         added = asyncio.run(

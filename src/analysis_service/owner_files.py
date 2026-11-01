@@ -3,10 +3,10 @@ section, for use in any analysis of that owner (ADR 0118).
 
 The text of an Owner File is an object under
 :func:`~analysis_service.objects.file_key`, and one row names it. The row holds
-what a page lists and what a job copies: the name, the kind, the format, the
-SHA-256 of the object, its size and the time of the upload. A job copies the
-text as a :class:`~analysis_service.sources.Source`, so a delete of the Owner
-File changes no job (ADR 0119).
+what a page lists and what a job copies: the name, the kind, the SHA-256 of
+the object, its size and the time of the upload. The kind gives the format. A
+job copies the text as a :class:`~analysis_service.sources.Source`, so a
+delete of the Owner File changes no job (ADR 0119).
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import (
     DIAGRAM_TYPES,
     FORMATS,
+    KIND_FORMATS,
     MAX_LABEL_CHARS,
     OWNER_FILE_ID,
     Source,
@@ -52,7 +53,6 @@ class OwnerFile(BaseModel):
     #: The Source label that a job gives the copy, so it obeys the label rule.
     name: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
     kind: SourceKind
-    format: SourceFormat
     sha256: Sha256Hex
     size_bytes: int = Field(ge=0)
     created_at: datetime
@@ -62,6 +62,19 @@ class OwnerFile(BaseModel):
     def _plain_name(cls, value: str) -> str:
         return plain_name(value)
 
+    @field_validator("kind")
+    @classmethod
+    def _uploaded_kind(cls, value: SourceKind) -> SourceKind:
+        if value not in KIND_FORMATS:
+            raise ValueError(f"no upload format allows the {value} kind")
+        return value
+
+    @property
+    def format(self) -> SourceFormat:
+        """What the file is written in: the one :data:`FORMATS` row whose kinds
+        hold its kind."""
+        return KIND_FORMATS[self.kind]
+
     @classmethod
     def create(
         cls,
@@ -69,7 +82,6 @@ class OwnerFile(BaseModel):
         owner_id: str,
         name: str,
         kind: SourceKind,
-        format: SourceFormat,
         text: str,
     ) -> Self:
         """The row of a new upload of ``text``, with a new ID."""
@@ -78,7 +90,6 @@ class OwnerFile(BaseModel):
             owner_id=owner_id,
             name=name,
             kind=kind,
-            format=format,
             sha256=text_digest(text),
             size_bytes=len(text.encode("utf-8")),
             created_at=datetime.now(UTC),

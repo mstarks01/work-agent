@@ -26,6 +26,7 @@ from analysis_service.sources import (
     DEFAULT_TRANSCRIPT_LABEL,
     DIAGRAM_TYPES,
     FORMATS,
+    KIND_FORMATS,
     MAX_LABEL_CHARS,
     Source,
     SourceKind,
@@ -352,6 +353,11 @@ class TestTheFormatTable:
 
     def test_no_row_allows_the_answers_kind(self):
         assert all("answers" not in row.kinds for row in FORMATS.values())
+
+    def test_no_kind_is_in_two_rows(self):
+        """So the kind of an Owner File gives its format."""
+        kinds = [kind for row in FORMATS.values() for kind in row.kinds]
+        assert sorted(kinds) == sorted(KIND_FORMATS)
 
     def test_no_extension_is_in_two_rows(self):
         extensions = [ext for row in FORMATS.values() for ext in row.extensions]

@@ -81,6 +81,10 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the entries that reach the routing half, which an entry stopping"
         " before it does not"
     ),
+    ("analysis_service.sources", "KIND_FORMATS"): (
+        "the kinds that an upload allows, so a kind that only the page or the"
+        " service writes is absent by construction"
+    ),
     ("analysis_service.jobs", "TERMINAL_STATUSES"): (
         "the statuses a job stops in, so a status it passes through is absent"
         " by construction"
