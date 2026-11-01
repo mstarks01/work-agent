@@ -43,6 +43,11 @@ LOCAL_SUBMITTER = "local-review"
 #: Whether a submission names the reviewer or files under the anonymous name.
 ReviewerMode = Literal["self", "anonymous"]
 
+#: How a review contribution reaches GitHub: a pull request that the ``gh``
+#: login opens, or a file that the reader takes to GitHub in the browser.
+#: ``sitting.js`` reads it.
+ContributionMode = Literal["direct", "browser"]
+
 #: What the page calls each rail state. One table, keyed by
 #: :data:`~evals.harness.sitting.RowState`. ``/api/review-states`` hands the
 #: page the state and the label together, so the page keys its own behaviour
@@ -482,7 +487,7 @@ def create_app(session: Session) -> FastAPI:
         base.refuse_cross_origin(request)
         base.require_token(request, session)
         login = _gh_login(session.root)
-        return JSONResponse({"mode": "direct" if login else "browser", "author": login})
+        return JSONResponse({"mode": _contribution_mode(login), "author": login})
 
     @app.post("/api/contribution-preview")
     def contribution_preview(
@@ -502,9 +507,10 @@ def create_app(session: Session) -> FastAPI:
         login = _gh_login(session.root)
         author = _author(login or body.author)
         envelope = _review_envelope(session, author, body.reviewer)
-        if not login:
+        mode = _contribution_mode(login)
+        if mode == "browser":
             return JSONResponse(
-                {"mode": "browser", "ok": True, **_preview(session, envelope)}
+                {"mode": mode, "ok": True, **_preview(session, envelope)}
             )
         try:
             url = review_submissions.open_pull_request(session.root, envelope)
@@ -514,7 +520,7 @@ def create_app(session: Session) -> FastAPI:
         warnings = _clean_local_record(session, cases)
         return JSONResponse(
             {
-                "mode": "direct",
+                "mode": mode,
                 "ok": True,
                 "url": url,
                 "author": author,
@@ -523,6 +529,10 @@ def create_app(session: Session) -> FastAPI:
         )
 
     return app
+
+
+def _contribution_mode(login: str) -> ContributionMode:
+    return "direct" if login else "browser"
 
 
 def main(argv: list[str] | None = None) -> int:

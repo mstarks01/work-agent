@@ -130,6 +130,17 @@ logger = logging.getLogger(__name__)
 # what was declared.
 _BODY_SLACK = 2
 
+
+def max_body_bytes(limits: SourceLimits) -> int:
+    """The raw-body guard of a deployment whose byte budget is ``limits``.
+
+    **The one reader of the guard.** :class:`BodyLimitMiddleware` enforces it
+    on ``/v1``, and the web app's JSON body reader enforces it on each job
+    route.
+    """
+    return limits.max_total_bytes * _BODY_SLACK
+
+
 #: How many event streams one owner may hold open at once. Each stream polls
 #: the store until its job is terminal, and a job that waits on answers is not,
 #: so a stream can stay open for as long as its caller keeps it. A page follows
@@ -790,7 +801,6 @@ def create_app(
     app.state.budget = _setting(
         budget, deployment, "budget", lambda d: d.resilience.budget_policy()
     )
-    max_body_bytes = limits.max_total_bytes * _BODY_SLACK
     app.state.verifier = verifier if verifier is not None else build_verifier()
 
     @app.exception_handler(StarletteHTTPException)
@@ -849,7 +859,7 @@ def create_app(
     async def _over_limit(request: Request, exc: SourcesOverLimit):
         return _problem_response(_STATUS_BY_RUNG[exc.breach.rung], str(exc))
 
-    app.add_middleware(BodyLimitMiddleware, max_bytes=max_body_bytes)
+    app.add_middleware(BodyLimitMiddleware, max_bytes=max_body_bytes(limits))
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

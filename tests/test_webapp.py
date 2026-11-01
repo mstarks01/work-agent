@@ -35,7 +35,7 @@ from analysis_service import (
     StubPipelineRunner,
 )
 from analysis_service.answer_shares import SharedAnswer
-from analysis_service.api import JOB_REFUSAL_STATUS
+from analysis_service.api import JOB_REFUSAL_STATUS, max_body_bytes
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import UNKNOWN_KEY_FIELDS
 from analysis_service.compact import FULL_FORMAT
@@ -50,9 +50,12 @@ from analysis_service.jobs import (
 )
 from analysis_service.owner_files import (
     CONTROL_CHARACTER,
+    NO_TEXT,
+    NOT_PLAIN_TEXT,
     OwnerFile,
     name_in_use,
     over_limit,
+    too_large,
 )
 from analysis_service.principals import LOCAL_ISSUER, Principal
 from analysis_service.question_kinds import QUESTION_KINDS
@@ -78,6 +81,7 @@ from webapp.main import (
     create_app,
     render_report,
 )
+from webapp.settings_save import MAX_SAVE_BYTES
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -356,6 +360,73 @@ def test_every_write_route_refuses_a_request_that_is_not_same_origin(client):
         assert response.json() == {
             "message": "This request did not come from the app's own page."
         }
+
+
+#: The write routes that take no body.
+NO_BODY = {("POST", "/workspace/runs/{run_id}/stop")}
+
+
+def _body_routes(client) -> list[tuple[str, str, int]]:
+    """Each POST and PUT route that reads a body, as a request path, with the
+    most bytes it reads."""
+    limits = {"/settings": MAX_SAVE_BYTES, "/settings/rows": MAX_SAVE_BYTES}
+    return [
+        (
+            method,
+            route.path.replace("{run_id}", "job-missing"),
+            limits.get(route.path, max_body_bytes(WEBAPP_LIMITS)),
+        )
+        for route in client.app.routes
+        for method in sorted(getattr(route, "methods", None) or ())
+        if method in {"POST", "PUT"} and (method, route.path) not in NO_BODY
+    ]
+
+
+def test_each_body_route_is_counted(client):
+    assert len(_body_routes(client)) == 8
+
+
+def test_each_write_route_refuses_a_body_that_is_not_json(client):
+    """The one body reader refuses another media type before it reads a byte."""
+    for method, path, _ in _body_routes(client):
+        response = client.request(
+            method,
+            path,
+            content=b"{}",
+            headers=SAME_ORIGIN | {"Content-Type": "text/plain"},
+        )
+        assert response.status_code == 415, (method, path)
+        assert response.json() == {"message": "This request takes a JSON body."}
+
+
+def test_each_write_route_reads_a_body_at_its_limit_and_refuses_one_over(client):
+    """A body of the route's limit is read and refused because it is not an
+    object; one byte more is refused for its size."""
+    for method, path, limit in _body_routes(client):
+        at_limit = b'["' + b"a" * (limit - len(b'[""]')) + b'"]'
+        for body, status in ((at_limit, 400), (at_limit + b" ", 413)):
+            response = client.request(
+                method,
+                path,
+                content=body,
+                headers=SAME_ORIGIN | {"Content-Type": "application/json"},
+            )
+            assert response.status_code == status, (method, path, response.text)
+        assert response.json() == {
+            "message": f"This request is at most {limit:,} bytes."
+        }
+
+
+def test_each_write_route_refuses_a_body_too_deep_to_parse(client):
+    """A nesting past the parser's recursion limit is a body that is not JSON."""
+    for method, path, _ in _body_routes(client):
+        response = client.request(
+            method,
+            path,
+            content=b"[" * 10_000,
+            headers=SAME_ORIGIN | {"Content-Type": "application/json"},
+        )
+        assert response.status_code == 400, (method, path, response.text)
 
 
 def test_a_run_streams_one_tick_per_node_then_redirects(client):
@@ -1039,6 +1110,56 @@ def test_the_settings_page_shows_each_source():
     from webapp.settings_view import ValueOrigin
 
     assert _table_keys("settings.js", "sources") == set(get_args(ValueOrigin))
+
+
+def _compared(page: str, field: str) -> set[str]:
+    """Each string that a page's script compares ``.<field>`` with."""
+    return set(re.findall(rf'\.{field} [!=]== "([\w-]+)"', page_javascript(page)))
+
+
+def test_the_first_run_page_listens_for_each_end_of_a_stream():
+    """``first_run.js`` listens for each :data:`~webapp.main.EndFrame`, for
+    the node event, and for the connection's own ``error``. A frame it does
+    not listen for leaves the page waiting."""
+    from analysis_service.jobs import EventKind
+    from webapp.main import EndFrame
+
+    listened = set(
+        re.findall(
+            r'stream\.addEventListener\("(\w+)"', page_javascript("first_run.js")
+        )
+    )
+    assert "node" in get_args(EventKind)
+    assert listened == {*get_args(EndFrame), "node", "error"}
+
+
+def test_the_review_page_draws_each_reason_kind():
+    """``review_finding.js`` draws one group for each
+    :data:`~webapp.review.ReasonKind`. A reason of a kind it lacks shows no
+    button."""
+    from webapp.review import ReasonKind
+
+    drawn = re.search(
+        r"\[([^\]]*)\]\.forEach\(kind =>", page_javascript("review_finding.js")
+    )
+    assert drawn is not None, "review_finding.js draws no reason groups"
+    assert re.findall(r'"(\w+)"', drawn.group(1)) == list(get_args(ReasonKind))
+    assert _compared("review_finding.js", "kind") <= set(get_args(ReasonKind))
+
+
+def test_the_sitting_page_reads_only_a_contribution_mode():
+    from webapp.sitting import ContributionMode
+
+    assert _compared("sitting.js", "mode") == set(get_args(ContributionMode))
+
+
+def test_the_settings_page_reads_only_a_numeric_kind():
+    """``settings.js`` tests a row for ``integer`` and takes every other
+    numeric row as a decimal."""
+    from webapp.settings_view import Numeric
+
+    assert _compared("settings.js", "numeric") == {"integer"}
+    assert set(get_args(Numeric)) == {"integer", "decimal"}
 
 
 def _graph_node_names() -> set[str]:
@@ -2465,6 +2586,23 @@ def test_the_page_and_the_server_refuse_one_control_class():
     assert json.loads(done.stdout) == [
         point for point in range(0x2100) if CONTROL_CHARACTER.search(chr(point))
     ]
+
+
+def test_no_page_script_words_a_refusal_the_server_words():
+    """The server renders each refusal that the page's own checks of a file
+    show (:func:`~webapp.main.file_refusals`), so the two cannot word one
+    refusal two ways. A script that spells one again fails here."""
+    sentences = [too_large(7), NOT_PLAIN_TEXT, NO_TEXT, over_limit(7)]
+    fragments = [
+        part for sentence in sentences for part in sentence.split("7") if len(part) > 12
+    ]
+    spelled = [
+        (script.name, fragment)
+        for script in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
+        for fragment in fragments
+        if fragment in script.read_text(encoding="utf-8")
+    ]
+    assert not spelled
 
 
 def test_the_page_names_a_label_for_each_source_it_makes():
