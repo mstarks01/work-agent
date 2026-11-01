@@ -20,7 +20,7 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import get_args
 
@@ -40,7 +40,7 @@ from analysis_service.compact import FULL_FORMAT
 from analysis_service.deployment import Deployment
 from analysis_service.jobs import JOB_ID_PATTERN, AdmissionOutcome, JobRecord
 from analysis_service.principals import LOCAL_ISSUER
-from analysis_service.sources import ANSWERS_LABEL
+from analysis_service.sources import ANSWERS_LABEL, FORMATS
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
     A_FACT_ANSWER,
@@ -193,6 +193,27 @@ def test_the_transcript_input_carries_the_deployment_s_byte_limit(client):
     """The page refuses an oversize file with the bound ``/analyze`` holds."""
     limit = WEBAPP_LIMITS.max_total_bytes
     assert f'data-max-bytes="{limit}"' in client.get("/").text
+
+
+def test_the_page_reads_the_format_table_the_server_renders(client):
+    """The form page gets the format table and its ``accept`` value from
+    :data:`FORMATS`, and no page file holds a copy of an extension (ADR 0120)."""
+    page = client.get("/").text
+    rendered = re.search(r'id="source_formats"[^>]*>(.*?)</script>', page, re.DOTALL)
+    extensions = [ext for row in FORMATS.values() for ext in row.extensions]
+
+    assert json.loads(rendered.group(1)) == {
+        name: {
+            **asdict(row),
+            "extensions": list(row.extensions),
+            "kinds": list(row.kinds),
+        }
+        for name, row in FORMATS.items()
+    }
+    assert f'accept="{",".join(extensions)}"' in page
+    for name in ("workspace.html", "static/first_run.js"):
+        held = (PROJECT_ROOT / "webapp" / name).read_text()
+        assert not [ext for ext in extensions if ext in held], name
 
 
 def test_no_form_control_can_influence_which_model_runs(client, tiers):
