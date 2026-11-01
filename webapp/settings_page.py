@@ -346,6 +346,7 @@ EXAMPLES: dict[str, str] = {
     "resilience.timeout_ms": "300000",
     "resilience.max_source_bytes": "102400",
     "resilience.max_sources": "10",
+    "resilience.max_owner_files": "100",
     "resilience.job_deadline_ms": "900000",
     "resilience.retry_budget_ratio": "0.1",
     "resilience.max_active_jobs": "3",
