@@ -2234,6 +2234,46 @@ calls.push({ line: line() });
     ]
 
 
+def test_cover_every_part_ticks_each_part_with_no_answer_of_its_own():
+    """A chosen answer with no part ticked says how to cover parts. Cover
+    every part ticks each blank part and gives it the answer, and leaves a
+    part answered by hand unticked (ADR 0113)."""
+    first, second = valid_model().data_flows[:2]
+    third = first.model_copy(
+        update={"id": "flow:process:web-app>store:orders-db>read", "name": "read"}
+    )
+    facts = [_control_row(first), _control_row(second), _control_row(third)]
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+const own = (r) => walk(r).find(c => c.tag === "select");
+const line = () => shared[0].children.find(c => c.className === "share-covers").textContent;
+const ticks = () => rowsOf().map(r => child(r, "input").checked);
+const [one] = rowsOf();
+own(one).value = "none"; own(one).listeners.change();
+const state = child(shared[0].children[0], "select");
+state.value = "none"; state.listeners.change();
+calls.push({ line: line(), ticks: ticks() });
+const all = shared[0].children.find(c => c.tag === "button" && c.textContent === "Cover every part");
+all.listeners.click();
+calls.push({ line: line(), ticks: ticks(), rows: rowsOf().map(r => own(r).value) });
+"""
+    )
+    seen = [c for c in _run_form_script(steps)["calls"] if "ticks" in c]
+    assert seen == [
+        {
+            "line": "This answer covers no part yet. Tick each part it covers,"
+            " or use Cover every part.",
+            "ticks": [False, False, False],
+        },
+        {
+            "line": f"This answer covers: {second.name}, {third.name}",
+            "ticks": [False, True, True],
+            "rows": ["none", "none", "none"],
+        },
+    ]
+
+
 def test_undo_puts_back_the_shared_answer_and_each_part_it_wrote():
     """Undo restores the answer before the last change, and each element it
     wrote (ADR 0114)."""

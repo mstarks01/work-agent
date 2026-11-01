@@ -35,6 +35,13 @@ answer is saved as each ticked part's own answer, through the save that
 exists. A facets row has a tick too. The list of parts stays open under the
 shared question.
 
+**Cover every part ticks each part that has no answer of its own**
+(maintainer's decision of 2026-11-01). It is one button beside the shared
+answer. A part with its own answer, given by hand or before a reload, stays
+unticked. When the shared answer holds a value and no part is ticked, the
+line beside it tells the person to tick the parts it covers or to use the
+button. The parts still start unticked, so a choice alone covers no part.
+
 **Unticking a part takes back only what the shared answer wrote.** A part
 that took the shared answer and is then unticked returns to blank. A part that
 a person answered by hand is an exception: it is unticked, and the shared
@@ -52,13 +59,19 @@ the parts spends 123 choices and over-claims none. An owner who shares and
 then corrects each part that differs would spend 70. These are offline counts
 over a corpus; the live effect on owners is unmeasured.
 
+Cover every part takes one click a box. An owner who uses it on each box
+spends 36 choices and 36 clicks over the STRIDE boxes, and over-claims only
+the parts that the owner chose to cover. The page never covers a part on its
+own.
+
 The service stores the parts a shared answer covers
 ([ADR 0114](0114-a-shared-answer-is-stored-with-the-parts-it-covers.md)).
 
 ## Evidence
 
 `tests/test_evals_shared_answers.py`,
-`test_one_shared_answer_fills_only_the_parts_a_person_ticks` and
+`test_one_shared_answer_fills_only_the_parts_a_person_ticks`,
+`test_cover_every_part_ticks_each_part_with_no_answer_of_its_own` and
 `test_unticking_a_part_takes_back_only_the_shared_answer` in
 `tests/test_webapp_questions.py`, and
 `test_one_shared_answer_saves_the_part_for_every_element_ticked` in

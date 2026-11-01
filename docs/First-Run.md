@@ -428,7 +428,10 @@ The app can ask you questions before the analysis, and after the report.
   back the shared answer from it. A line beside the answer names the parts
   it covers, and **Undo** puts back the answer and the parts as they were
   before your last change to it. A matching question does not prove that
-  one control covers every part, so the page ticks none for you. The service
+  one control covers every part, so the page ticks none for you. **Cover
+  every part** ticks each part that has no answer of its own, and leaves a
+  part with its own answer unticked. When you choose an answer and tick no
+  part, the line tells you to tick the parts it covers. The service
   keeps which parts the answer covers. After a reload, a covered part shows
   under **Your answers**, marked "(shared answer)"; change it there to give
   that part its own answer. The help
