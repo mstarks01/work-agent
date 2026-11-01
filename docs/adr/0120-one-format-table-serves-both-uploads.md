@@ -26,7 +26,7 @@ On `main`, the rule is only in the browser. `first_run.js` makes a `.mmd` or
 `.mermaid` file a `diagram` and each other file a `transcript`. The `accept`
 attribute in `workspace.html` holds a second copy of the extensions. The
 `accept` attribute only filters the file picker, so a person can upload
-`notes.md` or a file with no extension, and the page makes it a transcript.
+a Markdown file or a file with no extension, and the page makes it a transcript.
 
 The `diagram` register in `sources.py` tells extraction to read nodes, arrows
 and subgraphs. QA-2026-10-31-03 measured flowcharts only.
@@ -109,7 +109,7 @@ reads it. Only a record made before the check can hold such a Source. A test
 runs the check on each file in `evals/diagrams/` and on the output of
 `mermaid.py`.
 
-The direct upload refuses a file that it accepts today, such as `notes.md` or
+The direct upload refuses a file that it accepts today, such as a Markdown file or
 a file with no extension. The direct upload shows a diagram type error when the
 person selects "Prepare analysis", not when the person selects the file. The
 Files upload shows the error at the upload.
