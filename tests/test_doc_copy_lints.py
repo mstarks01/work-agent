@@ -214,6 +214,7 @@ def test_the_deadline_arithmetic_uses_the_shipped_values():
 INPUT_LIMITS = {
     "max_source_bytes": SHIPPED_RESILIENCE.max_source_bytes,
     "max_sources": SHIPPED_RESILIENCE.max_sources,
+    "max_owner_files": SHIPPED_RESILIENCE.max_owner_files,
     "job_deadline_ms": SHIPPED_RESILIENCE.job_deadline_ms,
     "max_active_jobs": SHIPPED_RESILIENCE.max_active_jobs,
     "label": MAX_LABEL_CHARS,

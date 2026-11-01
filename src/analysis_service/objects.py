@@ -1,7 +1,9 @@
-"""The object store: where the ``sql`` job store keeps sources and reports (ADR 0065).
+"""The object store: where the ``sql`` job store keeps sources, reports and
+Owner Files (ADRs 0065 and 0118).
 
 A job's sources and its report are each one object, under the key that
-:func:`object_key` gives. The job store writes each object once, writes the
+:func:`object_key` gives. An Owner File's text is one object, under the key
+that :func:`file_key` gives. The job store writes each object once, writes the
 object before the row that names it, and keeps the SHA-256 of each object in
 that row. So this module stores bytes and checks nothing about them, and the
 job store checks the digest on each read.
@@ -25,6 +27,7 @@ from pathlib import Path
 from typing import Literal, Protocol, cast, get_args
 
 from analysis_service.jobs import JOB_ID_PATTERN
+from analysis_service.owner_files import OWNER_FILE_ID_PATTERN
 from analysis_service.store_settings import (
     StoreConfigError,
     closed_setting,
@@ -42,38 +45,74 @@ ObjectName = Literal["sources.json", "report.json"]
 _OWNER_ID = re.compile(r"[0-9a-z][0-9a-z-]{0,63}")
 
 
+def _owner_part(owner_id: str) -> str:
+    if not _OWNER_ID.fullmatch(owner_id):
+        raise ValueError("an owner ID is not a key part")
+    return owner_id
+
+
 def object_key(owner_id: str, job_id: str, name: ObjectName) -> str:
     """The key of one object of a job: ``<owner-id>/<job-id>/<name>``.
 
-    **The one rule for a key.** A key holds only the IDs that the service
+    **The one rule for a job key.** A key holds only the IDs that the service
     generates, never a name, an email or a ``sub``. A part outside its shape
     raises, so a key never reaches outside the owner's and the job's prefix.
     """
-    if not _OWNER_ID.fullmatch(owner_id):
-        raise ValueError("an owner ID is not a key part")
     if not JOB_ID_PATTERN.fullmatch(job_id):
         raise ValueError("a job ID is not a key part")
     if name not in get_args(ObjectName):
         raise ValueError(f"{name!r} is not an object name")
-    return f"{owner_id}/{job_id}/{name}"
+    return f"{_owner_part(owner_id)}/{job_id}/{name}"
 
 
-def key_parts(key: str) -> tuple[str, str, ObjectName] | None:
-    """The owner ID, the job ID and the object name of ``key``, or ``None``
-    where :func:`object_key` cannot give ``key``.
+def file_key(owner_id: str, file_id: str) -> str:
+    """The key of an Owner File's text: ``<owner-id>/<file-id>``.
 
-    :func:`object_key` checks each part, so this function holds no rule of
-    its own.
+    **The one rule for a file key** (ADR 0118). A job key has three parts and
+    a file key two, so no key has both shapes.
+    """
+    if not OWNER_FILE_ID_PATTERN.fullmatch(file_id):
+        raise ValueError("a file ID is not a key part")
+    return f"{_owner_part(owner_id)}/{file_id}"
+
+
+@dataclass(frozen=True)
+class JobKey:
+    """The parts of a key that :func:`object_key` gives."""
+
+    owner_id: str
+    job_id: str
+    name: ObjectName
+
+
+@dataclass(frozen=True)
+class FileKey:
+    """The parts of a key that :func:`file_key` gives."""
+
+    owner_id: str
+    file_id: str
+
+
+def key_parts(key: str) -> JobKey | FileKey | None:
+    """The parts of ``key``, typed by its shape, or ``None`` where neither
+    :func:`object_key` nor :func:`file_key` can give ``key``.
+
+    The two builders check each part, so this function holds no rule of its
+    own.
     """
     parts = key.split("/")
-    if len(parts) != 3:
-        return None
-    owner_id, job_id, name = parts
     try:
-        object_key(owner_id, job_id, cast(ObjectName, name))
+        if len(parts) == 3:
+            owner_id, job_id, name = parts
+            object_key(owner_id, job_id, cast(ObjectName, name))
+            return JobKey(owner_id, job_id, cast(ObjectName, name))
+        if len(parts) == 2:
+            owner_id, file_id = parts
+            file_key(owner_id, file_id)
+            return FileKey(owner_id, file_id)
     except ValueError:
         return None
-    return owner_id, job_id, cast(ObjectName, name)
+    return None
 
 
 def check_private(path: Path, label: str, *, directory: bool) -> None:

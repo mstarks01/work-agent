@@ -19,6 +19,7 @@ from analysis_service.resilience import (
     ATTEMPTS_VAR,
     JOB_DEADLINE_MS_VAR,
     MAX_ACTIVE_JOBS_VAR,
+    MAX_OWNER_FILES_VAR,
     MAX_SOURCE_BYTES_VAR,
     MAX_SOURCES_VAR,
     SUPPORTED_VERSION,
@@ -38,6 +39,7 @@ VALID = (
     "timeout_ms = 300000\n"
     "max_source_bytes = 102400\n"
     "max_sources = 10\n"
+    "max_owner_files = 100\n"
     "job_deadline_ms = 900000\n"
     "retry_budget_ratio = 0.1\n"
     "max_active_jobs = 3\n"
@@ -64,6 +66,7 @@ def config(**kwargs: Any) -> ResilienceConfig:
         "timeout_ms": 300000,
         "max_source_bytes": 102400,
         "max_sources": 10,
+        "max_owner_files": 100,
         "job_deadline_ms": 900000,
         "retry_budget_ratio": 0.1,
         "max_active_jobs": 3,
@@ -464,7 +467,8 @@ def test_env_overrides_the_input_bounds(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("var", "value"), [(MAX_SOURCE_BYTES_VAR, "0"), (MAX_SOURCES_VAR, "0")]
+    ("var", "value"),
+    [(MAX_SOURCE_BYTES_VAR, "0"), (MAX_SOURCES_VAR, "0"), (MAX_OWNER_FILES_VAR, "0")],
 )
 def test_an_out_of_range_bound_is_rejected_from_the_environment(tmp_path, var, value):
     path = write(tmp_path, VALID)
@@ -475,3 +479,21 @@ def test_an_out_of_range_bound_is_rejected_from_the_environment(tmp_path, var, v
 def test_a_job_must_be_allowed_at_least_one_source():
     with pytest.raises(ValueError):
         config(max_sources=0)
+
+
+def test_an_owner_must_be_allowed_at_least_one_owner_file():
+    with pytest.raises(ValueError):
+        config(max_owner_files=0)
+
+
+def test_the_owner_file_count_is_required_rather_than_defaulted(tmp_path):
+    """A file with no ``max_owner_files`` is refused, never read as no bound."""
+    path = write(tmp_path, VALID.replace("max_owner_files = 100\n", ""))
+    with pytest.raises(ResilienceConfigError, match="max_owner_files"):
+        load_resilience(path, env={})
+
+
+def test_the_environment_overrides_the_owner_file_count(tmp_path):
+    path = write(tmp_path, VALID)
+    loaded = load_resilience(path, env={MAX_OWNER_FILES_VAR: "7"})
+    assert loaded.max_owner_files == 7

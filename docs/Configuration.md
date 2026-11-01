@@ -879,12 +879,13 @@ implies a provider was tried.
 ### Resilience
 
 `attempts = 3`, `timeout_ms = 300000`, `max_source_bytes = 102400`,
-`max_sources = 10`, `job_deadline_ms = 900000`, `retry_budget_ratio = 0.1`,
+`max_sources = 10`, `max_owner_files = 100`, `job_deadline_ms = 900000`,
+`retry_budget_ratio = 0.1`,
 `max_active_jobs = 3`, `budget_window_seconds = 3600`,
 `max_jobs_per_window = 30`, `max_tokens_per_window = 20000000`,
 `global_max_tokens_per_window = 100000000`, and a `[bounds_by_upstream]` table
 whose one row gives `openai/flex` a `timeout_ms` and a `job_deadline_ms` of
-`1800000` each (`version = 8`). On library
+`1800000` each (`version = 9`). On library
 defaults the LLM nodes never retry and never time out, so a single 429 kills a
 paid-for job; two more bound what one job may carry, the deadline bounds how
 long one may run, and the ceiling bounds how many one caller may run at once.
@@ -1244,6 +1245,7 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 | `ANALYSIS_TIMEOUT_MS` | Per-request timeout, milliseconds, for a request pinned to no upstream with a row in `[bounds_by_upstream]`. |
 | `ANALYSIS_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. |
 | `ANALYSIS_MAX_SOURCES` | How many sources one job may carry. |
+| `ANALYSIS_MAX_OWNER_FILES` | How many Owner Files one owner keeps in the web app's Files section. |
 | `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds, where no pinned upstream has a row in `[bounds_by_upstream]`. Turn it down to shed load. |
 | `ANALYSIS_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
 | `ANALYSIS_BUDGET_WINDOW_SECONDS` | Width of the rolling budget window. |
@@ -1435,6 +1437,7 @@ Bounds enforced before or during analysis:
 | --- | --- | --- |
 | `max_source_bytes` | 100 KiB (UTF-8), total across all sources | Rejected at both entry points; deployment config. |
 | `max_sources` | 10 | Rejected at both entry points; deployment config. |
+| `max_owner_files` | 100 Owner Files per owner | Rejected at the upload to Files; deployment config. |
 | `job_deadline_ms` | 900 s per job, wall clock | `failed` at the deadline; deployment config. |
 | `max_active_jobs` | 3 jobs in flight per owner | `429` at submission; deployment config. |
 | Source `label` | 200 characters, single-line, unique per job | Rejected as a malformed source. |

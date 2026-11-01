@@ -57,6 +57,7 @@ from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
 from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
 from analysis_service.links import MAX_HELD_LINKS
+from analysis_service.owner_files import FileAdmission, OwnerFile
 from analysis_service.principals import Identity, Principal, PrincipalTable
 from analysis_service.report import (
     SCHEMA_VERSION,
@@ -926,6 +927,50 @@ class JobStore(Protocol):
         """Fail each queued or running job, oldest first, and return the IDs."""
         ...
 
+    async def add_file(
+        self,
+        file: OwnerFile,
+        text: str,
+        *,
+        limit: int,
+        principal: Principal | None,
+    ) -> FileAdmission:
+        """Keep the Owner File ``file`` and its ``text`` (ADR 0118).
+
+        **Counting and adding is one step**, as admission is, so two uploads
+        cannot both pass ``limit``. The count comes first: an owner who holds
+        ``limit`` files gets ``over_limit``. A name that the owner already
+        uses gets ``name_in_use``. ``principal`` is a new principal whose
+        owner ID is the file's, which the store keeps only with the file, as
+        :meth:`reserve` keeps one with a job; without it, the owner must hold
+        one. ``file.sha256`` must be the digest of ``text``, or the call
+        raises and keeps nothing.
+        """
+        ...
+
+    async def owned_files(self, owner_id: str) -> list[OwnerFile]:
+        """Every Owner File of the owner, the newest first."""
+        ...
+
+    async def file_text(
+        self, file_id: str, owner_id: str
+    ) -> tuple[OwnerFile, str] | None:
+        """The owned Owner File and its text, or ``None``.
+
+        ``None`` too where the file is another owner's, so an ID tells
+        nothing about another owner. A text whose digest does not match its
+        row raises.
+        """
+        ...
+
+    async def delete_file(self, file_id: str, owner_id: str) -> bool:
+        """Delete the owned Owner File and its text, and keep nothing.
+
+        False where the owner holds no such file. A job that used the file
+        keeps its own copy, so a delete changes no job.
+        """
+        ...
+
 
 def stored_report(report: Report) -> bytes:
     """The report as a store holds it: its JSON, as UTF-8."""
@@ -1096,6 +1141,7 @@ class InMemoryJobStore:
         self._records: dict[str, JobRecord] = {}
         self._usage: dict[str, UsageRow] = {}
         self._principals = PrincipalTable()
+        self._files: dict[str, tuple[OwnerFile, str]] = {}
 
     def _rows(self) -> Iterator[JobRecord | UsageRow]:
         """Every job admission counts: the records held, and the usage rows left."""
@@ -1488,6 +1534,55 @@ class InMemoryJobStore:
     async def sweep_orphans(self, before: datetime) -> int:
         """Remove nothing: this store holds no objects."""
         return 0
+
+    async def add_file(
+        self,
+        file: OwnerFile,
+        text: str,
+        *,
+        limit: int,
+        principal: Principal | None,
+    ) -> FileAdmission:
+        """Count and add as one step: the body awaits nothing, as
+        :meth:`reserve` states."""
+        if principal is not None and principal.owner_id != file.owner_id:
+            raise ValueError(f"file {file.id} names another owner than its principal")
+        if file.sha256 != object_digest(text.encode("utf-8")):
+            raise ValueError(f"file {file.id} holds another digest than its text")
+        if principal is None:
+            if not self._principals.holds(file.owner_id):
+                raise ValueError(f"owner {file.owner_id} holds no principal")
+        elif self._principals.find(principal.identity) is not None:
+            return "principal_exists"
+        owned = [
+            held for held, _ in self._files.values() if held.owner_id == file.owner_id
+        ]
+        if len(owned) >= limit:
+            return "over_limit"
+        if any(held.name == file.name for held in owned):
+            return "name_in_use"
+        if principal is not None:
+            self._principals.add(principal)
+        self._files[file.id] = (file, text)
+        return "added"
+
+    async def owned_files(self, owner_id: str) -> list[OwnerFile]:
+        owned = [held for held, _ in self._files.values() if held.owner_id == owner_id]
+        return sorted(owned, key=lambda held: (held.created_at, held.id), reverse=True)
+
+    async def file_text(
+        self, file_id: str, owner_id: str
+    ) -> tuple[OwnerFile, str] | None:
+        held = self._files.get(file_id)
+        if held is None or held[0].owner_id != owner_id:
+            return None
+        return held
+
+    async def delete_file(self, file_id: str, owner_id: str) -> bool:
+        if await self.file_text(file_id, owner_id) is None:
+            return False
+        del self._files[file_id]
+        return True
 
     async def fail_in_flight(self) -> list[str]:
         """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.

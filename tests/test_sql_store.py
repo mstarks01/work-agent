@@ -242,6 +242,19 @@ class TestTheStartupRefusals:
         with pytest.raises(StoreConfigError, match="revision None"):
             start(env)
 
+    def test_a_database_made_before_a_schema_change(self, env):
+        """A schema change edits revision 0001 in place, so a database made
+        before it is at the head revision and lacks the new table."""
+        database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        engine = create_engine(f"sqlite:///{database}")
+        with engine.begin() as connection:
+            connection.exec_driver_sql("DROP TABLE owner_files")
+        engine.dispose()
+        with pytest.raises(
+            StoreConfigError, match="no owner_files table.*make it again"
+        ):
+            start(env)
+
     def test_a_missing_database_file(self, env, tmp_path):
         """The service never makes the file: only the migration step does."""
         missing = tmp_path / "missing.db"
