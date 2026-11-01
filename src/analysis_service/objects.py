@@ -301,7 +301,11 @@ def _delete(root: Path, parts: list[str]) -> bool:
             os.unlink(name, dir_fd=folder)
     except FileNotFoundError:
         return False
-    # The job's directory goes with its last object.
+    # The job's directory goes with its last object. An owner's directory
+    # stays: every job and every Owner File of the owner writes under it, so
+    # a removal could race another write.
+    if len(folders) < 2:
+        return True
     with (
         contextlib.suppress(OSError),
         _folder(root, folders[:-1], create=False) as parent,

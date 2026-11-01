@@ -28,6 +28,7 @@ from analysis_service.objects import (
     OBJECT_STORES,
     S3_KEY_FILES,
     FileKey,
+    FilesystemObjectStore,
     JobKey,
     ObjectStore,
     ObjectStoreName,
@@ -558,3 +559,14 @@ class TestTheKeyRules:
     )
     def test_a_key_no_builder_gives_has_no_parts(self, key):
         assert key_parts(key) is None
+
+
+def test_a_file_delete_keeps_the_owner_directory(tmp_path):
+    """Another write of the owner can need the directory at the same time."""
+    root = tmp_path / "objects"
+    root.mkdir(mode=0o700)
+    store = FilesystemObjectStore(root)
+    key = file_key("alice", "file-" + "b" * 32)
+    asyncio.run(store.put(key, b"x"))
+    assert asyncio.run(store.delete(key)) is True
+    assert (root / "alice").is_dir()
