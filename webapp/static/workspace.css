@@ -1212,21 +1212,22 @@ a.analysis-row:hover {
   max-width:38rem
 }
 @media (min-width:761px) {
+  /* A row with a tick keeps the tick layout: the tick, then the rest. */
   #list .each-one>p.question[data-layout=split]:not(:has(>input.share-answer)) {
     display:grid;
     grid-template-columns:minmax(0,1fr) minmax(14rem,20rem);
     column-gap:20px;
     align-items:start
   }
-  #list .each-one>p.question[data-layout=split]>.question-title {
+  #list .each-one>p.question[data-layout=split]:not(:has(>input.share-answer))>.question-title {
     grid-column:1;
     margin-bottom:0
   }
-  #list .each-one>p.question[data-layout=split]>.answer-fields {
+  #list .each-one>p.question[data-layout=split]:not(:has(>input.share-answer))>.answer-fields {
     grid-column:2
   }
-  #list .each-one>p.question[data-layout=split]>.hint,
-  #list .each-one>p.question[data-layout=split]>.conflict {
+  #list .each-one>p.question[data-layout=split]:not(:has(>input.share-answer))>.hint,
+  #list .each-one>p.question[data-layout=split]:not(:has(>input.share-answer))>.conflict {
     grid-column:1 / -1
   }
 }

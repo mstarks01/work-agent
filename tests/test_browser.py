@@ -556,6 +556,37 @@ def test_one_shared_answer_saves_the_part_for_every_element_ticked(page):
     assert share["answer"]["key"][0] == ""
 
 
+def test_a_ticked_choice_row_keeps_its_title_beside_the_tick(page):
+    """On a wide page a choice row is "split", and a row of a shared box has a
+    tick. The title sits in the column after the tick, at its full width."""
+    page.set_viewport_size({"width": 1280, "height": 900})
+    pause(page)
+    page.locator("#list .each-one").first.wait_for()
+    title, tick = page.evaluate(
+        """() => {
+          const row = document.createElement("p");
+          row.className = "question";
+          row.dataset.layout = "split";
+          const tick = document.createElement("input");
+          tick.type = "checkbox";
+          tick.className = "share-answer";
+          const title = document.createElement("div");
+          title.className = "question-title";
+          title.append(document.createElement("b"));
+          title.firstChild.textContent = "What is the trust zone for this part?";
+          const fields = document.createElement("div");
+          fields.className = "answer-fields";
+          fields.append(document.createElement("select"));
+          row.append(tick, title, fields);
+          document.querySelector("#list .each-one").append(row);
+          const box = (node) => node.getBoundingClientRect().toJSON();
+          return [box(title), box(tick)];
+        }"""
+    )
+    assert title["left"] >= tick["right"]
+    assert title["height"] < 40, "the title wraps in the tick's column"
+
+
 def test_no_to_the_rest_answers_each_blank_capability_question(page):
     """The button answers "no" to every capability question left blank, each
     as its own answer, and leaves a capability answered "yes" as it is."""
