@@ -415,6 +415,35 @@ class TestSubmit:
         assert response.status_code == 422
 
 
+class TestOwnerFilesAreNotOnV1:
+    """ADR 0119: ``/v1`` has no Files, and refuses a caller's copy."""
+
+    def test_a_source_that_names_an_owner_file_is_400(self):
+        client, _ = make_client()
+        forged = {
+            "kind": "transcript",
+            "label": "Forged",
+            "text": "Ana: hi",
+            "owner_file_id": "file-" + "a" * 32,
+        }
+        response = client.post(
+            "/v1/jobs",
+            json=submission(sources=[*one_source(), forged]),
+            headers=auth(),
+        )
+        assert response.status_code == 400
+        assert "owner_file_id" in response.json()["detail"]
+
+    def test_an_owner_files_key_is_422(self):
+        client, _ = make_client()
+        response = client.post(
+            "/v1/jobs",
+            json=submission(owner_files=["file-" + "a" * 32]),
+            headers=auth(),
+        )
+        assert response.status_code == 422
+
+
 class TestInputLadder:
     """Five rungs, shape before size (#52)."""
 

@@ -21,14 +21,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import (
     MAX_LABEL_CHARS,
+    OWNER_FILE_ID,
     SourceFormat,
     SourceKind,
     plain_name,
     text_digest,
 )
 
-#: An Owner File ID carries its type, as a job ID does.
-OWNER_FILE_ID_PATTERN = re.compile(r"^file-[0-9a-f]{32}$")
+OWNER_FILE_ID_PATTERN = re.compile(OWNER_FILE_ID)
 
 #: What one :meth:`~analysis_service.jobs.JobStore.add_file` call did.
 #: ``name_in_use`` and ``over_limit`` refuse the upload, and
@@ -41,7 +41,7 @@ class OwnerFile(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    id: str = Field(pattern=OWNER_FILE_ID_PATTERN.pattern)
+    id: str = Field(pattern=OWNER_FILE_ID)
     owner_id: str
     #: The Source label that a job gives the copy, so it obeys the label rule.
     name: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)

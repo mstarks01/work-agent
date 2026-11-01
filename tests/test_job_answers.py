@@ -29,6 +29,7 @@ from analysis_service.errors import ConfigError
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import LineageConflict, check_fact_answers
 from analysis_service.job_answers import (
+    OWNER_FILE_GONE,
     AnswersSaved,
     DraftSaved,
     JobAnswers,
@@ -43,6 +44,7 @@ from analysis_service.job_answers import (
 )
 from analysis_service.jobs import InMemoryJobStore, JobRecord, StubPipelineRunner
 from analysis_service.links import LinkAnswer
+from analysis_service.owner_files import OwnerFile
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError
 from analysis_service.sources import ANSWERS_LABEL, Source, SourceLimits
@@ -50,6 +52,7 @@ from tests.factories import (
     SEEDING_BUDGET,
     admit,
     identity_of,
+    new_principal,
     sample_selection,
     valid_model,
 )
@@ -683,3 +686,139 @@ class TestAContradictionIsNamed:
         assert json.loads(page.body) == {"message": "refused", "contradiction": named}
         assert json.loads(problem.body)["contradiction"] == named
         assert json.loads(problem.body)["detail"] == "refused"
+
+
+def held_file(
+    store,
+    name: str = "Kickoff call",
+    text: str = "Ana: the API uses mTLS.",
+    owner: str = OWNER,
+) -> OwnerFile:
+    """An Owner File of ``owner`` in ``store``, with a principal where none is held."""
+    file = OwnerFile.create(
+        owner_id=owner, name=name, kind="transcript", format="text/plain", text=text
+    )
+    principal = asyncio.run(new_principal(store, owner))
+    assert (
+        asyncio.run(store.add_file(file, text, limit=100, principal=principal))
+        == "added"
+    )
+    return file
+
+
+class TestOwnerFileSources:
+    """ADR 0119: a job copies each Owner File it names as a Source."""
+
+    submit = TestSubmitting.submit
+
+    def test_each_named_file_is_a_source_after_the_body_and_before_the_answers(self):
+        store = InMemoryJobStore()
+        file = held_file(store)
+        link = LinkAnswer(principal="shoppers", element="entity:shopper")
+        record = self.submit(
+            operations(store), submission(owner_files=[file.id], links=[link])
+        )
+        assert [source.kind for source in record.sources] == [
+            "description",
+            "transcript",
+            "answers",
+        ]
+        copy = record.sources[1]
+        assert (copy.label, copy.text, copy.owner_file_id) == (
+            file.name,
+            "Ana: the API uses mTLS.",
+            file.id,
+        )
+        assert copy.digest() == file.sha256
+        assert record.sources[0].owner_file_id is None
+
+    def test_a_file_alone_makes_a_job(self):
+        store = InMemoryJobStore()
+        file = held_file(store)
+        record = self.submit(
+            operations(store), submission(sources=[], owner_files=[file.id])
+        )
+        assert [source.owner_file_id for source in record.sources] == [file.id]
+
+    def test_a_deleted_file_and_another_owners_file_get_one_refusal(self):
+        store = InMemoryJobStore()
+        gone = held_file(store)
+        asyncio.run(store.delete_file(gone.id, OWNER))
+        foreign = held_file(store, owner="bob")
+        refusals = []
+        for file in (gone, foreign):
+            with pytest.raises(Refused) as refused:
+                self.submit(operations(store), submission(owner_files=[file.id]))
+            refusals.append(str(refused.value))
+        assert refusals == [OWNER_FILE_GONE] * 2
+        assert foreign.id not in OWNER_FILE_GONE
+
+    def test_more_files_than_the_source_limit_are_refused_before_a_read(self):
+        store = InMemoryJobStore()
+        named = ["file-" + f"{n:032x}" for n in range(ROOMY.max_sources + 1)]
+        with pytest.raises(SourcesOverLimit) as refused:
+            self.submit(operations(store), submission(owner_files=named))
+        assert refused.value.breach.rung == "count"
+
+    def test_a_repeated_file_is_refused(self):
+        store = InMemoryJobStore()
+        file = held_file(store)
+        with pytest.raises(Refused, match="twice"):
+            self.submit(operations(store), submission(owner_files=[file.id, file.id]))
+
+    def test_a_file_named_by_an_identity_with_no_principal_creates_none(self):
+        store = InMemoryJobStore()
+        with pytest.raises(Refused):
+            self.submit(operations(store), submission(owner_files=["file-" + "a" * 32]))
+        assert asyncio.run(store.principal(identity_of(OWNER))) is None
+
+    def test_a_copy_counts_toward_the_byte_limit(self):
+        store = InMemoryJobStore()
+        file = held_file(store, text="x" * ROOMY.max_total_bytes)
+        with pytest.raises(SourcesOverLimit) as refused:
+            self.submit(operations(store), submission(owner_files=[file.id]))
+        assert refused.value.breach.rung == "total"
+
+    def test_a_copy_whose_name_is_a_body_label_is_a_repeated_label(self):
+        store = InMemoryJobStore()
+        file = held_file(store, name=valid_model_sources()[0].label)
+        with pytest.raises(SourcesOverLimit) as refused:
+            self.submit(operations(store), submission(owner_files=[file.id]))
+        assert refused.value.breach.rung == "duplicate-label"
+
+    def test_a_callers_owner_file_id_is_refused(self):
+        forged = Source(
+            kind="transcript",
+            label="Forged",
+            text="x",
+            owner_file_id="file-" + "a" * 32,
+        )
+        with pytest.raises(Refused, match="composed by this service"):
+            self.submit(
+                operations(InMemoryJobStore()),
+                submission(sources=[*valid_model_sources(), forged]),
+            )
+
+    def test_an_amended_job_keeps_the_copy_after_the_file_is_deleted(self):
+        store = InMemoryJobStore()
+        file = held_file(store)
+        copy = Source(
+            kind=file.kind,
+            label=file.name,
+            text="Ana: the API uses mTLS.",
+            owner_file_id=file.id,
+        )
+        job = waiting(store)
+        record = asyncio.run(store.get(job))
+        asyncio.run(
+            store.save(record.model_copy(update={"sources": [*record.sources, copy]}))
+        )
+        asyncio.run(store.delete_file(file.id, OWNER))
+        starts = Starts()
+        asyncio.run(
+            operations(store).amend(
+                job, OWNER, "Also a gateway.", revision=0, start=starts
+            )
+        )
+        [(amended, _)] = starts.started
+        assert copy in amended.sources

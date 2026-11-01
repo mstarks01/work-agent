@@ -72,14 +72,19 @@ from analysis_service.jobs import (
     UnreadableSchema,
     readable,
 )
-from analysis_service.links import LinkAnswer, NoCatalogError, with_link_answers
+from analysis_service.links import (
+    LinkAnswer,
+    NoCatalogError,
+    refuse_owner_file_sources,
+    with_link_answers,
+)
 from analysis_service.pipeline import entry_of
 from analysis_service.principals import Identity, Principal, log_created
 from analysis_service.questions import question_fallback
 from analysis_service.report import Report
 from analysis_service.report_conditions import corrected_findings
 from analysis_service.selection import Requested, resolve_selection
-from analysis_service.sources import Source, SourceLimits
+from analysis_service.sources import LimitBreach, Source, SourceLimits
 from analysis_service.system_model import SystemModel
 
 logger = logging.getLogger(__name__)
@@ -190,6 +195,14 @@ class Refused(ValueError):
             return {}
         part, ancestor = self.contradiction
         return {"contradiction": {"part": list(part), "ancestor": list(ancestor)}}
+
+
+#: The refusal of a submission that names an Owner File the owner does not
+#: hold: one sentence for a deleted file and for another owner's ID.
+OWNER_FILE_GONE = (
+    "A file that this analysis names is no longer in Files. Remove it from the"
+    " analysis to continue."
+)
 
 
 class RunnerUnavailable(Exception):
@@ -331,7 +344,8 @@ class Submission:
     ``frameworks`` is the selection as the caller listed it. ``system_name``
     passed :func:`~analysis_service.sources.clean_system_name` already: each
     route refuses an unclean name in its own way. ``answers_from`` names the
-    earlier job whose answers the new job carries (ADR 0079).
+    earlier job whose answers the new job carries (ADR 0079). ``owner_files``
+    names the Owner Files whose text the new job copies (ADR 0119).
     """
 
     sources: Sequence[Source]
@@ -340,6 +354,7 @@ class Submission:
     links: Sequence[LinkAnswer] = ()
     questions: bool = False
     answers_from: str | None = None
+    owner_files: Sequence[str] = ()
 
 
 @dataclass(frozen=True)
@@ -542,12 +557,15 @@ class JobAnswers:
         1. the selection, by :func:`~analysis_service.selection.resolve_selection`,
            which orders it in the deployment's carried order and raises
            :class:`~analysis_service.selection.SelectionError`;
-        2. the sources with the link answers composed in, which raises the
-           :class:`NoCatalog` refusal :meth:`answer` makes, or :class:`Refused`
-           for the ``ValueError`` of
-           :func:`~analysis_service.links.with_link_answers`; the answers go
-           only onto a job that has sources of its own, because answers alone
-           would carry the body past the ladder's empty-sources rung;
+        2. the sources: the body's, with a caller's ``owner_file_id`` refused
+           (:func:`~analysis_service.links.refuse_owner_file_sources`), then a
+           copy of each Owner File it names (:meth:`owner_file_sources`), then
+           the link answers composed in, which raises the :class:`NoCatalog`
+           refusal :meth:`answer` makes, or :class:`Refused` for the
+           ``ValueError`` of :func:`~analysis_service.links.with_link_answers`;
+           the answers go only onto a job that has sources of its own, because
+           answers alone would carry the body past the ladder's empty-sources
+           rung;
         3. the source limits, which raise
            :class:`~analysis_service.answer_state.SourcesOverLimit`;
         4. the owner, by :meth:`submitter`;
@@ -566,6 +584,8 @@ class JobAnswers:
         if submission.links and not self.carries_catalog:
             raise NoCatalog()
         sources = list(submission.sources)
+        self._refusing(refuse_owner_file_sources, sources)
+        sources += await self.owner_file_sources(identity, submission.owner_files)
         if sources:
             sources = self._refusing(with_link_answers, sources, submission.links)
         breach = self.limits.breach(sources)
@@ -586,6 +606,49 @@ class JobAnswers:
             reserved_tokens=budgets.estimate(sources, selection),
         )
         return await self.admit(record, start=start, principal=submitter.new)
+
+    async def owner_file_sources(
+        self, identity: Identity, file_ids: Sequence[str]
+    ) -> list[Source]:
+        """A copy of each Owner File that ``file_ids`` names, as a Source
+        (ADR 0119).
+
+        Each copy takes the row's kind, the row's name as its label, the text
+        the store holds and the file's ID. The identity's principal is read
+        with no create, so a submission that names a file creates no
+        principal. A missing ID and another owner's ID get one refusal, which
+        names no ID, and so does a repeated ID. More IDs than the source limit
+        are refused before the store is read.
+        """
+        if not file_ids:
+            return []
+        if len(file_ids) > self.limits.max_sources:
+            raise SourcesOverLimit(
+                LimitBreach(
+                    "count",
+                    f"{len(file_ids)} files named, over the"
+                    f" {self.limits.max_sources} source limit",
+                )
+            )
+        if len(set(file_ids)) != len(file_ids):
+            raise Refused("The analysis names one file from Files twice.")
+        held = await self.store.principal(identity)
+        sources = []
+        for file_id in file_ids:
+            found = (
+                None
+                if held is None
+                else await self.store.file_text(file_id, held.owner_id)
+            )
+            if found is None:
+                raise Refused(OWNER_FILE_GONE)
+            file, text = found
+            sources.append(
+                Source(
+                    kind=file.kind, label=file.name, text=text, owner_file_id=file.id
+                )
+            )
+        return sources
 
     async def answer(
         self, job_id: str, owner_id: str, answers: Answers, *, start: Start

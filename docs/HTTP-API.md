@@ -235,7 +235,9 @@ and front matter come before it. A diagram of another type is refused with
 and the validity gate then requires an element for each node and a flow for
 each edge. A diagram with a syntax error is read as text (ADR 0121). A third kind,
 `answers`, is composed by the service from `links` (below); a submission that
-sends one itself is refused. `label` is yours: it
+sends one itself is refused. A source carries no `owner_file_id`: only the
+web app sets it, on the copy of a file from its Files section, so a submission
+that sends one is refused with `400` (ADR 0119). `label` is yours: it
 must be unique within the job, at most 200 characters and single-line, and it
 is the key every `source_excerpt` in the report cites, so pick something you
 will recognise. Order is presentation only — **sources carry equal weight**, and

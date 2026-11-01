@@ -76,6 +76,7 @@ __all__ = [
     "merged_facts",
     "merged_links",
     "refuse_answers_source",
+    "refuse_owner_file_sources",
     "resumed_sources",
     "with_link_answers",
 ]
@@ -202,6 +203,19 @@ def refuse_answers_source(sources: Sequence[Source]) -> None:
         raise ValueError(
             "an answers source is composed by this service from 'links';"
             " submit the answers there"
+        )
+
+
+def refuse_owner_file_sources(sources: Sequence[Source]) -> None:
+    """Refuse a caller's Source that names an Owner File, at every entry point.
+
+    The service sets ``owner_file_id`` from the store (ADR 0119), so the text
+    of a Source that names an Owner File is always the text the store holds.
+    """
+    if any(source.owner_file_id is not None for source in sources):
+        raise ValueError(
+            "a source that names an Owner File is composed by this service;"
+            " submit no owner_file_id"
         )
 
 

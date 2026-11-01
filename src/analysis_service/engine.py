@@ -53,6 +53,7 @@ from analysis_service.jobs import (
     PipelineRunner,
 )
 from analysis_service.links import (
+    refuse_owner_file_sources,
     with_link_answers,
 )
 from analysis_service.pipeline import entry_of
@@ -353,9 +354,11 @@ class Engine:
                 "analyze takes a sequence of Source, not a string; "
                 "pass [Source.description(text)] or [Source.transcript(text)]"
             )
-        # The same refusal the HTTP route makes: an answers source is composed
-        # by the service, and this entry point takes no link answers.
+        # The same refusals the HTTP routes make: an answers source and an
+        # Owner File's copy are composed by the service, and this entry point
+        # takes no link answers and no Owner File.
         try:
+            refuse_owner_file_sources(sources)
             with_link_answers(sources, ())
         except ValueError as exc:
             raise EngineInputError(str(exc)) from exc

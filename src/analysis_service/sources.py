@@ -52,6 +52,9 @@ from analysis_service.grounding import normalize
 # prompts/extract.md where the register alone does not say how to read it.
 SourceKind = Literal["description", "transcript", "diagram", "answers"]
 
+#: The shape of an Owner File ID: it carries its type, as a job ID does.
+OWNER_FILE_ID = r"^file-[0-9a-f]{32}$"
+
 #: What an uploaded file is written in. Each value is a row of :data:`FORMATS`.
 SourceFormat = Literal["text/plain", "text/vnd.mermaid"]
 
@@ -268,6 +271,11 @@ class Source(BaseModel):
     kind: SourceKind
     label: str = Field(max_length=MAX_LABEL_CHARS)
     text: str
+    #: The Owner File that this Source copies, or ``None`` (ADR 0119). Only
+    #: the service sets it, from the store, and
+    #: :func:`~analysis_service.links.refuse_owner_file_sources` refuses a
+    #: caller's. The copy's digest is :meth:`digest`, so no field holds it.
+    owner_file_id: str | None = Field(default=None, pattern=OWNER_FILE_ID)
 
     @field_validator("label")
     @classmethod
