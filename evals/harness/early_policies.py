@@ -248,23 +248,25 @@ POLICIES: Mapping[str, Callable[[SystemModel, Selection], list[Charge]]] = {
 }
 
 
-def _spend(order: Sequence[Charge], budget: int | None) -> tuple[set[UnknownKey], int]:
+def _answer_within(
+    order: Sequence[Charge], budget: int | None
+) -> tuple[set[UnknownKey], int]:
     """The questions a submitter answers before ``budget`` choices run out,
-    and the choices spent."""
-    spent = 0
+    and the choices they take."""
+    choices = 0
     answered: set[UnknownKey] = set()
     for charge in order:
-        if budget is not None and spent + charge.choices > budget:
+        if budget is not None and choices + charge.choices > budget:
             break
-        spent += charge.choices
+        choices += charge.choices
         answered |= charge.keys
-    return answered, spent
+    return answered, choices
 
 
 def _prefix(order: Sequence[EarlyQuestion], budget: int | None) -> set[UnknownKey]:
     """The questions a submitter answers before ``budget`` choices run out,
     each question charged on its own."""
-    return _spend(_each(order), budget)[0]
+    return _answer_within(_each(order), budget)[0]
 
 
 @dataclass(frozen=True)
@@ -336,7 +338,7 @@ def readings(
         for selected, frameworks in selections.items():
             order = build(report.system_model, frameworks)
             for budget in (*BUDGETS, None):
-                answered, spent = _spend(order, budget)
+                answered, choices = _answer_within(order, budget)
                 capabilities = {key_ref(key).capability for key in answered} - {""}
                 done = [
                     band for band, keys in needs.findings.values() if keys <= answered
@@ -349,7 +351,7 @@ def readings(
                         policy=policy,
                         selected=selected,
                         budget=budget,
-                        choices=spent,
+                        choices=choices,
                         findings=len(needs.findings),
                         completed=len(done),
                         finding_bands=dict(bands),

@@ -263,9 +263,9 @@ and `Vote.joins_the_pool` are the two booleans that carry it.
 
 `needs-evidence` is not a verdict about the finding at all. It says the reviewer
 cannot answer from what they were shown — an ungrounded finding demands more
-evidence, not a vote. So it moves no number and it is not spent: it holds for
+evidence, not a vote. So it moves no number and it is not kept: it holds for
 its own sitting, and a later one asks again over whatever evidence exists by
-then. Every other verdict is spent once and kept for ever.
+then. Every other verdict is cast once and kept for ever.
 
 ### Two mechanisms under one key are two findings
 
@@ -347,7 +347,7 @@ reader's reasoning may be about a mechanism the new claim does not use (#1135).
 
 ## What this buys, in reviewer minutes
 
-A vote is spent once and kept forever, because it hangs on a fingerprint rather
+A vote is cast once and kept forever, because it hangs on a fingerprint rather
 than on a run. So `evals/harness/queue.py` shows only what nobody has answered:
 
 - first sitting over a corpus — everything, a few hundred findings

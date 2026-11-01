@@ -148,9 +148,9 @@ const questionList = ({
     onEdit(row, event);
   };
 
-  // Cover every part: tick each part that has no answer of its own, so one
-  // click gives the shared answer to every blank part. A part with its own
-  // answer, by hand or from before, stays as it is (ADR 0113).
+  // "Cover every part": tick each element that has no answer of its own, so
+  // one click gives the shared answer to every blank element. An element with
+  // its own answer, by hand or from before, stays as it is (ADR 0113).
   const coverAll = (box) => {
     for (const row of box.rows) {
       if (row.kind !== "fact" || row.compact || !row.tick || row.tick.checked) continue;

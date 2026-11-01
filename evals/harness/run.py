@@ -2705,8 +2705,8 @@ COMMANDS: dict[str, Command] = {
         arguments=early_answerers.arguments,
     ),
     "shared-answers": Command(
-        help="read how often one shared answer is wrong for a part its box"
-        " lists, against the corpus's blessed models (offline, no credentials)",
+        help="read how often one shared answer is wrong for an element its"
+        " box lists, against the corpus's blessed models (offline, no credentials)",
         run=shared_answers.command_shared_answers,
         arguments=shared_answers.arguments,
     ),
@@ -2810,11 +2810,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     # Every command that reads the corpus refuses here, through the one
     # sentence `webapp/sitting.py` and the offline page print: the error names
-    # the case and the field, and a traceback over it names neither.
+    # the case and the field, and a traceback over it names neither. A sweep
+    # that a command cannot read refuses here in one line too: its error names
+    # the file and the missing part.
     try:
         return args.func(args)
     except CorpusError as exc:
         print(corpus_refusal(exc), file=sys.stderr)
+        return 1
+    except (ProvenanceError, modes.EvalRunError) as exc:
+        print(f"cannot read the sweep: {exc}", file=sys.stderr)
         return 1
 
 

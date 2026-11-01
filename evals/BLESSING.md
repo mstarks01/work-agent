@@ -736,7 +736,7 @@ unchecked. Cases that shipped before this was enforced are still unread, and
 `uv run python webapp/sitting.py --list` names them. The table is not the
 count — `evals.review_submission` derives that from the corpus and the merged
 submissions, so no list can disagree with it — and an entry for a case somebody
-has since read is spent and can be deleted.
+has since read no longer applies and can be deleted.
 
 **Why it cannot be replaced by a lint.** Review sitting 01 found a reference claim
 asserting the model emits training data in a case with no training pipeline. A

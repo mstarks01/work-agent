@@ -148,7 +148,7 @@ class TestTheServiceDecidesWhatWasPresented:
             if child.key in {q.key for q in after.early}:
                 return
             assert not after.done, "the list ended without asking the part"
-            # A later list: skip what it shows, which spends no limit.
+            # A later list: skip what it shows, which counts toward no limit.
             saved = _save(after, held, skips=[q.key for q in after.early])
             held, skipped, shown = saved.answers.facts, saved.skipped, saved.shown
         pytest.fail("the part never came to the list")

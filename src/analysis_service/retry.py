@@ -429,7 +429,7 @@ def _asks_a_longer_wait_than_we_take(failure: ProviderFailure) -> bool:
     and a budget token to reach the same refusal.
 
     Only a stated hint decides this. A failure carrying none is judged by its
-    ``retryable`` as before, because an absent header says nothing about how
+    ``retryable`` alone, because an absent header says nothing about how
     long capacity will take to return.
     """
     stated = failure.retry_after_seconds
@@ -637,7 +637,7 @@ class RetryPolicy:
         failure never spends a token it was never going to benefit from.
 
         Called **once** per failed attempt, because the last branch mutates:
-        :meth:`RetryBudget.withdraw` spends the token this answer grants.
+        :meth:`RetryBudget.withdraw` withdraws the token this answer grants.
         """
         if attempt >= self.attempts:
             return RetryRefusal.ATTEMPTS_SPENT

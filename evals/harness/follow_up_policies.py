@@ -176,12 +176,12 @@ def readings(path: str, report: Report, built: Report | None = None) -> list[Rea
         for effort in EFFORTS:
             cost = efforts[effort]
             for budget in (*BUDGETS, None):
-                spent = 0
+                choices = 0
                 answered: set[UnknownKey] = set()
                 for key in order:
-                    if budget is not None and spent + cost(key) > budget:
+                    if budget is not None and choices + cost(key) > budget:
                         break
-                    spent += cost(key)
+                    choices += cost(key)
                     answered.add(key)
                 done = [
                     labels[finding]
@@ -195,7 +195,7 @@ def readings(path: str, report: Report, built: Report | None = None) -> list[Rea
                         policy=policy,
                         effort=effort,
                         budget=budget,
-                        choices=spent,
+                        choices=choices,
                         findings=len(needs.waiting),
                         completed=len(done),
                         finding_bands=dict(Counter(labels.values())),

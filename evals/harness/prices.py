@@ -242,8 +242,8 @@ def _routes_to_many_providers(model: str) -> bool:
 
     Keyed off the vendor property rather than off a name, so a second
     aggregator is refused the day its row lands. A string that is not a route,
-    or a route whose prefix no vendor claims, is not this rule's business and
-    the map decides it as before.
+    or a route whose prefix no vendor claims, is not this rule's business, and
+    the map decides it.
     """
     try:
         vendor = vendor_for_route(model)

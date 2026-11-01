@@ -24,12 +24,12 @@ applicability. Twenty-four capability questions were under the floor, and
 the floor's effect.
 
 The same audit skipped every round of a STRIDE pause. The rounds showed 40
-distinct field questions under a field limit of 30, because a skip spends no
+distinct field questions under a field limit of 30, because a skip counts toward no
 limit. The limit counts answers, not the questions a person sees.
 
 ## Decision
 
-**No stop says that every fact is settled.** `QuestionSet.stop` has four
+**No stop says that every fact is settled.** `QuestionSet.empty_list_reason` has four
 values:
 
 | Stop | Meaning |

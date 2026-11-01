@@ -1,4 +1,4 @@
-"""A shared answer is stored with the parts it covers (#2029 package 2, ADR 0114)."""
+"""A shared answer is stored with the elements it covers (#2029 package 2, ADR 0114)."""
 
 from __future__ import annotations
 
@@ -188,7 +188,7 @@ def test_a_later_share_replaces_an_earlier_answer_of_a_part_it_covers():
 
 def test_a_draft_share_reaches_what_a_new_analysis_carries():
     """``held_answers`` writes a draft's shares out, so a job that carries
-    this one's answers reads each covered part (ADR 0079)."""
+    this one's answers reads each covered element (ADR 0079)."""
     record = JobRecord.create(
         owner_id="alice",
         sources=[DESCRIPTION],

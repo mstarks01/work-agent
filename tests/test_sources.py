@@ -214,8 +214,8 @@ class TestRender:
         assert "a comment in the diagram states its shape convention" in outside
 
     def test_a_job_with_no_diagram_renders_no_diagram_guidance(self):
-        """The diagram guidance rides on its own source's header, so a job
-        without one sends the extraction prompt it sent before the kind."""
+        """The diagram guidance rides on its own source's header, so the
+        extraction prompt of a job without one holds no diagram guidance."""
         document = render_sources([Source.description("x"), Source.transcript("y")])
         assert "Mermaid" not in document
 

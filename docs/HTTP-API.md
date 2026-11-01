@@ -607,7 +607,7 @@ the share back. A later answer of an element's own takes it out of the share.
 Each covered element counts toward the bound of fact answers in one request.
 The questions route returns the held shares as `answered_shares` and a
 report's draft shares as `draft_shares`
-([ADR 0114](adr/0114-a-shared-answer-is-stored-with-the-parts-it-covers.md)).
+([ADR 0114](adr/0114-a-shared-answer-is-stored-with-the-elements-it-covers.md)).
 A fact answer may carry a `detail`: one line, at most 300 characters, in your
 own words, such as an exception to a "yes". It follows the answer on its line
 of the answers source, and no code reads a fact out of it. Each fact question

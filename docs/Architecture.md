@@ -102,8 +102,8 @@ valid model goes on to the next node.
   over the drafts.
   Then that framework's **critic** rules on the drafts code did not settle, in
   one pass — a verdict on each draft, and the judgements its package's text
-  asks for, such as the STRIDE confidence rating — spending judgement only
-  on what code cannot check. A draft resting on an `unknown` is ruled
+  asks for, such as the STRIDE confidence rating — judging only
+  what code cannot check. A draft resting on an `unknown` is ruled
   `needs-info` in code before the critic reads, and when that leaves nothing
   to rule on, or the lanes drafted nothing, the critic is not called. **Each package carries its own critic, blind to every other
   framework**: two frameworks' subgraphs never touch between `prepare` and
@@ -138,7 +138,7 @@ Nothing downstream of the gate can tell the two apart, which is the point and
 also the reason the report records which one ran, in
 [`execution.extraction_format`](Report-Schema.md#provenance). The adapter resolves
 references and copies fields; it decides no fact. `repair` writes a full
-`SystemModel` on either transport, so the one repair pass is never spent on a
+`SystemModel` on either transport, so the one repair pass is never used for a
 format conversion.
 
 Whether the compact transport is worth running is a measurement, not a claim,

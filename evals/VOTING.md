@@ -171,7 +171,7 @@ stored under the key `standing`, and the artifact counts them per case:
 | `unvoted` | nobody answered it | Nothing. It is visible in the counts and never counts against the tool. |
 
 Both answers behind `open` move no number, and they part company in your queue.
-`unsure` is a spent answer: you judged the finding and it stays judged. Needing
+`unsure` is a final answer: you judged the finding and it stays judged. Needing
 more evidence is not a judgement, so it holds for that sitting only, and a later
 sitting asks again over whatever evidence exists by then. Pressing it is how you
 say *not yet*.

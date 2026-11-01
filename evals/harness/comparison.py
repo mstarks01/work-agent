@@ -226,7 +226,7 @@ def read_baseline(directory: Path, root: Path) -> Row | None:
         for case in flagged_cases(blocks)
     )
     held_out = audit.still_held_out(flagged, ledger)
-    spent = audit.exhausted(ledger)
+    exhausted = audit.exhausted(ledger)
     cells: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
     for series, sweeps in per_series.items():
         for framework in identity.get("frameworks", []):
@@ -267,7 +267,7 @@ def read_baseline(directory: Path, root: Path) -> Row | None:
         cells=cells,
         coverage=coverage,
         held_out=held_out,
-        exhausted={case: spent[case] for case in sorted(flagged - held_out)},
+        exhausted={case: exhausted[case] for case in sorted(flagged - held_out)},
     )
 
 

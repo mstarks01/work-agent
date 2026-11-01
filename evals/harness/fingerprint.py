@@ -165,7 +165,7 @@ class Components:
     #: from :func:`~analysis_service.claim_identity.grounded_mechanism`. **Not part of
     #: the fingerprint**: it tells apart two findings that share one key, by
     #: :func:`~analysis_service.claim_identity.distinct_mechanisms`, and a vote stored
-    #: without it reads as empty, which binds as before (ADR 0060).
+    #: without it reads as empty, which binds on the key alone (ADR 0060).
     mechanism: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:

@@ -178,7 +178,8 @@ class Replay:
     removed: int
     ended: bool
     #: Questions skipped for now, how many times a question already shown was
-    #: shown again, and why the list stopped (``QuestionSet.stop``).
+    #: shown again, and why the list asks nothing more
+    #: (``QuestionSet.empty_list_reason``; the stored key is ``stop``).
     skipped: int
     repeats: int
     stop: str
@@ -333,7 +334,7 @@ def replay(
         ended=saves < MAX_SAVES,
         skipped=len(skipped),
         repeats=sum(count - 1 for count in showings.values()),
-        stop=str(asked.stop),
+        stop=str(asked.empty_list_reason),
         below_floor=len(asked.below_floor),
         held_back=len(asked.held_back),
         units={}

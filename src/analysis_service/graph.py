@@ -50,7 +50,7 @@ Six of the per-framework nodes are structural rather than analytical:
 
 * ``revalidate`` is the second run of the same validate function, after the one
   repair pass. It is two nodes rather than a back-edge because the repair budget
-  is exactly one. The graph cannot loop, so it cannot spend a second pass, and
+  is exactly one. The graph cannot loop, so it cannot run a second pass, and
   "one repair, then reject" is visible in the topology rather than enforced by a
   counter.
 * ``reject`` is where the second failure lands. It is a terminal node that parks

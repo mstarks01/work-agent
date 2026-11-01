@@ -623,13 +623,13 @@ class TestTheAdaptiveList:
 
     def test_a_stop_says_whether_the_limits_held_questions_back(self):
         asked = _asked_after([])
-        assert asked.stop is None
+        assert asked.empty_list_reason is None
         ended = replace(asked, early=(), links=(), held_back=(), below_floor=())
-        assert ended.stop == "nothing-left"
+        assert ended.empty_list_reason == "nothing-left"
         low = replace(ended, below_floor=asked.early[:2])
-        assert low.stop == "below-floor"
+        assert low.empty_list_reason == "below-floor"
         held_back = replace(low, held_back=asked.early[:3])
-        assert held_back.stop == "budget-exhausted"
+        assert held_back.empty_list_reason == "budget-exhausted"
         assert held_back.to_json()["early_stop"] == "budget-exhausted"
         assert len(held_back.to_json()["early_held_back"]) == 3
         assert {row["reason"] for row in held_back.to_json()["early_held_back"]} == {
@@ -654,7 +654,9 @@ class TestTheAdaptiveList:
             answered = merged_facts(answered, given)
         assert not asked.early
         assert asked.links, "a control: the link questions still stand"
-        assert asked.stop is None, "a job that still asks a link has not stopped"
+        assert asked.empty_list_reason is None, (
+            "a job that still asks a link has not stopped"
+        )
 
     def test_a_save_must_answer_something_and_a_final_report_saves_nothing(
         self,
@@ -1399,12 +1401,12 @@ class TestTheFrameworksTakeTurns:
 
     def test_the_first_choices_serve_every_selected_framework(self):
         shown = self.list_of(BOTH)
-        first, spent = [], 0
+        first, choices = [], 0
         for question in shown:
-            if spent >= 10:
+            if choices >= 10:
                 break
             first.append(question)
-            spent += question.decisions
+            choices += question.decisions
         assert {name for q in first for name in q.frameworks} == set(BOTH)
 
     def test_a_part_still_follows_its_parent(self):

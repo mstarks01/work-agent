@@ -8,8 +8,9 @@
 # author's standing, so a "maintainer" line is legitimate only because a
 # maintainer merged it.
 #
-# A renamed account keeps one series: the old login goes into `aliases`, and
-# the old rows stay under the old name in evals/review/votes/. Example:
+# A renamed account keeps one series: the login before the rename goes into
+# `aliases`, and the rows cast under it stay under that name in
+# evals/review/votes/. Example:
 #
 #   [voters.new-login]
 #   standing = "contributor"

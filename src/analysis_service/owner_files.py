@@ -165,7 +165,7 @@ def upload_refusal(
         )
     if kind == "diagram" and not is_read_diagram_type(text):
         return (
-            "This Mermaid file is not a flowchart or an architecture-beta diagram."
+            "This Mermaid file is not a diagram type that the service reads."
             f" Its first diagram line must start with {_TYPES}."
         )
     try:

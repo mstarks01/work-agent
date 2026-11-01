@@ -55,6 +55,8 @@ from analysis_service.sampling import (
     load_sampling,
 )
 from analysis_service.sources import (
+    DIAGRAM_TYPES,
+    FORMATS,
     MAX_LABEL_CHARS,
     MAX_SYSTEM_NAME_CHARS,
     SourceKind,
@@ -583,6 +585,53 @@ def test_the_source_kind_vocabulary_is_every_source_kind():
 
     assert sentence
     assert set(backticked(sentence[1])) == set(get_args(SourceKind))
+
+
+def _paragraphs(path: Path) -> list[str]:
+    """Each paragraph, list item and table row of one guide, flattened."""
+    parts = re.split(r"\n\s*\n|\n(?=[-*|] )", path.read_text(encoding="utf-8"))
+    return [flat(part) for part in parts if part.strip()]
+
+
+def test_each_list_of_diagram_types_is_every_diagram_type():
+    """A paragraph that names `architecture-beta` lists the diagram types that
+    the reader reads, so it names each one of
+    :data:`~analysis_service.sources.DIAGRAM_TYPES`."""
+    lists = [
+        (path, paragraph)
+        for path in GUIDES
+        for paragraph in _paragraphs(path)
+        if "architecture-beta" in backticked(paragraph)
+    ]
+    short = [
+        f"{path.relative_to(REPO_ROOT)}: {paragraph[:80]}"
+        for path, paragraph in lists
+        if not set(DIAGRAM_TYPES) <= set(backticked(paragraph))
+    ]
+
+    assert lists
+    assert not short, f"these lists of diagram types are short: {short}"
+
+
+def test_each_list_of_upload_extensions_is_its_whole_format_row():
+    """A paragraph that names two extensions of one
+    :data:`~analysis_service.sources.FORMATS` row copies the row, so it names
+    every extension of that row."""
+    copies = [
+        (path, paragraph, row.extensions)
+        for path in GUIDES
+        for paragraph in _paragraphs(path)
+        for row in FORMATS.values()
+        if len(set(row.extensions) & set(backticked(paragraph))) > 1
+    ]
+    short = [
+        f"{path.relative_to(REPO_ROOT)}: {paragraph[:80]}"
+        for path, paragraph, extensions in copies
+        if not set(extensions) <= set(backticked(paragraph))
+    ]
+
+    assert len({extensions for _, _, extensions in copies}) == len(FORMATS)
+    assert not short, f"these lists of extensions are short: {short}"
 
 
 def test_the_concepts_ground_list_is_every_ground_kind():

@@ -527,9 +527,9 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         context.close()
 
 
-def test_one_shared_answer_saves_the_part_for_every_element_ticked(page):
+def test_one_shared_answer_saves_the_answer_for_every_element_ticked(page):
     """A box asks its question once (ADR 0081): one choice in the shared
-    control saves that part for each element a person ticks (ADR 0113)."""
+    control saves that answer for each element a person ticks (ADR 0113)."""
     pause(page)
     shared = page.locator("#list .shared-controls select").first
     shared.wait_for()

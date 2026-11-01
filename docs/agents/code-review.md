@@ -103,7 +103,7 @@ pre-merge review cuts no tag.
 
 ### What the round reads after that
 
-The same range as before. Its question narrows, because each pull request in the
+The round reads the same range. Its question narrows, because each pull request in the
 range already had a reader: the round hunts across pull requests, over the whole
 tree, and on surfaces no diff touched. The tag message names which pull requests
 in the range got a pre-merge review, so the next round knows which half of the
@@ -204,7 +204,7 @@ and a third takes `c`.
 
 Tags `reviewed/2026-09-04` to `reviewed/2026-09-22` carry names that are not
 their dates. Each tag message carries the true date, and nothing reads the
-name. Today's plain name may already be spent, so take the letter.
+name. Today's plain name may already be taken, so take the letter.
 
 Sort by `creatordate`, never by name. `creatordate` is the order that answers
 "since when".
@@ -240,7 +240,7 @@ these are rules about the fix itself, not about testing harder. The tag
 messages from `reviewed/2026-09-03` to `reviewed/2026-09-09` record them.
 
 A fix is the riskiest code in the tree. It is new, it lands fast, and the
-attention that found the defect is spent by the time the repair is written.
+attention that found the defect is gone by the time the repair is written.
 
 ### Review your own fix the way you reviewed the defect
 

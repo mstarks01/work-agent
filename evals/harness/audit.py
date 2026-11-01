@@ -1498,11 +1498,13 @@ def render_exposure(
     """
     ledger = tuple(ledger)
     reads = exposure(ledger)
-    spent = exhausted(ledger)
+    exhausted_cases = exhausted(ledger)
     for case in sorted(holdouts):
         held = reads.get(case, ())
         note = (
-            "; exhausted, so it counts as a development case" if case in spent else ""
+            "; exhausted, so it counts as a development case"
+            if case in exhausted_cases
+            else ""
         )
         yield (
             f"{case}: read {len(held)} of {HOLDOUT_READS} times"
@@ -1518,9 +1520,10 @@ def exhausted_line(
     The line a printer of the split adds, so a reader sees which flagged
     cases the development figures hold.
     """
-    spent = exhausted(ledger)
+    exhausted_cases = exhausted(ledger)
     named = [
-        f"{case} (read {spent[case]} times)" for case in sorted(set(cases) & set(spent))
+        f"{case} (read {exhausted_cases[case]} times)"
+        for case in sorted(set(cases) & set(exhausted_cases))
     ]
     if not named:
         return ""

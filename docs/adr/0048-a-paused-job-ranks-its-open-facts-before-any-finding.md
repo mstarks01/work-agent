@@ -70,6 +70,9 @@ counted. A framework whose row counted no run asks nothing early.
 **Each question gives its reasons.** They are the questions of the rules that
 fire on the element, because no finding exists to cite.
 
+> **Note ([#2050](https://github.com/mstarks01/work-agent/pull/2050)).** Each
+> reason holds the effect sentence of its rule, not the rule's analyst question.
+
 **An early answer takes the answer path that already exists.** The answers
 route checks it against the paused model, and the resumed job writes it: an
 attribute or a zone onto the model, a kind as a line of the answers Source.

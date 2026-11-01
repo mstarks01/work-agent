@@ -25,14 +25,21 @@ import pytest
 from analysis_service.identity import IDENTITY_VERSION
 from evals.harness.artifact import ARTIFACT_VERSION, DECLARED_KEYS, load_artifact
 from evals.harness.instruction_delta import (
-    artifact as delta_artifact,
-)
-from evals.harness.instruction_delta import (
+    absent_blocks,
     command_compare,
     measurement_deltas,
     node_deltas,
 )
+from evals.harness.instruction_delta import (
+    artifact as delta_artifact,
+)
 from evals.harness.provenance import RunProvenance
+from tests.source_tree import REPO_ROOT
+
+#: A committed sweep that carries no ``applicability_holdout_split`` block.
+OLDER_SWEEP = (
+    REPO_ROOT / "evals/emissions/20260914T201030Z-assert-model-benchmark/gem-r1.json"
+)
 
 
 def row(framework: str, node: str, tokens: int, sha: str) -> dict:
@@ -198,12 +205,51 @@ class TestTheMeasurementSide:
         assert not measurement_deltas(before, after)
 
 
+class TestAnOlderSweep:
+    def test_a_block_one_sweep_lacks_is_named_and_the_rest_compared(self, tmp_path):
+        """A sweep that predates an instrument carries no block for it, so
+        that block's numbers are not compared and the rest still are."""
+        rows = [row("stride", "critic_stride", 4_326, "a")]
+        before = write_run(tmp_path, "b.json", rows, coverage_totals={"drafts": 40})
+        payload = json.loads(before.read_text(encoding="utf-8"))
+        del payload["applicability_holdout_split"]
+        before.write_text(json.dumps(payload), encoding="utf-8")
+        after = write_run(tmp_path, "a.json", rows, coverage_totals={"drafts": 44})
+        older, newer = load_artifact(before), load_artifact(after)
+
+        assert absent_blocks(older, newer) == [f"{before}: applicability_holdout_split"]
+        assert [row.path for row in measurement_deltas(older, newer)] == [
+            "coverage_totals.drafts"
+        ]
+
+    def test_a_committed_older_sweep_compares(self, capsys):
+        """``compare`` raised on each committed sweep that lacks a block."""
+        args = argparse.Namespace(before=OLDER_SWEEP, after=OLDER_SWEEP, out=None)
+
+        assert command_compare(args) == 0
+        assert "applicability_holdout_split is absent" in capsys.readouterr().out
+
+    def test_a_sweep_with_no_instruction_block_is_refused(self, tmp_path, capsys):
+        """The instruction rows are the independent variable, so a sweep
+        without them is refused with one line and a non-zero exit."""
+        rows = [row("stride", "critic_stride", 4_326, "a")]
+        before = write_run(tmp_path, "b.json", rows)
+        payload = json.loads(before.read_text(encoding="utf-8"))
+        del payload["instruction"]
+        before.write_text(json.dumps(payload), encoding="utf-8")
+        after = write_run(tmp_path, "a.json", rows)
+        args = argparse.Namespace(before=before, after=after, out=None)
+
+        assert command_compare(args) == 1
+        assert capsys.readouterr().err.startswith("cannot compare: ")
+
+
 class TestTheRecord:
     def test_the_artifact_carries_only_what_moved(self, one_lane_grew):
         """A reader wants the edit, not the graph. The denominator rides beside it."""
         before, after = one_lane_grew
         record = delta_artifact(
-            node_deltas(before, after), measurement_deltas(before, after)
+            node_deltas(before, after), measurement_deltas(before, after), []
         )
 
         assert [row["node"] for row in record["instruction_delta"]] == [

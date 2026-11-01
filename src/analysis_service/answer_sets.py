@@ -6,8 +6,8 @@ Each group has link answers and fact answers, and every reader takes both, so
 one set holds them. It also holds the shared answers (ADR 0114).
 
 **A set is in one of two states, and each state has its own type.** An
-:class:`AnswerSet` holds each share's answer written as each covered part's
-own fact answer, which is what admission stores and what every reader of a
+:class:`AnswerSet` holds each share's answer written as each covered
+element's own fact answer, which is what admission stores and what every reader of a
 job's answers reads. A :class:`SentAnswers` holds its shares as a request
 sent them: a submission's answers, and a report's draft, which admission
 checks again at each save and at the run. :meth:`SentAnswers.written` is the
@@ -45,7 +45,7 @@ class _Answers(BaseModel):
         replaces the earlier answer to its question (:func:`merged_links`,
         :func:`merged_facts`), and each share the earlier share of its shape
         (:func:`merged_shares`). An answer a share takes back, and an earlier
-        answer of a part a share here covers, leave ``earlier``."""
+        answer of an element a share here covers, leave ``earlier``."""
         shares, taken_back = merged_shares(earlier.shares, self.shares, self.facts)
         gone = taken_back.union(*(share.keys() for share in self.shares))
         kept = [fact for fact in earlier.facts if fact.key not in gone]
@@ -57,7 +57,7 @@ class _Answers(BaseModel):
 
 
 class AnswerSet(_Answers):
-    """Answers with each share's answer written as each covered part's own."""
+    """Answers with each share's answer written as each covered element's own."""
 
 
 class SentAnswers(_Answers):
@@ -65,7 +65,7 @@ class SentAnswers(_Answers):
 
     def written(self) -> AnswerSet:
         """These answers with each share's answer written as each covered
-        part's own (:meth:`~analysis_service.answer_shares.SharedAnswer.facts`)."""
+        element's own (:meth:`~analysis_service.answer_shares.SharedAnswer.facts`)."""
         written = [fact for share in self.shares for fact in share.facts()]
         return AnswerSet(
             links=self.links,
@@ -78,7 +78,7 @@ def within_held_limits(answers: AnswerSet) -> AnswerSet:
     """``answers``, or a ``ValueError`` where they break the limits a job holds.
 
     **The one reader of the held limits.** A submission and a stored job
-    record both ask it. Each part a share covers counts as a fact answer.
+    record both ask it. Each element a share covers counts as a fact answer.
     """
     facts = len(answers.facts)
     if (

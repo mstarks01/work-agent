@@ -6,14 +6,14 @@
   whose limit now counts groups of field questions rather than questions, and
   [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md), whose questions a
   page now asks once for each group
-- **Amended by**: [ADR 0113](0113-a-shared-answer-covers-the-parts-a-person-ticks.md),
-  where a shared answer covers only the parts a person ticks
+- **Amended by**: [ADR 0113](0113-a-shared-answer-covers-the-elements-a-person-ticks.md),
+  where a shared answer covers only the elements a person ticks
 - **Relates to**: [ADR 0080](0080-each-question-kind-is-listed-once.md), which
   keeps a group's rows together
 - **Evidence**: `QA-2026-10-13-04-E1` and `-E2` in `evals/experiments/`,
   `tests/test_evals_early_policies.py`, `TestTheAdaptiveList` in
   `tests/test_answer_admission.py`, and
-  `test_one_shared_answer_saves_the_part_for_every_element_listed` in
+  `test_one_shared_answer_saves_the_answer_for_every_element_ticked` in
   `tests/test_browser.py`
 
 ## Context
@@ -40,8 +40,9 @@ fewer than 30 groups, so the floor and not the limit decides which field
 questions a pause asks. The page's progress counts a shared group's parts
 once.
 
-> **Amended by [ADR 0113](0113-a-shared-answer-covers-the-parts-a-person-ticks.md).**
-> Every part starts unticked, and the answer covers the parts a person ticks.
+> **Amended by [ADR 0113](0113-a-shared-answer-covers-the-elements-a-person-ticks.md).**
+> Every element starts unticked, and the answer covers the elements a person
+> ticks.
 
 **A shared answer covers the elements the box lists**, not every element of
 that kind in the model. The box opens with the shared question first and the

@@ -240,9 +240,10 @@ def evidence_catalog(
     A third enumeration follows where the job carried an assertion pass:
     every row :func:`~analysis_service.assertions.offered` returns — settled,
     and not already carried by the attribute its projection wrote — in the
-    catalog's own order. ``None`` is a job that ran no such pass, and it is the same catalog
-    as before the layer existed; an empty catalog is a pass that settled
-    nothing, which offers the same rows and says so on the report.
+    catalog's own order. ``None`` is a job that ran no such pass, and its
+    catalog holds only the first two enumerations; an empty catalog is a pass
+    that settled nothing, which offers the same rows and says so on the
+    report.
 
     Only the *type-specific* attributes are eligible
     (:func:`~analysis_service.system_model.attribute_names`). ``notes`` holding

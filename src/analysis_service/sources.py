@@ -73,7 +73,8 @@ class FormatRow:
 
 #: **The one format table** (ADR 0120). The direct upload and the Files upload
 #: both read it: the web app renders it into each page that uploads, so no
-#: page keeps a copy of the extensions. A new format is a new row.
+#: page keeps a copy of the extensions. ``tests/test_doc_copy_lints.py`` holds
+#: each guide's copy to this table. A new format is a new row.
 FORMATS: dict[SourceFormat, FormatRow] = {
     "text/plain": FormatRow(
         label="Plain text",
@@ -202,7 +203,7 @@ def _carries_formatting(value: str) -> bool:
 # All that ``kind`` still selects: one phrase telling the model what register
 # the text below is in. It sits outside the fence, so it is this module's bytes
 # and never the caller's. The diagram phrase also says how to read a diagram,
-# so a job with no diagram source sends the same prompt as before the kind.
+# so only a job with a diagram source is told how to read one.
 _REGISTERS: dict[SourceKind, str] = {
     "description": "a written description of the system",
     "transcript": "a transcribed conversation about the system",
@@ -328,8 +329,8 @@ class Source(BaseModel):
         if self.kind == "diagram" and not is_read_diagram_type(self.text):
             types = ", ".join(f"'{name}'" for name in DIAGRAM_TYPES)
             raise ValueError(
-                "a diagram source must be a Mermaid flowchart or architecture-beta"
-                f" diagram: its first diagram line must start with one of {types}"
+                "a diagram source must be a Mermaid diagram whose first diagram"
+                f" line starts with one of {types}"
             )
         return self
 
