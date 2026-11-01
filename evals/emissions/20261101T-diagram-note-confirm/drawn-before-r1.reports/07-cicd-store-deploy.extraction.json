@@ -1,0 +1,694 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:developer",
+        "name": "Developer",
+        "description": "Developers who push branches and manually rebuild main.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "dev[Developers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram names this node as 'Developers'.",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:public-package-registry",
+        "name": "Public package registry",
+        "description": "External registry providing dependencies to the build runner.",
+        "assets": [],
+        "source_excerpt": "pkgs[Public package registry]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:build-runner",
+        "name": "Build runner",
+        "description": "Builds from source, performs rebuilds, pushes images, and sets the current release.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "runner[Build runner]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:build-environment",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:deploy-controller",
+        "name": "Deploy controller",
+        "description": "Receives the current release selected by the build runner and is polled by store servers.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "ctrl[Deploy controller]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-server",
+        "name": "Store server",
+        "description": "Polls the current release and pulls images for the store estate.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "store[Store servers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram names this node as 'Store servers'.",
+        "technology": "unknown",
+        "trust_zone": "boundary:store-estate",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:git-server",
+        "name": "Git server",
+        "description": "Stores source and branches.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "git[Git server]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:image-registry",
+        "name": "Image registry",
+        "description": "Stores build images tagged with commit SHA tags.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "reg[(Image registry)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:build-environment",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:developer>store:git-server>push-branches",
+        "name": "push branches",
+        "description": "Branches pushed to the Git server.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "dev -->|push branches| git",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:developer",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "branches",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:store:git-server>process:build-runner>source",
+        "name": "source",
+        "description": "Source transferred from the Git server to the build runner on merge to main.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "git -->|\"source (merge to main)\"| runner",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:git-server",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "source (merge to main)",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:public-package-registry>process:build-runner>dependencies",
+        "name": "dependencies",
+        "description": "Dependencies transferred to the build runner.",
+        "assets": [],
+        "source_excerpt": "pkgs -->|dependencies| runner",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:public-package-registry",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dependencies",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:build-runner>store:image-registry>push-image",
+        "name": "push image",
+        "description": "An image tagged with a commit SHA is pushed to the image registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "runner -->|\"push image (commit sha tag)\"| reg",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "store:image-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "image (commit sha tag)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:build-runner>process:deploy-controller>set-current-release",
+        "name": "set current release",
+        "description": "The build runner sets the current release on the deploy controller.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "runner -->|set current release| ctrl",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "current release",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:developer>process:build-runner>manual-rebuild-of-main",
+        "name": "manual rebuild of main",
+        "description": "A developer manually requests a rebuild of main from the build runner.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "dev -->|manual rebuild of main| runner",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:developer",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "manual rebuild of main",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:store-server>process:deploy-controller>poll-current-release",
+        "name": "poll current release",
+        "description": "The store server polls the current release over the retail WAN.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "store -->|\"poll current release (retail WAN)\"| ctrl",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:store-server",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "current release",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:store:image-registry>process:store-server>pull-image",
+        "name": "pull image",
+        "description": "The store server pulls an image over the WAN from the image registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "reg -->|\"pull image (WAN)\"| store",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:image-registry",
+        "destination": "process:store-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "image",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "Corporate network trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph corp[Corporate network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:build-environment",
+        "name": "Build environment",
+        "description": "Build environment trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph build[Build environment]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:internet",
+        "name": "Internet",
+        "description": "Internet trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph internet[Internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:store-estate",
+        "name": "Store estate",
+        "description": "Store estate trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph stores[Store estate]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Developer is a human external entity.",
+        "element_id": "entity:developer",
+        "attribute": "kind",
+        "basis": "The node is named 'Developers' and represents people interacting with the system."
+      },
+      {
+        "assumption": "The trust zones are network boundaries.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The diagram explicitly labels the zone 'Corporate network'."
+      },
+      {
+        "assumption": "The trust zones are network boundaries.",
+        "element_id": "boundary:build-environment",
+        "attribute": "kind",
+        "basis": "The diagram presents 'Build environment' as a distinct deployment zone."
+      },
+      {
+        "assumption": "The trust zones are network boundaries.",
+        "element_id": "boundary:internet",
+        "attribute": "kind",
+        "basis": "The diagram explicitly labels the zone 'Internet'."
+      },
+      {
+        "assumption": "The trust zones are network boundaries.",
+        "element_id": "boundary:store-estate",
+        "attribute": "kind",
+        "basis": "The diagram presents 'Store estate' as a distinct deployment zone."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:developer",
+        "name": "Developer",
+        "description": "Developers who push branches and manually rebuild main.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "dev[Developers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram names this node as 'Developers'.",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:public-package-registry",
+        "name": "Public package registry",
+        "description": "External registry providing dependencies to the build runner.",
+        "assets": [],
+        "source_excerpt": "pkgs[Public package registry]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:build-runner",
+        "name": "Build runner",
+        "description": "Builds from source, performs rebuilds, pushes images, and sets the current release.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "runner[Build runner]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:build-environment",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:deploy-controller",
+        "name": "Deploy controller",
+        "description": "Receives the current release selected by the build runner and is polled by store servers.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "ctrl[Deploy controller]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-server",
+        "name": "Store server",
+        "description": "Polls the current release and pulls images for the store estate.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "store[Store servers]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "The diagram names this node as 'Store servers'.",
+        "technology": "unknown",
+        "trust_zone": "boundary:store-estate",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:git-server",
+        "name": "Git server",
+        "description": "Stores source and branches.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "git[Git server]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:image-registry",
+        "name": "Image registry",
+        "description": "Stores build images tagged with commit SHA tags.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "reg[(Image registry)]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:build-environment",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:developer>store:git-server>push-branches",
+        "name": "push branches",
+        "description": "Branches pushed to the Git server.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "dev -->|push branches| git",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:developer",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "branches",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:store:git-server>process:build-runner>source",
+        "name": "source",
+        "description": "Source transferred from the Git server to the build runner on merge to main.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "git -->|\"source (merge to main)\"| runner",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:git-server",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "source (merge to main)",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:public-package-registry>process:build-runner>dependencies",
+        "name": "dependencies",
+        "description": "Dependencies transferred to the build runner.",
+        "assets": [],
+        "source_excerpt": "pkgs -->|dependencies| runner",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:public-package-registry",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dependencies",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:build-runner>store:image-registry>push-image",
+        "name": "push image",
+        "description": "An image tagged with a commit SHA is pushed to the image registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "runner -->|\"push image (commit sha tag)\"| reg",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "store:image-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "image (commit sha tag)",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:build-runner>process:deploy-controller>set-current-release",
+        "name": "set current release",
+        "description": "The build runner sets the current release on the deploy controller.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "runner -->|set current release| ctrl",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "current release",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:developer>process:build-runner>manual-rebuild-of-main",
+        "name": "manual rebuild of main",
+        "description": "A developer manually requests a rebuild of main from the build runner.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "dev -->|manual rebuild of main| runner",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:developer",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "manual rebuild of main",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:store-server>process:deploy-controller>poll-current-release",
+        "name": "poll current release",
+        "description": "The store server polls the current release over the retail WAN.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "store -->|\"poll current release (retail WAN)\"| ctrl",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:store-server",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "current release",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:store:image-registry>process:store-server>pull-image",
+        "name": "pull image",
+        "description": "The store server pulls an image over the WAN from the image registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "reg -->|\"pull image (WAN)\"| store",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:image-registry",
+        "destination": "process:store-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "image",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "Corporate network trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph corp[Corporate network]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:build-environment",
+        "name": "Build environment",
+        "description": "Build environment trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph build[Build environment]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:internet",
+        "name": "Internet",
+        "description": "Internet trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph internet[Internet]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:store-estate",
+        "name": "Store estate",
+        "description": "Store estate trust zone.",
+        "assets": [],
+        "source_excerpt": "subgraph stores[Store estate]",
+        "source_label": "System diagram",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The Developer is a human external entity.",
+        "element_id": "entity:developer",
+        "attribute": "kind",
+        "basis": "The node is named 'Developers' and represents people interacting with the system."
+      },
+      {
+        "assumption": "The trust zones are network boundaries.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The diagram explicitly labels the zone 'Corporate network'."
+      },
+      {
+        "assumption": "The trust zones are network boundaries.",
+        "element_id": "boundary:build-environment",
+        "attribute": "kind",
+        "basis": "The diagram presents 'Build environment' as a distinct deployment zone."
+      },
+      {
+        "assumption": "The trust zones are network boundaries.",
+        "element_id": "boundary:internet",
+        "attribute": "kind",
+        "basis": "The diagram explicitly labels the zone 'Internet'."
+      },
+      {
+        "assumption": "The trust zones are network boundaries.",
+        "element_id": "boundary:store-estate",
+        "attribute": "kind",
+        "basis": "The diagram presents 'Store estate' as a distinct deployment zone."
+      }
+    ],
+    "capabilities": [],
+    "excerpt_repairs": []
+  },
+  "issues": [],
+  "repair": null
+}
