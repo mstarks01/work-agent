@@ -544,15 +544,16 @@ async def _run_mode(
         if outcome.extraction is not None:
             extractions.append(outcome.extraction)
             payloads.append(outcome.extraction.to_json())
-            # The citation half is scored, not failed. It fires when the model
-            # quotes a source wrongly, which production hands to ``repair`` and
-            # this mode stops before; ``score.uncited`` carries every one into
-            # the artifact. Everything else is still a malformed model.
+            # The citation and diagram rules are scored, not failed. They fire
+            # when the model quotes a source wrongly or leaves out a node or an
+            # edge of a diagram, which production hands to ``repair`` and this
+            # mode stops before; ``score.uncited`` carries every citation issue
+            # into the artifact. Everything else is still a malformed model.
             failures.extend(
                 f"{case.id}: extraction is not a valid system model:"
                 f" {issue.code}: {issue.message}"
                 for issue in outcome.issues
-                if not issue.is_citation
+                if not (issue.is_citation or issue.is_diagram)
             )
             return False
         run = outcome.run

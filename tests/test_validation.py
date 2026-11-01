@@ -543,7 +543,7 @@ class TestCitationsResolve:
         issues = validate(model)
 
         assert issues  # the model really is broken, so this proves something
-        assert not any(issue.is_citation for issue in issues)
+        assert not any(issue.is_citation or issue.is_diagram for issue in issues)
 
 
 class TestExcerptsVerify:

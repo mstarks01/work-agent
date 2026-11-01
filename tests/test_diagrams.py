@@ -218,6 +218,7 @@ class TestTheGate:
         issues = validate(valid_model(), diagrams={"Model": _structure(nodes=nodes)})
         assert [i.code for i in issues] == ["diagram-node-missing"]
         assert "'Payment Gateway'" in issues[0].message
+        assert issues[0].is_diagram and not issues[0].is_citation
 
     @pytest.mark.parametrize(
         "drawn", ["Orders DB: orders, customers", "Orders DB (PostgreSQL)", "Orders DB"]

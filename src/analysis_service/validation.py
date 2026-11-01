@@ -110,11 +110,10 @@ class ValidationIssue(BaseModel):
 
     @property
     def is_citation(self) -> bool:
-        """Did this issue come from the one gate rule that reads the sources?
+        """Did this issue come from the gate rule that reads the sources' text?
 
-        :func:`_citation_issues` is the only rule taking data from outside the
-        model, and it is the only rule that can name either of these fields. A
-        caller that supplies no sources can never see one.
+        :func:`_citation_issues` is the only rule that can name either of these
+        fields. A caller that supplies no sources can never see one.
 
         The property exists so a caller asking *which half of the gate failed*
         reads the answer here rather than re-deriving it from a code. The eval
@@ -124,6 +123,20 @@ class ValidationIssue(BaseModel):
         """
         return self.field in CITATION_FIELDS
 
+    @property
+    def is_diagram(self) -> bool:
+        """Did this issue come from the rule that reads a diagram's structure?
+
+        Like a citation issue, it names a gap the repair pass exists to fix
+        (ADR 0121), so the eval harness grades it rather than failing the case.
+        """
+        return self.code in DIAGRAM_CODES
+
+
+#: The codes only :func:`_diagram_issues` writes.
+DIAGRAM_CODES: frozenset[IssueCode] = frozenset(
+    {"diagram-node-missing", "diagram-edge-missing"}
+)
 
 #: The fields only :func:`_citation_issues` writes. Named beside the rule so the
 #: rule and :attr:`ValidationIssue.is_citation` cannot drift apart;
