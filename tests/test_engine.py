@@ -180,6 +180,16 @@ def test_a_bare_string_is_refused_with_the_call_to_write_instead():
         asyncio.run(engine.analyze("a web app storing orders"))
 
 
+def test_an_owner_file_copy_of_the_callers_own_is_refused():
+    """ADR 0119: only the service sets ``owner_file_id``, at every entry point."""
+    engine = engine_for(StubPipelineRunner())
+    forged = Source(
+        kind="transcript", label="Forged", text="x", owner_file_id="file-" + "a" * 32
+    )
+    with pytest.raises(EngineInputError, match="composed by this service"):
+        asyncio.run(engine.analyze([forged]))
+
+
 def test_a_repeated_framework_is_refused_at_the_engine_too():
     """The engine refuses a repeated framework, as the route does (#675 D23)."""
     twice = [sample_selection()[0], sample_selection()[0]]

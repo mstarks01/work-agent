@@ -117,7 +117,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -127,7 +127,7 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from analysis_service import (
@@ -235,6 +235,7 @@ from analysis_service.sources import (
     ANSWERS_LABEL,
     FORMATS,
     MAX_SYSTEM_NAME_CHARS,
+    OWNER_FILE_ID,
     SourceLimits,
     clean_system_name,
 )
@@ -692,6 +693,13 @@ class _Submission(BaseModel):
     questions: bool = _as_v1("questions")
     answers_from: str | None = _as_v1("answers_from")
     name: str | None = None
+    #: The Owner Files whose text the new job copies (ADR 0119). Only this
+    #: route takes them: ``POST /v1/jobs`` has no Files.
+    #: :meth:`~analysis_service.job_answers.JobAnswers.owner_file_sources`
+    #: refuses more of them than the deployment's source limit.
+    owner_files: list[Annotated[str, Field(pattern=OWNER_FILE_ID)]] = Field(
+        default_factory=list
+    )
 
 
 class _UnknownKey(Exception):
@@ -1498,9 +1506,18 @@ def create_app(
         sources = await store.sources(record.id, owner_id)
         if sources is None:
             await answers.missing(record, "sources")
+        # The text of an Owner File's copy stays out of the description; the
+        # page lists each copy under "Files used" (ADR 0119).
         payload["description"] = "\n\n".join(
-            source.text for source in sources if source.kind != "answers"
+            source.text
+            for source in sources
+            if source.kind != "answers" and source.owner_file_id is None
         )
+        payload["owner_files"] = [
+            {"id": source.owner_file_id, "label": source.label, "kind": source.kind}
+            for source in sources
+            if source.owner_file_id is not None
+        ]
         payload["error"] = record.error
         payload["issues"] = [
             {"code": issue.code, "message": issue.message}
@@ -1625,6 +1642,7 @@ def create_app(
                         system_name=name,
                         questions=submission.questions,
                         answers_from=submission.answers_from,
+                        owner_files=submission.owner_files,
                     ),
                     start=workspace.start(current.deadline_seconds),
                 )

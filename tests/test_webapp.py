@@ -38,8 +38,15 @@ from analysis_service.api import JOB_REFUSAL_STATUS
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.compact import FULL_FORMAT
 from analysis_service.deployment import Deployment
-from analysis_service.jobs import JOB_ID_PATTERN, AdmissionOutcome, JobRecord
-from analysis_service.principals import LOCAL_ISSUER
+from analysis_service.job_answers import OWNER_FILE_GONE
+from analysis_service.jobs import (
+    JOB_ID_PATTERN,
+    AdmissionOutcome,
+    InMemoryJobStore,
+    JobRecord,
+)
+from analysis_service.owner_files import OwnerFile
+from analysis_service.principals import LOCAL_ISSUER, Principal
 from analysis_service.sources import ANSWERS_LABEL, FORMATS
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import (
@@ -53,7 +60,14 @@ from tests.factories import (
     sample_selection,
     secret_env,
 )
-from webapp.main import Settings, Startup, Workspace, create_app, render_report
+from webapp.main import (
+    OPERATOR,
+    Settings,
+    Startup,
+    Workspace,
+    create_app,
+    render_report,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -2140,3 +2154,56 @@ def test_no_page_words_a_count_with_a_bracketed_plural():
         if (found := re.findall(r"[a-z]\(s\)", page.read_text(encoding="utf-8")))
     }
     assert bracketed == {}
+
+
+class TestOwnerFilesInAnAnalysis:
+    """ADR 0119: ``/analyze`` copies each chosen Owner File into the job."""
+
+    TEXT = "Ana: the API uses mTLS."
+
+    def client_with_a_file(self, tiers) -> tuple[TestClient, OwnerFile]:
+        store = InMemoryJobStore()
+        principal = Principal.new(OPERATOR)
+        file = OwnerFile.create(
+            owner_id=principal.owner_id,
+            name="Kickoff call",
+            kind="transcript",
+            format="text/plain",
+            text=self.TEXT,
+        )
+        added = asyncio.run(
+            store.add_file(file, self.TEXT, limit=100, principal=principal)
+        )
+        assert added == "added"
+        app = create_app(startup_for(tiers), workspace=Workspace(store=store))
+        return TestClient(app, base_url=LOOPBACK), file
+
+    def test_a_reopened_analysis_lists_each_copy_and_keeps_its_text_out(self, tiers):
+        client, file = self.client_with_a_file(tiers)
+        body = posted("A web app.") | {"owner_files": [file.id]}
+        started = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+        assert started.status_code == 200, started.text
+        run = started.json()["run"]
+        client.get(f"/events/{run}")
+        page = client.get(f"/workspace/runs/{run}").json()
+        assert page["owner_files"] == [
+            {"id": file.id, "label": "Kickoff call", "kind": "transcript"}
+        ]
+        assert page["description"] == "A web app."
+
+    def test_a_file_that_is_gone_is_refused_with_one_sentence(self, tiers):
+        client, _ = self.client_with_a_file(tiers)
+        body = posted("A web app.") | {"owner_files": ["file-" + "0" * 32]}
+        refused = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+        assert refused.status_code == 400
+        assert refused.json()["message"] == OWNER_FILE_GONE
+
+    @pytest.mark.parametrize(
+        "owner_files", [["job-" + "0" * 32], ["file-" + "0" * 32 + "x"], "file-0"]
+    )
+    def test_a_malformed_id_is_refused_by_the_body(self, tiers, owner_files):
+        client, _ = self.client_with_a_file(tiers)
+        body = posted("A web app.") | {"owner_files": owner_files}
+        assert (
+            client.post("/analyze", json=body, headers=SAME_ORIGIN).status_code == 400
+        )
