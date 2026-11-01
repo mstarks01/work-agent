@@ -113,7 +113,7 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import asynccontextmanager, nullcontext
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
@@ -233,6 +233,7 @@ from analysis_service.selection import SelectionError
 from analysis_service.settings_variables import deployment_env
 from analysis_service.sources import (
     ANSWERS_LABEL,
+    FORMATS,
     MAX_SYSTEM_NAME_CHARS,
     SourceLimits,
     clean_system_name,
@@ -1356,6 +1357,8 @@ def create_app(
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 source_limit=str(current.answers.limits.max_total_bytes),
+                source_formats=_SOURCE_FORMATS,
+                upload_accept=_UPLOAD_ACCEPT,
                 store_note=""
                 if workspace.store.durable
                 else escape(_MEMORY_STORE_NOTE),
@@ -2050,6 +2053,12 @@ _STYLE = """
 
 _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-8")
 _SETTINGS_PAGE = (Path(__file__).parent / "settings.html").read_text(encoding="utf-8")
+#: The format table as each page that uploads reads it, and the ``accept``
+#: attribute of its file field: both from :data:`FORMATS` (ADR 0120).
+_SOURCE_FORMATS = script_json({name: asdict(row) for name, row in FORMATS.items()})
+_UPLOAD_ACCEPT = escape(
+    ",".join(extension for row in FORMATS.values() for extension in row.extensions)
+)
 #: The sidebar of every workspace page: the form, Settings and the report.
 #: Static markup, so it takes no escape.
 _SIDEBAR = (Path(__file__).parent / "sidebar.html").read_text(encoding="utf-8")

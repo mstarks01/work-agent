@@ -427,6 +427,7 @@ class TestInputLadder:
             {"kind": "description", "label": "two\nlines", "text": "hi"},
             {"kind": "description", "label": "Doc"},
             {"kind": "description", "label": "Doc", "text": "hi", "authority": "x"},
+            {"kind": "diagram", "label": "Seq", "text": "sequenceDiagram\n  a->>b: hi"},
         ],
     )
     def test_rung_one_a_malformed_source_is_422(self, bad_source):

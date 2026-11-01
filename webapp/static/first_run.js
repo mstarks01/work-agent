@@ -65,14 +65,17 @@
   // before the text is kept, cheapest first: the size before a byte is read,
   // then a strict UTF-8 decode, then no control character other than a tab or
   // a line break. A refused file leaves the uploads the page holds as they were.
-  // The file name's extension decides the kind: a Mermaid file is a diagram,
-  // and every other file is a transcript. The page holds one file of each kind.
+  // The file name's extension finds the file's row in the format table that
+  // the server renders (ADR 0120), and the upload takes the row's default
+  // kind. A file with no row is refused. The page holds one file of each kind.
   const uploadFile = document.getElementById("upload-file");
+  const FORMATS = Object.values(JSON.parse(document.getElementById("source_formats").textContent));
+  const formatOf = (name) => FORMATS.find((row) => row.extensions.some((extension) => name.toLowerCase().endsWith(extension)));
+  const supportedFormats = FORMATS.map((row) => `${row.label} (${row.extensions.join(", ")})`).join(" or ");
   const maxUploadBytes = Number(uploadFile.dataset.maxBytes);
   const maxDescriptionBytes = Number(box.dataset.maxBytes);
   const remainingNote = document.getElementById("description-remaining");
   const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/;
-  const DIAGRAM_FILE = /\.(mmd|mermaid)$/i;
   const UPLOADS = {
     transcript: { label: "Uploaded transcript", text: null },
     diagram: { label: "Uploaded diagram", text: null },
@@ -104,6 +107,11 @@
     const [file] = uploadFile.files;
     uploadFile.value = "";
     if (!file) return;
+    const format = formatOf(file.name);
+    if (!format) {
+      fail(`The page reads only ${supportedFormats} files.`);
+      return;
+    }
     if (file.size > maxUploadBytes) {
       fail(`This file is larger than the ${maxUploadBytes} bytes that one analysis can carry.`);
       return;
@@ -124,7 +132,7 @@
       return;
     }
     problem.hidden = true;
-    hold(DIAGRAM_FILE.test(file.name) ? "diagram" : "transcript", text, file.name);
+    hold(format.default_kind, text, file.name);
   });
 
   // The description goes with an upload only where it holds text, and always
