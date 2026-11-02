@@ -1,0 +1,56 @@
+{
+ "report": {
+  "places": 244,
+  "references": 84,
+  "A": {
+   "shares": 117,
+   "no-ref-control": 118,
+   "differs": 9
+  },
+  "B": {
+   "shares": 171,
+   "differs": 64,
+   "no-ref-control": 9
+  },
+  "C": 5,
+  "C_of": 5,
+  "A_flagged_sweeps": {
+   "09/0 spoofing": 1,
+   "10/4 tampering": 3,
+   "12/14 elevation-of-privilege": 1,
+   "13/0 spoofing": 4
+  },
+  "C_flagged_sweeps": {
+   "05/6 information-disclosure": 3,
+   "05/7 information-disclosure": 1,
+   "07/18 elevation-of-privilege": 1
+  }
+ },
+ "drafts": {
+  "places": 251,
+  "references": 86,
+  "A": {
+   "shares": 119,
+   "no-ref-control": 123,
+   "differs": 9
+  },
+  "B": {
+   "shares": 176,
+   "differs": 66,
+   "no-ref-control": 9
+  },
+  "C": 5,
+  "C_of": 5,
+  "A_flagged_sweeps": {
+   "09/0 spoofing": 1,
+   "10/4 tampering": 3,
+   "12/14 elevation-of-privilege": 1,
+   "13/0 spoofing": 4
+  },
+  "C_flagged_sweeps": {
+   "05/6 information-disclosure": 3,
+   "05/7 information-disclosure": 1,
+   "07/18 elevation-of-privilege": 1
+  }
+ }
+}

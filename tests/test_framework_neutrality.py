@@ -154,6 +154,11 @@ DECLARED: dict[str, str] = {
         " reads capabilities: a package whose units carry an applicability"
         " expression."
     ),
+    "evals/experiments/QA-2026-11-02-05/mechanism_proxy.py": (
+        "This code is that framework's. It reads the must-finds of a package"
+        " whose references a lane drafts by a verb and a place, and the drafts"
+        " that the claim scorer matches to them."
+    ),
     "evals/experiments/QA-2026-11-02-05/read_capabilities.py": (
         "This code is that framework's. It reads the decisions at the top band"
         " of a package whose units carry an applicability expression, after the"
