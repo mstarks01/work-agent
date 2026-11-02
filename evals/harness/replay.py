@@ -81,7 +81,6 @@ and a run confirms.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import statistics
 from collections import Counter, defaultdict
@@ -108,6 +107,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.evidence import prepared_view
 from analysis_service.grounding import normalize
+from analysis_service.sources import text_digest
 from analysis_service.system_model import (
     FLOW_DELIMITER,
     DataFlow,
@@ -1189,7 +1189,7 @@ def rendered_digest(rendered: Mapping[str, str]) -> str:
     so repeats pool and a case's own input never makes an arm of its own.
     """
     canonical = json.dumps(dict(rendered), sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return text_digest(canonical)
 
 
 #: Which reading routes each mode admits, and so which nodes' instructions
