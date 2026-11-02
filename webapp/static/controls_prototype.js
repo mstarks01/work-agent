@@ -598,7 +598,7 @@
           h("td", { class: "name-cell" }, h("a", { href: "#", on: { click: (e) => { e.preventDefault(); startEdit(c.id); } } }, c.name),
             c.facts.length ? h("div", { class: "sub" }, `Proves ${c.facts.map((f) => f.attribute).join(", ")}`) : null),
           h("td", {}, scopeText(c.scope)),
-          h("td", {}, h("div", { class: "chips" }, ...c.rows.map((r) => h("span", { class: "chip" }, `${r.framework} ${r.unit}`)))),
+          h("td", {}, h("div", { class: "chips" }, ...c.rows.map((r) => h("span", { class: `chip fw-${r.framework.toLowerCase()}` }, `${r.framework} ${r.unit}`)))),
           h("td", {}, c.evidence.map((f) => `${f.name} (${CLASS_LABEL[f.class]})`).join(", ") || "—"),
           h("td", {}, h("time", { datetime: c.updated }, day(c.updated))),
           h("td", {}, h("div", { class: "row-actions" },

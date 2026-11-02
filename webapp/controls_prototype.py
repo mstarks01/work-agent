@@ -483,6 +483,8 @@ _PAGE = """<!doctype html>
   .control-card .scope-line { font-size:13px; color:var(--muted); margin:0 0 8px; }
   .chips { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
   .chip { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
+  .chip.fw-asvs { background:light-dark(#eaf0e5,#303f29); border-color:light-dark(#b9cbb0,#4f6b45); color:light-dark(#2f4f33,#cfe5c6); }
+  .chip.fw-stride { background:light-dark(#e9eef6,#2a3340); border-color:light-dark(#b7c6dd,#4b5f7a); color:light-dark(#2f4668,#c8d8f0); }
   .chip.applied { background:#e6f6ee; border-color:#2a7; }
   .chip.refused { background:var(--error-bg); border-color:var(--error); }
   blockquote.excerpt { margin:6px 0; padding:6px 10px; border-left:3px solid var(--line);
