@@ -118,7 +118,8 @@ class Engine:
         frameworks: Sequence[FrameworkSelection],
     ) -> None:
         # The same rule the HTTP routes apply, read through the one reader all
-        # three share: the selection in ``carried_frameworks`` order (ADR 0102).
+        # three share, :func:`~analysis_service.selection.resolve_names`: the
+        # selection in ``carried_frameworks`` order (ADR 0102).
         # An engine built on a deployment holds the frameworks the deployment
         # carries. A package's options model declares no default, so a selection missing
         # a value it needs is refused here rather than reaching a block that

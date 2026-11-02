@@ -494,8 +494,8 @@ async def _run_mode(
             )
         except Exception as error:  # noqa: BLE001 — every fault, so none is free
             # A refused model and a provider fault arrive the same way here and
-            # are told apart by :data:`MEASURED` in the fold, which is the one
-            # reader of that question.
+            # are told apart by :data:`MEASURED` in the fold, which answers that
+            # question.
             return _CaseOutcome(case=case, error=error)
         return _CaseOutcome(
             case=case,

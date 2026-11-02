@@ -9,8 +9,8 @@ a scored sweep into the question and the answer back into a ruling.
 names the surviving draft at a ``verb`` loss's place and the displaced draft
 beside a ``place`` or ``unled`` loss, with the vote status on it. Those are
 the near misses; this module selects from them and computes nothing about
-places or verbs of its own, so there is one reader of "which draft sits next
-to this miss".
+places or verbs of its own, so it decides nothing about which draft sits
+next to a miss.
 
 **A row is asked only where a ruling can move the figure.** A draft that
 matched a reference of its own keeps it, because the scorer assigns every

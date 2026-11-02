@@ -1429,7 +1429,7 @@ def _known_content(answer: FactAnswer | None) -> frozenset[tuple[str, str]]:
 
 
 #: The revision a request names: a whole number from zero, and never ``true``.
-#: **The one reader of a posted revision.** The HTTP models declare their
+#: **The type of a posted revision.** The HTTP models declare their
 #: ``revision`` fields with it, and the first-run app validates a posted value
 #: with it.
 Revision = Annotated[int, Field(ge=0, strict=True)]

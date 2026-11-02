@@ -32,8 +32,11 @@ from tests.test_five_class_read import HELD_ROWS
 pytestmark = pytest.mark.lint
 
 #: A site: the file, relative to the repository root, and the enclosing
-#: function, or ``<module>``.
+#: function, or :data:`MODULE_OWNER`.
 Site = tuple[str, str]
+
+#: The function part of a site at the module level of its file.
+MODULE_OWNER = "<module>"
 
 
 #: The parts of :data:`~tests.source_tree.PYTHON` no lint here walks, with
@@ -57,7 +60,7 @@ def _sites(
         {
             (path.relative_to(REPO_ROOT).as_posix(), function)
             for path in files
-            for node, function in _walk(parse(path), "<module>")
+            for node, function in _walk(parse(path), MODULE_OWNER)
             if match(node)
         }
     )
@@ -89,16 +92,18 @@ def _is_name(node: ast.AST, *names: str) -> bool:
 def test_each_store_choice_has_one_reader():
     """Only ``job_store_name`` and ``object_store_name`` choose a store row."""
 
-    def chooses(node: ast.AST) -> bool:
-        return (
+    def chooses(table: str) -> Callable[[ast.AST], bool]:
+        return lambda node: (
             _calls(node, "closed_setting")
             and len(node.args) == 3
-            and _is_name(node.args[2], "JOB_STORES", "OBJECT_STORES")
+            and _is_name(node.args[2], table)
         )
 
-    assert sorted(_sites(chooses)) == [
-        ("src/analysis_service/objects.py", "object_store_name"),
-        ("src/analysis_service/store_backends.py", "job_store_name"),
+    assert _sites(chooses("JOB_STORES")) == [
+        ("src/analysis_service/store_backends.py", "job_store_name")
+    ]
+    assert _sites(chooses("OBJECT_STORES")) == [
+        ("src/analysis_service/objects.py", "object_store_name")
     ]
 
 
@@ -447,15 +452,6 @@ def test_kept_text_has_one_reader():
     assert _sites(tests) == [("src/analysis_service/grounding.py", "keeps_text")]
 
 
-#: Each function that tests a spelling field of an
-#: :class:`~analysis_service.claims.UnknownRef` for its truth, and why it does
-#: not ask ``kind``.
-SPELLING_READERS: dict[Site, str] = {
-    ("src/analysis_service/claims.py", "spellings"): (
-        "it is the reader that ``kind`` reads"
-    ),
-}
-
 #: The fields of :class:`~analysis_service.claims.UnknownRef` that spell a
 #: kind of fact.
 SPELLING_FIELDS = frozenset(
@@ -498,8 +494,11 @@ def _tests_a_spelling(node: ast.AST) -> bool:
 
 
 def test_the_kind_of_an_open_fact_has_one_reader():
-    """Only ``UnknownRef.kind`` routes on which spelling a reference uses."""
-    assert set(_sites(_tests_a_spelling)) == SPELLING_READERS.keys()
+    """Only ``UnknownRef.spellings`` tests a spelling field for its truth, and
+    ``UnknownRef.kind`` routes on what it returns."""
+    assert _sites(_tests_a_spelling) == [
+        ("src/analysis_service/claims.py", "spellings")
+    ]
 
 
 def test_the_kind_of_an_open_fact_is_not_read_from_two_fields():
@@ -520,12 +519,9 @@ _SENT_KEY = (
     " cached ``key_ref`` cannot take it"
 )
 
-#: Each function that reads which part of an open fact's key is which, and
-#: why. Every other site asks ``key_ref``.
-KEY_LAYOUT_READERS: dict[Site, str] = {
-    ("src/analysis_service/fact_answers.py", "key_ref"): (
-        "it is the one reader of which part of a key is which"
-    ),
+#: Each function beside ``key_ref`` that reads which part of an open fact's
+#: key is which, and why. Every other site asks ``key_ref``.
+SENT_KEY_READERS: dict[Site, str] = {
     ("src/analysis_service/fact_answers.py", "_facet_value"): _SENT_KEY,
     ("src/analysis_service/fact_answers.py", "_one_spelling"): _SENT_KEY,
 }
@@ -564,8 +560,10 @@ def test_the_layout_of_an_open_facts_key_has_one_reader():
     key to state what it expects of a fixture, and no running code follows it.
     """
     sites = set(_sites(_reads_a_key_by_position))
-    assert sites - KEY_LAYOUT_READERS.keys() == set(), "read a key's parts by key_ref"
-    assert KEY_LAYOUT_READERS.keys() <= sites
+    assert SENT_KEY_READERS.keys() <= sites
+    assert sites - SENT_KEY_READERS.keys() == {
+        ("src/analysis_service/fact_answers.py", "key_ref")
+    }, "read a key's parts by key_ref"
 
 
 def test_the_place_of_a_pydantic_error_has_one_reader():
@@ -660,7 +658,6 @@ def _parses_a_report(node: ast.AST) -> bool:
 
 
 def test_each_declared_site_still_reads_the_rule_itself():
-    assert SPELLING_READERS.keys() <= set(_sites(_tests_a_spelling))
     assert FIELD_PAIR_READERS.keys() <= set(_sites(_tests_two_spelling_fields))
     assert LOC_READERS.keys() <= set(_sites(_reads_loc))
     assert CONFIG_DEFAULT_READERS.keys() <= set(_sites(_reads_a_config_default))
@@ -746,7 +743,7 @@ def _config_defaults() -> frozenset[str]:
 #: Each function that reads a repo default of ``CONFIG_PATHS`` without
 #: ``config_path``, and why.
 CONFIG_DEFAULT_READERS: dict[Site, str] = {
-    ("src/analysis_service/deployment.py", "<module>"): (
+    ("src/analysis_service/deployment.py", MODULE_OWNER): (
         "``CONFIG_PATHS`` pairs each default with its variable here"
     ),
     ("evals/harness/exemplar_verbs.py", "lane_verbs"): (
@@ -798,7 +795,7 @@ def test_each_refusal_has_one_status_row():
     """
     rows: dict[str, list[Site]] = {}
     for path in FILES:
-        for node, function in _walk(parse(path), "<module>"):
+        for node, function in _walk(parse(path), MODULE_OWNER):
             if not isinstance(node, ast.Dict):
                 continue
             pairs = list(zip(node.keys, node.values, strict=True))
@@ -1250,7 +1247,7 @@ def test_the_shape_of_a_digest_is_spelled_once():
     """Only ``parsing.Sha256Hex`` spells the shape, and each model field that
     holds a digest reads it."""
     assert _sites(_spells_a_digest_shape) == [
-        ("src/analysis_service/parsing.py", "<module>")
+        ("src/analysis_service/parsing.py", MODULE_OWNER)
     ]
 
 
@@ -1284,7 +1281,7 @@ def _spells_a_lane_doc(node: ast.AST) -> bool:
 
 #: Each function that spells ``skill`` for another meaning, and the meaning.
 NOT_A_LANE_DOC: dict[Site, str] = {
-    ("evals/harness/audit.py", "<module>"): (
+    ("evals/harness/audit.py", MODULE_OWNER): (
         "a finding's owner: the skill text as one of the places a fix belongs"
     ),
 }
@@ -1294,7 +1291,7 @@ def test_a_lane_doc_name_is_spelled_once():
     """Only ``frameworks`` spells a lane's two file names; the loader names,
     the package gate and the roster writer read the declarations."""
     assert set(_sites(_spells_a_lane_doc)) - NOT_A_LANE_DOC.keys() == {
-        ("src/analysis_service/frameworks/__init__.py", "<module>")
+        ("src/analysis_service/frameworks/__init__.py", MODULE_OWNER)
     }
 
 
@@ -1800,6 +1797,55 @@ def _reads_a_cache_rule(node: ast.AST) -> bool:
     return _loads_attribute(node, "prompt_cache") or _calls(node, "accepts")
 
 
+def _calls_each(node: ast.AST, *names: str) -> bool:
+    """Whether ``node`` holds a call of each of ``names``."""
+    return all(any(_calls(part, name) for part in ast.walk(node)) for name in names)
+
+
+def _joins(node: ast.AST, *names: str) -> bool:
+    """A boolean expression that calls each of ``names``."""
+    return isinstance(node, ast.BoolOp) and _calls_each(node, *names)
+
+
+def _compares_an_origin(node: ast.AST) -> bool:
+    return _compares_with(node, "answer") and any(
+        _loads_attribute(part, "origin") for part in (node.left, *node.comparators)
+    )
+
+
+def _ends_a_job(node: ast.AST) -> bool:
+    """A boolean expression that asks both halves of an ended job."""
+    return _joins(node, "readable") and any(
+        _loads(part, "TERMINAL_STATUSES") for part in ast.walk(node)
+    )
+
+
+def _opens_an_attribute(node: ast.AST) -> bool:
+    """A function that asks both ways an attribute stays open."""
+    return isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and _calls_each(
+        node, "control_state", "assumed_zone_elements"
+    )
+
+
+def _merges_the_shared_tier_nodes(node: ast.AST) -> bool:
+    return isinstance(node, ast.Dict) and any(
+        key is None and _loads(value, "_SHARED_TIER_NODES")
+        for key, value in zip(node.keys, node.values, strict=True)
+    )
+
+
+def _spells_an_unknown_key(node: ast.AST) -> bool:
+    """A tuple of each field of an open fact's key, in the key's order."""
+    return (
+        isinstance(node, ast.Tuple)
+        and len(node.elts) == len(UNKNOWN_KEY_FIELDS)
+        and all(
+            _loads_attribute(part, field)
+            for part, field in zip(node.elts, UNKNOWN_KEY_FIELDS, strict=True)
+        )
+    )
+
+
 def _digests(node: ast.AST, read: str) -> bool:
     """A sha256 over the value of a ``read`` call: ``encode`` for a text,
     ``read_bytes`` for a file."""
@@ -1947,7 +1993,7 @@ ONE_READERS: dict[str, _OneReader] = {
         _marks_a_read_back,
         ("src/analysis_service/fact_answers.py", "_read_back"),
         {
-            ("src/analysis_service/fact_answers.py", "<module>"): (
+            ("src/analysis_service/fact_answers.py", MODULE_OWNER): (
                 "the context a read-back passes, which the stores write"
             ),
         },
@@ -1963,7 +2009,7 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: _is_constant(node, "unanswered"),
         ("src/analysis_service/fact_answers.py", "fact_status"),
         {
-            ("src/analysis_service/fact_answers.py", "<module>"): (
+            ("src/analysis_service/fact_answers.py", MODULE_OWNER): (
                 "the FactStatus type that declares the set of histories"
             ),
         },
@@ -2104,7 +2150,7 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: _loads(node, "S3_KEY_FILES"),
         ("src/analysis_service/s3_objects.py", "_key_pair"),
         {
-            ("src/analysis_service/objects.py", "<module>"): (
+            ("src/analysis_service/objects.py", MODULE_OWNER): (
                 "the s3 row names the key files as settings it reads, and the"
                 " settings that only the api_key mode reads"
             ),
@@ -2115,6 +2161,298 @@ ONE_READERS: dict[str, _OneReader] = {
             ("src/analysis_service/settings_variables.py", "secret_vars"): (
                 "it lists the key files among the settings that hold a secret,"
                 " and refuses nothing"
+            ),
+        },
+        "",
+    ),
+    "a case directory": _OneReader(
+        lambda node: _loads(node, "CASE_FILES"),
+        ("evals/harness/reference.py", "missing_case_files"),
+        {},
+        "",
+    ),
+    "whether a catalog passes": _OneReader(
+        lambda node: _calls(node, "catalog_issues"),
+        ("src/analysis_service/assertions.py", "over"),
+        {},
+        "",
+    ),
+    "which rows a record loses": _OneReader(
+        lambda node: _loads(node, "GATE_REFUSALS"),
+        ("src/analysis_service/assertions.py", "refusals"),
+        {},
+        "",
+    ),
+    "which proposed row a record loses": _OneReader(
+        lambda node: _loads_attribute(node, "proposed_row"),
+        ("src/analysis_service/assertions.py", "resolved"),
+        {
+            ("evals/harness/population.py", "population"): (
+                "it copies the proposed row of each refusal into a population"
+                " row, and decides no loss"
+            ),
+        },
+        "",
+    ),
+    "whether a catalog row is an answer": _OneReader(
+        _compares_an_origin,
+        ("src/analysis_service/assertions.py", "answered"),
+        {
+            ("src/analysis_service/validation.py", "_citation_issues"): (
+                "it reads whether an answer stated a capability statement, and"
+                " reads no catalog row"
+            ),
+        },
+        "",
+    ),
+    "which settled rows the Evidence Catalog carries": _OneReader(
+        lambda node: _loads(node, "SETTLING_REASONS"),
+        ("src/analysis_service/assertions.py", "offered"),
+        {
+            ("src/analysis_service/assertions.py", "catalog_coverage"): (
+                "it counts the attributes that the catalog settles for a"
+                " coverage figure, and chooses no row"
+            ),
+        },
+        "",
+    ),
+    "the band-and-units order": _OneReader(
+        lambda node: _loads_attribute(node, "framework_bands"),
+        ("src/analysis_service/early_questions.py", "standing"),
+        {
+            ("src/analysis_service/answer_state.py", "passes_floor"): (
+                "it lets a question past the floor of its kind by its band, and"
+                " orders nothing"
+            ),
+        },
+        "",
+    ),
+    "the facts a candidate reads": _OneReader(
+        lambda node: _loads(node, "ZONE_FACTS"),
+        ("src/analysis_service/early_questions.py", "reads"),
+        {},
+        "",
+    ),
+    "whether a selection reads capabilities": _OneReader(
+        lambda node: _calls(node, "capability_keys"),
+        ("src/analysis_service/frameworks/__init__.py", "reads_capabilities"),
+        {},
+        "",
+    ),
+    "a requirement's decision": _OneReader(
+        lambda node: _calls(node, "applicability_for"),
+        ("src/analysis_service/frameworks/asvs/record.py", "applicability"),
+        {
+            ("src/analysis_service/frameworks/asvs/record.py", "open_capabilities"): (
+                "it lists the capabilities whose answer would change a decision,"
+                " and decides no requirement"
+            ),
+        },
+        "",
+    ),
+    "the pieces of a cut quote": _OneReader(
+        lambda node: _loads(node, "_ELLIPSIS"),
+        ("src/analysis_service/grounding.py", "fragments"),
+        {
+            ("src/analysis_service/grounding.py", "_needle_of"): (
+                "it refuses a cut quote as the needle of a repair, and splits no quote"
+            ),
+        },
+        "",
+    ),
+    "which kind a fact is": _OneReader(
+        lambda node: _loads(node, "_KIND_ORDER"),
+        ("src/analysis_service/claims.py", "kind"),
+        {},
+        "",
+    ),
+    "the schema rule a model takes": _OneReader(
+        lambda node: _loads_attribute(node, "schema_rules"),
+        ("src/analysis_service/vendors.py", "schema_rule"),
+        {},
+        "",
+    ),
+    "a stray store setting": _OneReader(
+        lambda node: (
+            _calls(node, "startswith")
+            and bool(node.args)
+            and _loads(node.args[0], "prefixes")
+        ),
+        ("src/analysis_service/store_settings.py", "refuse_unread"),
+        {},
+        "",
+    ),
+    "the frameworks a job names": _OneReader(
+        lambda node: _calls(node, "NotCarried"),
+        ("src/analysis_service/selection.py", "resolve_names"),
+        {},
+        "",
+    ),
+    "a claim's channels": _OneReader(
+        lambda node: _loads_attribute(node, "siblings") and _loads(node.value, "flows"),
+        ("evals/harness/identity.py", "channels"),
+        {},
+        "",
+    ),
+    "what an extraction loss lacked": _OneReader(
+        lambda node: _loads_attribute(node, "extraction_read"),
+        ("evals/harness/extraction_losses.py", "lacked"),
+        {
+            ("evals/harness/extraction_losses.py", "extraction_contributed"): (
+                "it reads a downstream loss, which lacked does not read, and"
+                " charges extraction beside the lanes"
+            ),
+        },
+        "",
+    ),
+    "the tier of each graph node": _OneReader(
+        _merges_the_shared_tier_nodes,
+        ("src/analysis_service/graph.py", "tier_node_by_graph_node"),
+        {},
+        "",
+    ),
+    "whether a case is read": _OneReader(
+        _tests_truth_of(lambda node: _calls(node, "waiting")),
+        ("evals/review_submission.py", "unreviewed_cases"),
+        {},
+        "",
+    ),
+    "what a job asks about": _OneReader(
+        lambda node: _calls(node, "checkpoint"),
+        ("src/analysis_service/job_answers.py", "answerable"),
+        {},
+        "",
+    ),
+    "whether a job has ended": _OneReader(
+        _ends_a_job, ("src/analysis_service/jobs.py", "ended"), {}, ""
+    ),
+    "whether an attribute is open": _OneReader(
+        _opens_an_attribute,
+        ("src/analysis_service/open_facts.py", "open_attribute"),
+        {},
+        "",
+    ),
+    "which listed question a list may rank": _OneReader(
+        lambda node: _joins(node, "_open", "passes_floor"),
+        ("src/analysis_service/answer_state.py", "_rankable"),
+        {
+            ("src/analysis_service/answer_state.py", "question_set"): (
+                "it holds back the questions an undecided gate would ask, and"
+                " the open questions below the floor, which no list ranks"
+            ),
+        },
+        "",
+    ),
+    "what a proposal comes to": _OneReader(
+        lambda node: _calls(node, "_resolve"),
+        ("src/analysis_service/assertions.py", "resolved"),
+        {},
+        "",
+    ),
+    "the limits of an audit": _OneReader(
+        lambda node: (
+            isinstance(node, ast.Compare)
+            and any(_loads_attribute(part, "budget_usd") for part in ast.walk(node))
+        ),
+        ("evals/harness/audit.py", "admit"),
+        {},
+        "",
+    ),
+    "whether two references are the same": _OneReader(
+        _spells_an_unknown_key,
+        ("src/analysis_service/claims.py", "key"),
+        {},
+        "",
+    ),
+    "why a part of an owned job is missing": _OneReader(
+        lambda node: _calls(node, "JobDataMissing"),
+        ("src/analysis_service/job_answers.py", "missing"),
+        {},
+        "",
+    ),
+    "which subjects a catalog names": _OneReader(
+        lambda node: (
+            isinstance(node, ast.AugAssign)
+            and isinstance(node.op, ast.Sub)
+            and _loads(node.value, "UNIVERSAL_TERMS")
+        ),
+        ("src/analysis_service/assertions.py", "subjects_of"),
+        {},
+        "",
+    ),
+    "a config path": _OneReader(
+        lambda node: (
+            _calls(node, "Path") and bool(node.args) and _calls(node.args[0], "strip")
+        ),
+        ("src/analysis_service/deployment.py", "config_path"),
+        {},
+        "",
+    ),
+    "a Report's rows": _OneReader(
+        lambda node: _calls(node, "row_controls"),
+        ("src/analysis_service/claim_identity.py", "report_rows"),
+        {
+            ("src/analysis_service/fixes.py", "absent_rows"): (
+                "it holds a catalog and no Report, so it reads the row controls"
+                " of the catalog itself"
+            ),
+        },
+        "",
+    ),
+    "which control a row is about": _OneReader(
+        lambda node: (
+            isinstance(node, ast.DictComp)
+            and _calls(node.key, "assertion_id")
+            and any(_loads(part, "REGISTRY") for part in ast.walk(node))
+        ),
+        ("src/analysis_service/claim_identity.py", "row_controls"),
+        {},
+        "",
+    ),
+    "whether a report may be served": _OneReader(
+        lambda node: _calls(node, "NotCompleted"),
+        ("src/analysis_service/job_answers.py", "servable"),
+        {},
+        "",
+    ),
+    "a closed setting": _OneReader(
+        lambda node: (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and "unknown value for " in node.value
+        ),
+        ("src/analysis_service/store_settings.py", "closed_setting"),
+        {},
+        "",
+    ),
+    "the app's store defaults": _OneReader(
+        lambda node: _calls(node, "_default_database"),
+        ("webapp/settings_view.py", "store_defaults"),
+        {
+            ("webapp/settings_view.py", "build_app_store"): (
+                "it asks whether the store sits at the default database, to make"
+                " its directory, and sets no default"
+            ),
+        },
+        "",
+    ),
+    "how a Baseline's models read": _OneReader(
+        lambda node: _is_constant(node, " unpinned"),
+        ("evals/harness/comparison.py", "models_phrase"),
+        {},
+        "",
+    ),
+    "why a finding is still conditional": _OneReader(
+        lambda node: _calls(node, "waits_on"),
+        ("src/analysis_service/report_conditions.py", "conditions"),
+        {
+            ("src/analysis_service/report_conditions.py", "rests_on"): (
+                "it asks whether a claim rests on a corrected fact, and writes"
+                " no condition"
+            ),
+            ("src/analysis_service/questions.py", "follow_up_needs"): (
+                "it lists the open facts a draft waits on as questions to ask,"
+                " and writes no condition"
             ),
         },
         "",

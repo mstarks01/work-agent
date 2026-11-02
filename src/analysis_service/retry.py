@@ -519,8 +519,8 @@ def classify(exc: BaseException) -> ProviderFailure:
     """One provider failure as a value, read off the exception exactly once.
 
     The single place this module turns a third party's object into facts. Every
-    other reader takes the :class:`ProviderFailure`, so the rules keep the one
-    reader each that they have, and a caller on the far side of a process
+    other reader takes the :class:`ProviderFailure`, so each rule keeps its own
+    reader, and a caller on the far side of a process
     boundary gets the same answer without the object.
     """
     retryable = _is_transient(exc)

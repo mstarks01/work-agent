@@ -162,8 +162,8 @@ ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
 #: default (ADR 0087); a non-empty value other than an affirmative turns it
 #: off, and an unset or empty variable keeps the default.
 CAPABILITY_READER_VAR = "ANALYSIS_CAPABILITY_READER"
-#: Each optional pass, by its variable, with its default. The one reader of the
-#: defaults: :meth:`Deployment.from_env`, the Settings page and the doc test of
+#: Each optional pass, by its variable, with its default.
+#: :meth:`Deployment.from_env`, the Settings page and the doc test of
 #: the "Optional passes" table in ``Configuration.md`` read it (ADR 0091).
 PASS_FLAGS: dict[str, bool] = {
     ASSERTIONS_VAR: True,

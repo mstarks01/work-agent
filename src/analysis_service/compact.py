@@ -63,8 +63,8 @@ Three properties make the expansion safe to put in front of the gate:
 - **A provisional ID is unmistakable.** The adapter does not derive element IDs.
   It writes ``ref_process:<ref>`` — a prefix no element class declares, so a
   provisional ID can never equal a derived one — and lets
-  :func:`~analysis_service.system_model.normalize_element_ids`, the one reader
-  of the ID rule, overwrite it and follow every reference. Deriving here would
+  :func:`~analysis_service.system_model.normalize_element_ids`, which applies
+  the ID rule, overwrite it and follow every reference. Deriving here would
   be a second reader of that rule, and it would re-impose the 300-character
   ``id`` bound on a value the full route never re-checks.
 - **An unresolved ref survives as itself.** A ref that names no element, and

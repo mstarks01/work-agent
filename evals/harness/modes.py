@@ -499,7 +499,7 @@ class ExtractionScore:
     crossings_match: bool
     attributes: tuple[AttributeCheck, ...]
     #: Which produced element stands for which blessed one, and on what
-    #: evidence — :mod:`evals.harness.alignment` is the one reader of that
+    #: evidence — :mod:`evals.harness.alignment` answers that
     #: question, and every figure below that asks it reads this. ``matched``,
     #: ``missing`` and ``extra`` are the strict reading by exact ID, kept beside
     #: it so no archived number changes meaning.
@@ -1654,8 +1654,9 @@ async def run_assertions(case: GoldenCase, pipeline: Pipeline) -> AssertionResul
     state = graph_run.final_state
     if STATE_ASSERTION_PROPOSAL not in state:
         raise EvalRunError(f"{case.id}: assert produced no assertions")
-    # Resolved and gated through the one reader production's ``prepare`` node
-    # uses, so a sweep grades the catalog a job would have read.
+    # Resolved and gated through :meth:`AssertionRecord.of`, the call that
+    # production's ``prepare`` node makes, so a sweep grades the catalog a job
+    # would have read.
     record = AssertionRecord.of(
         CatalogProposal.model_validate(state[STATE_ASSERTION_PROPOSAL]),
         case.model,
@@ -2459,7 +2460,7 @@ def _report_of(
     """
     now = datetime.now(UTC)
     try:
-        # The terminal shape first, through the one reader of it. A refused
+        # The terminal shape first, through :func:`result_of`. A refused
         # model reached no fan-in, so reading the drafts first would name the
         # rejection as a framework the graph never reached.
         outcome = result_of(graph_run.final_state)

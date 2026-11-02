@@ -4,7 +4,9 @@
 state, in the shape the assertion node proposes: a subject, a predicate, a
 value, a scope, a basis and the quotes that carry it. :func:`reference_catalog`
 resolves those rows through :meth:`analysis_service.assertions.AssertionRecord.of`,
-the one reader of what a proposed row means, so a reference row is held to
+which reads them through
+:meth:`analysis_service.assertions.AssertionRecord.resolved`, the one reader of
+what a proposed row means, so a reference row is held to
 every rule a produced row is — its quote is located in the source, its subject
 snaps to the blessed model, its value is one the predicate admits — and a row
 the gate would refuse is a corpus error rather than a reference.
@@ -323,13 +325,10 @@ def reference_catalog(
 ) -> AssertionCatalog:
     """The rows resolved against the case's own blessed model and sources.
 
-    Through :meth:`~analysis_service.assertions.AssertionRecord.of`, which is
-    the one reader of what a proposal comes to: the production ``prepare``
-    node, the assertion eval mode and the offline replay all ask it, and a
-    reference row that would not survive as a produced row cannot stand as a
-    reference. This asked the resolver and the gate itself until a checkpoint
-    round found the two steps spelled here as well, where a third step added
-    to that rule would have reached production and missed the corpus.
+    Through :meth:`~analysis_service.assertions.AssertionRecord.of`, which
+    reads it through :meth:`~analysis_service.assertions.AssertionRecord.resolved`,
+    the one reader of what a proposal comes to, so a reference row that would
+    not survive as a produced row cannot stand as a reference.
 
     Any refusal — a quote the source does not carry, a subject the model does
     not hold, a value the predicate does not admit — is a corpus error here,

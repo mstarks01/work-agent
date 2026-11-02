@@ -190,7 +190,7 @@ class _ReportedCharge:
 
     ``covers_whole_call`` is the whole of it, and it is what decides whether the
     figure may be recorded as what a call cost.
-    :func:`analysis_service.charges.records_reported_charge` is the one reader.
+    :func:`analysis_service.charges.records_reported_charge` reads it.
 
     A ``False`` here is not a smaller number to record with a note beside it. It
     is a number that answers a different question from the one the field asks,
@@ -216,7 +216,7 @@ class _UpstreamPin:
     Three field names in the request body, because a gateway spells them its
     own way: ``field`` is the routing object, ``only`` its allowlist, and
     ``fallbacks`` the flag that would let the gateway leave the list when every
-    named upstream is busy. :meth:`Vendor.upstream_kwargs` is the one reader,
+    named upstream is busy. :meth:`Vendor.upstream_kwargs` reads it,
     and it always sets the flag off: a pin the gateway may abandon is not a
     pin, and the served upstream is what a **Baseline** is named after.
     """

@@ -1,7 +1,7 @@
 """The vote ledger: what a person decided about a finding, kept forever.
 
-This is the only place in the repository where a human judgement is the datum.
-Everything else under ``evals/`` is agent-authored, and ``evals/README.md`` says
+The ledger records a human judgement as the datum. Everything else under
+``evals/`` is agent-authored, and ``evals/README.md`` says
 so once for the whole directory. This is the directory that changes that, one
 line at a time.
 

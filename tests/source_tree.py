@@ -16,7 +16,10 @@ here judges a file; each lint keeps its own predicates and declarations.
 from __future__ import annotations
 
 import ast
+import io
 import os
+import re
+import tokenize
 from collections.abc import Iterable, Mapping
 from functools import cache
 from pathlib import Path
@@ -183,6 +186,96 @@ def module_name(path: Path) -> str:
     if parts[-1] == "__init__":
         parts = parts[:-1]
     return ".".join(parts)
+
+
+#: The statements that define a name.
+DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+
+def joined_runs(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    """Consecutive numbered lines joined into one text, at its first line."""
+    runs: list[tuple[int, str]] = []
+    for lineno, text in lines:
+        if runs and lineno == runs[-1][0] + runs[-1][1].count("\n") + 1:
+            runs[-1] = (runs[-1][0], f"{runs[-1][1]}\n{text}")
+        else:
+            runs.append((lineno, text))
+    return runs
+
+
+def comment_runs(path: Path) -> list[tuple[int, str]]:
+    """Each run of comment lines in the Python file at ``path``, joined into
+    one text without its ``#`` marks, at its first line."""
+    source = path.read_text(encoding="utf-8")
+    comments = [
+        (token.start[0], token.string.lstrip("#").strip())
+        for token in tokenize.generate_tokens(io.StringIO(source).readline)
+        if token.type == tokenize.COMMENT
+    ]
+    return joined_runs(comments)
+
+
+def trailing_comment(line: str, marker: str) -> str | None:
+    """The comment that ends a line of code, or None.
+
+    A comment starts at ``marker`` after a space, outside any quote: the text
+    before it holds an even count of each quote character. A quote that a
+    comment does not close, such as an apostrophe in a plain YAML value, hides
+    the comment, so the reader misses a comment rather than reads a string.
+    """
+    start = line.find(f" {marker}")
+    while start != -1:
+        before = line[:start]
+        if all(before.count(quote) % 2 == 0 for quote in "\"'`"):
+            return line[start + 1 + len(marker) :].strip()
+        start = line.find(f" {marker}", start + 1)
+    return None
+
+
+def line_comments(path: Path, marker: str) -> list[tuple[int, str]]:
+    """Every run of full-line ``marker`` comments in one file, and every comment
+    that ends a line of code, at its line."""
+    full: list[tuple[int, str]] = []
+    trailing: list[tuple[int, str]] = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if line.lstrip().startswith(marker):
+            full.append((lineno, line.strip().removeprefix(marker).strip()))
+        elif (comment := trailing_comment(line, marker)) is not None:
+            trailing.append((lineno, comment))
+    return joined_runs(full) + trailing
+
+
+_BLOCK_COMMENT = re.compile(r"/\*(.*?)\*/|<!--(.*?)-->", re.DOTALL)
+
+
+def block_comments(path: Path) -> list[tuple[int, str]]:
+    """Every ``/* */`` and ``<!-- -->`` comment in one script, page or style
+    sheet, at its first line."""
+    source = path.read_text(encoding="utf-8")
+    return [
+        (
+            source.count("\n", 0, block.start()) + 1,
+            "\n".join(
+                line.strip().removeprefix("*").strip()
+                for line in block.group(block.lastindex or 0).splitlines()
+            ),
+        )
+        for block in _BLOCK_COMMENT.finditer(source)
+    ]
+
+
+def imports(tree: ast.Module) -> dict[str, str]:
+    """Each local name an import in ``tree`` binds, with its dotted target."""
+    bound: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                head = alias.name.split(".")[0]
+                bound[alias.asname or head] = alias.name if alias.asname else head
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                bound[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    return bound
 
 
 @cache

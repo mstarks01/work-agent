@@ -36,7 +36,12 @@ from analysis_service.fact_answers import (
 )
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES
-from analysis_service.jobs import Checkpoint, PipelineAwaiting, PipelineCompleted
+from analysis_service.jobs import (
+    Checkpoint,
+    InMemoryJobStore,
+    PipelineAwaiting,
+    PipelineCompleted,
+)
 from analysis_service.links import NONE_OF_THESE, LinkAnswer, fold_principal
 from analysis_service.open_facts import group_of
 from analysis_service.question_kinds import QUESTION_KINDS
@@ -1636,7 +1641,7 @@ def _bounded(tiers, runner, max_jobs: int) -> TestClient:
     """A client over a workspace that holds at most ``max_jobs`` jobs."""
     from webapp.main import Workspace
 
-    workspace = Workspace(max_jobs=max_jobs)
+    workspace = Workspace(store=InMemoryJobStore(), max_jobs=max_jobs)
     return TestClient(
         app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
     )
@@ -1781,7 +1786,7 @@ def test_the_run_an_answer_continues_is_never_deleted_for_it(tiers):
     from webapp.main import Workspace
 
     runner = PausingRunner(catalog=False)
-    workspace = Workspace(max_jobs=2)
+    workspace = Workspace(store=InMemoryJobStore(), max_jobs=2)
     with TestClient(
         app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
     ) as client:
@@ -4834,7 +4839,7 @@ def test_a_withheld_pause_ends_its_stream_with_a_frame_the_page_reads(
     from webapp.main import Workspace
 
     runner = PausingRunner(catalog=False)
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     with TestClient(
         app_for(tiers, runner, catalog=False, workspace=workspace), base_url=LOOPBACK
     ) as client:
@@ -4855,7 +4860,7 @@ def test_a_held_run_without_its_sources_reads_as_this_service_s_defect(
     sources are gone is a logged 500, never a 404 that reads as a deleted run."""
     from webapp.main import Workspace
 
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     with TestClient(
         app_for(tiers, runner, workspace=workspace), base_url=LOOPBACK
     ) as client:

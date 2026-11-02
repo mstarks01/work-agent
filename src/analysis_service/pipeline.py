@@ -103,7 +103,7 @@ class AdkPipelineRunner:
         *,
         session_service: BaseSessionService | None = None,
         app_name: str = DEFAULT_APP_NAME,
-        certification: CertificationGate | None = None,
+        certification: CertificationGate | None,
     ) -> None:
         self._pipeline = pipeline
         self._certification = certification

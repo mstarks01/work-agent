@@ -6,6 +6,7 @@ import logging
 import pytest
 from fastapi.testclient import TestClient
 
+from analysis_service.jobs import InMemoryJobStore
 from analysis_service.sources import MAX_SYSTEM_NAME_CHARS
 from tests import test_webapp_questions as web
 from tests.test_webapp import BREAKOUT, LOOPBACK, SAME_ORIGIN, posted
@@ -111,7 +112,7 @@ TITLE = "My orders board"
 def _workspace_client(tiers, runner=None):
     from webapp.main import Workspace
 
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     runner = web.PausingRunner() if runner is None else runner
     client = TestClient(
         web.app_for(tiers, runner, workspace=workspace), base_url=LOOPBACK
@@ -430,7 +431,6 @@ class AdmitsAChildOnDelete:
 def test_a_child_started_during_the_delete_keeps_the_analysis(tiers):
     """The store keeps a parent whose child is in flight (ADR 0107), so the
     route answers 409 and the analysis stays whole."""
-    from analysis_service.jobs import InMemoryJobStore
     from webapp.main import Workspace
 
     store = AdmitsAChildOnDelete(InMemoryJobStore())
@@ -470,7 +470,6 @@ class RefusesTheSecondDelete:
 
 def test_a_refusal_partway_names_the_jobs_the_route_deleted(tiers):
     """The jobs deleted before a refusal stay deleted, and the 409 names them."""
-    from analysis_service.jobs import InMemoryJobStore
     from webapp.main import Workspace
 
     store = RefusesTheSecondDelete(InMemoryJobStore())

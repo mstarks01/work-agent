@@ -636,7 +636,7 @@ class TestTheBound:
         assert listed == {oldest, newest, started.json()["run"]}
 
     def test_each_delete_writes_the_line_with_the_cause_workspace(self, tiers, caplog):
-        workspace = Workspace(max_jobs=1)
+        workspace = Workspace(store=InMemoryJobStore(), max_jobs=1)
         client = TestClient(
             create_app(startup_for(tiers), workspace), base_url=LOOPBACK
         )

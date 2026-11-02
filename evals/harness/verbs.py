@@ -9,9 +9,8 @@ records what the rule cannot do.
 The figures are measured rather than asserted, over the whole corpus, and
 all 285 reference claims carry a verb. ``tests/test_evals_identity.py``'s
 ``FRONTIER`` prices the rule on every error at once, and the frontier table in
-``docs/agents/claim-identity.md`` carries every row of it. That table is also
-the one reader of the reference-merge column, which this module therefore
-states nowhere.
+``docs/agents/claim-identity.md`` carries every row of it. That table also
+holds the reference-merge column, so this module does not state it.
 
 Against ``endpoint subset`` alone, the verb moves the two columns below.
 It takes the false merges from 69 to 2 over 92 candidate negatives.

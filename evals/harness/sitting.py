@@ -496,7 +496,7 @@ def rail(
     """Every case in the corpus, in corpus order, with the status a reader reads.
 
     ``signatures`` says who cleared each case, from
-    :func:`evals.review_submission.rail_signatures` — the one reader of
+    :func:`evals.review_submission.rail_signatures`, which answers
     that question. It is passed in rather than read here because a submission
     is a merged file rather than a fact about a case directory, and this
     module is what a submission is validated against.
