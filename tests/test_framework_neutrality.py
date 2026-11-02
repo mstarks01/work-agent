@@ -160,6 +160,10 @@ DECLARED: dict[str, str] = {
         " capability reader. A package whose units carry none reads no"
         " capability, so a stated capability settles nothing in it."
     ),
+    "evals/experiments/QA-2026-11-02-05/read_capabilities_v2.py": (
+        "This code is that framework's: it reads the same decisions as"
+        " `read_capabilities.py`, and it is the script that made the E4 calls."
+    ),
     "evals/experiments/QA-2026-11-02-05/read_capabilities_v1.py": (
         "This code is that framework's: it reads the same decisions as"
         " `read_capabilities.py`, through an earlier form of the request."

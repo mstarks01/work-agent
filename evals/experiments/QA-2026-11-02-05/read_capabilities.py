@@ -73,15 +73,18 @@ async def request_for(case_dir: Path) -> tuple[str, Any]:
 
 
 #: The files that decide the instruction and the turn: the graph's gate and
-#: node wiring, the request builder, the prompt, its table and the rendering.
+#: node wiring, the request builder, the prompt, its loader, its table, the
+#: rendering, and the lock file that pins ADK's state injection.
 REQUEST_INPUTS = (
     "src/analysis_service/graph.py",
     "src/analysis_service/node_requests.py",
     "src/analysis_service/prompts.py",
+    "src/analysis_service/markdown_loader.py",
     "src/analysis_service/capabilities.py",
     "src/analysis_service/execution.py",
     "src/analysis_service/sources.py",
     "prompts/capabilities.md",
+    "uv.lock",
 )
 
 

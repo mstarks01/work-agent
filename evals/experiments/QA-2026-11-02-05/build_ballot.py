@@ -6,14 +6,15 @@ order with a fixed seed. A row does not name its run: its ``group`` is a letter
 given to the run in a second shuffled order, and ``ballot-key.json`` maps each
 row to its run.
 
-Each check has a closed set of verdicts, in ``VERDICTS``. A spoofing draft that
+Each check has a closed set of verdicts, in ``VERDICTS``. For E2, a draft that
 repeats another row of the same group in attacker, failed control and fix at
 one place takes the verdict ``duplicate`` and names that row in
-``duplicate_of``. Two groups are two runs, and a repeat across them is
-expected.
+``duplicate_of``; a ``right`` draft whose flow also holds a ``right`` row of the
+same group that impersonates the other end names that row in ``pair_of``. Two
+groups are two runs, and a repeat across them is expected.
 
-Usage, from the repository root: ``build_ballot.py``. The returned ballot is
-read by hand into each row's outcome with ``run.py experiments --record``.
+Usage, from the repository root: ``build_ballot.py``. ``read_ballot.py`` reads
+the returned file.
 """
 
 import csv
@@ -44,18 +45,22 @@ VERDICTS: Mapping[Check, tuple[Verdict, ...]] = {
     "item4-no-read-control": ("yes", "no", "unsure"),
 }
 
-#: The runs and the stores each E3 check rules: the targets of references 6
-#: and 7, the database of reference 13/11, and the store no component reads.
-STORES: Mapping[Check, tuple[str, frozenset[str]]] = {
+#: Each check's runs and, where it rules only some drafts, the stores they
+#: must touch: the targets of references 6 and 7, the database of reference
+#: 13/11, and the store no component reads. ``None`` rules every draft.
+DRAFTS: Mapping[Check, tuple[str, frozenset[str] | None]] = {
     "item4": (
         "item4-05-p*.json",
         frozenset({"store:worker-config", "store:web-application-config"}),
     ),
     "item4-copy-control": ("item4-13-p*.json", frozenset({"store:dispatch-database"})),
     "item4-no-read-control": ("item4-04-p*.json", frozenset({"store:inference-log"})),
+    "item2": ("item2-*-p*.json", None),
 }
 
-(_NO_READ_STORE,) = STORES["item4-no-read-control"][1]
+_NO_READ = DRAFTS["item4-no-read-control"][1]
+assert _NO_READ is not None
+(_NO_READ_STORE,) = _NO_READ
 
 QUESTIONS: Mapping[Check, str] = {
     "item4": (
@@ -76,9 +81,28 @@ QUESTIONS: Mapping[Check, str] = {
     "item2": (
         "Is this spoofing threat right for the source? duplicate: it repeats"
         " another row of the same group in attacker, failed control and fix at"
-        " the same place; name that row in duplicate_of."
+        " the same place; name that row in duplicate_of. If it is right and"
+        " another right row of the same group at the same flow impersonates the"
+        " other end, name that row in pair_of."
     ),
 }
+
+COLUMNS = (
+    "n",
+    "check",
+    "group",
+    "case",
+    "title",
+    "description",
+    "elements",
+    "mitigations",
+    "question",
+    "verdicts",
+    "verdict",
+    "duplicate_of",
+    "pair_of",
+    "note",
+)
 
 
 def _runs(pattern: str) -> list[tuple[str, dict]]:
@@ -91,16 +115,12 @@ def _runs(pattern: str) -> list[tuple[str, dict]]:
 def drafts() -> list[tuple[Check, str, str, dict]]:
     """Each ruled draft with its check, its run and its case, shuffled."""
     rows: list[tuple[Check, str, str, dict]] = []
-    for check, (pattern, stores) in STORES.items():
+    for check, (pattern, stores) in DRAFTS.items():
         for run, output in _runs(pattern):
             case = output["record"]["table"]["case"]
             for claim in output["claims"]:
-                if stores & set(claim["affected_element_ids"]):
+                if stores is None or stores & set(claim["affected_element_ids"]):
                     rows.append((check, run, case, claim))
-    for run, output in _runs("item2-*-p*.json"):
-        case = output["record"]["table"]["case"]
-        for claim in output["claims"]:
-            rows.append(("item2", run, case, claim))
     random.Random(SEED).shuffle(rows)
     return rows
 
@@ -108,8 +128,10 @@ def drafts() -> list[tuple[Check, str, str, dict]]:
 def groups(runs: list[str]) -> dict[str, str]:
     """A letter for each run, in an order no reader can tie to the run."""
     order = sorted(set(runs))
+    if len(order) > len(string.ascii_uppercase):
+        raise ValueError(f"{len(order)} runs, and only 26 group letters")
     random.Random(SEED + 1).shuffle(order)
-    return dict(zip(order, string.ascii_uppercase, strict=False))
+    return dict(zip(order, string.ascii_uppercase[: len(order)], strict=True))
 
 
 def main() -> None:
@@ -118,23 +140,7 @@ def main() -> None:
     key = []
     with (HERE / "ballot-issued.csv").open("w", newline="") as out:
         writer = csv.writer(out)
-        writer.writerow(
-            [
-                "n",
-                "check",
-                "group",
-                "case",
-                "title",
-                "description",
-                "elements",
-                "mitigations",
-                "question",
-                "verdicts",
-                "verdict",
-                "duplicate_of",
-                "note",
-            ]
-        )
+        writer.writerow(COLUMNS)
         for n, (check, run, case, claim) in enumerate(rows, 1):
             writer.writerow(
                 [
@@ -150,6 +156,7 @@ def main() -> None:
                     ),
                     QUESTIONS[check],
                     "/".join(VERDICTS[check]),
+                    "",
                     "",
                     "",
                     "",
