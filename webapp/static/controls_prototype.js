@@ -368,26 +368,30 @@
   // The editor's four fieldsets, shared by the variants that edit in a form
   // or a dialog. Variant C edits inline with the same pieces.
   const editorScope = (draft) => {
-    const type = scopeTypes.find((row) => row.type === draft.scope.type);
-    const nameField = draft.scope.type === "application" ? null : h("div", {},
+    const named = draft.scope.type !== "application";
+    const nameField = named ? h("div", {},
       h("label", { class: "field-label", for: "scope-name" }, "Its name in your descriptions"),
       h("input", { type: "text", id: "scope-name", value: draft.scope.name, placeholder: "For example, Orders DB",
-        on: { input: (e) => { draft.scope.name = e.target.value; } } }),
-      h("p", { class: "hint" }, "A Control matches an element when the name is the same, letter for letter after case and punctuation. A similar name matches nothing."),
-      h("label", { class: "field-label" }, "Other names it goes by"),
+        on: { input: (e) => { draft.scope.name = e.target.value; } } })) : null;
+    const aliasField = named ? h("div", {},
+      h("label", { class: "field-label", for: "alias-input" }, "Other names it goes by"),
       h("div", { class: "aliases" },
         ...draft.scope.aliases.map((alias, i) => h("span", { class: "tag" }, alias, " ",
           h("button", { type: "button", class: "quiet", "aria-label": `Remove the alias ${alias}`, on: { click: () => { draft.scope.aliases.splice(i, 1); render(); } } }, "×"))),
-        h("input", { type: "text", id: "alias-input", placeholder: "Add an alias and press Enter", "aria-label": "Add an alias",
-          on: { keydown: (e) => { if (e.key === "Enter") { e.preventDefault(); const v = e.target.value.trim(); if (v) { draft.scope.aliases.push(v); render(); } } } } })));
+        h("input", { type: "text", id: "alias-input", placeholder: "Add an alias and press Enter",
+          on: { keydown: (e) => { if (e.key === "Enter") { e.preventDefault(); const v = e.target.value.trim(); if (v) { draft.scope.aliases.push(v); render(); } } } } }))) : null;
     return h("fieldset", {}, h("legend", {}, "What it protects"),
       h("div", { class: "line" },
         h("div", {},
           h("label", { class: "field-label", for: "scope-type" }, "Kind"),
           h("select", { id: "scope-type", on: { change: (e) => { draft.scope.type = e.target.value; draft.facts = []; render(); } } },
             ...scopeTypes.map((row) => h("option", { value: row.type, selected: row.type === draft.scope.type }, row.label)))),
-        nameField),
-      type && draft.scope.type === "boundary" ? h("p", { class: "hint" }, "A zone Control applies to each element the description places in that zone. The offer lists each one before the analysis runs.") : null);
+        nameField, aliasField),
+      h("p", { class: "hint" }, named
+        ? (draft.scope.type === "boundary"
+          ? "The name must match the zone letter for letter, after case and punctuation. The Control applies to each element the description places in it."
+          : "The name must match the element letter for letter, after case and punctuation. A similar name matches nothing.")
+        : "The Control applies to every element of each analysis."));
   };
 
   const editorFacts = (draft) => {
@@ -396,7 +400,7 @@
     let attribute = open[0] ?? "";
     let value = "";
     return h("fieldset", {}, h("legend", {}, "What it proves"),
-      h("p", { class: "hint" }, "Each fact answers a question the analysis would otherwise ask. A fact the description already states stands as stated, and the Control does not change it."),
+      h("p", { class: "hint" }, "Each fact answers a question the analysis would otherwise ask. A fact the description states stands."),
       h("ul", { class: "facts-list" }, ...draft.facts.map((fact, i) => h("li", {},
         h("span", { class: "u" }, h("b", {}, fact.attribute), ": ", fact.value, fact.detail ? h("span", { class: "sub" }, ` (${fact.detail})`) : null),
         h("button", { type: "button", class: "quiet", on: { click: () => { draft.facts.splice(i, 1); render(); } } }, "Remove")))),
@@ -416,7 +420,7 @@
       ...units[framework].units.map((u) => h("option", { value: u.id }, `${u.id} · ${u.name}`.slice(0, 90))));
     const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitSelect());
     return h("fieldset", {}, h("legend", {}, "What it covers"),
-      h("p", { class: "hint" }, "A row says this Control covers one unit of one framework. The analysis judges each row against its findings. A row that does not bear on its unit is refused with a reason."),
+      h("p", { class: "hint" }, "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses one that does not bear on its unit."),
       h("ul", { class: "rows-list" }, ...draft.rows.map((row, i) => h("li", {},
         h("span", { class: "u" }, unitText(row), " ", h("span", { class: "sub" }, `v${row.version}`)),
         h("button", { type: "button", class: "quiet", on: { click: () => { draft.rows.splice(i, 1); render(); } } }, "Remove")))),
@@ -431,7 +435,7 @@
   const editorEvidence = (draft) => {
     let cls = "config";
     return h("fieldset", {}, h("legend", {}, "Evidence"),
-      h("p", { class: "hint" }, "A file that shows the protection. It is not a source: the analysis quotes it beside a ruling and never reads it as a description. Say what kind of evidence it is."),
+      h("p", { class: "hint" }, "A file that shows the protection. The analysis quotes it beside a ruling and never reads it as a description."),
       h("ul", { class: "evidence-list" }, ...draft.evidence.map((file, i) => h("li", {},
         h("span", { class: "u" }, h("b", {}, file.name), " ", tag(CLASS_LABEL[file.class]), " ", h("span", { class: "sub" }, size(file.size))),
         h("button", { type: "button", class: "quiet", on: { click: () => { draft.evidence.splice(i, 1); render(); } } }, "Remove")))),
