@@ -185,10 +185,13 @@ class GcsObjectStore:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> GcsObjectStore:
+        mode = closed_setting(
+            env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, CREDENTIALS
+        )
         refuse_unread(
             env,
             ("ANALYSIS_OBJECT_",),
-            OBJECT_STORES["gcs"].reads,
+            OBJECT_STORES["gcs"].reads_in(mode),
             "the gcs object store",
         )
         bucket = env.get(OBJECT_BUCKET_VAR, "").strip()
@@ -196,9 +199,6 @@ class GcsObjectStore:
             raise StoreConfigError(f"set {OBJECT_BUCKET_VAR} for the gcs object store")
         if _BUCKET.fullmatch(bucket) is None:
             raise StoreConfigError(f"{OBJECT_BUCKET_VAR} must match {_BUCKET.pattern}")
-        mode = closed_setting(
-            env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, CREDENTIALS
-        )
         credentials = CREDENTIALS[mode](env)
         try:
             client = make_client(credentials)

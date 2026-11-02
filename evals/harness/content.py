@@ -57,7 +57,6 @@ are separate values.
 
 from __future__ import annotations
 
-import hashlib
 import re
 import unicodedata
 from collections.abc import Callable, Iterable
@@ -65,6 +64,7 @@ from typing import Any
 
 from analysis_service.claims import Claim, Ground, Mitigation, Severity, Verdict
 from analysis_service.parsing import ascii_int
+from analysis_service.sources import text_digest
 
 #: The version of the structural digest this build computes.
 STRUCTURAL_VERSION = 1
@@ -189,9 +189,7 @@ def _digest(prefix: str, version: int, parts: Iterable[str]) -> str:
     # NUL joins the parts for the reason it joins a fingerprint's: it occurs in
     # none of them, so no value can impersonate a boundary between two others.
     joined = "\0".join(parts)
-    return (
-        f"{prefix}{version}:{hashlib.sha256(joined.encode('utf-8')).hexdigest()[:16]}"
-    )
+    return f"{prefix}{version}:{text_digest(joined)[:16]}"
 
 
 #: How long a version segment may be. Two digits is past every version a

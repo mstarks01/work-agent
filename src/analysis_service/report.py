@@ -22,7 +22,6 @@ resolves inside one payload.
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Annotated, Any, Literal, Self
@@ -752,7 +751,7 @@ class InputRef(BaseModel):
         digests merely concatenate to the same string do not collide.
         """
         joined = "\n".join(f"{ref.kind}\x1f{ref.label}\x1f{ref.sha256}" for ref in refs)
-        return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+        return text_digest(joined)
 
     @classmethod
     def of(cls, *, system_name: str, sources: Sequence[Source]) -> Self:

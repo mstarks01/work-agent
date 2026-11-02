@@ -40,6 +40,7 @@ it would quietly lower the recall denominator.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -567,6 +568,15 @@ class ReadRecord(BaseModel):
 
     file: str = Field(min_length=1, max_length=200, pattern=CORPUS_RELATIVE_PATH)
     sha256: Sha256Hex
+
+
+def read_digest(path: Path) -> str:
+    """The digest a :class:`ReadRecord` pins: the sha256 of the file's bytes.
+
+    **The one reader of a read file's digest**: a sitting writes it, a reading
+    document prints it, and a later read compares against it.
+    """
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 #: What a sitting records when the person who read the case is not named.

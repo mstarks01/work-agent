@@ -28,7 +28,6 @@ reviewer never saw.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 from collections.abc import Mapping, Sequence
@@ -47,6 +46,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.evidence import prepared_view
 from analysis_service.reassess import ReviewerAssessment, reassess
+from analysis_service.sources import text_digest
 from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
 from evals.harness.artifact import corpus_digest, load_artifact
@@ -98,7 +98,7 @@ def catalog_digest(record: AssertionRecord) -> str:
     with another digest was written against rows this population never held.
     """
     body = json.dumps(record.catalog.model_dump(mode="json"), sort_keys=True)
-    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return text_digest(body)
 
 
 def population(

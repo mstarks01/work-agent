@@ -1800,6 +1800,12 @@ def _reads_a_cache_rule(node: ast.AST) -> bool:
     return _loads_attribute(node, "prompt_cache") or _calls(node, "accepts")
 
 
+def _digests(node: ast.AST, read: str) -> bool:
+    """A sha256 over the value of a ``read`` call: ``encode`` for a text,
+    ``read_bytes`` for a file."""
+    return _calls(node, "sha256") and bool(node.args) and _calls(node.args[0], read)
+
+
 @dataclasses.dataclass(frozen=True)
 class _OneReader:
     """A rule that one function reads.
@@ -2045,6 +2051,56 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: _loads(node, "_RESOURCE_FORMS"),
         ("src/analysis_service/vendors.py", "_resource_form"),
         {},
+        "",
+    ),
+    "a text's digest": _OneReader(
+        partial(_digests, read="encode"),
+        ("src/analysis_service/sources.py", "text_digest"),
+        {},
+        "",
+    ),
+    "a read file's digest": _OneReader(
+        partial(_digests, read="read_bytes"),
+        ("evals/harness/reference.py", "read_digest"),
+        {
+            ("evals/harness/artifact.py", "corpus_digest"): (
+                "it folds each corpus file and its path into one digest of the"
+                " corpus, and pins no read"
+            ),
+            ("evals/harness/baseline.py", "_file_digests"): (
+                "it seals the files of a Baseline, and the same function"
+                " recomputes the seal"
+            ),
+            ("evals/harness/run_record.py", "run_record"): (
+                "it records each input file of one command in its run record,"
+                " and pins no read"
+            ),
+        },
+        "",
+    ),
+    "the settings a credential mode reads": _OneReader(
+        lambda node: _loads_attribute(node, "mode_reads"),
+        ("src/analysis_service/objects.py", "reads_in"),
+        {},
+        "",
+    ),
+    "a key file of the s3 store": _OneReader(
+        lambda node: _loads(node, "S3_KEY_FILES"),
+        ("src/analysis_service/s3_objects.py", "_key_pair"),
+        {
+            ("src/analysis_service/objects.py", "<module>"): (
+                "the s3 row names the key files as settings it reads, and the"
+                " settings that only the api_key mode reads"
+            ),
+            ("src/analysis_service/s3_objects.py", "_credential_mode"): (
+                "it refuses a key set by its own name beside each key file, and"
+                " leaves a key file of another mode to refuse_unread"
+            ),
+            ("src/analysis_service/settings_variables.py", "secret_vars"): (
+                "it lists the key files among the settings that hold a secret,"
+                " and refuses nothing"
+            ),
+        },
         "",
     ),
 }

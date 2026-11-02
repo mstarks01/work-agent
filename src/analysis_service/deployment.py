@@ -380,7 +380,11 @@ class Deployment:
         registry instead of a sentence naming what went wrong.
 
         Order is the caller's and is preserved: it is the order the report's
-        blocks carry, and the envelope checks the two agree.
+        blocks carry, and the envelope checks the two agree. Each caller passes
+        a selection that :func:`~analysis_service.selection.resolve_selection`
+        put in the carried order (ADR 0102): a job record's, or an
+        :class:`~analysis_service.engine.Engine`'s. A resumed job keeps the
+        order of the job it resumes, so its graph is the one that job ran.
 
         Read through :func:`~analysis_service.selection.resolve_names`, the
         one reader of the name rule. This seam holds names and no options — a
