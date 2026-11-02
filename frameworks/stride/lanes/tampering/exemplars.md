@@ -1,6 +1,6 @@
 # Tampering Exemplars
 
-Three drafts against the exemplar system, showing the shape and the reasoning. Follow the reasoning, not the wording.
+Three drafts against the exemplar systems, showing the shape and the reasoning. Follow the reasoning, not the wording.
 
 ## Canonical: transfer instructions modified in flight
 

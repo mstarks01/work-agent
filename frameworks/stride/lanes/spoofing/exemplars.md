@@ -1,6 +1,6 @@
 # Spoofing Exemplars
 
-Five drafts against the exemplar system, showing the shape and the reasoning. The last one also shows a near-duplicate that is not a draft. Follow the reasoning, not the wording.
+Five drafts against the exemplar systems, showing the shape and the reasoning. The last one also shows a near-duplicate that is not a draft. Follow the reasoning, not the wording.
 
 ## Canonical: password-only customer identity
 
