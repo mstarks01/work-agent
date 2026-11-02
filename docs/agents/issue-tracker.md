@@ -55,8 +55,9 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** The last map, [#2057](https://github.com/mstarks01/work-agent/issues/2057), is under
-Completed maps. Chart a new one only against the bar at the end of this file.
+[#2111](https://github.com/mstarks01/work-agent/issues/2111) — **Controls**: an owner's durable record of a protection
+the system has, which writes facts before the lanes and names framework units the critic judges per finding.
+Charted 2026-11-02. The map branch is `docs/wayfinder-live-map-2111`.
 
 ### Completed maps
 
