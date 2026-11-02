@@ -52,7 +52,6 @@ from analysis_service.links import (
     with_link_answers,
 )
 from analysis_service.open_facts import open_attribute
-from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.questions import _by_band, fact_questions
 from analysis_service.report import Report
@@ -62,6 +61,7 @@ from analysis_service.system_model import ZONE_ATTRIBUTE, Assumption
 from tests import test_open_facts
 from tests.factories import (
     DESCRIPTION_TEXT,
+    adk_runner,
     sample_analysis,
     sample_selection,
     sample_threat,
@@ -445,9 +445,7 @@ class TestTheResumedRunWithoutACatalog:
         async def on_node(node: str) -> None:
             return None
 
-        outcome = asyncio.run(
-            AdkPipelineRunner(pipeline, certification=None).run(record, on_node)
-        )
+        outcome = asyncio.run(adk_runner(pipeline).run(record, on_node))
 
         assert isinstance(outcome, PipelineCompleted)
         assert outcome.report.system_model.data_flows[0].encryption_in_transit == (
@@ -559,9 +557,7 @@ def resume(checkpoint, facts=(), earlier=(), given=(DESCRIPTION,)):
     async def on_node(node: str) -> None:
         del node
 
-    outcome = asyncio.run(
-        AdkPipelineRunner(pipeline, certification=None).run(job, on_node)
-    )
+    outcome = asyncio.run(adk_runner(pipeline).run(job, on_node))
     assert isinstance(outcome, PipelineCompleted)
     return outcome.report
 
@@ -677,9 +673,7 @@ def resume_links(checkpoint, links, earlier=()):
     async def on_node(node: str) -> None:
         del node
 
-    outcome = asyncio.run(
-        AdkPipelineRunner(pipeline, certification=None).run(job, on_node)
-    )
+    outcome = asyncio.run(adk_runner(pipeline).run(job, on_node))
     assert isinstance(outcome, PipelineCompleted)
     return outcome.report
 

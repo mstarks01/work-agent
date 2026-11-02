@@ -33,6 +33,7 @@ from analysis_service.report import NodeRun
 from analysis_service.sources import Source
 from tests.factories import (
     DESCRIPTION_TEXT,
+    adk_runner,
     emitted,
     sample_selection,
     scripted_pipeline,
@@ -83,9 +84,7 @@ class TestThePausedRun:
         async def on_node(node: str) -> None:
             visited.append(node)
 
-        outcome = asyncio.run(
-            AdkPipelineRunner(pipeline, certification=None).run(record, on_node)
-        )
+        outcome = asyncio.run(adk_runner(pipeline).run(record, on_node))
 
         assert isinstance(outcome, PipelineAwaiting)
         assert outcome.checkpoint.system_model == graph.after_gate(valid_model())
@@ -106,9 +105,7 @@ class TestThePausedRun:
         async def on_node(node: str) -> None:
             visited.append(node)
 
-        outcome = asyncio.run(
-            AdkPipelineRunner(pipeline, certification=None).run(record, on_node)
-        )
+        outcome = asyncio.run(adk_runner(pipeline).run(record, on_node))
 
         assert isinstance(outcome, PipelineAwaiting)
         assert outcome.checkpoint.system_model == graph.after_gate(valid_model())

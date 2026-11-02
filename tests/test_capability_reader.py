@@ -23,7 +23,6 @@ from analysis_service.claims import ApplicabilityEntry, FrameworkName
 from analysis_service.frameworks import PACKAGES, reads_capabilities
 from analysis_service.jobs import JobRecord, PipelineAwaiting
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.prompts import compose_capabilities_prompt
 from analysis_service.report import FrameworkSelection
 from analysis_service.sources import ANSWERS_LABEL, DEFAULT_DESCRIPTION_LABEL, Source
@@ -31,6 +30,7 @@ from analysis_service.system_model import CapabilityStatement, SystemModel
 from tests.factories import (
     DESCRIPTION_TEXT,
     PROJECT_ROOT,
+    adk_runner,
     emitted,
     sample_selection,
     scripted_pipeline,
@@ -159,9 +159,7 @@ class TestTheGraph:
         async def on_node(node: str) -> None:
             visited.append(node)
 
-        outcome = asyncio.run(
-            AdkPipelineRunner(pipeline, certification=None).run(record, on_node)
-        )
+        outcome = asyncio.run(adk_runner(pipeline).run(record, on_node))
         return outcome, visited
 
     def test_a_paused_job_holds_the_capabilities_its_sources_state(self):

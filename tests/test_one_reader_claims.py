@@ -1,10 +1,10 @@
 """Each comment or docstring that claims a rule has one reader names its guard.
 
 A claim is a comment or a docstring in :data:`~tests.source_tree.PYTHON`, or in
-a page script there, that says "the one reader",
-"one reader of", "the only place" or "the single source". A claim is a
-promise that no second site applies the rule, and only a lint keeps that
-promise as the code moves. So the claim must name a symbol that a lint holds:
+a page script there, that says "the one reader", "one reader of", "the only
+place" or "the single source". A claim is a promise that no second site
+applies the rule, and only a lint keeps that promise as the code moves. So the
+claim must name a site that a lint holds:
 
 - the reader or another site of a row of
   :data:`~tests.test_one_reader_lints.ONE_READERS`;
@@ -14,11 +14,14 @@ promise as the code moves. So the claim must name a symbol that a lint holds:
   definition in the tree holds that name.
 
 A claim passes when its owner, in its own file, is such a site, or when it
-names the function of such a site in backticks on the claim's line, on the
-line before it or on the line after it. A claim names its reader on either
-side of its words. The owner of a comment is the
-definition or the assignment that starts on the next statement, and otherwise
-the function or the class that holds it. The owner of a docstring is the
+names such a site in backticks on the claim's line, on the line before it or
+on the line after it. A claim names its reader on either side of its words. A
+dotted name in backticks names a function of the module it starts with, read
+through the imports of the claim's file; a bare name names a function of the
+claim's own file. So a guard is a site, never a bare name.
+
+The owner of a comment is the definition or the assignment that starts on the
+next statement, and otherwise the function or the class that holds it. The owner of a docstring is the
 function or the class it documents, or the name it follows as an attribute
 docstring. A claim spans line breaks, so a claim wrapped across two lines is
 still found. "The one reader" followed by a verb in ``-ing`` describes a
@@ -46,6 +49,7 @@ from tests.source_tree import (
     PYTHON,
     REPO_ROOT,
     SHORTEST_REASON,
+    module_name,
     parse,
     source_files,
     without,
@@ -77,9 +81,9 @@ CLAIM = re.compile(
     re.IGNORECASE,
 )
 
-#: A symbol in backticks, as Sphinx or Markdown writes it: the last dotted
-#: part, without a leading ``~`` or trailing call parentheses.
-_TICKED = re.compile(r"`~?(?:[\w.]+\.)?(\w+)(?:\(\))?`")
+#: A symbol in backticks, as Sphinx or Markdown writes it: its dotted text,
+#: without a leading ``~`` or trailing call parentheses.
+_TICKED = re.compile(r"`~?([\w.]*\w)(?:\(\))?`")
 
 #: The statements that define a name a test can require.
 _DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
@@ -160,6 +164,7 @@ UNGUARDED_CLAIMS: dict[tuple[str, str], str] = dict.fromkeys(
         ("src/analysis_service/jobs.py", "execute_job"),
         ("src/analysis_service/jobs.py", "parent_of"),
         ("src/analysis_service/knowledge.py", "select_per_lane"),
+        ("src/analysis_service/links.py", "resumed_sources"),
         ("src/analysis_service/model_gate.py", "library_sends_no_native_schema"),
         ("src/analysis_service/model_gate.py", "schema_support"),
         ("src/analysis_service/model_gate.py", "takes_thinking"),
@@ -230,7 +235,7 @@ def _statements(tree: ast.Module) -> list[ast.stmt]:
 
 def _name_of(node: ast.stmt) -> str | None:
     """The name a definition or a one-name assignment binds."""
-    if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+    if isinstance(node, _DEFINITIONS):
         return node.name
     target = None
     if isinstance(node, ast.Assign) and len(node.targets) == 1:
@@ -245,7 +250,7 @@ def _holder(statements: list[ast.stmt], line: int, path: Path) -> str:
     holders = [
         node
         for node in statements
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
+        if isinstance(node, _DEFINITIONS)
         and node.lineno <= line <= (node.end_lineno or node.lineno)
     ]
     return holders[-1].name if holders else path.stem
@@ -397,11 +402,59 @@ def guarded_sites() -> frozenset[tuple[str, str]]:
     return frozenset(sites)
 
 
+@cache
+def _modules() -> dict[str, str]:
+    """The file of each module the lint reads, by its dotted name."""
+    return {
+        module_name(path): path.relative_to(REPO_ROOT).as_posix()
+        for path in FILES
+        if path.suffix == ".py"
+    }
+
+
+@cache
+def _imported(path: str) -> dict[str, str]:
+    """Each name that an import in the Python file ``path`` binds, with the
+    dotted name it reads. A file the lint does not read binds nothing."""
+    if path not in _modules().values():
+        return {}
+    bound = {}
+    for node in ast.walk(parse(REPO_ROOT / path)):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                bound[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                bound[alias.asname or alias.name] = alias.name
+    return bound
+
+
+def _site_of(reference: str, path: str) -> tuple[str, str]:
+    """The site that the backticked ``reference`` in the file ``path`` names.
+
+    A dotted reference names the function in the longest module it starts
+    with, read through the imports of ``path`` where its first part is an
+    imported name. A reference that starts with no module names a function in
+    ``path`` itself.
+    """
+    head, _, rest = reference.partition(".")
+    dotted = _imported(path).get(head, head) + (f".{rest}" if rest else "")
+    parts = dotted.split(".")
+    modules = _modules()
+    for end in range(len(parts) - 1, 0, -1):
+        module = ".".join(parts[:end])
+        if module in modules:
+            return modules[module], parts[-1]
+    return path, parts[-1]
+
+
 def guarded(claim: Claim) -> bool:
     """Whether ``claim``'s owner, in its own file, is a guarded site, or the
     claim names the function of a guarded site in backticks."""
     sites = guarded_sites()
-    return claim.key in sites or bool(claim.named & {name for _, name in sites})
+    return claim.key in sites or any(
+        _site_of(reference, claim.path) in sites for reference in claim.named
+    )
 
 
 def unguarded() -> list[Claim]:
@@ -461,9 +514,9 @@ def test_the_lint_reads_the_owner_and_the_named_symbol(tmp_path):
     """Positive and negative controls for the guard.
 
     A claim on an unheld function fails. A claim on a ``ONE_READERS`` reader
-    in the reader's own file passes, and so does a claim that names that
-    reader in backticks. A function with the reader's name in another file
-    fails: a guard is a site, never a bare name.
+    in the reader's own file passes, and so does a claim there that names
+    that reader in backticks. In another file, both fail: a guard is a site,
+    never a bare name.
     """
     place, reader = next(iter(ONE_READERS.values())).reader
     probe = tmp_path / "probe.py"
@@ -487,9 +540,7 @@ def test_the_lint_reads_the_owner_and_the_named_symbol(tmp_path):
         (8, reader),
     ]
     assert [guarded(claim) for claim in found] == [True, False, True]
-    assert sorted(claim.owner for claim in elsewhere if not guarded(claim)) == sorted(
-        ["unheld_probe_rule", reader]
-    )
+    assert not any(guarded(claim) for claim in elsewhere)
 
 
 def test_the_lint_reads_a_real_population():

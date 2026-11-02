@@ -1800,11 +1800,14 @@ def _reads_a_cache_rule(node: ast.AST) -> bool:
     return _loads_attribute(node, "prompt_cache") or _calls(node, "accepts")
 
 
+def _calls_each(node: ast.AST, *names: str) -> bool:
+    """Whether ``node`` holds a call of each of ``names``."""
+    return all(any(_calls(part, name) for part in ast.walk(node)) for name in names)
+
+
 def _joins(node: ast.AST, *names: str) -> bool:
     """A boolean expression that calls each of ``names``."""
-    return isinstance(node, ast.BoolOp) and all(
-        any(_calls(part, name) for part in ast.walk(node)) for name in names
-    )
+    return isinstance(node, ast.BoolOp) and _calls_each(node, *names)
 
 
 def _compares_an_origin(node: ast.AST) -> bool:
@@ -1815,18 +1818,15 @@ def _compares_an_origin(node: ast.AST) -> bool:
 
 def _ends_a_job(node: ast.AST) -> bool:
     """A boolean expression that asks both halves of an ended job."""
-    return (
-        isinstance(node, ast.BoolOp)
-        and any(_calls(part, "readable") for part in ast.walk(node))
-        and any(_loads(part, "TERMINAL_STATUSES") for part in ast.walk(node))
+    return _joins(node, "readable") and any(
+        _loads(part, "TERMINAL_STATUSES") for part in ast.walk(node)
     )
 
 
 def _opens_an_attribute(node: ast.AST) -> bool:
     """A function that asks both ways an attribute stays open."""
-    return isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and all(
-        any(_calls(part, name) for part in ast.walk(node))
-        for name in ("control_state", "assumed_zone_elements")
+    return isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and _calls_each(
+        node, "control_state", "assumed_zone_elements"
     )
 
 
@@ -2371,6 +2371,27 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: _calls(node, "JobDataMissing"),
         ("src/analysis_service/job_answers.py", "missing"),
         {},
+        "",
+    ),
+    "how a Baseline's models read": _OneReader(
+        lambda node: _is_constant(node, " unpinned"),
+        ("evals/harness/comparison.py", "models_phrase"),
+        {},
+        "",
+    ),
+    "why a finding is still conditional": _OneReader(
+        lambda node: _calls(node, "waits_on"),
+        ("src/analysis_service/report_conditions.py", "conditions"),
+        {
+            ("src/analysis_service/report_conditions.py", "rests_on"): (
+                "it asks whether a claim rests on a corrected fact, and writes"
+                " no condition"
+            ),
+            ("src/analysis_service/questions.py", "follow_up_needs"): (
+                "it lists the open facts a draft waits on as questions to ask,"
+                " and writes no condition"
+            ),
+        },
         "",
     ),
 }
