@@ -1,0 +1,9 @@
+material from today's prepare, catalog signed; prompt files from 53ab865734b686cb35ec04d8c23e91067ecf26be
+- An on-path attacker can impersonate the CDN to asset readers | ['entity:reader', 'entity:cdn', 'flow:entity:reader>entity:cdn>asset-fetch']
+- A fake database endpoint can deceive the direct administrator | ['entity:admin', 'store:mysql-database', 'flow:entity:admin>store:mysql-database>direct-administration']
+- An attacker can administer MySQL as the admin if caller authentication is not verified | ['entity:admin', 'store:mysql-database', 'flow:entity:admin>store:mysql-database>direct-administration']
+- An attacker can publish assets as the web server if the CDN bucket does not verify the publisher | ['process:web-server', 'store:cdn-bucket', 'flow:process:web-server>store:cdn-bucket>asset-publish']
+- A fake CDN bucket can receive web-server asset publications if server authenticity is unverified | ['process:web-server', 'store:cdn-bucket', 'flow:process:web-server>store:cdn-bucket>asset-publish']
+- A fake MySQL endpoint can deceive the web server if database server authenticity is unverified | ['process:web-server', 'store:mysql-database', 'flow:process:web-server>store:mysql-database>cms-data']
+spent: $0.0555 reported
+must-finds matched: [1]

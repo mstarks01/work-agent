@@ -100,6 +100,11 @@ KEPT_DEFAULTS: dict[tuple[str, str, str], str] = {
         "ExecutedLlm.generate_content_async",
         "stream",
     ): _ADK_OVERRIDE,
+    (
+        "evals.experiments.QA-2026-11-02-05.capture_turn",
+        "Recording.generate_content_async",
+        "stream",
+    ): _ADK_OVERRIDE,
     ("evals.harness.modes", "SignedFactsLlm.generate_content_async", "stream"): (
         _ADK_OVERRIDE
     ),
