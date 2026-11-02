@@ -15,7 +15,7 @@ import dataclasses
 import importlib
 import re
 from collections.abc import Callable, Iterable, Iterator
-from functools import partial
+from functools import cache, partial
 from itertools import pairwise
 from pathlib import Path
 from typing import TypeGuard
@@ -26,7 +26,15 @@ from analysis_service.analysis import CONTROL_ATTRIBUTES
 from analysis_service.claims import UNKNOWN_KEY_FIELDS, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
 from evals.harness.prices import UnitPrices
-from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
+from tests.source_tree import (
+    PYTHON,
+    REPO_ROOT,
+    TESTS,
+    imports,
+    parse,
+    source_files,
+    without,
+)
 from tests.test_five_class_read import HELD_ROWS
 
 pytestmark = pytest.mark.lint
@@ -688,9 +696,10 @@ def _classes_holding(match: Callable[[ast.AST], bool]) -> list[Site]:
 
 
 def test_a_drafts_direction_has_one_field():
-    """Only ``RequirementProposal`` requires a draft's direction, so code
-    reads a direction before a critic does only from that field. A claim
-    carries a copy with a default, for a report written before the field."""
+    """Only ``RequirementProposal`` requires a draft's direction. The claim
+    that the service resolves from it carries a copy with a default, for a
+    report written before the field, so each direction that code reads comes
+    from this one field."""
     assert _classes_holding(_states_a_direction) == [
         ("src/analysis_service/frameworks/asvs/record.py", "RequirementProposal")
     ]
@@ -1882,13 +1891,41 @@ def _digests(node: ast.AST, read: str) -> bool:
     return _calls(node, "sha256") and bool(node.args) and _calls(node.args[0], read)
 
 
-def _digests_a_queue_claim(node: ast.AST) -> bool:
-    """A call of ``digests.structural`` or ``digests.prose``."""
+#: The two digest functions of a produced claim.
+_CLAIM_DIGESTS = frozenset(
+    {"evals.harness.content.structural", "evals.harness.content.prose"}
+)
+
+
+@cache
+def _digest_names() -> tuple[frozenset[str], frozenset[str]]:
+    """The local names that an import in :data:`FILES` binds to a digest
+    function, and to the module that holds the digest functions."""
+    bound = [imports(parse(path)).items() for path in FILES]
+    functions = {
+        local for pairs in bound for local, dotted in pairs if dotted in _CLAIM_DIGESTS
+    }
+    modules = {
+        local
+        for pairs in bound
+        for local, dotted in pairs
+        if dotted == "evals.harness.content"
+    }
+    return frozenset(functions), frozenset(modules)
+
+
+def _digests_a_claim(node: ast.AST) -> bool:
+    """A call of a digest function of a produced claim, through any import."""
+    if not isinstance(node, ast.Call):
+        return False
+    functions, modules = _digest_names()
+    func = node.func
+    if isinstance(func, ast.Name):
+        return func.id in functions
     return (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr in {"structural", "prose"}
-        and _is_name(node.func.value, "digests")
+        isinstance(func, ast.Attribute)
+        and f"evals.harness.content.{func.attr}" in _CLAIM_DIGESTS
+        and _is_name(func.value, *modules)
     )
 
 
@@ -2521,7 +2558,19 @@ ONE_READERS: dict[str, _OneReader] = {
         "",
     ),
     "the digests a queue item carries": _OneReader(
-        _digests_a_queue_claim, ("evals/harness/queue.py", "from_claim"), {}, ""
+        _digests_a_claim,
+        ("evals/harness/queue.py", "from_claim"),
+        {
+            ("evals/harness/scorer.py", "_status_of_unmatched"): (
+                "it digests a produced threat to ask whether a vote on it is"
+                " still live, and builds no queue item"
+            ),
+            ("evals/harness/writing.py", "measure_case"): (
+                "it digests a claim's prose to ask whether a vote judged these"
+                " words, and builds no queue item"
+            ),
+        },
+        "",
     ),
     "the keys of an object store": _OneReader(
         _lists_a_store,

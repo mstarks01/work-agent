@@ -123,7 +123,7 @@ in the fix pull requests of the review before it:
 | Class | What the reader checks |
 |---|---|
 | A second reader | each new helper or rule: is there one reader, and does a lint refuse a second? |
-| A claim with no guard | each comment or docstring that says a rule has one reader (`CLAIM` in `tests/test_one_reader_claims.py`) belongs to a guarded site or names one in backticks: the reader of a `ONE_READERS` row, or the one site of a one-site `==` assert in `tests/test_one_reader_lints.py`. Only a ruling keeps a claim with no guard, in `UNGUARDED_CLAIMS` |
+| A claim with no guard | each claim that a rule has one reader (`CLAIM`): does it sit on a guard or name one in backticks? A guard is the reader of a `ONE_READERS` row or the one site of a one-site `==` assert. Only a ruling keeps a claim in `UNGUARDED_CLAIMS` |
 | A closed set with no `Literal` | each table or tuple of string keys that code reads as a set |
 | A default only a test omits | each new default: does a caller outside `tests/` omit it? |
 | A type that says the wrong thing | each new exception: does its base describe it? |

@@ -27,9 +27,10 @@ is caller-controlled, so it must never sit on the marker line. What is left
 outside carries only this module's own bytes — an index, a count, and the
 register.
 
-The render is a pure function of the sources, called from the one place the
-graph is driven, :func:`~analysis_service.execution.seed_state`, so the service
-and the eval harness cannot show the same job to a model differently.
+The render is a pure function of the sources.
+:func:`~analysis_service.execution.seed_state` is its one reader for a graph
+run, so the service and the eval harness cannot show the same job to a model
+differently.
 """
 
 from __future__ import annotations

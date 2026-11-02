@@ -2,10 +2,11 @@
 
 A claim is a comment or a docstring in :data:`~tests.source_tree.PYTHON`, or in
 a page script there, that says a rule has one reader: "the one reader", "one
-reader of", "its one reader", "the only reader", "the single reader", "has one
-reader", "no second reader", "the only place", "the one place", "the single
-place", "one site", "nowhere else", "the single source" or "single source of
-truth". A claim is a promise that no second site applies the rule, and only a
+reader of", "its" or "their" "one", "only", "sole" or "single reader", "the
+only", "sole" or "single reader", "has one" or "a single reader", "only one
+reader", "no other" or "second reader", "the only place", "the one", "single"
+or "sole place", "one site", "nowhere else", "the single" or "sole source" or
+"single source of truth". A claim is a promise that no second site applies the rule, and only a
 lint keeps that promise as the code moves. So the claim must name a site that
 a lint holds:
 
