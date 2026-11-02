@@ -1,16 +1,20 @@
-"""The capability reader's request, as a job sends it, once on each named case.
+"""The capability reader's instruction and user turn, as a job sends them, on each case.
 
 The request is rebuilt with :func:`~analysis_service.node_requests.node_request`
 and sent with :func:`~evals.harness.node_call.node_call`, on the deployment's
 route, sampling and structured output for the ``capabilities`` node. In a job
 the node runs right after the validity gate, so its user turn is the gate's
-valid-route payload, ``VALID_TURN``. ``capture_turn.py`` holds the rebuilt
-request against a real graph run's on case 15 and writes
-``runs/request-check.json``; this script refuses to call unless that check
-passed. The only case input to the request is the Sources text, so the check
-on one case covers the turn and the template filling of every case. The output names the tier, its selection, its
-sampling, the pinned upstreams and the revision, and keeps what the provider
-answered for each call.
+valid-route payload, ``VALID_TURN``.
+
+``capture_turn.py`` holds the rebuilt instruction and turn against the request
+of a real graph run on case 15. It writes ``runs/request-check.json`` with a
+digest of each file in ``REQUEST_INPUTS``. This script refuses to call unless
+the check passed and no digest moved. The only case input to the request is
+the Sources text, so the check on one case covers the turn and the template
+filling of every case.
+
+The output names the tier, its selection, its sampling, the pinned upstreams
+and the commit, and keeps what the provider answered for each call.
 
 Usage, under ``bash -l`` with ``ANALYSIS_TIERS_FILE`` set:
 
@@ -34,11 +38,12 @@ from analysis_service.capability_reader import (
 from analysis_service.deployment import Deployment
 from analysis_service.execution import seed_state
 from analysis_service.frameworks.asvs.applicability import applicability_for
+from analysis_service.frameworks.asvs.catalog import ASVS_LEVELS
 from analysis_service.graph import CAPABILITIES_NODE, after_gate
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.node_requests import node_request
 from analysis_service.prompts import compose_capabilities_prompt
-from analysis_service.sources import Source
+from analysis_service.sources import Source, text_digest
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import repo_commit
 from evals.harness.node_call import node_call
@@ -67,13 +72,32 @@ async def request_for(case_dir: Path) -> tuple[str, Any]:
     )
 
 
+#: The files that decide the instruction and the turn: the graph's gate and
+#: node wiring, the request builder, the prompt, its table and the rendering.
+REQUEST_INPUTS = (
+    "src/analysis_service/graph.py",
+    "src/analysis_service/node_requests.py",
+    "src/analysis_service/prompts.py",
+    "src/analysis_service/capabilities.py",
+    "src/analysis_service/execution.py",
+    "src/analysis_service/sources.py",
+    "prompts/capabilities.md",
+)
+
+
+def input_digests() -> dict[str, str]:
+    """Each file of ``REQUEST_INPUTS`` with the digest of its text."""
+    return {path: text_digest(Path(path).read_text()) for path in REQUEST_INPUTS}
+
+
 def refuse_unchecked() -> None:
-    """Stop before any call unless the offline request check passed."""
-    checks = json.loads(REQUEST_CHECK.read_text())
+    """Stop before any call unless the request check passed on today's files."""
+    check = json.loads(REQUEST_CHECK.read_text())
+    cases = check["cases"]
     passed = all(
-        check["instruction_equal"] and check["turn_equal"] for check in checks.values()
+        case["instruction_equal"] and case["turn_equal"] for case in cases.values()
     )
-    if not checks or not passed:
+    if not cases or not passed or check["inputs"] != input_digests():
         raise SystemExit("run capture_turn.py: the request is unchecked")
 
 
@@ -90,7 +114,7 @@ async def read_case(case_dir: Path, deployment: Deployment) -> dict:
     stated = with_stated_capabilities(
         model, reading, {source.label: source.text for source in sources}
     )
-    decisions = applicability_for(3, stated.capability_facts())
+    decisions = applicability_for(max(ASVS_LEVELS), stated.capability_facts())
     return {
         "case": case_dir.name,
         "rows": [row.model_dump() for row in reading.capabilities],

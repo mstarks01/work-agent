@@ -1,16 +1,27 @@
 {
- "15-multitenant-invoicing": {
-  "instruction_equal": true,
-  "turn_equal": true,
-  "captured_turn": [
-   {
-    "parts": [
-     {
-      "text": "{\"issue_count\": 0}"
-     }
-    ],
-    "role": "user"
-   }
-  ]
+ "inputs": {
+  "src/analysis_service/graph.py": "cd16eaa024201fb6939e72306c2b38c1048f3fd2e76719ac6ab744d12aa9a1c0",
+  "src/analysis_service/node_requests.py": "a3f11340470593d5251a2b563acababcdb1f6c3d547d05358227ef2d7f8b16c9",
+  "src/analysis_service/prompts.py": "3a215ecddcb94a4fbc7f54a52eb2fc883533bc8be581e4d5deeb5c25ff313882",
+  "src/analysis_service/capabilities.py": "4a72c23e027b9e44d36ca762224bb450d7146803815e3dca1fe552959c979176",
+  "src/analysis_service/execution.py": "6ab6fcd8e2c5daabe4df927557786a46b8741c51b6774c41062e367ceb54d71a",
+  "src/analysis_service/sources.py": "7756c473ed5988df08c23ff83ca7a093612eea56ba18df6e0d0b31f14d80b7e7",
+  "prompts/capabilities.md": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6"
+ },
+ "cases": {
+  "15-multitenant-invoicing": {
+   "instruction_equal": true,
+   "turn_equal": true,
+   "captured_turn": [
+    {
+     "parts": [
+      {
+       "text": "{\"issue_count\": 0}"
+      }
+     ],
+     "role": "user"
+    }
+   ]
+  }
  }
 }

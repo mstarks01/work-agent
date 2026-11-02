@@ -5,9 +5,11 @@ costs nothing, and the request its ``capabilities`` node sends is captured. A
 case needs a model that passes the validity gate against its own Sources:
 case 15's reference model does, and the empty models of the contrast cases do
 not.
-``read_capabilities.request_for`` rebuilds the request the paid script sends.
-The output records, per case, whether the instruction and the user turn are
-equal, and the captured user turn.
+``read_capabilities.request_for`` rebuilds the instruction and the user turn
+the paid script sends. The output records the digest of each file that decides
+them and, per case, whether the instruction and the user turn are equal, with
+the captured user turn. It compares neither the response schema nor the
+sampling: ``node_call`` sends those from the deployment.
 
 Usage, from the repository root:
 
@@ -29,7 +31,7 @@ from analysis_service.system_model import SystemModel
 from tests.factories import ScriptedLlm, emitted, sample_selection, scripted_pipeline
 
 sys.path.insert(0, str(Path(__file__).parent))
-from read_capabilities import request_for
+from read_capabilities import input_digests, request_for
 
 
 class Recording(ScriptedLlm):
@@ -86,7 +88,9 @@ def main(out: str, case_dirs: list[str]) -> None:
             "turn_equal": [turn.model_dump(mode="json", exclude_none=True)] == contents,
             "captured_turn": contents,
         }
-    Path(out).write_text(json.dumps(checks, indent=1) + "\n")
+    Path(out).write_text(
+        json.dumps({"inputs": input_digests(), "cases": checks}, indent=1) + "\n"
+    )
     print(
         json.dumps(
             {k: [v["instruction_equal"], v["turn_equal"]] for k, v in checks.items()}

@@ -55,6 +55,8 @@ STORES: Mapping[Check, tuple[str, frozenset[str]]] = {
     "item4-no-read-control": ("item4-04-p*.json", frozenset({"store:inference-log"})),
 }
 
+(_NO_READ_STORE,) = STORES["item4-no-read-control"][1]
+
 QUESTIONS: Mapping[Check, str] = {
     "item4": (
         "Does the draft name an attacker who runs code in the process that reads"
@@ -67,7 +69,7 @@ QUESTIONS: Mapping[Check, str] = {
         " database reads the crew data in it?"
     ),
     "item4-no-read-control": (
-        "Does the draft name an attacker who reads store:inference-log through a"
+        f"Does the draft name an attacker who reads {_NO_READ_STORE} through a"
         " component's own read access? The sources give no component read access"
         " to it, so yes is a failed control."
     ),
