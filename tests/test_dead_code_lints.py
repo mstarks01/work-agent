@@ -211,9 +211,9 @@ TEST_ONLY: dict[str, str] = {
 
 
 #: The assignment shapes a module-level constant takes, judged beside
-#: :data:`~tests.source_tree.DEFINITIONS`. A constant is a fact like any other and needs a reader
-#: like any other -- and a lint that looked only at ``def`` and ``class`` left
-#: the whole shape unchecked. Five sat in that gap: a prefix nothing composed,
+#: :data:`~tests.source_tree.DEFINITIONS`. A constant is a fact like any other
+#: and needs a reader like any other -- and a lint that looked only at ``def``
+#: and ``class`` left the whole shape unchecked. Five sat in that gap: a prefix nothing composed,
 #: a field name the code read as a literal, a tuple beside the ``Literal`` that
 #: already declared it, a rank map built from a tuple nobody indexed, and a
 #: version nothing stamped.

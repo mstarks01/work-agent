@@ -314,13 +314,13 @@ def _script_claims(path: Path) -> Iterator[tuple[int, str]]:
             yield line, owner
 
 
-def _claims_in(path: Path, name: str) -> list[OneReaderClaim]:
-    """Each claim in the file at ``path``, which the claims call ``name``."""
+def _claims_in(path: Path, place: str) -> list[OneReaderClaim]:
+    """Each claim in the file at ``path``, which the claims call ``place``."""
     lines = path.read_text(encoding="utf-8").splitlines()
     read = _python_claims if path.suffix == ".py" else _script_claims
     return [
         OneReaderClaim(
-            name,
+            place,
             line,
             owner,
             frozenset(_TICKED.findall(" ".join(lines[max(0, line - 2) : line + 1]))),
@@ -350,9 +350,17 @@ def _tests(tree: ast.Module) -> Iterator[ast.FunctionDef]:
 def _asserted_sites(tree: ast.Module) -> Iterator[Site]:
     """Each site that an ``assert`` in a test names as the one site of a rule:
     the one element of a list or a set that the found sites must equal. A
-    comprehension filters the found sites to a part of the tree, so an
-    equality with one guards nothing."""
+    comprehension, or a ``_sites`` call given a file list without ``FILES``,
+    reads a part of the tree, so an equality with one guards nothing. A name
+    that the test assigns stands for its value."""
     for test in _tests(tree):
+        local = {
+            target.id: node.value
+            for node in ast.walk(test)
+            if isinstance(node, ast.Assign)
+            for target in node.targets
+            if isinstance(target, ast.Name)
+        }
         for statement in ast.walk(test):
             if not isinstance(statement, ast.Assert):
                 continue
@@ -364,7 +372,7 @@ def _asserted_sites(tree: ast.Module) -> Iterator[Site]:
                 ):
                     continue
                 sides = (node.left, *node.comparators)
-                if any(isinstance(side, ast.ListComp | ast.SetComp) for side in sides):
+                if any(_reads_a_part(side, local) for side in sides):
                     continue
                 candidates = [
                     side.elts[0]
@@ -374,6 +382,34 @@ def _asserted_sites(tree: ast.Module) -> Iterator[Site]:
                 for candidate in candidates:
                     if (site := _site(candidate)) is not None:
                         yield site
+
+
+def _reads_a_part(node: ast.AST, local: dict[str, ast.expr]) -> bool:
+    """Whether ``node`` filters the found sites, or finds them in a file list
+    that does not hold every file the one-reader lints read."""
+    if isinstance(node, ast.ListComp | ast.SetComp):
+        return True
+    return any(
+        _narrows(part, local) for part in ast.walk(node) if isinstance(part, ast.Call)
+    )
+
+
+def _narrows(call: ast.Call, local: dict[str, ast.expr]) -> bool:
+    """Whether ``call`` is a ``_sites`` call given a file list without the
+    whole of ``FILES``."""
+    if not (isinstance(call.func, ast.Name) and call.func.id == "_sites"):
+        return False
+    given = [*call.args[1:], *(keyword.value for keyword in call.keywords)]
+    return not all(_holds_files(arg, local) for arg in given)
+
+
+def _holds_files(node: ast.expr, local: dict[str, ast.expr]) -> bool:
+    """Whether the file list ``node`` holds ``FILES``."""
+    if isinstance(node, ast.Name) and node.id in local:
+        node = local[node.id]
+    return any(
+        isinstance(part, ast.Name) and part.id == "FILES" for part in ast.walk(node)
+    )
 
 
 def _site(node: ast.AST) -> Site | None:
@@ -629,6 +665,28 @@ def test_a_comment_inside_a_table_belongs_to_the_table(tmp_path):
     )
 
     assert [claim.owner for claim in _claims_in(probe, "probe.py")] == ["TABLE"]
+
+
+def test_an_assert_guards_only_where_it_names_one_site_of_the_whole_tree():
+    """Positive and negative controls for the assert path of the guard."""
+    probe = ast.parse(
+        "def test_one():\n"
+        "    assert _sites(f) == [('a.py', 'f')]\n"
+        "def test_filtered():\n"
+        "    assert [s for s in _sites(g)] == [('a.py', 'g')]\n"
+        "def test_narrowed():\n"
+        "    assert _sites(h, files) == [('a.py', 'h')]\n"
+        "def test_wider():\n"
+        "    searched = (*FILES, *tests)\n"
+        "    assert _sites(n, searched) == [('a.py', 'n')]\n"
+        "def test_several():\n"
+        "    assert _sites(k) == [('a.py', 'k'), ('b.py', 'k')]\n"
+        "def helper():\n"
+        "    assert _sites(m) == [('a.py', 'm')]\n"
+    )
+
+    assert list(_asserted_sites(probe)) == [("a.py", "f"), ("a.py", "n")]
+    assert ("src/analysis_service/config_files.py", "refused_var") in guarded_sites()
 
 
 def test_the_lint_reads_a_real_population():
