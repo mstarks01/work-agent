@@ -58,7 +58,7 @@ assert MFA in CAPABILITIES
 REQUEST_CHECK = Path(__file__).parent / "runs" / "request-check.json"
 
 
-def _sources(case_dir: Path) -> list[Source]:
+def sources_of(case_dir: Path) -> list[Source]:
     return [Source.description(case_dir.joinpath("source.md").read_text())]
 
 
@@ -66,7 +66,7 @@ async def request_for(case_dir: Path) -> tuple[str, Any]:
     """The instruction and the user turn the capabilities node sends for a case."""
     return await node_request(
         compose_capabilities_prompt(MarkdownLoader(Path("prompts"))),
-        seed_state(_sources(case_dir)),
+        seed_state(sources_of(case_dir)),
         VALID_TURN,
         None,
     )
@@ -95,6 +95,8 @@ def input_digests() -> dict[str, str]:
 
 def refuse_unchecked() -> None:
     """Stop before any call unless the request check passed on today's files."""
+    if not REQUEST_CHECK.exists():
+        raise SystemExit("run capture_turn.py: the request is unchecked")
     check = json.loads(REQUEST_CHECK.read_text())
     cases = check["cases"]
     passed = all(
@@ -105,7 +107,7 @@ def refuse_unchecked() -> None:
 
 
 async def read_case(case_dir: Path, deployment: Deployment) -> dict:
-    sources = _sources(case_dir)
+    sources = sources_of(case_dir)
     instruction, turn = await request_for(case_dir)
     spent: list[float | None] = []
     seen: list[dict[str, Any]] = []
@@ -143,6 +145,7 @@ def main(out: str, case_dirs: list[str]) -> None:
         "sampling": deployment.sampling.for_tier(tier).model_dump(mode="json"),
         "pinned_upstreams": list(deployment.tiers.pinned_upstreams()),
         "commit": repo_commit().model_dump(),
+        "inputs": input_digests(),
     }
     results = []
     for case_dir in case_dirs:

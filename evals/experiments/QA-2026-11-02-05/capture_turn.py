@@ -26,12 +26,11 @@ from pydantic import Field
 from analysis_service import graph
 from analysis_service.jobs import JobRecord
 from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 from tests.factories import ScriptedLlm, emitted, sample_selection, scripted_pipeline
 
 sys.path.insert(0, str(Path(__file__).parent))
-from read_capabilities import input_digests, request_for
+from read_capabilities import input_digests, request_for, sources_of
 
 
 class Recording(ScriptedLlm):
@@ -60,7 +59,7 @@ def captured(case: Path):
     )
     record = JobRecord.create(
         owner_id="alice",
-        sources=[Source.description((case / "source.md").read_text())],
+        sources=sources_of(case),
         frameworks=sample_selection(("asvs",)),
         ask_questions=True,
     )

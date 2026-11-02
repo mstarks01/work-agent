@@ -10,7 +10,9 @@ The counts are the ones the E2 and E3 falsifiers read:
 * E3 targets, in target places by runs: a target store of a run counts once
   where at least one of the run's drafts at it is ruled ``same``. Two stores
   and two runs give four.
-* E3 controls: the ``yes``, ``no`` and ``unsure`` rulings of each control.
+* E3 controls: the ``yes`` rulings of each control in each run, with 0 for a
+  run that has none. A copy control fails in a run with 0; a no-read control
+  fails in a run with more than 0.
 * E2: the ``right``, ``wrong``, ``duplicate`` and ``unsure`` rulings, the pairs
   (each unordered ``pair_of`` link counted once) and the duplicates, by group.
 
@@ -25,7 +27,7 @@ from pathlib import Path
 from typing import cast
 
 sys.path.insert(0, str(Path(__file__).parent))
-from build_ballot import COLUMNS, DRAFTS, VERDICTS, Check
+from build_ballot import COLUMNS, DRAFTS, RUNS, VERDICTS, Check
 
 HERE = Path(__file__).parent
 RULED = ("verdict", "duplicate_of", "pair_of", "note")
@@ -44,6 +46,8 @@ def _linked(rows, row, column: str) -> dict[str, str] | None:
     target = row[column].strip()
     if not target:
         return None
+    if target == row["n"]:
+        raise BallotError(f"row {row['n']}: {column} names the row itself")
     other = rows.get(target)
     if (
         other is None
@@ -55,6 +59,11 @@ def _linked(rows, row, column: str) -> dict[str, str] | None:
             f" {row['check']} in group {row['group']}"
         )
     return other
+
+
+def _run_names(check: Check) -> list[str]:
+    """Every run of a check, whether or not the ballot holds a row from it."""
+    return sorted(path.stem for path in RUNS.glob(DRAFTS[check][0]))
 
 
 def read(returned: Path, issued: Path, key_path: Path) -> dict:
@@ -105,8 +114,20 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
         },
         "e3_target_places": {
             "same": len(places),
-            "of": len(targets)
-            * len({key[n]["run"] for n, r in rows.items() if r["check"] == "item4"}),
+            "of": len(targets) * len(_run_names("item4")),
+        },
+        "e3_control_yes_by_run": {
+            check: {
+                run: sum(
+                    1
+                    for n, r in rows.items()
+                    if r["check"] == check
+                    and key[n]["run"] == run
+                    and r["verdict"] == "yes"
+                )
+                for run in _run_names(check)
+            }
+            for check in ("item4-copy-control", "item4-no-read-control")
         },
         "e2_pairs_by_group": dict(Counter(rows[min(p)]["group"] for p in pairs)),
         "e2_duplicates_by_group": dict(
