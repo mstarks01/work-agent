@@ -55,6 +55,7 @@ from typing import Literal, TypeGuard
 import pytest
 
 from tests.source_tree import (
+    DEFINITIONS,
     PYTHON,
     REPO_ROOT,
     SHORTEST_REASON,
@@ -190,11 +191,7 @@ class Resolver:
     def __init__(self, modules: Mapping[str, ast.Module]) -> None:
         self._aliases = {module: imports(tree) for module, tree in modules.items()}
         self._top_level = {
-            module: {
-                node.name
-                for node in tree.body
-                if isinstance(node, (*_FUNCTIONS, ast.ClassDef))
-            }
+            module: {node.name for node in tree.body if isinstance(node, DEFINITIONS)}
             for module, tree in modules.items()
         }
 

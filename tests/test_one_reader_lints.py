@@ -519,12 +519,9 @@ _SENT_KEY = (
     " cached ``key_ref`` cannot take it"
 )
 
-#: Each function that reads which part of an open fact's key is which, and
-#: why. Every other site asks ``key_ref``.
-KEY_LAYOUT_READERS: dict[Site, str] = {
-    ("src/analysis_service/fact_answers.py", "key_ref"): (
-        "it is the one reader of which part of a key is which"
-    ),
+#: Each function beside ``key_ref`` that reads which part of an open fact's
+#: key is which, and why. Every other site asks ``key_ref``.
+SENT_KEY_READERS: dict[Site, str] = {
     ("src/analysis_service/fact_answers.py", "_facet_value"): _SENT_KEY,
     ("src/analysis_service/fact_answers.py", "_one_spelling"): _SENT_KEY,
 }
@@ -563,10 +560,10 @@ def test_the_layout_of_an_open_facts_key_has_one_reader():
     key to state what it expects of a fixture, and no running code follows it.
     """
     sites = set(_sites(_reads_a_key_by_position))
-    assert sites - KEY_LAYOUT_READERS.keys() == set(), "read a key's parts by key_ref"
-    assert KEY_LAYOUT_READERS.keys() <= sites
-    senders = {site for site, why in KEY_LAYOUT_READERS.items() if why == _SENT_KEY}
-    assert sites - senders == {("src/analysis_service/fact_answers.py", "key_ref")}
+    assert SENT_KEY_READERS.keys() <= sites
+    assert sites - SENT_KEY_READERS.keys() == {
+        ("src/analysis_service/fact_answers.py", "key_ref")
+    }, "read a key's parts by key_ref"
 
 
 def test_the_place_of_a_pydantic_error_has_one_reader():

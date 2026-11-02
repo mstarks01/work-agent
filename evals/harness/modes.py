@@ -1654,8 +1654,9 @@ async def run_assertions(case: GoldenCase, pipeline: Pipeline) -> AssertionResul
     state = graph_run.final_state
     if STATE_ASSERTION_PROPOSAL not in state:
         raise EvalRunError(f"{case.id}: assert produced no assertions")
-    # Resolved and gated through the call production's ``prepare`` node
-    # makes, so a sweep grades the catalog a job would have read.
+    # Resolved and gated through :meth:`AssertionRecord.of`, the call that
+    # production's ``prepare`` node makes, so a sweep grades the catalog a job
+    # would have read.
     record = AssertionRecord.of(
         CatalogProposal.model_validate(state[STATE_ASSERTION_PROPOSAL]),
         case.model,

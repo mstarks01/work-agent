@@ -278,7 +278,7 @@ def _locals(function: ast.FunctionDef | ast.AsyncFunctionDef) -> frozenset[str]:
     pending: list[ast.AST] = list(function.body)
     while pending:
         node = pending.pop()
-        if isinstance(node, (*_FUNCTIONS, ast.ClassDef)):
+        if isinstance(node, DEFINITIONS):
             bound.add(node.name)
             continue
         if isinstance(node, (ast.Lambda, *_COMPREHENSIONS)):

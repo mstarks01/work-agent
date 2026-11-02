@@ -327,9 +327,8 @@ def reference_catalog(
 
     Through :meth:`~analysis_service.assertions.AssertionRecord.of`, which
     reads it through :meth:`~analysis_service.assertions.AssertionRecord.resolved`,
-    the one reader of what a proposal comes to. Every caller calls ``of``,
-    except the offline replay, which calls ``resolved``, so a reference row
-    that would not survive as a produced row cannot stand as a reference.
+    the one reader of what a proposal comes to, so a reference row that would
+    not survive as a produced row cannot stand as a reference.
 
     Any refusal — a quote the source does not carry, a subject the model does
     not hold, a value the predicate does not admit — is a corpus error here,

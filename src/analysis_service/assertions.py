@@ -966,15 +966,10 @@ class AssertionRecord(BaseModel):
         model: SystemModel,
         sources: Mapping[str, str],
     ) -> AssertionRecord:
-        """Resolve one proposal and run the gate over what was built.
+        """The record that :meth:`resolved` builds and gates from one proposal.
 
-        **What the node's proposal came to**, read through
-        :meth:`resolved`, the one reader of it. Every caller calls this method,
-        except the offline replay, which calls :meth:`resolved`, so a resolver
-        change moves every caller at once.
-        The gate runs over the resolver's output rather than being assumed:
-        the resolver's contract is that its catalog raises nothing, and here
-        is where that contract meets real model output.
+        **What the node's proposal came to**, read through :meth:`resolved`,
+        the one reader of it.
         """
         record, _ = cls.resolved(proposal, model, sources)
         return record
@@ -986,8 +981,12 @@ class AssertionRecord(BaseModel):
         model: SystemModel,
         sources: Mapping[str, str],
     ) -> tuple[AssertionRecord, dict[int, tuple[str, ...]]]:
-        """:meth:`of`, and each proposed row the record lost, by index, with
-        its codes.
+        """The record of one proposal, resolved and gated, and each proposed
+        row the record lost, by index, with its codes.
+
+        The gate runs over the resolver's output rather than being assumed:
+        the resolver's contract is that its catalog raises nothing, and here
+        is where that contract meets real model output.
 
         **The one reader of "which proposed row did this record lose".** It
         reads :meth:`refusals`, so a refusal of the whole catalog loses every
