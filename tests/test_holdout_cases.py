@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 
 from evals.harness import applicability, audit, comparison, early_policies, scorer
+from evals.harness.bundle import UnreadableReport
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import (
     CorpusError,
@@ -399,7 +400,7 @@ class TestEverySiteAsksTheOneReader:
         """``paired`` skips a held-out report unopened; an exhausted one is read."""
         (tmp_path / f"{EXHAUSTED}.report.json").write_text("not JSON")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(UnreadableReport, match=EXHAUSTED):
             early_policies.paired(tmp_path)
 
     def test_the_exposure_listing_says_exhausted(self, exhausted):
