@@ -213,6 +213,7 @@ somewhere else.
 | Module | What it owns |
 |---|---|
 | `harness/reference.py` | The `ReferenceThreat` type and the fail-closed corpus loader. |
+| `harness/entry_refusal.py` | The one-line refusal of a command line that loads the corpus or a configuration. Each entry point catches `ENTRY_ERRORS` and returns `refuse_entry`. |
 | `harness/bundle.py` | A sweep's report bundle: the per-case report, drafts and proposals files beside an artifact, their writer and reader, and the block accessors every reader of a saved report starts from. Also the extraction and assertion emission files an extraction or assertion sweep writes, and the readers that re-parse them under the code that stands. A head-only sweep's archived catalog is redrawn as it is read: a principal, a credential and an artifact carry an ID that is a pure function of the words a source used, so it is re-derived from the label the archive holds. A graph-bound subject is left exactly as archived, because its ID is an Element ID the run's own model decided. |
 | `harness/structural.py` | The structural gates — the only checks that fail a run. |
 | `harness/scorer.py` | The scoring pipeline: prefilter → rule → match → standing → severity. |

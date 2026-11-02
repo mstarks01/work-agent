@@ -139,6 +139,7 @@ from evals.harness.calibration import (
 from evals.harness.certify import PromotionPlan, plan_promotion, promote
 from evals.harness.coverage import TaggedRow
 from evals.harness.critic_yield import CriticYield, score_case_with_yield
+from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.grounds import (
     CAUGHT,
     CaseGrounds,
@@ -166,7 +167,6 @@ from evals.harness.provenance import (
     tree_identity,
 )
 from evals.harness.reference import (
-    ENTRY_ERRORS,
     CorpusError,
     GoldenCase,
     corpus_argument,
@@ -174,7 +174,6 @@ from evals.harness.reference import (
     diagnosable,
     flows_by_case,
     load_corpus,
-    refuse_entry,
 )
 from evals.harness.run_record import run_record, sweep_inputs
 from evals.harness.scorer import CaseScore

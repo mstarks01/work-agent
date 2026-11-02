@@ -117,10 +117,10 @@ def test_an_entry_point_refusal_has_one_printer():
     load. Each entry point that loads the corpus catches ``ENTRY_ERRORS`` and
     returns it, so the pair of refusals is written once."""
     assert _sites(lambda node: _calls(node, "corpus_refusal")) == [
-        ("evals/harness/reference.py", "refuse_entry")
+        ("evals/harness/entry_refusal.py", "refuse_entry")
     ]
     assert _sites(lambda node: _calls(node, "config_refusal")) == sorted(
-        [("evals/harness/reference.py", "refuse_entry"), *CONFIG_REFUSERS]
+        [("evals/harness/entry_refusal.py", "refuse_entry"), *CONFIG_REFUSERS]
     )
 
 
@@ -2084,6 +2084,22 @@ ONE_READERS: dict[str, _OneReader] = {
         {},
         "",
     ),
+    "the object credential mode": _OneReader(
+        lambda node: (
+            _calls(node, "closed_setting")
+            and len(node.args) == 3
+            and _loads(node.args[1], "OBJECT_CREDENTIALS_VAR")
+        ),
+        ("src/analysis_service/objects.py", "_named_mode"),
+        {},
+        "",
+    ),
+    "which process migrates a database": _OneReader(
+        lambda node: _loads_attribute(node, "first_run_migrates"),
+        ("src/analysis_service/sql_store.py", "migrator"),
+        {},
+        "",
+    ),
     "a key file of the s3 store": _OneReader(
         lambda node: _loads(node, "S3_KEY_FILES"),
         ("src/analysis_service/s3_objects.py", "_key_pair"),
@@ -2126,3 +2142,99 @@ def test_a_rule_with_one_reader_has_no_second(rule):
 )
 def test_each_other_site_of_a_rule_says_why(rule, reason):
     assert len(reason) >= 40, rule
+
+
+def _compares_with(node: ast.AST, value: str) -> TypeGuard[ast.Compare]:
+    """Whether ``node`` compares something with the constant ``value``."""
+    return isinstance(node, ast.Compare) and any(
+        _is_constant(part, value) for part in (node.left, *node.comparators)
+    )
+
+
+def test_which_verdict_waits_has_one_rule():
+    """Only the validator of ``Verdict`` reads ``related_unknowns`` beside a
+    test of the ``needs-info`` status. Each other site reads the field, which
+    the validator keeps empty on every other status."""
+    compared = set(_sites(lambda node: _compares_with(node, "needs-info")))
+    read = set(_sites(lambda node: _loads_attribute(node, "related_unknowns")))
+
+    assert sorted(compared & read) == [
+        ("src/analysis_service/claims.py", "_check_shape")
+    ]
+
+
+def test_the_gate_and_done_tests_of_a_question_have_one_reader():
+    """Only ``_open`` asks whether a question is not a gate."""
+
+    def not_a_gate(node: ast.AST) -> bool:
+        return (
+            isinstance(node, ast.UnaryOp)
+            and isinstance(node.op, ast.Not)
+            and _loads_attribute(node.operand, "gates")
+        )
+
+    assert _sites(not_a_gate) == [("src/analysis_service/answer_state.py", "_open")]
+
+
+def test_an_expected_requirement_has_one_reader():
+    """Only ``applies`` compares a record's disposition with
+    ``not-applicable``, and only ``rules_out`` names the answers that rule a
+    requirement out."""
+
+    def compares_a_disposition(node: ast.AST) -> bool:
+        return _compares_with(node, "not-applicable") and any(
+            _loads_attribute(part, "disposition")
+            or _loads_attribute(part, "expected")
+            or _loads(part, "disposition")
+            for part in (node.left, *node.comparators)
+        )
+
+    def names_the_ruled_out_answers(node: ast.AST) -> bool:
+        return isinstance(node, ast.Set) and all(
+            any(_is_constant(item, kind) for item in node.elts)
+            for kind in ("rejected", "not-applicable")
+        )
+
+    assert _sites(compares_a_disposition) == [
+        ("evals/harness/applicability.py", "applies")
+    ]
+    assert _sites(names_the_ruled_out_answers) == [
+        ("evals/harness/applicability.py", "rules_out")
+    ]
+
+
+#: Each site that writes a catalog's subjects table past ``subjects_of``,
+#: with the reason.
+OWN_SUBJECT_TABLES: dict[Site, str] = {
+    ("evals/harness/bundle.py", "redrawn"): (
+        "it moves each subject of the table to its derived ID, and every row to"
+        " the moved ID, so the table names what the rows name"
+    ),
+    **{
+        ("evals/harness/falsify.py", function): (
+            "a falsification probe builds a catalog that breaks a rule on purpose"
+        )
+        for function in ("consume_probe", "reading", "run_probe")
+    },
+}
+
+
+def test_a_subjects_table_has_one_reader():
+    """Each catalog writer derives its subjects table with ``subjects_of``."""
+
+    def writes_a_table(node: ast.AST) -> bool:
+        if _calls(node, "AssertionCatalog"):
+            values = [k.value for k in node.keywords if k.arg == "subjects"]
+        elif _calls(node, "model_copy"):
+            values = [
+                value
+                for k in node.keywords
+                if k.arg == "update" and isinstance(k.value, ast.Dict)
+                for key, value in zip(k.value.keys, k.value.values, strict=True)
+                if key is not None and _is_constant(key, "subjects")
+            ]
+        else:
+            return False
+        return any(not _calls(value, "subjects_of") for value in values)
+
+    assert _sites(writes_a_table) == sorted(OWN_SUBJECT_TABLES)

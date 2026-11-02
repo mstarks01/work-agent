@@ -291,7 +291,7 @@ class Deployment:
     #: Every one of them passed the package gate at load. A
     #: job selects from this set; it is not itself a selection, and it is never
     #: used as a default for one.
-    frameworks: tuple[FrameworkName, ...]
+    carried_frameworks: tuple[FrameworkName, ...]
     paths: ConfigPaths
     require_certified: bool = False
     #: Which transport this install asks ``extract`` to write in. A property of
@@ -357,7 +357,7 @@ class Deployment:
             sampling=load_sampling(paths.sampling, env=env),
             resilience=load_resilience(paths.resilience, env=env),
             manifest=load_manifest(paths.blessed_fingerprints),
-            frameworks=frameworks,
+            carried_frameworks=frameworks,
             paths=paths,
             require_certified=env_flag(env, REQUIRE_CERTIFIED_VAR),
             extraction_format=(
@@ -397,7 +397,7 @@ class Deployment:
         every package whose options require a field, on every job.
         """
         try:
-            return tuple(resolve_names(self.frameworks, frameworks))
+            return tuple(resolve_names(self.carried_frameworks, frameworks))
         except NotCarried as exc:
             raise FrameworkNotCarried(str(exc)) from exc
         except SelectionError as exc:
@@ -431,7 +431,7 @@ class Deployment:
         otherwise re-derive it from the framework list and drift from the map the
         gate actually resolves against.
         """
-        return tier_node_by_graph_node(self.frameworks)
+        return tier_node_by_graph_node(self.carried_frameworks)
 
     def pipeline(
         self,

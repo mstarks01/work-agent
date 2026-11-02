@@ -27,6 +27,7 @@ from analysis_service.answer_sets import NO_SENT_ANSWERS
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.jobs import RESTART_FAILURE_MESSAGE, InMemoryJobStore, JobRecord
 from analysis_service.sources import Source
+from analysis_service.sql_store import RevisionNotHeld
 from analysis_service.store_backends import build_store
 from analysis_service.store_settings import StoreConfigError
 from tests import test_webapp
@@ -286,22 +287,30 @@ class TestTheFirstRunMigration:
         assert _migrated_lines(caplog) == []
 
     @pytest.mark.parametrize(
-        ("change", "refused"),
+        ("change", "error", "refused"),
         [
-            ("UPDATE alembic_version SET version_num = 'r9999'", "revision r9999"),
-            ("ALTER TABLE jobs DROP COLUMN carried_renames", "differs"),
+            (
+                "UPDATE alembic_version SET version_num = 'r9999'",
+                RevisionNotHeld,
+                "revision r9999",
+            ),
+            (
+                "ALTER TABLE jobs DROP COLUMN carried_renames",
+                StoreConfigError,
+                "differs",
+            ),
         ],
         ids=["a revision the tree does not hold", "a schema difference"],
     )
     def test_a_database_no_migration_repairs_stops_the_startup(
-        self, tiers, durable, change, refused
+        self, tiers, durable, change, error, refused
     ):
         """The app migrates its own SQLite file, so the remedy names no
         command line: delete the file and start the app again."""
         with sqlite3.connect(database_of(durable)) as connection:
             connection.execute(change)
         with (
-            pytest.raises(StoreConfigError, match=refused) as stopped,
+            pytest.raises(error, match=refused) as stopped,
             app(tiers),
         ):
             pass

@@ -1430,13 +1430,21 @@ def without(catalog: AssertionCatalog, identities: Collection[str]) -> Assertion
 def _catalog(
     entries: list[Assertion], labels: Mapping[str, Subject]
 ) -> AssertionCatalog:
-    """One catalog over ``entries``, carrying the subjects they name.
+    """One catalog over ``entries``, carrying the subjects they name, by
+    :func:`subjects_of`."""
+    return AssertionCatalog(subjects=subjects_of(entries, labels), entries=entries)
 
-    **The subjects table that** ``retracted``, ``refused`` and ``resolve``
-    **build.** The table is derived, for the reason :class:`CatalogProposal`
-    gives: two places to spell one subject eventually spell it two ways. The
-    answer writers in ``links`` and ``fact_writes`` keep or extend the
-    subjects table themselves.
+
+def subjects_of(
+    entries: Sequence[Assertion], labels: Mapping[str, Subject]
+) -> list[Subject]:
+    """The subjects that ``entries`` name, from ``labels``.
+
+    **The one reader of a catalog's subjects table.** Every writer of a
+    catalog derives the table here, the answer writers in ``links`` and
+    ``fact_writes`` included. The table is derived, for the reason
+    :class:`CatalogProposal` gives: two places to spell one subject eventually
+    spell it two ways.
 
     A row names **two** subjects where its predicate's value is a reference —
     what the row is about, and what it points at. A credential nothing is
@@ -1453,8 +1461,7 @@ def _catalog(
         if predicate is not None and predicate.value == "reference":
             named.add(entry.value)
     named -= UNIVERSAL_TERMS
-    subjects = [labels[subject] for subject in sorted(named) if subject in labels]
-    return AssertionCatalog(subjects=subjects, entries=entries)
+    return [labels[subject] for subject in sorted(named) if subject in labels]
 
 
 def ambiguous_quote(quote: str, haystack: str) -> bool:

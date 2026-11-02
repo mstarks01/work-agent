@@ -829,14 +829,14 @@ class Startup:
     every route that would run a model is replaced by the diagnostic page, so
     no analysis can run on a model nobody chose — fail-closed, but explained.
 
-    ``frameworks`` is what this install carries, which is what the picker
+    ``carried_frameworks`` is what this install carries, which is what the picker
     offers and what the one submission allow-lists against. It is not itself a
     selection and it is never used as one: a submission names its own, and the
     form ships with every box unticked.
     """
 
     settings: Settings | None
-    frameworks: tuple[FrameworkName, ...]
+    carried_frameworks: tuple[FrameworkName, ...]
     tiers: ModelTierConfig | None
     error: ConfigError | None
 
@@ -853,7 +853,7 @@ class Startup:
                 limits=settings.limits,
                 ceiling=1,
                 budget=settings.budget,
-                frameworks=self.frameworks,
+                carried_frameworks=self.carried_frameworks,
                 carries_catalog=settings.carries_catalog,
                 gate=settings.gate,
             ),
@@ -889,11 +889,11 @@ def build_startup(env: Mapping[str, str]) -> Startup:
     deployment = None
     try:
         deployment = Deployment.from_env(env)
-        deployment.runner(deployment.frameworks)
+        deployment.runner(deployment.carried_frameworks)
     except ConfigError as exc:
         logger.error("the Deployment did not build: %s", exc)
         tiers = deployment.tiers if deployment is not None else None
-        return Startup(settings=None, frameworks=(), tiers=tiers, error=exc)
+        return Startup(settings=None, carried_frameworks=(), tiers=tiers, error=exc)
     return Startup(
         settings=Settings(
             runner_for=deployment.runner,
@@ -904,7 +904,7 @@ def build_startup(env: Mapping[str, str]) -> Startup:
             carries_catalog=deployment.carries_catalog,
             gate=deployment.gate,
         ),
-        frameworks=deployment.frameworks,
+        carried_frameworks=deployment.carried_frameworks,
         tiers=deployment.tiers,
         error=None,
     )
@@ -1427,7 +1427,7 @@ def create_app(
     except SettingsFileError as exc:
         logger.error("settings.env was refused at startup: %s", exc)
         env = process_env
-        startup = Startup(settings=None, frameworks=(), tiers=None, error=exc)
+        startup = Startup(settings=None, carried_frameworks=(), tiers=None, error=exc)
     if workspace is None:
         store = build_app_store(env)
         logger.info("job store: %s", type(store).__name__)
@@ -1484,7 +1484,7 @@ def create_app(
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
-                frameworks=_framework_fields(current.answers.frameworks),
+                frameworks=_framework_fields(current.answers.carried_frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 source_limit=str(current.answers.limits.max_total_bytes),

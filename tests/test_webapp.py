@@ -144,7 +144,7 @@ def stub_settings(runner=None, catalog: bool = False) -> Settings:
 def startup_for(tiers, runner=None, catalog: bool = False) -> Startup:
     return Startup(
         settings=stub_settings(runner, catalog),
-        frameworks=CARRIED,
+        carried_frameworks=CARRIED,
         tiers=tiers,
         error=None,
     )
@@ -161,7 +161,7 @@ def broken_client(tiers):
     """The app as it comes up when the vendor's credentials are missing."""
     startup = Startup(
         settings=None,
-        frameworks=(),
+        carried_frameworks=(),
         tiers=tiers,
         error=ProviderAuthError(
             "vendor 'vertex' needs ANALYSIS_VERTEX_PROJECT; it is unset or empty"
@@ -621,7 +621,7 @@ def test_a_framework_this_install_does_not_carry_is_refused(tiers):
         app=create_app(
             Startup(
                 settings=stub_settings(),
-                frameworks=(narrow,),
+                carried_frameworks=(narrow,),
                 tiers=tiers,
                 error=None,
             )
@@ -1804,7 +1804,7 @@ def test_a_config_error_spelling_the_placeholder_is_not_substituted(tiers):
     page = diagnostic_page(
         Startup(
             settings=None,
-            frameworks=(),
+            carried_frameworks=(),
             tiers=tiers,
             error=ConfigError("__CSP_NONCE__"),
         ),
@@ -2333,7 +2333,7 @@ def test_a_run_whose_runner_cannot_be_built_names_the_setting(tiers, caplog):
 
     startup = Startup(
         settings=replace(stub_settings(), runner_for=unconfigured),
-        frameworks=CARRIED,
+        carried_frameworks=CARRIED,
         tiers=tiers,
         error=None,
     )

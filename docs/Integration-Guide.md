@@ -90,9 +90,9 @@ once — and builds the engine from it. Resolve it yourself when you need both:
 from analysis_service import Deployment, Engine
 
 deployment = Deployment.from_env()  # reads config; no credentials touched
-engine = Engine.from_deployment(deployment, deployment.frameworks)
+engine = Engine.from_deployment(deployment, deployment.carried_frameworks)
 
-deployment.frameworks  # what config/frameworks.toml carries
+deployment.carried_frameworks  # what config/frameworks.toml carries
 
 deployment.tiers.tiers["strong"].model  # what the strong tier selected
 ```

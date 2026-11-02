@@ -907,10 +907,9 @@ def question_set(
         held += [
             (question, "gate-undecided")
             for question in would_ask
-            if not question.gates
-            and question.key not in listed_keys
-            and question.key not in done
+            if _open(question, done)
             and passes_floor(question, would_ask)
+            and question.key not in listed_keys
         ]
     effects = capability_effects(
         prepared,
@@ -928,9 +927,7 @@ def question_set(
     below_floor = tuple(
         question
         for question in listed
-        if not question.gates
-        and question.key not in aside | done
-        and not passes_floor(question, listed)
+        if _open(question, aside | done) and not passes_floor(question, listed)
     )
     linked = {fold_principal(link.principal): link for link in answered.links}
     open_links = link_questions(catalog, view)
@@ -1032,25 +1029,34 @@ def _settled(done: Iterable[SkipKey]) -> set[str]:
     }
 
 
+def _open(question: EarlyQuestion, done: Container[SkipKey]) -> bool:
+    """Whether a list may still ask ``question``: it is not a gate, and
+    ``done`` does not hold it.
+
+    **The one reader of the gate and done tests.** :func:`_rankable`, the
+    questions that an undecided gate would add, and the questions below the
+    floor read it.
+    """
+    return not question.gates and question.key not in done
+
+
 def _rankable(
     listed: Sequence[EarlyQuestion], done: frozenset[SkipKey]
 ) -> list[EarlyQuestion]:
-    """The listed questions a list may rank: not a gate, at or above its
-    kind's floor, not done, and not waiting on a parent.
+    """The listed questions a list may rank: open, at or above its kind's
+    floor, and not waiting on a parent.
 
-    **The reader of which listed question a list may rank.**
+    **The one reader of which listed question a list may rank.**
     :func:`recommended` takes from it, and the effects that break its ties are
     computed over its capability questions, so no rankable question goes
-    without its effect. :func:`question_set` applies the gate, done and floor
-    tests itself to the questions that an undecided gate would add.
+    without its effect.
     """
     waiting = _waiting(listed, _settled(done))
     return [
         question
         for question in listed
-        if not question.gates
+        if _open(question, done)
         and passes_floor(question, listed)
-        and question.key not in done
         and question.key not in waiting
     ]
 

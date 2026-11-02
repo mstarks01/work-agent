@@ -35,6 +35,7 @@ import sys
 import tokenize
 from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -53,6 +54,9 @@ from tests.source_tree import (
     without,
 )
 from tests.test_five_class_read import HELD_ROWS
+
+if TYPE_CHECKING:
+    from five_class_read import HeldRule
 
 pytestmark = pytest.mark.lint
 
@@ -481,7 +485,7 @@ MONEY_SEARCHED = without(
 )
 
 
-def held(rule: str) -> dict[str, tuple[str, ...]]:
+def held(rule: HeldRule) -> dict[str, tuple[str, ...]]:
     """Each file against the phrases that the held rows of ``rule`` hold in it."""
     phrases: dict[str, tuple[str, ...]] = {}
     for row in HELD_ROWS:

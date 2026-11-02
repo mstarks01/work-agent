@@ -512,7 +512,7 @@ def stand_in_engine(
     the selection to every package this build carries."""
     return Engine(
         lambda selection, entry: runner,
-        carried=tuple(PACKAGES),
+        carried_frameworks=tuple(PACKAGES),
         limits=limits,
         deadline_seconds=deadline_seconds,
         frameworks=frameworks,

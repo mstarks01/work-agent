@@ -112,20 +112,19 @@ class Engine:
         self,
         runner_for: RunnerFor,
         *,
-        carried: Sequence[FrameworkName],
+        carried_frameworks: Sequence[FrameworkName],
         limits: SourceLimits,
         deadline_seconds: float,
         frameworks: Sequence[FrameworkSelection],
-        carries_catalog: bool = False,
     ) -> None:
         # The same rule the HTTP routes apply, read through the one reader all
-        # three share: the selection in ``carried`` order (ADR 0102). An engine
-        # built on a deployment holds the frameworks the deployment carries. A
-        # package's options model declares no default, so a selection missing
+        # three share: the selection in ``carried_frameworks`` order (ADR 0102).
+        # An engine built on a deployment holds the frameworks the deployment
+        # carries. A package's options model declares no default, so a selection missing
         # a value it needs is refused here rather than reaching a block that
         # cannot be built — which would fail after the provider billed every node.
         try:
-            self._frameworks = resolve_selection(carried, frameworks)
+            self._frameworks = resolve_selection(carried_frameworks, frameworks)
         except SelectionError as exc:
             raise EngineInputError(str(exc)) from exc
         # The graph a job runs depends on where it starts: its sources, a
@@ -133,10 +132,6 @@ class Engine:
         # is looked up by this engine's own selection, so a job and its graph
         # name the frameworks in one order.
         self._runner_for = partial(runner_for, self.frameworks)
-        # Whether a job here builds an assertion catalog, which is the only
-        # reader of a link answer. False unless the deployment says so, so an
-        # engine that cannot know refuses one.
-        self._carries_catalog = carries_catalog
         self._limits = limits
         self._principals = PrincipalTable()
         self._deadline_seconds = deadline_seconds
@@ -187,11 +182,10 @@ class Engine:
         ]
         engine = cls(
             deployment.runner,
-            carried=deployment.frameworks,
+            carried_frameworks=deployment.carried_frameworks,
             limits=deployment.resilience.source_limits(),
             deadline_seconds=deployment.job_deadline_seconds(),
             frameworks=selections,
-            carries_catalog=deployment.carries_catalog,
         )
         # Built now rather than at the first job, so the build-time gates of
         # :meth:`~analysis_service.deployment.Deployment.pipeline` refuse here.

@@ -25,7 +25,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 HEADING = "## Five-class read"
 
@@ -80,8 +80,11 @@ PACKAGE = "{package}"
 #: reads the base branch's copy, as it does for :data:`TABLE`.
 HELD = Path(__file__).with_name("held_wording.toml")
 
-#: The rules a held row may name, against what each rule is.
-RULES = {
+#: A rule that a held row may name.
+HeldRule = Literal["spend", "money", "element-term"]
+
+#: Each rule a held row may name, against what the rule is.
+RULES: dict[HeldRule, str] = {
     "spend": "the SPEND lint of tests/test_history_prose_lints.py",
     "money": "the MONEY lint of tests/test_history_prose_lints.py",
     "element-term": (

@@ -166,7 +166,7 @@ def held(request, tmp_path_factory, monkeypatch):
     deletes a test can make fail."""
     env = _settings(request, tmp_path_factory, monkeypatch)()
     objects = FailingDeletes(build_object_store(env))
-    return JOB_STORES[env["ANALYSIS_JOB_STORE"]].build(env, objects, False), objects
+    return JOB_STORES[env["ANALYSIS_JOB_STORE"]].build(env, objects), objects
 
 
 class DeletingReads:
@@ -196,7 +196,7 @@ def racing(request, tmp_path_factory, monkeypatch):
     can delete a job during a read."""
     env = _settings(request, tmp_path_factory, monkeypatch)()
     objects = DeletingReads(build_object_store(env))
-    objects.store = JOB_STORES[env["ANALYSIS_JOB_STORE"]].build(env, objects, False)
+    objects.store = JOB_STORES[env["ANALYSIS_JOB_STORE"]].build(env, objects)
     return objects.store, objects
 
 
