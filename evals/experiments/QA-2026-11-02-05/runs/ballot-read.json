@@ -1,0 +1,48 @@
+{
+ "verdicts": {
+  "item4": {
+   "different": 10,
+   "same": 2
+  },
+  "item4-copy-control": {
+   "no": 4,
+   "yes": 2
+  },
+  "item4-no-read-control": {
+   "no": 4
+  },
+  "item2": {
+   "right": 37
+  }
+ },
+ "e3_target_places": {
+  "same": 2,
+  "of": 4
+ },
+ "e3_control_yes_by_run": {
+  "item4-copy-control": {
+   "item4-13-p1": 1,
+   "item4-13-p2": 1
+  },
+  "item4-no-read-control": {
+   "item4-04-p1": 0,
+   "item4-04-p2": 0
+  }
+ },
+ "e2_pairs_by_group": {
+  "B": 3,
+  "D": 3,
+  "G": 2,
+  "H": 0,
+  "K": 1,
+  "L": 4
+ },
+ "e2_duplicates_by_group": {
+  "B": 0,
+  "D": 0,
+  "G": 0,
+  "H": 0,
+  "K": 0,
+  "L": 0
+ }
+}

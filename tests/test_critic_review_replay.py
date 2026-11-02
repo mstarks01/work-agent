@@ -21,8 +21,10 @@ import pytest
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.system_model import SystemModel
+from evals.critic_review import __main__ as critic_review
 from evals.critic_review import replay as R
 from evals.critic_review.loading import (
+    CASES,
     REPO_ROOT,
     corpus_model,
     corpus_sources,
@@ -31,6 +33,8 @@ from evals.critic_review.loading import (
 from evals.critic_review.model import CriticFixture, Expectation
 from evals.harness import critic_replay
 from evals.harness.assembly import ruling_type
+from evals.harness.provenance import ProvenanceError
+from evals.harness.run_record import loaded
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixtures)
     finished,
     recorded,
@@ -714,3 +718,21 @@ def test_the_user_turn_is_the_merge_nodes_output_over_the_fixture_drafts(
         "unverified_count": 0,
         "unresolved_mention_count": 0,
     }
+
+
+def test_a_critic_review_record_names_each_prompt_and_package_file(monkeypatch):
+    """A record from a changed tree still names the text the critic read."""
+    held = {}
+
+    def record(outputs, command, table, inputs):
+        held.update(inputs)
+        raise ProvenanceError("stop before the call")
+
+    monkeypatch.setattr(critic_review, "run_record_for", record)
+
+    assert critic_review.main(["--accept-cost", "unknown"]) == 1
+
+    framework = next(iter({entry.framework for entry in load_fixtures()}))
+    package = MarkdownLoader(REPO_ROOT / "frameworks" / framework)
+    prompts = MarkdownLoader(REPO_ROOT / "prompts")
+    assert held.keys() == {CASES, *loaded((package, prompts))}

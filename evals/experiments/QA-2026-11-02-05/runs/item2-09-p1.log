@@ -1,0 +1,7 @@
+material from today's prepare, catalog signed; prompt files from 53ab865734b686cb35ec04d8c23e91067ecf26be
+- A network attacker can impersonate the Web API to the mobile app | ['process:mobile-app', 'flow:process:mobile-app>process:web-api>api-traffic', 'process:web-api']
+- An attacker can pose as a mobile client to the Web API if caller authentication is absent | ['process:mobile-app', 'flow:process:mobile-app>process:web-api>api-traffic', 'process:web-api']
+- A marketing-office attacker can impersonate catalogue macros if the API does not authenticate them | ['process:catalogue-spreadsheet', 'flow:process:catalogue-spreadsheet>process:web-api>sql-statements', 'process:web-api']
+- A forged fax can impersonate the fax gateway to customers if sender authenticity is not verified | ['process:fax-gateway', 'flow:process:fax-gateway>entity:customer>confirmation-fax', 'entity:customer']
+spent: $0.0482 reported
+must-finds matched: [0, 1]
