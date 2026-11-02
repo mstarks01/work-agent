@@ -26,9 +26,14 @@ pydantic's coercion path are unaffected.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pydantic import ValidationError
+
+if TYPE_CHECKING:
+    from alembic.util import CommandError
+
+    from analysis_service.store_settings import StoreConfigError
 
 
 class ConfigError(ValueError):
@@ -39,8 +44,14 @@ class ConfigError(ValueError):
     """
 
 
-def config_refusal(exc: ConfigError) -> str:
-    """The one line a command prints for ``exc`` in place of a traceback."""
+def config_refusal(exc: ConfigError | StoreConfigError | CommandError) -> str:
+    """The one line a command prints for ``exc`` in place of a traceback.
+
+    A :class:`~analysis_service.store_settings.StoreConfigError` names the
+    store setting to fix, and an Alembic :class:`~alembic.util.CommandError`
+    names the revision the database holds. Neither holds a secret or the
+    database URL.
+    """
     return f"cannot run on this configuration: {exc}"
 
 

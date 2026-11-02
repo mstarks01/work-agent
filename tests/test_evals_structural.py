@@ -1,43 +1,27 @@
 """Tier 1 structural gates — the only ones that block.
 
-Each check is exercised against a report deliberately broken in one way. The
-gates are re-asserted in :mod:`evals.harness.structural` rather than delegated
-to :class:`~analysis_service.report.Report`'s own validator, so these tests build the broken
-payloads as raw JSON where the model would refuse to construct them.
+Each check is exercised against a report broken in one way after it parsed.
+The gates are re-asserted in :mod:`evals.harness.structural` rather than
+delegated to :class:`~analysis_service.report.Report`'s own validator, so a
+report edited in place still fails them. ``tests/test_structural_readers.py``
+breaks one sound report each way either reader names and holds the two readers
+against each other.
 
 **Per block since schema 3.0.** A claim lives in its framework's own analysis
-block, so a payload is broken by reaching into ``analyses[0]`` rather than into
+block, so a report is broken by reaching into ``analyses[0]`` rather than into
 a top-level threat array, and every message the gate returns names the
 framework whose block it came from.
 """
 
 from __future__ import annotations
 
-from evals.harness.structural import report_issues, structural_issues
+from analysis_service.claims import UnknownRef, Verdict
+from evals.harness.structural import report_issues
 from tests.factories import sample_report, sample_threat
-
-
-def claims_of(payload: dict) -> list[dict]:
-    """The first block's claim array, which is where a broken claim goes."""
-    return payload["analyses"][0]["claims"]
 
 
 def test_a_sound_report_has_no_issues():
     assert report_issues(sample_report()) == []
-    assert structural_issues(sample_report().model_dump(mode="json")) == []
-
-
-def test_unparseable_payload_fails_the_gate():
-    issues = structural_issues({"job": {"id": "x"}})
-
-    assert issues and all("does not parse as Report" in i for i in issues)
-
-
-def test_dangling_element_reference_fails_the_gate():
-    payload = sample_report().model_dump(mode="json")
-    claims_of(payload)[0]["affected_element_ids"] = ["process:ghost"]
-
-    assert any("system model" in issue for issue in structural_issues(payload))
 
 
 def test_a_subject_only_unknown_is_not_a_dangling_reference():
@@ -48,50 +32,18 @@ def test_a_subject_only_unknown_is_not_a_dangling_reference():
     correctly shaped claims. Other offline tests cannot see this, because the
     scripted critic never emits a subject.
     """
-    payload = sample_report().model_dump(mode="json")
-    claim = claims_of(payload)[0]
-    claim["verdict"] = {
-        "status": "needs-info",
-        "reason": "the input does not say whether queries are parameterized",
-        "related_unknowns": [
-            {"element_id": "", "attribute": "", "subject": "are queries parameterized"}
-        ],
-    }
+    report = sample_report()
+    unknown = UnknownRef(
+        element_id="", attribute="", subject="are queries parameterized"
+    )
+    report.analyses[0].claims[0].verdict = Verdict(
+        status="needs-info",
+        reason="the input does not say whether queries are parameterized",
+        related_unknowns=[unknown],
+    )
 
-    assert not [
-        issue for issue in structural_issues(payload) if "system model" in issue
-    ]
-
-
-def test_an_element_spelled_unknown_still_has_to_resolve():
-    """The first spelling is unchanged: a named element must exist."""
-    payload = sample_report().model_dump(mode="json")
-    claim = claims_of(payload)[0]
-    claim["verdict"] = {
-        "status": "needs-info",
-        "reason": "unsettled",
-        "related_unknowns": [
-            {"element_id": "process:ghost", "attribute": "technology", "subject": ""}
-        ],
-    }
-
-    assert any("system model" in issue for issue in structural_issues(payload))
-
-
-def test_duplicate_claim_ids_fail_the_gate():
-    payload = sample_report(
-        threats=[sample_threat("S-01"), sample_threat("S-02")]
-    ).model_dump(mode="json")
-    claims_of(payload)[1]["id"] = "S-01"
-
-    assert any("appears" in issue for issue in structural_issues(payload))
-
-
-def test_severity_band_contradicting_the_matrix_fails_the_gate():
-    payload = sample_report().model_dump(mode="json")
-    claims_of(payload)[0]["severity"]["level"] = "low"
-
-    assert any("matrix" in issue for issue in structural_issues(payload))
+    assert not unknown.names_an_element
+    assert not [issue for issue in report_issues(report) if "system model" in issue]
 
 
 def test_summary_inconsistent_with_contents_fails_the_gate():
@@ -108,13 +60,6 @@ def test_summary_inconsistent_with_contents_fails_the_gate():
     issues = report_issues(report)
 
     assert any("summary does not match" in issue for issue in issues)
-
-
-def test_boundary_crossings_must_be_the_derived_ones():
-    payload = sample_report().model_dump(mode="json")
-    payload["boundary_crossings"] = []
-
-    assert any("boundary_crossings" in issue for issue in structural_issues(payload))
 
 
 def test_every_failure_is_reported_at_once():
