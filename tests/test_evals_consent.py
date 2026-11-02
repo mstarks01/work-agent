@@ -999,9 +999,8 @@ class TestTheSweepLoopPassesTheCasesThatRan:
 class TestTheAcceptedAmountIsTheAmountBilled:
     """The two readers of what a retry costs, tested against each other.
 
-    Not each against its own expectation, which is how they came to disagree:
-    `test_budgets.py` asserted the charge and this file never mentioned
-    `attempts`, so a sweep offered $9.75 against a $25.35 bill.
+    Not each against its own expectation, because two readers tested apart
+    can disagree: a sweep can then offer $9.75 against a $25.35 bill.
     """
 
     def _nodes(self, attempts):

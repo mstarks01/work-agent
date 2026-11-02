@@ -1149,7 +1149,7 @@ def _corrections_payload(
     ADR 0114).
 
     Each answer carries its current value with every correction in. A
-    corrected answer is its part's own, whatever share covered the part.
+    corrected answer is its element's own, whatever share covered the element.
     """
     corrected = {fact.key for fact in corrections}
     answers = merged_facts(answered, corrections)

@@ -397,7 +397,7 @@ class TestDrivingTheEngine:
         monkeypatch.setattr(
             smoke.Engine,
             "from_deployment",
-            # The smoke run names the selection now — every carried framework —
+            # The smoke run names the selection — every carried framework —
             # so the stand-in takes it and ignores it.
             classmethod(lambda cls, _deployment, _frameworks: engine),
         )

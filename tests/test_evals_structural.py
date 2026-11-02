@@ -7,7 +7,7 @@ report edited in place still fails them. ``tests/test_structural_readers.py``
 breaks one sound report each way either reader names and holds the two readers
 against each other.
 
-**Per block since schema 3.0.** A claim lives in its framework's own analysis
+**Per block.** A claim lives in its framework's own analysis
 block, so a report is broken by reaching into ``analyses[0]`` rather than into
 a top-level threat array, and every message the gate returns names the
 framework whose block it came from.

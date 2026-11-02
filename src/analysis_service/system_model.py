@@ -293,7 +293,7 @@ _FLOW_ID_SHAPES = MappingProxyType(
     }
 )
 
-#: The version this service writes. Version 1 dropped the endpoints' type
+#: The version this service writes. Version 1 omits the endpoints' type
 #: prefixes, so an entity and a process sharing one name derived one flow ID
 #: (#989); version 2 encodes both endpoints' full IDs. Bumping it is a schema
 #: change: the corpus moves to the new version in the same change, and
@@ -390,8 +390,8 @@ def flow_label(flow_id: str) -> str:
 #: colons and the third delimiter, less the four characters of ``-to-``.
 #: Measured over the corpus the longest derived flow ID is 83 characters, so the
 #: headroom is unchanged in practice — but a flow between two long names that
-#: fitted under version 1 can now fail the gate as ``schema``, which is a
-#: refusal rather than a silent truncation.
+#: fits under version 1 can fail the gate as ``schema`` under version 2, which
+#: is a refusal rather than a silent truncation.
 ELEMENT_ID = "^(?:{})$".format(
     "|".join([_PLAIN_ID, *(rule.pattern for _, rule in sorted(FLOW_ID_RULES.items()))])
 )

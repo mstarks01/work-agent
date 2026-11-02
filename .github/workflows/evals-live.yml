@@ -172,10 +172,10 @@ jobs:
     # and every vendor runs through the one LiteLlm adapter that reads the
     # registry (#8, #9), so no code reads them.
     #
-    # Those two are the whole required set. Vertex runs under the `iam`
-    # credential mode and passes no credential material: the auth action below
-    # writes a credentials file, and Google's own ADC chain finds it. The
-    # service names no credentials variable and reads none.
+    # `vertex_project` and `vertex_location` are the whole required set. Vertex
+    # runs under the `iam` credential mode and passes no credential material:
+    # the auth action below writes a credentials file, and Google's own ADC
+    # chain finds it. The service names no credentials variable and reads none.
     #
     # The ANALYSIS_MODEL_* four are the sweep's vendor choice. Nothing is selected
     # by default, so without them the run stops at config load with the
@@ -227,9 +227,9 @@ jobs:
       # automatic, path-filtered trigger rather than listing what is not exempt,
       # so a trigger added later is on the failing side by default.
       #
-      # That asymmetry is why the schedule was removed rather than left to fail
-      # quietly -- a scheduled run is on the failing side of it, every week,
-      # forever, until federation exists.
+      # That asymmetry is why the workflow has no schedule: a scheduled run is
+      # on the failing side of it, and it would fail every week until
+      # federation exists.
       #
       # Only variable *names* are reported. None of the four is secret, but a
       # preflight step is not the place that decision gets re-litigated.

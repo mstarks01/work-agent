@@ -9,7 +9,7 @@ against its own expectation.
 The effect of a disagreement is concrete: ``evals/runs`` holds run artifacts the
 repository does not track, a live run leaves its probe scripts beside them, and
 a reader that judges that directory fails on a file the tree does not hold
-(#942).
+(PR #944).
 
 The named file sets are held the same way: each one against a source that no
 lint reads, such as ``git ls-files`` and the code paths of
@@ -31,6 +31,7 @@ from tests.source_tree import (
     _SKIPPED,
     _SKIPPED_PATHS,
     CONFIG,
+    HOOKS,
     LINT_MARKER,
     MODEL_TEXT,
     NOT_GUIDES,
@@ -228,7 +229,7 @@ def test_each_named_root_holds_a_tracked_file():
     """A root that holds nothing is a set that reads less than its name says."""
     empty = [
         root
-        for root in (*PYTHON, *TESTS, *CONFIG, *WORKFLOWS, *MODEL_TEXT)
+        for root in (*PYTHON, *TESTS, *CONFIG, *WORKFLOWS, *HOOKS, *MODEL_TEXT)
         if not _tracked(root)
     ]
 
@@ -329,7 +330,7 @@ def test_every_module_that_reads_the_tree_declares_itself_a_lint():
 
 #: The named sets of roots a lint may pass to the walk.
 _ROOT_SETS = frozenset(
-    {"PYTHON", "TESTS", "CONFIG", "WORKFLOWS", "MODEL_TEXT", "WHOLE_TREE"}
+    {"PYTHON", "TESTS", "CONFIG", "WORKFLOWS", "HOOKS", "MODEL_TEXT", "WHOLE_TREE"}
 )
 
 #: The modules that may pass the walk a root of their own: the walk itself, and

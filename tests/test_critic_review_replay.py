@@ -332,11 +332,11 @@ def test_the_replay_parses_what_this_package_asks_a_critic_for():
 def test_the_advice_is_scored_apart_from_the_fate(fixtures, model):
     """The third half: what the critic made of the recommendation.
 
-    A critic that read the advice and one that never looked emitted the same
-    ruling, so a fixture's `recommendation_sound` could not be checked against
-    anything. The package's ruling carries the reading now, and this drives the
-    three answers it can give: agreeing with the reader, disagreeing, and
-    making no reading at all.
+    A ruling with no reading would be the same for a critic that read the
+    advice and one that never looked, so a fixture's `recommendation_sound`
+    could not be checked against anything. The package's ruling carries the
+    reading, and this drives the three answers it can give: agreeing with the
+    reader, disagreeing, and making no reading at all.
     """
     payload = {"claims": []}
     for fixture in fixtures:
@@ -471,9 +471,10 @@ def test_a_word_inside_a_longer_word_is_not_an_anchor():
 def test_a_dismissal_is_recorded_so_relevance_can_be_read(fixtures, model):
     """#894's question, in a field the replay reads.
 
-    A critic that weighed an unknown and found it irrelevant and one that never
-    opened the question emitted the same ruling. A confirmed is reachable only
-    by naming every such pair, so the ruling now states it.
+    Without the field, a critic that weighed an unknown and found it
+    irrelevant and one that never opened the question would emit the same
+    ruling. A confirmed is reachable only by naming every such pair, so the
+    ruling states it.
     """
     shielded = next(
         f
@@ -588,8 +589,8 @@ def test_a_deficient_set_is_not_reported_as_a_killed_discriminator(fixtures, mod
 def test_the_gate_and_the_run_read_the_set_through_one_rule():
     """The lint over the file and the score over a run, against each other.
 
-    Two readers of "can this set discriminate" is how the warning came to
-    name the wrong cause. They are one function now, so the fixture set is
+    Two readers of "can this set discriminate" can disagree, and the warning
+    then names the wrong cause. They are one function, so the fixture set is
     driven through both spellings of its rows here rather than each being
     trusted against its own expectation.
     """

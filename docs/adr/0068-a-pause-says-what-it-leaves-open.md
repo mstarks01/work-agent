@@ -4,23 +4,23 @@
 - **Date**: 2026-10-07
 - **Effort**: [#1542](https://github.com/mstarks01/work-agent/issues/1542) (F2, F5)
 - **Relates to**: [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md),
-  whose floors and limits this keeps and whose `nothing-left` stop it
+  whose floors and limits this keeps and whose `nothing-left` reason it
   narrows, and [ADR 0067](0067-a-paused-job-asks-what-decides-a-framework-first.md)
 - **Amended by**: [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
-  which adds the list's own counts and words each stop for a list, not a
-  round
+  which adds the list's own counts and words each empty-list reason for a list,
+  not a round
 
 ## Context
 
-A paused job stopped with `budget-exhausted` or `nothing-left`. The page then
+A paused job gave the reason `budget-exhausted` or `nothing-left`. The page then
 said "No question is left", and the workspace said "Question review
 complete". Neither was true in general.
 
 The audit of 7 October 2026 answered every offered capability "yes" at ASVS
-level 1, on the shared test model. The pause stopped with `nothing-left` and
+level 1, on the shared test model. The pause gave `nothing-left` and
 zero questions withheld, but 22 of 70 requirements still had unknown
 applicability. Twenty-four capability questions were under the floor, and
-`withheld` counted only the questions that a limit held back. So the stop hid
+`withheld` counted only the questions that a limit held back. So the reason hid
 the floor's effect.
 
 The same audit skipped every round of a STRIDE pause. The rounds showed 40
@@ -29,10 +29,10 @@ limit. The limit counts answers, not the questions a person sees.
 
 ## Decision
 
-**No stop says that every fact is settled.** `QuestionSet.empty_list_reason` has four
-values:
+**No empty-list reason says that every fact is settled.**
+`QuestionSet.empty_list_reason` has four values:
 
-| Stop | Meaning |
+| Reason | Meaning |
 | --- | --- |
 | `budget-exhausted` | A limit holds questions back from every round. |
 | `below-floor` | No question passes its floor, and questions under a floor are left. |
@@ -78,7 +78,7 @@ under the floor can be answered. A change to the rule needs its own decision.
 
 ## Consequences
 
-The level 1 reproduction now stops with `below-floor`. It lists 24 questions
+The level 1 reproduction gives `below-floor`. It lists 24 questions
 under the floor and reports 22 of 70 level 1 requirements as unknown. A level
 2 job reports level 1 and level 2 apart: 7 of 70 level 1 requirements stay
 unknown after 30 "yes" answers.

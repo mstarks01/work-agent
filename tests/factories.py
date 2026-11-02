@@ -507,8 +507,8 @@ def package_whose_precondition(
 
     **The one thing this repository cannot otherwise test.** STRIDE's
     precondition is total, so a gate that never runs and a gate that always
-    passes look identical from every seam — which is how the member came to be
-    declared, checked on the corpus side and never called in ``src/``. A package
+    passes look identical from every seam — so a member declared, checked on
+    the corpus side and never called in ``src/`` shows nothing at any seam. A package
     that can refuse is what tells the two apart, and until a second framework
     lands there is no such package to select.
 
@@ -569,7 +569,7 @@ DESCRIPTION_TEXT = (
 """The submitted text every scripted job carries.
 
 Every ``source_excerpt`` in :func:`valid_model` and the quote ground in
-:func:`sample_threat` are verbatim spans of *this string*, because the gate now
+:func:`sample_threat` are verbatim spans of *this string*, because the gate
 checks an excerpt against the source it cites the same way the fan-in checks a
 threat's quote. A fixture citing words its own job never carried is the exact
 defect that check exists to catch, and one used by 29 tests would have failed

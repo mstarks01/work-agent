@@ -138,12 +138,12 @@ class TestAnUnruledRenameStaysUnaligned:
 
     The audit reproduced initiator recall 0.0 here with every element and flow
     retained. That number is right: no reader has ruled, and nothing infers a
-    rename. What changed is that the score now says so — the two are
-    unaligned, and the extras are unreviewed rather than additions.
+    rename. The score says so — the two are unaligned, and the extras are
+    unreviewed rather than additions.
 
     The names the audit probed with, the source's own "Other teams' backends"
-    and "ML engineers", were ruled aliases on 2026-09-16 (#961 step 3), so
-    they now align and the second test says so. The unruled pair here is two
+    and "ML engineers", are ruled aliases (#961 step 3), so they align and
+    the second test says so. The unruled pair here is two
     names the source never uses.
     """
 

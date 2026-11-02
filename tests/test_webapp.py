@@ -1090,10 +1090,12 @@ def test_the_first_run_page_words_each_empty_list_reason():
 def test_the_first_run_page_reads_each_carried_reason():
     """``first_run.js`` says for each
     :data:`~analysis_service.answer_state.CarriedReason` whether a dropped
-    answer waits for a part, and for no other reason."""
+    answer waits for an element, and for no other reason."""
     from analysis_service.answer_state import CarriedReason
 
-    assert _table_keys("first_run.js", "waitsForPart") == set(get_args(CarriedReason))
+    assert _table_keys("first_run.js", "waitsForElement") == set(
+        get_args(CarriedReason)
+    )
 
 
 def test_the_first_run_page_names_each_element_type():

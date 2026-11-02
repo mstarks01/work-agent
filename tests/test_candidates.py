@@ -32,7 +32,7 @@ from analysis_service.system_model import (
 )
 
 #: STRIDE's own rule table. The neutral engine takes the lanes and the rules as
-#: arguments now, so a test about *these* rules has to name the package they
+#: arguments, so a test about *these* rules has to name the package they
 #: belong to rather than reaching for a module-level constant.
 RULES = STRIDE.rules
 

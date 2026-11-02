@@ -1,10 +1,10 @@
 """What a paused job says it leaves open (#1542 F2 and F5, ADR 0068).
 
-At 2fae7d3, a level 1 pause whose owner answered every capability "yes" ended
-with ``nothing-left``, no question withheld and 22 requirements still unknown;
-the page said "No question is left". A STRIDE pause skipped save by save
-showed 40 distinct field questions under a limit of 30. These tests drive the
-same paths through the production question set.
+A paused job says what it leaves open: the requirements still unknown, the
+questions under a floor, and each question a pause skipped save by save
+showed, counted apart from the limit. No empty-list reason says that every
+fact is settled. These tests drive the same paths through the production
+question set.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def _save(asked, earlier=(), facts=(), skips=(), presented=None):
 
 def _all_yes(level):
     """The issue's F2 run: every offered capability "yes", every other
-    question "I don't know", through production admission, to the stop."""
+    question "I don't know", through production admission, to the empty list."""
     model = valid_model()
     selection = {"asvs": {"level": level}}
     held, shown = [], ()
@@ -177,7 +177,7 @@ def test_the_summary_counts_only_the_questions_the_page_presented():
 
 
 def test_a_pause_whose_questions_left_were_all_skipped_says_so():
-    """A skipped question stays open and takes an answer, so the stop is not
+    """A skipped question stays open and takes an answer, so the reason is not
     ``nothing-left`` (ADR 0068, checkpoint review c4)."""
     path = PROJECT_ROOT / "evals/corpus/07-cicd-store-deploy/model.json"
     model = SystemModel.model_validate_json(path.read_text())

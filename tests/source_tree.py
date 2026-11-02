@@ -57,7 +57,7 @@ _FROZEN = frozenset({"research"})
 #: Directories the repository does not hold, by their place rather than by name.
 #: ``evals/runs`` holds run artifacts the repository does not track, and a live
 #: run leaves its probe scripts beside them, so a lint that reads that directory
-#: judges a file the tree does not hold (#942). ``.claude/worktrees`` holds whole
+#: judges a file the tree does not hold (PR #944). ``.claude/worktrees`` holds whole
 #: checkouts at other revisions, while ``.claude/skills`` beside it is tracked
 #: prose. Anchored rather than added to :data:`_SKIPPED`, so a future module
 #: directory that happens to be called ``runs`` stays under every lint.
@@ -84,6 +84,9 @@ CONFIG: tuple[str, ...] = ("config",)
 
 #: The GitHub Actions workflows.
 WORKFLOWS: tuple[str, ...] = (".github/workflows",)
+
+#: The git hooks, which carry no suffix.
+HOOKS: tuple[str, ...] = (".githooks",)
 
 #: Every file the repository holds.
 WHOLE_TREE: tuple[str, ...] = (".",)

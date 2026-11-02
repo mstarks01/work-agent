@@ -9,12 +9,12 @@ from tests.test_links import catalog_client
 from tests.test_pause import waiting
 
 
-def _part(element_id: str) -> dict:
+def _element(element_id: str) -> dict:
     return next(p for p in detected_facts(valid_model()) if p["element"] == element_id)
 
 
 def _facts(element_id: str) -> dict:
-    return {f["attribute"]: f for f in _part(element_id)["facts"]}
+    return {f["attribute"]: f for f in _element(element_id)["facts"]}
 
 
 def test_a_stated_fact_is_listed_and_an_open_one_is_not():
@@ -22,7 +22,7 @@ def test_a_stated_fact_is_listed_and_an_open_one_is_not():
     assert store["technology"]["value"] == "Cloud SQL Postgres"
     assert store["assets"]["value"] == "business-critical-data, pii"
     assert "encryption_at_rest" not in store, "an open fact is asked, not listed"
-    assert _part("store:orders-db")["excerpt"] == "orders are stored in Postgres"
+    assert _element("store:orders-db")["excerpt"] == "orders are stored in Postgres"
 
 
 def test_an_inferred_value_carries_its_basis():

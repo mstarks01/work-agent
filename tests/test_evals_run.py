@@ -2,8 +2,8 @@
 
 ``certified`` is narrow by design (see :mod:`analysis_service.certification`): it
 means no *observed* fingerprint went unblessed, and is therefore vacuously true
-of a sweep that observed none. Printing it alone is how a run that certified
-nothing came to announce "all node fingerprints blessed" and write
+of a sweep that observed none. Printed alone, it would announce "all node
+fingerprints blessed" for a run that certified nothing and write
 ``"trusted": true`` into its artifact. These pin the two halves together.
 """
 
