@@ -3,8 +3,8 @@
 A claim is a comment or a docstring in :data:`~tests.source_tree.PYTHON`, or in
 a page script there, that says a rule has one reader in the words that
 :data:`CLAIM` matches. A claim is a promise that no second site applies the
-rule, and only a lint keeps that promise as the code moves. So the claim must name a site that
-a lint holds:
+rule, and only a lint keeps that promise as the code moves. So the claim must
+name a site that a lint holds:
 
 - the reader of a row of :data:`~tests.test_one_reader_lints.ONE_READERS`;
 - a ``(path, function)`` site that an ``assert`` in a test of
@@ -31,7 +31,9 @@ owner of a docstring is the function or the class it documents, or the name it
 follows as an attribute docstring. A claim spans line breaks, so a claim
 wrapped across two lines is still found. :data:`CLAIM` skips the words that
 describe a reader or a place and claim nothing, and a negative control holds
-each skip.
+each skip. The skip of "the one reader" before a word in ``-ing`` reads the
+word, so it also skips a claim where the next word is a noun such as
+"string", or a word such as "during".
 
 :data:`UNGUARDED_CLAIMS` holds each claim that a ruling keeps without a guard.
 An entry that matches no unguarded claim fails, so it cannot outlive its claim.
@@ -590,6 +592,7 @@ def test_the_claim_pattern_finds_a_claim_and_skips_a_description():
         "That means the one place this goes wrong is the place people try it.",
         "it would kill the run at the one place built to report why it died.",
         "is the defect the single reader in that module exists to prevent.",
+        "the single reader in another file applies it.",
         "a single reader of the page",
         "one reader asks",
     ]
