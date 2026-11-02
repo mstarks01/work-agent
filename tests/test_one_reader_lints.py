@@ -666,6 +666,36 @@ def test_each_declared_site_still_reads_the_rule_itself():
     assert REPORT_PARSERS.keys() <= set(_sites(_parses_a_report))
 
 
+def _states_a_direction(node: ast.AST) -> bool:
+    """A required ``direction`` field whose ``Literal`` holds ``gap``."""
+    return (
+        isinstance(node, ast.AnnAssign)
+        and _is_name(node.target, "direction")
+        and node.value is None
+        and any(_is_constant(part, "gap") for part in ast.walk(node.annotation))
+    )
+
+
+def _classes_holding(match: Callable[[ast.AST], bool]) -> list[Site]:
+    """Each class in :data:`FILES` whose own body holds a statement ``match``
+    accepts."""
+    return sorted(
+        (path.relative_to(REPO_ROOT).as_posix(), node.name)
+        for path in FILES
+        for node in ast.walk(parse(path))
+        if isinstance(node, ast.ClassDef) and any(map(match, node.body))
+    )
+
+
+def test_a_drafts_direction_has_one_field():
+    """Only ``RequirementProposal`` requires a draft's direction, so code
+    reads a direction before a critic does only from that field. A claim
+    carries a copy with a default, for a report written before the field."""
+    assert _classes_holding(_states_a_direction) == [
+        ("src/analysis_service/frameworks/asvs/record.py", "RequirementProposal")
+    ]
+
+
 def test_the_cell_has_one_reader():
     """Only ``Cell.read`` reads the cell for a route that needs a ``Current``.
 

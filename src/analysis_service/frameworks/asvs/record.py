@@ -427,8 +427,8 @@ class RequirementProposal(Proposal):
     ``direction`` is the agent's statement of which of the three things this
     draft is (ADR 0028): a ``gap`` the input states, a ``question`` the input
     does not settle, or a requirement ``excluded`` because the system has no
-    such subject. The lane directs and the **Critic** rules; code reads a
-    draft's direction from the field before a critic does, and the
+    such subject. The lane directs and the **Critic** rules; the field is the
+    one place code can read a draft's direction before a critic does, and the
     fan-in drops a ``gap`` that rests on absence alone, because silence never
     confirms.
 
