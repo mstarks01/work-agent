@@ -1,0 +1,16 @@
+{
+ "15-multitenant-invoicing": {
+  "instruction_equal": true,
+  "turn_equal": true,
+  "captured_turn": [
+   {
+    "parts": [
+     {
+      "text": "{\"issue_count\": 0}"
+     }
+    ],
+    "role": "user"
+   }
+  ]
+ }
+}

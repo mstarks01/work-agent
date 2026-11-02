@@ -1,7 +1,17 @@
-"""Record the instruction and the user turn of the capabilities node in a real graph run.
+"""Hold the capability reader's rebuilt request against a real graph run's.
 
-The graph runs with scripted replies, so the run is offline and costs nothing.
-Usage, from the repository root: ``capture_turn.py <case dir> <out.json>``.
+For each case, the graph runs with scripted replies, so the run is offline and
+costs nothing, and the request its ``capabilities`` node sends is captured. A
+case needs a model that passes the validity gate against its own Sources:
+case 15's reference model does, and the empty models of the contrast cases do
+not.
+``read_capabilities.request_for`` rebuilds the request the paid script sends.
+The output records, per case, whether the instruction and the user turn are
+equal, and the captured user turn.
+
+Usage, from the repository root:
+
+    capture_turn.py <out.json> <case dir> [<case dir> ...]
 """
 
 import asyncio
@@ -18,8 +28,13 @@ from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 from tests.factories import ScriptedLlm, emitted, sample_selection, scripted_pipeline
 
+sys.path.insert(0, str(Path(__file__).parent))
+from read_capabilities import request_for
+
 
 class Recording(ScriptedLlm):
+    """A scripted model that keeps each request it receives."""
+
     requests: list = Field(default_factory=list)
 
     async def generate_content_async(self, llm_request, stream=False):
@@ -28,40 +43,56 @@ class Recording(ScriptedLlm):
             yield response
 
 
-case = Path(sys.argv[1])
-model = SystemModel.model_validate_json((case / "model.json").read_text())
-pipeline, llms = scripted_pipeline(
-    {
-        "extract": emitted(model),
-        graph.CAPABILITIES_NODE: json.dumps({"capabilities": []}),
-    },
-    llm_class=Recording,
-    entry=graph.ENTRY_HEAD_ONLY,
-    frameworks=("asvs",),
-    capability_reader=True,
-)
-record = JobRecord.create(
-    owner_id="alice",
-    sources=[Source.description((case / "source.md").read_text())],
-    frameworks=sample_selection(("asvs",)),
-    ask_questions=True,
-)
-record.transition("running")
+def captured(case: Path):
+    """The request the capabilities node sends in a real graph run of ``case``."""
+    model = SystemModel.model_validate_json((case / "model.json").read_text())
+    pipeline, llms = scripted_pipeline(
+        {
+            "extract": emitted(model),
+            graph.CAPABILITIES_NODE: json.dumps({"capabilities": []}),
+        },
+        llm_class=Recording,
+        entry=graph.ENTRY_HEAD_ONLY,
+        frameworks=("asvs",),
+        capability_reader=True,
+    )
+    record = JobRecord.create(
+        owner_id="alice",
+        sources=[Source.description((case / "source.md").read_text())],
+        frameworks=sample_selection(("asvs",)),
+        ask_questions=True,
+    )
+    record.transition("running")
+
+    async def on_node(node: str) -> None:
+        pass
+
+    asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+    reader = llms[graph.CAPABILITIES_NODE]
+    assert isinstance(reader, Recording)
+    return reader.requests[0]
 
 
-async def on_node(node):
-    pass
+def main(out: str, case_dirs: list[str]) -> None:
+    checks = {}
+    for case_dir in map(Path, case_dirs):
+        request = captured(case_dir)
+        instruction, turn = asyncio.run(request_for(case_dir))
+        contents = [
+            c.model_dump(mode="json", exclude_none=True) for c in request.contents
+        ]
+        checks[case_dir.name] = {
+            "instruction_equal": instruction == request.config.system_instruction,
+            "turn_equal": [turn.model_dump(mode="json", exclude_none=True)] == contents,
+            "captured_turn": contents,
+        }
+    Path(out).write_text(json.dumps(checks, indent=1) + "\n")
+    print(
+        json.dumps(
+            {k: [v["instruction_equal"], v["turn_equal"]] for k, v in checks.items()}
+        )
+    )
 
 
-asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
-reader = llms[graph.CAPABILITIES_NODE]
-assert isinstance(reader, Recording)
-request = reader.requests[0]
-out = {
-    "system": request.config.system_instruction,
-    "contents": [
-        c.model_dump(mode="json", exclude_none=True) for c in request.contents
-    ],
-}
-Path(sys.argv[2]).write_text(json.dumps(out, indent=1))
-print("contents:", json.dumps(out["contents"])[:600])
+if __name__ == "__main__":
+    main(sys.argv[1], sys.argv[2:])
