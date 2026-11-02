@@ -115,28 +115,28 @@ Column = Literal[
 COLUMNS: tuple[Column, ...] = get_args(Column)
 
 
-def runs(check: Check) -> list[tuple[str, dict]]:
+def runs(checks: Mapping[Check, CheckSpec], check: Check) -> list[tuple[str, dict]]:
     """Each run of a check, by name and output, in name order."""
     return [
         (path.stem, json.loads(path.read_text()))
-        for path in sorted(RUNS.glob(CHECKS[check].pattern))
+        for path in sorted(RUNS.glob(checks[check].pattern))
     ]
 
 
-def ruled(check: Check, claim: dict) -> bool:
+def ruled(checks: Mapping[Check, CheckSpec], check: Check, claim: dict) -> bool:
     """Whether the check rules this draft."""
-    stores = CHECKS[check].stores
+    stores = checks[check].stores
     return stores is None or bool(stores & set(claim["affected_element_ids"]))
 
 
-def drafts() -> list[tuple[Check, str, str, dict]]:
+def drafts(checks: Mapping[Check, CheckSpec]) -> list[tuple[Check, str, str, dict]]:
     """Each ruled draft with its check, its run and its case, shuffled."""
     rows: list[tuple[Check, str, str, dict]] = []
-    for check in CHECKS:
-        for run, output in runs(check):
+    for check in checks:
+        for run, output in runs(checks, check):
             case = output["record"]["table"]["case"]
             for claim in output["claims"]:
-                if ruled(check, claim):
+                if ruled(checks, check, claim):
                     rows.append((check, run, case, claim))
     random.Random(SEED).shuffle(rows)
     return rows
@@ -151,15 +151,16 @@ def groups(names: list[str]) -> dict[str, str]:
     return dict(zip(order, string.ascii_uppercase[: len(order)], strict=True))
 
 
-def main() -> None:
-    rows = drafts()
+def write(checks: Mapping[Check, CheckSpec], issued: Path, key_path: Path) -> None:
+    """Write the ballot of ``checks`` to ``issued`` and its key to ``key_path``."""
+    rows = drafts(checks)
     letter = groups([run for _, run, _, _ in rows])
     key = []
-    with (HERE / "ballot-issued.csv").open("w", newline="") as out:
+    with issued.open("w", newline="") as out:
         writer = csv.writer(out)
         writer.writerow(COLUMNS)
         for n, (check, run, case, claim) in enumerate(rows, 1):
-            spec = CHECKS[check]
+            spec = checks[check]
             writer.writerow(
                 [
                     n,
@@ -188,8 +189,8 @@ def main() -> None:
                     "sequence": claim["sequence"],
                 }
             )
-    (HERE / "ballot-key.json").write_text(json.dumps(key, indent=1) + "\n")
+    key_path.write_text(json.dumps(key, indent=1) + "\n")
 
 
 if __name__ == "__main__":
-    main()
+    write(CHECKS, HERE / "ballot-issued.csv", HERE / "ballot-key.json")

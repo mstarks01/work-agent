@@ -19,6 +19,10 @@
   "same": 2,
   "of": 4
  },
+ "e3_same_by_run": {
+  "item4-05-p1": 2,
+  "item4-05-p2": 0
+ },
  "e3_control_yes_by_run": {
   "item4-copy-control": {
    "item4-13-p1": 1,

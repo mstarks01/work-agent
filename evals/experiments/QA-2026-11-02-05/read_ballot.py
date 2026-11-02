@@ -16,6 +16,8 @@ The counts are the ones the E2 and E3 falsifiers read:
 * E3 targets, in target places by runs: a target store of a run counts once
   where at least one of the run's drafts at it is ruled ``same``. The
   denominator is the target stores by the runs on disk.
+* E3 targets by run: the target places ruled ``same`` in each run, with 0
+  for a run that has none.
 * E3 controls: the ``yes`` rulings of each control in each run, with 0 for a
   run that has none. A copy control fails in a run with 0; a no-read control
   fails in a run with more than 0.
@@ -30,11 +32,12 @@ import csv
 import json
 import sys
 from collections import Counter
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal, cast, get_args
 
 sys.path.insert(0, str(Path(__file__).parent))
-from build_ballot import CHECKS, COLUMNS, HERE, RUNS, Check, runs
+from build_ballot import CHECKS, COLUMNS, HERE, RUNS, Check, CheckSpec, runs
 
 from evals.harness.reference import load_case
 
@@ -83,7 +86,9 @@ def _linked(rows, row, column: str) -> dict[str, str] | None:
     return other
 
 
-def read(returned: Path, issued: Path, key_path: Path) -> dict:
+def read(
+    checks: Mapping[Check, CheckSpec], returned: Path, issued: Path, key_path: Path
+) -> dict:
     rows = _rows(returned)
     sent = _rows(issued)
     key = {str(entry["n"]): entry for entry in json.loads(key_path.read_text())}
@@ -91,8 +96,8 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
         raise BallotError("the returned rows are not the issued rows")
     claims = {
         (run, claim["sequence"]): claim
-        for check in CHECKS
-        for run, output in runs(check)
+        for check in checks
+        for run, output in runs(checks, check)
         for claim in output["claims"]
     }
 
@@ -110,7 +115,7 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
         if changed:
             raise BallotError(f"row {n}: the issued columns {changed} changed")
         check = cast(Check, row["check"])
-        if row["verdict"] not in CHECKS[check].verdicts:
+        if row["verdict"] not in checks[check].verdicts:
             raise BallotError(f"row {n}: {row['verdict']!r} is not a {check} verdict")
         duplicate = _linked(rows, row, "duplicate_of")
         if duplicate is not None and duplicate["verdict"] == "duplicate":
@@ -142,7 +147,7 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
     if twice := sorted(n for n, count in membership.items() if count > 1):
         raise BallotError(f"rows {twice} are each in more than one pair")
 
-    targets = CHECKS["item4"].stores
+    targets = checks["item4"].stores
     assert targets is not None
     places = set()
     for n, row in rows.items():
@@ -165,11 +170,15 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
             check: dict(
                 Counter(r["verdict"] for r in rows.values() if r["check"] == check)
             )
-            for check in CHECKS
+            for check in checks
         },
         "e3_target_places": {
             "same": len(places),
-            "of": len(targets) * len(runs("item4")),
+            "of": len(targets) * len(runs(checks, "item4")),
+        },
+        "e3_same_by_run": {
+            run: sum(1 for ruled_run, _ in places if ruled_run == run)
+            for run, _ in runs(checks, "item4")
         },
         "e3_control_yes_by_run": {
             check: {
@@ -180,9 +189,9 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
                     and key[n]["run"] == run
                     and r["verdict"] == "yes"
                 )
-                for run, _ in runs(check)
+                for run, _ in runs(checks, check)
             }
-            for check, spec in CHECKS.items()
+            for check, spec in checks.items()
             if spec.control
         },
         "e2_pairs_by_group": {group: paired[group] for group in groups},
@@ -193,6 +202,7 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
 if __name__ == "__main__":
     counts = json.dumps(
         read(
+            CHECKS,
             HERE / "ballot-returned.csv",
             HERE / "ballot-issued.csv",
             HERE / "ballot-key.json",

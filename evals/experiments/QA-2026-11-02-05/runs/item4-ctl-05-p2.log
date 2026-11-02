@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from f453772fa9638aa38ecb88c970ce9c2660ddbc63
+- Job messages may be intercepted between the web tier and message queue | ['flow:process:web-application>store:message-queue>enqueue-job', 'process:web-application', 'store:message-queue']
+- Worker queue consumption may expose job contents on an unverified internal channel | ['flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process', 'store:message-queue']
+- Database records may be intercepted on the worker database connection | ['flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process', 'store:database']
+- Queue credentials may be intercepted while the web application reads configuration | ['flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application', 'store:web-application-config']
+- Database credentials may be intercepted while the worker reads configuration | ['flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process', 'store:worker-config']
+- Queued jobs may be readable from storage copies if queue encryption at rest is absent | ['store:message-queue']
+- Database records may be readable from storage copies if encryption at rest is absent | ['store:database']
+- Queue credentials may be recovered from unencrypted web configuration storage | ['store:web-application-config']
+- Database credentials may be recovered from unencrypted worker configuration storage | ['store:worker-config']
+- Queue contents may be disclosed if worker queue authentication is absent or weak | ['store:message-queue', 'flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process']
+- Database records may be disclosed if worker database authentication is absent or weak | ['store:database', 'flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process']
+- Queue credentials may be disclosed if web configuration reads lack authentication | ['store:web-application-config', 'flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application']
+- Database credentials may be disclosed if worker configuration reads lack authentication | ['store:worker-config', 'flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process']
+spent: $0.0353 reported
+must-finds matched: [6, 7]
