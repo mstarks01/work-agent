@@ -1237,8 +1237,8 @@ class Claim(BaseModel):
     def text_of_unit(cls, unit: str) -> str:
         """This framework's own statement of one unit, or ``""``.
 
-        **What a unit says** is asked by the critic view, through
-        :meth:`unit_text`, and by the report page, which lists a row per unit
+        The critic view asks **what a unit says**, through :meth:`unit_text`,
+        and so does the report page, which lists a row per unit
         and would otherwise show a reader an identifier and a verdict with no
         way to tell whether either is right. A package answers from its own
         catalog: ASVS's answer is

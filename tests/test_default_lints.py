@@ -25,7 +25,10 @@ call to it there:
   names as a base, has construction calls that the tree does not show, so the
   lint does not judge its ``__init__``. A read of the class in an annotation,
   in an ``except`` clause, as the owner of an attribute, or in ``isinstance``
-  or ``issubclass`` constructs nothing, so it is no such value read.
+  or ``issubclass`` constructs nothing, so it is no such value read. The lint
+  does not see ``self.__class__(...)``, ``type(other)(...)`` or
+  ``dataclasses.replace`` as a construction call, so a class built only those
+  ways can be a false hit.
 
 A function that production also reads as a value, such as an argument to
 ``functools.partial``, an entry of a table or a ``getattr`` string, has callers
@@ -54,6 +57,7 @@ from tests.source_tree import (
     PYTHON,
     REPO_ROOT,
     SHORTEST_REASON,
+    imports,
     module_name,
     parse,
     source_files,
@@ -174,25 +178,11 @@ def production() -> dict[str, ast.Module]:
     return {module_name(path): parse(path) for path in source_files(*PYTHON)}
 
 
-def _imports(tree: ast.Module) -> dict[str, str]:
-    """Each local name an import in ``tree`` binds, with its dotted target."""
-    bound: dict[str, str] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                head = alias.name.split(".")[0]
-                bound[alias.asname or head] = alias.name if alias.asname else head
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            for alias in node.names:
-                bound[alias.asname or alias.name] = f"{node.module}.{alias.name}"
-    return bound
-
-
 class Resolver:
     """The dotted name each expression reads, through the imports of its module."""
 
     def __init__(self, modules: Mapping[str, ast.Module]) -> None:
-        self._aliases = {module: _imports(tree) for module, tree in modules.items()}
+        self._aliases = {module: imports(tree) for module, tree in modules.items()}
         self._top_level = {
             module: {
                 node.name

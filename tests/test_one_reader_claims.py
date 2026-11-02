@@ -6,8 +6,7 @@ place" or "the single source". A claim is a promise that no second site
 applies the rule, and only a lint keeps that promise as the code moves. So the
 claim must name a site that a lint holds:
 
-- the reader or another site of a row of
-  :data:`~tests.test_one_reader_lints.ONE_READERS`;
+- the reader of a row of :data:`~tests.test_one_reader_lints.ONE_READERS`;
 - a ``(path, function)`` site that a test in ``tests/test_one_reader_lints.py``
   spells, or a name that a table there maps to its file;
 - a function that a test there requires as the callee of a call, where one
@@ -38,6 +37,7 @@ import ast
 import io
 import re
 import tokenize
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import cache
@@ -49,6 +49,7 @@ from tests.source_tree import (
     PYTHON,
     REPO_ROOT,
     SHORTEST_REASON,
+    imports,
     module_name,
     parse,
     source_files,
@@ -105,6 +106,7 @@ _RULED = (
 UNGUARDED_CLAIMS: dict[tuple[str, str], str] = dict.fromkeys(
     [
         ("evals/critic_review/replay.py", "_reading"),
+        ("evals/harness/alignment.py", "protocol_state"),
         ("evals/harness/applicability.py", "Observation"),
         ("evals/harness/applicability.py", "applied_requirements"),
         ("evals/harness/audit.py", "held_out"),
@@ -129,6 +131,7 @@ UNGUARDED_CLAIMS: dict[tuple[str, str], str] = dict.fromkeys(
         ("src/analysis_service/analysis.py", "leading_word"),
         ("src/analysis_service/answer_forms.py", "answer_limit"),
         ("src/analysis_service/answer_sets.py", "within_held_limits"),
+        ("src/analysis_service/answer_state.py", "passes_floor"),
         ("src/analysis_service/answer_state.py", "recommended"),
         ("src/analysis_service/assertion_use.py", "assertion_use"),
         ("src/analysis_service/assertions.py", "settled"),
@@ -177,6 +180,7 @@ UNGUARDED_CLAIMS: dict[tuple[str, str], str] = dict.fromkeys(
         ("src/analysis_service/pipeline.py", "entry_of"),
         ("src/analysis_service/report_conditions.py", "corrected_findings"),
         ("src/analysis_service/sources.py", "plain_name"),
+        ("src/analysis_service/settings_variables.py", "secret_vars"),
         ("src/analysis_service/system_model.py", "capability_facts"),
         ("src/analysis_service/vendors.py", "litellm_provider"),
         ("src/analysis_service/vendors.py", "vendor_for_route"),
@@ -187,8 +191,9 @@ UNGUARDED_CLAIMS: dict[tuple[str, str], str] = dict.fromkeys(
 
 
 @dataclass(frozen=True)
-class Claim:
-    """One claim: where it sits, the symbol that owns it and each symbol it names."""
+class OneReaderClaim:
+    """One one-reader claim: where it sits, the symbol that owns it and each
+    symbol it names in backticks."""
 
     path: str
     line: int
@@ -282,30 +287,32 @@ def _python_claims(path: Path) -> Iterator[tuple[int, str]]:
 
 
 def _script_claims(path: Path) -> Iterator[tuple[int, str]]:
-    """Each claim line in a page script, with the name the next lines define."""
+    """Each claim line in a page script, with the name that the code after
+    its comment defines first."""
     source = path.read_text(encoding="utf-8")
     rows = source.splitlines()
     for comment in _SCRIPT_COMMENT.finditer(source):
         start = source.count("\n", 0, comment.start()) + 1
+        end = source.count("\n", 0, comment.end()) + 1
+        owner = next(
+            (
+                found.group(1)
+                for row in rows[end : end + 15]
+                if (found := _JS_OWNER.search(row))
+            ),
+            path.stem,
+        )
         text = re.sub(r"(?m)^[ \t]*(?://|/?\*+/?)", "", comment.group())
         for line in _matches(text, start):
-            owner = next(
-                (
-                    found.group(1)
-                    for row in rows[line - 1 : line + 15]
-                    if (found := _JS_OWNER.search(row))
-                ),
-                path.stem,
-            )
             yield line, owner
 
 
-def _claims_in(path: Path, name: str) -> list[Claim]:
+def _claims_in(path: Path, name: str) -> list[OneReaderClaim]:
     """Each claim in the file at ``path``, which the claims call ``name``."""
     rows = path.read_text(encoding="utf-8").splitlines()
     read = _python_claims if path.suffix == ".py" else _script_claims
     return [
-        Claim(
+        OneReaderClaim(
             name,
             line,
             owner,
@@ -316,7 +323,7 @@ def _claims_in(path: Path, name: str) -> list[Claim]:
 
 
 @cache
-def claims() -> tuple[Claim, ...]:
+def claims() -> tuple[OneReaderClaim, ...]:
     """Each one-reader claim in :data:`FILES`."""
     found = {
         claim
@@ -379,7 +386,8 @@ def _required_callees(tree: ast.Module) -> Iterator[str]:
 def guarded_sites() -> frozenset[tuple[str, str]]:
     """Each ``(path, function)`` site that a lint holds.
 
-    - the reader and each other site of each ``ONE_READERS`` row;
+    - the reader of each ``ONE_READERS`` row, and never a site that a row
+      names as no second reader;
     - each site that ``tests/test_one_reader_lints.py`` spells;
     - each callee that a test there requires, at its one definition. A name
       that several definitions hold, or none, names no site.
@@ -387,8 +395,9 @@ def guarded_sites() -> frozenset[tuple[str, str]]:
     tree = parse(REPO_ROOT / "tests" / "test_one_reader_lints.py")
     held = {path.relative_to(REPO_ROOT).as_posix() for path in FILES}
     sites = {site for site in _site_literals(tree) if site[0] in held}
-    for row in ONE_READERS.values():
-        sites |= {row.reader, *row.others}
+    readers = {row.reader for row in ONE_READERS.values()}
+    exempt = {site for row in ONE_READERS.values() for site in row.others}
+    sites = (sites - exempt) | readers
     defined: dict[str, set[str]] = {}
     for path in FILES:
         if path.suffix == ".py":
@@ -418,15 +427,7 @@ def _imported(path: str) -> dict[str, str]:
     dotted name it reads. A file the lint does not read binds nothing."""
     if path not in _modules().values():
         return {}
-    bound = {}
-    for node in ast.walk(parse(REPO_ROOT / path)):
-        if isinstance(node, ast.ImportFrom) and node.module:
-            for alias in node.names:
-                bound[alias.asname or alias.name] = f"{node.module}.{alias.name}"
-        elif isinstance(node, ast.Import):
-            for alias in node.names:
-                bound[alias.asname or alias.name] = alias.name
-    return bound
+    return imports(parse(REPO_ROOT / path))
 
 
 def _site_of(reference: str, path: str) -> tuple[str, str]:
@@ -448,7 +449,7 @@ def _site_of(reference: str, path: str) -> tuple[str, str]:
     return path, parts[-1]
 
 
-def guarded(claim: Claim) -> bool:
+def guarded(claim: OneReaderClaim) -> bool:
     """Whether ``claim``'s owner, in its own file, is a guarded site, or the
     claim names the function of a guarded site in backticks."""
     sites = guarded_sites()
@@ -457,7 +458,7 @@ def guarded(claim: Claim) -> bool:
     )
 
 
-def unguarded() -> list[Claim]:
+def unguarded() -> list[OneReaderClaim]:
     """Each claim that names no guard."""
     return [claim for claim in claims() if not guarded(claim)]
 
@@ -484,6 +485,14 @@ def test_each_kept_claim_is_still_an_unguarded_claim(key):
         f"{key} is in UNGUARDED_CLAIMS, but no unguarded claim sits there; drop"
         " the entry"
     )
+
+
+def test_a_kept_entry_keeps_one_claim():
+    """An entry keys one claim. A second unguarded claim under a kept owner
+    is a new claim, which the ruling does not cover."""
+    kept = Counter(claim.key for claim in unguarded() if claim.key in UNGUARDED_CLAIMS)
+
+    assert [key for key, count in kept.items() if count > 1] == []
 
 
 @pytest.mark.parametrize("key", sorted(UNGUARDED_CLAIMS), ids="/".join)
@@ -541,6 +550,33 @@ def test_the_lint_reads_the_owner_and_the_named_symbol(tmp_path):
     ]
     assert [guarded(claim) for claim in found] == [True, False, True]
     assert not any(guarded(claim) for claim in elsewhere)
+
+
+def test_a_dotted_name_resolves_through_its_module_and_the_imports(tmp_path):
+    """Positive and negative controls for a dotted or imported reference.
+
+    A dotted reference resolves to a function of the module it names. A bare
+    name that the claim's file imports resolves through that import. The
+    reader's name under another module does not resolve to the reader.
+    """
+    place, reader = ONE_READERS["the frameworks a job names"].reader
+    importer = "src/analysis_service/deployment.py"
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        f"#: :func:`{module_name(REPO_ROOT / place)}.{reader}` is the one reader.\n"
+        "FIRST = 1\n"
+        "\n"
+        f"#: :func:`analysis_service.jobs.{reader}` is the one reader of them.\n"
+        "SECOND = 2\n"
+        "\n"
+        f"#: :func:`{reader}` is the one reader of the rule.\n"
+        "THIRD = 3\n",
+        encoding="utf-8",
+    )
+    found = sorted(_claims_in(probe, importer), key=lambda claim: claim.line)
+
+    assert reader in _imported(importer)
+    assert [guarded(claim) for claim in found] == [True, False, True]
 
 
 def test_the_lint_reads_a_real_population():

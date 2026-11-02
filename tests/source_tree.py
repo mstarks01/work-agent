@@ -185,6 +185,20 @@ def module_name(path: Path) -> str:
     return ".".join(parts)
 
 
+def imports(tree: ast.Module) -> dict[str, str]:
+    """Each local name an import in ``tree`` binds, with its dotted target."""
+    bound: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                head = alias.name.split(".")[0]
+                bound[alias.asname or head] = alias.name if alias.asname else head
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                bound[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    return bound
+
+
 @cache
 def parse(path: Path) -> ast.Module:
     """The parsed module at ``path``, read once per session. Walk it; never edit it."""
