@@ -41,6 +41,9 @@ def digests(commit: str, roots: tuple[str, ...]) -> dict[str, str]:
 
 
 def main(revision: str, run_commit: str) -> None:
+    revision, run_commit = (
+        _git("rev-parse", one).strip() for one in (revision, run_commit)
+    )
     roots = (*REQUEST_ROOTS, *WIDER)
     at_revision, at_run = digests(revision, roots), digests(run_commit, roots)
     checked = json.loads(REQUEST_CHECK.read_text())["inputs"]
