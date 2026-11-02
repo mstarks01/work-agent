@@ -1567,3 +1567,471 @@ def test_the_raw_body_guard_has_one_reader():
         ("src/analysis_service/api.py", "create_app"),
         ("webapp/main.py", "_job_body"),
     ]
+
+
+# The rules a docstring calls "the one reader" of, each with its own match.
+
+
+def _loads(node: ast.AST, name: str) -> bool:
+    """Whether ``node`` reads the name ``name``."""
+    return (
+        isinstance(node, ast.Name)
+        and node.id == name
+        and isinstance(node.ctx, ast.Load)
+    )
+
+
+def _loads_attribute(node: ast.AST, attr: str) -> bool:
+    """Whether ``node`` reads an attribute named ``attr``."""
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == attr
+        and isinstance(node.ctx, ast.Load)
+    )
+
+
+def _is_constant(node: ast.AST, value: object) -> bool:
+    return isinstance(node, ast.Constant) and node.value == value
+
+
+def _parses_a_version_segment(node: ast.AST) -> bool:
+    return _calls(node, "ascii_int") and isinstance(node.args[0], ast.Subscript)
+
+
+def _reads_a_flow_label(node: ast.AST) -> bool:
+    return _loads_attribute(node, "label") and _calls(node.value, "parse_flow_id")
+
+
+#: The score fields that hold an extraction's endpoint keys.
+_ENDPOINT_FIELDS = frozenset({"endpoint_missing", "missing", "matched"})
+
+
+def _splits_the_zones_of_a_score(node: ast.AST) -> bool:
+    """A comprehension over a score's endpoint keys that keeps the zones."""
+    if not isinstance(node, ast.ListComp | ast.SetComp | ast.GeneratorExp):
+        return False
+    over_keys = any(
+        isinstance(sub, ast.Attribute) and sub.attr in _ENDPOINT_FIELDS
+        for generator in node.generators
+        for sub in ast.walk(generator.iter)
+    )
+    keeps_zones = any(
+        _calls(sub, "is_zone")
+        for generator in node.generators
+        for test in generator.ifs
+        for sub in ast.walk(test)
+    )
+    return over_keys and keeps_zones
+
+
+def _scores_an_assertion_run(node: ast.AST) -> bool:
+    """A function that takes a signed reference and an assertion run."""
+    if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+        return False
+    annotations = {
+        ast.unparse(argument.annotation)
+        for argument in (*node.args.args, *node.args.kwonlyargs)
+        if argument.annotation is not None
+    }
+    return {"SignedReference", "AssertionResult"} <= annotations
+
+
+def _keys_a_crossing(node: ast.AST) -> bool:
+    return (
+        _calls(node, "_endpoint_key")
+        and bool(node.args)
+        and _loads_attribute(node.args[0], "flow_id")
+    )
+
+
+def _finds_an_assumed_zone(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Compare):
+        return False
+    sides = (node.left, *node.comparators)
+    return any(_loads_attribute(side, "attribute") for side in sides) and any(
+        _loads(side, "ZONE_ATTRIBUTE") or _is_constant(side, "trust_zone")
+        for side in sides
+    )
+
+
+def _places_a_field_question(node: ast.AST) -> bool:
+    return isinstance(node, ast.Subscript) and _calls(node.value, "group_of")
+
+
+def _counts_a_charge(node: ast.AST) -> bool:
+    return (
+        _calls(node, "get")
+        and isinstance(node.func, ast.Attribute)
+        and _loads(node.func.value, "charged")
+    )
+
+
+def _renames_the_carried_answers(node: ast.AST) -> bool:
+    return (
+        _calls(node, "renamed")
+        and bool(node.args)
+        and _loads_attribute(node.args[0], "carried")
+    )
+
+
+def _walks_the_scoped_controls(node: ast.AST) -> bool:
+    return isinstance(node, ast.For) and _loads(node.iter, "IN_SCOPE")
+
+
+def _reads_a_unit_text(node: ast.AST) -> bool:
+    return _calls(node, "requirement_text") or _loads(node, "_TEXT_BY_ID")
+
+
+def _marks_a_read_back(node: ast.AST) -> bool:
+    return _is_constant(node, "stored") or (
+        _loads_attribute(node, "context") and _loads(node.value, "info")
+    )
+
+
+def _opens_an_answered_row(node: ast.AST) -> bool:
+    if not _calls(node, "model_copy"):
+        return False
+    return any(
+        keyword.arg == "update"
+        and isinstance(keyword.value, ast.Dict)
+        and any(
+            _is_constant(key, "value") and _loads(value, "UNKNOWN")
+            for key, value in zip(keyword.value.keys, keyword.value.values)
+            if key is not None
+        )
+        for keyword in node.keywords
+    )
+
+
+def _reads_a_requirement_level(node: ast.AST) -> bool:
+    return _calls(node, "requirement_level") or _loads(node, "_LEVEL_BY_ID")
+
+
+#: The admission bounds a job is held to.
+_ADMISSION_BOUNDS = frozenset(
+    {"max_jobs_per_window", "max_tokens_per_window", "global_max_tokens_per_window"}
+)
+
+
+def _compares_an_admission_bound(node: ast.AST) -> bool:
+    return isinstance(node, ast.Compare) and any(
+        isinstance(side, ast.Attribute) and side.attr in _ADMISSION_BOUNDS
+        for side in (node.left, *node.comparators)
+    )
+
+
+def _finds_a_stated_protocol(node: ast.AST) -> bool:
+    if isinstance(node, ast.Tuple):
+        return len(node.elts) == 2 and _is_constant(node.elts[1], "protocol")
+    if not isinstance(node, ast.Compare):
+        return False
+    sides = (node.left, *node.comparators)
+    return any(_is_constant(side, "protocol") for side in sides) and any(
+        _loads_attribute(side, "attribute") for side in sides
+    )
+
+
+def _counts_element_ids(node: ast.AST) -> bool:
+    if not (_calls(node, "Counter") and node.args):
+        return False
+    counted = node.args[0]
+    return (
+        isinstance(counted, ast.ListComp | ast.GeneratorExp)
+        and _loads_attribute(counted.elt, "id")
+        and _loads(counted.elt.value, "element")
+    )
+
+
+def _compares_a_slug(node: ast.AST) -> bool:
+    """A comparison with the part of an ID after its prefix."""
+
+    def slug(side: ast.expr) -> bool:
+        if not (isinstance(side, ast.Subscript) and isinstance(side.value, ast.Call)):
+            return False
+        cut = side.value
+        index = side.slice
+        return (_calls(cut, "partition") and _is_constant(index, 2)) or (
+            _calls(cut, "split")
+            and isinstance(index, ast.UnaryOp)
+            and _is_constant(index.operand, 1)
+        )
+
+    return isinstance(node, ast.Compare) and any(
+        slug(side) for side in (node.left, *node.comparators)
+    )
+
+
+def _reads_a_cache_rule(node: ast.AST) -> bool:
+    return _loads_attribute(node, "prompt_cache") or _calls(node, "accepts")
+
+
+@dataclasses.dataclass(frozen=True)
+class _OneReader:
+    """A rule that one function reads.
+
+    ``match`` finds each node that applies the rule, ``reader`` is the site
+    that reads it, and ``others`` keys each other site that ``match`` finds
+    to the reason it is no second reader. ``within`` is the path prefix of the
+    sites the rule covers.
+    """
+
+    match: Callable[[ast.AST], bool]
+    reader: Site
+    others: dict[Site, str]
+    within: str
+
+
+#: Each rule a docstring calls "the one reader" of, by the rule's name.
+ONE_READERS: dict[str, _OneReader] = {
+    "a version segment": _OneReader(
+        _parses_a_version_segment,
+        ("evals/harness/content.py", "stored_version"),
+        {},
+        "",
+    ),
+    "a rejection's steps in an eval instrument": _OneReader(
+        lambda node: _loads_attribute(node, "rejected_because"),
+        ("evals/harness/critic_yield.py", "rejection_steps"),
+        {
+            ("evals/harness/attribution.py", "_charge_miss"): (
+                "the loss attribution charges a miss to the critic, a separate"
+                " instrument with a rule of its own"
+            ),
+        },
+        "evals/",
+    ),
+    "a flow's label": _OneReader(
+        _reads_a_flow_label,
+        ("src/analysis_service/system_model.py", "flow_label"),
+        {},
+        "",
+    ),
+    "the trust zones of an extraction score": _OneReader(
+        _splits_the_zones_of_a_score, ("evals/harness/modes.py", "_zones"), {}, ""
+    ),
+    "an assertion run against its signed reference": _OneReader(
+        _scores_an_assertion_run,
+        ("evals/harness/replay.py", "replay_assertions"),
+        {
+            ("evals/harness/replay.py", "aligned_rows"): (
+                "the row alignment that replay_assertions calls, and nothing else"
+                " calls it"
+            ),
+        },
+        "",
+    ),
+    "a decided crossing's endpoint key": _OneReader(
+        _keys_a_crossing, ("evals/harness/modes.py", "_crossing_keys"), {}, ""
+    ),
+    "an assumed trust zone": _OneReader(
+        _finds_an_assumed_zone,
+        ("src/analysis_service/system_model.py", "assumed_zone_elements"),
+        {},
+        "",
+    ),
+    "the place a question's limit counts": _OneReader(
+        _places_a_field_question,
+        ("src/analysis_service/answer_state.py", "limit_place"),
+        {},
+        "",
+    ),
+    "the turn rule": _OneReader(
+        _counts_a_charge,
+        ("src/analysis_service/answer_state.py", "whose_turn"),
+        {},
+        "",
+    ),
+    "what a new analysis carries": _OneReader(
+        _renames_the_carried_answers,
+        ("src/analysis_service/jobs.py", "held_answers"),
+        {},
+        "",
+    ),
+    "whether a quote names where it sits": _OneReader(
+        lambda node: _calls(node, "placements"),
+        ("src/analysis_service/assertions.py", "ambiguous_quote"),
+        {},
+        "",
+    ),
+    "which values the control diagnostic measures": _OneReader(
+        _walks_the_scoped_controls,
+        ("src/analysis_service/basis.py", "control_measurability"),
+        {},
+        "",
+    ),
+    "a framework's own text of a unit": _OneReader(
+        _reads_a_unit_text,
+        ("src/analysis_service/frameworks/asvs/record.py", "text_of_unit"),
+        {
+            ("src/analysis_service/frameworks/asvs/catalog.py", "requirement_text"): (
+                "the package's catalog reader, which text_of_unit calls"
+            ),
+            ("evals/build_review_docs.py", "_standard"): (
+                "the review documents of one package's corpus read that"
+                " package's catalog, and the neutral seam serves a ruling"
+            ),
+        },
+        "",
+    ),
+    "a bare secret beside its file variable": _OneReader(
+        lambda node: _calls(node, "refused_var"),
+        ("src/analysis_service/config_files.py", "refuse_bare_secret"),
+        {
+            ("webapp/settings_page.py", "_credential_settings"): (
+                "it names a key's setting on the page from the variable, and it"
+                " refuses nothing"
+            ),
+            ("webapp/settings_save.py", "_key_stem"): (
+                "it names the stem of a key file from the variable, and it"
+                " refuses nothing"
+            ),
+        },
+        "",
+    ),
+    "when a part waits on its parent": _OneReader(
+        lambda node: _calls(node, "asked_parent"),
+        ("src/analysis_service/early_questions.py", "waiting_parts"),
+        {
+            ("src/analysis_service/early_questions.py", "capability_questions"): (
+                "it orders the capability questions under their parents, and"
+                " decides no wait"
+            ),
+            ("src/analysis_service/early_questions.py", "depth"): (
+                "it counts a question's depth for the order, and decides no wait"
+            ),
+        },
+        "",
+    ),
+    "a submission or a read-back": _OneReader(
+        _marks_a_read_back,
+        ("src/analysis_service/fact_answers.py", "_read_back"),
+        {
+            ("src/analysis_service/fact_answers.py", "<module>"): (
+                "the context a read-back passes, which the stores write"
+            ),
+        },
+        "",
+    ),
+    "the row an answer settles": _OneReader(
+        _opens_an_answered_row,
+        ("src/analysis_service/fact_answers.py", "answered_row"),
+        {},
+        "",
+    ),
+    "a fact's history": _OneReader(
+        lambda node: _is_constant(node, "unanswered"),
+        ("src/analysis_service/fact_answers.py", "fact_status"),
+        {
+            ("src/analysis_service/fact_answers.py", "<module>"): (
+                "the FactStatus type that declares the set of histories"
+            ),
+        },
+        "",
+    ),
+    "how a published catalog ranks a requirement": _OneReader(
+        _reads_a_requirement_level,
+        ("src/analysis_service/frameworks/asvs/catalog.py", "requirement_band"),
+        {
+            ("src/analysis_service/frameworks/asvs/catalog.py", "requirement_level"): (
+                "the level lookup that requirement_band calls"
+            ),
+        },
+        "",
+    ),
+    "an open protocol for a web precondition": _OneReader(
+        lambda node: _calls(node, "states_a_protocol"),
+        ("src/analysis_service/frameworks/asvs/rules.py", "_protocol_unsettled"),
+        {
+            ("evals/harness/alignment.py", "protocol_state"): (
+                "it reduces a protocol to stated or silent for the scorer, and"
+                " asks no precondition"
+            ),
+        },
+        "",
+    ),
+    "whether a resumed job locks its parent": _OneReader(
+        lambda node: _loads(node, "NON_LOCKING_STATUSES"),
+        ("src/analysis_service/jobs.py", "locks_its_parent"),
+        {},
+        "",
+    ),
+    "the admission bounds": _OneReader(
+        _compares_an_admission_bound,
+        ("src/analysis_service/jobs.py", "check_bounds"),
+        {},
+        "",
+    ),
+    "a model's family past its gateways": _OneReader(
+        lambda node: _loads(node, "_GATEWAY_PREFIX"),
+        ("src/analysis_service/vendors.py", "family_identifier"),
+        {},
+        "",
+    ),
+    "whether a flow's protocol is a basis": _OneReader(
+        _finds_a_stated_protocol,
+        ("src/analysis_service/protocol_defaults.py", "stated_protocol_flows"),
+        {},
+        "",
+    ),
+    "the bound a pinned upstream takes": _OneReader(
+        lambda node: _loads_attribute(node, "bounds_by_upstream"),
+        ("src/analysis_service/resilience.py", "_pinned"),
+        {
+            ("src/analysis_service/resilience.py", "_check_upstream_keys"): (
+                "it checks the table's keys when the file loads, and reads no bound"
+            ),
+        },
+        "",
+    ),
+    "whether an element ID is unique": _OneReader(
+        _counts_element_ids,
+        ("src/analysis_service/system_model.py", "duplicate_ids"),
+        {},
+        "",
+    ),
+    "an endpoint that follows a slug": _OneReader(
+        _compares_a_slug,
+        ("src/analysis_service/system_model.py", "follow_by_slug"),
+        {
+            ("evals/harness/replay.py", "_node_fate"): (
+                "it labels a missed reference node in an eval replay, and"
+                " resolves no endpoint"
+            ),
+        },
+        "",
+    ),
+    "whether a model takes the cache breakpoint": _OneReader(
+        _reads_a_cache_rule,
+        ("src/analysis_service/vendors.py", "caches_prompt_prefix"),
+        {},
+        "",
+    ),
+    "a cloud resource identifier": _OneReader(
+        lambda node: _loads(node, "_RESOURCE_FORMS"),
+        ("src/analysis_service/vendors.py", "_resource_form"),
+        {},
+        "",
+    ),
+}
+
+
+@pytest.mark.parametrize("rule", sorted(ONE_READERS))
+def test_a_rule_with_one_reader_has_no_second(rule):
+    """Each rule a docstring calls "the one reader" of is applied at its
+    reader, and at each other site only for the reason the row gives."""
+    row = ONE_READERS[rule]
+    found = [site for site in _sites(row.match) if site[0].startswith(row.within)]
+
+    assert found == sorted([row.reader, *row.others])
+
+
+@pytest.mark.parametrize(
+    ("rule", "reason"),
+    [
+        (rule, reason)
+        for rule, row in ONE_READERS.items()
+        for reason in row.others.values()
+    ],
+)
+def test_each_other_site_of_a_rule_says_why(rule, reason):
+    assert len(reason) >= 40, rule

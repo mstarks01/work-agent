@@ -1311,8 +1311,11 @@ class RuledClaim(Claim):
         """The open facts this claim waits on: its ``needs-info`` verdict's
         ``related_unknowns``, or none for any other verdict.
 
-        **The one reader of "what a finding waits on"** (ADR 0094). The card,
-        the open-facts grouping and the follow-up's counts and order call it.
+        **The reader of "what a finding waits on"** (ADR 0094) for the card,
+        the open-facts grouping and the follow-up's counts and order. Other
+        readers read ``verdict.related_unknowns`` directly, which holds the
+        same facts, because the verdict keeps it empty unless it is
+        ``needs-info``.
         A ground the critic dismissed in ``immaterial_unknowns`` is not one;
         :func:`~analysis_service.critic.complete_rulings` adds every other
         unknown ground to ``related_unknowns``.

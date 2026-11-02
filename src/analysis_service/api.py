@@ -331,7 +331,7 @@ class JobSubmission(BaseModel):
     The order of the list decides nothing. The report's analysis blocks follow
     the order of ``config/frameworks.toml``, whatever order the submission
     listed (ADR 0102). :func:`~analysis_service.selection.resolve_selection`
-    is the one reader of that rule.
+    puts the selection in that order.
     """
 
     model_config = ConfigDict(extra="forbid")

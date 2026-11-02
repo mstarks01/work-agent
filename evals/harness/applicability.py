@@ -334,11 +334,12 @@ def split_references(
 ) -> tuple[list[ReferenceRequirement], list[ReferenceRequirement]]:
     """A case's ASVS records as ``(positives, negatives)``.
 
-    **The one reader of what an expected requirement is.** A record labelled
-    ``not-applicable`` says the requirement does *not* apply, so it belongs in
-    no expected set: a run that excludes it is right. Both scorers that build
-    an expected set read it here, so they cannot disagree about which records
-    count.
+    **The split of a case's records for the applicability and yield
+    scorers.** A record labelled ``not-applicable`` says the requirement does
+    *not* apply, so it belongs in no expected set: a run that excludes it is
+    right. Both scorers that build an expected set read it here, so they cannot
+    disagree about which records count. The disposition tables compare a
+    record's ``expected`` with ``not-applicable`` themselves.
     """
     records = list(references)
     positives = [ref for ref in records if ref.disposition != "not-applicable"]
