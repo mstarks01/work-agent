@@ -162,7 +162,7 @@ DECLARED: dict[str, str] = {
     ),
     "evals/experiments/QA-2026-11-02-05/read_capabilities_v2.py": (
         "This code is that framework's: it reads the same decisions as"
-        " `read_capabilities.py`, and it is the script that made the E4 calls."
+        " `read_capabilities.py`, through the same request."
     ),
     "evals/experiments/QA-2026-11-02-05/read_capabilities_v1.py": (
         "This code is that framework's: it reads the same decisions as"

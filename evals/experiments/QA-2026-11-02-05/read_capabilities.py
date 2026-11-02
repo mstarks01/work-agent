@@ -8,7 +8,7 @@ valid-route payload, ``VALID_TURN``.
 
 ``capture_turn.py`` holds the rebuilt instruction and turn against the request
 of a real graph run on case 15. It writes ``runs/request-check.json`` with a
-digest of each file in ``REQUEST_INPUTS``. This script refuses to call unless
+digest of each tracked file under ``REQUEST_ROOTS``. This script refuses to call unless
 the check passed and no digest moved. The only case input to the request is
 the Sources text, so the check on one case covers the turn and the template
 filling of every case.
@@ -26,6 +26,7 @@ paid call, and the charge is the one the provider reported.
 
 import asyncio
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -72,25 +73,21 @@ async def request_for(case_dir: Path) -> tuple[str, Any]:
     )
 
 
-#: The files that decide the instruction and the turn: the graph's gate and
-#: node wiring, the request builder, the prompt, its loader, its table, the
-#: rendering, and the lock file that pins ADK's state injection.
-REQUEST_INPUTS = (
-    "src/analysis_service/graph.py",
-    "src/analysis_service/node_requests.py",
-    "src/analysis_service/prompts.py",
-    "src/analysis_service/markdown_loader.py",
-    "src/analysis_service/capabilities.py",
-    "src/analysis_service/execution.py",
-    "src/analysis_service/sources.py",
-    "prompts/capabilities.md",
-    "uv.lock",
-)
+#: Where the files that can decide the instruction and the turn live: all of
+#: the service's code, its prompts, and the lock file that pins ADK's state
+#: injection. Every tracked file there is digested, so no list is kept by hand.
+REQUEST_ROOTS = ("src", "prompts", "uv.lock")
 
 
 def input_digests() -> dict[str, str]:
-    """Each file of ``REQUEST_INPUTS`` with the digest of its text."""
-    return {path: text_digest(Path(path).read_text()) for path in REQUEST_INPUTS}
+    """Each tracked file under ``REQUEST_ROOTS`` with the digest of its text."""
+    tracked = subprocess.run(
+        ["git", "ls-files", "--", *REQUEST_ROOTS],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+    return {path: text_digest(Path(path).read_text()) for path in tracked}
 
 
 def refuse_unchecked() -> None:

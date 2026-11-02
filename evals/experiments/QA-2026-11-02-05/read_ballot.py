@@ -1,20 +1,23 @@
 """Read the returned ballot of QA-2026-11-02-05 into the counts its rows need.
 
-The returned file is ``ballot-returned.csv``. Each issued column must be
-unchanged, each verdict must be in its check's set, and ``duplicate_of`` and
-``pair_of`` must name a row of the same check and the same group. A file that
-breaks one of these is refused by name.
+The returned file is ``ballot-returned.csv``. Its header must be ``COLUMNS``,
+each ``n`` must appear once, each issued column must be unchanged, each verdict
+must be in its check's set, and ``duplicate_of`` and ``pair_of`` must name
+another row of the same check and the same group. A row may be in one pair at
+most, and a link written on both rows counts once. A file that breaks one of
+these is refused by name. The file may carry the byte-order mark a spreadsheet
+writes.
 
 The counts are the ones the E2 and E3 falsifiers read:
 
 * E3 targets, in target places by runs: a target store of a run counts once
-  where at least one of the run's drafts at it is ruled ``same``. Two stores
-  and two runs give four.
+  where at least one of the run's drafts at it is ruled ``same``. The
+  denominator is the target stores by the runs on disk.
 * E3 controls: the ``yes`` rulings of each control in each run, with 0 for a
   run that has none. A copy control fails in a run with 0; a no-read control
   fails in a run with more than 0.
-* E2: the ``right``, ``wrong``, ``duplicate`` and ``unsure`` rulings, the pairs
-  (each unordered ``pair_of`` link counted once) and the duplicates, by group.
+* E2: the ``right``, ``wrong``, ``duplicate`` and ``unsure`` rulings, and the
+  pairs and the duplicates by group.
 
 Usage, from the repository root: ``read_ballot.py``.
 """
@@ -27,7 +30,7 @@ from pathlib import Path
 from typing import cast
 
 sys.path.insert(0, str(Path(__file__).parent))
-from build_ballot import COLUMNS, DRAFTS, RUNS, VERDICTS, Check
+from build_ballot import CHECKS, COLUMNS, Check, runs
 
 HERE = Path(__file__).parent
 RULED = ("verdict", "duplicate_of", "pair_of", "note")
@@ -38,8 +41,16 @@ class BallotError(ValueError):
 
 
 def _rows(path: Path) -> dict[str, dict[str, str]]:
-    with path.open(newline="") as handle:
-        return {row["n"]: row for row in csv.DictReader(handle)}
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        reader = csv.DictReader(handle)
+        if tuple(reader.fieldnames or ()) != COLUMNS:
+            raise BallotError(f"{path.name}: the header is not {list(COLUMNS)}")
+        rows: dict[str, dict[str, str]] = {}
+        for row in reader:
+            if row["n"] in rows:
+                raise BallotError(f"{path.name}: row {row['n']} appears twice")
+            rows[row["n"]] = row
+    return rows
 
 
 def _linked(rows, row, column: str) -> dict[str, str] | None:
@@ -61,60 +72,63 @@ def _linked(rows, row, column: str) -> dict[str, str] | None:
     return other
 
 
-def _run_names(check: Check) -> list[str]:
-    """Every run of a check, whether or not the ballot holds a row from it."""
-    return sorted(path.stem for path in RUNS.glob(DRAFTS[check][0]))
-
-
 def read(returned: Path, issued: Path, key_path: Path) -> dict:
     rows = _rows(returned)
     sent = _rows(issued)
     key = {str(entry["n"]): entry for entry in json.loads(key_path.read_text())}
     if rows.keys() != sent.keys():
         raise BallotError("the returned rows are not the issued rows")
+    pairs: set[frozenset[str]] = set()
     for n, row in rows.items():
         changed = [c for c in COLUMNS if c not in RULED and row[c] != sent[n][c]]
         if changed:
             raise BallotError(f"row {n}: the issued columns {changed} changed")
-        if row["check"] not in VERDICTS:
-            raise BallotError(f"row {n}: {row['check']!r} is not a check")
         check = cast(Check, row["check"])
-        if row["verdict"] not in VERDICTS[check]:
-            raise BallotError(
-                f"row {n}: {row['verdict']!r} is not a {row['check']} verdict"
-            )
+        if row["verdict"] not in CHECKS[check].verdicts:
+            raise BallotError(f"row {n}: {row['verdict']!r} is not a {check} verdict")
         duplicate = _linked(rows, row, "duplicate_of")
         if (duplicate is None) != (row["verdict"] != "duplicate"):
             raise BallotError(
                 f"row {n}: a duplicate names its row, and only a duplicate"
             )
         pair = _linked(rows, row, "pair_of")
-        if pair is not None and (row["verdict"], pair["verdict"]) != ("right", "right"):
-            raise BallotError(f"row {n}: a pair links two right rows")
+        if pair is not None:
+            if (row["verdict"], pair["verdict"]) != ("right", "right"):
+                raise BallotError(f"row {n}: a pair links two right rows")
+            pairs.add(frozenset((n, pair["n"])))
+    paired = Counter(member for pair in pairs for member in pair)
+    if twice := sorted(n for n, count in paired.items() if count > 1):
+        raise BallotError(f"rows {twice} are each in more than one pair")
 
-    targets = DRAFTS["item4"][1]
+    claims = {
+        (run, claim["sequence"]): claim
+        for check in CHECKS
+        for run, output in runs(check)
+        for claim in output["claims"]
+    }
+
+    def stores_of(n: str) -> set[str]:
+        claim = claims[(key[n]["run"], key[n]["sequence"])]
+        return set(claim["affected_element_ids"])
+
+    targets = CHECKS["item4"].stores
     assert targets is not None
     places = {
         (key[n]["run"], store)
         for n, row in rows.items()
         if row["check"] == "item4" and row["verdict"] == "same"
-        for store in targets & set(row["elements"].split("; "))
-    }
-    pairs = {
-        frozenset((n, row["pair_of"].strip()))
-        for n, row in rows.items()
-        if row["check"] == "item2" and row["pair_of"].strip()
+        for store in targets & stores_of(n)
     }
     return {
         "verdicts": {
             check: dict(
                 Counter(r["verdict"] for r in rows.values() if r["check"] == check)
             )
-            for check in VERDICTS
+            for check in CHECKS
         },
         "e3_target_places": {
             "same": len(places),
-            "of": len(targets) * len(_run_names("item4")),
+            "of": len(targets) * len(runs("item4")),
         },
         "e3_control_yes_by_run": {
             check: {
@@ -125,9 +139,10 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
                     and key[n]["run"] == run
                     and r["verdict"] == "yes"
                 )
-                for run in _run_names(check)
+                for run, _ in runs(check)
             }
-            for check in ("item4-copy-control", "item4-no-read-control")
+            for check, spec in CHECKS.items()
+            if spec.control
         },
         "e2_pairs_by_group": dict(Counter(rows[min(p)]["group"] for p in pairs)),
         "e2_duplicates_by_group": dict(

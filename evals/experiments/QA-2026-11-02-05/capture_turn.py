@@ -13,7 +13,9 @@ sampling: ``node_call`` sends those from the deployment.
 
 Usage, from the repository root:
 
-    capture_turn.py <out.json> <case dir> [<case dir> ...]
+    capture_turn.py <case dir> [<case dir> ...]
+
+It writes ``read_capabilities.REQUEST_CHECK``, the file the paid script reads.
 """
 
 import asyncio
@@ -30,7 +32,7 @@ from analysis_service.system_model import SystemModel
 from tests.factories import ScriptedLlm, emitted, sample_selection, scripted_pipeline
 
 sys.path.insert(0, str(Path(__file__).parent))
-from read_capabilities import input_digests, request_for, sources_of
+from read_capabilities import REQUEST_CHECK, input_digests, request_for, sources_of
 
 
 class Recording(ScriptedLlm):
@@ -74,7 +76,7 @@ def captured(case: Path):
     return reader.requests[0]
 
 
-def main(out: str, case_dirs: list[str]) -> None:
+def main(case_dirs: list[str]) -> None:
     checks = {}
     for case_dir in map(Path, case_dirs):
         request = captured(case_dir)
@@ -87,7 +89,7 @@ def main(out: str, case_dirs: list[str]) -> None:
             "turn_equal": [turn.model_dump(mode="json", exclude_none=True)] == contents,
             "captured_turn": contents,
         }
-    Path(out).write_text(
+    REQUEST_CHECK.write_text(
         json.dumps({"inputs": input_digests(), "cases": checks}, indent=1) + "\n"
     )
     print(
@@ -98,4 +100,4 @@ def main(out: str, case_dirs: list[str]) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2:])
+    main(sys.argv[1:])
