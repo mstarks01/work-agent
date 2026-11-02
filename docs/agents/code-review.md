@@ -80,6 +80,55 @@ So the check does not guard a pull request that changes
 `.github/workflows/five-class.yml`. The reviewer of such a pull request reads
 the workflow diff.
 
+### The standards read before the merge
+
+The author of a diff reads it against the five classes, but the author also
+believes the design is right, so the author misses the defects that come from
+that design. Before the merge of each pull request that changes a code path,
+a second reader reads the diff against the standards. That reader is a
+sub-task or a person who did not write the diff.
+
+Give the reader only these inputs:
+
+- the diff of the pull request head, and the files it touches;
+- `AGENTS.md`, `GLOSSARY.md` and each guide in `docs/agents/`;
+- the smell list and the classes that come back, below.
+
+Do not give the reader the author's reasons. Start the read when the head is
+pushed, so it runs while CI runs. The author fixes each finding, or answers it
+with evidence in the pull request body. A fix makes a new head, and a new head
+needs a new read.
+
+**The smell list.** Each smell is a judgement call, and a rule in these guides
+overrides it:
+
+| Smell | What the reader looks for |
+|---|---|
+| Mysterious Name | a name that does not say what the value holds or what the function does |
+| Duplicated Code | the same steps in two hunks or two files |
+| Feature Envy | a function that reads another object's fields more than its own |
+| Data Clumps | the same few parameters or fields that always go together |
+| Primitive Obsession | a bare string, number or bool that stands for a domain concept |
+| Repeated Switches | the same branch on the same value in more than one place |
+| Shotgun Surgery | one change that needs edits in many files |
+| Divergent Change | one module that changes for unrelated reasons |
+| Speculative Generality | a parameter, hook or layer that no caller needs |
+| Message Chains | a caller that walks a long chain of attributes |
+| Middle Man | a function or class that only passes a call on |
+| Refused Bequest | a subclass that does not fit what its base says |
+
+**The classes that come back in fixes.** The review of 2026-11-02 found these
+in the fix pull requests of the review before it:
+
+| Class | What the reader checks |
+|---|---|
+| A second reader | each new helper or rule: is there one reader, and does a lint refuse a second? |
+| A claim with no guard | each "the one reader" comment names a row of `ONE_READERS` |
+| A closed set with no `Literal` | each table or tuple of string keys that code reads as a set |
+| A default only a test omits | each new default: does a caller outside `tests/` omit it? |
+| A type that says the wrong thing | each new exception: does its base describe it? |
+| A name for the wrong thing | each rename: does the new name say what the value holds? |
+
 ## The five defect classes
 
 Every finding in this repository's record — ten audit rounds, the range review
