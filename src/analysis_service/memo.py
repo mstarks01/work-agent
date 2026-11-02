@@ -7,10 +7,11 @@ so :func:`remembered` builds it once and keeps it.
 
 from __future__ import annotations
 
-import hashlib
 from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from typing import TypeVar
+
+from analysis_service.sources import text_digest
 
 __all__ = ["REMEMBERED", "Memo", "remembered"]
 
@@ -42,9 +43,7 @@ def remembered(
     value is immutable and shared. The memo holds :data:`REMEMBERED` values
     and drops the oldest.
     """
-    key = hashlib.sha256(
-        "\x1f".join([*parts, *(str(id(each)) for each in held)]).encode("utf-8")
-    ).hexdigest()
+    key = text_digest("\x1f".join([*parts, *(str(id(each)) for each in held)]))
     if key in memo:
         memo.move_to_end(key)
         return memo[key][1]

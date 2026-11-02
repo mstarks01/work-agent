@@ -68,6 +68,7 @@ from typing import Any, NamedTuple, get_args, get_type_hints
 
 from analysis_service.model_tiers import TierName
 from analysis_service.parsing import non_negative, strings
+from analysis_service.sources import text_digest
 from analysis_service.vendors import vendor_for_route
 
 # The tier whose model names a baseline. Spelled, not indexed: a position in
@@ -223,9 +224,7 @@ class BaselineIdentity:
 
     @property
     def hash(self) -> str:
-        return hashlib.sha256(
-            json.dumps(self.to_json(), sort_keys=True).encode("utf-8")
-        ).hexdigest()
+        return text_digest(json.dumps(self.to_json(), sort_keys=True))
 
     @property
     def name(self) -> str:

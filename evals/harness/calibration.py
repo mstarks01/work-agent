@@ -75,7 +75,6 @@ labels and no provider call happens at all.
 
 from __future__ import annotations
 
-import hashlib
 import itertools
 import json
 from collections import Counter
@@ -87,6 +86,7 @@ from typing import Any, Literal, get_args
 from analysis_service.frameworks import FrameworkName
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
 from analysis_service.parsing import strings
+from analysis_service.sources import text_digest
 from evals.harness.identity import (
     NO_FLOWS,
     CaseFlows,
@@ -154,7 +154,7 @@ def fixture_id(case: str, reference_index: int, candidate_ordinal: int) -> str:
     edit nobody can check.
     """
     material = f"{case}\0{reference_index}\0{candidate_ordinal}"
-    return hashlib.sha256(material.encode()).hexdigest()[:12]
+    return text_digest(material)[:12]
 
 
 @dataclass(frozen=True)

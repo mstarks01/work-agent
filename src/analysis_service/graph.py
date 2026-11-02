@@ -110,7 +110,6 @@ critic seams here.
 from __future__ import annotations
 
 import functools
-import hashlib
 import json
 import logging
 from collections.abc import Callable, Collection, Mapping, Sequence
@@ -242,7 +241,7 @@ from analysis_service.skills import (
     compose_domain_skills,
     compose_lane_skills,
 )
-from analysis_service.sources import render_fenced
+from analysis_service.sources import render_fenced, text_digest
 from analysis_service.system_model import (
     BoundaryCrossing,
     EmittedSystemModel,
@@ -3355,7 +3354,7 @@ def instruction_sizes(llm_nodes: Sequence[LlmAgent]) -> dict[str, InstructionSiz
             raise TypeError(f"node {node.name!r} carries a computed instruction")
         sizes[node.name] = InstructionSize(
             tokens=estimate_tokens(node.instruction),
-            sha256=hashlib.sha256(node.instruction.encode("utf-8")).hexdigest(),
+            sha256=text_digest(node.instruction),
         )
     return sizes
 
@@ -3387,7 +3386,7 @@ def instruction_digest(llm_nodes: Sequence[LlmAgent]) -> str:
         sort_keys=True,
         separators=(",", ":"),
     )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return text_digest(payload)
 
 
 def _node_sampling(

@@ -54,7 +54,6 @@ recomputation rather than by a re-vote.
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -62,6 +61,7 @@ from typing import Any
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.asvs.record import requirement_of
+from analysis_service.sources import text_digest
 from evals.harness.content import stored_version
 from evals.harness.identity import CaseFlows, endpoint_form
 from evals.harness.verbs import canonical, check_verb
@@ -340,7 +340,7 @@ def fingerprint(components: Components, version: int) -> str:
         parts.append(components.identifier)
     # NUL joins the parts because it cannot occur in any of them, so no value
     # can impersonate a boundary between two others.
-    digest = hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
+    digest = text_digest("\0".join(parts))
     return f"v{version}:{digest[:16]}"
 
 
