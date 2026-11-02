@@ -2628,8 +2628,8 @@ def test_the_file_scripts_read_only_a_file_refusal():
     sends, and no other key. A key the server does not send shows nothing."""
     read = {
         key
-        for script in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        for key in re.findall(r"\brefusals\.(\w+)", page_javascript(script.name))
+        for script in STATIC_SCRIPTS
+        for key in re.findall(r"\brefusals\.(\w+)", page_javascript(script))
     }
     assert set(file_refusals(7, 7)) == set(get_args(FileRefusal))
     assert read == set(get_args(FileRefusal))
@@ -2648,8 +2648,8 @@ def test_each_page_reads_only_an_answer_limit():
     not send reads as ``undefined``, and a cap of ``undefined`` caps nothing."""
     read = {
         key
-        for script in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        for key in re.findall(r"\bANSWER_LIMITS\.(\w+)", page_javascript(script.name))
+        for script in STATIC_SCRIPTS
+        for key in re.findall(r"\bANSWER_LIMITS\.(\w+)", page_javascript(script))
     }
     assert read
     assert read <= ANSWER_LIMITS.keys()
