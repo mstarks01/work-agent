@@ -441,9 +441,8 @@ class FrameworkNodes:
     subgraphs never touch: they fan out from the one prepared model and fan back
     in at ``assemble``, which is the only node that sees both.
 
-    A node name
-    and the state key it writes are derived from the same ``name``, so a graph
-    carrying two frameworks cannot cross their wires.
+    A node name and the state key it writes are derived from the same
+    ``name``, so a graph carrying two frameworks cannot cross their wires.
     """
 
     name: FrameworkName

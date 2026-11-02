@@ -2518,7 +2518,7 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: _calls(node, "Finding"),
         ("evals/harness/queue.py", "from_claim"),
         {},
-        "evals/",
+        "",
     ),
     "the digests a queue item carries": _OneReader(
         _digests_a_queue_claim, ("evals/harness/queue.py", "from_claim"), {}, ""
@@ -2550,8 +2550,13 @@ ONE_READERS: dict[str, _OneReader] = {
     "the render of a job's sources": _OneReader(
         lambda node: _calls(node, "render_sources"),
         ("src/analysis_service/execution.py", "seed_state"),
-        {},
-        "src/",
+        {
+            ("evals/adversarial/verify.py", "fencing_issues"): (
+                "it renders sources to check the fence around them, and it"
+                " drives no graph and shows no job to a model"
+            ),
+        },
+        "",
     ),
 }
 

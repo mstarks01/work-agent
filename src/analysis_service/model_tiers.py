@@ -407,10 +407,9 @@ class ModelTierConfig(BaseModel):
         missing = [node for node in LLM_NODES if node not in self.nodes]
         if missing:
             raise ValueError(f"nodes missing entries for: {missing}")
-        # Both cross-node rules, run here because the validator holds a
-        # complete node -> tier map here. The loader runs both cross-node
-        # rules here. The pairing matters because `review` is a place a critic
-        # can move to and leave its re-ask behind.
+        # The loader runs both cross-node rules here, because the validator
+        # holds a complete node -> tier map. The pairing matters because
+        # `review` is a place a critic can move to and leave its re-ask behind.
         problems = critic_pairing_issues(self.nodes.__getitem__)
         problems += self.independence_breaches()
         problems += self._credential_mode_problems()
@@ -864,8 +863,8 @@ def _apply_upstream_overrides(raw: dict[str, object], env: Mapping[str, str]) ->
     """Fold ``ANALYSIS_MODEL_UPSTREAMS_{VENDOR}`` into the raw table.
 
     A comma-separated list, split and stripped here.
-    :meth:`ModelTierConfig._upstream_problems` judges it: it rejects an empty list, a slug
-    that is not one, and a vendor with nothing to pin.
+    :meth:`ModelTierConfig._upstream_problems` judges it: it rejects an empty
+    list, a slug that is not one, and a vendor with nothing to pin.
     """
     declared = {
         vendor: env[var]

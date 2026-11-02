@@ -810,9 +810,10 @@ def _grounds_of(
     Quotes first, then evidence, then absences, and the order is fixed rather
     than incidental: :class:`~analysis_service.claims.UnverifiedGround` marks a
     quote by its *index* into the finished list, so a reader following a mark
-    back to the quote it is about depends on the order this sets. The fan-in's scope check later removes the grounds about none of a
-    claim's elements, keeping the order of the rest, and it runs before the
-    quote check takes any mark. Quotes lead because they are the submitter's
+    back to the quote it is about depends on the order this sets. The fan-in's
+    scope check later removes the grounds about none of a claim's elements,
+    keeping the order of the rest, and it runs before the quote check takes
+    any mark. Quotes lead because they are the submitter's
     own words, which is what a reader looks for first.
 
     A ref is stripped of surrounding whitespace before lookup — which spelling
@@ -895,9 +896,9 @@ def resolve_proposals(
     package could break. Three things are the service's here and none of them is
     a judgement: the grounds, the claim ID, and the lane.
 
-    A resolved ground is its catalog entry itself, so it carries the branch and the fields that branch
-    requires, and the claim this returns cannot be mis-shaped whatever an agent
-    emitted.
+    A resolved ground is its catalog entry itself, so it carries the branch and
+    the fields that branch requires, and the claim this returns cannot be
+    mis-shaped whatever an agent emitted.
 
     ``lane`` is the lane being resolved, and it arrives as an argument because
     that is where the fact lives — the graph builds one node per

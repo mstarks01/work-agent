@@ -624,15 +624,15 @@ def test_a_planted_claim_in_each_new_word_fails(tmp_path):
     probe = tmp_path / "probe.py"
     probe.write_text(
         "".join(
-            f'def unheld_{index}():\n    """This {words[index]}."""\n'
-            for index in range(len(words))
+            f'def unheld_{index}():\n    """This {word}."""\n'
+            for index, word in enumerate(words)
         ),
         encoding="utf-8",
     )
     found = _claims_in(probe, "src/analysis_service/elsewhere.py")
 
     assert sorted(claim.owner for claim in found) == sorted(
-        f"unheld_{index}" for index in range(len(words))
+        f"unheld_{index}" for index, _ in enumerate(words)
     )
     assert not any(guarded(claim) for claim in found)
 
