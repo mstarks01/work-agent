@@ -20,8 +20,8 @@ worker pool, and wall-clock on one of eight threads measures the other seven.
 **What the numbers say, so nobody optimises this layer again without reading
 it.** The ``pipeline`` case measures a whole scripted job. The deterministic
 bodies cost 4 ms of CPU on a STRIDE-only run and 47 ms on one carrying ASVS,
-and serializing the analysis costs 0.2 ms. A real job spends seconds per node
-waiting for a provider, so this layer is a rounding error on job latency —
+and serializing the analysis costs 0.2 ms. A real job waits seconds per node
+for a provider, so this layer is a rounding error on job latency —
 *except* in one place. Fuzzy quote repair is the only part whose cost is set by
 submitted text rather than by the model, which is why it carries three separate
 bounds and why it is the one thing here worth tuning.

@@ -67,6 +67,12 @@ asks for a read of that package's own texts, and a new package needs no row.
 rows to `PACKAGES`, and holds every prompt to some row.
 `tests/test_one_reader_lints.py` refuses a pairing written in Python.
 
+A pull request that changes a file with a row in
+`.github/scripts/held_wording.toml` names each held phrase of that file in the
+same section. The entry says what the pull request did with the phrase: it
+changed it by a measured change, with the ledger row, or it kept it. The check
+reads the base branch's copy of this table too.
+
 The check has a limit. GitHub runs the copy of `five-class.yml` that the pull
 request carries. The workflow runs the base branch's copy of the script, but a
 pull request that edits the workflow can remove that step or the whole check.
@@ -152,6 +158,14 @@ and the test holds the rows to that set. Where a prompt can take a sentence
 from a table that the code reads, render the sentence from the table instead,
 as `render_predicates` does.
 
+Wording in model text that breaks a wording rule, such as the SPEND lint or
+the GLOSSARY Element term, changes only with a measured prompt change. The
+maintainer rules such wording held until that change lands, and
+`.github/scripts/held_wording.toml` holds one row for each held phrase, with
+the rule and the reason. A round
+reads that table and does not report a held row as a finding. The SPEND and
+MONEY lints read model text and skip only the held rows of their rule.
+
 An exemplar teaches the model a draft shape, so it must pass every check that
 real lane output meets. `tests/test_exemplar_fan_in.py` sends each exemplar
 draft through `fan_in` against a fixture of its exemplar system. A new check in
@@ -219,7 +233,9 @@ The message carries what a later reader cannot recover from the diff:
 - how many findings were in code older than the last `reviewed/*` tag, and how
   many were in newer code
 - **what was left open by decision**, with the reason — this is the part that
-  stops the next review re-reporting a settled question as a new finding
+  stops the next review re-reporting a settled question as a new finding.
+  Held wording in model text goes in `.github/scripts/held_wording.toml`, and
+  the message points to that table instead of listing the rows
 
 ## Why a tag
 

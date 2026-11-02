@@ -359,8 +359,8 @@ class TestTheRepairRung:
 
         A median quote on a source at the size ceiling finds its match after
         about 6,000 units and then needs 113,000,000 more to finish ranking
-        every remaining window. Answering `None` there spends the whole budget
-        and buys nothing, and it turns the rung off for exactly the largest
+        every remaining window. Answering `None` there uses the whole budget
+        and gains nothing, and it turns the rung off for exactly the largest
         source it is meant to serve.
         """
         source = " ".join(
