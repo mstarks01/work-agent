@@ -380,7 +380,7 @@
           h("button", { type: "button", class: "quiet", "aria-label": `Remove the alias ${alias}`, on: { click: () => { draft.scope.aliases.splice(i, 1); render(); } } }, "×"))),
         h("input", { type: "text", id: "alias-input", placeholder: "Add an alias and press Enter",
           on: { keydown: (e) => { if (e.key === "Enter") { e.preventDefault(); const v = e.target.value.trim(); if (v) { draft.scope.aliases.push(v); render(); } } } } }))) : null;
-    return h("fieldset", {}, h("legend", {}, "What it protects"),
+    return h("details", { class: "q-card", open: true }, h("summary", {}, "What it protects"),
       h("div", { class: "line" },
         h("div", {},
           h("label", { class: "field-label", for: "scope-type" }, "Kind"),
@@ -399,11 +399,11 @@
     const open = type.facts.filter((f) => !draft.facts.some((fact) => fact.attribute === f));
     let attribute = open[0] ?? "";
     let value = "";
-    return h("fieldset", {}, h("legend", {}, "What it proves"),
+    return h("details", { class: "q-card", open: true }, h("summary", {}, "What it proves"),
       h("p", { class: "hint" }, "Each fact answers a question the analysis would otherwise ask. A fact the description states stands."),
       h("ul", { class: "facts-list" }, ...draft.facts.map((fact, i) => h("li", {},
         h("span", { class: "u" }, h("b", {}, fact.attribute), ": ", fact.value, fact.detail ? h("span", { class: "sub" }, ` (${fact.detail})`) : null),
-        h("button", { type: "button", class: "quiet", on: { click: () => { draft.facts.splice(i, 1); render(); } } }, "Remove")))),
+        h("button", { type: "button", class: "quiet row-remove", on: { click: () => { draft.facts.splice(i, 1); render(); } } }, "Remove")))),
       open.length ? h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "fact-attr" }, "Fact"),
           h("select", { id: "fact-attr", on: { change: (e) => { attribute = e.target.value; } } }, ...open.map((f) => h("option", { value: f }, f)))),
@@ -419,11 +419,11 @@
     const unitSelect = () => h("select", { id: "row-unit", on: { change: (e) => { unit = e.target.value; } } },
       ...units[framework].units.map((u) => h("option", { value: u.id }, `${u.id} · ${u.name}`.slice(0, 90))));
     const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitSelect());
-    return h("fieldset", {}, h("legend", {}, "What it covers"),
+    return h("details", { class: "q-card", open: true }, h("summary", {}, "What it covers"),
       h("p", { class: "hint" }, "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses one that does not bear on its unit."),
       h("ul", { class: "rows-list" }, ...draft.rows.map((row, i) => h("li", {},
         h("span", { class: "u" }, unitText(row), " ", h("span", { class: "sub" }, `v${row.version}`)),
-        h("button", { type: "button", class: "quiet", on: { click: () => { draft.rows.splice(i, 1); render(); } } }, "Remove")))),
+        h("button", { type: "button", class: "quiet row-remove", on: { click: () => { draft.rows.splice(i, 1); render(); } } }, "Remove")))),
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "row-fw" }, "Framework"),
           h("select", { id: "row-fw", on: { change: (e) => { framework = e.target.value; unit = units[framework].units[0].id; holder.replaceChildren(h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitSelect()); } } },
@@ -434,11 +434,11 @@
 
   const editorEvidence = (draft) => {
     let cls = "config";
-    return h("fieldset", {}, h("legend", {}, "Evidence"),
+    return h("details", { class: "q-card", open: true }, h("summary", {}, "Evidence"),
       h("p", { class: "hint" }, "A file that shows the protection. The analysis quotes it beside a ruling and never reads it as a description."),
       h("ul", { class: "evidence-list" }, ...draft.evidence.map((file, i) => h("li", {},
         h("span", { class: "u" }, h("b", {}, file.name), " ", tag(CLASS_LABEL[file.class]), " ", h("span", { class: "sub" }, size(file.size))),
-        h("button", { type: "button", class: "quiet", on: { click: () => { draft.evidence.splice(i, 1); render(); } } }, "Remove")))),
+        h("button", { type: "button", class: "quiet row-remove", on: { click: () => { draft.evidence.splice(i, 1); render(); } } }, "Remove")))),
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "ev-class" }, "Kind of evidence"),
           h("select", { id: "ev-class", on: { change: (e) => { cls = e.target.value; } } },
