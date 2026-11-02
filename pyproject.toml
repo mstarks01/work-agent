@@ -203,7 +203,7 @@ extend-exclude = ["docs/research"]
 # re-spelled as a bare `str`, and the tests are what pin the Protocol seams --
 # checking only `src/` would leave the checker blind to exactly the drift it
 # was added for.
-files = ["src", "tests", "evals", "examples", "webapp"]
+files = ["src", "tests", "evals", "examples", "webapp", ".github/scripts"]
 # `evals/runs` holds run artifacts the repository does not track, and a live run
 # leaves its probe scripts beside them. Checking them fails the push gate on a
 # file the tree does not hold. `ruff` already skips them, because it respects
@@ -211,10 +211,12 @@ files = ["src", "tests", "evals", "examples", "webapp"]
 # tree; this is the third reader of the same rule (#942).
 exclude = ["^evals/runs/"]
 # `src` on the path, so `src/analysis_service/api.py` is the module
-# `analysis_service.api` and not also `src.analysis_service.api`. With the layouts
+# `analysis_service.api` and not also `src.analysis_service.api`. The CI
+# scripts' directory is on the path too, so a test names a script's type by
+# the script's module name. With the layouts
 # outside it -- `evals/` and `examples/` have no `__init__.py` -- that needs
 # each directory in `files` treated as its own package root.
-mypy_path = "src"
+mypy_path = "src:.github/scripts"
 explicit_package_bases = true
 # The `requires-python` floor rather than the version CI happens to install, so
 # a 3.12-only construct fails here instead of at an integrator's 3.11.

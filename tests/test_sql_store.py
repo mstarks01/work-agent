@@ -103,7 +103,7 @@ def app_over(store: JobStore, runner=None):
         job_deadline_seconds=TEST_DEADLINE_SECONDS,
         max_active_jobs=TEST_MAX_ACTIVE_JOBS,
         budget=SEEDING_BUDGET,
-        frameworks=DEFAULT_FRAMEWORKS,
+        carried_frameworks=DEFAULT_FRAMEWORKS,
         carries_catalog=True,
     )
 

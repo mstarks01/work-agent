@@ -1308,20 +1308,18 @@ class RuledClaim(Claim):
     verdict: Verdict
 
     def waits_on(self) -> list[UnknownRef]:
-        """The open facts this claim waits on: its ``needs-info`` verdict's
-        ``related_unknowns``, or none for any other verdict.
+        """The open facts this claim waits on: its verdict's
+        ``related_unknowns``.
 
-        **The reader of "what a finding waits on"** (ADR 0094) for the card,
-        the open-facts grouping and the follow-up's counts and order. Other
-        readers read ``verdict.related_unknowns`` directly, which holds the
-        same facts, because the verdict keeps it empty unless it is
-        ``needs-info``.
-        A ground the critic dismissed in ``immaterial_unknowns`` is not one;
+        The card, the open-facts grouping and the follow-up's counts and order
+        read it (ADR 0094). The validator of :class:`Verdict` is the one rule
+        of which verdict waits: it refuses ``related_unknowns`` on any status
+        but ``needs-info``, and an empty list on ``needs-info``. So a site that
+        reads ``verdict.related_unknowns`` reads the same facts. A ground the
+        critic dismissed in ``immaterial_unknowns`` is not one;
         :func:`~analysis_service.critic.complete_rulings` adds every other
         unknown ground to ``related_unknowns``.
         """
-        if self.verdict.status != "needs-info":
-            return []
         return list(self.verdict.related_unknowns)
 
     def rules_on_unit(self) -> bool:

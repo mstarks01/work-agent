@@ -416,7 +416,7 @@ def _answers(request: Request) -> JobAnswers:
         limits=state.limits,
         ceiling=state.max_active_jobs,
         budget=state.budget,
-        frameworks=state.frameworks,
+        carried_frameworks=state.carried_frameworks,
         carries_catalog=state.carries_catalog,
         gate=state.certification,
     )
@@ -719,7 +719,7 @@ def create_app(
     job_deadline_seconds: float | None = None,
     max_active_jobs: int | None = None,
     budget: BudgetPolicy | None = None,
-    frameworks: Sequence[FrameworkName] | None = None,
+    carried_frameworks: Sequence[FrameworkName] | None = None,
     carries_catalog: bool | None = None,
 ) -> FastAPI:
     """Build the service app; production defaults, injectable seams for tests.
@@ -739,16 +739,12 @@ def create_app(
     because a stand-in that answers one is answering the seam rather than the
     graph.
 
-    ``carries_catalog`` says whether a job here builds an assertion catalog,
-    which is the only reader of a link answer. It is the deployment's wherever
-    there is one. Without a deployment it defaults to ``False``, so an app
-    that cannot know refuses link answers rather than accepting what nothing
-    reads.
-
     ``limits`` bounds what one job may carry, ``job_deadline_seconds`` bounds
     how long one may run, ``max_active_jobs`` bounds how many one caller may
-    have in flight, and ``frameworks`` is what a submission may select from. All
-    four come from the deployment wherever there is one; a caller who injects a
+    have in flight, ``carried_frameworks`` is what a submission may select
+    from, and ``carries_catalog`` says whether a job here builds an assertion
+    catalog, which is the only reader of a link answer. All five come from the
+    deployment wherever there is one; a caller who injects a
     runner instead must state them, because reading a second configuration
     behind their back is how an app comes to enforce bounds its deployment never
     chose.
@@ -776,12 +772,16 @@ def create_app(
         deployment = deployment if deployment is not None else Deployment.from_env()
         app.state.runner_for = deployment.runner
         app.state.certification = deployment.gate
-    frameworks = _setting(frameworks, deployment, "frameworks", lambda d: d.frameworks)
-    app.state.frameworks = tuple(frameworks)
-    app.state.carries_catalog = (
-        carries_catalog
-        if carries_catalog is not None
-        else deployment is not None and deployment.carries_catalog
+    app.state.carried_frameworks = tuple(
+        _setting(
+            carried_frameworks,
+            deployment,
+            "carried_frameworks",
+            lambda d: d.carried_frameworks,
+        )
+    )
+    app.state.carries_catalog = _setting(
+        carries_catalog, deployment, "carries_catalog", lambda d: d.carries_catalog
     )
     app.state.limits = limits = _setting(
         limits, deployment, "limits", lambda d: d.resilience.source_limits()

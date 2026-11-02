@@ -45,6 +45,7 @@ from analysis_service.assertions import (
     SupportSpan,
     answer,
     settled,
+    subjects_of,
 )
 from analysis_service.claims import UnknownKey
 from analysis_service.fact_answers import (
@@ -499,14 +500,18 @@ def _link_rows(
                 origin="answer",
                 support=[span],
             )
-    kept = [
-        entry
-        for entry in catalog.entries
-        if not (entry.predicate == "represented-by" and entry.subject in answered)
+    entries = [
+        *(
+            entry
+            for entry in catalog.entries
+            if not (entry.predicate == "represented-by" and entry.subject in answered)
+        ),
+        *answered.values(),
     ]
+    labels = {subject.id: subject for subject in subjects}
     return (
         catalog.model_copy(
-            update={"subjects": subjects, "entries": [*kept, *answered.values()]}
+            update={"subjects": subjects_of(entries, labels), "entries": entries}
         ),
         issues,
     )

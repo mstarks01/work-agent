@@ -125,7 +125,8 @@ def make_client(
         job_deadline_seconds=TEST_DEADLINE_SECONDS,
         max_active_jobs=max_active_jobs,
         budget=budget,
-        frameworks=frameworks,
+        carried_frameworks=frameworks,
+        carries_catalog=False,
     )
     return TestClient(app, raise_server_exceptions=raise_server_exceptions), store
 
@@ -186,7 +187,8 @@ class TestInjectedBoundsMustBeStated:
                 runner=StubPipelineRunner(),
                 verifier=FakeVerifier(),
                 limits=TEST_LIMITS,
-                frameworks=DEFAULT_FRAMEWORKS,
+                carried_frameworks=DEFAULT_FRAMEWORKS,
+                carries_catalog=False,
             )
 
     def test_a_runner_without_limits_is_refused(self):
@@ -197,7 +199,8 @@ class TestInjectedBoundsMustBeStated:
                 verifier=FakeVerifier(),
                 job_deadline_seconds=TEST_DEADLINE_SECONDS,
                 max_active_jobs=TEST_MAX_ACTIVE_JOBS,
-                frameworks=DEFAULT_FRAMEWORKS,
+                carried_frameworks=DEFAULT_FRAMEWORKS,
+                carries_catalog=False,
             )
 
     def test_a_runner_without_a_concurrency_ceiling_is_refused(self):
@@ -208,7 +211,8 @@ class TestInjectedBoundsMustBeStated:
                 verifier=FakeVerifier(),
                 limits=TEST_LIMITS,
                 job_deadline_seconds=TEST_DEADLINE_SECONDS,
-                frameworks=DEFAULT_FRAMEWORKS,
+                carried_frameworks=DEFAULT_FRAMEWORKS,
+                carries_catalog=False,
             )
 
 
@@ -227,7 +231,7 @@ class TestEveryCarriedPackageReachesARunner:
         app = create_app(
             deployment=deployment, store=InMemoryJobStore(), verifier=FakeVerifier()
         )
-        carried = tuple(deployment.frameworks)
+        carried = tuple(deployment.carried_frameworks)
 
         runner = app.state.runner_for(carried)
 

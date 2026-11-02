@@ -31,6 +31,7 @@ from analysis_service.assertions import (
     answered,
     assertion_id,
     projected_attribute,
+    subjects_of,
 )
 from analysis_service.capabilities import CAPABILITIES, lineage
 from analysis_service.fact_answers import (
@@ -447,11 +448,17 @@ def fact_rows(
             }
         )
     entries = [
-        replaced.get(assertion_id(entry), entry)
-        for entry in catalog.entries
-        if assertion_id(entry) not in superseded
+        *(
+            replaced.get(assertion_id(entry), entry)
+            for entry in catalog.entries
+            if assertion_id(entry) not in superseded
+        ),
+        *written.values(),
     ]
+    labels = {subject.id: subject for subject in catalog.subjects}
     return (
-        catalog.model_copy(update={"entries": [*entries, *written.values()]}),
+        catalog.model_copy(
+            update={"subjects": subjects_of(entries, labels), "entries": entries}
+        ),
         issues,
     )

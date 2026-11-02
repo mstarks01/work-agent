@@ -80,7 +80,8 @@ def make_client(result: CertifyResult, gate_policy: CertificationGate) -> TestCl
         job_deadline_seconds=30,
         max_active_jobs=10,
         budget=SEEDING_BUDGET,
-        frameworks=DEFAULT_FRAMEWORKS,
+        carried_frameworks=DEFAULT_FRAMEWORKS,
+        carries_catalog=False,
     )
     app.state.certification = gate_policy
     return TestClient(app)
@@ -201,7 +202,8 @@ class TestNothingReachesTheClientView:
             job_deadline_seconds=30,
             max_active_jobs=10,
             budget=SEEDING_BUDGET,
-            frameworks=DEFAULT_FRAMEWORKS,
+            carried_frameworks=DEFAULT_FRAMEWORKS,
+            carries_catalog=False,
         )
         app.state.certification = None
         assert fetch_report(TestClient(app)).status_code == 200
