@@ -369,6 +369,24 @@ class ObjectStoreBackend:
     #: that mode. The Settings page shows them only for that mode.
     mode_reads: Mapping[CredentialMode, tuple[str, ...]]
 
+    def reads_in(self, mode: CredentialMode | None) -> tuple[str, ...]:
+        """The settings of :attr:`reads` that ``mode`` reads: each one but the
+        :attr:`mode_reads` of every other mode. ``None`` names no mode, so no
+        setting of :attr:`mode_reads` is in the list.
+
+        **The one reader of which settings a credential mode reads.** A store
+        refuses each other setting through
+        :func:`~analysis_service.store_settings.refuse_unread`, and the
+        Settings page shows only these.
+        """
+        unread = {
+            var
+            for other, mode_vars in self.mode_reads.items()
+            if other != mode
+            for var in mode_vars
+        }
+        return tuple(var for var in self.reads if var not in unread)
+
 
 ObjectStoreName = Literal["filesystem", "s3", "gcs"]
 
@@ -438,7 +456,6 @@ def object_reads(env: Mapping[str, str]) -> tuple[str, ...]:
     The Settings page shows only these. Where the credential mode names no
     mode, no setting of :attr:`ObjectStoreBackend.mode_reads` is in the list.
     """
-    backend = OBJECT_STORES[object_store_name(env)]
     mode: CredentialMode | None
     try:
         mode = closed_setting(
@@ -446,13 +463,7 @@ def object_reads(env: Mapping[str, str]) -> tuple[str, ...]:
         )
     except StoreConfigError:
         mode = None
-    unread = {
-        var
-        for other, mode_vars in backend.mode_reads.items()
-        if other != mode
-        for var in mode_vars
-    }
-    return tuple(var for var in backend.reads if var not in unread)
+    return OBJECT_STORES[object_store_name(env)].reads_in(mode)
 
 
 def build_object_store(env: Mapping[str, str]) -> ObjectStore:

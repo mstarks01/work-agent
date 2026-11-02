@@ -32,13 +32,13 @@ beyond the repository.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path
 
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.asvs.catalog import ASVS_VERSION, requirement_text
+from evals.harness.reference import read_digest
 
 EVALS = Path(__file__).resolve().parent
 CORPUS = EVALS / "corpus"
@@ -433,9 +433,7 @@ def closing(case_id: str, meta: dict) -> str:
     read.append("model.json")
     read += [f"claims/{fw['name']}.json" for fw in meta["frameworks"]]
     read_json = ",\n      ".join(
-        json.dumps(name)
-        + ": "
-        + json.dumps(hashlib.sha256((case_dir / name).read_bytes()).hexdigest())
+        json.dumps(name) + ": " + json.dumps(read_digest(case_dir / name))
         for name in read
     )
     return f"""\

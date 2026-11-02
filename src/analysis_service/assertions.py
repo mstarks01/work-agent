@@ -58,7 +58,6 @@ that cannot be made answers with an issue rather than with a pass.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
@@ -1259,7 +1258,7 @@ def _value_key(predicate: Predicate, value: str) -> str:
 
 def _digest(text: str) -> str:
     """Twelve hex characters of sha256 — enough to key rows within one artifact."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+    return text_digest(text)[:12]
 
 
 @dataclass(frozen=True)

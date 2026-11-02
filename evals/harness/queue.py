@@ -39,7 +39,6 @@ ranked by the reference pool would cause; see the note below the rows.
 from __future__ import annotations
 
 import argparse
-import hashlib
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -50,6 +49,7 @@ from analysis_service.claim_identity import (
     grounded_mechanism,
 )
 from analysis_service.claims import Claim, FrameworkName
+from analysis_service.sources import text_digest
 from evals.harness import content as digests
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
@@ -125,7 +125,7 @@ class QueueItem:
         mechanism = self.components.mechanism
         if not mechanism:
             return self.fingerprint
-        digest = hashlib.sha256("\n".join(mechanism).encode()).hexdigest()[:16]
+        digest = text_digest("\n".join(mechanism))[:16]
         return f"{self.fingerprint}~{digest}"
 
     @property

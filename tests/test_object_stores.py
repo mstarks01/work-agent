@@ -274,7 +274,7 @@ class TestTheSettings:
             ),
             (
                 {"ANALYSIS_OBJECT_CREDENTIALS": "iam"},
-                "reads no static key; unset ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE",
+                "the iam mode of the s3 object store takes no ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE",
             ),
             (
                 {"ANALYSIS_OBJECT_ROOT": "/srv/objects"},
@@ -398,7 +398,10 @@ class TestTheIamMode:
     def test_a_setting_of_the_api_key_mode_stops_the_startup(self, env, var):
         """The Settings page hides the rows of the ``api_key`` mode in the
         ``iam`` mode, so the ``iam`` mode refuses each of them."""
-        with pytest.raises(StoreConfigError, match=f"reads no static key; unset {var}"):
+        with pytest.raises(
+            StoreConfigError,
+            match=f"the iam mode of the s3 object store takes no {var}; unset it$",
+        ):
             build_store(iam(env) | {var: "/run/secrets/key"})
 
     def test_the_api_key_mode_reads_the_files(self, env):

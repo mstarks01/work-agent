@@ -42,6 +42,7 @@ import math
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -108,6 +109,7 @@ from evals.harness.artifact import (
     ScoredAgainst,
     corpus_digest,
     load_artifact,
+    rendered_sources,
     repo_commit,
 )
 from evals.harness.artifact import build as build_artifact
@@ -1100,6 +1102,7 @@ def command_run(args: argparse.Namespace) -> int:
     # a repository that cannot say what it is about to run stops here rather
     # than 90 minutes later holding an artifact that cannot name its prompts.
     commit, corpus = repo_commit(), corpus_digest()
+    rendered = rendered_sources(cases)
     # One deployment for the whole sweep: the graph it runs and the manifest it
     # is certified against are then one configuration rather than two reads
     # that could disagree.
@@ -1193,6 +1196,7 @@ def command_run(args: argparse.Namespace) -> int:
         trusted=trusted,
         commit=commit,
         corpus=corpus,
+        rendered=rendered,
         sweep=sweep,
         series=_series_record(by_series) if by_series else None,
     )
@@ -1772,8 +1776,10 @@ def command_replay(args: argparse.Namespace) -> int:
     corpus_dir = Path(args.corpus)
     try:
         cases = load_corpus(corpus_dir)
+        named = named_arms(args.arm, args.artifact)
         sweeps = [
-            replay_artifact(Path(path), cases, corpus_dir) for path in args.artifact
+            replay_artifact(Path(path), cases, corpus_dir, named[path])
+            for path in args.artifact
         ]
     except (ProvenanceError, CorpusError, modes.EvalRunError, ValueError) as error:
         print(f"cannot replay: {error}", file=sys.stderr)
@@ -1791,8 +1797,39 @@ def command_replay(args: argparse.Namespace) -> int:
     return 0
 
 
+def named_arms(
+    entries: Sequence[str] | None, paths: Sequence[str]
+) -> dict[str, str | None]:
+    """The arm each ``--arm LABEL=GLOB`` names for each artifact, by its file name.
+
+    ``None`` for an artifact that no entry matches. A file that two labels
+    match, or an entry with no label or no glob, is refused: the caller's
+    grouping is the only record of what such a sweep read.
+    """
+    parsed = []
+    for entry in entries or ():
+        label, _, pattern = entry.partition("=")
+        if not label or not pattern:
+            raise ValueError(f"--arm {entry!r} is not LABEL=GLOB")
+        parsed.append((label, pattern))
+    named: dict[str, str | None] = {}
+    for path in paths:
+        labels = {
+            label for label, pattern in parsed if fnmatch(Path(path).name, pattern)
+        }
+        if len(labels) > 1:
+            raise ValueError(
+                f"{path}: --arm names it {sorted(labels)}; name one arm for it"
+            )
+        named[path] = next(iter(labels), None)
+    return named
+
+
 def replay_artifact(
-    path: Path, cases: Sequence[GoldenCase], corpus_dir: Path
+    path: Path,
+    cases: Sequence[GoldenCase],
+    corpus_dir: Path,
+    named: str | None,
 ) -> replay.SweepReplay:
     """One archived sweep, read through the loader and re-scored by its mode.
 
@@ -1815,7 +1852,7 @@ def replay_artifact(
         for case in present
         if not diagnosable(case)
     }
-    arm = replay.arm_of(loaded)
+    arm = replay.arm_of(loaded, named)
 
     def sweep(**graded: Any) -> replay.SweepReplay:
         return replay.SweepReplay(
@@ -1874,7 +1911,11 @@ def command_bind(args: argparse.Namespace) -> int:
             (path.name, listed_extractions(path, cases))
             for path in map(Path, args.graphs)
         ]
-        sweeps = [bind_artifact(Path(path), cases, graphs) for path in args.proposals]
+        named = named_arms(args.arm, args.proposals)
+        sweeps = [
+            bind_artifact(Path(path), cases, graphs, named[path])
+            for path in args.proposals
+        ]
     except (ProvenanceError, CorpusError, modes.EvalRunError, ValueError) as error:
         print(f"cannot bind: {error}", file=sys.stderr)
         return 1
@@ -1895,6 +1936,7 @@ def bind_artifact(
     path: Path,
     cases: Sequence[GoldenCase],
     graphs: Sequence[tuple[str, Mapping[str, modes.ExtractionResult]]],
+    named: str | None,
 ) -> replay.BindingSweep:
     """One archived assertion sweep against every archived graph of each case."""
     loaded = load_artifact(path)
@@ -1908,7 +1950,7 @@ def bind_artifact(
     proposed = assertions_from_reports(loaded, held)
     return replay.BindingSweep(
         artifact=path.name,
-        arm=replay.arm_of(loaded),
+        arm=replay.arm_of(loaded, named),
         bindings=tuple(
             replay.bind_assertions(case, proposed[case.id], extracted[case.id], name)
             for case in held
@@ -2446,6 +2488,18 @@ def _bind_arguments(parser: argparse.ArgumentParser) -> None:
         "--targets", type=int, default=10, help="how many refused rows to list per arm"
     )
     parser.add_argument("--out", help="where to write the binding report")
+    _arm_argument(parser)
+
+
+def _arm_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--arm",
+        action="append",
+        metavar="LABEL=GLOB",
+        help="name the arm of each sweep whose file name GLOB matches, for a sweep"
+        " that records no rendered_sources block; such a sweep is otherwise its own"
+        " arm. Repeat for each arm. A sweep that records the block is placed by it",
+    )
 
 
 def _replay_arguments(parser: argparse.ArgumentParser) -> None:
@@ -2465,6 +2519,7 @@ def _replay_arguments(parser: argparse.ArgumentParser) -> None:
         "--targets", type=int, default=10, help="how many lost elements to list per arm"
     )
     parser.add_argument("--out", help="where to write the replay report")
+    _arm_argument(parser)
 
 
 def _stability_arguments(parser: argparse.ArgumentParser) -> None:

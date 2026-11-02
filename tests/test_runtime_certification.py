@@ -21,7 +21,6 @@ from analysis_service.certification import (
     CertifyResult,
 )
 from analysis_service.deployment import Deployment
-from analysis_service.engine import Engine
 from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
@@ -37,6 +36,7 @@ from tests.factories import (
     TEST_CREDENTIAL_ENV,
     TEST_TIER_ENV,
     sample_selection,
+    stand_in_engine,
 )
 from tests.test_api import FakeVerifier, auth, submit
 
@@ -222,7 +222,7 @@ class TestWithholdingIsARuleOfTheHttpSurfaces:
             | {"ANALYSIS_REQUIRE_CERTIFIED": "true"}
         )
         assert deployment.gate.withholds(result)
-        engine = Engine(
+        engine = stand_in_engine(
             CertifyingRunner(result),
             limits=TEST_LIMITS,
             deadline_seconds=30,

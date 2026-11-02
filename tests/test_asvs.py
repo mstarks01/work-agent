@@ -35,7 +35,7 @@ from analysis_service.claims import (
     UnknownRef,
     Verdict,
 )
-from analysis_service.engine import Engine, EngineInputError
+from analysis_service.engine import EngineInputError
 from analysis_service.evidence import (
     evidence_catalog,
     known_proposals,
@@ -68,6 +68,7 @@ from analysis_service.frameworks.asvs.record import (
     requirement_of,
 )
 from analysis_service.frameworks.asvs.roster import replace_roster, roster_block
+from analysis_service.jobs import StubPipelineRunner
 from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.report import (
     FrameworkSelection,
@@ -76,7 +77,12 @@ from analysis_service.report import (
 from analysis_service.skills import lane_skill_doc
 from analysis_service.sources import SourceLimits
 from analysis_service.system_model import CapabilityStatement, Process, SystemModel
-from tests.factories import PROJECT_ROOT, sample_draft, valid_model
+from tests.factories import (
+    PROJECT_ROOT,
+    sample_draft,
+    stand_in_engine,
+    valid_model,
+)
 
 ASVS = PACKAGES["asvs"]
 STRIDE = PACKAGES["stride"]
@@ -146,8 +152,8 @@ def test_the_engine_refuses_a_selection_missing_an_option_it_needs():
     would otherwise fail after the provider billed every node.
     """
     with pytest.raises(EngineInputError) as caught:
-        Engine(
-            runner=None,
+        stand_in_engine(
+            StubPipelineRunner(),
             limits=SourceLimits(max_total_bytes=1, max_sources=1),
             deadline_seconds=1.0,
             frameworks=[FrameworkSelection(name="asvs")],
