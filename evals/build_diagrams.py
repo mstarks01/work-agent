@@ -23,10 +23,17 @@ writes. Run ``python evals/build_diagrams.py``. It is offline.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
+from analysis_service.errors import ConfigError, config_refusal
 from analysis_service.mermaid import model_mermaid
-from evals.harness.reference import development_cases, load_corpus
+from evals.harness.reference import (
+    CorpusError,
+    corpus_refusal,
+    development_cases,
+    load_corpus,
+)
 
 EVALS = Path(__file__).resolve().parent
 CORPUS = EVALS / "corpus"
@@ -41,9 +48,16 @@ def diagrams(corpus_dir: Path = CORPUS) -> dict[str, str]:
     }
 
 
-def main() -> None:
+def main() -> int:
     """Write each diagram, and remove a file whose case no longer has one."""
-    written = diagrams()
+    try:
+        written = diagrams()
+    except CorpusError as exc:
+        print(corpus_refusal(exc), file=sys.stderr)
+        return 1
+    except ConfigError as exc:
+        print(config_refusal(exc), file=sys.stderr)
+        return 1
     DIAGRAMS.mkdir(exist_ok=True)
     for stale in DIAGRAMS.glob("*.mmd"):
         if stale.stem not in written:
@@ -51,7 +65,8 @@ def main() -> None:
     for case_id, text in written.items():
         (DIAGRAMS / f"{case_id}.mmd").write_text(text, encoding="utf-8")
     print(f"wrote {len(written)} diagrams to {DIAGRAMS}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

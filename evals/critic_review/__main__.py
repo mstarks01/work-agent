@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 from analysis_service.deployment import Deployment
+from analysis_service.errors import ConfigError, config_refusal
 from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
 from evals.critic_review.loading import (
@@ -130,23 +131,29 @@ def main(argv: list[str] | None = None) -> int:
         print(error, file=sys.stderr)
         return 1
     model = corpus_model(case_id)
-    # The node's own route, sampling and output schema, through the one helper
-    # every replay uses. The request it sends is the graph's, instruction and
-    # user turn, rendered by the critic's round.
-    node = node_call(
-        Deployment.from_env(), _critic_node(framework), schemas_for(framework).rulings
-    )
-    score, problems = asyncio.run(
-        replay(
-            fixtures,
-            model,
-            corpus_sources(case_id),
-            package,
-            MarkdownLoader(REPO_ROOT / "frameworks" / framework),
-            MarkdownLoader(REPO_ROOT / "prompts"),
-            node,
+    try:
+        # The node's own route, sampling and output schema, through the one
+        # helper every replay uses. The request it sends is the graph's,
+        # instruction and user turn, rendered by the critic's round.
+        node = node_call(
+            Deployment.from_env(),
+            _critic_node(framework),
+            schemas_for(framework).rulings,
         )
-    )
+        score, problems = asyncio.run(
+            replay(
+                fixtures,
+                model,
+                corpus_sources(case_id),
+                package,
+                MarkdownLoader(REPO_ROOT / "frameworks" / framework),
+                MarkdownLoader(REPO_ROOT / "prompts"),
+                node,
+            )
+        )
+    except ConfigError as error:
+        print(config_refusal(error), file=sys.stderr)
+        return 1
 
     removed, of_removed = score.unsupported_removed
     preserved, of_preserved = score.valid_preserved

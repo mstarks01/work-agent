@@ -47,11 +47,14 @@ from analysis_service.assertions import (
 )
 from analysis_service.evidence import prepared_view
 from analysis_service.reassess import ReviewerAssessment, reassess
-from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
 from evals.harness.artifact import corpus_digest, load_artifact
-from evals.harness.bundle import assertions_from_reports
+from evals.harness.bundle import (
+    UnreadableReport,
+    assertions_from_reports,
+    read_report,
+)
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 from evals.harness.run_record import run_record, sweep_inputs
@@ -323,7 +326,7 @@ def parsed_verdicts(held: object) -> dict[str, ReviewerAssessment]:
 def command_reassess(args: argparse.Namespace) -> int:
     """Recompute a report under a review. It runs no model and writes no report."""
     try:
-        report = Report.model_validate_json(args.report.read_text(encoding="utf-8"))
+        report = read_report(args.report)
         review = json.loads(args.verdicts.read_text(encoding="utf-8"))
         if report.assertions is None:
             raise PopulationError("the report ran no assertion pass")
@@ -337,7 +340,7 @@ def command_reassess(args: argparse.Namespace) -> int:
             )
         result = reassess(report, parsed_verdicts(review.get("verdicts")))
         record = run_record("reassess", {}, {args.report: {}, args.verdicts: {}})
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, UnreadableReport) as error:
         print(f"cannot reassess: {error}", file=sys.stderr)
         return 1
     written = {

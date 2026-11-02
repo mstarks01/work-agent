@@ -14,11 +14,9 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from pydantic import ValidationError
-
 from analysis_service.assertion_use import AssertionUse, assertion_use
-from analysis_service.report import Report
 from evals.harness.archive import case_suffix
+from evals.harness.bundle import UnreadableReport, read_report
 
 REPORT_GLOB = f"*{case_suffix('report')}"
 
@@ -86,8 +84,8 @@ def command_assertion_use(args: argparse.Namespace) -> int:
     try:
         for path in report_paths(args.reports):
             try:
-                report = Report.model_validate_json(path.read_bytes())
-            except ValidationError:
+                report = read_report(path)
+            except UnreadableReport:
                 refused += 1
                 continue
             use = assertion_use(report)

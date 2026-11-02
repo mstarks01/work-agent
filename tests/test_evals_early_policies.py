@@ -8,6 +8,7 @@ from analysis_service.answer_sets import AnswerSet
 from analysis_service.answer_state import question_set
 from analysis_service.report import Report
 from evals.harness import audit, early_policies
+from evals.harness.bundle import UnreadableReport
 from evals.harness.early_policies import POLICIES, _answer_within, needs_of, readings
 from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT
@@ -166,5 +167,5 @@ def test_paired_never_opens_a_holdout_case(tmp_path, monkeypatch):
     (tmp_path / "14-loyalty-oauth-platform.report.json").write_text("not JSON")
     assert early_policies.paired(tmp_path) == []
     (tmp_path / "01-payments-checkout.report.json").write_text("not JSON")
-    with pytest.raises(ValueError):
+    with pytest.raises(UnreadableReport, match="01-payments-checkout"):
         early_policies.paired(tmp_path)

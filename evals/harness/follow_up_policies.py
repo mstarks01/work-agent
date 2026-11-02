@@ -49,6 +49,7 @@ from analysis_service.questions import (
 )
 from analysis_service.report import Report
 from evals.harness.archive import case_suffix
+from evals.harness.bundle import read_report
 from evals.harness.run_record import run_record
 
 #: The owner effort, in choices, at which each order is read.
@@ -251,7 +252,7 @@ def crossed(
         if not all(source.is_file() for source in sources):
             continue
         read.extend((path, *sources))
-        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        report = read_report(path)
         for build_from, score_on in (
             (sources[0], sources[1]),
             (sources[1], sources[0]),
@@ -269,7 +270,7 @@ def sweep(root: Path) -> tuple[list[Reading], list[Path]]:
     found = []
     read: list[Path] = []
     for path in sorted(root.rglob(f"*{case_suffix('report')}")):
-        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        report = read_report(path)
         if len(report.job.frameworks) == 1:
             read.append(path)
             found.extend(readings(str(path), report))

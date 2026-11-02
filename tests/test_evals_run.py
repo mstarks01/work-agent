@@ -21,11 +21,13 @@ import pytest
 from analysis_service.certification import CertifyResult, UncertifiedNode
 from analysis_service.deployment import Deployment
 from evals.harness import run
+from evals.harness.bundle import reports_dir
 from evals.harness.modes import AttributeCheck, ExtractionScore, render_extraction
 from evals.harness.reference import CorpusError
 from evals.harness.run import _models_record, _print_certification
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 from tests.source_tree import REPO_ROOT
+from tests.test_evals_assembly import UNREADABLE_CASE, unreadable_sweep  # noqa: F401
 
 BLESSED = "a" * 64
 
@@ -301,6 +303,38 @@ class TestTheCommandTable:
 
         assert run.main(["score", str(sweep), "--out", str(tmp_path / "o")]) == 1
         assert capsys.readouterr().err.startswith("cannot read the sweep: ")
+
+    def test_a_report_today_s_model_refuses_ends_in_one_line(
+        self,
+        unreadable_sweep,  # noqa: F811
+        tmp_path,
+        capsys,
+    ):
+        """``score`` read each report with a bare parse, and a catalog entry
+        with no ``origin`` stopped it with a pydantic traceback."""
+        out = tmp_path / "scored.json"
+
+        assert run.main(["score", str(unreadable_sweep), "--out", str(out)]) == 1
+        report = reports_dir(unreadable_sweep) / f"{UNREADABLE_CASE}.report.json"
+        assert capsys.readouterr().err == (
+            f"cannot read the sweep: {report}: today's Report refuses"
+            " assertions.catalog.entries.0.origin: Field required\n"
+        )
+        assert not out.exists()
+
+    def test_a_configuration_that_selects_no_vendor_ends_in_one_line(
+        self, monkeypatch, capsys
+    ):
+        """``promote`` read the shipped tiers file, which selects no vendor,
+        into a ``ModelConfigError`` traceback."""
+        for var in TEST_TIER_ENV:
+            monkeypatch.delenv(var)
+
+        assert run.main(["promote", "never-read.json"]) == 1
+        printed = capsys.readouterr().err
+        assert printed.startswith("cannot run on this configuration: ")
+        assert "no vendor selected" in printed
+        assert printed.count("\n") == 1
 
     @pytest.mark.parametrize("name", sorted(run.COMMANDS))
     def test_each_command_parses_its_own_help(self, name, capsys):

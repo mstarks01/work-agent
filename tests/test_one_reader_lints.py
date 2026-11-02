@@ -592,6 +592,40 @@ def _reads_loc(node: ast.AST) -> bool:
     )
 
 
+def test_an_archived_report_has_one_reader():
+    """Only ``read_report`` parses a report the harness reads from a file.
+
+    A bare parse stops a command with a pydantic traceback on an archive that
+    today's :class:`~analysis_service.report.Report` refuses. ``read_report``
+    refuses it in one line that names the file and the field.
+    """
+    readers = set(_sites(_parses_a_report)) - REPORT_PARSERS.keys()
+    assert readers == {("evals/harness/bundle.py", "read_report")}
+
+
+#: Each function that parses a :class:`~analysis_service.report.Report` and
+#: does not ask ``read_report``, and why.
+REPORT_PARSERS: dict[Site, str] = {
+    ("src/analysis_service/sql_store.py", "report"): (
+        "the job store reads a report from a job row, and refuses one that"
+        " does not parse as UnreadableSchema (ADR 0095)"
+    ),
+    ("evals/harness/structural.py", "structural_issues"): (
+        "it checks a payload in memory and returns each refusal as a Tier 1"
+        " issue; it reads no file"
+    ),
+}
+
+
+def _parses_a_report(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr.startswith("model_validate")
+        and _is_name(node.func.value, "Report")
+    )
+
+
 def test_each_declared_site_still_reads_the_rule_itself():
     assert SPELLING_READERS.keys() <= set(_sites(_tests_a_spelling))
     assert FIELD_PAIR_READERS.keys() <= set(_sites(_tests_two_spelling_fields))
@@ -599,6 +633,7 @@ def test_each_declared_site_still_reads_the_rule_itself():
     assert CONFIG_DEFAULT_READERS.keys() <= set(_sites(_reads_a_config_default))
     assert ID_DERIVERS.keys() <= set(_sites(_derives_an_id))
     assert STORED_ANSWER_READERS.keys() <= set(_sites(_validates_an_answer))
+    assert REPORT_PARSERS.keys() <= set(_sites(_parses_a_report))
 
 
 def test_the_cell_has_one_reader():

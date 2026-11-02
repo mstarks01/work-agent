@@ -68,6 +68,7 @@ from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness import audit
 from evals.harness.archive import case_suffix
+from evals.harness.bundle import read_report
 from evals.harness.early_rounds import MAX_SAVES, dont_know
 from evals.harness.run_record import run_record
 
@@ -390,7 +391,7 @@ def paired(root: Path) -> list[Paired]:
         case = path.name.removesuffix(case_suffix("report"))
         if case in held:
             continue
-        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        report = read_report(path)
         if len(report.job.frameworks) == 1:
             by_case[case].append((path, report))
     found = []

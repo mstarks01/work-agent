@@ -59,7 +59,7 @@ from evals.harness.artifact import (
     load_artifact,
     repo_commit,
 )
-from evals.harness.bundle import check_out, finished_file
+from evals.harness.bundle import check_out, finished_file, read_report
 from evals.harness.lane_replay import material_at
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
@@ -102,7 +102,7 @@ def load(artifact: EvalArtifact, case_id: str, framework: FrameworkName) -> Arch
     lanes_path = finished_file(artifact, case_id, "lanes")
     # A finished case: finished_file returns each path or raises.
     assert drafts_path is not None and lanes_path is not None
-    report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
+    report = read_report(report_path)
     shared = material_at(lanes_path)["shared"]
     block = next((b for b in report.analyses if b.framework == framework), None)
     if block is None:
