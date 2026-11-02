@@ -3,8 +3,8 @@
 The returned file is ``ballot-returned.csv``. Its header must be ``COLUMNS``,
 each ``n`` must appear once, each issued column must be unchanged, each verdict
 must be in its check's set, and ``duplicate_of`` and ``pair_of`` must name
-another row of the same check and the same group. A row may be in one pair at
-most, and a link written on both rows counts once. A file that breaks one of
+another row of the same check and the same group, and a pair's two drafts
+must share a flow. A row may be in one pair at most, and a link written on both rows counts once. A file that breaks one of
 these is refused by name. The file may carry the byte-order mark a spreadsheet
 writes.
 
@@ -78,6 +78,17 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
     key = {str(entry["n"]): entry for entry in json.loads(key_path.read_text())}
     if rows.keys() != sent.keys():
         raise BallotError("the returned rows are not the issued rows")
+    claims = {
+        (run, claim["sequence"]): claim
+        for check in CHECKS
+        for run, output in runs(check)
+        for claim in output["claims"]
+    }
+
+    def elements_of(n: str) -> set[str]:
+        claim = claims[(key[n]["run"], key[n]["sequence"])]
+        return set(claim["affected_element_ids"])
+
     pairs: set[frozenset[str]] = set()
     for n, row in rows.items():
         changed = [c for c in COLUMNS if c not in RULED and row[c] != sent[n][c]]
@@ -95,21 +106,17 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
         if pair is not None:
             if (row["verdict"], pair["verdict"]) != ("right", "right"):
                 raise BallotError(f"row {n}: a pair links two right rows")
+            flows = {
+                e
+                for e in elements_of(n) & elements_of(pair["n"])
+                if e.startswith("flow:")
+            }
+            if not flows:
+                raise BallotError(f"row {n}: a pair links two drafts at one flow")
             pairs.add(frozenset((n, pair["n"])))
     paired = Counter(member for pair in pairs for member in pair)
     if twice := sorted(n for n, count in paired.items() if count > 1):
         raise BallotError(f"rows {twice} are each in more than one pair")
-
-    claims = {
-        (run, claim["sequence"]): claim
-        for check in CHECKS
-        for run, output in runs(check)
-        for claim in output["claims"]
-    }
-
-    def stores_of(n: str) -> set[str]:
-        claim = claims[(key[n]["run"], key[n]["sequence"])]
-        return set(claim["affected_element_ids"])
 
     targets = CHECKS["item4"].stores
     assert targets is not None
@@ -117,7 +124,7 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
         (key[n]["run"], store)
         for n, row in rows.items()
         if row["check"] == "item4" and row["verdict"] == "same"
-        for store in targets & stores_of(n)
+        for store in targets & elements_of(n)
     }
     return {
         "verdicts": {

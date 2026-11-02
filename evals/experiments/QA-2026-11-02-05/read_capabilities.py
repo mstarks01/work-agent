@@ -16,7 +16,8 @@ filling of every case.
 The output names the tier, its selection, its sampling, the pinned upstreams
 and the commit, and keeps what the provider answered for each call.
 
-Usage, under ``bash -l`` with ``ANALYSIS_TIERS_FILE`` set:
+Usage, from the repository root, under ``bash -l`` with ``ANALYSIS_TIERS_FILE``
+set:
 
     read_capabilities.py <out.json> <case dir> [<case dir> ...]
 
@@ -52,7 +53,8 @@ from evals.harness.node_call import node_call
 #: What the validity gate hands the next node on its valid route.
 VALID_TURN = {"issue_count": 0}
 MFA = "multi-factor-authentication"
-assert MFA in CAPABILITIES
+if MFA not in CAPABILITIES:
+    raise SystemExit(f"{MFA!r} is not a capability key")
 
 
 #: The offline check ``capture_turn.py`` writes.
@@ -82,12 +84,12 @@ REQUEST_ROOTS = ("src", "prompts", "uv.lock")
 def input_digests() -> dict[str, str]:
     """Each tracked file under ``REQUEST_ROOTS`` with the digest of its text."""
     tracked = subprocess.run(
-        ["git", "ls-files", "--", *REQUEST_ROOTS],
+        ["git", "ls-files", "-z", "--", *REQUEST_ROOTS],
         check=True,
         capture_output=True,
         text=True,
-    ).stdout.split()
-    return {path: text_digest(Path(path).read_text()) for path in tracked}
+    ).stdout.split("\0")
+    return {path: text_digest(Path(path).read_text()) for path in tracked if path}
 
 
 def refuse_unchecked() -> None:
