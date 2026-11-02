@@ -1,9 +1,10 @@
 {
  "commit": {
-  "commit": "29dd67d92f5ee8690b9c601ce1d08c9069b5a65d",
+  "commit": "7b2b67a7ead2e70483cd2345ca2c94d664d52ff4",
   "clean": false
  },
  "inputs": {
+  "evals/experiments/QA-2026-11-02-05/read_capabilities.py": "066811321c19f7cf848d1a06776af58533c7f53fa04b9cb66c4ece890362d785",
   "prompts/analyze.md": "7aae3bdeb3d63a15fa22915783c07900d3e8a1a09da6e322f76da2e8397ad659",
   "prompts/assert.md": "5b27d936cec6c7c361b76abf94331cd1d5c483aa8a9fd2ec04bfc46d8f879497",
   "prompts/capabilities.md": "8bdf154fa558d026cbdec26162085338b6f4d6439fe83d2655039b3edde8d8b6",

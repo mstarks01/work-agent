@@ -1,6 +1,6 @@
 {
  "revision": "53ab865734b686cb35ec04d8c23e91067ecf26be",
- "run_commit": "f90ea44fddd9540520561e09ec5888efe101adf1",
+ "run_commit": "f90ea44f",
  "roots": [
   "src",
   "prompts",
@@ -11,5 +11,6 @@
  ],
  "files": 229,
  "equal": true,
- "differ": []
+ "differ": [],
+ "request_check_equal": true
 }
