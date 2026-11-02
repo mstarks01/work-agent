@@ -122,7 +122,10 @@
     S.draft = null;        // the editor's working copy
     S.tab = "scope";       // variant B's detail tab
     S.selected = S.controls[0]?.id ?? null;
-    S.confirm = null;      // the ID a delete waits on
+    S.confirm = null;      // the IDs a delete waits on
+    S.chosen = new Set();  // variant A's selected rows
+    S.sortBy = "date"; S.descending = true;
+    S.search = ""; S.filterKind = ""; S.filterFramework = "";
     S.problem = null;
     S.notice = null;
     S.dialog = false;      // variant B's offer dialog
@@ -274,13 +277,15 @@
     render();
   };
 
-  const deleteControl = (id) => {
-    const control = controlById(id);
-    S.controls = S.controls.filter((c) => c.id !== id);
-    delete S.offer[id];
-    if (S.selected === id) S.selected = S.controls[0]?.id ?? null;
+  const deleteControls = (ids) => {
+    const names = ids.map((id) => controlById(id).name);
+    S.controls = S.controls.filter((c) => !ids.includes(c.id));
+    for (const id of ids) { delete S.offer[id]; S.chosen.delete(id); }
+    if (ids.includes(S.selected)) S.selected = S.controls[0]?.id ?? null;
     S.confirm = null;
-    S.notice = `“${control.name}” is deleted. The analyses that applied it keep their copy.`;
+    S.notice = names.length === 1
+      ? `“${names[0]}” is deleted. The analyses that applied it keep their copy.`
+      : `${names.length} Controls are deleted. The analyses that applied them keep their copy.`;
     render();
   };
 
@@ -345,18 +350,20 @@
   const countLine = () => h("p", { class: "hint" }, `${S.controls.length} of ${limits.max_controls} Controls`);
 
   const confirmDialog = () => {
-    const control = S.confirm && controlById(S.confirm);
-    const dialog = h("dialog", { "aria-labelledby": "delete-question" },
-      h("p", { id: "delete-question" }, control ? `Delete “${control.name}”?` : ""),
-      h("p", {}, "This removes it from Controls. Each analysis that already applied it keeps its own copy, and its reports do not change. You cannot undo a delete."),
+    const ids = S.confirm ?? [];
+    const text = ids.length === 1
+      ? `Delete “${controlById(ids[0]).name}”? Each analysis that already applied it keeps its own copy, and its reports do not change. You cannot undo this.`
+      : `Delete ${ids.length} Controls? Each analysis that already applied them keeps its own copy, and its reports do not change. You cannot undo this.`;
+    const dialog = h("dialog", { id: "confirm-delete", "aria-labelledby": "confirm-delete-text" },
+      h("p", { id: "confirm-delete-text" }, ids.length ? text : ""),
       h("div", { class: "dialog-actions" },
         h("button", { type: "button", on: { click: () => { S.confirm = null; render(); } } }, "Cancel"),
-        h("button", { type: "button", class: "danger", on: { click: () => deleteControl(S.confirm) } }, "Delete")));
-    if (control) queueMicrotask(() => dialog.showModal());
+        h("button", { type: "button", class: "danger", on: { click: () => deleteControls(S.confirm) } }, "Delete")));
+    if (ids.length) queueMicrotask(() => dialog.showModal());
     return dialog;
   };
 
-  const askDelete = (id) => { S.confirm = id; render(); };
+  const askDelete = (...ids) => { S.confirm = ids; render(); };
 
   // The editor's four fieldsets, shared by the variants that edit in a form
   // or a dialog. Variant C edits inline with the same pieces.
@@ -543,26 +550,64 @@
 
   // ---- variant A: form page, checklist offer, one report table --------------------
 
-  const controlsA = () => [
-    h("div", { class: "count-line" }, h("h1", {}, "Controls"),
-      h("span", {}, h("button", { type: "button", class: "primary", disabled: atLimit() || S.editing === "new", on: { click: () => startEdit("new") } }, "New Control"))),
-    introLine(), countLine(),
-    atLimit() ? h("div", { class: "refusal" }, LIMIT_TEXT()) : null,
-    noticeBox(),
-    S.editing ? editorForm(S.draft, () => { S.editing = null; S.draft = null; S.problem = null; render(); }) : null,
-    S.controls.length ? h("div", { class: "table-wrap" }, h("table", { class: "grid-table" },
-      h("thead", {}, h("tr", {}, h("th", { scope: "col" }, "Name"), h("th", { scope: "col" }, "Protects"), h("th", { scope: "col" }, "Facts"), h("th", { scope: "col" }, "Covers"), h("th", { scope: "col" }, "Evidence"), h("th", { scope: "col" }, "Updated"), h("th", { scope: "col" }, h("span", { class: "sr-only" }, "Actions")))),
-      h("tbody", {}, ...S.controls.map((c) => h("tr", {},
-        h("td", { class: "name" }, c.name), h("td", {}, scopeText(c.scope)),
-        h("td", {}, c.facts.map((f) => f.attribute).join(", ") || "—"),
-        h("td", {}, h("div", { class: "chips" }, ...c.rows.map((r) => h("span", { class: "chip" }, `${r.framework} ${r.unit}`)))),
-        h("td", {}, c.evidence.map((f) => `${f.name} (${CLASS_LABEL[f.class]})`).join(", ") || "—"),
-        h("td", { class: "num" }, day(c.updated)),
-        h("td", { class: "act" }, h("button", { type: "button", class: "quiet", on: { click: () => startEdit(c.id) } }, "Edit"), " ",
-          h("button", { type: "button", class: "quiet", on: { click: () => askDelete(c.id) } }, "Delete")))))))
-      : h("p", { class: "muted" }, "No Controls yet. Record a protection your systems already have, and every analysis can apply it."),
-    confirmDialog(),
-  ];
+  // The Analyses page's shape: the filters, "Delete selected", a sortable
+  // table with a select column, and the row actions.
+  const controlsA = () => {
+    const text = S.search.toLocaleLowerCase();
+    const shown = S.controls.filter((c) =>
+      [c.name, scopeText(c.scope), ...c.rows.map(unitText), ...c.evidence.map((f) => f.name)].some((v) => v.toLocaleLowerCase().includes(text))
+      && (!S.filterKind || c.scope.type === S.filterKind)
+      && (!S.filterFramework || c.rows.some((r) => r.framework === S.filterFramework)));
+    shown.sort((a, b) => {
+      const order = S.sortBy === "name"
+        ? a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })
+        : new Date(a.updated) - new Date(b.updated);
+      return (S.descending ? -order : order) || a.name.localeCompare(b.name);
+    });
+    const chosen = shown.filter((c) => S.chosen.has(c.id));
+    const refocus = (id) => queueMicrotask(() => { const input = document.getElementById(id); if (input) { input.focus(); input.setSelectionRange?.(input.value.length, input.value.length); } });
+    const sortHead = (key, label, id, cls) => h("th", { scope: "col", id, class: cls, "aria-sort": S.sortBy === key ? (S.descending ? "descending" : "ascending") : "none" },
+      h("button", { type: "button", "data-sort": key, on: { click: () => { S.descending = S.sortBy === key ? !S.descending : key === "date"; S.sortBy = key; render(); } } }, label));
+    const selectShown = h("input", { type: "checkbox", id: "select-shown", "aria-label": "Select all shown Controls", checked: Boolean(shown.length) && chosen.length === shown.length,
+      on: { change: (e) => { shown.forEach((c) => (e.target.checked ? S.chosen.add(c.id) : S.chosen.delete(c.id))); render(); } } });
+    selectShown.indeterminate = Boolean(chosen.length) && chosen.length < shown.length;
+    return [
+      h("div", { class: "count-line" }, h("h1", {}, "Controls"),
+        h("span", {}, h("button", { type: "button", class: "primary", disabled: atLimit() || S.editing === "new", on: { click: () => startEdit("new") } }, "New Control"))),
+      introLine(), countLine(),
+      atLimit() ? h("div", { class: "refusal" }, LIMIT_TEXT()) : null,
+      noticeBox(),
+      S.editing ? editorForm(S.draft, () => { S.editing = null; S.draft = null; S.problem = null; render(); }) : null,
+      h("div", { class: "analysis-filters" },
+        h("div", {}, h("label", { class: "field-label", for: "controls-search" }, "Find a Control"),
+          h("input", { type: "search", id: "controls-search", placeholder: "Search by name, what it protects or a unit", value: S.search, on: { input: (e) => { S.search = e.target.value; render(); refocus("controls-search"); } } })),
+        h("div", {}, h("label", { class: "field-label", for: "controls-kind" }, "Protects"),
+          h("select", { id: "controls-kind", on: { change: (e) => { S.filterKind = e.target.value; render(); } } }, h("option", { value: "" }, "All kinds"),
+            ...scopeTypes.map((row) => h("option", { value: row.type, selected: S.filterKind === row.type }, row.label)))),
+        h("div", {}, h("label", { class: "field-label", for: "controls-framework" }, "Framework"),
+          h("select", { id: "controls-framework", on: { change: (e) => { S.filterFramework = e.target.value; render(); } } }, h("option", { value: "" }, "All frameworks"),
+            ...Object.keys(units).map((f) => h("option", { value: f, selected: S.filterFramework === f }, f))))),
+      h("div", { class: "analysis-actions" }, h("button", { type: "button", id: "delete-selected", disabled: !chosen.length, on: { click: () => askDelete(...chosen.map((c) => c.id)) } },
+        chosen.length ? `Delete selected (${chosen.length})` : "Delete selected")),
+      h("div", { class: "analysis-table-wrap" }, h("table", { id: "controls-list", hidden: !shown.length },
+        h("thead", {}, h("tr", {}, h("th", { scope: "col", class: "select-cell" }, selectShown),
+          sortHead("name", "Name", "sort-name", "name-cell"), h("th", { scope: "col" }, "Protects"), h("th", { scope: "col" }, "Covers"), h("th", { scope: "col" }, "Evidence"),
+          sortHead("date", "Updated", "sort-date"), h("th", { scope: "col" }, "Actions"))),
+        h("tbody", {}, ...shown.map((c) => h("tr", {},
+          h("td", {}, h("input", { type: "checkbox", checked: S.chosen.has(c.id), "aria-label": `Select ${c.name}`, on: { change: (e) => { e.target.checked ? S.chosen.add(c.id) : S.chosen.delete(c.id); render(); } } })),
+          h("td", { class: "name-cell" }, h("a", { href: "#", on: { click: (e) => { e.preventDefault(); startEdit(c.id); } } }, c.name),
+            c.facts.length ? h("div", { class: "sub" }, `Proves ${c.facts.map((f) => f.attribute).join(", ")}`) : null),
+          h("td", {}, scopeText(c.scope)),
+          h("td", {}, h("div", { class: "chips" }, ...c.rows.map((r) => h("span", { class: "chip" }, `${r.framework} ${r.unit}`)))),
+          h("td", {}, c.evidence.map((f) => `${f.name} (${CLASS_LABEL[f.class]})`).join(", ") || "—"),
+          h("td", {}, h("time", { datetime: c.updated }, day(c.updated))),
+          h("td", {}, h("div", { class: "row-actions" },
+            h("button", { type: "button", "aria-label": `Edit ${c.name}`, on: { click: () => startEdit(c.id) } }, "Edit"),
+            h("button", { type: "button", class: "danger", "aria-label": `Delete ${c.name}`, on: { click: () => askDelete(c.id) } }, "Delete")))))))),
+      shown.length ? null : h("p", { class: "muted" }, S.controls.length ? "No Controls match your filters." : "Record a protection your systems already have. Your Controls will appear here."),
+      confirmDialog(),
+    ];
+  };
 
   const offerA = () => formStub(
     h("h2", {}, "Controls for this analysis"),

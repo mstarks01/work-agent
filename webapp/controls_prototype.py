@@ -410,6 +410,18 @@ _PAGE = """<!doctype html>
   .grid-table td.act { width:1%; }
   .grid-table td.act button { display:block; }
   .table-wrap { overflow-x:auto; }
+  #controls-list { display:table; min-width:640px; width:100%; overflow:visible; }
+  #controls-list[hidden] { display:none; }
+  #controls-list th, #controls-list td { min-width:0; padding:14px 10px; }
+  #controls-list th:first-child, #controls-list td:first-child { width:1%; padding-left:0; }
+  #controls-list .name-cell { width:32%; }
+  #controls-list th:last-child, #controls-list td:last-child { padding-right:0; }
+  #controls-list th button { min-height:0; padding:0; border:0; background:transparent; font-weight:600; }
+  #controls-list th button:hover { color:var(--accent); }
+  #controls-list th[aria-sort=ascending] button::after { content:" ↑"; }
+  #controls-list th[aria-sort=descending] button::after { content:" ↓"; }
+  #controls-list td a { font-weight:600; text-decoration:none; overflow-wrap:anywhere; }
+  #controls-list td time { white-space:nowrap; }
   .fanout li.fact { display:block; }
   .editor { display:grid; gap:14px; border:1px solid var(--line);
     border-radius:9px; padding:16px 18px; margin:16px 0 24px; }
