@@ -502,6 +502,14 @@ blessed element and every signed reference row:
 python -m evals.harness.run replay evals/emissions/*.json --out replay.json
 ```
 
+The replay pools sweeps into one arm when they ran one route, one prompt and
+one model, and read one input. The input is the artifact's `rendered_sources`
+block: one digest for each case, of the Sources as the graph renders them for
+the model. A change to a Source or to its render, such as the diagram reader,
+moves it. A sweep without the block is an arm of its own, and the replay prints
+`NOT POOLED` with its name. Name the arm of such sweeps with
+`--arm LABEL=GLOB` to pool them. `bind` takes the same option.
+
 The assertion benchmark seeded the blessed model, so its proposals name
 blessed element IDs; a production job resolves them against the graph its own
 extraction produced. `bind` resolves each archived proposal against every
@@ -513,7 +521,7 @@ cited over the extracted graphs against the blessed one:
 
 ```sh
 python -m evals.harness.run bind evals/emissions/20260914T201030Z-assert-model-benchmark/*.json \
-  --graphs evals/emissions/*.json --out bind.json
+  --graphs evals/emissions/*.json --arm 'benchmark=*' --out bind.json
 ```
 
 A `run` fails (exits non-zero) **only** on a structural problem — a report that

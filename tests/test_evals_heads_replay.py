@@ -91,6 +91,9 @@ class TestPlacingAHeadOnlySweep:
             mode = "heads"
             path = Path("heads.json")
 
+            def carries(self, name: str) -> bool:
+                return name != "rendered_sources"
+
             def block(self, name: str):
                 if name == "instruction":
                     return [

@@ -9,6 +9,7 @@ real corpus case so the alignment it reads is the shipped one.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -30,6 +31,8 @@ from analysis_service.assertions import (
     assertion_id,
     identity_parts,
 )
+from analysis_service.execution import seed_state
+from analysis_service.graph import STATE_INPUT_TEXT
 from analysis_service.system_model import (
     DataFlow,
     SystemModel,
@@ -40,9 +43,10 @@ from analysis_service.system_model import (
 )
 from analysis_service.validation import parse_and_validate
 from evals.harness import audit, bundle, replay
+from evals.harness import run as run_module
 from evals.harness.alignment import align, placeholder_zones
 from evals.harness.archive import kind_of
-from evals.harness.artifact import load_artifact
+from evals.harness.artifact import load_artifact, rendered_sources
 from evals.harness.bundle import (
     assertions_from_reports,
     extractions_from_reports,
@@ -1040,7 +1044,9 @@ class TestBothReadingsArriveTogether:
         graded = self.graded(golden, reference, entries)
         sweep = replay.SweepReplay(
             artifact="synthetic.json",
-            arm=replay.Arm(("assert",), ("digest",), ("a/model",)),
+            arm=replay.Arm(
+                ("assert",), ("digest",), ("a/model",), "synthetic", "named"
+            ),
             commit="0000000",
             clean=True,
             corpus_digest="synthetic",
@@ -1449,7 +1455,7 @@ class TestTheArchivedEmissionsReplay:
     def test_the_spread_is_read_over_the_sweeps_that_ran_every_case(self, corpus):
         """A ceiling is priced against the sd of the fate's per-sweep count."""
         sweeps = [
-            replay_artifact(path, corpus, CORPUS)
+            replay_artifact(path, corpus, CORPUS, named="archive")
             for path in ARTIFACTS
             if load_artifact(path).mode == "extraction"
         ]
@@ -1757,3 +1763,201 @@ class TestBindingAProposalToAnExtractedGraph:
         written = json.loads(out.read_text("utf-8"))
         assert list(written) == ["record", "arms", "bindings"]
         assert written["bindings"]
+
+
+#: The drawn sweeps of QA-2026-11-01-01 E2: four at ``480ef2c3``, before the
+#: diagram reader's flowchart corrections, and four at ``efc0087b``, after
+#: them. One prompt and one model, so the instruction digest cannot tell the
+#: two sides apart; the rendered diagram input can.
+DIAGRAM_STRUCTURE = EMISSIONS / "20261101T-diagram-structure"
+E2_BEFORE = sorted(DIAGRAM_STRUCTURE.glob("e2-drawn-before-r*.json"))
+E2_AFTER = sorted(DIAGRAM_STRUCTURE.glob("e2-drawn-after-r*.json"))
+
+#: Elements lost per sweep as QA-2026-11-01-01 reads them, on the corpus at
+#: digest ``44a9bcd7``: the six loss fates, summed over the sweep's cases.
+E2_LOSSES = {"before": [84, 77, 80, 81], "after": [75, 75, 74, 73]}
+
+
+def _losses(sweep: replay.SweepReplay) -> int:
+    return sum(
+        count
+        for extraction in sweep.extractions
+        for fate, count in extraction.counts.items()
+        if fate in replay.LOSSES
+    )
+
+
+def _with_rendered(path: Path, tmp_path: Path, rendered: object) -> Path:
+    """A copy of an archived sweep that records ``rendered`` as its input."""
+    raw = json.loads(path.read_text("utf-8"))
+    raw["rendered_sources"] = rendered
+    copy = tmp_path / path.name
+    copy.write_text(json.dumps(raw), "utf-8")
+    reports_dir(copy).symlink_to(reports_dir(path).resolve())
+    return copy
+
+
+class TestAnArmSeparatesWhatTheRouteRead:
+    """Sweeps on one prompt that read different input are two arms (#2105 item 5)."""
+
+    @pytest.fixture(scope="class")
+    def corpus(self):
+        return load_corpus(CORPUS)
+
+    def test_every_kind_of_treatment_has_a_label(self):
+        assert set(replay.TREATMENT_LABELS) == set(get_args(replay.TreatmentBy))
+
+    def test_the_archived_e2_sweeps_are_the_four_and_four_the_experiment_read(self):
+        assert len(E2_BEFORE) == len(E2_AFTER) == 4
+
+    def test_sweeps_that_record_no_input_are_never_pooled(self, corpus):
+        sweeps = [replay_artifact(p, corpus, CORPUS) for p in E2_BEFORE + E2_AFTER]
+
+        arms = replay.by_arm(sweeps)
+
+        assert len(arms) == 8
+        assert {arm.treatment_by for arm in arms} == {"sweep"}
+        note = replay.unpooled_note(arms)
+        assert note is not None
+        assert "8 sweep(s)" in note
+        assert "--arm LABEL=GLOB" in note
+
+    def test_the_command_says_why_it_did_not_pool(self, capsys):
+        code = main(["replay", *map(str, E2_BEFORE + E2_AFTER)])
+
+        assert code == 0
+        printed = capsys.readouterr().out
+        assert printed.startswith("NOT POOLED: 8 sweep(s)")
+        assert printed.count("\n== ") == 8
+
+    def test_named_arms_reproduce_the_archived_loss_counts(self, tmp_path, capsys):
+        out = tmp_path / "replay.json"
+        code = main(
+            [
+                "replay",
+                *map(str, E2_BEFORE + E2_AFTER),
+                "--arm",
+                "before=e2-drawn-before-*",
+                "--arm",
+                "after=e2-drawn-after-*",
+                "--out",
+                str(out),
+            ]
+        )
+
+        assert code == 0
+        assert "NOT POOLED" not in capsys.readouterr().out
+        written = json.loads(out.read_text("utf-8"))
+        assert [arm["arm"]["treatment"] for arm in written["arms"]] == [
+            "before",
+            "after",
+        ]
+        assert [arm["extraction"]["sweeps"] for arm in written["arms"]] == [4, 4]
+        by_side: dict[str, list[int]] = {"before": [], "after": []}
+        for sweep in written["sweeps"]:
+            by_side[sweep["arm"]["treatment"]].append(
+                sum(
+                    count
+                    for extraction in sweep["extractions"]
+                    for fate, count in extraction["counts"].items()
+                    if fate in replay.LOSSES
+                )
+            )
+        assert by_side == E2_LOSSES
+
+    def test_recorded_input_places_two_arms_of_four(self, corpus, tmp_path):
+        """The record, not a name, separates the arms, and no case is an arm."""
+        cases = load_artifact(E2_BEFORE[0]).cases
+        # A digest per case that differs from case to case, as every corpus's
+        # does; the reader's change moved the render of every case.
+        before = {case: f"{index:064x}" for index, case in enumerate(cases)}
+        after = {case: f"{index + 100:064x}" for index, case in enumerate(cases)}
+        (tmp_path / "before").mkdir()
+        (tmp_path / "after").mkdir()
+        sweeps = [
+            replay_artifact(
+                _with_rendered(path, tmp_path / side, rendered),
+                corpus,
+                CORPUS,
+                # A name never overrides the record.
+                named="ignored",
+            )
+            for side, paths, rendered in (
+                ("before", E2_BEFORE, before),
+                ("after", E2_AFTER, after),
+            )
+            for path in paths
+        ]
+
+        arms = replay.by_arm(sweeps)
+
+        assert [len(group) for group in arms.values()] == [4, 4]
+        assert {arm.treatment_by for arm in arms} == {"rendered_sources"}
+        assert replay.unpooled_note(arms) is None
+        assert [[_losses(sweep) for sweep in group] for group in arms.values()] == [
+            E2_LOSSES["before"],
+            E2_LOSSES["after"],
+        ]
+
+    @pytest.mark.parametrize("rendered", [None, ["0" * 64], {"01": 1}])
+    def test_a_block_of_another_shape_is_refused(self, corpus, tmp_path, rendered):
+        copy = _with_rendered(E2_BEFORE[0], tmp_path, rendered)
+
+        with pytest.raises(ValueError, match="not a digest per case"):
+            replay_artifact(copy, corpus, CORPUS)
+
+    def test_genuine_repeats_still_pool(self, corpus):
+        """Five sweeps at one commit and one prompt, named as one arm, are one arm."""
+        paths = sorted((EMISSIONS / "20261017T-1813-name-rule").glob("after-r*.json"))
+        named = run_module.named_arms(["after=after-r*"], list(map(str, paths)))
+        sweeps = [
+            replay_artifact(Path(path), corpus, CORPUS, label)
+            for path, label in named.items()
+        ]
+
+        arms = replay.by_arm(sweeps)
+
+        assert [len(group) for group in arms.values()] == [5]
+        pool = replay.pooled_extraction(next(iter(arms.values())))
+        assert pool["emissions"] == sum(len(s.extractions) for s in sweeps)
+        assert sum(pool["fates"][fate] for fate in replay.LOSSES) == sum(
+            map(_losses, sweeps)
+        )
+
+    def test_a_file_two_arms_match_is_refused(self):
+        with pytest.raises(ValueError, match="name one arm for it"):
+            run_module.named_arms(["a=*-r1.json", "b=e2-*"], ["x/e2-drawn-r1.json"])
+
+    @pytest.mark.parametrize("entry", ["before", "=*.json", "before="])
+    def test_an_arm_entry_needs_a_label_and_a_glob(self, entry):
+        with pytest.raises(ValueError, match="is not LABEL=GLOB"):
+            run_module.named_arms([entry], ["x.json"])
+
+    def test_a_bad_arm_entry_stops_the_command_by_name(self, capsys):
+        code = main(["replay", str(E2_BEFORE[0]), "--arm", "before"])
+
+        assert code == 1
+        assert "is not LABEL=GLOB" in capsys.readouterr().err
+
+
+class TestRenderedSources:
+    """The digest a sweep records of each case's input, before it spends."""
+
+    @pytest.fixture(scope="class")
+    def golden(self):
+        return load_corpus(CORPUS)[0]
+
+    def test_the_digest_is_of_the_text_the_model_reads(self, golden):
+        rendered = seed_state(golden.sources)[STATE_INPUT_TEXT]
+
+        assert rendered_sources([golden]) == {
+            golden.id: hashlib.sha256(rendered.encode("utf-8")).hexdigest()
+        }
+
+    def test_a_moved_source_moves_the_digest(self, golden):
+        first, *rest = golden.sources
+        moved = dataclasses.replace(
+            golden, sources=(first.model_copy(update={"text": first.text + " "}), *rest)
+        )
+
+        assert rendered_sources([moved]) != rendered_sources([golden])
