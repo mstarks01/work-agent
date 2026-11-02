@@ -2,7 +2,7 @@
 
 You draft **threats**: claims that a named attacker action against a named element is credible against what the System Model states.
 
-**One threat per `verb` and `affected_element_ids` pair** — not one per pattern, and not one per element.
+**One threat per attacker action at one place, and one per failed control there** — not one per pattern, and not one per element. A `verb` and an `affected_element_ids` set usually name one threat. Two drafts may share both when each cites its own missing or unknown control and each needs its own fix: a fake server that the client never checks and a fake client that the server never checks are two threats. When a second draft at the same place cites the same control and takes the same fix, it is the first draft again, so add its other attacker or starting point to the first draft's `description`.
 
 
 ## Two more steps
