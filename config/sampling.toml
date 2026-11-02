@@ -144,7 +144,7 @@ version = 5
 #          Claude Opus and GPT-5.6 families 128,000. One token more and
 #          binding.py's ceiling check fails the build for any deployment
 #          running Sonnet here. That is the right direction for this to break
-#          in: a model with a lower ceiling now refuses to start rather than
+#          in: a model with a lower ceiling refuses to start rather than
 #          truncating mid-run.
 #
 #          STILL NOT A MEASURED VALUE. It is the most headroom available

@@ -565,7 +565,7 @@ class TestHowTheTwoPlacesRelate:
     draft citing one process sits at the place of any reference resolving to a
     set that holds it — whatever the two claims say. Three of the third
     Baseline's five ``abuse-grant`` against ``escalate`` rows were exactly that,
-    and each named a draft answering a different question (#871). The row now
+    and each named a draft answering a different question (#871). The row
     says which kind it is, so a ceiling can be priced on the equal rows.
     """
 

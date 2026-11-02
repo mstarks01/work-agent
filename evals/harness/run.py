@@ -1286,8 +1286,8 @@ def _print_certification(result: CertifyResult) -> None:
     ``certified`` is narrow by design (see
     :mod:`analysis_service.certification`): it means no *observed* fingerprint
     went unblessed, which is vacuously true of a sweep that observed none.
-    Printing it alone is how a run that certified nothing came to announce that
-    every fingerprint was blessed, so completeness is reported first and the
+    Printed alone, it would announce that every fingerprint was blessed for a
+    run that certified nothing, so completeness is reported first and the
     green line requires both halves.
     """
     if not result.complete:

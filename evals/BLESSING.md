@@ -324,8 +324,8 @@ In the same sitting, give each candidate threat pair one primary disposition:
 cannot decide it** — that is a real answer, it leaves the denominator rather
 than counting against either side, and it is better than a binary the evidence
 does not support. Check the bullet below on specificity first: review sitting
-01 returned four `unclear` answers and all four had one cause that bullet now
-settles. A pair that carries candidate element IDs carries a candidate
+01 returned four `unclear` answers and all four had one cause, which that
+bullet settles. A pair that carries candidate element IDs carries a candidate
 **verb** beside them, assigned from the candidate sentence's own words — never
 by reading the reference's, which would make every pair agree by construction
 and the measurement worthless. These are what the **false-split count** is measured over, and what lets the
@@ -463,7 +463,7 @@ is yours, so repair it or delete it, and every other case still walks.
 
 The rest of this section is what it writes.
 
-**This step is now enforced.** The act is a **Case Sitting** (see `GLOSSARY.md`),
+**This step is enforced.** The act is a **Case Sitting** (see `GLOSSARY.md`),
 and it is recorded as **one JSON file** under `evals/review/submissions/`:
 
 ```json
@@ -732,11 +732,11 @@ the second one. A merged submission is never removed, so sit it again.
 
 `tests/test_case_review.py` fails on a new case that arrives with no submission
 clearing it, and its `UNREVIEWED` table says what each unread case leaves
-unchecked. Cases that shipped before this was enforced are still unread, and
+unchecked. Some cases have no submission that clears them, and
 `uv run python webapp/sitting.py --list` names them. The table is not the
 count — `evals.review_submission` derives that from the corpus and the merged
-submissions, so no list can disagree with it — and an entry for a case somebody
-has since read no longer applies and can be deleted.
+submissions, so no list can disagree with it — and an entry for a case that a
+submission clears can be deleted.
 
 **Why it cannot be replaced by a lint.** Review sitting 01 found a reference claim
 asserting the model emits training data in a case with no training pipeline. A
@@ -752,9 +752,9 @@ sitting measures nothing.
 
 Take the shape from it and the mark names from a generated `REVIEW.md`. That
 document is a merged reader's own words, so a vocabulary sweep stops at it, and
-it still spells the marks `doubt` and `dup`. The set is now `agree`, `reject`,
-`duplicate` and `unsure` — `MARKS` in `evals/harness/sitting.py` — and the app
-and the import both refuse anything else.
+its mark names `doubt` and `dup` are not in the set. The set is `agree`,
+`reject`, `duplicate` and `unsure` — `MARKS` in `evals/harness/sitting.py` — and
+the app and the import both refuse anything else.
 
 Merge checklist:
 

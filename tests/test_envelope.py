@@ -40,7 +40,7 @@ def digests_for(tree: Path, case: str) -> dict[str, str]:
 
 
 def every_mark(tree: Path, case: str = CASE) -> dict[str, str]:
-    """A mark on every recorded finding, which a submission now needs."""
+    """A mark on every recorded finding, which a submission needs."""
     prepared = sittings.prepare(tree / "evals" / "corpus" / case)
     return {target.fingerprint: "agree" for target in prepared.mark_targets}
 

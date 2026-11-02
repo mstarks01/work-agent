@@ -230,8 +230,8 @@ DECLARED: dict[str, str] = {
         "The scoring pass is that package's, because grading an open claim set"
         " is not a per-case fold; it names the block it grades so a sweep of"
         " another package skips it rather than fails in it. The"
-        " per-case mechanical dispatch that used to branch here is now"
-        " `PACKAGE_SCORERS`, a table keyed by framework."
+        " per-case mechanical dispatch is `PACKAGE_SCORERS`, a table keyed by"
+        " framework."
     ),
     "webapp/review.py": (
         "QUESTIONS is a table keyed by framework, checked against PACKAGES at"

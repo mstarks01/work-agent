@@ -59,7 +59,7 @@ waiting job sends renames.
 
 The questions route lists the kept answers in `carried_kept` and
 `carried_kept_links`. The first-run page marks each one under "Your answers"
-and counts the answers kept, not kept and waiting for a part, as one change
+and counts the answers kept, not kept and waiting for an element, as one change
 review. A carried answer is not taken back when the facts it depends on
 change; that is the next step of package 7.
 

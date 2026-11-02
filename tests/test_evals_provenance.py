@@ -87,8 +87,8 @@ def node_run(
     )
 
 
-#: The strong-tier node this sweep drives. Per framework since schema 3.0, so
-#: it is spelled once here rather than at each site that names a node.
+#: The strong-tier node this sweep drives. Per framework, so it is spelled
+#: once here rather than at each site that names a node.
 CRITIC_NODE = "critic_stride"
 
 

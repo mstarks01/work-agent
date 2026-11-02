@@ -11,10 +11,10 @@ what a person decided about each finding.
 
 ## Read this before you quote a number
 
-**An agent wrote all of it; review records now identify the subsets people have
+**An agent wrote all of it; review records identify the subsets people have
 read.** Every golden case, every reference claim and every calibration label
 began agent-authored. On 2026-09-21 one **Case Sitting** read all 13 cases and
-marked all 344 recorded claims, so every reference set now carries a human
+marked all 344 recorded claims, so every reference set carries a human
 judgement per claim — `agree`, `reject`, `duplicate` or `unsure`. A mark is a
 reader's answer on a claim as written; it does not make the set exhaustive, and
 the 26 `missing` entries that sitting recorded say where the reader thought it
@@ -538,7 +538,7 @@ agent-authored, so it measures agreement with them and not correctness.
 Every number here is measured **against the rule and the ledger** — use
 them to compare configurations and track movement, never as absolute scores or
 against another tool's published figures. The reference sets they rest on are
-agent-authored, and every claim in them now carries one reader's mark.
+agent-authored, and every claim in them carries one reader's mark.
 
 **ASVS's differ only in mechanism.** The `applicability` block is a confusion
 matrix over a finite catalog, matched by requirement ID: its claims carry

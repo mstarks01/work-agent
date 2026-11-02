@@ -307,7 +307,7 @@ lands from now on sharpens it and costs nothing extra.
 
 Extraction is graded on element IDs, which are derived from names, so a model
 that identifies a component correctly and names it its own way scores as though
-it found nothing. Those are two different questions and the score now asks both:
+it found nothing. Those are two different questions and the score asks both:
 
 - **Naming-policy conformity** — `endpoint_recall`. Did the extraction keep the
   source's wording, which is what `extract.md` rule 3 asks for?

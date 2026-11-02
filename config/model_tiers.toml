@@ -43,9 +43,8 @@
 #
 # Pinning is a proxy, not the guarantee: the reproducibility guarantee is the
 # *served* build read back from every response and recorded per node execution.
-# The predecessor to this rule was an allowlist of numbered Gemini builds, and
-# it broke outright when Google retired them; matching a shape rather than
-# enumerating builds is what keeps the Claude half from repeating that.
+# The rule matches a shape rather than a list of numbered builds, so the check
+# does not break when a vendor retires a build.
 #
 # ENV OVERRIDES are two vars per tier: ANALYSIS_MODEL_{BASE,STRONG,REVIEW}_VENDOR and
 # _MODEL, plus ANALYSIS_MODEL_CREDENTIALS_{VENDOR}, ANALYSIS_MODEL_CHARGES_{VENDOR}
@@ -53,8 +52,8 @@
 # an image rebuild). `_VENDOR` alone is a build-time error — a cross-vendor pair
 # like anthropic + gemini-2.5-pro passes every downstream check and would die on
 # node one of a paid-for job. Any unrecognised ANALYSIS_MODEL_* var also raises,
-# so a deployment still carrying v2's ANALYSIS_MODEL_FLASH fails loudly instead of
-# being silently ignored.
+# so a deployment that sets ANALYSIS_MODEL_FLASH fails loudly instead of being
+# silently ignored.
 #
 # NOTHING IS SELECTED BY DEFAULT, and that is the point. A default model would
 # make "no privileged default" true of the *mechanism* while the values said
@@ -251,7 +250,7 @@ capabilities = "base"
 "analyze/stride" = "strong"
 "critic/stride" = "strong"
 # The bounded critic re-ask (ticket 038): same judgement as the critic, so
-# always the same tier. The loader now *checks* the pairing rather than trusting
+# always the same tier. The loader *checks* the pairing rather than trusting
 # this comment — at two keys a comment holds, at 2N keys it drifts, and a re-ask
-# on a cheaper model than the pass it corrects is what the comment warned about.
+# on a cheaper model than the pass it corrects is the fault the check refuses.
 "recritic/stride" = "strong"

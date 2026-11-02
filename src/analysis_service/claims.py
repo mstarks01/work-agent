@@ -1699,7 +1699,7 @@ class RepairedQuote(BaseModel):
 
     The ladder refused what the agent wrote, and
     :func:`~analysis_service.grounding.repair_prepared` found a window of the named
-    source near enough to hand back. The ground now carries that window — the
+    source near enough to hand back. The ground carries that window — the
     submitter's words — and this mark carries what the agent wrote, so the
     substitution is on the record rather than silent. ``similarity`` is the
     ratio that licensed it.
@@ -2830,7 +2830,7 @@ class FrameworkAnalysis(BaseModel):
 
         Uniqueness stops at the block on purpose. #163 ruled that ``id`` has no
         shared grammar, so two packages composing ``1.2.5`` and ``1.2.5`` for
-        unrelated things is legal — and every mark that points at a claim now
+        unrelated things is legal — and every mark that points at a claim
         lives in the same block as the claim it points at, so nothing resolves
         an ID across a boundary.
 

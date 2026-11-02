@@ -37,7 +37,7 @@ its own question.
 **The limit counts places** (`answer_state.limit_place`): a group of field
 questions takes one place, and a capability question one. A STRIDE list holds
 fewer than 30 groups, so the floor and not the limit decides which field
-questions a pause asks. The page's progress counts a shared group's parts
+questions a pause asks. The page's progress counts a shared group's elements
 once.
 
 > **Amended by [ADR 0113](0113-a-shared-answer-covers-the-elements-a-person-ticks.md).**
