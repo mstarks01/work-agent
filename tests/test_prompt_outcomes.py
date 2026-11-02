@@ -30,6 +30,11 @@ from pydantic import ValidationError
 from analysis_service import graph
 from analysis_service.assertions import assertion_id
 from analysis_service.capabilities import resolve
+from analysis_service.claim_identity import (
+    distinct_mechanisms,
+    finding_key,
+    mechanism_of,
+)
 from analysis_service.claims import AnalysisMarks, ProposedVerdict, Severity
 from analysis_service.compact import COMPACT_FORMAT
 from analysis_service.critic_round import CriticRound, Reask, rulings_of
@@ -38,13 +43,14 @@ from analysis_service.fan_in import join_drafts
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.frameworks.asvs.record import RequirementProposal
 from analysis_service.graph import parse_extraction
-from analysis_service.system_model import normalize_name
+from analysis_service.system_model import ModelIndex, normalize_name
 from analysis_service.validation import IssueCode, parse_and_validate, validate
 from tests.factories import sample_draft, sample_ruling, valid_model
 from tests.source_tree import REPO_ROOT
 from tests.test_capabilities import _facts
 from tests.test_compact import compact_fixture
 from tests.test_evidence import assertions, row
+from tests.test_exemplar_fan_in import fixture_model
 from tests.test_five_class_read import TABLE
 from tests.test_graph import (  # noqa: F401  (four fixtures)
     KEYS,
@@ -57,6 +63,7 @@ from tests.test_graph import (  # noqa: F401  (four fixtures)
     prompt_loader,
     routed_targets,
 )
+from tests.test_two_mechanisms_one_place import merged, pair
 from tests.test_validation import TestCitationsResolve, codes
 
 pytestmark = pytest.mark.lint
@@ -320,6 +327,17 @@ def a_repeated_threat_id_keeps_the_first_draft_and_drops_the_rest():
     assert [draft.title for draft in joined.drafts] == ["first"]
     (mark,) = joined.marks.dropped_claims
     assert (mark.claim_id, mark.title) == ("S-01", "second")
+
+
+@decides
+def two_drafts_at_one_place_that_fail_two_controls_are_two_findings():
+    caller, server = merged(pair()).drafts
+    flows = ModelIndex.of(fixture_model("A")).flow_endpoints
+
+    assert finding_key(caller, flows) == finding_key(server, flows)
+    assert distinct_mechanisms(
+        mechanism_of(caller, flows, {}), mechanism_of(server, flows, {})
+    )
 
 
 @decides
