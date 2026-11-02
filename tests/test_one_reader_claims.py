@@ -50,7 +50,8 @@ from tests.test_one_reader_lints import ONE_READERS
 
 pytestmark = pytest.mark.lint
 
-#: The parts of the read trees that the lint leaves out, with the reason.
+#: The parts of :data:`~tests.source_tree.PYTHON` the lint leaves out, with the
+#: reason.
 LEFT_OUT: dict[str, str] = {
     "evals/experiments": (
         "an audit script there runs one experiment as it ran on its day, so it"
@@ -212,7 +213,7 @@ def _comment_blocks(source: str) -> Iterator[tuple[int, str]]:
         yield start, "\n".join(block)
 
 
-def _definitions(tree: ast.Module) -> list[ast.stmt]:
+def _statements(tree: ast.Module) -> list[ast.stmt]:
     """Each statement in ``tree``, in source order."""
     return sorted(
         (node for node in ast.walk(tree) if isinstance(node, ast.stmt)),
@@ -224,13 +225,11 @@ def _name_of(node: ast.stmt) -> str | None:
     """The name a definition or a one-name assignment binds."""
     if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
         return node.name
-    target = (
-        node.targets[0]
-        if isinstance(node, ast.Assign) and len(node.targets) == 1
-        else getattr(node, "target", None)
-        if isinstance(node, ast.AnnAssign)
-        else None
-    )
+    target = None
+    if isinstance(node, ast.Assign) and len(node.targets) == 1:
+        target = node.targets[0]
+    elif isinstance(node, ast.AnnAssign):
+        target = node.target
     return target.id if isinstance(target, ast.Name) else None
 
 
@@ -248,7 +247,7 @@ def _holder(statements: list[ast.stmt], line: int, path: Path) -> str:
 def _python_claims(path: Path) -> Iterator[tuple[int, str]]:
     """Each claim line in a Python file, with its owner."""
     tree = parse(path)
-    statements = _definitions(tree)
+    statements = _statements(tree)
     for start, text in _comment_blocks(path.read_text(encoding="utf-8")):
         for line in _matches(text, start):
             following = next((node for node in statements if node.lineno > line), None)
@@ -289,24 +288,30 @@ def _script_claims(path: Path) -> Iterator[tuple[int, str]]:
             yield line, owner
 
 
+def _claims_in(path: Path, name: str) -> list[Claim]:
+    """Each claim in the file at ``path``, which the claims call ``name``."""
+    rows = path.read_text(encoding="utf-8").splitlines()
+    read = _python_claims if path.suffix == ".py" else _script_claims
+    return [
+        Claim(
+            name,
+            line,
+            owner,
+            frozenset(_TICKED.findall(" ".join(rows[max(0, line - 2) : line + 1]))),
+        )
+        for line, owner in read(path)
+    ]
+
+
 @cache
 def claims() -> tuple[Claim, ...]:
     """Each one-reader claim in :data:`FILES`."""
-    found = []
-    for path in FILES:
-        rows = path.read_text(encoding="utf-8").splitlines()
-        read = _python_claims if path.suffix == ".py" else _script_claims
-        for line, owner in read(path):
-            near = " ".join(rows[max(0, line - 2) : line + 1])
-            found.append(
-                Claim(
-                    path.relative_to(REPO_ROOT).as_posix(),
-                    line,
-                    owner,
-                    frozenset(_TICKED.findall(near)),
-                )
-            )
-    return tuple(sorted(set(found), key=lambda claim: (claim.path, claim.line)))
+    found = {
+        claim
+        for path in FILES
+        for claim in _claims_in(path, path.relative_to(REPO_ROOT).as_posix())
+    }
+    return tuple(sorted(found, key=lambda claim: (claim.path, claim.line)))
 
 
 @cache
@@ -400,11 +405,17 @@ def test_the_lint_reads_the_owner_and_the_named_symbol(tmp_path):
         "PROBE_TABLE = {}\n",
         encoding="utf-8",
     )
-    found = sorted((line, owner) for line, owner in _python_claims(probe))
+    found = _claims_in(probe, "probe.py")
+    held = guarded_symbols()
 
-    assert found == [(2, "unheld_probe_rule"), (4, reader), (5, "PROBE_TABLE")]
-    assert "unheld_probe_rule" not in guarded_symbols()
-    assert reader in guarded_symbols()
+    assert sorted((claim.line, claim.owner) for claim in found) == [
+        (2, "unheld_probe_rule"),
+        (4, reader),
+        (5, "PROBE_TABLE"),
+    ]
+    assert [claim.owner for claim in found if not claim.symbols & held] == [
+        "unheld_probe_rule"
+    ]
 
 
 def test_the_lint_reads_a_real_population():
