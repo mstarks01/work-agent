@@ -723,8 +723,8 @@ def _check_aliases(case_dir: Path, meta: dict) -> Iterator[str]:
     Each of these refuses a way it could do that dishonestly.
 
     The excerpt check is the load-bearing one: an alias is supported by the
-    case's own words or it is somebody's preference. :func:`verify_quote` is
-    the one reader of "does this source carry this quotation", so an excerpt
+    case's own words or it is somebody's preference. :func:`verify_quote` answers
+    "does this source carry this quotation", so an excerpt
     here is held to what a ``model.json`` excerpt and the evidence gate are
     held to. A raw substring test is a second reader, and it disagrees on a
     sentence the source wraps across two lines.

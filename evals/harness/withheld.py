@@ -14,7 +14,7 @@ arms then compare one case:
 
 Every answer is then the source's own statement, and nobody invents one.
 
-**One reader of the file.** :func:`load_answer_file` parses and checks it,
+**The file's two steps.** :func:`load_answer_file` parses and checks it,
 and :func:`withheld_case` applies it, for both modes. A withheld phrase must
 occur exactly once across the sources, and afterwards no withheld phrase may
 remain in a source or in a model field, and every element's excerpt must still

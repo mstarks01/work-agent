@@ -7,10 +7,14 @@ applies the rule, and only a lint keeps that promise as the code moves. So the
 claim must name a site that a lint holds:
 
 - the reader of a row of :data:`~tests.test_one_reader_lints.ONE_READERS`;
-- a ``(path, function)`` site that a test in ``tests/test_one_reader_lints.py``
-  spells, or a name that a table there maps to its file;
+- a ``(path, function)`` site that an ``assert`` in a test of
+  ``tests/test_one_reader_lints.py`` spells, as the one site of a rule;
 - a function that a test there requires as the callee of a call, where one
   definition in the tree holds that name.
+
+A site in a table of exempt sites, or a site that a row names as no second
+reader, guards nothing. A name that its file defines more than once guards
+nothing either, because a site cannot tell the definitions apart.
 
 A claim passes when its owner, in its own file, is such a site, or when it
 names such a site in backticks on the claim's line, on the line before it or
@@ -338,19 +342,24 @@ def claims() -> tuple[OneReaderClaim, ...]:
 _CALLEE_TESTS = frozenset({"_calls", "_is_name"})
 
 
-def _site_literals(tree: ast.Module) -> Iterator[tuple[str, str]]:
-    """Each site that ``tree`` spells: a ``(path, function)`` tuple, and a
-    ``name: path`` entry of a table."""
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Tuple) and len(node.elts) == 2:
-            path, name = map(_text, node.elts)
-            if path is not None and name is not None:
-                yield path, name
-        elif isinstance(node, ast.Dict):
-            for key, value in zip(node.keys, node.values, strict=True):
-                name, path = _text(key), _text(value)
-                if path is not None and name is not None:
-                    yield path, name
+def _tests(tree: ast.Module) -> Iterator[ast.FunctionDef]:
+    """Each test function in ``tree``."""
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name.startswith("test_"):
+            yield node
+
+
+def _asserted_sites(tree: ast.Module) -> Iterator[tuple[str, str]]:
+    """Each ``(path, function)`` site that an ``assert`` in a test spells."""
+    for test in _tests(tree):
+        for statement in ast.walk(test):
+            if not isinstance(statement, ast.Assert):
+                continue
+            for node in ast.walk(statement.test):
+                if isinstance(node, ast.Tuple) and len(node.elts) == 2:
+                    path, name = map(_text, node.elts)
+                    if path is not None and name is not None:
+                        yield path, name
 
 
 def _text(node: ast.AST | None) -> str | None:
@@ -361,54 +370,53 @@ def _text(node: ast.AST | None) -> str | None:
 
 
 def _required_callees(tree: ast.Module) -> Iterator[str]:
-    """Each function name that ``tree`` requires as the callee of a call."""
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        named = [
-            *(
-                arg.value
-                for arg in node.args[1:]
-                if isinstance(node.func, ast.Name)
-                and node.func.id in _CALLEE_TESTS
-                and isinstance(arg, ast.Constant)
-            ),
-            *(
-                keyword.value.value
-                for keyword in node.keywords
-                if keyword.arg == "name" and isinstance(keyword.value, ast.Constant)
-            ),
-        ]
-        yield from (name for name in named if isinstance(name, str))
+    """Each function name that a test in ``tree`` requires as a callee."""
+    for test in _tests(tree):
+        for node in ast.walk(test):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if isinstance(func, ast.Name) and func.id in _CALLEE_TESTS:
+                yield from filter(None, map(_text, node.args[1:]))
+            elif (
+                isinstance(func, ast.Name)
+                and func.id == "partial"
+                and node.args
+                and isinstance(node.args[0], ast.Name)
+                and node.args[0].id in _CALLEE_TESTS
+            ):
+                names = (_text(k.value) for k in node.keywords if k.arg == "name")
+                yield from filter(None, names)
 
 
 @cache
 def guarded_sites() -> frozenset[tuple[str, str]]:
     """Each ``(path, function)`` site that a lint holds.
 
-    - the reader of each ``ONE_READERS`` row, and never a site that a row
-      names as no second reader;
-    - each site that ``tests/test_one_reader_lints.py`` spells;
-    - each callee that a test there requires, at its one definition. A name
-      that several definitions hold, or none, names no site.
+    - the reader of each ``ONE_READERS`` row;
+    - each site that an ``assert`` in a test of
+      ``tests/test_one_reader_lints.py`` spells;
+    - each callee that a test there requires, at its one definition.
+
+    A name that several definitions hold in its file, or none, names no site,
+    because a site is a file and a function and cannot tell them apart.
     """
     tree = parse(REPO_ROOT / "tests" / "test_one_reader_lints.py")
-    held = {path.relative_to(REPO_ROOT).as_posix() for path in FILES}
-    sites = {site for site in _site_literals(tree) if site[0] in held}
-    readers = {row.reader for row in ONE_READERS.values()}
-    exempt = {site for row in ONE_READERS.values() for site in row.others}
-    sites = (sites - exempt) | readers
-    defined: dict[str, set[str]] = {}
+    defined: dict[str, list[str]] = {}
     for path in FILES:
         if path.suffix == ".py":
             for node in ast.walk(parse(path)):
                 if isinstance(node, _DEFINITIONS):
                     name = path.relative_to(REPO_ROOT).as_posix()
-                    defined.setdefault(node.name, set()).add(name)
+                    defined.setdefault(node.name, []).append(name)
+    sites = {row.reader for row in ONE_READERS.values()}
+    sites |= set(_asserted_sites(tree))
     for callee in _required_callees(tree):
-        if len(places := defined.get(callee, set())) == 1:
-            sites.add((places.pop(), callee))
-    return frozenset(sites)
+        if len(set(places := defined.get(callee, []))) == 1:
+            sites.add((places[0], callee))
+    return frozenset(
+        (path, name) for path, name in sites if defined.get(name, []).count(path) == 1
+    )
 
 
 @cache
@@ -577,6 +585,22 @@ def test_a_dotted_name_resolves_through_its_module_and_the_imports(tmp_path):
 
     assert reader in _imported(importer)
     assert [guarded(claim) for claim in found] == [True, False, True]
+
+
+def test_a_site_a_row_exempts_guards_nothing(tmp_path):
+    """Negative control: a claim on a site that a row names as no second
+    reader fails, though the lint file spells that site."""
+    row = ONE_READERS["a rejection's steps in an eval instrument"]
+    (place, name), *_ = row.others
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        f'def {name}():\n    """The one reader of its own rule."""\n',
+        encoding="utf-8",
+    )
+    (claim,) = _claims_in(probe, place)
+
+    assert claim.key == (place, name)
+    assert not guarded(claim)
 
 
 def test_the_lint_reads_a_real_population():

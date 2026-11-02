@@ -193,7 +193,7 @@ def split(
     held_out: bool,
     ledger: Sequence[audit.Experiment] | None = None,
 ) -> CaseSplit:
-    """The cases a reading counts, through the one reader of the split.
+    """The cases a reading counts, through the case split.
 
     A development reading counts an exhausted holdout and names it. A held-out
     reading refuses one, and raises :class:`RefusedError` where an artifact

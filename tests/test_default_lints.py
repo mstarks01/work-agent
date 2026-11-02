@@ -241,9 +241,10 @@ class Uses:
     bare_values: set[str] = field(default_factory=set)
     #: The names that code looks up by a string.
     lookups: set[str] = field(default_factory=set)
-    #: The dotted names of the classes whose construction the tree may not
-    #: show: each class read as a value or named as a base.
-    opaque_classes: set[str] = field(default_factory=set)
+    #: The dotted names that code reads as a value outside an annotation, an
+    #: ``except`` clause, an attribute's owner and a type test. A class among
+    #: them, or named as a base, has construction calls the tree may not show.
+    opaque_values: set[str] = field(default_factory=set)
 
 
 #: The calls whose arguments a class may be read in without a construction.
@@ -302,7 +303,7 @@ def uses(modules: Mapping[str, ast.Module]) -> Uses:
             if (target := resolver.resolve(node, module)) is not None:
                 found.values.add(target)
                 if id(node) not in quiet:
-                    found.opaque_classes.add(target)
+                    found.opaque_values.add(target)
     return found
 
 
@@ -425,7 +426,7 @@ def calls_of(function: Judged, found: Uses) -> list[Call] | None:
     """Each call of ``function``, or None where code also reads it as a value."""
     if function.kind == "init":
         dotted = f"{function.module}.{function.qualified.split('.')[0]}"
-        return None if dotted in found.opaque_classes else found.calls[dotted]
+        return None if dotted in found.opaque_values else found.calls[dotted]
     if function.name in found.lookups:
         return None
     if function.kind == "function":

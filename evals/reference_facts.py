@@ -327,12 +327,10 @@ def reference_catalog(
 
     Through :meth:`~analysis_service.assertions.AssertionRecord.of`, which
     reads it through :meth:`~analysis_service.assertions.AssertionRecord.resolved`,
-    the one reader of what a proposal comes to: the production ``prepare``
-    node, the assertion eval mode and the offline replay all ask it, and a
-    reference row that would not survive as a produced row cannot stand as a
-    reference. This asked the resolver and the gate itself until a checkpoint
-    round found the two steps spelled here as well, where a third step added
-    to that rule would have reached production and missed the corpus.
+    the one reader of what a proposal comes to. The production ``prepare``
+    node and the assertion eval mode call ``of``, and the offline replay calls
+    ``resolved``, so a reference row that would not survive as a produced row
+    cannot stand as a reference.
 
     Any refusal — a quote the source does not carry, a subject the model does
     not hold, a value the predicate does not admit — is a corpus error here,

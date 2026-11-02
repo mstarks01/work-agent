@@ -500,6 +500,7 @@ def _tests_a_spelling(node: ast.AST) -> bool:
 def test_the_kind_of_an_open_fact_has_one_reader():
     """Only ``UnknownRef.kind`` routes on which spelling a reference uses."""
     assert set(_sites(_tests_a_spelling)) == SPELLING_READERS.keys()
+    assert ("src/analysis_service/claims.py", "spellings") in _sites(_tests_a_spelling)
 
 
 def test_the_kind_of_an_open_fact_is_not_read_from_two_fields():
@@ -566,6 +567,7 @@ def test_the_layout_of_an_open_facts_key_has_one_reader():
     sites = set(_sites(_reads_a_key_by_position))
     assert sites - KEY_LAYOUT_READERS.keys() == set(), "read a key's parts by key_ref"
     assert KEY_LAYOUT_READERS.keys() <= sites
+    assert ("src/analysis_service/fact_answers.py", "key_ref") in sites
 
 
 def test_the_place_of_a_pydantic_error_has_one_reader():
