@@ -148,6 +148,12 @@ DECLARED: dict[str, str] = {
         "This code is that framework's: it prints the matches `e8_count.py`"
         " counts, beside their drafts, through the same identity."
     ),
+    "evals/experiments/QA-2026-11-02-05/read_capabilities.py": (
+        "This code is that framework's. It reads ASVS level 3 decisions after"
+        " the capability reader, which exists only for a package whose units"
+        " carry an applicability expression. A package whose units carry none"
+        " reads no capability, so a stated capability settles nothing in it."
+    ),
     "evals/experiments/QA-2026-11-02-03/trace_baselines.py": (
         "This code is that framework's. It traces two references through the"
         " lane that a lead points at a place, and matches a draft by action and"

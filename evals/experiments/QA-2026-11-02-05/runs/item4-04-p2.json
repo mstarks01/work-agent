@@ -1,0 +1,371 @@
+{
+  "record": {
+    "command": "lane-replay",
+    "commit": "53ab865734b686cb35ec04d8c23e91067ecf26be",
+    "clean": false,
+    "table": {
+      "case": "04-ml-inference-service",
+      "lane": "information-disclosure",
+      "framework": "stride",
+      "fresh_leads": false,
+      "prepare_today": "signed",
+      "corpus_digest": "44a9bcd75769e1114dd7a4949297ecba00570a386b118de35417ec1be6ac9f97"
+    },
+    "inputs": []
+  },
+  "claims": [
+    {
+      "title": "Inference requests may be intercepted between calling services and the gateway",
+      "description": "If `encryption_in_transit` is not enabled on `flow:entity:calling-service>process:inference-gateway>submit-inference-request`, an on-path attacker on the public-internet-to-serving-edge boundary can intercept end-user text and PII submitted to `process:inference-gateway`. The flow crosses a trust boundary and transport protection is unverified, rather than known absent. Captured prompts can reveal customer information and provide material for targeted attacks against the calling teams.",
+      "affected_element_ids": [
+        "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
+        "entity:calling-service",
+        "process:inference-gateway"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:entity:calling-service>process:inference-gateway>submit-inference-request",
+        "unknown:flow:entity:calling-service>process:inference-gateway>submit-inference-request:protocol",
+        "unknown:flow:entity:calling-service>process:inference-gateway>submit-inference-request:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 1,
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high and conditional because this PII-bearing flow crosses from `boundary:public-internet` to the internet-facing gateway while `encryption_in_transit` is unknown. Impact is high because interception can continuously disclose end-user text and PII from requests submitted by multiple calling services."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated TLS for inbound inference requests",
+          "detail": "Set `encryption_in_transit` on `flow:entity:calling-service>process:inference-gateway>submit-inference-request` to TLS 1.2+ and verify the gateway certificate; use mTLS where calling-service identities can support it."
+        }
+      ]
+    },
+    {
+      "title": "Forwarded inference payloads may be readable between the gateway and model server",
+      "description": "If `flow:process:inference-gateway>process:model-server>forward-request` lacks transport encryption, an attacker with observation capability on the serving-edge-to-model-network path can intercept PII-bearing inference payloads forwarded by `process:inference-gateway` to `process:model-server`. This is conditional on the unverified `encryption_in_transit` attribute; the flow is a decided boundary crossing. The disclosed requests can expose customer input and help an attacker craft later requests against the inference service.",
+      "affected_element_ids": [
+        "flow:process:inference-gateway>process:model-server>forward-request",
+        "process:inference-gateway",
+        "process:model-server"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "crossing:flow:process:inference-gateway>process:model-server>forward-request",
+        "unknown:flow:process:inference-gateway>process:model-server>forward-request:protocol",
+        "unknown:flow:process:inference-gateway>process:model-server>forward-request:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 2,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because an attacker needs a position on the serving-edge-to-model-network path, but the flow is a boundary crossing and its transport protection is unknown. Impact is high because the forwarded request carries PII and reaches the model-serving path."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and authenticate the gateway-to-model-server hop",
+          "detail": "Use mTLS for `flow:process:inference-gateway>process:model-server>forward-request`, with the model server accepting only the gateway workload identity."
+        }
+      ]
+    },
+    {
+      "title": "Model artifacts may be intercepted while the model server loads them",
+      "description": "If transport encryption is absent on `flow:process:model-server>store:model-registry-bucket>load-artifact`, an attacker with a foothold on the model network can intercept model artifacts as `process:model-server` reads them from `store:model-registry-bucket`. The `encryption_in_transit` value is unknown, so this is not an assertion that the object-storage connection is cleartext. A captured artifact can reveal proprietary model behavior and can assist later attacks on the inference service.",
+      "affected_element_ids": [
+        "flow:process:model-server>store:model-registry-bucket>load-artifact",
+        "process:model-server",
+        "store:model-registry-bucket"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:model-server>store:model-registry-bucket>load-artifact:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 3,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because observation requires a prior foothold in `boundary:model-network`, while transport encryption is unverified. Impact is medium because the affected flow carries business-critical model artifacts rather than public content."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify encrypted object-storage transport",
+          "detail": "Require TLS for `flow:process:model-server>store:model-registry-bucket>load-artifact` and configure the model-server workload to reject insecure object-storage endpoints."
+        }
+      ]
+    },
+    {
+      "title": "Customer features may be intercepted on the model-server-to-Redis read path",
+      "description": "If `flow:process:model-server>store:redis-feature-store>read-features` is not encrypted in transit, an attacker able to observe model-network traffic can intercept per-customer account ages and spend bands while `process:model-server` reads `store:redis-feature-store`. The condition is unresolved because `encryption_in_transit` is unknown. The captured financial and PII-derived features enable profiling of customers and can be correlated with inference requests handled by the model server.",
+      "affected_element_ids": [
+        "flow:process:model-server>store:redis-feature-store>read-features",
+        "process:model-server",
+        "store:redis-feature-store"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:model-server>store:redis-feature-store>read-features:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 4,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because a model-network foothold is required, but the feature-read connection has unverified transport protection. Impact is high because `store:redis-feature-store` is confidential and contains `pii` and `financial` assets."
+      },
+      "mitigations": [
+        {
+          "summary": "Enable TLS for Redis feature reads",
+          "detail": "Configure TLS on `flow:process:model-server>store:redis-feature-store>read-features`, validate the Redis server certificate, and use authenticated service-to-store connections."
+        }
+      ]
+    },
+    {
+      "title": "Raw prompts and responses may be intercepted while being written to the inference log",
+      "description": "If the BigQuery connection on `flow:process:inference-gateway>store:inference-log>write-request-log` is not encrypted, an attacker observing that path can intercept raw prompts and model responses sent by `process:inference-gateway` to `store:inference-log`. This is conditional on the flow's unknown `encryption_in_transit` value. Because every request and response is logged, a successful observer can accumulate a broad historical dataset of end-user content rather than a single request.",
+      "affected_element_ids": [
+        "flow:process:inference-gateway>store:inference-log>write-request-log",
+        "process:inference-gateway",
+        "store:inference-log"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:process:inference-gateway>store:inference-log>write-request-log:encryption_in_transit"
+      ],
+      "quotes": [
+        {
+          "text": "The gateway writes every request and response into an inference log in BigQuery, for debugging.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 5,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because an attacker must observe the serving-edge logging path, but its encryption state is unknown. Impact is high because the log flow carries raw prompts and responses for every request and `store:inference-log` is tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted gateway-to-log transport",
+          "detail": "Require TLS with endpoint validation for `flow:process:inference-gateway>store:inference-log>write-request-log` and prevent fallback to unencrypted logging endpoints."
+        },
+        {
+          "summary": "Reduce sensitive log content",
+          "detail": "Redact or tokenize prompt fields before the gateway writes diagnostic records, and retain only fields needed for debugging."
+        }
+      ]
+    },
+    {
+      "title": "Published model artifacts may be intercepted on the engineer-to-registry path",
+      "description": "If `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact` lacks encrypted transport, an attacker able to observe the model-network path can intercept model artifacts published by `entity:ml-engineer` to `store:model-registry-bucket`. This is conditional on the flow's unknown `encryption_in_transit` setting. Artifact disclosure exposes proprietary model material and can help an attacker understand or target the model-serving deployment.",
+      "affected_element_ids": [
+        "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact",
+        "entity:ml-engineer",
+        "store:model-registry-bucket"
+      ],
+      "verb": "intercept",
+      "evidence_refs": [
+        "unknown:flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact:encryption_in_transit"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 6,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the attacker needs network observation within `boundary:model-network`, and transport encryption is unverified. Impact is medium because the flow carries business-critical model artifacts."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce TLS for artifact publication",
+          "detail": "Require HTTPS or another TLS-protected object-storage protocol for `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact` and reject plaintext endpoints."
+        }
+      ]
+    },
+    {
+      "title": "A copied model-registry storage artifact may reveal models if encryption at rest is absent",
+      "description": "`store:model-registry-bucket` has unverified `encryption_at_rest`. If that attribute resolves to no encryption, an attacker who obtains a snapshot, backup, decommissioned medium, or storage-layer copy can read model artifacts without using the model server's service account. This is conditional and does not assert that the bucket is unencrypted. Disclosure of the artifacts exposes business-critical model material and supports further analysis of the inference system.",
+      "affected_element_ids": [
+        "store:model-registry-bucket"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:model-registry-bucket:encryption_at_rest",
+        "unknown:store:model-registry-bucket:data_classification"
+      ],
+      "quotes": [],
+      "absent_elements": [],
+      "sequence": 7,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because obtaining a storage-layer copy requires separate access, while at-rest encryption is unknown. Impact is medium because the store contains business-critical model artifacts, although its data classification is also unknown."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption for registry storage and copies",
+          "detail": "Establish the `encryption_at_rest` posture of `store:model-registry-bucket`, then require managed encryption keys for the bucket, backups, snapshots, and exports while restricting export permissions."
+        }
+      ]
+    },
+    {
+      "title": "A copied Redis volume may disclose confidential customer features if encryption at rest is absent",
+      "description": "`store:redis-feature-store` is confidential and contains PII and financial customer features, but its `encryption_at_rest` value is unknown. If storage encryption is absent, an attacker who obtains a disk image, snapshot, backup, or decommissioned volume can read account ages and spend bands without authenticating to the live Redis service. A raw copy can expose the feature corpus and enable customer profiling or targeted fraud attempts.",
+      "affected_element_ids": [
+        "store:redis-feature-store"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:redis-feature-store:encryption_at_rest"
+      ],
+      "quotes": [
+        {
+          "text": "The features include account age and spend bands per customer.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 8,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because storage-copy access is a separate prerequisite, but encryption at rest is unverified. Impact is high because `store:redis-feature-store` is classified confidential and tagged `pii` and `financial`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt Redis data and its operational copies",
+          "detail": "Verify `store:redis-feature-store` encryption at rest, enable managed-key encryption for persistence and snapshots, and restrict access to backup and restore artifacts."
+        },
+        {
+          "summary": "Minimize durable feature retention",
+          "detail": "Keep only the customer-feature fields and retention period required for inference so copied storage contains less sensitive material."
+        }
+      ]
+    },
+    {
+      "title": "A copied inference-log dataset may expose raw prompts if encryption at rest is absent",
+      "description": "`store:inference-log` retains raw prompts and model responses for debugging, while its `encryption_at_rest` status is unknown. If it is not encrypted at rest, an attacker obtaining a storage-layer copy can read logged end-user content without going through `process:inference-gateway`. Since the gateway records every request and response, the copied dataset can expose accumulated PII and sensitive information users included in prompts.",
+      "affected_element_ids": [
+        "store:inference-log"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:store:inference-log:encryption_at_rest",
+        "unknown:store:inference-log:data_classification"
+      ],
+      "quotes": [
+        {
+          "text": "That means raw prompts, which sometimes carry whatever the calling team's users typed.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 9,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because a storage-layer copy must be obtained, while encryption at rest is unknown. Impact is high because `store:inference-log` contains every request and response and is tagged `pii`, even though its classification is unverified."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and restrict inference-log storage copies",
+          "detail": "Establish and enforce encryption at rest for `store:inference-log`, including exports, backups, and snapshots, with tightly scoped key and export permissions."
+        },
+        {
+          "summary": "Redact prompts before persistence",
+          "detail": "Apply deny-by-default logging and redaction at `process:inference-gateway` so raw user content is not retained unless specifically required."
+        }
+      ]
+    },
+    {
+      "title": "Model-network access may permit direct reading of Redis customer features",
+      "description": "`flow:process:model-server>store:redis-feature-store>read-features` has unknown authentication, and the source states that Redis has no password. If no compensating Redis authentication or network authorization exists, an attacker who gains a foothold in `boundary:model-network` can directly read customer account ages and spend bands from `store:redis-feature-store`, rather than only obtaining features through inference requests. The disclosure can be correlated with other model-server activity to profile customers. This draft is conditional because the model does not establish whether another authentication mechanism protects the read path.",
+      "affected_element_ids": [
+        "store:redis-feature-store",
+        "flow:process:model-server>store:redis-feature-store>read-features",
+        "process:model-server"
+      ],
+      "verb": "read",
+      "evidence_refs": [
+        "unknown:flow:process:model-server>store:redis-feature-store>read-features:authentication",
+        "assertion:internet-exposure~store:redis-feature-store~any~internal"
+      ],
+      "quotes": [
+        {
+          "text": "Redis has no password on it; it is only reachable inside the model network.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 10,
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because the attacker first needs a model-network foothold, but password authentication is stated absent and the remaining authentication state is unknown. Impact is high because `store:redis-feature-store` is confidential and holds PII and financial customer features."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated, least-privilege Redis reads",
+          "detail": "Configure a dedicated Redis identity for `process:model-server`, require authentication and TLS on the feature-read flow, and deny reads from all other model-network principals."
+        },
+        {
+          "summary": "Segment the feature store from general model-network access",
+          "detail": "Restrict network reachability to the specific model-server workload identities that require `store:redis-feature-store`."
+        }
+      ]
+    },
+    {
+      "title": "A compromised model-server workload can read registry artifacts through its service account",
+      "description": "`process:model-server` reads `store:model-registry-bucket` using its own service account. An attacker who obtains code execution or the workload identity in the model server can use that existing read path to retrieve model artifacts from the registry. The disclosed artifacts reveal business-critical model material and may help the attacker analyze the serving behavior or prepare further attacks against the inference deployment. The model does not state the service account's artifact scope, so the breadth of this disclosure requires confirmation.",
+      "affected_element_ids": [
+        "process:model-server",
+        "flow:process:model-server>store:model-registry-bucket>load-artifact",
+        "store:model-registry-bucket"
+      ],
+      "verb": "read",
+      "evidence_refs": [],
+      "quotes": [
+        {
+          "text": "It uses its own service account for that.",
+          "source_label": "System description"
+        }
+      ],
+      "absent_elements": [],
+      "sequence": 11,
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low because the attacker must first compromise `process:model-server` or acquire its workload identity. Impact is medium because the service account reads business-critical model artifacts from `store:model-registry-bucket`; the model does not establish a broader data classification or grant scope."
+      },
+      "mitigations": [
+        {
+          "summary": "Scope the model-server identity to required artifacts only",
+          "detail": "Restrict the model-server service account to read only the approved artifact prefix and version needed at startup, with separate identities for unrelated registry operations."
+        },
+        {
+          "summary": "Use short-lived workload identity credentials",
+          "detail": "Issue narrowly scoped, short-lived workload credentials to `process:model-server` and monitor unusual artifact downloads."
+        }
+      ]
+    }
+  ],
+  "invalid": []
+}

@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from 53ab865734b686cb35ec04d8c23e91067ecf26be
+- Queue job messages may be intercepted across the web-to-backend boundary | ['flow:process:web-application>store:message-queue>enqueue-job', 'process:web-application', 'store:message-queue']
+- Worker queue consumption may expose job messages on an unverified internal channel | ['flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process', 'store:message-queue']
+- Worker database traffic may disclose application and log records | ['flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process', 'store:database']
+- Queue credentials may be intercepted while the web application reads configuration | ['flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application', 'store:web-application-config']
+- Database credentials may be intercepted while the worker reads configuration | ['flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process', 'store:worker-config']
+- Unencrypted queue storage could expose retained job messages | ['store:message-queue']
+- Unencrypted database storage could expose application and log records | ['store:database']
+- Unverified encryption at rest could expose queue credentials in web configuration | ['store:web-application-config']
+- Unverified encryption at rest could expose database credentials in worker configuration | ['store:worker-config']
+- A compromised worker can read queued jobs through its existing reader path | ['store:message-queue', 'process:background-worker-process', 'flow:process:background-worker-process>store:message-queue>consume-job']
+- A compromised worker can read database records through its existing grant | ['store:database', 'process:background-worker-process', 'flow:process:background-worker-process>store:database>read-write-records']
+- A compromised web application can recover its queue credential from configuration | ['store:web-application-config', 'process:web-application', 'flow:process:web-application>store:web-application-config>read-configuration']
+- A compromised worker can recover its database credential from configuration | ['store:worker-config', 'process:background-worker-process', 'flow:process:background-worker-process>store:worker-config>read-configuration']
+spent: $0.0614 reported
+must-finds matched: [6, 7]
