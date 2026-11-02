@@ -87,7 +87,7 @@ from evals.harness.reference import (
     load_case,
     refuse_holdout,
 )
-from evals.harness.run_record import Selections, run_record_for
+from evals.harness.run_record import Selections, loaded, run_record_for
 from evals.reference_facts import load_facts, signed_proposal
 
 #: What ``--prepare-today`` hands ``prepare`` as the catalog: none, which is a
@@ -190,10 +190,12 @@ def fresh_leads(
 
 @dataclass(frozen=True)
 class PreparedToday:
-    """What today's ``prepare`` wrote for one case: the lanes' material and the state."""
+    """What today's ``prepare`` wrote for one case: the lanes' material, the
+    state, and each file its loaders held, for a run record."""
 
     material: dict[str, Any]
     state: dict[str, Any]
+    inputs: dict[Path, Selections]
 
 
 def prepare_today(
@@ -222,17 +224,21 @@ def prepare_today(
         facts = load_facts(REPO_ROOT / DEFAULT_CORPUS / case.id)
         extra[STATE_ASSERTION_PROPOSAL] = signed_proposal(facts).model_dump(mode="json")
     ctx = SimpleNamespace(state=seed_state(case.sources, extra))
+    domains = MarkdownLoader(REPO_ROOT / "domains")
+    package = MarkdownLoader(REPO_ROOT / "frameworks" / framework)
     event = prepare_analysis(
         valid_model,
         ctx,
         GraphKeys.of([framework]),
         [framework],
-        MarkdownLoader(REPO_ROOT / "domains"),
-        {framework: MarkdownLoader(REPO_ROOT / "frameworks" / framework)},
+        domains,
+        {framework: package},
         assertions=arm == "signed",
     )
     run = GraphRun(final_state=ctx.state, node_runs=[], prepared=event.output)
-    return PreparedToday(run.lane_material([framework]), ctx.state)
+    return PreparedToday(
+        run.lane_material([framework]), ctx.state, loaded((domains, package))
+    )
 
 
 def parse(raw: str, framework: FrameworkName) -> BaseModel:
@@ -297,13 +303,6 @@ def arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def loaded(loaders: tuple[MarkdownLoader, ...]) -> dict[Path, Selections]:
-    """Each file the loaders hold, for a run record's inputs."""
-    return {
-        loader.root / f"{name}.md": {} for loader in loaders for name in loader.names()
-    }
-
-
 def command_lane_replay(args: argparse.Namespace) -> int:
     """Send one lane request again, and print what the lane proposed."""
     prepared = None
@@ -324,7 +323,7 @@ def command_lane_replay(args: argparse.Namespace) -> int:
         if args.prepare_today is not None:
             prepared = prepare_today(case, args.framework, args.prepare_today)
             material = prepared.material
-            inputs |= loaded((MarkdownLoader(REPO_ROOT / "domains"),))
+            inputs |= prepared.inputs
             print(
                 f"material from today's prepare, catalog {args.prepare_today};"
                 f" prompt files from {repo_commit().commit}"

@@ -31,6 +31,7 @@ from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import DEFAULT_CORPUS
+from evals.harness.run_record import loaded
 from evals.harness.scorer import score_case
 from evals.reference_facts import load_facts
 from tests import test_evals_run_grounds as grounds
@@ -279,12 +280,13 @@ def test_the_out_file_starts_with_the_record_of_the_lane_material(
     )
 
 
-def test_a_replay_of_todays_prepare_names_each_domain_pack_file(
+def test_a_replay_of_todays_prepare_names_each_file_it_loaded(
     case,  # noqa: F811
     tmp_path,
     monkeypatch,
 ):
-    """``prepare`` reads the Domain Packs, so the record names each of them."""
+    """With no sweep, the record names each prompt, package and Domain Pack file
+    the lane's request was built from, with its digest."""
 
     def scripted(*_):
         async def call(instruction, turn):
@@ -310,10 +312,14 @@ def test_a_replay_of_todays_prepare_names_each_domain_pack_file(
     assert lane_replay.command_lane_replay(args) == 0
 
     held = json.loads(written.read_text(encoding="utf-8"))
+    digests = {one["path"]: one["sha256"] for one in held["record"]["inputs"]}
     domains = MarkdownLoader(REPO_ROOT / "domains")
-    assert {str(domains.root / f"{name}.md") for name in domains.names()} <= {
-        one["path"] for one in held["record"]["inputs"]
-    }
+    named = loaded((PACKAGE_LOADER, PROMPT_LOADER, domains))
+    assert digests.keys() == set(map(str, named))
+    assert all(
+        digests[str(path)] == hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in named
+    )
 
 
 def test_material_without_the_user_turn_is_refused(tmp_path):

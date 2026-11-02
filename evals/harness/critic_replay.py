@@ -65,7 +65,7 @@ from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, load_case, refuse_holdout
-from evals.harness.run_record import run_record_for
+from evals.harness.run_record import loaded, run_record_for
 
 
 @dataclass(frozen=True)
@@ -273,6 +273,8 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 
 def command_critic_replay(args: argparse.Namespace) -> int:
     """Send one archived critic request again and compare the verdicts."""
+    package_loader = MarkdownLoader(REPO_ROOT / "frameworks" / args.framework)
+    prompt_loader = MarkdownLoader(REPO_ROOT / "prompts")
     try:
         refuse_holdout(args.case)
         check_out(args.out, args.raw)
@@ -282,7 +284,10 @@ def command_critic_replay(args: argparse.Namespace) -> int:
             [args.out, args.raw],
             "critic-replay",
             {"case": args.case, "framework": args.framework},
-            {path: {} for path in (artifact.path, *archived.files)},
+            {
+                **{path: {} for path in (artifact.path, *archived.files)},
+                **loaded((package_loader, prompt_loader)),
+            },
         )
     except (CorpusError, EvalRunError, ProvenanceError, FileNotFoundError) as error:
         print(error, file=sys.stderr)
@@ -304,8 +309,8 @@ def command_critic_replay(args: argparse.Namespace) -> int:
         replay(
             archived,
             call,
-            MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
-            MarkdownLoader(REPO_ROOT / "prompts"),
+            package_loader,
+            prompt_loader,
         )
     )
     if args.raw is not None:
