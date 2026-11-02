@@ -1,13 +1,9 @@
 """Each comment or docstring that claims a rule has one reader names its guard.
 
 A claim is a comment or a docstring in :data:`~tests.source_tree.PYTHON`, or in
-a page script there, that says a rule has one reader: "the one reader", "one
-reader of", "its" or "their" "one", "only", "sole" or "single reader", "the
-only", "sole" or "single reader", "has one" or "a single reader", "only one
-reader", "no other" or "second reader", "the only place", "the one", "single"
-or "sole place", "one site", "nowhere else", "the single" or "sole source" or
-"single source of truth". A claim is a promise that no second site applies the rule, and only a
-lint keeps that promise as the code moves. So the claim must name a site that
+a page script there, that says a rule has one reader in the words that
+:data:`CLAIM` matches. A claim is a promise that no second site applies the
+rule, and only a lint keeps that promise as the code moves. So the claim must name a site that
 a lint holds:
 
 - the reader of a row of :data:`~tests.test_one_reader_lints.ONE_READERS`;
@@ -33,14 +29,9 @@ next lines declare. A site is Python, so a page-script claim passes only where
 it names a Python site in backticks. The
 owner of a docstring is the function or the class it documents, or the name it
 follows as an attribute docstring. A claim spans line breaks, so a claim
-wrapped across two lines is still found. "The one reader" followed by a word
-in ``-ing`` describes a reader and claims nothing, and so does "a single
-source" or "no single source". The rule reads the word, so it also skips a
-noun such as "string". "The single reader in that module" points at a reader
-in another file. "Names nowhere else" names no place. "The one place this goes
-wrong", "the one place that must not" and "the one place built to" say where
-a fault shows, what a place may not do, or what it is for; none of them says
-that a rule has one reader.
+wrapped across two lines is still found. :data:`CLAIM` skips the words that
+describe a reader or a place and claim nothing, and a negative control holds
+each skip.
 
 :data:`UNGUARDED_CLAIMS` holds each claim that a ruling keeps without a guard.
 An entry that matches no unguarded claim fails, so it cannot outlive its claim.
