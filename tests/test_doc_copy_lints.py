@@ -35,6 +35,7 @@ from analysis_service.auth import (
     build_verifier,
 )
 from analysis_service.claims import GroundKind, RuledClaim, Spelling, UnknownKey
+from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.deployment import ConfigPaths
 from analysis_service.diagrams import _install_argv
 from analysis_service.fact_answers import FactAnswer, FactStatus, fact_kind
@@ -66,6 +67,7 @@ from analysis_service.system_model import ElementPrefix
 from analysis_service.validation import MAX_ELEMENTS
 from analysis_service.vendors import VENDORS, CredentialMode
 from evals.harness.early_rounds import paused_state
+from evals.harness.instruments import INSTRUMENTS
 from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT, guide_files
 from tests.test_api import make_client
@@ -716,6 +718,71 @@ def test_every_tier_example_states_the_supported_version():
     assert shown, "no guide shows a tier example with a version"
     for name, version in shown:
         assert version == SUPPORTED_VERSION, f"{name} shows version {version}"
+
+
+def test_every_tier_example_in_a_guide_selects_a_profiled_model():
+    """A reader copies a ``[tiers.<name>]`` block out of a guide into
+    ``config/model_tiers.toml``, so its model must be one the matrix
+    profiles for its vendor. Every tier, ``review`` included, since each
+    one is a selection a reader can copy."""
+    shown = [
+        (path.name, name, tier["vendor"], tier["model"])
+        for path in GUIDES
+        for block in _TOML_FENCE.findall(path.read_text(encoding="utf-8"))
+        for name, tier in tomllib.loads(block).get("tiers", {}).items()
+        if "model" in tier
+    ]
+
+    assert shown, "no guide shows a tier example to check"
+    for doc, name, vendor, model in shown:
+        assert model in REFERENCE_MODELS[vendor], (
+            f"{doc} shows tiers.{name} as {vendor}/{model}, which is not"
+            f" a model the matrix profiles for {vendor}"
+        )
+
+
+# Eval instruments: the registry the evals guides describe.
+
+#: The evals guides, which together describe what a sweep reports.
+EVALS_GUIDES = [path for path in GUIDES if path.parent == REPO_ROOT / "evals"]
+
+
+def test_every_instrument_is_described_in_the_guides():
+    """An instrument nobody documents is a number nobody can interpret.
+
+    The registry grew an entry per measurement, and the prose beside it is a
+    hand-kept enumeration of the same set — the shape that left
+    ``evals/README.md``'s harness table six modules short. So the enumeration
+    is keyed to the registry rather than remembered.
+
+    **Either spelling counts.** Code names a reading with an identifier and
+    prose names it in words: ``applicability_yield`` is written "applicability
+    yield" in ``TUNING.md``, and both are the same instrument. Holding the
+    guides to the identifier would be a style rule wearing a lint's clothes.
+
+    This decides that an instrument is *mentioned*, never that the sentence
+    around it is right. Nothing mechanical can decide the second — see
+    ``tests/test_doc_reference_lints.py``.
+    """
+    prose = "\n".join(guide.read_text(encoding="utf-8") for guide in EVALS_GUIDES)
+    undocumented = sorted(
+        name
+        for name in INSTRUMENTS
+        if name not in prose and name.replace("_", " ") not in prose
+    )
+
+    assert not undocumented, (
+        f"these instruments are described in no evals guide: {undocumented}."
+        " A sweep reports every entry in INSTRUMENTS, so a reader meets a"
+        " number the documentation never names. Describe it in README.md's"
+        " metrics section, or in TUNING.md if it is a tuning lever."
+    )
+
+
+def test_the_evals_guides_are_actually_read():
+    """Guards the guard: an empty set would pass the test above vacuously."""
+    assert len(EVALS_GUIDES) >= 4, f"only found {[g.name for g in EVALS_GUIDES]}"
+    assert INSTRUMENTS, "the registry is empty"
 
 
 def test_the_nodes_example_is_every_node_key():

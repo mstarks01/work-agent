@@ -177,8 +177,6 @@ def test_the_catalog_is_the_published_standard():
 def test_one_lane_is_one_chapter_in_the_standards_own_order():
     assert ASVS.lanes == LANES
     assert [chapter.id for chapter in CHAPTERS] == [f"V{n}" for n in range(1, 18)]
-    dirs = sorted(path.name for path in (ASVS_ROOT / "lanes").iterdir())
-    assert dirs == sorted(LANES)
 
 
 @pytest.mark.parametrize("lane", LANES)

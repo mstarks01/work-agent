@@ -226,6 +226,18 @@ def without(paths: Iterable[Path], left_out: Mapping[str, str]) -> list[Path]:
     return kept
 
 
+def matching(pattern: str) -> list[Path]:
+    """Each file or directory the repository holds that the glob ``pattern``
+    names, relative to :data:`REPO_ROOT`. A directory counts when it holds a
+    file the repository holds."""
+    held = held_files(*WHOLE_TREE)
+    return sorted(
+        match
+        for match in REPO_ROOT.glob(pattern)
+        if any(path == match or path.is_relative_to(match) for path in held)
+    )
+
+
 def prompt_files() -> list[Path]:
     """Every prompt a model reads: the files :data:`PROMPTS` matches."""
     return sorted({path for pattern in PROMPTS for path in REPO_ROOT.glob(pattern)})

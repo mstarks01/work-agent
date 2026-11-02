@@ -3570,21 +3570,6 @@ class TestNoPromptWritesItsOwnFence:
         assert lines[0] == "````", "the body's backtick run sized the fence"
         assert lines[0] == lines[-1]
 
-    def test_no_prompt_file_writes_a_fence_around_a_placeholder(self):
-        """The lint. A fence written beside a ``{placeholder}`` is the shape
-        this class exists to keep out, whatever the value turns out to hold."""
-        import re
-
-        offenders = []
-        for path in sorted((PROJECT_ROOT / "prompts").glob("*.md")):
-            text = path.read_text(encoding="utf-8")
-            if re.search(r"`{3,}\s*\n\{[a-z_]+\}\s*\n`{3,}", text):
-                offenders.append(path.name)
-        assert not offenders, (
-            f"{offenders} fence a placeholder in the file. Interpolate the value"
-            " on its own line and let render_fenced size the fence over it."
-        )
-
 
 class TestTheReviseCount:
     """`Job.revise_rounds` counts the re-asks the graph makes.

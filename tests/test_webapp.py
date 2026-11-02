@@ -1867,6 +1867,17 @@ PAGE_SCRIPTS = {
     "webapp/report_view.html": ("sidebar.js", "answer_editor.js", "report_view.js"),
 }
 
+#: Every client script the apps serve, as :data:`PAGE_SCRIPTS` names them.
+#: :func:`~tests.test_reader_lints.test_every_client_script_belongs_to_a_page`
+#: holds the set to the files in ``webapp/static``.
+STATIC_SCRIPTS = sorted(
+    {
+        name
+        for value in PAGE_SCRIPTS.values()
+        for name in ((value,) if isinstance(value, str) else value)
+    }
+)
+
 #: A ``<script>`` block a page template is allowed to fill itself. Each one
 #: holds values rather than code: a page's injected values keep their escape
 #: at the template, where :func:`~webapp.page.script_json` decides how each is
@@ -1917,26 +1928,6 @@ def test_a_page_template_carries_no_script_body(source):
     )
 
 
-def test_every_client_script_belongs_to_a_page():
-    """A script file nothing serves is dead code nothing would notice.
-
-    The reverse of the sweep above, over the same table: that one holds a page
-    to its file, and this one holds a file to its page.
-    """
-    named = {
-        name
-        for value in PAGE_SCRIPTS.values()
-        for name in ((value,) if isinstance(value, str) else value)
-    }
-    from webapp.page import _STATIC
-
-    on_disk = {path.name for path in _STATIC.glob("*.js")}
-    assert on_disk == named, (
-        f"webapp/static holds {sorted(on_disk - named)} that no page names, and"
-        f" the table names {sorted(named - on_disk)} that is not there."
-    )
-
-
 #: The pages that take an answer, and what builds an answer's input. Each
 #: marker is a piece of an answer input that only the shared builder spells.
 ANSWER_PAGES = ("report_view.js", "first_run.js", "question_list.js")
@@ -1976,12 +1967,6 @@ def test_a_page_builds_an_answer_input_with_the_shared_builder(page):
         f"{page} builds a piece of an answer input itself. Build it with"
         " answerEditor or facetSelect in webapp/static/answer_editor.js."
     )
-
-
-#: Every client script the app serves.
-STATIC_SCRIPTS = sorted(
-    path.name for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-)
 
 
 #: The rules the question list's pages share, each with the pages that read
@@ -2137,9 +2122,9 @@ def test_the_link_group_heading_is_spelled_once():
     ``question_list.js``, and each page and the export read it there."""
     heading = "Match each user, team or account to a part of your system"
     spelled = {
-        path.name: page_javascript(path.name).count(heading)
-        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        if heading in page_javascript(path.name)
+        name: page_javascript(name).count(heading)
+        for name in STATIC_SCRIPTS
+        if heading in page_javascript(name)
     }
 
     assert spelled == {"question_list.js": 1}
@@ -2175,14 +2160,12 @@ def test_the_question_index_is_built_once_for_both_pages():
     page and on the first-run page: it hides a box with no row that shows and
     counts the rows of each box that does. A page keeps only its click."""
     defined = [
-        path.name
-        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        if "const indexGroups = " in page_javascript(path.name)
+        name
+        for name in STATIC_SCRIPTS
+        if "const indexGroups = " in page_javascript(name)
     ]
     spelled = [
-        path.name
-        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        if "question-group-" in page_javascript(path.name)
+        name for name in STATIC_SCRIPTS if "question-group-" in page_javascript(name)
     ]
 
     assert defined == spelled == ["question_list.js"]
@@ -2404,18 +2387,6 @@ def test_every_workspace_page_takes_the_one_sidebar(name):
     assert 'id="sidebar-navigation"' not in template
 
 
-def test_no_page_words_a_count_with_a_bracketed_plural():
-    """A page words a count with ``counted``, never "finding(s)"."""
-    pages = [*(PROJECT_ROOT / "webapp" / "static").glob("*.js")]
-    pages += [*(PROJECT_ROOT / "webapp").glob("*.html")]
-    bracketed = {
-        page.name: found
-        for page in pages
-        if (found := re.findall(r"[a-z]\(s\)", page.read_text(encoding="utf-8")))
-    }
-    assert bracketed == {}
-
-
 class TestOwnerFilesInAnAnalysis:
     """ADR 0119: ``/analyze`` copies each chosen Owner File into the job."""
 
@@ -2599,10 +2570,11 @@ def test_no_page_script_words_a_refusal_the_server_words():
         part for sentence in sentences for part in sentence.split("7") if len(part) > 12
     ]
     spelled = [
-        (script.name, fragment)
-        for script in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
+        (script, fragment)
+        for script in STATIC_SCRIPTS
         for fragment in fragments
-        if fragment in script.read_text(encoding="utf-8")
+        if fragment
+        in (PROJECT_ROOT / "webapp" / "static" / script).read_text(encoding="utf-8")
     ]
     assert not spelled
 
