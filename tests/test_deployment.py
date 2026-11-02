@@ -1181,9 +1181,9 @@ def test_require_certified_is_off_unless_explicitly_affirmative():
 
 
 def test_the_carried_variable_replaces_the_list_of_the_file():
-    assert Deployment.from_env(env=VERTEX_TIERS).frameworks == ("asvs", "stride")
+    assert Deployment.from_env(env=VERTEX_TIERS).carried_frameworks == ("asvs", "stride")
     narrowed = Deployment.from_env(env=VERTEX_TIERS | {CARRIED_VAR: "stride"})
-    assert narrowed.frameworks == ("stride",)
+    assert narrowed.carried_frameworks == ("stride",)
 
 
 def test_the_v1_service_carries_what_the_variable_names(monkeypatch):
