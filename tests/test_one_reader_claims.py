@@ -29,9 +29,10 @@ next lines declare. A site is Python, so a page-script claim passes only where
 it names a Python site in backticks. The
 owner of a docstring is the function or the class it documents, or the name it
 follows as an attribute docstring. A claim spans line breaks, so a claim
-wrapped across two lines is still found. "The one reader" followed by a verb in ``-ing`` describes a
-reader and claims nothing, and so does "a single source" or "no single
-source".
+wrapped across two lines is still found. "The one reader" followed by a word
+in ``-ing`` describes a reader and claims nothing, and so does "a single
+source" or "no single source". The rule reads the word, so it also skips a
+noun such as "string"; no claim in the tree has that shape.
 
 :data:`UNGUARDED_CLAIMS` holds each claim that a ruling keeps without a guard.
 An entry that matches no unguarded claim fails, so it cannot outlive its claim.
