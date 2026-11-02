@@ -13,23 +13,25 @@ and exit status 1.
 import os
 import sys
 
-from alembic.util import CommandError
-
 from analysis_service.errors import config_refusal
-from analysis_service.migrations import upgrade
+from analysis_service.sql_store import RevisionNotHeld, migrate_database
 from analysis_service.store_settings import StoreConfigError
 
 
 def main() -> int:
-    """Run the migration, or refuse the configuration in one line.
+    """Run the migration, or refuse in one line.
 
-    Each database setting the migration reads raises a
-    :class:`StoreConfigError` when it is unusable, and Alembic raises a
-    :class:`~alembic.util.CommandError` for a revision the tree does not hold.
+    A database at a revision the tree does not hold raises
+    :class:`~analysis_service.sql_store.RevisionNotHeld`, which names the
+    remedy. Each database setting the migration reads raises a
+    :class:`StoreConfigError` when it is unusable.
     """
     try:
-        upgrade(os.environ)
-    except (StoreConfigError, CommandError) as exc:
+        migrate_database(os.environ)
+    except RevisionNotHeld as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    except StoreConfigError as exc:
         print(config_refusal(exc), file=sys.stderr)
         return 1
     return 0

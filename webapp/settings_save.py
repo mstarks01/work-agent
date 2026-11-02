@@ -350,8 +350,18 @@ def _check(
     try:
         build_app_store(env)
         retention_days(env)
-    except (StoreConfigError, ImportError) as exc:
+    except StoreConfigError as exc:
         found.append(Refusal(None, str(exc)))
+    except ImportError as exc:
+        # Each store converts a missing extra into a StoreConfigError, so an
+        # ImportError here is a broken install of a library the store loads.
+        found.append(
+            Refusal(
+                None,
+                f"the store cannot load a library ({exc}): install"
+                " analysis-service again with the extra that the store needs",
+            )
+        )
     return built, found
 
 

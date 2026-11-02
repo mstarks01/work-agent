@@ -7,8 +7,9 @@ hides that line. ``tests/test_evals_run.py`` holds the same refusal for
 ``run.main``.
 
 The migration step reads the database settings, and the service's startup
-tells an operator to run it. A store setting it cannot run on, or a database at
-a revision this build does not hold, ends in the same one line.
+tells an operator to run it. A store setting it cannot run on ends in the same
+one line. A database at a revision this build does not hold ends in one line
+of its own, with the remedy that the startup gives.
 :data:`SERVICE_ENTRY_POINTS` holds each ``python -m analysis_service...``
 command to a stated answer.
 """
@@ -122,8 +123,10 @@ def test_the_migration_step_refuses_a_revision_this_build_does_not_hold(
 
     assert migrations_main() == 1
     printed = capsys.readouterr().err
-    assert printed.startswith(REFUSAL)
-    assert "r9999" in printed
+    assert not printed.startswith(REFUSAL)
+    assert printed.startswith("the database schema is at revision r9999, which")
+    assert "delete its file" in printed
+    assert "drop the database and create it again" in printed
     assert str(tmp_path) not in printed
     assert printed.count("\n") == 1
 

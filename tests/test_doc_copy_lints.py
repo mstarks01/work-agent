@@ -25,7 +25,7 @@ import pytest
 from fastapi.routing import APIRoute
 from pydantic import TypeAdapter
 
-from analysis_service import resilience
+from analysis_service import deployment, resilience
 from analysis_service.answer_state import EARLY_RULES, POLICY_VERSION
 from analysis_service.assertions import Basis
 from analysis_service.auth import (
@@ -36,6 +36,7 @@ from analysis_service.auth import (
 )
 from analysis_service.claims import GroundKind, RuledClaim, Spelling, UnknownKey
 from analysis_service.deployment import ConfigPaths
+from analysis_service.diagrams import _install_argv
 from analysis_service.fact_answers import FactAnswer, FactStatus, fact_kind
 from analysis_service.frameworks import SCHEMAS
 from analysis_service.jobs import TERMINAL_STATUSES
@@ -747,6 +748,26 @@ def test_the_rung_table_is_every_rung():
     )
 
     assert [backticked(row[0])[0] for row in rows] == list(get_args(Rung))
+
+
+# The diagram reader step: the install argv and the directory a wheel bundles.
+
+
+def test_the_diagram_reader_step_is_the_install_the_app_runs():
+    """The ``/v1`` deploy step runs :func:`_install_argv` from a checkout, and
+    names the directory that ``force-include`` bundles the reader in."""
+    text = section(HTTP_API, "#### The diagram reader step")
+    fences = re.findall(r"^```bash\n(.*?)\n```", text, re.DOTALL | re.MULTILINE)
+    manifest = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text("utf-8"))
+    included = manifest["tool"]["hatch"]["build"]["targets"]["wheel"]["force-include"]
+    *install, prefix = _install_argv()
+    directory = Path(prefix).name
+
+    assert len(fences) == 2
+    assert fences[0].split() == [*install, directory]
+    assert f"`{included[directory]}`" in flat(text)
+    assert "import DEFAULT_DIAGRAM_READER_DIR as d" in fences[1]
+    assert Path(prefix) == deployment.DEFAULT_DIAGRAM_READER_DIR
 
 
 # The readers' own teeth.

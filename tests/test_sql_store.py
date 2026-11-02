@@ -54,6 +54,7 @@ from analysis_service.sources import Source
 from analysis_service.sql_store import (
     METADATA,
     CorruptObject,
+    RevisionNotHeld,
     SqlJobStore,
     database_url,
     engine_for,
@@ -255,10 +256,10 @@ class TestTheStartupRefusals:
                 "UPDATE alembic_version SET version_num = 'r9999'"
             )
         engine.dispose()
-        with pytest.raises(
-            StoreConfigError, match="holds no revision r9999.*delete its file"
-        ) as refused:
+        with pytest.raises(RevisionNotHeld, match="r9999, which this build") as refused:
             start(env)
+        assert "delete its file" in str(refused.value)
+        assert "python -m analysis_service.migrations" in str(refused.value)
         assert database not in str(refused.value)
 
     @pytest.mark.parametrize(
@@ -654,7 +655,7 @@ class TestTheDigestCheck:
     )
     def test_a_delete_during_the_read_answers_404(self, env, path, name):
         objects = DeletingReads(build_object_store(env))
-        store = objects.store = JOB_STORES["sql"].build(env, objects)
+        store = objects.store = JOB_STORES["sql"].build(env, objects, False)
         record = completed_job(store)
         objects.deleting = {object_key("alice", record.id, name)}
         with TestClient(app_over(store), raise_server_exceptions=False) as client:
@@ -1093,7 +1094,7 @@ class TestAStoreFailureAsARunStartsOrEnds:
         assert "running" not in statuses(stored)
 
     def test_a_report_put_that_fails(self, env):
-        store = SqlJobStore(engine_for(env), ReportPutFails(env))
+        store = SqlJobStore(engine_for(env), ReportPutFails(env), migrates=False)
         runner = CountingRunner()
         stored = executed(store, runner)
         assert runner.runs == 1
@@ -1126,7 +1127,9 @@ class TestAStoreFailureAsARunStartsOrEnds:
         # The bound covers every store call, so it leaves room for an SQLite
         # commit on a loaded runner; only the hanging put reaches it.
         monkeypatch.setattr(jobs_module, "STORE_TIMEOUT_SECONDS", 1.0)
-        store = SqlJobStore(engine_for(env), ReportPutFails(env, hang=True))
+        store = SqlJobStore(
+            engine_for(env), ReportPutFails(env, hang=True), migrates=False
+        )
         stored = executed(store, CountingRunner())
         assert stored.status == "failed"
         assert stored.measured_tokens == METERED

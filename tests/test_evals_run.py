@@ -22,7 +22,12 @@ from analysis_service.certification import CertifyResult, UncertifiedNode
 from analysis_service.deployment import Deployment
 from evals.harness import run
 from evals.harness.bundle import reports_dir
-from evals.harness.modes import AttributeCheck, ExtractionScore, render_extraction
+from evals.harness.modes import (
+    AttributeCheck,
+    EvalRunError,
+    ExtractionScore,
+    render_extraction,
+)
 from evals.harness.reference import CorpusError
 from evals.harness.run import _models_record, _print_certification
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
@@ -292,8 +297,27 @@ class TestTheCommandTable:
 
         assert run.main(["score", str(sweep), "--out", "/dev/null"]) == 1
         printed = capsys.readouterr().err
-        assert printed.startswith("cannot read the sweep: 01-payments-checkout:")
+        assert printed.startswith("01-payments-checkout: the artifact records")
         assert "Traceback" not in printed
+
+    def test_an_eval_run_error_names_its_own_fault(self, monkeypatch, capsys):
+        """An ``EvalRunError`` is not always a sweep that a command cannot
+        read: ``pipeline_for`` refuses a deployment before any call."""
+        fault = (
+            "the heads mode scores the catalog its head produces, and this"
+            " deployment builds no pass that makes one"
+        )
+
+        def refuse_the_deployment(args):
+            raise EvalRunError(fault)
+
+        monkeypatch.setitem(
+            run.COMMANDS,
+            "score",
+            dataclasses.replace(run.COMMANDS["score"], run=refuse_the_deployment),
+        )
+        assert run.main(["score", "sweep.json", "--out", "/dev/null"]) == 1
+        assert capsys.readouterr().err == f"{fault}\n"
 
     def test_an_artifact_of_another_version_ends_in_one_line(self, tmp_path, capsys):
         """``load_artifact`` raises a ``ProvenanceError``, and ``score`` does
@@ -317,7 +341,7 @@ class TestTheCommandTable:
         assert run.main(["score", str(unreadable_sweep), "--out", str(out)]) == 1
         report = reports_dir(unreadable_sweep) / f"{UNREADABLE_CASE}.report.json"
         assert capsys.readouterr().err == (
-            f"cannot read the sweep: {report}: today's Report refuses"
+            f"{report}: today's Report refuses"
             " assertions.catalog.entries.0.origin: Field required\n"
         )
         assert not out.exists()

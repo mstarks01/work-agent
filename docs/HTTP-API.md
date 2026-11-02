@@ -1269,6 +1269,31 @@ drop the database and create it again. Then run the command. The new
 database holds no jobs. A database at a revision that this build does not
 hold, such as one from a later build, takes the same repair.
 
+#### The diagram reader step
+
+The service reads a `diagram` Source with Mermaid's own parsers, which run in
+Node (ADR 0121). The service installs nothing at its startup. Before you
+start it, install Node 20 or newer. Then install the reader's locked packages
+from the checkout:
+
+```bash
+npm ci --ignore-scripts --prefix diagram_reader
+```
+
+`npm ci` installs only the versions that `package-lock.json` locks, and
+`--ignore-scripts` runs no package's own install script. A wheel install
+holds the reader at `analysis_service/_bundled/diagram_reader`, in the
+directory of the installed package. Give that directory to `--prefix`, as a
+user that can write to it. This command prints it:
+
+```bash
+python -c "from analysis_service.deployment import DEFAULT_DIAGRAM_READER_DIR as d; print(d)"
+```
+
+Without Node or the packages, a job with a `diagram` Source fails, and the
+service log names the install step. A job with no diagram does not need the
+reader.
+
 ### The startup
 
 The service starts in this order, and a failure at a step stops the startup:
