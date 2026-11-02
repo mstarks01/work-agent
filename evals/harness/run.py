@@ -1100,7 +1100,7 @@ def command_run(args: argparse.Namespace) -> int:
     # Before anything is spent. Both answers are free and the sweep is not, so
     # a repository that cannot say what it is about to run stops here rather
     # than 90 minutes later holding an artifact that cannot name its prompts.
-    commit, corpus = repo_commit(), corpus_digest()
+    commit, corpus = repo_commit(), corpus_digest(Path(args.corpus))
     rendered = rendered_sources(cases)
     # One deployment for the whole sweep: the graph it runs and the manifest it
     # is certified against are then one configuration rather than two reads

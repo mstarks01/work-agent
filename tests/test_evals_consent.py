@@ -1066,3 +1066,31 @@ class TestABorrowedArtifactStaysInsideItsBaseline:
         (tmp_path / "elsewhere.json").write_text("{}", encoding="utf-8")
 
         assert consent._reprice(directory, "../elsewhere.json", {}) is None
+
+
+class TestASweepNamesTheCorpusItRead:
+    """The artifact's corpus digest is the digest of ``--corpus``, not the default."""
+
+    def test_a_sweep_digests_the_corpus_it_was_given(self, tmp_path, monkeypatch):
+        import shutil
+        from pathlib import Path
+
+        corpus = tmp_path / "corpus"
+        shutil.copytree(
+            Path("evals/corpus/01-payments-checkout"),
+            corpus / "01-payments-checkout",
+        )
+        digested = []
+
+        class Digested(Exception):
+            pass
+
+        def record(corpus_dir=None):
+            digested.append(corpus_dir)
+            raise Digested
+
+        monkeypatch.setattr(run, "corpus_digest", record)
+        with pytest.raises(Digested):
+            run.main(["run", "--mode", "extraction", "--corpus", str(corpus)])
+
+        assert digested == [corpus]
