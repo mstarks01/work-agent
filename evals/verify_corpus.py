@@ -471,7 +471,8 @@ def _escalate_leads(
             f"{source} -> {destination}" for source, destination in joined
         )
         # Every raise, declared or not. The caller that reports and the check
-        # that finds an obsolete declaration read the same keys, so a declaration cannot answer for a claim nothing raises.
+        # that finds an obsolete declaration read the same keys, so a
+        # declaration cannot answer for a claim nothing raises.
         yield (
             (case_id, tuple(sorted(cited))),
             (

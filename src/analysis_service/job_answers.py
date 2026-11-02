@@ -860,8 +860,8 @@ class JobAnswers:
         **The one admission.** A submission, a Resumed Job and an amended job
         are all new jobs: each takes an in-flight slot and a share of the
         token budget, and each is refused the same way when it cannot have
-        one. Every refusal is logged, because it is the only place these
-        bounds are observable from outside the caller they refused, and the
+        one. Every refusal is logged, because only the log shows these
+        bounds outside the caller they refused, and the
         log carries the deployment-wide figure a response withholds.
 
         A selection that names a framework the Deployment no longer carries

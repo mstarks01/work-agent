@@ -46,7 +46,7 @@ from collections import defaultdict
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from functools import cache
-from typing import TypeGuard
+from typing import Literal, TypeGuard
 
 import pytest
 
@@ -114,6 +114,11 @@ KEPT_DEFAULTS: dict[tuple[str, str, str], str] = {
     ),
 }
 
+#: How the lint finds the calls of a function: by its dotted name, by an
+#: attribute call of its name, through its class, or by a plain call in its
+#: module.
+Kind = Literal["function", "method", "init", "nested"]
+
 #: A key of :data:`KEPT_DEFAULTS`: the module, the function and the parameter.
 Key = tuple[str, str, str]
 
@@ -135,7 +140,7 @@ class Judged:
     module: str
     #: ``Class.method`` for a method, ``outer.inner`` for a nested function.
     qualified: str
-    kind: str  # "function", "method", "init" or "nested"
+    kind: Kind
     line: int
     parameters: tuple[Defaulted, ...]
 
@@ -293,7 +298,9 @@ def uses(modules: Mapping[str, ast.Module]) -> Uses:
         for cls in tree.body:
             if isinstance(cls, ast.ClassDef):
                 found.calls[f"{module}.{cls.name}"].extend(
-                    _call(node) for node in ast.walk(cls) if _builds_its_own_type(node)
+                    _call(node)
+                    for node in _own_nodes(cls)
+                    if _builds_its_own_type(node)
                 )
         quiet = _constructs_nothing(tree)
         for node in ast.walk(tree):
@@ -318,13 +325,25 @@ def _call(node: ast.Call) -> Call:
     )
 
 
+def _own_nodes(node: ast.AST) -> Iterator[ast.AST]:
+    """Each node under ``node``, outside the classes nested in it."""
+    for child in ast.iter_child_nodes(node):
+        yield child
+        if not isinstance(child, ast.ClassDef):
+            yield from _own_nodes(child)
+
+
 def _builds_its_own_type(node: ast.AST) -> TypeGuard[ast.Call]:
     """Whether ``node`` is a ``cls(...)`` or a ``type(self)(...)`` call."""
     if not isinstance(node, ast.Call):
         return False
     func = node.func
     return (isinstance(func, ast.Name) and func.id == "cls") or (
-        isinstance(func, ast.Call) and _called_name(func) == "type"
+        isinstance(func, ast.Call)
+        and _called_name(func) == "type"
+        and len(func.args) == 1
+        and isinstance(func.args[0], ast.Name)
+        and func.args[0].id == "self"
     )
 
 
@@ -378,7 +397,7 @@ def _defaulted(
 def judged(module: str, tree: ast.Module) -> Iterator[Judged]:
     """Each function in ``tree`` that has a default and no framework decorator."""
 
-    def visit(node: ast.AST, owner: str, kind: str) -> Iterator[Judged]:
+    def visit(node: ast.AST, owner: str, kind: Kind) -> Iterator[Judged]:
         for child in ast.iter_child_nodes(node):
             if isinstance(child, ast.ClassDef):
                 yield from visit(child, f"{owner}{child.name}.", "method")
@@ -403,7 +422,7 @@ def judged(module: str, tree: ast.Module) -> Iterator[Judged]:
     yield from visit(tree, "", "function")
 
 
-def _kind(name: str, owner: str, kind: str) -> str | None:
+def _kind(name: str, owner: str, kind: Kind) -> Kind | None:
     """How the lint finds the calls of a function, or None where it does not
     judge it: a dunder other than the ``__init__`` of a module-level class."""
     if not name.startswith("__"):

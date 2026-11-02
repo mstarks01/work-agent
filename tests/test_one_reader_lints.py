@@ -1837,6 +1837,18 @@ def _merges_the_shared_tier_nodes(node: ast.AST) -> bool:
     )
 
 
+def _spells_an_unknown_key(node: ast.AST) -> bool:
+    """A tuple of each field of an open fact's key, in the key's order."""
+    return (
+        isinstance(node, ast.Tuple)
+        and len(node.elts) == len(UNKNOWN_KEY_FIELDS)
+        and all(
+            _loads_attribute(part, field)
+            for part, field in zip(node.elts, UNKNOWN_KEY_FIELDS, strict=True)
+        )
+    )
+
+
 def _digests(node: ast.AST, read: str) -> bool:
     """A sha256 over the value of a ``read`` call: ``encode`` for a text,
     ``read_bytes`` for a file."""
@@ -2332,6 +2344,33 @@ ONE_READERS: dict[str, _OneReader] = {
                 " the open questions below the floor, which no list ranks"
             ),
         },
+        "",
+    ),
+    "what a proposal comes to": _OneReader(
+        lambda node: _calls(node, "_resolve"),
+        ("src/analysis_service/assertions.py", "resolved"),
+        {},
+        "",
+    ),
+    "the limits of an audit": _OneReader(
+        lambda node: (
+            isinstance(node, ast.Compare)
+            and any(_loads_attribute(part, "budget_usd") for part in ast.walk(node))
+        ),
+        ("evals/harness/audit.py", "admit"),
+        {},
+        "",
+    ),
+    "whether two references are the same": _OneReader(
+        _spells_an_unknown_key,
+        ("src/analysis_service/claims.py", "key"),
+        {},
+        "",
+    ),
+    "why a part of an owned job is missing": _OneReader(
+        lambda node: _calls(node, "JobDataMissing"),
+        ("src/analysis_service/job_answers.py", "missing"),
+        {},
         "",
     ),
 }

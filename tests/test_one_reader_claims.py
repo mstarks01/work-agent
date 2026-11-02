@@ -6,13 +6,17 @@ a page script there, that says "the one reader",
 promise that no second site applies the rule, and only a lint keeps that
 promise as the code moves. So the claim must name a symbol that a lint holds:
 
-- the reader of a row of :data:`~tests.test_one_reader_lints.ONE_READERS`, or
-- a symbol that ``tests/test_one_reader_lints.py`` imports, or spells as a
-  whole string, as the function of a site or the name of a call it matches.
+- the reader or another site of a row of
+  :data:`~tests.test_one_reader_lints.ONE_READERS`;
+- a ``(path, function)`` site that a test in ``tests/test_one_reader_lints.py``
+  spells, or a name that a table there maps to its file;
+- a function that a test there requires as the callee of a call, where one
+  definition in the tree holds that name.
 
-The symbols of a claim are its owner and each symbol in backticks on the
-claim's line, on the line before it or on the line after it, because a claim
-names its reader on either side of its words. The owner of a comment is the
+A claim passes when its owner, in its own file, is such a site, or when it
+names the function of such a site in backticks on the claim's line, on the
+line before it or on the line after it. A claim names its reader on either
+side of its words. The owner of a comment is the
 definition or the assignment that starts on the next statement, and otherwise
 the function or the class that holds it. The owner of a docstring is the
 function or the class it documents, or the name it follows as an attribute
@@ -77,6 +81,9 @@ CLAIM = re.compile(
 #: part, without a leading ``~`` or trailing call parentheses.
 _TICKED = re.compile(r"`~?(?:[\w.]+\.)?(\w+)(?:\(\))?`")
 
+#: The statements that define a name a test can require.
+_DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
 #: The JavaScript forms that name what a comment above them is about.
 _JS_OWNER = re.compile(r"(?:function\s+|const\s+|let\s+)(\w+)")
 
@@ -85,8 +92,9 @@ _SCRIPT_COMMENT = re.compile(r"//[^\n]*(?:\n[ \t]*//[^\n]*)*|/\*.*?\*/", re.DOTA
 
 #: The one shared reason for each claim the maintainer's ruling keeps.
 _RULED = (
-    "ruled on 2026-11-02: an older claim whose symbol a test outside the lints"
-    " reads stays without a lint row, because no defect in it is proved"
+    "the maintainer ruled on 2026-11-02 that the older claims of that day's"
+    " sweep that a unit test reads stay as they are, as no defect in them is"
+    " proved"
 )
 
 #: Each claim that a ruling keeps without a guard, by its file and owner.
@@ -97,6 +105,7 @@ UNGUARDED_CLAIMS: dict[tuple[str, str], str] = dict.fromkeys(
         ("evals/harness/applicability.py", "applied_requirements"),
         ("evals/harness/audit.py", "held_out"),
         ("evals/harness/baseline.py", "declared_pins"),
+        ("evals/harness/flow_ids.py", "flow_ids"),
         ("evals/harness/flow_ids.py", "rewrite_text"),
         ("evals/harness/instruments.py", "ModeRun"),
         ("evals/harness/ledger.py", "verdicts_for"),
@@ -118,6 +127,7 @@ UNGUARDED_CLAIMS: dict[tuple[str, str], str] = dict.fromkeys(
         ("src/analysis_service/answer_sets.py", "within_held_limits"),
         ("src/analysis_service/answer_state.py", "recommended"),
         ("src/analysis_service/assertion_use.py", "assertion_use"),
+        ("src/analysis_service/assertions.py", "settled"),
         ("src/analysis_service/assertions.py", "_bounded"),
         ("src/analysis_service/assertions.py", "admissible"),
         ("src/analysis_service/assertions.py", "conflicts"),
@@ -132,6 +142,7 @@ UNGUARDED_CLAIMS: dict[tuple[str, str], str] = dict.fromkeys(
         ("src/analysis_service/compact.py", "parse_extraction"),
         ("src/analysis_service/critic_round.py", "rulings_of"),
         ("src/analysis_service/deployment.py", "job_deadline_seconds"),
+        ("src/analysis_service/evidence.py", "lead_topics"),
         ("src/analysis_service/evidence.py", "ground_gloss"),
         ("src/analysis_service/evidence.py", "ground_issues"),
         ("src/analysis_service/evidence.py", "ground_places"),
@@ -182,10 +193,6 @@ class Claim:
     @property
     def key(self) -> tuple[str, str]:
         return (self.path, self.owner)
-
-    @property
-    def symbols(self) -> frozenset[str]:
-        return self.named | {self.owner}
 
 
 def _matches(text: str, first_line: int) -> Iterator[int]:
@@ -314,33 +321,92 @@ def claims() -> tuple[Claim, ...]:
     return tuple(sorted(found, key=lambda claim: (claim.path, claim.line)))
 
 
+#: The calls whose name argument is the callee a test in
+#: ``tests/test_one_reader_lints.py`` requires.
+_CALLEE_TESTS = frozenset({"_calls", "_is_name"})
+
+
+def _site_literals(tree: ast.Module) -> Iterator[tuple[str, str]]:
+    """Each site that ``tree`` spells: a ``(path, function)`` tuple, and a
+    ``name: path`` entry of a table."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Tuple) and len(node.elts) == 2:
+            path, name = map(_text, node.elts)
+            if path is not None and name is not None:
+                yield path, name
+        elif isinstance(node, ast.Dict):
+            for key, value in zip(node.keys, node.values, strict=True):
+                name, path = _text(key), _text(value)
+                if path is not None and name is not None:
+                    yield path, name
+
+
+def _text(node: ast.AST | None) -> str | None:
+    """The string ``node`` spells, or None."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
+def _required_callees(tree: ast.Module) -> Iterator[str]:
+    """Each function name that ``tree`` requires as the callee of a call."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        named = [
+            *(
+                arg.value
+                for arg in node.args[1:]
+                if isinstance(node.func, ast.Name)
+                and node.func.id in _CALLEE_TESTS
+                and isinstance(arg, ast.Constant)
+            ),
+            *(
+                keyword.value.value
+                for keyword in node.keywords
+                if keyword.arg == "name" and isinstance(keyword.value, ast.Constant)
+            ),
+        ]
+        yield from (name for name in named if isinstance(name, str))
+
+
 @cache
-def guarded_symbols() -> frozenset[str]:
-    """Each symbol a lint holds: the reader of each ``ONE_READERS`` row, and
-    each symbol that ``tests/test_one_reader_lints.py`` imports or spells as a
-    whole string, as a site or a call it matches."""
+def guarded_sites() -> frozenset[tuple[str, str]]:
+    """Each ``(path, function)`` site that a lint holds.
+
+    - the reader and each other site of each ``ONE_READERS`` row;
+    - each site that ``tests/test_one_reader_lints.py`` spells;
+    - each callee that a test there requires, at its one definition. A name
+      that several definitions hold, or none, names no site.
+    """
     tree = parse(REPO_ROOT / "tests" / "test_one_reader_lints.py")
-    spelled = {
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant)
-        and isinstance(node.value, str)
-        and node.value.isidentifier()
-    }
-    imported = {
-        alias.asname or alias.name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom)
-        for alias in node.names
-    }
-    readers = {row.reader[1] for row in ONE_READERS.values()}
-    return frozenset(spelled | imported | readers)
+    held = {path.relative_to(REPO_ROOT).as_posix() for path in FILES}
+    sites = {site for site in _site_literals(tree) if site[0] in held}
+    for row in ONE_READERS.values():
+        sites |= {row.reader, *row.others}
+    defined: dict[str, set[str]] = {}
+    for path in FILES:
+        if path.suffix == ".py":
+            for node in ast.walk(parse(path)):
+                if isinstance(node, _DEFINITIONS):
+                    name = path.relative_to(REPO_ROOT).as_posix()
+                    defined.setdefault(node.name, set()).add(name)
+    for callee in _required_callees(tree):
+        if len(places := defined.get(callee, set())) == 1:
+            sites.add((places.pop(), callee))
+    return frozenset(sites)
+
+
+def guarded(claim: Claim) -> bool:
+    """Whether ``claim``'s owner, in its own file, is a guarded site, or the
+    claim names the function of a guarded site in backticks."""
+    sites = guarded_sites()
+    return claim.key in sites or bool(claim.named & {name for _, name in sites})
 
 
 def unguarded() -> list[Claim]:
-    """Each claim that names no symbol a lint holds."""
-    held = guarded_symbols()
-    return [claim for claim in claims() if not claim.symbols & held]
+    """Each claim that names no guard."""
+    return [claim for claim in claims() if not guarded(claim)]
 
 
 def test_each_one_reader_claim_names_its_guard():
@@ -392,30 +458,38 @@ def test_the_claim_pattern_finds_a_claim_and_skips_a_description():
 
 
 def test_the_lint_reads_the_owner_and_the_named_symbol(tmp_path):
-    """Positive control: a claim on an unheld symbol fails, and a claim that
-    names a reader in backticks, or sits on that reader, passes."""
-    reader = next(iter(ONE_READERS.values())).reader[1]
+    """Positive and negative controls for the guard.
+
+    A claim on an unheld function fails. A claim on a ``ONE_READERS`` reader
+    in the reader's own file passes, and so does a claim that names that
+    reader in backticks. A function with the reader's name in another file
+    fails: a guard is a site, never a bare name.
+    """
+    place, reader = next(iter(ONE_READERS.values())).reader
     probe = tmp_path / "probe.py"
     probe.write_text(
+        "#: :func:`" + reader + "` is the one reader of that rule.\n"
+        "PROBE_TABLE = {}\n"
+        "\n"
         "def unheld_probe_rule():\n"
         '    """The one reader of a probe rule."""\n'
+        "\n"
         f"def {reader}():\n"
-        '    """The one reader of its rule."""\n'
-        "#: :func:`" + reader + "` is the one reader of that rule.\n"
-        "PROBE_TABLE = {}\n",
+        '    """The one reader of its rule."""\n',
         encoding="utf-8",
     )
-    found = _claims_in(probe, "probe.py")
-    held = guarded_symbols()
+    found = sorted(_claims_in(probe, place), key=lambda claim: claim.line)
+    elsewhere = _claims_in(probe, "src/analysis_service/elsewhere.py")
 
-    assert sorted((claim.line, claim.owner) for claim in found) == [
-        (2, "unheld_probe_rule"),
-        (4, reader),
-        (5, "PROBE_TABLE"),
+    assert [(claim.line, claim.owner) for claim in found] == [
+        (1, "PROBE_TABLE"),
+        (5, "unheld_probe_rule"),
+        (8, reader),
     ]
-    assert [claim.owner for claim in found if not claim.symbols & held] == [
-        "unheld_probe_rule"
-    ]
+    assert [guarded(claim) for claim in found] == [True, False, True]
+    assert sorted(claim.owner for claim in elsewhere if not guarded(claim)) == sorted(
+        ["unheld_probe_rule", reader]
+    )
 
 
 def test_the_lint_reads_a_real_population():
