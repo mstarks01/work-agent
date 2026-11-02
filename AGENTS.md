@@ -20,7 +20,9 @@ wayfinder maps use native sub-issues and issue dependencies. See `docs/agents/is
 
 Run a **pre-merge review** on each pull request's diff, and a **checkpoint
 round** over a range of merged commits. Read your own fix diff against the five
-defect classes, because a fix is the riskiest code in the tree.
+defect classes, because a fix is the riskiest code in the tree. Before the
+merge, a sub-task that did not write the diff reads it against the standards
+and the smell list.
 
 CI requires a `## Five-class read` section, with one entry for each class,
 in the body of each pull request that changes code.
