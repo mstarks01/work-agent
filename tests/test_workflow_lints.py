@@ -22,7 +22,14 @@ from pathlib import Path
 import pytest
 
 from analysis_service.config_files import SECRET_FILE_SUFFIX
-from tests.source_tree import PYTHON, REPO_ROOT, WORKFLOWS, parse, source_files
+from tests.source_tree import (
+    PYTHON,
+    REPO_ROOT,
+    WORKFLOWS,
+    matching,
+    parse,
+    source_files,
+)
 
 pytestmark = pytest.mark.lint
 
@@ -40,7 +47,8 @@ FILTERED_WORKFLOWS = (
 
 
 def _package_modules() -> set[str]:
-    return {path.stem for path in PACKAGE.glob("*.py")}
+    """The top-level modules of the package, which the filter's negations name."""
+    return {path.stem for path in source_files(*PYTHON) if path.parent == PACKAGE}
 
 
 def _module_file(dotted: str) -> Path | None:
@@ -198,7 +206,7 @@ def test_every_swept_path_still_exists(workflow):
     missing = [
         entry
         for entry in _filter_paths(workflow)
-        if not entry.startswith("!") and not any(REPO_ROOT.glob(entry))
+        if not entry.startswith("!") and not matching(entry)
     ]
 
     assert not missing, (

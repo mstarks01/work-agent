@@ -293,8 +293,8 @@ owner_files = Table(
     Column("sha256", String(64), nullable=False),
     Column("size_bytes", BigInteger, nullable=False),
     Column("created_at", _UtcTime, nullable=False),
-    # The one reader of a name's uniqueness: two names are one where the
-    # strings are equal.
+    # Refuses a second file of one name for one owner: two names are one where
+    # the strings are equal. The in-memory store compares names in `add_file`.
     UniqueConstraint("owner_id", "name"),
 )
 
@@ -1963,9 +1963,9 @@ class SqlJobStore:
     ) -> FileAdmission:
         """Count the owner's files and insert the row under the owner's lock.
 
-        ``UNIQUE (owner_id, name)`` is the one reader of a name's uniqueness.
-        Its refusal ends the transaction, so the store reads the name again
-        after the rollback, and raises the error where no row holds it.
+        ``UNIQUE (owner_id, name)`` refuses a duplicate name. Its refusal ends
+        the transaction, so the store reads the name again after the rollback,
+        and raises the error where no row holds it.
         """
         owned = owner_files.c.owner_id == file.owner_id
         try:

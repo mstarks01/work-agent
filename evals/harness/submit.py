@@ -701,9 +701,8 @@ def _baseline_allowlist(root: Path, author: str) -> list[str]:
 def added_sweeps(root: Path, name: str) -> list[Mapping[str, Any]]:
     """The manifest entries this diff adds to Baseline ``name``.
 
-    The one reader of what a diff *contributes*, called by the kind's selector
-    and by the stamp check, so "does this PR add a sweep" cannot be answered
-    twice and differently.
+    The kind's selector and the stamp check both call it, so they read one
+    answer to "does this PR add a sweep".
 
     Raises :class:`SubmitError` for every way a manifest can fail to answer —
     unreadable, unparsable, or not a table of tables. One type because the two

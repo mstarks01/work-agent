@@ -135,8 +135,8 @@ def max_body_bytes(limits: SourceLimits) -> int:
     """The raw-body guard of a deployment whose byte budget is ``limits``.
 
     **The one reader of the guard.** :class:`BodyLimitMiddleware` enforces it
-    on ``/v1``, and the web app's JSON body reader enforces it on each job
-    route.
+    on ``/v1``, and the web app's ``_job_body`` enforces it on each job route.
+    ``tests/test_one_reader_lints.py`` refuses a second reader.
     """
     return limits.max_total_bytes * _BODY_SLACK
 
@@ -331,7 +331,7 @@ class JobSubmission(BaseModel):
     The order of the list decides nothing. The report's analysis blocks follow
     the order of ``config/frameworks.toml``, whatever order the submission
     listed (ADR 0102). :func:`~analysis_service.selection.resolve_selection`
-    is the one reader of that rule.
+    puts the selection in that order.
     """
 
     model_config = ConfigDict(extra="forbid")

@@ -1433,9 +1433,11 @@ def _catalog(
 ) -> AssertionCatalog:
     """One catalog over ``entries``, carrying the subjects they name.
 
-    **The one reader of which subjects a set of rows declares.** The table is
-    derived, for the reason :class:`CatalogProposal` gives: two places to spell
-    one subject eventually spell it two ways.
+    **The subjects table that** ``retracted``, ``refused`` and ``resolve``
+    **build.** The table is derived, for the reason :class:`CatalogProposal`
+    gives: two places to spell one subject eventually spell it two ways. The
+    answer writers in ``links`` and ``fact_writes`` keep or extend the
+    subjects table themselves.
 
     A row names **two** subjects where its predicate's value is a reference —
     what the row is about, and what it points at. A credential nothing is

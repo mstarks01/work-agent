@@ -39,6 +39,7 @@ from evals.harness.bundle import REPORTS_SUFFIX
 from evals.harness.reference import CASE_FILES, MUST_FIND
 from evals.harness.roster import STANDINGS
 from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
+from tests.test_webapp import STATIC_SCRIPTS
 from webapp import main, offline_sitting, review, sitting
 from webapp.page import client_script
 
@@ -65,7 +66,9 @@ PAGES: tuple[str, ...] = (
     (REPO_ROOT / "webapp" / "report_view.html").read_text(encoding="utf-8"),
 )
 SCRIPTS: tuple[str, ...] = tuple(
-    path.name for path in sorted((REPO_ROOT / "webapp" / "static").glob("*.js"))
+    path.name
+    for path in source_files(*PYTHON, suffixes=(".js",))
+    if path.parent == REPO_ROOT / "webapp" / "static"
 )
 
 #: Fields no code reads, kept on purpose, with the reason. Two readings live
@@ -191,6 +194,40 @@ def test_no_page_assertion_is_satisfied_by_a_comment():
 
 def test_the_spelling_scan_reads_a_real_population():
     assert len(_asserted_spellings()) > 20
+
+
+def test_every_client_script_belongs_to_a_page():
+    """A script file nothing serves is dead code nothing would notice.
+
+    The reverse of the template sweep in ``tests/test_webapp.py``, over the
+    same table: that one holds a page to its file, and this one holds a file to
+    its page.
+    """
+    on_disk = set(SCRIPTS)
+    named = set(STATIC_SCRIPTS)
+
+    assert on_disk == named, (
+        f"webapp/static holds {sorted(on_disk - named)} that no page names, and"
+        f" the table names {sorted(named - on_disk)} that is not there."
+    )
+
+
+def test_no_page_words_a_count_with_a_bracketed_plural():
+    """A page words a count with ``counted``, never "finding(s)"."""
+    pages = [
+        *(REPO_ROOT / "webapp" / "static" / name for name in SCRIPTS),
+        *(
+            path
+            for path in source_files(*PYTHON, suffixes=(".html",))
+            if path.parent == REPO_ROOT / "webapp"
+        ),
+    ]
+    bracketed = {
+        page.name: found
+        for page in pages
+        if (found := re.findall(r"[a-z]\(s\)", page.read_text(encoding="utf-8")))
+    }
+    assert bracketed == {}
 
 
 # --- 3. A field no code reads -------------------------------------------------------

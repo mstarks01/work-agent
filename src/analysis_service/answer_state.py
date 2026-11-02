@@ -1038,9 +1038,11 @@ def _rankable(
     """The listed questions a list may rank: not a gate, at or above its
     kind's floor, not done, and not waiting on a parent.
 
-    **The one reader of which question a list may rank.** :func:`recommended`
-    takes from it, and the effects that break its ties are computed over its
-    capability questions, so no rankable question goes without its effect.
+    **The reader of which listed question a list may rank.**
+    :func:`recommended` takes from it, and the effects that break its ties are
+    computed over its capability questions, so no rankable question goes
+    without its effect. :func:`question_set` applies the gate, done and floor
+    tests itself to the questions that an undecided gate would add.
     """
     waiting = _waiting(listed, _settled(done))
     return [

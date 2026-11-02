@@ -264,9 +264,10 @@ def recorded_upstreams(
 ) -> dict[str, tuple[str, ...]]:
     """Every upstream the record names, per tier on an aggregator route.
 
-    The one reader of the question "which provider served this tier", for the
-    identity and for the rule that refuses a tier it cannot answer. Keyed only
-    by the tiers whose vendor does not route to one provider: a direct vendor
+    The reader of the question "which provider served this tier" for the
+    identity and for the rule that refuses a tier it cannot answer.
+    :meth:`~evals.harness.provenance.RunProvenance.tier_identities` folds the
+    same field for the artifact's tier summary. Keyed only by the tiers whose vendor does not route to one provider: a direct vendor
     is its own upstream, names none in its responses, and has nothing here to
     read. An aggregator tier whose executions name no upstream maps to an
     empty tuple rather than being absent, so the rule can tell "the record is

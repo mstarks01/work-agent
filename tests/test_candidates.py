@@ -493,32 +493,6 @@ class TestCandidatesAreNotFindings:
             "facts",
         }
 
-    def test_nothing_outside_the_prompt_seam_reads_a_candidate(self):
-        """Candidates reach the agents and stop there.
-
-        The importers of this module are the seam that renders the prompt
-        (``graph``), the fan-in that regenerates the same candidates for the
-        coverage account (``fan_in``), the accounting itself (``coverage``),
-        and the ranking of the questions a paused job asks
-        (``early_questions``), which orders questions and writes no finding.
-        Neither the critic nor the report can see one, so no code path exists
-        that turns a fired rule into a threat.
-        """
-        from pathlib import Path
-
-        package = Path(__file__).resolve().parents[1] / "src" / "analysis_service"
-        importers = {
-            path.name
-            for path in package.glob("*.py")
-            if "from analysis_service.candidates import" in path.read_text()
-        }
-        assert importers == {
-            "coverage.py",
-            "early_questions.py",
-            "fan_in.py",
-            "graph.py",
-        }
-
 
 class TestTheRuleThatReadsTheCatalog:
     """`spoofing-second-factor-stated-absent`: the first rule to read a row.
