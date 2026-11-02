@@ -749,7 +749,7 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
             label = ground.source_label
             if label not in prepared:
                 # The body's deadline, asked before the fold rather than inside
-                # the scan after it. A body that has spent its thirty seconds
+                # the scan after it. A body whose thirty seconds have run out
                 # answers ``None`` for every quote that is left, and folding a
                 # whole submission to reach that answer is what this ordering
                 # removes: 400 refused quotes against a 20,000-word source is

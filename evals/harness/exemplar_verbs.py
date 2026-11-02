@@ -9,7 +9,7 @@ over-report at once.
 
 ## The measurement
 
-STRIDE ships 19 exemplars, and the corpus holds 285 reference claims. No
+STRIDE ships 20 exemplars, and the corpus holds 285 reference claims. No
 exemplar is read from a holdout case (#744), and no case is still held out, so
 this reads all 285.
 51 of those claims name a verb no exemplar in their lane demonstrates.

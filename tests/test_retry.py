@@ -374,7 +374,7 @@ class TestRetryAfter:
         """The provider has answered the question a retry exists to ask.
 
         Sleeping an hour would park a paid job on a third party's number, and
-        sleeping less and asking anyway spends an attempt and a budget token to
+        sleeping less and asking anyway uses an attempt and a budget token to
         reach the same refusal.
         """
         pol = policy()
