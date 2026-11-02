@@ -7,9 +7,14 @@ output cap. This script sends the same request straight to litellm, without
 the ADK runner and without the deployment's structured-output fallback. It then
 runs the node's own check and the ASVS level 3 decisions of the result.
 
-Usage, under ``bash -l`` with ``ANALYSIS_TIERS_FILE`` naming the tiers file:
+Usage, under ``bash -l`` so the credential loads:
 
     read_capabilities.py <out.json> <route> <upstream> <case dir> [<case dir> ...]
+
+The route and the upstream come from the arguments. QA-2026-11-02-05 passed the
+``capabilities`` node's tier from the deployment's tiers file:
+``openrouter/openai/gpt-5.6-luna`` and ``openai/flex``. The output cap is a copy
+of the base tier's value in ``config/sampling.toml`` on the day of the run.
 
 Each case directory holds ``source.md`` and ``model.json``. Each case is one
 paid call, and the charge is the one the provider reported.
