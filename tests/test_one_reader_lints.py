@@ -2378,6 +2378,61 @@ ONE_READERS: dict[str, _OneReader] = {
         {},
         "",
     ),
+    "which subjects a catalog names": _OneReader(
+        lambda node: (
+            isinstance(node, ast.AugAssign)
+            and isinstance(node.op, ast.Sub)
+            and _loads(node.value, "UNIVERSAL_TERMS")
+        ),
+        ("src/analysis_service/assertions.py", "subjects_of"),
+        {},
+        "",
+    ),
+    "a config path": _OneReader(
+        lambda node: (
+            _calls(node, "Path") and bool(node.args) and _calls(node.args[0], "strip")
+        ),
+        ("src/analysis_service/deployment.py", "config_path"),
+        {},
+        "",
+    ),
+    "which control a row is about": _OneReader(
+        lambda node: (
+            isinstance(node, ast.DictComp)
+            and _calls(node.key, "assertion_id")
+            and any(_loads(part, "REGISTRY") for part in ast.walk(node))
+        ),
+        ("src/analysis_service/claim_identity.py", "row_controls"),
+        {},
+        "",
+    ),
+    "whether a report may be served": _OneReader(
+        lambda node: _calls(node, "NotCompleted"),
+        ("src/analysis_service/job_answers.py", "servable"),
+        {},
+        "",
+    ),
+    "a closed setting": _OneReader(
+        lambda node: (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and "unknown value for " in node.value
+        ),
+        ("src/analysis_service/store_settings.py", "closed_setting"),
+        {},
+        "",
+    ),
+    "the app's store defaults": _OneReader(
+        lambda node: _calls(node, "_default_database"),
+        ("webapp/settings_view.py", "store_defaults"),
+        {
+            ("webapp/settings_view.py", "build_app_store"): (
+                "it asks whether the store sits at the default database, to make"
+                " its directory, and sets no default"
+            ),
+        },
+        "",
+    ),
     "how a Baseline's models read": _OneReader(
         lambda node: _is_constant(node, " unpinned"),
         ("evals/harness/comparison.py", "models_phrase"),

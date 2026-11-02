@@ -8,13 +8,12 @@ claim must name a site that a lint holds:
 
 - the reader of a row of :data:`~tests.test_one_reader_lints.ONE_READERS`;
 - a ``(path, function)`` site that an ``assert`` in a test of
-  ``tests/test_one_reader_lints.py`` spells, as the one site of a rule;
-- a function that a test there requires as the callee of a call, where one
-  definition in the tree holds that name.
+  ``tests/test_one_reader_lints.py`` names as the one site of a rule: the one
+  element of a list or a set that the found sites must equal.
 
-A site in a table of exempt sites, or a site that a row names as no second
-reader, guards nothing. A name that its file defines more than once guards
-nothing either, because a site cannot tell the definitions apart.
+A site that a row names as no second reader guards nothing. A name that its
+file defines more than once guards nothing either, because a site cannot tell
+the definitions apart.
 
 A claim passes when its owner, in its own file, is such a site, or when it
 names such a site in backticks on the claim's line, on the line before it or
@@ -26,8 +25,8 @@ claim's own file. So a guard is a site, never a bare name.
 The owner of a comment is the definition or the assignment that starts on the
 next statement, and otherwise the function or the class that holds it. The
 owner of a docstring is the function or the class it documents, or the name it
-follows as an attribute docstring. A claim spans line breaks, so a claim wrapped across two lines is
-still found. "The one reader" followed by a verb in ``-ing`` describes a
+follows as an attribute docstring. A claim spans line breaks, so a claim
+wrapped across two lines is still found. "The one reader" followed by a verb in ``-ing`` describes a
 reader and claims nothing, and so does "a single source" or "no single
 source".
 
@@ -51,14 +50,16 @@ from tests.source_tree import (
     PYTHON,
     REPO_ROOT,
     SHORTEST_REASON,
+    block_comments,
     comment_runs,
     imports,
+    line_comments,
     module_name,
     parse,
     source_files,
     without,
 )
-from tests.test_one_reader_lints import ONE_READERS, Site, _calls, _is_name
+from tests.test_one_reader_lints import ONE_READERS, Site
 
 pytestmark = pytest.mark.lint
 
@@ -99,9 +100,6 @@ _OWNER_REACH = 2
 
 #: The JavaScript forms that name what a comment above them is about.
 _JS_OWNER = re.compile(r"^\s*(?:export\s+)?(?:async\s+)?(?:function|const|let)\s+(\w+)")
-
-#: A run of ``//`` comment lines, or one ``/* */`` comment, in a page script.
-_SCRIPT_COMMENT = re.compile(r"//[^\n]*(?:\n[ \t]*//[^\n]*)*|/\*.*?\*/", re.DOTALL)
 
 #: The one shared reason for each claim the maintainer's ruling keeps.
 _RULED = (
@@ -278,20 +276,17 @@ def _python_claims(path: Path) -> Iterator[tuple[int, str]]:
 def _script_claims(path: Path) -> Iterator[tuple[int, str]]:
     """Each claim line in a page script, with the name that the code after
     its comment defines first."""
-    source = path.read_text(encoding="utf-8")
-    lines = source.splitlines()
-    for comment in _SCRIPT_COMMENT.finditer(source):
-        start = source.count("\n", 0, comment.start()) + 1
-        end = source.count("\n", 0, comment.end()) + 1
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for start, text in line_comments(path, "//") + block_comments(path):
+        end = start + text.count("\n")
         owner = next(
             (
                 found.group(1)
-                for text in lines[end : end + _OWNER_REACH]
-                if (found := _JS_OWNER.search(text))
+                for code in lines[end : end + _OWNER_REACH]
+                if (found := _JS_OWNER.search(code))
             ),
             path.stem,
         )
-        text = re.sub(r"(?m)^[ \t]*(?://|/?\*+/?)", "", comment.group())
         for line in _matches(text, start):
             yield line, owner
 
@@ -322,11 +317,6 @@ def claims() -> tuple[OneReaderClaim, ...]:
     return tuple(sorted(found, key=lambda claim: (claim.path, claim.line)))
 
 
-#: The calls whose name argument is the callee a test in
-#: ``tests/test_one_reader_lints.py`` requires.
-_CALLEE_TESTS = frozenset({_calls.__name__, _is_name.__name__})
-
-
 def _tests(tree: ast.Module) -> Iterator[ast.FunctionDef]:
     """Each test function in ``tree``."""
     for node in tree.body:
@@ -342,15 +332,15 @@ def _asserted_sites(tree: ast.Module) -> Iterator[Site]:
             if not isinstance(statement, ast.Assert):
                 continue
             for node in ast.walk(statement.test):
-                if not isinstance(node, ast.Compare) or len(node.ops) != 1:
-                    continue
-                (op,) = node.ops
-                sides = (node.left, *node.comparators)
-                if not isinstance(op, ast.Eq):
+                if not (
+                    isinstance(node, ast.Compare)
+                    and len(node.ops) == 1
+                    and isinstance(node.ops[0], ast.Eq)
+                ):
                     continue
                 candidates = [
                     side.elts[0]
-                    for side in sides
+                    for side in (node.left, *node.comparators)
                     if isinstance(side, ast.List | ast.Set) and len(side.elts) == 1
                 ]
                 for candidate in candidates:
@@ -373,37 +363,17 @@ def _text(node: ast.AST | None) -> str | None:
     return None
 
 
-def _required_callees(tree: ast.Module) -> Iterator[str]:
-    """Each function name that a test in ``tree`` requires as a callee."""
-    for test in _tests(tree):
-        for node in ast.walk(test):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if isinstance(func, ast.Name) and func.id in _CALLEE_TESTS:
-                yield from filter(None, map(_text, node.args[1:]))
-            elif (
-                isinstance(func, ast.Name)
-                and func.id == "partial"
-                and node.args
-                and isinstance(node.args[0], ast.Name)
-                and node.args[0].id in _CALLEE_TESTS
-            ):
-                names = (_text(k.value) for k in node.keywords if k.arg == "name")
-                yield from filter(None, names)
-
-
 @cache
 def guarded_sites() -> frozenset[Site]:
     """Each ``(path, function)`` site that a lint holds.
 
     - the reader of each ``ONE_READERS`` row;
     - each site that an ``assert`` in a test of
-      ``tests/test_one_reader_lints.py`` spells;
-    - each callee that a test there requires, at its one definition.
+      ``tests/test_one_reader_lints.py`` names as the one site of a rule.
 
-    A name that several definitions hold in its file, or none, names no site,
-    because a site is a file and a function and cannot tell them apart.
+    A site that a row names as no second reader is no guard. A name that its
+    file defines more than once, or not at all, names no site, because a site
+    is a file and a function and cannot tell the definitions apart.
     """
     tree = parse(REPO_ROOT / "tests" / "test_one_reader_lints.py")
     defined: dict[str, list[str]] = {}
@@ -411,13 +381,11 @@ def guarded_sites() -> frozenset[Site]:
         if path.suffix == ".py":
             for node in ast.walk(parse(path)):
                 if isinstance(node, _DEFINITIONS):
-                    name = path.relative_to(REPO_ROOT).as_posix()
-                    defined.setdefault(node.name, []).append(name)
+                    place = path.relative_to(REPO_ROOT).as_posix()
+                    defined.setdefault(node.name, []).append(place)
+    exempt = {site for row in ONE_READERS.values() for site in row.others}
     sites = {row.reader for row in ONE_READERS.values()}
-    sites |= set(_asserted_sites(tree))
-    for callee in _required_callees(tree):
-        if len(set(places := defined.get(callee, []))) == 1:
-            sites.add((places[0], callee))
+    sites |= set(_asserted_sites(tree)) - exempt
     return frozenset(
         (path, name) for path, name in sites if defined.get(name, []).count(path) == 1
     )
@@ -612,7 +580,7 @@ def test_a_site_among_several_in_an_assert_guards_nothing():
     one reader, so it guards nothing."""
     assert ("src/analysis_service/job_answers.py", "amend") not in guarded_sites()
     assert ("src/analysis_service/fixes.py", "absent_rows") not in guarded_sites()
-    assert ("src/analysis_service/job_answers.py", "missing") in guarded_sites()
+    assert ("src/analysis_service/claim_identity.py", "report_rows") in guarded_sites()
 
 
 def test_the_lint_reads_a_real_population():

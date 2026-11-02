@@ -18,6 +18,7 @@ from __future__ import annotations
 import ast
 import io
 import os
+import re
 import tokenize
 from collections.abc import Iterable, Mapping
 from functools import cache
@@ -208,6 +209,55 @@ def comment_runs(path: Path) -> list[tuple[int, str]]:
         if token.type == tokenize.COMMENT
     ]
     return joined_runs(comments)
+
+
+def trailing_comment(line: str, marker: str) -> str | None:
+    """The comment that ends a line of code, or None.
+
+    A comment starts at ``marker`` after a space, outside any quote: the text
+    before it holds an even count of each quote character. A quote that a
+    comment does not close, such as an apostrophe in a plain YAML value, hides
+    the comment, so the reader misses a comment rather than reads a string.
+    """
+    start = line.find(f" {marker}")
+    while start != -1:
+        before = line[:start]
+        if all(before.count(quote) % 2 == 0 for quote in "\"'`"):
+            return line[start + 1 + len(marker) :].strip()
+        start = line.find(f" {marker}", start + 1)
+    return None
+
+
+def line_comments(path: Path, marker: str) -> list[tuple[int, str]]:
+    """Every run of full-line ``marker`` comments in one file, and every comment
+    that ends a line of code, at its line."""
+    full: list[tuple[int, str]] = []
+    trailing: list[tuple[int, str]] = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if line.lstrip().startswith(marker):
+            full.append((lineno, line.strip().removeprefix(marker).strip()))
+        elif (comment := trailing_comment(line, marker)) is not None:
+            trailing.append((lineno, comment))
+    return joined_runs(full) + trailing
+
+
+_BLOCK_COMMENT = re.compile(r"/\*(.*?)\*/|<!--(.*?)-->", re.DOTALL)
+
+
+def block_comments(path: Path) -> list[tuple[int, str]]:
+    """Every ``/* */`` and ``<!-- -->`` comment in one script, page or style
+    sheet, at its first line."""
+    source = path.read_text(encoding="utf-8")
+    return [
+        (
+            source.count("\n", 0, block.start()) + 1,
+            "\n".join(
+                line.strip().removeprefix("*").strip()
+                for line in block.group(block.lastindex or 0).splitlines()
+            ),
+        )
+        for block in _BLOCK_COMMENT.finditer(source)
+    ]
 
 
 def imports(tree: ast.Module) -> dict[str, str]:
