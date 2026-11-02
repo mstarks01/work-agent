@@ -179,9 +179,15 @@ in a ledger row.
 - Fix each instance that the sweep finds, in the same way as the finding.
 - When a mechanism comes back in a later round, add a lint that refuses it.
   Then it cannot come back again.
-- Count the findings in two groups: code older than the last `reviewed/*` tag,
-  and newer code. The count in older code must go down from round to round. A
-  count that does not go down shows a mechanism that needs a lint.
+- Count the findings in three groups:
+  - code newer than the last `reviewed/*` tag;
+  - older code, for a class whose definition did not change in this round;
+  - older code, for a class whose definition this round made wider, such as
+    new claim words or a wider scope.
+
+  The second count must go down from round to round. A count that does not go
+  down shows a mechanism that needs a lint. The third count shows old defects
+  that the narrower definition did not count, not new defects.
 
 ### Read the prompts against the code they describe
 
@@ -279,8 +285,8 @@ The message carries what a later reader cannot recover from the diff:
   knows which half of its own range nobody read before the merge
 - which axes ran, and what each read as its source of truth
 - how many findings each axis produced, and where each was fixed
-- how many findings were in code older than the last `reviewed/*` tag, and how
-  many were in newer code
+- how many findings were in each of the three count groups: newer code, older
+  code under an unchanged definition, and older code under a wider definition
 - **what was left open by decision**, with the reason — this is the part that
   stops the next review re-reporting a settled question as a new finding.
   Held wording in model text goes in `.github/scripts/held_wording.toml`, and
