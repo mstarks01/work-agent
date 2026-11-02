@@ -32,6 +32,7 @@ from analysis_service.markdown_loader import (
     estimate_tokens,
     split_sections,
 )
+from tests.source_tree import MODEL_TEXT, source_files
 
 pytestmark = pytest.mark.lint
 
@@ -80,7 +81,11 @@ EMPTY_CORPUS: set[str] = set()
 def documents(framework: str, kind: str) -> list[str]:
     """The document stems on disk for one package's notes or cases."""
     directory = FRAMEWORKS_DIR / framework / kind
-    return sorted(path.stem for path in directory.glob("*.md"))
+    return sorted(
+        path.stem
+        for path in source_files(*MODEL_TEXT, suffixes=(".md",))
+        if path.parent == directory
+    )
 
 
 def loader_for(framework: str) -> MarkdownLoader:

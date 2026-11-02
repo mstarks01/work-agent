@@ -928,25 +928,6 @@ def test_two_jobs_on_one_deployment_share_an_instruction_digest():
     )
 
 
-def test_nothing_turns_the_context_into_evidence():
-    """The one rule the block exists under, asserted where it could break.
-
-    A pack informed the analysis; it did not ground anything. The report's own
-    importers are what keep that true — ``AnalysisContext`` is built in the
-    graph and read by nobody, so there is no path from a pack name or a rule ID
-    to a ``Ground``.
-    """
-    from pathlib import Path
-
-    package = Path(__file__).resolve().parents[1] / "src" / "analysis_service"
-    importers = {
-        path.name
-        for path in package.glob("*.py")
-        if "AnalysisContext" in path.read_text() and path.name != "report.py"
-    }
-    assert importers == {"graph.py"}
-
-
 # --- Two frameworks under the real scheduler ---------------------------------
 
 

@@ -867,7 +867,9 @@ def _case_refusal(case_dir: Path, error: ValidationError) -> str:
 def missing_case_files(case_dir: Path) -> list[str]:
     """Which of :data:`CASE_FILES` this directory does not carry, as files.
 
-    **The one reader of "is this a case directory".** The loader raises on the
+    **The one reader of "is this a case directory"** for the loader and the
+    corpus lint. An experiment script under ``evals/experiments`` tests
+    ``case.json`` itself. The loader raises on the
     answer and ``evals/verify_corpus.py`` reports it, and the two asked it
     apart: one listed the three names and called ``is_file``, the other listed
     them again and called ``exists``, so a *directory* named ``case.json``

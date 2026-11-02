@@ -14,10 +14,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.api import (
-    _BODY_SLACK,
     _REFUSALS,
     BodyLimitMiddleware,
     create_app,
+    max_body_bytes,
 )
 from analysis_service.auth import AuthenticationError
 from analysis_service.budgets import BudgetPolicy
@@ -589,7 +589,7 @@ class TestInputLadder:
             headers=auth()
             | {
                 "content-type": "application/json",
-                "content-length": str(TEST_LIMITS.max_total_bytes * 4),
+                "content-length": str(max_body_bytes(TEST_LIMITS) * 2),
             },
         )
         assert response.status_code == 413
@@ -601,7 +601,7 @@ class TestInputLadder:
         # through. Streaming the body from a generator makes httpx send it
         # chunked.
         client, _ = make_client()
-        over_cap = TEST_LIMITS.max_total_bytes * _BODY_SLACK * 2
+        over_cap = max_body_bytes(TEST_LIMITS) * 2
 
         def chunks():
             sent = 0
@@ -1363,7 +1363,7 @@ class TestBodyCapOnEveryPost:
         """Driven through the real app, so a POST route added tomorrow is
         covered by the same test rather than by a path someone remembers."""
         client, _ = make_client()
-        over_cap = b"x" * (TEST_LIMITS.max_total_bytes * _BODY_SLACK * 2)
+        over_cap = b"x" * (max_body_bytes(TEST_LIMITS) * 2)
         paths = [
             route.path.replace("{job_id}", "abc")
             for route in client.app.routes

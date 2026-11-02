@@ -22,7 +22,7 @@ from analysis_service.frameworks import (
     SEVERITY_RUBRIC_DOC,
 )
 from evals.harness.submit import run_command
-from tests.source_tree import REPO_ROOT, prompt_files
+from tests.source_tree import REPO_ROOT, matching, prompt_files
 from tests.test_workflow_lints import FILTERED_WORKFLOWS, _filter_paths
 
 pytestmark = pytest.mark.lint
@@ -323,7 +323,7 @@ def test_each_reader_is_a_module(pattern):
     ),
 )
 def test_each_prompt_a_reader_names_is_a_file(prompt):
-    assert list(REPO_ROOT.glob(prompt))
+    assert matching(prompt)
 
 
 def _package_texts(name: FrameworkName) -> set[str]:

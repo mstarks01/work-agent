@@ -104,7 +104,14 @@ from analysis_service.token_caps import (
     prompt_key,
 )
 from evals.harness.exemplar_verbs import _JSON_BLOCK, proposal_type
-from tests.source_tree import MODEL_TEXT, REPO_ROOT, source_files, without
+from tests.source_tree import (
+    MODEL_TEXT,
+    REPO_ROOT,
+    held_files,
+    prompt_files,
+    source_files,
+    without,
+)
 
 pytestmark = pytest.mark.lint
 
@@ -449,7 +456,13 @@ def test_the_composed_compact_extract_prompt_is_the_body_plus_the_delta():
 def test_exemplar_files_match_the_packages_declared_lanes(framework):
     """The tree and the declaration are one list, for every package."""
     root = FRAMEWORKS_DIR / framework / "lanes"
-    lanes = sorted(path.name for path in root.iterdir())
+    lanes = sorted(
+        {
+            path.relative_to(root).parts[0]
+            for path in held_files(*MODEL_TEXT)
+            if path.is_relative_to(root)
+        }
+    )
 
     assert lanes == sorted(PACKAGES[framework].lanes)
     for lane in lanes:
@@ -718,11 +731,29 @@ def test_no_stray_prompt_files():
     assert set(loader.names()) == set(PROMPT_BODY_NAMES) | set(PROMPT_DELTA_NAMES)
 
 
+def test_no_prompt_file_writes_a_fence_around_a_placeholder():
+    """A fence written beside a ``{placeholder}`` is sized before the value
+    arrives, so a value that holds a fence of its own closes it early.
+    Interpolate the value on its own line and let
+    :func:`~analysis_service.sources.render_fenced` size the fence over it."""
+    offenders = [
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in prompt_files()
+        if re.search(
+            r"`{3,}\s*\n\{[a-z_]+\}\s*\n`{3,}", path.read_text(encoding="utf-8")
+        )
+    ]
+    assert not offenders, (
+        f"{offenders} fence a placeholder in the file. Interpolate the value"
+        " on its own line and let render_fenced size the fence over it."
+    )
+
+
 def test_no_non_markdown_files_under_prompts():
     stray = [
         path.relative_to(PROMPTS_DIR).as_posix()
-        for path in PROMPTS_DIR.rglob("*")
-        if path.is_file() and path.suffix != ".md"
+        for path in held_files(*MODEL_TEXT)
+        if path.is_relative_to(PROMPTS_DIR) and path.suffix != ".md"
     ]
     assert not stray
 
