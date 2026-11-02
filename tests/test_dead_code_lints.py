@@ -64,7 +64,14 @@ from pathlib import Path
 
 import pytest
 
-from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files
+from tests.source_tree import (
+    DEFINITIONS,
+    PYTHON,
+    REPO_ROOT,
+    TESTS,
+    parse,
+    source_files,
+)
 
 pytestmark = pytest.mark.lint
 
@@ -202,7 +209,6 @@ TEST_ONLY: dict[str, str] = {
     ),
 }
 
-_DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
 #: The assignment shapes a module-level constant takes, judged beside the
 #: definitions above. A constant is a fact like any other and needs a reader
@@ -237,7 +243,7 @@ def _definitions() -> dict[str, str]:
         if where.startswith(tuple(NAMED_BY_A_LIBRARY)):
             continue
         for node in parse(path).body:
-            if isinstance(node, _DEFINITIONS):
+            if isinstance(node, DEFINITIONS):
                 names = [node.name]
             elif isinstance(node, _ASSIGNMENTS):
                 names = _assigned_names(node)
@@ -333,7 +339,7 @@ def _names_read(tree: ast.AST, ignoring: frozenset[str] = frozenset()) -> set[st
     used: set[str] = set()
 
     def visit(node: ast.AST, hidden: frozenset[str]) -> None:
-        if isinstance(node, _DEFINITIONS) and node.name in ignoring:
+        if isinstance(node, DEFINITIONS) and node.name in ignoring:
             return
         if isinstance(node, _FUNCTIONS):
             for outer in (*node.decorator_list, node.args, node.returns):

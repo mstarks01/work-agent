@@ -254,7 +254,7 @@ _TYPE_TESTS: frozenset[Literal["isinstance", "issubclass"]] = frozenset(
 )
 
 
-def _constructs_nothing(tree: ast.Module) -> set[int]:
+def _reads_that_build_nothing(tree: ast.Module) -> set[int]:
     """The id of each node in ``tree`` that reads a class without building one:
     an annotation, the owner of an attribute, and an argument of a type test."""
     builds_nothing: set[int] = set()
@@ -299,7 +299,7 @@ def uses(modules: Mapping[str, ast.Module]) -> Uses:
                     for node in _own_nodes(cls)
                     if _builds_its_own_type(node)
                 )
-        builds_nothing = _constructs_nothing(tree)
+        builds_nothing = _reads_that_build_nothing(tree)
         for node in ast.walk(tree):
             if id(node) in called or not isinstance(node, ast.Name | ast.Attribute):
                 continue

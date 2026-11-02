@@ -188,6 +188,10 @@ def module_name(path: Path) -> str:
     return ".".join(parts)
 
 
+#: The statements that define a name.
+DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+
 def joined_runs(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
     """Consecutive numbered lines joined into one text, at its first line."""
     runs: list[tuple[int, str]] = []

@@ -23,7 +23,10 @@ through the imports of the claim's file; a bare name names a function of the
 claim's own file. So a guard is a site, never a bare name.
 
 The owner of a comment is the definition or the assignment that starts on the
-next statement, and otherwise the function or the class that holds it. The
+next statement, and otherwise the function or the class that holds it, and
+otherwise ``<module>``. The owner of a page-script comment is the name that the
+next lines declare. A site is Python, so a page-script claim passes only where
+it names a Python site in backticks. The
 owner of a docstring is the function or the class it documents, or the name it
 follows as an attribute docstring. A claim spans line breaks, so a claim
 wrapped across two lines is still found. "The one reader" followed by a verb in ``-ing`` describes a
@@ -47,6 +50,7 @@ from pathlib import Path
 import pytest
 
 from tests.source_tree import (
+    DEFINITIONS,
     PYTHON,
     REPO_ROOT,
     SHORTEST_REASON,
@@ -90,8 +94,9 @@ CLAIM = re.compile(
 #: without a leading ``~`` or trailing call parentheses.
 _TICKED = re.compile(r"`~?([\w.]*\w)(?:\(\))?`")
 
-#: The statements that define a name a test can require.
-_DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+#: The owner of a claim that no function or class holds, as the one-reader
+#: lints name the module level of a file.
+MODULE_OWNER = "<module>"
 
 #: How many lines after a page-script comment the lint reads for the name the
 #: comment is about: the line below the comment, and one more for a wrapped
@@ -117,14 +122,14 @@ UNGUARDED_CLAIMS: dict[Site, str] = dict.fromkeys(
         ("evals/harness/applicability.py", "applied_requirements"),
         ("evals/harness/audit.py", "held_out"),
         ("evals/harness/baseline.py", "declared_pins"),
-        ("evals/harness/flow_ids.py", "flow_ids"),
+        ("evals/harness/flow_ids.py", MODULE_OWNER),
         ("evals/harness/flow_ids.py", "rewrite_text"),
         ("evals/harness/instruments.py", "ModeRun"),
         ("evals/harness/ledger.py", "verdicts_for"),
         ("evals/harness/modes.py", "NAMED_TYPES"),
         ("evals/harness/modes.py", "PROJECTION_COMPARED"),
         ("evals/harness/modes.py", "reachable_controls"),
-        ("evals/harness/node_call.py", "node_call"),
+        ("evals/harness/node_call.py", MODULE_OWNER),
         ("evals/harness/provenance.py", "checkout_state"),
         ("evals/harness/reference.py", "stride_readings"),
         ("evals/harness/replay.py", "bind_assertions"),
@@ -139,7 +144,7 @@ UNGUARDED_CLAIMS: dict[Site, str] = dict.fromkeys(
         ("src/analysis_service/answer_sets.py", "within_held_limits"),
         ("src/analysis_service/answer_state.py", "passes_floor"),
         ("src/analysis_service/answer_state.py", "recommended"),
-        ("src/analysis_service/assertion_use.py", "assertion_use"),
+        ("src/analysis_service/assertion_use.py", MODULE_OWNER),
         ("src/analysis_service/assertions.py", "settled"),
         ("src/analysis_service/assertions.py", "_bounded"),
         ("src/analysis_service/assertions.py", "admissible"),
@@ -227,7 +232,7 @@ def _statements(tree: ast.Module) -> list[ast.stmt]:
 
 def _name_of(node: ast.stmt) -> str | None:
     """The name a definition or a one-name assignment binds."""
-    if isinstance(node, _DEFINITIONS):
+    if isinstance(node, DEFINITIONS):
         return node.name
     target = None
     if isinstance(node, ast.Assign) and len(node.targets) == 1:
@@ -242,10 +247,10 @@ def _holder(statements: list[ast.stmt], line: int, path: Path) -> str:
     holders = [
         node
         for node in statements
-        if isinstance(node, _DEFINITIONS)
+        if isinstance(node, DEFINITIONS)
         and node.lineno <= line <= (node.end_lineno or node.lineno)
     ]
-    return holders[-1].name if holders else path.stem
+    return holders[-1].name if holders else MODULE_OWNER
 
 
 def _python_claims(path: Path) -> Iterator[tuple[int, str]]:
@@ -285,7 +290,7 @@ def _script_claims(path: Path) -> Iterator[tuple[int, str]]:
                 for code in lines[end : end + _OWNER_REACH]
                 if (found := _JS_OWNER.search(code))
             ),
-            path.stem,
+            MODULE_OWNER,
         )
         for line in _matches(text, start):
             yield line, owner
@@ -380,7 +385,7 @@ def guarded_sites() -> frozenset[Site]:
     for path in FILES:
         if path.suffix == ".py":
             for node in ast.walk(parse(path)):
-                if isinstance(node, _DEFINITIONS):
+                if isinstance(node, DEFINITIONS):
                     place = path.relative_to(REPO_ROOT).as_posix()
                     defined.setdefault(node.name, []).append(place)
     exempt = {site for row in ONE_READERS.values() for site in row.others}
