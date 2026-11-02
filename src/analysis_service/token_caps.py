@@ -185,13 +185,17 @@ TOKEN_CAPS: dict[str, int] = {
     # sentence would prove the control, so such a question routes to a
     # request and not to `config`. "Rule on every requirement at or below the
     # level" yields to the scope line's own list of units code ruled out.
-    f"package/{OUTPUT_DOC}": 1400,
+    # STRIDE's output contract allows two drafts at one verb and place where
+    # each fails its own control (ADR 0060).
+    f"package/{OUTPUT_DOC}": 1600,
     f"package/{SEVERITY_RUBRIC_DOC}": 900,
     "package/lane_skill": 3600,
-    # Four spoofing exemplars (#1295). One presents a held credential and
+    # Five spoofing exemplars (#1295). One presents a held credential and
     # carries ``use-credential``, as ``output.md`` files it; one poses as a
-    # caller without a credential, so the lane demonstrates both verbs.
-    "package/lane_exemplars": 2000,
+    # caller without a credential, so the lane demonstrates both verbs. A
+    # fifth shares the fourth's verb and place and fails another control, and
+    # its section names a near-duplicate that stays one draft (ADR 0060).
+    "package/lane_exemplars": 2600,
     # One instruction a lane reads last, in its user turn rather than its
     # instruction, so COMPOSED_ANALYZE_CAP does not count it (ADR 0030).
     "package/lane_closing": 120,
