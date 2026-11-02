@@ -294,7 +294,11 @@ class TestTheFirstRunMigration:
                 RevisionNotHeld,
                 "revision r9999",
             ),
-            ("ALTER TABLE jobs DROP COLUMN carried_renames", StoreConfigError, "differs"),
+            (
+                "ALTER TABLE jobs DROP COLUMN carried_renames",
+                StoreConfigError,
+                "differs",
+            ),
         ],
         ids=["a revision the tree does not hold", "a schema difference"],
     )

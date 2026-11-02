@@ -26,11 +26,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from analysis_service.mermaid import model_mermaid
+from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.reference import (
-    ENTRY_ERRORS,
     development_cases,
     load_corpus,
-    refuse_entry,
 )
 
 EVALS = Path(__file__).resolve().parent

@@ -344,12 +344,13 @@ def split_references(
     return positives, negatives
 
 
-def applies(disposition: str) -> bool:
+def applies(disposition: str | None) -> bool:
     """Whether a record with ``disposition`` expects its requirement to apply.
 
     **The one reader of an expected requirement.** A record labelled
     ``not-applicable`` says the requirement does *not* apply, so it belongs in
-    no expected set: a run that excludes it is right. The split above and the
+    no expected set: a run that excludes it is right. A record with no
+    disposition expects its requirement to apply. The split above and the
     disposition tables read it.
     """
     return disposition != "not-applicable"
@@ -741,10 +742,7 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
     false_confirmed = sum(len(score.false_confirmed) for score in scores)
     wrong_kind = sum(len(score.wrong_kind) for score in scores)
     applicable = sum(
-        1
-        for score in scores
-        for entry in score.judged
-        if applies(entry.expected)
+        1 for score in scores for entry in score.judged if applies(entry.expected)
     )
     false_not_applicable = sum(len(score.false_not_applicable) for score in scores)
     return {

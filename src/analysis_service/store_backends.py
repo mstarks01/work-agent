@@ -14,8 +14,8 @@ import os
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
-from functools import partial
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from typing import Literal, get_args
 
 from analysis_service.jobs import DeleteRefusal, InMemoryJobStore, JobStore

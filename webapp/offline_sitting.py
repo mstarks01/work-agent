@@ -59,12 +59,11 @@ from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
+from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.envelope import VERSION, stamp
 from evals.harness.reference import (
     ANONYMOUS,
-    ENTRY_ERRORS,
     is_submitted_for,
-    refuse_entry,
 )
 from webapp.page import WORKSPACE_STYLE, client_script, script_json
 

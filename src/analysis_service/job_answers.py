@@ -580,9 +580,7 @@ class JobAnswers:
         hears about the limit; both answers refuse it, and neither runs a
         model.
         """
-        selection = resolve_selection(
-            self.carried_frameworks, submission.frameworks
-        )
+        selection = resolve_selection(self.carried_frameworks, submission.frameworks)
         if submission.links and not self.carries_catalog:
             raise NoCatalog()
         sources = list(submission.sources)

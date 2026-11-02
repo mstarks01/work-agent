@@ -79,6 +79,7 @@ from evals import verify_corpus
 from evals.harness import baseline, bundle
 from evals.harness import queue as review_queue
 from evals.harness.artifact import ProvenanceError, load_artifact
+from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.fingerprint import FingerprintError, identifier_of, lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
@@ -95,10 +96,8 @@ from evals.harness.ledger import (
 )
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import (
-    ENTRY_ERRORS,
     flows_by_case,
     load_corpus,
-    refuse_entry,
 )
 from webapp.page import (
     LOOPBACK_HOSTS,

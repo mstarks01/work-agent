@@ -62,7 +62,7 @@ SECRET_TAGS = frozenset({"credentials", "secrets"})
 
 
 @dataclass(frozen=True)
-class _Elements:
+class _ModelIndex:
     """What the rows read off one model."""
 
     flows: tuple[DataFlow, ...]
@@ -76,7 +76,7 @@ class _Elements:
     assumed: frozenset[tuple[str, str]]
 
     @classmethod
-    def of(cls, model: SystemModel) -> _Elements:
+    def of(cls, model: SystemModel) -> _ModelIndex:
         processes = tuple(model.processes)
         stores = tuple(model.data_stores)
         return cls(
@@ -97,84 +97,84 @@ class _Elements:
         return frozenset({flow.source, flow.destination})
 
 
-def _tls(elements: _Elements) -> Iterator[DataFlow]:
+def _tls(index: _ModelIndex) -> Iterator[DataFlow]:
     """Stated TLS-family flows with one end that is the application's own."""
-    for flow in elements.stated:
-        if states_inherently(flow, TLS_FAMILY) and elements.ends(flow) & elements.own:
+    for flow in index.stated:
+        if states_inherently(flow, TLS_FAMILY) and index.ends(flow) & index.own:
             yield flow
 
 
-def _tls_client(elements: _Elements) -> Iterator[DataFlow]:
-    return (flow for flow in _tls(elements) if flow.source in elements.process_ids)
+def _tls_client(index: _ModelIndex) -> Iterator[DataFlow]:
+    return (flow for flow in _tls(index) if flow.source in index.process_ids)
 
 
 def _internal(
-    elements: _Elements, states: Callable[[DataFlow], bool]
+    index: _ModelIndex, states: Callable[[DataFlow], bool]
 ) -> Iterator[DataFlow]:
     """Stated flows between two of the application's own elements, where
     ``states`` holds of the flow's protocol."""
-    for flow in elements.stated:
-        if elements.ends(flow) <= elements.own and states(flow):
+    for flow in index.stated:
+        if index.ends(flow) <= index.own and states(flow):
             yield flow
 
 
-def _internal_tls(elements: _Elements) -> Iterator[DataFlow]:
-    return _internal(elements, lambda flow: states_inherently(flow, TLS_FAMILY))
+def _internal_tls(index: _ModelIndex) -> Iterator[DataFlow]:
+    return _internal(index, lambda flow: states_inherently(flow, TLS_FAMILY))
 
 
-def _internal_http(elements: _Elements) -> Iterator[DataFlow]:
-    return _internal(elements, lambda flow: states_protocol(flow, HTTP_FAMILY))
+def _internal_http(index: _ModelIndex) -> Iterator[DataFlow]:
+    return _internal(index, lambda flow: states_protocol(flow, HTTP_FAMILY))
 
 
-def _internal_service(elements: _Elements) -> Iterator[DataFlow]:
+def _internal_service(index: _ModelIndex) -> Iterator[DataFlow]:
     """A process and a data store that talk over a TLS-family or HTTP-family protocol."""
     network = (*TLS_FAMILY, *HTTP_FAMILY)
-    for flow in _internal(elements, lambda flow: states_protocol(flow, network)):
-        ends = elements.ends(flow)
-        if ends & elements.process_ids and ends & elements.store_ids:
+    for flow in _internal(index, lambda flow: states_protocol(flow, network)):
+        ends = index.ends(flow)
+        if ends & index.process_ids and ends & index.store_ids:
             yield flow
 
 
-def _to_system(elements: _Elements) -> Iterator[DataFlow]:
-    for flow in elements.flows:
-        if flow.source in elements.process_ids and flow.destination in elements.systems:
+def _to_system(index: _ModelIndex) -> Iterator[DataFlow]:
+    for flow in index.flows:
+        if flow.source in index.process_ids and flow.destination in index.systems:
             yield flow
 
 
 def _named(
-    names: tuple[str, ...], ends: Callable[[_Elements, DataFlow], bool]
-) -> Callable[[_Elements], Iterator[DataFlow]]:
+    names: tuple[str, ...], ends: Callable[[_ModelIndex, DataFlow], bool]
+) -> Callable[[_ModelIndex], Iterator[DataFlow]]:
     """Stated flows that name one of ``names``, where ``ends`` holds."""
 
-    def proof(elements: _Elements) -> Iterator[DataFlow]:
-        for flow in elements.stated:
-            if states_protocol(flow, names) and ends(elements, flow):
+    def proof(index: _ModelIndex) -> Iterator[DataFlow]:
+        for flow in index.stated:
+            if states_protocol(flow, names) and ends(index, flow):
                 yield flow
 
     return proof
 
 
-def _own_end(elements: _Elements, flow: DataFlow) -> bool:
-    return bool(elements.ends(flow) & elements.own)
+def _own_end(index: _ModelIndex, flow: DataFlow) -> bool:
+    return bool(index.ends(flow) & index.own)
 
 
-def _sensitive_own_end(elements: _Elements, flow: DataFlow) -> bool:
-    return _own_end(elements, flow) and bool(set(flow.assets) & SENSITIVE_TAGS)
+def _sensitive_own_end(index: _ModelIndex, flow: DataFlow) -> bool:
+    return _own_end(index, flow) and bool(set(flow.assets) & SENSITIVE_TAGS)
 
 
-def _process_end(elements: _Elements, flow: DataFlow) -> bool:
-    return bool(elements.ends(flow) & elements.process_ids)
+def _process_end(index: _ModelIndex, flow: DataFlow) -> bool:
+    return bool(index.ends(flow) & index.process_ids)
 
 
-def _process_destination(elements: _Elements, flow: DataFlow) -> bool:
-    return flow.destination in elements.process_ids
+def _process_destination(index: _ModelIndex, flow: DataFlow) -> bool:
+    return flow.destination in index.process_ids
 
 
-def _tagged(tags: frozenset[str]) -> Callable[[_Elements], Iterator[Element]]:
+def _tagged(tags: frozenset[str]) -> Callable[[_ModelIndex], Iterator[Element]]:
     """The processes and data stores tagged with one of ``tags``."""
 
-    def proof(elements: _Elements) -> Iterator[Element]:
-        owned: tuple[Process | DataStore, ...] = (*elements.processes, *elements.stores)
+    def proof(index: _ModelIndex) -> Iterator[Element]:
+        owned: tuple[Process | DataStore, ...] = (*index.processes, *index.stores)
         for element in owned:
             if set(element.assets) & tags:
                 yield element
@@ -182,16 +182,16 @@ def _tagged(tags: frozenset[str]) -> Callable[[_Elements], Iterator[Element]]:
     return proof
 
 
-def _web_on_internet(elements: _Elements) -> Iterator[Process]:
-    for process in elements.processes:
+def _web_on_internet(index: _ModelIndex) -> Iterator[Process]:
+    for process in index.processes:
         if process.exposure == "internet-facing" and process.interface_kind == "web":
             yield process
 
 
-def _encrypted_store(elements: _Elements) -> Iterator[DataStore]:
+def _encrypted_store(index: _ModelIndex) -> Iterator[DataStore]:
     """Data stores whose encryption at rest is stated, and not assumed."""
-    for store in elements.stores:
-        assumed = (store.id, "encryption_at_rest") in elements.assumed
+    for store in index.stores:
+        assumed = (store.id, "encryption_at_rest") in index.assumed
         if not assumed and control_state(store.encryption_at_rest) == "stated":
             yield store
 
@@ -202,7 +202,7 @@ class FieldCapability:
 
     capability: str
     #: The elements whose fields prove it, in the model's order.
-    proof: Callable[[_Elements], Iterator[Element]]
+    proof: Callable[[_ModelIndex], Iterator[Element]]
     #: Why the fields prove it, in our words.
     basis: str
 
@@ -312,13 +312,13 @@ def with_field_capabilities(model: SystemModel) -> SystemModel:
         for statement in model.capabilities
         if statement.origin != "field"
     }
-    elements = _Elements.of(model)
+    index = _ModelIndex.of(model)
     proven = []
     for row in FIELD_CAPABILITIES:
         if row.capability in named:
             continue
         cited = next(
-            (e for e in row.proof(elements) if e.source_excerpt and e.source_label),
+            (e for e in row.proof(index) if e.source_excerpt and e.source_label),
             None,
         )
         if cited is None:

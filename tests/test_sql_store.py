@@ -1094,7 +1094,9 @@ class TestAStoreFailureAsARunStartsOrEnds:
         assert "running" not in statuses(stored)
 
     def test_a_report_put_that_fails(self, env):
-        store = SqlJobStore(engine_for(env), ReportPutFails(env), migrator="the migration step")
+        store = SqlJobStore(
+            engine_for(env), ReportPutFails(env), migrator="the migration step"
+        )
         runner = CountingRunner()
         stored = executed(store, runner)
         assert runner.runs == 1
@@ -1128,7 +1130,9 @@ class TestAStoreFailureAsARunStartsOrEnds:
         # commit on a loaded runner; only the hanging put reaches it.
         monkeypatch.setattr(jobs_module, "STORE_TIMEOUT_SECONDS", 1.0)
         store = SqlJobStore(
-            engine_for(env), ReportPutFails(env, hang=True), migrator="the migration step"
+            engine_for(env),
+            ReportPutFails(env, hang=True),
+            migrator="the migration step",
         )
         stored = executed(store, CountingRunner())
         assert stored.status == "failed"

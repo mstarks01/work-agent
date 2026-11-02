@@ -1427,9 +1427,7 @@ def create_app(
     except SettingsFileError as exc:
         logger.error("settings.env was refused at startup: %s", exc)
         env = process_env
-        startup = Startup(
-            settings=None, carried_frameworks=(), tiers=None, error=exc
-        )
+        startup = Startup(settings=None, carried_frameworks=(), tiers=None, error=exc)
     if workspace is None:
         store = build_app_store(env)
         logger.info("job store: %s", type(store).__name__)

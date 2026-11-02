@@ -117,10 +117,10 @@ def test_an_entry_point_refusal_has_one_printer():
     load. Each entry point that loads the corpus catches ``ENTRY_ERRORS`` and
     returns it, so the pair of refusals is written once."""
     assert _sites(lambda node: _calls(node, "corpus_refusal")) == [
-        ("evals/harness/reference.py", "refuse_entry")
+        ("evals/harness/entry_refusal.py", "refuse_entry")
     ]
     assert _sites(lambda node: _calls(node, "config_refusal")) == sorted(
-        [("evals/harness/reference.py", "refuse_entry"), *CONFIG_REFUSERS]
+        [("evals/harness/entry_refusal.py", "refuse_entry"), *CONFIG_REFUSERS]
     )
 
 
@@ -2085,9 +2085,11 @@ ONE_READERS: dict[str, _OneReader] = {
         "",
     ),
     "the object credential mode": _OneReader(
-        lambda node: _calls(node, "closed_setting")
-        and len(node.args) == 3
-        and _loads(node.args[1], "OBJECT_CREDENTIALS_VAR"),
+        lambda node: (
+            _calls(node, "closed_setting")
+            and len(node.args) == 3
+            and _loads(node.args[1], "OBJECT_CREDENTIALS_VAR")
+        ),
         ("src/analysis_service/objects.py", "_named_mode"),
         {},
         "",
