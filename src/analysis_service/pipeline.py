@@ -15,8 +15,8 @@ last predecessor finished — the point the graph could have started it — to t
 moment the executor observed its own output.
 
 The submitted sources are untrusted text (OWASP LLM01). This module never
-renders them: it hands the job's sources to the executor, which is the single
-place a job becomes prompt bytes, and takes back the digest that ties the
+renders them: it hands the job's sources to the executor, which turns a job
+into prompt bytes, and takes back the digest that ties the
 report to what was submitted.
 
 Which config this runner is built from is not this module's business: see

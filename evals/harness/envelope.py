@@ -63,8 +63,7 @@ VERSION = 1
 MAX_LINE = 500
 MAX_LINES = 200
 
-#: The notes field, which is the one place a reader writes prose rather than a
-#: line. Every one of these values is written into a document that a pull
+#: The notes field, where a reader writes prose rather than a line. Every one of these values is written into a document that a pull
 #: request then carries, so the ceiling is on what merges, not on what parses.
 MAX_NOTES = 20_000
 

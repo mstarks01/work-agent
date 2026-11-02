@@ -164,7 +164,9 @@ class ObjectStore(Protocol):
     def list(self) -> AsyncIterator[tuple[str, datetime]]:
         """Each key in the store, with the time of its last write in UTC.
 
-        The orphan sweep is the only reader. A key can have any shape, so the
+        The orphan sweep,
+        :meth:`~analysis_service.sql_store.SqlJobStore.sweep_orphans`, is the
+        only reader. A key can have any shape, so the
         sweep checks each one with :func:`key_parts`.
         """
         ...

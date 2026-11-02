@@ -533,7 +533,7 @@ class DataFlow(_Element):
     #: it stays out of :data:`~analysis_service.analysis.CONTROL_ATTRIBUTES` and
     #: an ``unknown`` here is never counted as an unstated control.
     #:
-    #: **The default is the one place a default is honest.** Every other
+    #: **This default is honest.** Every other
     #: attribute is required, so an extraction that omits one fails rather than
     #: reading as silence. This one carries ``unknown`` because a report written
     #: before the field existed has to keep loading — every artifact under
@@ -826,7 +826,7 @@ class BoundaryCrossing(BaseModel):
     source_zone: str
     destination_zone: str
     #: False when either zone is :data:`UNKNOWN`. Read it rather than comparing
-    #: the zones again, so the three outcomes have one reader.
+    #: the zones again.
     #: :meth:`_decide` writes it from the zones on each load and each
     #: construction, and refuses a stated value that disagrees. So no writer
     #: passes it, and the default only keeps it out of the constructor's

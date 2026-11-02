@@ -1852,6 +1852,33 @@ def _digests(node: ast.AST, read: str) -> bool:
     return _calls(node, "sha256") and bool(node.args) and _calls(node.args[0], read)
 
 
+def _digests_a_queue_claim(node: ast.AST) -> bool:
+    """A call of ``digests.structural`` or ``digests.prose``."""
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in {"structural", "prose"}
+        and _is_name(node.func.value, "digests")
+    )
+
+
+def _lists_a_store(node: ast.AST) -> bool:
+    """A ``.list()`` call with no argument: the keys of an object store."""
+    return (
+        isinstance(node, ast.Call)
+        and _loads_attribute(node.func, "list")
+        and not node.args
+        and not node.keywords
+    )
+
+
+def _reads_the_carried_variable(node: ast.AST) -> bool:
+    """A read of ``CARRIED_VAR`` from a mapping, by ``get`` or by subscript."""
+    if isinstance(node, ast.Subscript):
+        return _loads(node.slice, "CARRIED_VAR")
+    return _calls(node, "get") and any(_loads(arg, "CARRIED_VAR") for arg in node.args)
+
+
 @dataclasses.dataclass(frozen=True)
 class _OneReader:
     """A rule that one function reads.
@@ -2456,6 +2483,45 @@ ONE_READERS: dict[str, _OneReader] = {
             ),
         },
         "",
+    ),
+    "what a queue item shows": _OneReader(
+        lambda node: _calls(node, "Finding"),
+        ("evals/harness/queue.py", "from_claim"),
+        {},
+        "evals/",
+    ),
+    "the digests a queue item carries": _OneReader(
+        _digests_a_queue_claim, ("evals/harness/queue.py", "from_claim"), {}, ""
+    ),
+    "the keys of an object store": _OneReader(
+        _lists_a_store,
+        ("src/analysis_service/sql_store.py", "sweep_orphans"),
+        {},
+        "",
+    ),
+    "the input bounds an eval run reads from the environment": _OneReader(
+        lambda node: _calls(node, "load_resilience"),
+        ("evals/harness/reference.py", "source_limits"),
+        {},
+        "evals/",
+    ),
+    "the carried frameworks variable": _OneReader(
+        _reads_the_carried_variable,
+        ("src/analysis_service/framework_config.py", "load_frameworks"),
+        {},
+        "",
+    ),
+    "the capabilities the sources state": _OneReader(
+        lambda node: _calls(node, "with_stated_capabilities"),
+        ("src/analysis_service/graph.py", "stated"),
+        {},
+        "",
+    ),
+    "the render of a job's sources": _OneReader(
+        lambda node: _calls(node, "render_sources"),
+        ("src/analysis_service/execution.py", "seed_state"),
+        {},
+        "src/",
     ),
 }
 

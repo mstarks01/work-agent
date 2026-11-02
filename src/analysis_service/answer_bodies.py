@@ -4,7 +4,7 @@
 first-run app's ``/answer``, ``/amend`` and ``/correct``, each take a JSON body.
 Both drivers hand the parsed body to one of :func:`read_answers`,
 :func:`read_amendment` and :func:`read_corrections`, and get back a typed
-value or a :class:`BodyRefused`. So one site applies the rules a body meets:
+value or a :class:`BodyRefused`. So this module applies the rules a body meets:
 the keys it may carry, the shape and bound of each field, and the strictness
 of ``save`` and ``revision``. Each driver only maps a refusal to its own
 transport: the ``/v1`` routes to a ``422`` problem that lists each place, the

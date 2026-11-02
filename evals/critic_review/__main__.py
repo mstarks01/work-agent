@@ -70,8 +70,7 @@ def _critic_node(framework: FrameworkName) -> str:
     """This package's critic node, as the *graph* names it.
 
     :meth:`~analysis_service.deployment.Deployment.tier_of` takes this spelling
-    and is the one place the walk to a tier is written — graph node to
-    canonical tier node to tier. The tiers file spells the same node
+    and walks it to a tier — graph node to canonical tier node to tier. The tiers file spells the same node
     ``critic/<framework>``, so a caller that asked
     ``tiers.resolve_tier`` with this name is a second reader of that walk, and
     a wrong one.

@@ -518,7 +518,7 @@ class ProviderFailure:
 def classify(exc: BaseException) -> ProviderFailure:
     """One provider failure as a value, read off the exception exactly once.
 
-    The single place this module turns a third party's object into facts. Every
+    Here this module turns a third party's object into facts. Every
     other reader takes the :class:`ProviderFailure`, so each rule keeps its own
     reader, and a caller on the far side of a process
     boundary gets the same answer without the object.
@@ -537,8 +537,8 @@ def classify(exc: BaseException) -> ProviderFailure:
 def _kind_of(exc: BaseException, retryable: bool) -> FailureKind:
     """Name what this failure was, having already decided whether to retry it.
 
-    Takes ``retryable`` rather than asking again: the decision has one reader
-    and this is a label on its answer. A 429 splits on the same dimension
+    Takes ``retryable`` rather than asking again: this is a label on the
+    answer :func:`classify` already decided. A 429 splits on the same dimension
     :data:`_RATE_LIMIT_CLEARS_WITH_TIME` reads — a window that reopens is a
     throttle, a cap that does not is a spent quota — so the two meanings of one
     status code stay distinguishable in a record.

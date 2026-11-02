@@ -17,8 +17,7 @@ whole-set checks, snapping references, dropping duplicate IDs, resolving and
 bounding element references and verifying quotes;
 a draft on a unit the package's own rules ruled out is refused; and every mark
 is narrowed once to the drafts that survived. Each pass marks what it sees and
-cannot know what a later pass drops, so the narrowing is the last step and
-happens nowhere else.
+cannot know what a later pass drops, so the narrowing is the last step.
 
 **One package per call.** Two frameworks' drafts never meet here: they are
 ruled by different critics against different questions, and a duplicate across
@@ -167,8 +166,8 @@ def fan_in(
     #
     # It lives here rather than on the field so that no model-facing schema caps
     # a root-level array of objects, which at least one vendor's structured
-    # output refuses outright (#942), and so that the bound has one reader for
-    # every framework instead of a line each package writes.
+    # output refuses outright (#942), and so that this bound serves every
+    # framework instead of a line each package writes.
     over = {
         lane: len(batch.claims) + len(batch.invalid)
         for lane, batch in batches.items()

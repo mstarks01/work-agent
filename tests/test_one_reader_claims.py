@@ -1,10 +1,13 @@
 """Each comment or docstring that claims a rule has one reader names its guard.
 
 A claim is a comment or a docstring in :data:`~tests.source_tree.PYTHON`, or in
-a page script there, that says "the one reader", "one reader of", "the only
-place" or "the single source". A claim is a promise that no second site
-applies the rule, and only a lint keeps that promise as the code moves. So the
-claim must name a site that a lint holds:
+a page script there, that says a rule has one reader: "the one reader", "one
+reader of", "its one reader", "the only reader", "the single reader", "has one
+reader", "no second reader", "the only place", "the one place", "the single
+place", "one site", "nowhere else", "the single source" or "single source of
+truth". A claim is a promise that no second site applies the rule, and only a
+lint keeps that promise as the code moves. So the claim must name a site that
+a lint holds:
 
 - the reader of a row of :data:`~tests.test_one_reader_lints.ONE_READERS`;
 - a ``(path, function)`` site that an ``assert`` in a test of
@@ -32,7 +35,11 @@ follows as an attribute docstring. A claim spans line breaks, so a claim
 wrapped across two lines is still found. "The one reader" followed by a word
 in ``-ing`` describes a reader and claims nothing, and so does "a single
 source" or "no single source". The rule reads the word, so it also skips a
-noun such as "string".
+noun such as "string". "The single reader in that module" points at a reader
+in another file. "Names nowhere else" names no place. "The one place this goes
+wrong", "the one place that must not" and "the one place built to" say where
+a fault shows, what a place may not do, or what it is for; none of them says
+that a rule has one reader.
 
 :data:`UNGUARDED_CLAIMS` holds each claim that a ruling keeps without a guard.
 An entry that matches no unguarded claim fails, so it cannot outlive its claim.
@@ -86,8 +93,18 @@ FILES = without(source_files(*PYTHON, suffixes=(".py", ".js")), LEFT_OUT)
 CLAIM = re.compile(
     r"\bthe\s+one\s+reader\b(?!\s+\w+ing\b)"
     r"|\bone\s+reader\s+of\b"
+    r"|\b(?:its|their)\s+(?:one|only|sole|single)\s+reader\b"
+    r"|\bthe\s+(?:only|sole|single)\s+readers?\b(?!\s+in\s+(?:that|another)\b)"
+    r"|\bha(?:s|ve)\s+(?:only\s+)?(?:one|a\s+single)\s+reader\b"
+    r"|\bonly\s+one\s+reader\b"
+    r"|\bno\s+(?:other|second)\s+reader\b"
     r"|\bthe\s+only\s+places?\b"
-    r"|\bthe\s+single\s+source\b",
+    r"|\bthe\s+(?:one|single|sole)\s+places?\b"
+    r"(?!\s+(?:this\s+goes\s+wrong|that\s+must\s+not|built\s+to)\b)"
+    r"|\bone\s+site\b"
+    r"|(?<!\bnames\s)\bnowhere\s+else\b"
+    r"|\bthe\s+(?:single|sole)\s+source\b"
+    r"|\bsingle\s+source\s+of\s+truth\b",
     re.IGNORECASE,
 )
 
@@ -556,15 +573,68 @@ def test_the_claim_pattern_finds_a_claim_and_skips_a_description():
         "One reader of the file.",
         "the only place that correspondence lives",
         "Derived so the prefix stays the single source.",
+        "This loader is its one reader.",
+        "The orphan sweep is the only\n        reader.",
+        "The single reader of what a queue item shows.",
+        "the sole reader of the key",
+        "so the rule has one reader and a row over it",
+        "so the three outcomes have a single reader.",
+        "the decision has only one reader",
+        "the field has no second reader",
+        "this is the one place the inverse is written",
+        "the single\n    place a job becomes prompt bytes",
+        "The one site in the harness that reads the environment.",
+        "So one site applies the rules a body meets.",
+        "split here and judged nowhere\n    else.",
+        "The catalog is the sole source of truth for evidence.",
+        "the single source of truth",
     ]
     described = [
         "and no single source is at fault.",
         'a check that dropped a "not" would be the one reader lying to the rest.',
         "a single source of text",
+        "Where drafts live when a caller names nowhere else.",
+        "The second-opinion pass is the one place that must\nnot be told.",
+        "That means the one place this goes wrong is the place people try it.",
+        "it would kill the run at the one place built to report why it died.",
+        "is the defect the single reader in that module exists to prevent.",
+        "a single reader of the page",
+        "one reader asks",
     ]
 
     assert [bool(CLAIM.search(text)) for text in claimed] == [True] * len(claimed)
     assert [bool(CLAIM.search(text)) for text in described] == [False] * len(described)
+
+
+def test_a_planted_claim_in_each_new_word_fails(tmp_path):
+    """Positive control: a claim in each synonym, on an unheld function,
+    names no guard."""
+    words = [
+        "is its one reader",
+        "is the only reader",
+        "is the single reader",
+        "has one reader",
+        "has no second reader",
+        "is the one place it is read",
+        "is the single place it is read",
+        "is the one site that reads it",
+        "is read here and nowhere else",
+        "is the single source of truth",
+    ]
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "".join(
+            f'def unheld_{index}():\n    """This {words[index]}."""\n'
+            for index in range(len(words))
+        ),
+        encoding="utf-8",
+    )
+    found = _claims_in(probe, "src/analysis_service/elsewhere.py")
+
+    assert sorted(claim.owner for claim in found) == sorted(
+        f"unheld_{index}" for index in range(len(words))
+    )
+    assert not any(guarded(claim) for claim in found)
 
 
 def test_the_lint_reads_the_owner_and_the_named_symbol(tmp_path):

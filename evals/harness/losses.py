@@ -438,7 +438,7 @@ def attribute_case(
     by_id = {claim.id: claim for claim in produced}
     # The ledger's answer per unmatched claim, as the scorer recorded it. Read
     # rather than keyed again, for the reason ``misfiled`` above gives: the
-    # fingerprint rule has one reader, and a claim the scorer matched to a
+    # scorer applied the fingerprint rule, and a claim the scorer matched to a
     # reference of its own is absent here because nobody was asked about it.
     statuses = {threat.threat_id: threat.status for threat in score.unlisted}
     # Keyed by the title as the drop mark cut it, through the mark's own cut,

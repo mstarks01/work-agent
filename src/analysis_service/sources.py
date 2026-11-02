@@ -28,7 +28,7 @@ outside carries only this module's own bytes — an index, a count, and the
 register.
 
 The render is a pure function of the sources, called from the one place the
-graph is driven, so the service and the eval harness cannot show the same job to
+graph is driven, :func:`~analysis_service.execution.seed_state`, so the service and the eval harness cannot show the same job to
 a model differently.
 """
 

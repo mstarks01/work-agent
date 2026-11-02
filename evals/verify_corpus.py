@@ -718,8 +718,8 @@ def _check_case_metadata(case_dir: Path, meta: dict) -> Iterator[str]:
 def _check_aliases(case_dir: Path, meta: dict) -> Iterator[str]:
     """Every reviewed alias names a real element, keeps its type, and is sourced.
 
-    An alias credits an extraction that the strict reading marks wrong, so it
-    is the one place a name nobody wrote into the model can move a number.
+    An alias credits an extraction that the strict reading marks wrong, so
+    with it a name nobody wrote into the model can move a number.
     Each of these refuses a way it could do that dishonestly.
 
     The excerpt check is the load-bearing one: an alias is supported by the
