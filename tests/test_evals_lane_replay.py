@@ -264,7 +264,7 @@ def test_the_out_file_starts_with_the_record_of_the_lane_material(
     assert held["claims"] == []
     assert held["record"]["table"]["lane"] == "spoofing"
     digests = {one["path"]: one["sha256"] for one in held["record"]["inputs"]}
-    loaded = [
+    files = [
         loader.root / f"{name}.md"
         for loader in (PACKAGE_LOADER, PROMPT_LOADER)
         for name in loader.names()
@@ -272,11 +272,11 @@ def test_the_out_file_starts_with_the_record_of_the_lane_material(
     assert digests.keys() == {
         str(out),
         str(case_file(out, case.id, "lanes")),
-        *map(str, loaded),
+        *map(str, files),
     }
     assert all(
         digests[str(path)] == hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in loaded
+        for path in files
     )
 
 
