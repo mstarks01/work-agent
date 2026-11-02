@@ -15,19 +15,27 @@ read by hand into each row's outcome with ``run.py experiments --record``.
 import csv
 import json
 import random
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Literal
 
 HERE = Path(__file__).parent
 RUNS = HERE / "runs"
 SEED = 20261102
 
+#: The two checks the ballot holds: E2 (item 2) and E3 (item 4) of the audit.
+Check = Literal["item2", "item4"]
+
+#: The case 05 stores whose drafts E3 rules: the stores of references 6 and 7.
+TARGETS = frozenset({"store:worker-config", "store:web-application-config"})
+
 #: Each check's verdicts. A verdict outside its set is not a ruling.
-VERDICTS = {
+VERDICTS: Mapping[Check, tuple[str, ...]] = {
     "item4": ("same", "different", "unsure"),
     "item2": ("right", "wrong", "duplicate", "unsure"),
 }
 
-QUESTIONS = {
+QUESTIONS: Mapping[Check, str] = {
     "item4": (
         "Does the draft name an attacker who runs code in the process that reads"
         " this config store, and reads the credential through that process's own"
@@ -42,15 +50,25 @@ QUESTIONS = {
 }
 
 
-def drafts() -> list[tuple[str, str, dict]]:
-    rows = []
-    for path in sorted(RUNS.glob("item4-05-p*.json")):
-        for claim in json.loads(path.read_text())["claims"]:
-            if any("config" in ref for ref in claim["affected_element_ids"]):
-                rows.append(("item4", path.stem, claim))
-    for path in sorted(RUNS.glob("item2-*-p*.json")):
-        for claim in json.loads(path.read_text())["claims"]:
-            rows.append(("item2", path.stem, claim))
+def _runs(pattern: str) -> list[tuple[str, dict]]:
+    """Each run's name and output, in name order."""
+    return [
+        (path.stem, json.loads(path.read_text())) for path in sorted(RUNS.glob(pattern))
+    ]
+
+
+def drafts() -> list[tuple[Check, str, str, dict]]:
+    """Each ruled draft with its check, its run and its case, shuffled."""
+    rows: list[tuple[Check, str, str, dict]] = []
+    for run, output in _runs("item4-05-p*.json"):
+        case = output["record"]["table"]["case"]
+        for claim in output["claims"]:
+            if TARGETS & set(claim["affected_element_ids"]):
+                rows.append(("item4", run, case, claim))
+    for run, output in _runs("item2-*-p*.json"):
+        case = output["record"]["table"]["case"]
+        for claim in output["claims"]:
+            rows.append(("item2", run, case, claim))
     random.Random(SEED).shuffle(rows)
     return rows
 
@@ -76,18 +94,17 @@ def main() -> None:
                 "note",
             ]
         )
-        for n, (check, run, claim) in enumerate(rows, 1):
+        for n, (check, run, case, claim) in enumerate(rows, 1):
             writer.writerow(
                 [
                     n,
                     check,
-                    run.split("-")[1],
+                    case,
                     claim["title"],
                     claim["description"],
                     "; ".join(claim["affected_element_ids"]),
                     " | ".join(
-                        f"{m['summary']}: {m['detail']}"
-                        for m in claim.get("mitigations", [])
+                        f"{m['summary']}: {m['detail']}" for m in claim["mitigations"]
                     ),
                     QUESTIONS[check],
                     "/".join(VERDICTS[check]),
@@ -96,7 +113,7 @@ def main() -> None:
                     "",
                 ]
             )
-            key.append({"n": n, "run": run, "sequence": claim.get("sequence")})
+            key.append({"n": n, "run": run, "sequence": claim["sequence"]})
     (HERE / "ballot-key.json").write_text(json.dumps(key, indent=1) + "\n")
 
 

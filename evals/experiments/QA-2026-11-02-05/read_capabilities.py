@@ -1,75 +1,60 @@
-"""The capability reader's request as a job sends it, once on each named case.
+"""The capability reader's request, as a job sends it, once on each named case.
 
-A job sends the composed instruction, with ``{input_text}`` filled from state,
-as the system message, the rendered Sources as the user message, and the
-``CapabilityReading`` schema in ADK's own response format, at the base tier's
-output cap. This script sends the same request straight to litellm, without
-the ADK runner and without the deployment's structured-output fallback. It then
-runs the node's own check and the ASVS level 3 decisions of the result.
+The request is rebuilt with :func:`~analysis_service.node_requests.node_request`
+and sent with :func:`~evals.harness.node_call.node_call`, on the deployment's
+route, sampling and structured output for the ``capabilities`` node. In a job
+the node runs right after the validity gate, so its user turn is the gate's
+valid-route payload, ``VALID_TURN``; ``capture_turn.py`` records that turn from a
+real graph run. The output names the tier, its selection, its sampling, the
+pinned upstreams and the revision.
 
-Usage, under ``bash -l`` so the credential loads:
+Usage, under ``bash -l`` with ``ANALYSIS_TIERS_FILE`` set:
 
-    read_capabilities.py <out.json> <route> <upstream> <case dir> [<case dir> ...]
-
-The route and the upstream come from the arguments. QA-2026-11-02-05 passed the
-``capabilities`` node's tier from the deployment's tiers file:
-``openrouter/openai/gpt-5.6-luna`` and ``openai/flex``. The output cap is a copy
-of the base tier's value in ``config/sampling.toml`` on the day of the run.
+    read_capabilities.py <out.json> <case dir> [<case dir> ...]
 
 Each case directory holds ``source.md`` and ``model.json``. Each case is one
 paid call, and the charge is the one the provider reported.
 """
 
+import asyncio
 import json
-import os
 import sys
 from pathlib import Path
 
-from google.adk.models.lite_llm import _to_litellm_response_format
-
-from analysis_service import model_gate
+from analysis_service.capabilities import CAPABILITIES
 from analysis_service.capability_reader import (
     CapabilityReading,
     with_stated_capabilities,
 )
-from analysis_service.charges import reported_charge_of
+from analysis_service.deployment import Deployment
 from analysis_service.execution import seed_state
 from analysis_service.frameworks.asvs.applicability import applicability_for
-from analysis_service.graph import STATE_INPUT_TEXT, after_gate
+from analysis_service.graph import CAPABILITIES_NODE, after_gate
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.offline import refuse_live_inference
+from analysis_service.node_requests import node_request
 from analysis_service.prompts import compose_capabilities_prompt
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
-from analysis_service.vendors import CredentialMode, vendor_for_route
+from evals.harness.artifact import repo_commit
+from evals.harness.node_call import node_call
 
-#: The base tier's output cap in ``config/sampling.toml``.
-MAX_OUTPUT_TOKENS = 16384
+#: What the validity gate hands the next node on its valid route.
+VALID_TURN = {"issue_count": 0}
 MFA = "multi-factor-authentication"
+assert MFA in CAPABILITIES
 
 
-def read_case(case_dir: Path, route: str, upstream: str) -> dict:
+async def read_case(case_dir: Path, deployment: Deployment) -> dict:
     sources = [Source.description(case_dir.joinpath("source.md").read_text())]
-    rendered = seed_state(sources)[STATE_INPUT_TEXT]
-    instruction = compose_capabilities_prompt(MarkdownLoader(Path("prompts")))
-    vendor = vendor_for_route(route)
-    key = vendor.credential_kwargs(os.environ, CredentialMode.API_KEY)["api_key"]
-    refuse_live_inference(route)
-    reply = model_gate._litellm.completion(
-        model=route,
-        api_key=key,
-        max_tokens=MAX_OUTPUT_TOKENS,
-        response_format=_to_litellm_response_format(CapabilityReading, route),
-        messages=[
-            {
-                "role": "system",
-                "content": instruction.replace("{input_text}", rendered),
-            },
-            {"role": "user", "content": rendered},
-        ],
-        **vendor.upstream_kwargs((upstream,)),
+    instruction, turn = await node_request(
+        compose_capabilities_prompt(MarkdownLoader(Path("prompts"))),
+        seed_state(sources),
+        VALID_TURN,
+        None,
     )
-    reading = CapabilityReading.model_validate_json(reply.choices[0].message.content)
+    spent: list[float | None] = []
+    call = node_call(deployment, CAPABILITIES_NODE, CapabilityReading, spent)
+    reading = CapabilityReading.model_validate_json(await call(instruction, turn))
     model = after_gate(
         SystemModel.model_validate_json(case_dir.joinpath("model.json").read_text())
     )
@@ -86,22 +71,28 @@ def read_case(case_dir: Path, route: str, upstream: str) -> dict:
             if statement.capability == MFA
         ],
         "V6.4.4": decisions["V6.4.4"].state,
-        "charge_usd": reported_charge_of(reply),
-        "usage": {
-            "prompt_tokens": reply.usage.prompt_tokens,
-            "completion_tokens": reply.usage.completion_tokens,
-        },
+        "charge_usd": spent[0] if spent else None,
     }
 
 
-def main(out: str, route: str, upstream: str, case_dirs: list[str]) -> None:
+def main(out: str, case_dirs: list[str]) -> None:
+    deployment = Deployment.from_env()
+    tier = deployment.tier_of(CAPABILITIES_NODE)
+    record = {
+        "node": CAPABILITIES_NODE,
+        "tier": tier,
+        "selection": deployment.tiers.tiers[tier].model_dump(mode="json"),
+        "sampling": deployment.sampling.for_tier(tier).model_dump(mode="json"),
+        "pinned_upstreams": list(deployment.tiers.pinned_upstreams()),
+        "commit": repo_commit().model_dump(),
+    }
     results = []
     for case_dir in case_dirs:
-        results.append(read_case(Path(case_dir), route, upstream))
+        results.append(asyncio.run(read_case(Path(case_dir), deployment)))
         Path(out).write_text(
-            json.dumps({"route": route, "results": results}, indent=1) + "\n"
+            json.dumps({"record": record, "results": results}, indent=1) + "\n"
         )
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:])
+    main(sys.argv[1], sys.argv[2:])

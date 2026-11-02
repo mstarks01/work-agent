@@ -148,11 +148,21 @@ DECLARED: dict[str, str] = {
         "This code is that framework's: it prints the matches `e8_count.py`"
         " counts, beside their drafts, through the same identity."
     ),
+    "evals/experiments/QA-2026-11-02-05/capture_turn.py": (
+        "This code is that framework's. It runs a job that reaches the capability"
+        " reader, and the graph puts the reader only in a job whose selection"
+        " reads capabilities: a package whose units carry an applicability"
+        " expression."
+    ),
     "evals/experiments/QA-2026-11-02-05/read_capabilities.py": (
-        "This code is that framework's. It reads ASVS level 3 decisions after"
-        " the capability reader, which exists only for a package whose units"
-        " carry an applicability expression. A package whose units carry none"
-        " reads no capability, so a stated capability settles nothing in it."
+        "This code is that framework's. It reads the decisions at the top band"
+        " of a package whose units carry an applicability expression, after the"
+        " capability reader. A package whose units carry none reads no"
+        " capability, so a stated capability settles nothing in it."
+    ),
+    "evals/experiments/QA-2026-11-02-05/read_capabilities_v1.py": (
+        "This code is that framework's: it reads the same decisions as"
+        " `read_capabilities.py`, through an earlier form of the request."
     ),
     "evals/experiments/QA-2026-11-02-03/trace_baselines.py": (
         "This code is that framework's. It traces two references through the"
