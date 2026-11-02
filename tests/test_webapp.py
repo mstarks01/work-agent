@@ -35,6 +35,7 @@ from analysis_service import (
     StubPipelineRunner,
 )
 from analysis_service.answer_shares import SharedAnswer
+from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.api import JOB_REFUSAL_STATUS, max_body_bytes
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import UNKNOWN_KEY_FIELDS
@@ -75,10 +76,13 @@ from tests.factories import (
 from webapp.main import (
     OPERATOR,
     PAGE_SOURCE_LABELS,
+    FileRefusal,
+    FilesLimits,
     Settings,
     Startup,
     Workspace,
     create_app,
+    file_refusals,
     render_report,
 )
 from webapp.settings_save import MAX_SAVE_BYTES
@@ -2616,6 +2620,39 @@ def test_no_page_script_words_a_refusal_the_server_words():
         in (PROJECT_ROOT / "webapp" / "static" / script).read_text(encoding="utf-8")
     ]
     assert not spelled
+
+
+def test_the_file_scripts_read_only_a_file_refusal():
+    """``text_file.js`` and ``files.js`` read each
+    :data:`~webapp.main.FileRefusal` that :func:`~webapp.main.file_refusals`
+    sends, and no other key. A key the server does not send shows nothing."""
+    read = {
+        key
+        for script in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
+        for key in re.findall(r"\brefusals\.(\w+)", page_javascript(script.name))
+    }
+    assert set(file_refusals(7, 7)) == set(get_args(FileRefusal))
+    assert read == set(get_args(FileRefusal))
+
+
+def test_the_files_page_reads_only_a_files_limit():
+    """``files.js`` reads each :class:`~webapp.main.FilesLimits` key and no
+    other. A key the server does not send reads as ``undefined``."""
+    read = set(re.findall(r"\blimits\.(\w+)", page_javascript("files.js")))
+    assert read == FilesLimits.__required_keys__
+
+
+def test_each_page_reads_only_an_answer_limit():
+    """A script reads only a key of
+    :data:`~analysis_service.answer_state.ANSWER_LIMITS`. A key the server does
+    not send reads as ``undefined``, and a cap of ``undefined`` caps nothing."""
+    read = {
+        key
+        for script in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
+        for key in re.findall(r"\bANSWER_LIMITS\.(\w+)", page_javascript(script.name))
+    }
+    assert read
+    assert read <= ANSWER_LIMITS.keys()
 
 
 def test_the_page_names_a_label_for_each_source_it_makes():

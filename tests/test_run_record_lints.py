@@ -61,6 +61,10 @@ UNRECORDED: dict[str, str] = {}
 
 WRITES = {"write_text", "write_bytes"}
 
+#: The calls that write the record: the record itself, and the record of a run
+#: that writes one of its outputs.
+RECORDERS = {"run_record", "run_record_for"}
+
 
 def _writes(call: ast.Call) -> bool:
     """Whether ``call`` writes a file: a path write, or an open to write."""
@@ -81,7 +85,7 @@ def _writes(call: ast.Call) -> bool:
 
 
 def _writers() -> dict[str, bool]:
-    """Every eval function that writes a file, and whether it calls the record."""
+    """Every eval function that writes a file, and whether it calls a recorder."""
     found: dict[str, bool] = {}
 
     def visit(node: ast.AST, prefix: str) -> None:
@@ -90,7 +94,7 @@ def _writers() -> dict[str, bool]:
                 inside = list(ast.walk(child))
                 if any(isinstance(n, ast.Call) and _writes(n) for n in inside):
                     found[prefix + child.name] = any(
-                        isinstance(n, ast.Name) and n.id == "run_record" for n in inside
+                        isinstance(n, ast.Name) and n.id in RECORDERS for n in inside
                     )
                 visit(child, f"{prefix}{child.name}.")
             elif isinstance(child, ast.ClassDef):
@@ -122,3 +126,20 @@ def test_every_exception_still_names_a_writer_with_no_record():
     spent = {name for name in NOT_A_MEASUREMENT | UNRECORDED if writers.get(name, True)}
     assert not spent, f"{sorted(spent)} write no file, or write the record"
     assert not set(NOT_A_MEASUREMENT) & set(UNRECORDED)
+
+
+def test_a_record_of_a_run_that_may_write_nothing_has_one_helper():
+    """``run_record_for`` is the one place a run with no output skips the record."""
+    sites = [
+        f"{path.relative_to(REPO_ROOT)}:{node.lineno}"
+        for path in without(source_files(*PYTHON), LEFT_OUT)
+        for node in ast.walk(parse(path))
+        if isinstance(node, ast.IfExp)
+        and any(
+            isinstance(branch, ast.Call)
+            and isinstance(branch.func, ast.Name)
+            and branch.func.id == "run_record"
+            for branch in (node.body, node.orelse)
+        )
+    ]
+    assert not sites, f"{sites} choose between None and run_record; call run_record_for"

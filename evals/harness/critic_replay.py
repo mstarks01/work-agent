@@ -65,7 +65,7 @@ from evals.harness.modes import EvalRunError
 from evals.harness.node_call import NodeCall, node_call
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, load_case, refuse_holdout
-from evals.harness.run_record import run_record
+from evals.harness.run_record import run_record_for
 
 
 @dataclass(frozen=True)
@@ -278,14 +278,11 @@ def command_critic_replay(args: argparse.Namespace) -> int:
         check_out(args.out, args.raw)
         artifact = load_artifact(args.artifact)
         archived = load(artifact, args.case, args.framework)
-        record = (
-            None
-            if args.out is None and args.raw is None
-            else run_record(
-                "critic-replay",
-                {"case": args.case, "framework": args.framework},
-                {path: {} for path in (artifact.path, *archived.files)},
-            )
+        record = run_record_for(
+            [args.out, args.raw],
+            "critic-replay",
+            {"case": args.case, "framework": args.framework},
+            {path: {} for path in (artifact.path, *archived.files)},
         )
     except (CorpusError, EvalRunError, ProvenanceError, FileNotFoundError) as error:
         print(error, file=sys.stderr)

@@ -243,7 +243,7 @@ def draft_root() -> Path:
     importing this module resolves no home directory and a test can pass a
     temporary one instead.
     """
-    return xdg_dir(os.environ, "XDG_STATE_HOME", ".local/state") / "sittings"
+    return xdg_dir(os.environ, "state") / "sittings"
 
 
 def draft_path(root: Path, login: str, case_id: str) -> Path:

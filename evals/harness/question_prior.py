@@ -159,14 +159,11 @@ def command_question_prior(args: argparse.Namespace) -> int:
         return 1
     table = dict(load_prior(args.out)) if args.out.is_file() else {}
     for name in PACKAGES:
-        table.setdefault(
-            name, PriorRow(record=None, runs=(), revision=None, cases=0, rates={})
-        )
+        table.setdefault(name, PriorRow(record=None, runs=(), cases=0, rates={}))
     counted = {case for case, _, _ in samples}
     table[args.framework] = PriorRow(
         record=record,
         runs=(str(args.artifact), *map(str, args.replay)),
-        revision=record["commit"],
         cases=len(counted),
         rates=count(samples),
     )
