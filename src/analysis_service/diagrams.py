@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from contextlib import suppress
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -39,8 +40,10 @@ __all__ = [
     "DiagramReading",
     "DiagramRefusal",
     "DiagramStructure",
+    "install_reader",
     "node_names",
     "read_diagram",
+    "reader_missing",
 ]
 
 #: The longest a reading may take, and the most memory Node may hold for it.
@@ -50,6 +53,9 @@ READ_MEMORY_MB = 256
 
 #: The exit code ``read.mjs`` gives when a package is missing.
 _MISSING_PACKAGE = 3
+
+#: The longest the install of the locked packages may take.
+INSTALL_TIMEOUT_SECONDS = 300
 
 #: What the ends of an edge say about its direction: ``forward`` from source
 #: to target, ``backward`` from target to source, ``both`` and ``none`` either.
@@ -145,7 +151,7 @@ def read_diagram(text: str) -> DiagramReading:
     from analysis_service.deployment import DEFAULT_DIAGRAM_READER_DIR
 
     script = DEFAULT_DIAGRAM_READER_DIR / "read.mjs"
-    install = f"npm ci --ignore-scripts --prefix {DEFAULT_DIAGRAM_READER_DIR}"
+    install = " ".join(_install_argv())
     try:
         done = subprocess.run(
             ["node", f"--max-old-space-size={READ_MEMORY_MB}", str(script)],
@@ -192,3 +198,32 @@ def reader_missing() -> str | None:
     except DiagramReaderMissing as missing:
         return str(missing)
     return None
+
+
+def _install_argv() -> list[str]:
+    """The install step of the reader's locked packages. ``--ignore-scripts``
+    runs no package's own install script."""
+    from analysis_service.deployment import DEFAULT_DIAGRAM_READER_DIR
+
+    return [
+        "npm",
+        "ci",
+        "--ignore-scripts",
+        "--prefix",
+        str(DEFAULT_DIAGRAM_READER_DIR),
+    ]
+
+
+def install_reader() -> None:
+    """Install the reader's locked packages (ADR 0122).
+
+    It does nothing where npm is missing, and it ignores a failed install,
+    because :func:`reader_missing` then names the step for a person to run.
+    """
+    with suppress(FileNotFoundError, subprocess.TimeoutExpired):
+        subprocess.run(
+            _install_argv(),
+            capture_output=True,
+            timeout=INSTALL_TIMEOUT_SECONDS,
+            check=False,
+        )

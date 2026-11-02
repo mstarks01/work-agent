@@ -17,6 +17,7 @@ from analysis_service.diagrams import (
     DiagramReaderMissing,
     DiagramRefusal,
     DiagramStructure,
+    install_reader,
     read_diagram,
     reader_missing,
 )
@@ -169,6 +170,29 @@ class TestTheReader:
 
     def test_the_startup_check_passes_where_the_reader_runs(self):
         assert reader_missing() is None
+
+    def test_the_install_runs_the_locked_install_without_scripts(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(
+            subprocess, "run", lambda argv, **kwargs: calls.append(argv)
+        )
+        install_reader()
+        assert calls == [
+            [
+                "npm",
+                "ci",
+                "--ignore-scripts",
+                "--prefix",
+                str(deployment.DEFAULT_DIAGRAM_READER_DIR),
+            ]
+        ]
+
+    def test_the_install_does_nothing_where_npm_is_missing(self, monkeypatch):
+        def no_npm(*args, **kwargs):
+            raise FileNotFoundError("npm")
+
+        monkeypatch.setattr(subprocess, "run", no_npm)
+        install_reader()
 
 
 DIAGRAM = Source(kind="diagram", label="Model", text="flowchart LR\n  a --> b\n")
