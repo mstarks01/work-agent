@@ -101,6 +101,28 @@ def test_each_store_choice_has_one_reader():
     ]
 
 
+#: Each entry point that prints a configuration refusal itself, beside
+#: ``refuse_entry``, with the reason: it loads no corpus.
+CONFIG_REFUSERS: dict[Site, str] = {
+    ("evals/critic_review/__main__.py", "main"): "it reads the tiers and no corpus",
+    ("src/analysis_service/migrations/__main__.py", "main"): (
+        "it reads the database settings and no corpus"
+    ),
+}
+
+
+def test_an_entry_point_refusal_has_one_printer():
+    """Only ``refuse_entry`` prints the refusal of a corpus that does not
+    load. Each entry point that loads the corpus catches ``ENTRY_ERRORS`` and
+    returns it, so the pair of refusals is written once."""
+    assert _sites(lambda node: _calls(node, "corpus_refusal")) == [
+        ("evals/harness/reference.py", "refuse_entry")
+    ]
+    assert _sites(lambda node: _calls(node, "config_refusal")) == sorted(
+        [("evals/harness/reference.py", "refuse_entry"), *CONFIG_REFUSERS]
+    )
+
+
 def _variable_definitions(path: Path) -> list[ast.expr]:
     """The value of each module-level ``*_VAR`` assignment in ``path``."""
     found = []

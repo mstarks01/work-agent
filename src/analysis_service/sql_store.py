@@ -949,6 +949,22 @@ def create_database(env: Mapping[str, str]) -> None:
     _database(url).create(url)
 
 
+def migrate_database(env: Mapping[str, str]) -> None:
+    """Migrate the database that the settings name to the latest revision:
+    the migration step.
+
+    It makes a missing database first. A database at a revision that the tree
+    does not hold raises :class:`RevisionNotHeld`, with the remedy of the
+    migration step. It runs event loops of its own, so call it where none
+    runs.
+    """
+    create_database(env)
+    current = asyncio.run(_current_revision(env))
+    if not migrations.holds(current):
+        raise _not_held(current, migrates=False)
+    migrations.upgrade(env)
+
+
 def migrate_first_run_database(env: Mapping[str, str]) -> None:
     """Migrate the database that the settings name to the latest revision,
     where its row sets ``first_run_migrates`` (ADR 0110).
@@ -959,9 +975,10 @@ def migrate_first_run_database(env: Mapping[str, str]) -> None:
     as the migration step does. A database at the latest revision, or at a
     revision that the tree does not hold, stays as it is, and the startup
     check refuses the second. A migration writes one log line that names the
-    two revisions. A database that cannot be read or migrated stops the
-    startup with a :class:`StoreConfigError`, which names no path. It runs
-    event loops of its own, so call it where none runs.
+    two revisions. A database whose revision cannot be read, or that cannot
+    be migrated, stops the startup with a :class:`StoreConfigError` that says
+    which, and names no path. It runs event loops of its own, so call it
+    where none runs.
     """
     url = database_url(env)
     database = _database(url)
@@ -971,8 +988,15 @@ def migrate_first_run_database(env: Mapping[str, str]) -> None:
     head = migrations.head()
     try:
         current = asyncio.run(_current_revision(env))
-        if current == head or not migrations.holds(current):
-            return
+    except SQLAlchemyError:
+        logger.exception("the first-run app could not read the job database")
+        raise StoreConfigError(
+            f"the database that {DATABASE_URL_VAR} names cannot be read;"
+            " the log says why"
+        ) from None
+    if current == head or not migrations.holds(current):
+        return
+    try:
         migrations.upgrade(env)
     except (SQLAlchemyError, CommandError):
         logger.exception("the first-run app could not migrate the job database")
@@ -1014,12 +1038,39 @@ def _revision(connection: Connection) -> str | None:
     return MigrationContext.configure(connection).get_current_revision()
 
 
-#: The remedy for a database that no migration can bring to the latest
-#: revision. It names no path, so the refusal that holds it names none.
-_REMAKE = (
-    "remove the database (for SQLite, delete its file; for PostgreSQL, drop the"
-    " database and create it again), then run python -m analysis_service.migrations"
-)
+def _remake(migrates: bool) -> str:
+    """The remedy for a database that no migration can bring to the latest
+    revision. ``migrates`` is whether the process that refuses the database
+    migrates it itself: the first-run app on SQLite (ADR 0110). Each other
+    process leaves the migration to the migration step. The remedy names no
+    path, so the refusal that holds it names none.
+    """
+    if migrates:
+        return (
+            "delete the database file, then start the app again: the app makes"
+            " a new database and migrates it"
+        )
+    return (
+        "remove the database (for SQLite, delete its file; for PostgreSQL, drop"
+        " the database and create it again), then run"
+        " python -m analysis_service.migrations"
+    )
+
+
+class RevisionNotHeld(StoreConfigError):
+    """A database at a revision that the tree does not hold, such as one that
+    a later build migrated. No migration of this build brings it to the
+    latest revision."""
+
+
+def _not_held(current: str | None, *, migrates: bool) -> RevisionNotHeld:
+    """**The one refusal of a revision that the tree does not hold**, with the
+    remedy of :func:`_remake`. The migration step and the startup check
+    raise it."""
+    return RevisionNotHeld(
+        f"the database schema is at revision {current}, which this build does"
+        f" not hold, so {_remake(migrates)}"
+    )
 
 
 def _schema_differences(connection: Connection) -> list[str]:
@@ -1101,15 +1152,27 @@ class SqlJobStore:
     #: The database and the object store keep each job through a restart.
     durable = True
 
-    def __init__(self, engine: AsyncEngine, objects: ObjectStore) -> None:
+    def __init__(
+        self, engine: AsyncEngine, objects: ObjectStore, *, migrates: bool
+    ) -> None:
+        """``migrates`` is whether this process migrates the database itself,
+        which decides the remedy that :meth:`startup_check` gives."""
         self._engine = engine
         self._objects = objects
+        self._migrates = migrates
         self._admission_lock = _database(engine.url).admission_lock
         self._owner_files_lock = _database(engine.url).owner_files_lock
 
     @classmethod
-    def from_env(cls, env: Mapping[str, str], objects: ObjectStore) -> SqlJobStore:
-        return cls(engine_for(env), objects)
+    def from_env(
+        cls, env: Mapping[str, str], objects: ObjectStore, *, first_run: bool
+    ) -> SqlJobStore:
+        """The store on the database that the settings name. ``first_run`` is
+        whether the first-run app builds it; that app migrates the database
+        where its row sets ``first_run_migrates``."""
+        engine = engine_for(env)
+        migrates = first_run and _database(engine.url).first_run_migrates
+        return cls(engine, objects, migrates=migrates)
 
     @asynccontextmanager
     async def _transaction(
@@ -1128,15 +1191,12 @@ class SqlJobStore:
         async with self._transaction() as connection:
             current = await connection.run_sync(_revision)
         head = migrations.head()
+        if not migrations.holds(current):
+            raise _not_held(current, migrates=self._migrates)
         if current != head:
-            remedy = (
-                "run python -m analysis_service.migrations first"
-                if migrations.holds(current)
-                else f"this build holds no revision {current}, so {_REMAKE}"
-            )
             raise StoreConfigError(
                 f"the database schema is at revision {current}, and this service"
-                f" needs {head}: {remedy}"
+                f" needs {head}: run python -m analysis_service.migrations first"
             )
         async with self._transaction() as connection:
             differences = await connection.run_sync(_schema_differences)
@@ -1147,7 +1207,8 @@ class SqlJobStore:
             raise StoreConfigError(
                 f"the database schema differs from the one this service needs"
                 f" ({'; '.join(differences)}): the database was made before a"
-                f" schema change, and a migration does not change it, so {_REMAKE}"
+                f" schema change, and a migration does not change it, so"
+                f" {_remake(self._migrates)}"
             )
         await self._objects.check()
 

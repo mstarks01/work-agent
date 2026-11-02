@@ -55,7 +55,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from analysis_service.errors import ConfigError, config_refusal
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
@@ -63,9 +62,9 @@ from evals.harness import submit as submit_spine
 from evals.harness.envelope import VERSION, stamp
 from evals.harness.reference import (
     ANONYMOUS,
-    CorpusError,
-    corpus_refusal,
+    ENTRY_ERRORS,
     is_submitted_for,
+    refuse_entry,
 )
 from webapp.page import WORKSPACE_STYLE, client_script, script_json
 
@@ -231,12 +230,8 @@ def main(argv: list[str] | None = None) -> int:
     # to fix, and it names the case rather than a pydantic frame.
     try:
         page = build(sittings.CORPUS_DIR, submitted_by, submitted_for)
-    except CorpusError as exc:
-        print(corpus_refusal(exc), file=sys.stderr)
-        return 1
-    except ConfigError as exc:
-        print(config_refusal(exc), file=sys.stderr)
-        return 1
+    except ENTRY_ERRORS as exc:
+        return refuse_entry(exc)
 
     out = Path(args.out)
     out.write_text(page, encoding="utf-8")
