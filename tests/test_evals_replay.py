@@ -897,7 +897,7 @@ class TestTheEndpointRidesWithTheFates:
         graded = self.graded(golden, reference, reference.entries)
         sweep = replay.SweepReplay(
             artifact="one.json",
-            arm=replay.arm_of(load_artifact(ARMS / "arm-A.json")),
+            arm=replay.arm_of(load_artifact(ARMS / "arm-A.json"), None),
             commit="0" * 40,
             clean=True,
             corpus_digest="",
@@ -1385,11 +1385,11 @@ class TestTheArchivedEmissionsReplay:
             "extraction" if loaded.mode == "extraction" else "assertions"
         }
         assert {f.name.split(".")[0] for f in files} <= set(loaded.cases)
-        replay.arm_of(loaded)
+        replay.arm_of(loaded, None)
 
     def test_every_extraction_emission_replays(self, corpus):
         sweeps = [
-            replay_artifact(path, corpus, CORPUS)
+            replay_artifact(path, corpus, CORPUS, None)
             for path in ARTIFACTS
             if load_artifact(path).mode == "extraction"
         ]
@@ -1422,7 +1422,7 @@ class TestTheArchivedEmissionsReplay:
     ):
         """Two sweeps on one tier table are two arms when the node ran on two tiers."""
         source = EMISSIONS / "20260914T201030Z-assert-model-benchmark" / "luna-r1.json"
-        luna = replay.arm_of(load_artifact(source))
+        luna = replay.arm_of(load_artifact(source), None)
         raw = json.loads(source.read_text("utf-8"))
         terra_model = "openrouter/openai/gpt-5.6-terra"
         for execution in raw["provenance"]["node_runs"]["assert"]:
@@ -1445,7 +1445,7 @@ class TestTheArchivedEmissionsReplay:
         moved = tmp_path / "terra-r1.json"
         moved.write_text(json.dumps(raw), "utf-8")
 
-        terra = replay.arm_of(load_artifact(moved))
+        terra = replay.arm_of(load_artifact(moved), None)
 
         assert luna.models == ("openrouter/openai/gpt-5.6-luna",)
         assert terra.models == ("openrouter/openai/gpt-5.6-terra",)
@@ -1478,7 +1478,7 @@ class TestTheArchivedEmissionsReplay:
 
     def test_one_sweep_has_no_spread(self, corpus):
         (sweep,) = [
-            replay_artifact(path, corpus, CORPUS)
+            replay_artifact(path, corpus, CORPUS, None)
             for path in ARTIFACTS
             if path.name.endswith("preflight-01.json")
         ]
@@ -1519,7 +1519,7 @@ class TestTheArchivedEmissionsReplay:
         )
 
         with pytest.raises(EvalRunError, match="analysis sweep keeps no emission"):
-            replay_artifact(path, corpus, CORPUS)
+            replay_artifact(path, corpus, CORPUS, None)
 
     def test_an_end_to_end_sweep_replays_its_first_pass(
         self,
@@ -1557,7 +1557,7 @@ class TestTheArchivedEmissionsReplay:
             {golden.id: ExtractionResult(golden.id, None, (), raw=raw)},
         )
 
-        sweep = replay_artifact(path, corpus, CORPUS)
+        sweep = replay_artifact(path, corpus, CORPUS, None)
 
         (graded,) = sweep.extractions
         assert graded.counts["found"] == len(list(golden.model.elements()))
@@ -1607,7 +1607,7 @@ class TestTheArchivedEmissionsReplay:
             },
         )
 
-        sweep = replay_artifact(path, corpus, CORPUS)
+        sweep = replay_artifact(path, corpus, CORPUS, None)
 
         assert [graded.case_id for graded in sweep.extractions] == [CASE]
         assert sweep.skipped == {
@@ -1619,7 +1619,7 @@ class TestTheArchivedEmissionsReplay:
         old = tmp_path / "corpus"
         shutil.copytree(CORPUS, old, ignore=shutil.ignore_patterns("facts.json"))
 
-        sweep = replay_artifact(bench, load_corpus(old), old)
+        sweep = replay_artifact(bench, load_corpus(old), old, None)
 
         assert sweep.assertions == ()
         assert sweep.skipped == {
@@ -1769,9 +1769,18 @@ class TestBindingAProposalToAnExtractedGraph:
 #: diagram reader's flowchart corrections, and four at ``efc0087b``, after
 #: them. One prompt and one model, so the instruction digest cannot tell the
 #: two sides apart; the rendered diagram input can.
-DIAGRAM_STRUCTURE = EMISSIONS / "20261101T-diagram-structure"
-E2_BEFORE = sorted(DIAGRAM_STRUCTURE.glob("e2-drawn-before-r*.json"))
-E2_AFTER = sorted(DIAGRAM_STRUCTURE.glob("e2-drawn-after-r*.json"))
+E2_BEFORE = [
+    p
+    for p in ARTIFACTS
+    if p.parent.name == "20261101T-diagram-structure"
+    and p.name.startswith("e2-drawn-before-r")
+]
+E2_AFTER = [
+    p
+    for p in ARTIFACTS
+    if p.parent.name == "20261101T-diagram-structure"
+    and p.name.startswith("e2-drawn-after-r")
+]
 
 #: Elements lost per sweep as QA-2026-11-01-01 reads them, on the corpus at
 #: digest ``44a9bcd7``: the six loss fates, summed over the sweep's cases.
@@ -1811,7 +1820,9 @@ class TestAnArmSeparatesWhatTheRouteRead:
         assert len(E2_BEFORE) == len(E2_AFTER) == 4
 
     def test_sweeps_that_record_no_input_are_never_pooled(self, corpus):
-        sweeps = [replay_artifact(p, corpus, CORPUS) for p in E2_BEFORE + E2_AFTER]
+        sweeps = [
+            replay_artifact(p, corpus, CORPUS, None) for p in E2_BEFORE + E2_AFTER
+        ]
 
         arms = replay.by_arm(sweeps)
 
@@ -1904,11 +1915,16 @@ class TestAnArmSeparatesWhatTheRouteRead:
         copy = _with_rendered(E2_BEFORE[0], tmp_path, rendered)
 
         with pytest.raises(ValueError, match="not a digest per case"):
-            replay_artifact(copy, corpus, CORPUS)
+            replay_artifact(copy, corpus, CORPUS, None)
 
     def test_genuine_repeats_still_pool(self, corpus):
         """Five sweeps at one commit and one prompt, named as one arm, are one arm."""
-        paths = sorted((EMISSIONS / "20261017T-1813-name-rule").glob("after-r*.json"))
+        paths = [
+            p
+            for p in ARTIFACTS
+            if p.parent.name == "20261017T-1813-name-rule"
+            and p.name.startswith("after-r")
+        ]
         named = run_module.named_arms(["after=after-r*"], list(map(str, paths)))
         sweeps = [
             replay_artifact(Path(path), corpus, CORPUS, label)

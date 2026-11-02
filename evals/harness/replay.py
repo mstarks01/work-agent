@@ -1224,7 +1224,7 @@ KEEPS: Mapping[str, str] = {
 }
 
 
-def arm_of(artifact: EvalArtifact, named: str | None = None) -> Arm:
+def arm_of(artifact: EvalArtifact, named: str | None) -> Arm:
     """Which prompts, which input and which models an archived sweep ran, off its own record.
 
     One route of :data:`ROUTES_OF`, and one prompt per node of it. A sweep

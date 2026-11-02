@@ -1829,7 +1829,7 @@ def replay_artifact(
     path: Path,
     cases: Sequence[GoldenCase],
     corpus_dir: Path,
-    named: str | None = None,
+    named: str | None,
 ) -> replay.SweepReplay:
     """One archived sweep, read through the loader and re-scored by its mode.
 
@@ -1936,7 +1936,7 @@ def bind_artifact(
     path: Path,
     cases: Sequence[GoldenCase],
     graphs: Sequence[tuple[str, Mapping[str, modes.ExtractionResult]]],
-    named: str | None = None,
+    named: str | None,
 ) -> replay.BindingSweep:
     """One archived assertion sweep against every archived graph of each case."""
     loaded = load_artifact(path)
