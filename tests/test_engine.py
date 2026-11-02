@@ -360,7 +360,7 @@ def test_an_engine_on_a_deployment_runs_in_the_carried_order(carried, asked):
 
 def test_engine_drives_the_real_graph_to_a_report():
     pipeline, _ = build(happy_replies())
-    engine = engine_for(AdkPipelineRunner(pipeline))
+    engine = engine_for(AdkPipelineRunner(pipeline, certification=None))
 
     outcome = analyze(engine, DESCRIPTION_TEXT)
 

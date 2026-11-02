@@ -112,8 +112,8 @@ def served_trust_for(requested_route: str) -> ServedTrust:
     Read off the *requested* route because that is the only key the three call
     sites hold. The producer has a route and no ``Vendor``; the two verifiers
     recompute from an artifact's recorded ``requested_model``, which is a
-    string. :func:`~analysis_service.vendors.vendor_for_route` is the one
-    reader of the rule that turns it into a vendor.
+    string. :func:`~analysis_service.vendors.vendor_for_route` applies
+    the rule that turns it into a vendor.
 
     Raising on a route that names no vendor is safe, and is the point.
     ``node_models`` is built from the tier config through ``Vendor.prefix``, so

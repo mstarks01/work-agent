@@ -94,7 +94,9 @@ def _run(path: Path, reading: dict[str, Any]) -> tuple[SystemModel, SchemaLlm]:
     async def on_node(node: str) -> None:
         pass
 
-    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+    outcome = asyncio.run(
+        AdkPipelineRunner(pipeline, certification=None).run(record, on_node)
+    )
     assert isinstance(outcome, PipelineAwaiting)
     reader = llms[graph.CAPABILITIES_NODE]
     assert isinstance(reader, SchemaLlm)

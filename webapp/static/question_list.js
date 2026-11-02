@@ -726,9 +726,9 @@ const rowKey = (row) => questionKey(row.q.key);
 // The parts of a question's key, in the order the service serves them
 // (UNKNOWN_KEY_FIELDS). A test holds the two equal.
 const KEY_FIELDS = ["element_id", "attribute", "assertion", "subject", "question", "capability"];
-// The one reader of which part of a key is which: the key's parts by name.
-// `withElement` writes a key in the same order. A test refuses any other read
-// of a key by position.
+// The parts of a key by name, which say which part of a key is which.
+// `withElement` writes a key in the same order. A test in tests/test_webapp.py
+// refuses a read of a key by position anywhere else.
 const keyRef = (key) => Object.fromEntries(KEY_FIELDS.map((field, at) => [field, key[at]]));
 // The key with its element replaced by `element`.
 const withElement = (key, element) =>

@@ -1800,6 +1800,43 @@ def _reads_a_cache_rule(node: ast.AST) -> bool:
     return _loads_attribute(node, "prompt_cache") or _calls(node, "accepts")
 
 
+def _joins(node: ast.AST, *names: str) -> bool:
+    """A boolean expression that calls each of ``names``."""
+    return isinstance(node, ast.BoolOp) and all(
+        any(_calls(part, name) for part in ast.walk(node)) for name in names
+    )
+
+
+def _compares_an_origin(node: ast.AST) -> bool:
+    return _compares_with(node, "answer") and any(
+        _loads_attribute(part, "origin") for part in (node.left, *node.comparators)
+    )
+
+
+def _ends_a_job(node: ast.AST) -> bool:
+    """A boolean expression that asks both halves of an ended job."""
+    return (
+        isinstance(node, ast.BoolOp)
+        and any(_calls(part, "readable") for part in ast.walk(node))
+        and any(_loads(part, "TERMINAL_STATUSES") for part in ast.walk(node))
+    )
+
+
+def _opens_an_attribute(node: ast.AST) -> bool:
+    """A function that asks both ways an attribute stays open."""
+    return isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and all(
+        any(_calls(part, name) for part in ast.walk(node))
+        for name in ("control_state", "assumed_zone_elements")
+    )
+
+
+def _merges_the_shared_tier_nodes(node: ast.AST) -> bool:
+    return isinstance(node, ast.Dict) and any(
+        key is None and _loads(value, "_SHARED_TIER_NODES")
+        for key, value in zip(node.keys, node.values, strict=True)
+    )
+
+
 def _digests(node: ast.AST, read: str) -> bool:
     """A sha256 over the value of a ``read`` call: ``encode`` for a text,
     ``read_bytes`` for a file."""
@@ -2115,6 +2152,184 @@ ONE_READERS: dict[str, _OneReader] = {
             ("src/analysis_service/settings_variables.py", "secret_vars"): (
                 "it lists the key files among the settings that hold a secret,"
                 " and refuses nothing"
+            ),
+        },
+        "",
+    ),
+    "a case directory": _OneReader(
+        lambda node: _loads(node, "CASE_FILES"),
+        ("evals/harness/reference.py", "missing_case_files"),
+        {},
+        "",
+    ),
+    "whether a catalog passes": _OneReader(
+        lambda node: _calls(node, "catalog_issues"),
+        ("src/analysis_service/assertions.py", "over"),
+        {},
+        "",
+    ),
+    "which rows a record loses": _OneReader(
+        lambda node: _loads(node, "GATE_REFUSALS"),
+        ("src/analysis_service/assertions.py", "refusals"),
+        {},
+        "",
+    ),
+    "which proposed row a record loses": _OneReader(
+        lambda node: _loads_attribute(node, "proposed_row"),
+        ("src/analysis_service/assertions.py", "resolved"),
+        {
+            ("evals/harness/population.py", "population"): (
+                "it copies the proposed row of each refusal into a population"
+                " row, and decides no loss"
+            ),
+        },
+        "",
+    ),
+    "whether a catalog row is an answer": _OneReader(
+        _compares_an_origin,
+        ("src/analysis_service/assertions.py", "answered"),
+        {
+            ("src/analysis_service/validation.py", "_citation_issues"): (
+                "it reads whether an answer stated a capability statement, and"
+                " reads no catalog row"
+            ),
+        },
+        "",
+    ),
+    "which settled rows the Evidence Catalog carries": _OneReader(
+        lambda node: _loads(node, "SETTLING_REASONS"),
+        ("src/analysis_service/assertions.py", "offered"),
+        {
+            ("src/analysis_service/assertions.py", "catalog_coverage"): (
+                "it counts the attributes that the catalog settles for a"
+                " coverage figure, and chooses no row"
+            ),
+        },
+        "",
+    ),
+    "the band-and-units order": _OneReader(
+        lambda node: _loads_attribute(node, "framework_bands"),
+        ("src/analysis_service/early_questions.py", "standing"),
+        {
+            ("src/analysis_service/answer_state.py", "passes_floor"): (
+                "it lets a question past the floor of its kind by its band, and"
+                " orders nothing"
+            ),
+        },
+        "",
+    ),
+    "the facts a candidate reads": _OneReader(
+        lambda node: _loads(node, "ZONE_FACTS"),
+        ("src/analysis_service/early_questions.py", "reads"),
+        {},
+        "",
+    ),
+    "whether a selection reads capabilities": _OneReader(
+        lambda node: _calls(node, "capability_keys"),
+        ("src/analysis_service/frameworks/__init__.py", "reads_capabilities"),
+        {},
+        "",
+    ),
+    "a requirement's decision": _OneReader(
+        lambda node: _calls(node, "applicability_for"),
+        ("src/analysis_service/frameworks/asvs/record.py", "applicability"),
+        {
+            ("src/analysis_service/frameworks/asvs/record.py", "open_capabilities"): (
+                "it lists the capabilities whose answer would change a decision,"
+                " and decides no requirement"
+            ),
+        },
+        "",
+    ),
+    "the pieces of a cut quote": _OneReader(
+        lambda node: _loads(node, "_ELLIPSIS"),
+        ("src/analysis_service/grounding.py", "fragments"),
+        {
+            ("src/analysis_service/grounding.py", "_needle_of"): (
+                "it refuses a cut quote as the needle of a repair, and splits no quote"
+            ),
+        },
+        "",
+    ),
+    "which kind a fact is": _OneReader(
+        lambda node: _loads(node, "_KIND_ORDER"),
+        ("src/analysis_service/claims.py", "kind"),
+        {},
+        "",
+    ),
+    "the schema rule a model takes": _OneReader(
+        lambda node: _loads_attribute(node, "schema_rules"),
+        ("src/analysis_service/vendors.py", "schema_rule"),
+        {},
+        "",
+    ),
+    "a stray store setting": _OneReader(
+        lambda node: (
+            _calls(node, "startswith")
+            and bool(node.args)
+            and _loads(node.args[0], "prefixes")
+        ),
+        ("src/analysis_service/store_settings.py", "refuse_unread"),
+        {},
+        "",
+    ),
+    "the frameworks a job names": _OneReader(
+        lambda node: _calls(node, "NotCarried"),
+        ("src/analysis_service/selection.py", "resolve_names"),
+        {},
+        "",
+    ),
+    "a claim's channels": _OneReader(
+        lambda node: _loads_attribute(node, "siblings") and _loads(node.value, "flows"),
+        ("evals/harness/identity.py", "channels"),
+        {},
+        "",
+    ),
+    "what an extraction loss lacked": _OneReader(
+        lambda node: _loads_attribute(node, "extraction_read"),
+        ("evals/harness/extraction_losses.py", "lacked"),
+        {
+            ("evals/harness/extraction_losses.py", "extraction_contributed"): (
+                "it reads a downstream loss, which lacked does not read, and"
+                " charges extraction beside the lanes"
+            ),
+        },
+        "",
+    ),
+    "the tier of each graph node": _OneReader(
+        _merges_the_shared_tier_nodes,
+        ("src/analysis_service/graph.py", "tier_node_by_graph_node"),
+        {},
+        "",
+    ),
+    "whether a case is read": _OneReader(
+        _tests_truth_of(lambda node: _calls(node, "waiting")),
+        ("evals/review_submission.py", "unreviewed_cases"),
+        {},
+        "",
+    ),
+    "what a job asks about": _OneReader(
+        lambda node: _calls(node, "checkpoint"),
+        ("src/analysis_service/job_answers.py", "answerable"),
+        {},
+        "",
+    ),
+    "whether a job has ended": _OneReader(
+        _ends_a_job, ("src/analysis_service/jobs.py", "ended"), {}, ""
+    ),
+    "whether an attribute is open": _OneReader(
+        _opens_an_attribute,
+        ("src/analysis_service/open_facts.py", "open_attribute"),
+        {},
+        "",
+    ),
+    "which listed question a list may rank": _OneReader(
+        lambda node: _joins(node, "_open", "passes_floor"),
+        ("src/analysis_service/answer_state.py", "_rankable"),
+        {
+            ("src/analysis_service/answer_state.py", "question_set"): (
+                "it holds back the questions an undecided gate would ask, and"
+                " the open questions below the floor, which no list ranks"
             ),
         },
         "",

@@ -591,7 +591,7 @@ def _check_no_self_raise(root: Path, author: str) -> Check:
         now = roster.load(live).standing_of(author) if live.exists() else None
         was = None
         if base_raw is not None:
-            # Through the one reader, so a base roster whose ``voters`` is a
+            # Through :func:`_voters_table`, so a base roster whose ``voters`` is a
             # scalar leaves ``was`` unknown rather than raising out of this
             # whole preflight. Unknown is the safe answer here: it ranks as
             # ``contributor``, so a line raising itself to ``maintainer`` is

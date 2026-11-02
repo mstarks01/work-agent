@@ -83,7 +83,9 @@ class TestThePausedRun:
         async def on_node(node: str) -> None:
             visited.append(node)
 
-        outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+        outcome = asyncio.run(
+            AdkPipelineRunner(pipeline, certification=None).run(record, on_node)
+        )
 
         assert isinstance(outcome, PipelineAwaiting)
         assert outcome.checkpoint.system_model == graph.after_gate(valid_model())
@@ -104,7 +106,9 @@ class TestThePausedRun:
         async def on_node(node: str) -> None:
             visited.append(node)
 
-        outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+        outcome = asyncio.run(
+            AdkPipelineRunner(pipeline, certification=None).run(record, on_node)
+        )
 
         assert isinstance(outcome, PipelineAwaiting)
         assert outcome.checkpoint.system_model == graph.after_gate(valid_model())

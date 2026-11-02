@@ -18,6 +18,14 @@ call to it there:
   argument hides a hit, and it never adds one.
 - **A nested function** is matched by its name against each plain call in its
   module.
+- **The ``__init__`` of a module-level class** is matched through the calls
+  of its class, which the imports resolve as they resolve a module-level
+  function, and through each ``cls(...)`` and ``type(self)(...)`` call in the
+  class's own body. A class that code reads as a value, or that another class
+  names as a base, has construction calls that the tree does not show, so the
+  lint does not judge its ``__init__``. A read of the class in an annotation,
+  in an ``except`` clause, as the owner of an attribute, or in ``isinstance``
+  or ``issubclass`` constructs nothing, so it is no such value read.
 
 A function that production also reads as a value, such as an argument to
 ``functools.partial``, an entry of a table or a ``getattr`` string, has callers
@@ -38,6 +46,7 @@ from collections import defaultdict
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from functools import cache
+from typing import TypeGuard
 
 import pytest
 
@@ -126,7 +135,7 @@ class Judged:
     module: str
     #: ``Class.method`` for a method, ``outer.inner`` for a nested function.
     qualified: str
-    kind: str  # "function", "method" or "nested"
+    kind: str  # "function", "method", "init" or "nested"
     line: int
     parameters: tuple[Defaulted, ...]
 
@@ -180,7 +189,11 @@ class Resolver:
     def __init__(self, modules: Mapping[str, ast.Module]) -> None:
         self._aliases = {module: _imports(tree) for module, tree in modules.items()}
         self._top_level = {
-            module: {node.name for node in tree.body if isinstance(node, _FUNCTIONS)}
+            module: {
+                node.name
+                for node in tree.body
+                if isinstance(node, (*_FUNCTIONS, ast.ClassDef))
+            }
             for module, tree in modules.items()
         }
 
@@ -233,6 +246,38 @@ class Uses:
     bare_values: set[str] = field(default_factory=set)
     #: The names that code looks up by a string.
     lookups: set[str] = field(default_factory=set)
+    #: The dotted names of the classes whose construction the tree may not
+    #: show: each class read as a value or named as a base.
+    opaque_classes: set[str] = field(default_factory=set)
+
+
+#: The calls whose arguments a class may be read in without a construction.
+_TYPE_TESTS = frozenset({"isinstance", "issubclass"})
+
+
+def _constructs_nothing(tree: ast.Module) -> set[int]:
+    """The id of each node in ``tree`` that reads a class without building one:
+    an annotation, the owner of an attribute, and an argument of a type test."""
+    quiet: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.arg | ast.AnnAssign) and node.annotation:
+            quiet.update(map(id, ast.walk(node.annotation)))
+        elif isinstance(node, _FUNCTIONS) and node.returns:
+            quiet.update(map(id, ast.walk(node.returns)))
+        elif isinstance(node, ast.ExceptHandler) and node.type:
+            quiet.update(map(id, ast.walk(node.type)))
+        elif isinstance(node, ast.Attribute):
+            quiet.add(id(node.value))
+        elif isinstance(node, ast.Call) and _called_name(node) in _TYPE_TESTS:
+            quiet.update(id(part) for arg in node.args for part in ast.walk(arg))
+    return quiet
+
+
+def _called_name(node: ast.Call) -> str | None:
+    func = node.func
+    if isinstance(func, ast.Name):
+        return func.id
+    return func.attr if isinstance(func, ast.Attribute) else None
 
 
 def uses(modules: Mapping[str, ast.Module]) -> Uses:
@@ -245,6 +290,12 @@ def uses(modules: Mapping[str, ast.Module]) -> Uses:
             if isinstance(node, ast.Call):
                 called.add(id(node.func))
                 _record_call(node, module, resolver, found)
+        for cls in tree.body:
+            if isinstance(cls, ast.ClassDef):
+                found.calls[f"{module}.{cls.name}"].extend(
+                    _call(node) for node in ast.walk(cls) if _builds_its_own_type(node)
+                )
+        quiet = _constructs_nothing(tree)
         for node in ast.walk(tree):
             if id(node) in called or not isinstance(node, ast.Name | ast.Attribute):
                 continue
@@ -253,17 +304,33 @@ def uses(modules: Mapping[str, ast.Module]) -> Uses:
             found.bare_values.add(node.id if isinstance(node, ast.Name) else node.attr)
             if (target := resolver.resolve(node, module)) is not None:
                 found.values.add(target)
+                if id(node) not in quiet:
+                    found.opaque_classes.add(target)
     return found
 
 
-def _record_call(node: ast.Call, module: str, resolver: Resolver, found: Uses) -> None:
-    """File one call under each way the lint can match it."""
-    call = Call(
+def _call(node: ast.Call) -> Call:
+    return Call(
         positional=sum(not isinstance(a, ast.Starred) for a in node.args),
         keywords=frozenset(k.arg for k in node.keywords if k.arg),
         splat=any(isinstance(a, ast.Starred) for a in node.args)
         or any(k.arg is None for k in node.keywords),
     )
+
+
+def _builds_its_own_type(node: ast.AST) -> TypeGuard[ast.Call]:
+    """Whether ``node`` is a ``cls(...)`` or a ``type(self)(...)`` call."""
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    return (isinstance(func, ast.Name) and func.id == "cls") or (
+        isinstance(func, ast.Call) and _called_name(func) == "type"
+    )
+
+
+def _record_call(node: ast.Call, module: str, resolver: Resolver, found: Uses) -> None:
+    """File one call under each way the lint can match it."""
+    call = _call(node)
     if (target := resolver.resolve(node.func, module)) is not None:
         found.calls[target].append(call)
     if isinstance(node.func, ast.Name):
@@ -322,21 +389,34 @@ def judged(module: str, tree: ast.Module) -> Iterator[Judged]:
                 }
                 bound = kind == "method" and "staticmethod" not in decorators
                 parameters = _defaulted(child, bound=bound)
-                if (
-                    parameters
-                    and decorators <= _PLAIN_DECORATORS
-                    and not child.name.startswith("__")
-                ):
+                own_kind = _kind(child.name, owner, kind)
+                if parameters and decorators <= _PLAIN_DECORATORS and own_kind:
                     yield Judged(
-                        module, f"{owner}{child.name}", kind, child.lineno, parameters
+                        module,
+                        f"{owner}{child.name}",
+                        own_kind,
+                        child.lineno,
+                        parameters,
                     )
                 yield from visit(child, f"{owner}{child.name}.", "nested")
 
     yield from visit(tree, "", "function")
 
 
+def _kind(name: str, owner: str, kind: str) -> str | None:
+    """How the lint finds the calls of a function, or None where it does not
+    judge it: a dunder other than the ``__init__`` of a module-level class."""
+    if not name.startswith("__"):
+        return kind
+    top_level = kind == "method" and owner.count(".") == 1
+    return "init" if name == "__init__" and top_level else None
+
+
 def calls_of(function: Judged, found: Uses) -> list[Call] | None:
     """Each call of ``function``, or None where code also reads it as a value."""
+    if function.kind == "init":
+        dotted = f"{function.module}.{function.qualified.split('.')[0]}"
+        return None if dotted in found.opaque_classes else found.calls[dotted]
     if function.name in found.lookups:
         return None
     if function.kind == "function":
@@ -435,6 +515,18 @@ _CONTROL = {
         "def outer():\n"
         "    def inner(a, b=1): ...\n"
         "    inner(1, 2)\n"
+        "class Built:\n"
+        "    def __init__(self, a, *, b=1): ...\n"
+        "    def named(self) -> 'Built': ...\n"
+        "class Rebuilt:\n"
+        "    def __init__(self, a, b=1): ...\n"
+        "    @classmethod\n"
+        "    def again(cls): return cls(1)\n"
+        "class Handed:\n"
+        "    def __init__(self, a, b=1): ...\n"
+        "class Based:\n"
+        "    def __init__(self, a, b=1): ...\n"
+        "class Derived(Based): ...\n"
     ),
     "app": (
         "import pkg\n"
@@ -453,6 +545,12 @@ _CONTROL = {
         "box.put(1, where='bottom')\n"
         "box.take(2)\n"
         "queue.take()\n"
+        "lib.Built(1, b=2)\n"
+        "if isinstance(box, lib.Built): pass\n"
+        "lib.Rebuilt(1, 2)\n"
+        "factory = lib.Handed\n"
+        "lib.Handed(1, 2)\n"
+        "lib.Based(1, 2)\n"
     ),
 }
 
@@ -468,6 +566,10 @@ def test_the_lint_reports_a_default_every_call_passes():
     by a ``getattr`` string, ``splatted`` has a call with a splat, ``take``
     shares its name with a call that omits the argument, and ``inner`` is a
     nested function that its one call passes.
+
+    ``Built`` is a class that every call passes ``b``, and a type test and an
+    annotation of it build nothing. ``Rebuilt`` builds itself with ``cls(1)``,
+    ``Handed`` is read as a value, and ``Based`` is a base of another class.
     """
     modules = {module: ast.parse(text) for module, text in _CONTROL.items()}
 
@@ -475,6 +577,7 @@ def test_the_lint_reports_a_default_every_call_passes():
         ("pkg.lib", "unread", "b"),
         ("pkg.lib", "Box.put", "where"),
         ("pkg.lib", "outer.inner", "b"),
+        ("pkg.lib", "Built.__init__", "b"),
     }
 
 

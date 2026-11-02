@@ -253,7 +253,9 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
     async def on_node(node: str) -> None:
         return None
 
-    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+    outcome = asyncio.run(
+        AdkPipelineRunner(pipeline, certification=None).run(record, on_node)
+    )
 
     assert isinstance(outcome, PipelineCompleted)
     (block,) = outcome.report.analyses

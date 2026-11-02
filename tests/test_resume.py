@@ -105,7 +105,9 @@ class TestTheResumedRun:
             visited.append(node)
 
         async def scenario():
-            return await AdkPipelineRunner(pipeline).run(self.resumed_job(), on_node)
+            return await AdkPipelineRunner(pipeline, certification=None).run(
+                self.resumed_job(), on_node
+            )
 
         return asyncio.run(scenario()), visited
 

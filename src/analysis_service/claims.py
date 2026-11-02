@@ -118,8 +118,8 @@ CriticStep = Literal["evidence", "reasoning", "lane"]
 # a legal *attribute value* across the System Model, so ``kind="unknown"`` would
 # read as "the kind is unknown" rather than "the ground is an unknown
 # attribute". ``absent-attribute`` follows that spelling for the same reason and
-# for one more: the two attribute branches carry identical fields, so the kind
-# is the only place their difference can live.
+# for one more: the two attribute branches carry identical fields, so only the
+# kind can tell them apart.
 GroundKind = Literal[
     "quote",
     "unknown-attribute",

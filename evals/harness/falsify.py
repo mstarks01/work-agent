@@ -15,7 +15,7 @@ instruments must then say:
   the one reader of "does this catalog pass") refuses the row, by code, in
   any of its rounds; or
 * **the endpoint** (:attr:`~evals.harness.replay.AssertionReplay.recovered`,
-  the one reader of required-fact recall) stops counting the row, and the
+  which counts required-fact recall) stops counting the row, and the
   matcher's fate says why.
 
 A falsification probe that takes nothing away at either instrument is a hole in

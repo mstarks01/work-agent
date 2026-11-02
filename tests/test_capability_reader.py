@@ -159,7 +159,9 @@ class TestTheGraph:
         async def on_node(node: str) -> None:
             visited.append(node)
 
-        outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+        outcome = asyncio.run(
+            AdkPipelineRunner(pipeline, certification=None).run(record, on_node)
+        )
         return outcome, visited
 
     def test_a_paused_job_holds_the_capabilities_its_sources_state(self):

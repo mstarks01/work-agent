@@ -157,7 +157,7 @@ async def _run_all(count: int) -> list[tuple[int, str, object]]:
     global _barrier
     _barrier = asyncio.Barrier(count)
     runner = AdkPipelineRunner(
-        _build_shared_pipeline()
+        _build_shared_pipeline(), certification=None
     )  # one shared runner + session service
 
     async def one(index: int) -> tuple[int, str, object]:

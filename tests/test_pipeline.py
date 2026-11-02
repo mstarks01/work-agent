@@ -115,7 +115,9 @@ def run(pipeline: graph.Pipeline, record: JobRecord) -> tuple[object, list[str]]
         visited.append(node)
 
     async def scenario():
-        return await AdkPipelineRunner(pipeline).run(record, on_node)
+        return await AdkPipelineRunner(pipeline, certification=None).run(
+            record, on_node
+        )
 
     return asyncio.run(scenario()), visited
 
@@ -1014,7 +1016,7 @@ def test_one_framework_finishing_first_does_not_fail_the_other(first, held, wind
             gate.set()
 
     async def scenario():
-        runner = AdkPipelineRunner(pipeline)
+        runner = AdkPipelineRunner(pipeline, certification=None)
         return await asyncio.wait_for(runner.run(pair_job((first, held)), on_node), 30)
 
     outcome = asyncio.run(scenario())
@@ -1049,7 +1051,9 @@ def test_a_lane_with_no_unit_left_calls_no_model():
     }
     pipeline, models = build(replies, frameworks=("asvs",))
 
-    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(pair_job(("asvs",)), None))
+    outcome = asyncio.run(
+        AdkPipelineRunner(pipeline, certification=None).run(pair_job(("asvs",)), None)
+    )
 
     assert isinstance(outcome, PipelineCompleted)
     assert [claim.id for claim in outcome.report.analyses[0].claims] == [
@@ -1079,7 +1083,9 @@ def test_both_review_passes_read_the_submitted_sources(role):
     }
     pipeline, models = build(replies, frameworks=("stride",))
 
-    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(pair_job(("stride",)), None))
+    outcome = asyncio.run(
+        AdkPipelineRunner(pipeline, certification=None).run(pair_job(("stride",)), None)
+    )
 
     assert isinstance(outcome, PipelineCompleted)
     (instruction,) = models[nodes.node(role)].seen
@@ -1106,7 +1112,9 @@ def test_every_node_s_system_text_starts_with_its_stable_prefix():
     }
 
     outcome = asyncio.run(
-        AdkPipelineRunner(pipeline).run(pair_job(tuple(PACKAGES)), None)
+        AdkPipelineRunner(pipeline, certification=None).run(
+            pair_job(tuple(PACKAGES)), None
+        )
     )
 
     assert isinstance(outcome, PipelineCompleted)

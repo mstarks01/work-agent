@@ -289,7 +289,7 @@ def _reusing(tiers):
     from analysis_service.answer_sets import AnswerSet
 
     startup = startup_for(tiers)
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     reusing = TestClient(create_app(startup, workspace), base_url=LOOPBACK)
     earlier = run_to_completion(reusing)
     record = asyncio.run(workspace.store.get(earlier))
@@ -721,7 +721,7 @@ def test_an_option_that_is_not_a_closed_set_fails_loudly(client):
 
 def test_the_workspace_deletes_the_oldest_finished_job_and_stays_bounded(tiers):
     """Untrusted prose and its report never accumulate without bound."""
-    workspace = Workspace(max_jobs=3)
+    workspace = Workspace(store=InMemoryJobStore(), max_jobs=3)
     with TestClient(
         create_app(startup_for(tiers), workspace), base_url=LOOPBACK
     ) as client:
@@ -815,7 +815,8 @@ def test_a_refused_submission_deletes_no_finished_job(tiers):
     )
     startup = replace(startup_for(tiers), settings=settings)
     with TestClient(
-        create_app(startup, Workspace(max_jobs=2)), base_url=LOOPBACK
+        create_app(startup, Workspace(store=InMemoryJobStore(), max_jobs=2)),
+        base_url=LOOPBACK,
     ) as client:
         runs = [run_to_completion(client) for _ in range(2)]
         refused = client.post("/analyze", json=posted("C"), headers=SAME_ORIGIN)
@@ -2403,7 +2404,7 @@ def test_the_operator_is_a_local_principal_that_the_first_run_creates(tiers):
     from webapp.main import OPERATOR
 
     startup = startup_for(tiers)
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     client = TestClient(create_app(startup, workspace), base_url=LOOPBACK)
 
     assert client.get("/workspace/runs").json() == []
