@@ -68,7 +68,7 @@ client. The first attempt would therefore carry its own SDK-level retries
 underneath, and the worst case per node would be ``2 * attempts - 1``
 requests: five at the shipped three, and five times the fan-out in the seconds the lane agents
 go out together. Against a per-minute quota, that burst is what turns one 429
-into a run that spends its budget on retried 429s, which is OWASP LLM10. Passing
+into a run whose retries all go to repeated 429s, which is OWASP LLM10. Passing
 ``max_retries`` does not close it, because ``num_retries`` overwrites it on the
 way to the client. ``tests/test_model_gate.py`` probes exactly that.
 

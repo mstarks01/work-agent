@@ -2914,7 +2914,7 @@ def test_a_trigger_after_the_report_is_built_builds_it_no_second_time(domain_loa
 
     Two frameworks that finish before either of their triggers is scheduled both
     find every framework finished. The second one would compose the same blocks
-    from the same parked artifacts, so it spends the time and changes nothing;
+    from the same parked artifacts, so it takes the time and changes nothing;
     the written report is what says the pass already happened.
     """
     model = valid_model().model_dump(mode="json")

@@ -27,6 +27,7 @@ from analysis_service.claims import UNKNOWN_KEY_FIELDS, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
 from evals.harness.prices import UnitPrices
 from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
+from tests.test_five_class_read import HELD_ROWS
 
 pytestmark = pytest.mark.lint
 
@@ -1451,6 +1452,25 @@ def test_a_module_to_prompt_pairing_is_written_only_in_the_table():
     """The prompt read's map derives from the table, and the outcome tests read
     the same rows, so no Python holds a second copy of a pair."""
     assert _sites(_pairs_a_module_with_a_prompt, (*FILES, *source_files(*TESTS))) == []
+
+
+def _spells_a_held_phrase(node: ast.AST) -> bool:
+    """Whether ``node`` is a string constant that holds a phrase of a row of
+    ``.github/scripts/held_wording.toml``."""
+    return (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and any(row["phrase"] in node.value for row in HELD_ROWS)
+    )
+
+
+def test_a_held_phrase_is_written_only_in_its_own_file():
+    """The wording lints and the prompt read take each held phrase from the
+    table, so no Python but the file that holds the wording spells one."""
+    own = {row["file"] for row in HELD_ROWS}
+    sites = _sites(_spells_a_held_phrase, (*FILES, *source_files(*TESTS)))
+
+    assert [site for site in sites if site[0] not in own] == []
 
 
 _PATH_PARSE = re.compile(r"location\.pathname\??\.(?:split|match)\(")
