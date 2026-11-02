@@ -63,7 +63,7 @@ from tests.source_tree import (
     source_files,
     without,
 )
-from tests.test_one_reader_lints import ONE_READERS, Site
+from tests.test_one_reader_lints import MODULE_OWNER, ONE_READERS, Site
 
 pytestmark = pytest.mark.lint
 
@@ -94,9 +94,6 @@ CLAIM = re.compile(
 #: without a leading ``~`` or trailing call parentheses.
 _TICKED = re.compile(r"`~?([\w.]*\w)(?:\(\))?`")
 
-#: The owner of a claim that no function or class holds, as the one-reader
-#: lints name the module level of a file.
-MODULE_OWNER = "<module>"
 
 #: How many lines after a page-script comment the lint reads for the name the
 #: comment is about: the line below the comment, and one more for a wrapped
@@ -242,7 +239,7 @@ def _name_of(node: ast.stmt) -> str | None:
     return target.id if isinstance(target, ast.Name) else None
 
 
-def _holder(statements: list[ast.stmt], line: int, path: Path) -> str:
+def _holder(statements: list[ast.stmt], line: int) -> str:
     """The innermost function or class whose lines hold ``line``."""
     holders = [
         node
@@ -253,15 +250,35 @@ def _holder(statements: list[ast.stmt], line: int, path: Path) -> str:
     return holders[-1].name if holders else MODULE_OWNER
 
 
+def _comment_owner(statements: list[ast.stmt], line: int) -> str:
+    """The owner of a comment claim at ``line``.
+
+    A comment inside a statement, such as an entry of a table literal, is owned
+    by the innermost such statement that binds a name. A comment between
+    statements is owned by the next statement where that binds a name, and
+    otherwise by the function or the class that holds it.
+    """
+    inside = [
+        name
+        for node in statements
+        if node.lineno < line <= (node.end_lineno or node.lineno)
+        and (name := _name_of(node)) is not None
+        and not isinstance(node, DEFINITIONS)
+    ]
+    if inside:
+        return inside[-1]
+    following = next((node for node in statements if node.lineno > line), None)
+    name = None if following is None else _name_of(following)
+    return name or _holder(statements, line)
+
+
 def _python_claims(path: Path) -> Iterator[tuple[int, str]]:
     """Each claim line in a Python file, with its owner."""
     tree = parse(path)
     statements = _statements(tree)
     for start, text in comment_runs(path):
         for line in _matches(text, start):
-            following = next((node for node in statements if node.lineno > line), None)
-            name = None if following is None else _name_of(following)
-            yield line, name or _holder(statements, line, path)
+            yield line, _comment_owner(statements, line)
     for body_owner in ast.walk(tree):
         body = getattr(body_owner, "body", None)
         if not isinstance(body, list):
@@ -275,7 +292,7 @@ def _python_claims(path: Path) -> Iterator[tuple[int, str]]:
                 continue
             before = _name_of(body[index - 1]) if index else None
             for line in _matches(node.value.value, node.lineno):
-                yield line, before or _holder(statements, line, path)
+                yield line, before or _holder(statements, line)
 
 
 def _script_claims(path: Path) -> Iterator[tuple[int, str]]:
@@ -415,23 +432,27 @@ def _imported(path: str) -> dict[str, str]:
     return imports(parse(REPO_ROOT / path))
 
 
-def _site_of(reference: str, path: str) -> Site:
+def _site_of(reference: str, path: str) -> Site | None:
     """The site that the backticked ``reference`` in the file ``path`` names.
 
     A dotted reference names the function in the longest module it starts
     with, read through the imports of ``path`` where its first part is an
     imported name. A reference that starts with no module names a function in
-    ``path`` itself.
+    ``path`` itself, or a method of a class there, as ``Class.method``. A
+    reference through an import of a module the lint does not read names no
+    site.
     """
     head, _, rest = reference.partition(".")
-    dotted = _imported(path).get(head, head) + (f".{rest}" if rest else "")
+    imported = _imported(path).get(head)
+    dotted = (imported or head) + (f".{rest}" if rest else "")
     parts = dotted.split(".")
     modules = _modules()
     for end in range(len(parts) - 1, 0, -1):
         module = ".".join(parts[:end])
         if module in modules:
             return modules[module], parts[-1]
-    return path, parts[-1]
+    outside = imported is not None or len(parts) > 2
+    return None if outside else (path, parts[-1])
 
 
 def guarded(claim: OneReaderClaim) -> bool:
@@ -586,6 +607,22 @@ def test_a_site_among_several_in_an_assert_guards_nothing():
     assert ("src/analysis_service/job_answers.py", "amend") not in guarded_sites()
     assert ("src/analysis_service/fixes.py", "absent_rows") not in guarded_sites()
     assert ("src/analysis_service/claim_identity.py", "report_rows") in guarded_sites()
+
+
+def test_a_comment_inside_a_table_belongs_to_the_table(tmp_path):
+    """A claim on an entry of a table literal is owned by the table, never by
+    the definition after it."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "TABLE = {\n"
+        "    # The one reader of the first entry.\n"
+        "    'first': 1,\n"
+        "}\n"
+        "def unrelated(): ...\n",
+        encoding="utf-8",
+    )
+
+    assert [claim.owner for claim in _claims_in(probe, "probe.py")] == ["TABLE"]
 
 
 def test_the_lint_reads_a_real_population():

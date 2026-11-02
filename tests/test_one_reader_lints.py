@@ -32,8 +32,11 @@ from tests.test_five_class_read import HELD_ROWS
 pytestmark = pytest.mark.lint
 
 #: A site: the file, relative to the repository root, and the enclosing
-#: function, or ``<module>``.
+#: function, or :data:`MODULE_OWNER`.
 Site = tuple[str, str]
+
+#: The function part of a site at the module level of its file.
+MODULE_OWNER = "<module>"
 
 
 #: The parts of :data:`~tests.source_tree.PYTHON` no lint here walks, with
@@ -57,7 +60,7 @@ def _sites(
         {
             (path.relative_to(REPO_ROOT).as_posix(), function)
             for path in files
-            for node, function in _walk(parse(path), "<module>")
+            for node, function in _walk(parse(path), MODULE_OWNER)
             if match(node)
         }
     )
@@ -798,7 +801,7 @@ def test_each_refusal_has_one_status_row():
     """
     rows: dict[str, list[Site]] = {}
     for path in FILES:
-        for node, function in _walk(parse(path), "<module>"):
+        for node, function in _walk(parse(path), MODULE_OWNER):
             if not isinstance(node, ast.Dict):
                 continue
             pairs = list(zip(node.keys, node.values, strict=True))
