@@ -31,8 +31,6 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 from pydantic import ValidationError
 
 if TYPE_CHECKING:
-    from alembic.util import CommandError
-
     from analysis_service.store_settings import StoreConfigError
 
 
@@ -44,13 +42,11 @@ class ConfigError(ValueError):
     """
 
 
-def config_refusal(exc: ConfigError | StoreConfigError | CommandError) -> str:
+def config_refusal(exc: ConfigError | StoreConfigError) -> str:
     """The one line a command prints for ``exc`` in place of a traceback.
 
     A :class:`~analysis_service.store_settings.StoreConfigError` names the
-    store setting to fix, and an Alembic :class:`~alembic.util.CommandError`
-    names the revision the database holds. Neither holds a secret or the
-    database URL.
+    store setting to fix. It holds no secret and not the database URL.
     """
     return f"cannot run on this configuration: {exc}"
 

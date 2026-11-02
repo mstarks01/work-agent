@@ -59,9 +59,10 @@ class JobStoreBackend:
     No field has a default, so a new row states every fact.
     """
 
-    #: Builds the store from the environment and the object store, which is
-    #: ``None`` where :attr:`objects` is False.
-    build: Callable[[Mapping[str, str], ObjectStore | None], JobStore]
+    #: Builds the store from the environment, the object store, which is
+    #: ``None`` where :attr:`objects` is False, and whether the first-run app
+    #: builds it.
+    build: Callable[[Mapping[str, str], ObjectStore | None, bool], JobStore]
     #: Whether the store keeps sources and reports in an object store. Where
     #: True, ``ANALYSIS_OBJECT_STORE`` is required; where False, it is refused,
     #: so a half-durable configuration cannot start.
@@ -91,7 +92,9 @@ def _sql_first_run(env: Mapping[str, str]) -> None:
     migrate_first_run_database(env)
 
 
-def _sql_store(env: Mapping[str, str], objects: ObjectStore | None) -> JobStore:
+def _sql_store(
+    env: Mapping[str, str], objects: ObjectStore | None, first_run: bool
+) -> JobStore:
     """The ``sql`` store, from the ``sql`` extra (ADR 0023)."""
     try:
         from analysis_service.sql_store import SqlJobStore
@@ -102,14 +105,14 @@ def _sql_store(env: Mapping[str, str], objects: ObjectStore | None) -> JobStore:
         ) from None
     if objects is None:
         raise StoreConfigError("the sql job store needs an object store")
-    return SqlJobStore.from_env(env, objects)
+    return SqlJobStore.from_env(env, objects, first_run=first_run)
 
 
 #: Each job store a deployment can select. The table answers for every name of
 #: :data:`JobStoreName`.
 JOB_STORES: dict[JobStoreName, JobStoreBackend] = {
     "memory": JobStoreBackend(
-        build=lambda env, objects: InMemoryJobStore(),
+        build=lambda env, objects, first_run: InMemoryJobStore(),
         objects=False,
         reads=(),
         first_run=_no_first_run,
@@ -177,7 +180,7 @@ def build_store(
         objects = None
     if first_run:
         backend.first_run(env)
-    return backend.build(env, objects)
+    return backend.build(env, objects, first_run)
 
 
 #: Why a job is deleted: its owner asked, its retention period passed, or the

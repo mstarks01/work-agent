@@ -54,7 +54,6 @@ from analysis_service.claims import (
 )
 from analysis_service.critic import CriticOutputError
 from analysis_service.deployment import Deployment
-from analysis_service.errors import ConfigError, config_refusal
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Pipeline
 from analysis_service.identity import build_identity
@@ -165,14 +164,15 @@ from evals.harness.provenance import (
     tree_identity,
 )
 from evals.harness.reference import (
+    ENTRY_ERRORS,
     CorpusError,
     GoldenCase,
     corpus_argument,
-    corpus_refusal,
     development_cases,
     diagnosable,
     flows_by_case,
     load_corpus,
+    refuse_entry,
 )
 from evals.harness.run_record import run_record, sweep_inputs
 from evals.harness.scorer import CaseScore
@@ -2809,22 +2809,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             command.arguments(sub)
         sub.set_defaults(func=command.run)
     args = parser.parse_args(argv)
-    # Every command that reads the corpus refuses here, through the one
-    # sentence `webapp/sitting.py` and the offline page print: the error names
-    # the case and the field, and a traceback over it names neither. A sweep
-    # that a command cannot read refuses here in one line too: its error names
-    # the file and the missing part. So does a configuration this process
-    # cannot run on: its error names the file or the variable to fix.
+    # Each command refuses here in one line. A corpus that does not load and a
+    # configuration this process cannot run on go through `refuse_entry`, as
+    # in each other entry point: the error names the case and the field, or
+    # the file or the variable to fix, and a traceback over it names neither.
+    # A ProvenanceError is a sweep that a command cannot read. An
+    # EvalRunError names its own fault, such as a missing part of a sweep, an
+    # argument, a case or a pass that this deployment does not build.
     try:
         return args.func(args)
-    except CorpusError as exc:
-        print(corpus_refusal(exc), file=sys.stderr)
-        return 1
-    except (ProvenanceError, modes.EvalRunError) as exc:
+    except ENTRY_ERRORS as exc:
+        return refuse_entry(exc)
+    except ProvenanceError as exc:
         print(f"cannot read the sweep: {exc}", file=sys.stderr)
         return 1
-    except ConfigError as exc:
-        print(config_refusal(exc), file=sys.stderr)
+    except modes.EvalRunError as exc:
+        print(exc, file=sys.stderr)
         return 1
 
 

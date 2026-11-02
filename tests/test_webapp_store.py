@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 
 from analysis_service import migrations
 from analysis_service.answer_sets import NO_SENT_ANSWERS
@@ -284,21 +285,50 @@ class TestTheFirstRunMigration:
             pass
         assert _migrated_lines(caplog) == []
 
-    def test_a_revision_the_tree_does_not_hold_stops_the_startup(self, tiers, durable):
+    @pytest.mark.parametrize(
+        ("change", "refused"),
+        [
+            ("UPDATE alembic_version SET version_num = 'r9999'", "revision r9999"),
+            ("ALTER TABLE jobs DROP COLUMN carried_renames", "differs"),
+        ],
+        ids=["a revision the tree does not hold", "a schema difference"],
+    )
+    def test_a_database_no_migration_repairs_stops_the_startup(
+        self, tiers, durable, change, refused
+    ):
+        """The app migrates its own SQLite file, so the remedy names no
+        command line: delete the file and start the app again."""
         with sqlite3.connect(database_of(durable)) as connection:
-            connection.execute("UPDATE alembic_version SET version_num = 'r9999'")
+            connection.execute(change)
         with (
-            pytest.raises(StoreConfigError, match="revision r9999"),
+            pytest.raises(StoreConfigError, match=refused) as stopped,
             app(tiers),
         ):
             pass
+        assert "delete the database file, then start the app again" in str(
+            stopped.value
+        )
+        assert "python -m" not in str(stopped.value)
+        assert database_of(durable) not in str(stopped.value)
 
     def test_a_file_that_is_not_a_database_stops_the_startup(
         self, tiers, first_run, caplog
     ):
+        """The read of its revision fails, before any migration."""
         first_run.write_bytes(b"not a database" * 100)
         first_run.chmod(0o600)
-        with pytest.raises(StoreConfigError, match="cannot be migrated"):
+        with pytest.raises(StoreConfigError, match="cannot be read;"):
+            app(tiers)
+        assert str(first_run) not in str(caplog.messages)
+
+    def test_a_migration_that_fails_stops_the_startup(
+        self, tiers, first_run, caplog, monkeypatch
+    ):
+        def fails(env):
+            raise OperationalError("ALTER TABLE", {}, Exception("disk I/O error"))
+
+        monkeypatch.setattr(migrations, "upgrade", fails)
+        with pytest.raises(StoreConfigError, match="cannot be migrated;"):
             app(tiers)
         assert str(first_run) not in str(caplog.messages)
 
