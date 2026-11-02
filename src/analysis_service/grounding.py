@@ -123,8 +123,8 @@ _REPAIR_WIDTH_SLACK = 2
 #: character multiset. No constant over the input can admit the first and refuse
 #: the second, because the first is the larger number.
 #:
-#: So the loop spends this budget as it goes, and it charges for **both** kinds
-#: of work at **different rates**.
+#: So the loop counts its work against this budget as it goes, and it counts
+#: **both** kinds of work at **different rates**.
 #:
 #: A charge for only the comparisons that survive the prune would read zero on
 #: the input where the prune itself is the cost: the join and ``quick_ratio``

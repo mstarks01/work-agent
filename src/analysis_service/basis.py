@@ -460,7 +460,7 @@ def coverage(model: SystemModel, sources: Mapping[str, str]) -> Coverage:
 
 
 class _Scan:
-    """One call's token searches: cached, and spent against a budget.
+    """One call's token searches: cached, and counted against a budget.
 
     Two things make the naive walk cost what it does. It lower-cases the source
     once per element, and it searches the same token against the same source

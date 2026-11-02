@@ -490,6 +490,10 @@ def _store_at_rest_unverified(
         )
 
 
+#: The operations that prove a caller reads a store.
+_READS = frozenset({"read", "read-write"})
+
+
 def _store_readers(model: SystemModel, catalog: AssertionCatalog) -> Iterator[Match]:
     """A store holding a graded asset, with every element that reads it.
 
@@ -501,30 +505,39 @@ def _store_readers(model: SystemModel, catalog: AssertionCatalog) -> Iterator[Ma
     the readers, so the lane can ask what one of them, or a grant like theirs,
     exposes.
 
-    A reader is the initiator of a flow into the store whose ``operations``
-    is ``read``, ``read-write`` or ``unknown``; a flow stating ``write`` only
-    is skipped, for the reason :func:`_unverified_write_to_store` skips a read.
+    **A caller's status comes from all of its flows into the store.** A
+    caller with one flow stating ``read`` or ``read-write`` is a reader, and
+    the fact ``readers`` names it. A caller whose flows state ``unknown`` and
+    never a read may or may not read, so ``callers_of_unknown_operation``
+    names it and the question asks the lane to settle the operation first. A
+    caller that only writes supplies no lead, for the reason
+    :func:`_unverified_write_to_store` skips a read. Each caller appears once,
+    at the strongest status its flows support (#2105).
     """
     for store in model.data_stores:
         assets = sensitive_assets(store)
         if not assets:
             continue
+        operations: dict[str, set[str]] = {}
+        for flow in inbound_flows(model, store.id):
+            operations.setdefault(flow.source, set()).add(flow.operations)
         readers = sorted(
-            {
-                flow.source
-                for flow in inbound_flows(model, store.id)
-                if flow.operations != "write"
-            }
+            caller for caller, stated in operations.items() if stated & _READS
         )
-        if not readers:
+        unknown = sorted(
+            caller
+            for caller, stated in operations.items()
+            if "unknown" in stated and not stated & _READS
+        )
+        if not readers and not unknown:
             continue
-        yield (
-            (store.id, *readers),
-            {
-                "readers": _clip(", ".join(readers)),
-                "assets": ", ".join(assets),
-            },
-        )
+        facts: dict[str, Fact] = {}
+        if readers:
+            facts["readers"] = _clip(", ".join(readers))
+        if unknown:
+            facts["callers_of_unknown_operation"] = _clip(", ".join(unknown))
+        facts["assets"] = ", ".join(assets)
+        yield (store.id, *readers, *unknown), facts
 
 
 # --- Denial of service ------------------------------------------------------
@@ -813,9 +826,11 @@ _RULES: tuple[Rule, ...] = (
         rule_id="information-disclosure-store-readers",
         lane="information-disclosure",
         question=(
-            "These elements read this store through access they already hold."
-            " Who else holds a grant like theirs, and what does compromising one"
-            " of these readers expose?"
+            "Each element under `readers` reads this store through access it"
+            " already holds. Each element under `callers_of_unknown_operation`"
+            " sends this store a flow whose operation the sources do not state,"
+            " so it is a reader only if that flow reads. Who else holds a grant"
+            " like a reader's, and what does compromising one of them expose?"
         ),
         find=_store_readers,
     ),
