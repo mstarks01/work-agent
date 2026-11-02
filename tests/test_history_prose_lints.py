@@ -31,7 +31,9 @@ from __future__ import annotations
 import ast
 import io
 import re
+import sys
 import tokenize
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import pytest
@@ -50,6 +52,7 @@ from tests.source_tree import (
     source_files,
     without,
 )
+from tests.test_five_class_read import HELD_ROWS
 
 pytestmark = pytest.mark.lint
 
@@ -451,14 +454,16 @@ def test_the_history_phrases_hold_to_their_history_reading():
 #: money word such as "bill" for a provider charge is not here. Case-insensitive.
 MONEY = re.compile(r"\b(debts?|clean bill|ow(e|es|ed|ing))\b", re.IGNORECASE)
 
-#: Every code file of the project and its tests, every guide, and the config
-#: files and workflows, read whole: comments, docstrings, strings and
-#: identifiers. The prompts are not here: a prompt edit changes model input.
+#: Every code file of the project and its tests, every guide, the config files
+#: and workflows, and every text a model reads, read whole: comments,
+#: docstrings, strings and identifiers. A hit in model text that a row of
+#: ``.github/scripts/held_wording.toml`` holds for the lint's rule is skipped.
 MONEY_SEARCHED = without(
     [
         *source_files(*PYTHON, *TESTS, suffixes=(".py", ".js", ".html", ".css")),
         *guide_files(),
         *HASH_COMMENTED,
+        *source_files(*MODEL_TEXT, suffixes=(".md",)),
     ],
     {
         "evals/experiments": (
@@ -468,8 +473,49 @@ MONEY_SEARCHED = without(
             "this module states the words the lint refuses, so the lint always"
             " finds them here"
         ),
+        ".github/scripts/held_wording.toml": (
+            "each row quotes a held phrase exactly, and the lints read the rows"
+            " to skip that phrase where it is held"
+        ),
     },
 )
+
+
+def held(rule: str) -> dict[str, tuple[str, ...]]:
+    """Each file against the phrases that the held rows of ``rule`` hold in it."""
+    phrases: dict[str, tuple[str, ...]] = {}
+    for row in HELD_ROWS:
+        if row["rule"] == rule:
+            phrases[row["file"]] = (*phrases.get(row["file"], ()), row["phrase"])
+    return phrases
+
+
+def _wording_hits(
+    pattern: re.Pattern[str],
+    paths: Iterable[Path],
+    phrases: Mapping[str, Iterable[str]],
+) -> list[str]:
+    """Each match of ``pattern`` in ``paths`` that no phrase of its file in
+    ``phrases`` covers on its line, as ``path:line 'match'``."""
+    found: list[str] = []
+    for path in paths:
+        where = path.relative_to(REPO_ROOT).as_posix()
+        text = path.read_text(encoding="utf-8")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            spans = [
+                occurrence.span()
+                for phrase in phrases.get(where, ())
+                for occurrence in re.finditer(re.escape(phrase), line)
+            ]
+            found.extend(
+                f"{where}:{lineno} {match.group(0)!r}"
+                for match in pattern.finditer(line)
+                if not any(
+                    start <= match.start() and match.end() <= end
+                    for start, end in spans
+                )
+            )
+    return found
 
 
 def test_no_file_uses_a_ruled_out_money_word():
@@ -478,28 +524,36 @@ def test_no_file_uses_a_ruled_out_money_word():
     The sentence names the concrete fact instead: what the code drops, refuses,
     runs, needs or gives.
     """
-    found = [
-        f"{path.relative_to(REPO_ROOT)}:{lineno} {match.group(0)!r}"
-        for path in MONEY_SEARCHED
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
-        for match in MONEY.finditer(line)
-    ]
+    found = _wording_hits(MONEY, MONEY_SEARCHED, held("money"))
 
     assert not found, (
         f"these lines use a ruled-out money word: {found}. Say what the code"
-        " drops, refuses, runs, needs or gives."
+        " drops, refuses, runs, needs or gives. In model text, a hit stays only"
+        " where a row of .github/scripts/held_wording.toml holds it."
     )
 
 
-#: What a metaphorical "spend" spends: a choice, a read, a place, a vote, an
-#: answer, a judgement, a pass, a quote or a question. Each is counted, used or
-#: taken, never paid. A literal spend of money, CPU time or wall time names
-#: none of these, so it is not matched. Case-insensitive.
+#: What a metaphorical "spend" spends: a thing that is never money. That is a
+#: choice, a read, a place, a vote, an answer, a judgement, a pass, a quote, a
+#: question, effort, attention, time, seconds or minutes, a turn, a retry or an
+#: attempt. Each is counted, used or taken, never paid. Case-insensitive.
 _SPENT_THING = (
-    r"(?:choices?|reads?|places?|votes?|answers?|judge?ments?|pass|quote|question)"
+    r"(?:choices?|reads?|places?|votes?|answers?|judge?ments?|pass(?:es)?|quotes?"
+    r"|questions?|efforts?|attention|time|seconds?|minutes?|turns?|retr(?:y|ies)"
+    r"|attempts?)"
 )
+
+#: A budget that is not money, such as a retry budget or a budget of scan work.
+#: A budget of a vendor, a model or tokens buys model calls, so it is money.
+_SPENT_BUDGET = r"(?<!vendor )(?<!model )(?<!token )(?<!tokens )budgets?"
+
+#: A word between "spend" and what it spends. "And" opens a new phrase, and a
+#: spend "on" or "over" something names what money buys or a period of it.
+_BETWEEN = r"(?:(?!(?:and|on|over)\b)[\w'`-]+ )"
+
 SPEND = re.compile(
-    rf"\b(?:re-?)?spen(?:d|ds|t|ding) (?:(?!and\b)\S+ ){{0,3}}?{_SPENT_THING}\b"
+    rf"\b(?:re-?)?spen(?:d|ds|t|ding) {_BETWEEN}{{0,3}}?"
+    rf"(?:{_SPENT_THING}|{_SPENT_BUDGET})\b"
     rf"|\b{_SPENT_THING} (?:is|are|was|were) (?:\w+ )?spent\b"
     rf"|\bspent {_SPENT_THING}\b",
     re.IGNORECASE,
@@ -524,22 +578,18 @@ def test_no_file_spends_a_choice_a_read_or_a_vote():
     The sentence says what the code does with it: counts it, uses it, takes it
     or makes it.
     """
-    found = [
-        f"{path.relative_to(REPO_ROOT)}:{lineno} {match.group(0)!r}"
-        for path in SPEND_SEARCHED
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
-        for match in SPEND.finditer(line)
-    ]
+    found = _wording_hits(SPEND, SPEND_SEARCHED, held("spend"))
 
     assert not found, (
         f"these lines spend something that is not money: {found}. Say that the"
-        " code counts, uses, takes or makes it."
+        " code counts, uses, takes or makes it. In model text, a hit stays only"
+        " where a row of .github/scripts/held_wording.toml holds it."
     )
 
 
 def test_the_spend_pattern_matches_only_a_metaphor():
-    """Positive control: a spend of a choice, a read, a vote or a pass matches,
-    and a spend of money, of time or of a retry token does not."""
+    """Positive control: a spend of a thing that is never money matches, and a
+    spend of money, of quota or of a vendor's budget does not."""
     for text in (
         "Each save spends at least one choice.",
         "Each case read spends one of its reads.",
@@ -548,6 +598,15 @@ def test_the_spend_pattern_matches_only_a_metaphor():
         "the critic's rule against re-spending judgement",
         "it would spend `repair`'s single pass",
         "and it spends a quote",
+        "Spend your effort on the flows",
+        "spend your attention on a lane",
+        "A body that has spent its thirty seconds",
+        "it spends minutes on a retry",
+        "the model spends a turn on it",
+        "the process had spent its retry budget",
+        "a run that spends its budget on retried 429s",
+        "asking anyway spends an attempt",
+        "the scan is cached, and spent against a budget",
     ):
         assert SPEND.search(text), text
     for text in (
@@ -556,6 +615,15 @@ def test_the_spend_pattern_matches_only_a_metaphor():
         "price a fix before spending and read a band",
         "a reader spent a week on words",
         "the walk takes at most its budget",
+        "a save runs nothing and spends nothing",
+        "a contributor may spend any amount",
+        "a wide filter would spend your vendor budget",
+        "a wider filter would spend live model budget",
+        "the smoke run spends no quota",
+        "nobody has chosen to spend on a second route",
+        "the window bounds the spend over time",
+        "the budget is spent against the job's bytes",
+        "a settled draft: spend nothing on it",
     ):
         assert not SPEND.search(text), text
 
@@ -567,3 +635,36 @@ def test_the_money_words_match_only_the_ruled_out_words():
         assert MONEY.search(word), word
     for word in ("bowed", "lower", "billed", "the provider bill", "indebted"):
         assert not MONEY.search(word), word
+
+
+def test_the_wording_lints_read_model_text():
+    prompt = REPO_ROOT / "prompts" / "critic.md"
+
+    assert prompt in MONEY_SEARCHED
+    assert prompt in SPEND_SEARCHED
+
+
+def test_a_hit_in_model_text_that_no_row_holds_fails(tmp_path, monkeypatch):
+    """Positive control: a held phrase frees the hit it covers in its own file,
+    and nothing else: not the same words in another file, and not a hit that it
+    does not cover."""
+    monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
+    prompt = tmp_path / "prompts" / "probe.md"
+    prompt.parent.mkdir()
+    prompt.write_text(
+        "A rule.\nNever spend a vote on it. Spend a quote.\n", encoding="utf-8"
+    )
+    vote = f"prompts/probe.md:2 {'spend a vote'!r}"
+    quote = f"prompts/probe.md:2 {'Spend a quote'!r}"
+
+    assert _wording_hits(SPEND, [prompt], {}) == [vote, quote]
+    assert _wording_hits(
+        SPEND, [prompt], {"prompts/probe.md": ["Never spend a vote on it"]}
+    ) == [quote]
+    assert _wording_hits(
+        SPEND, [prompt], {"prompts/other.md": ["Never spend a vote on it"]}
+    ) == [vote, quote]
+    assert _wording_hits(SPEND, [prompt], {"prompts/probe.md": ["a vote on"]}) == [
+        vote,
+        quote,
+    ]

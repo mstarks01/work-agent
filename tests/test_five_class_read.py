@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tomllib
 from fnmatch import fnmatchcase
+from itertools import permutations
 from pathlib import Path
 
 import pytest
@@ -453,3 +454,82 @@ def test_a_module_change_with_no_prompt_read_is_refused(repo):
     read = f"{check.PROMPT_HEADING}\n\n- prompts/extract-compact.md: still true."
     assert _run(repo, base, head, FULL_SECTION) == 1
     assert _run(repo, base, head, f"{FULL_SECTION}\n\n{read}") == 0
+
+
+#: The rows of held wording in model text, read once for every test here and
+#: for the wording lints of ``tests/test_history_prose_lints.py``.
+HELD_TABLE = tomllib.loads(check.HELD.read_text(encoding="utf-8"))
+HELD_ROWS: list[dict[str, str]] = HELD_TABLE["held"]
+
+#: The keys a held row carries.
+HELD_KEYS = frozenset({"file", "phrase", "rule", "reason"})
+
+
+def test_the_held_table_sits_beside_the_script():
+    assert check.HELD == SCRIPT.with_name("held_wording.toml")
+    assert check.HELD.is_file()
+
+
+@pytest.mark.parametrize("row", HELD_ROWS, ids=lambda row: row["phrase"][:40])
+def test_each_held_row_holds_a_phrase_its_file_spells_and_names_a_rule(row):
+    """A row whose phrase is gone fails, so the row goes with the measured
+    change that removes the phrase."""
+    assert set(row) == HELD_KEYS
+    assert row["rule"] in check.RULES
+    assert row["reason"].strip()
+    assert "\n" not in row["phrase"]
+    lines = (REPO_ROOT / row["file"]).read_text(encoding="utf-8").splitlines()
+    assert any(row["phrase"] in line for line in lines), (
+        f"{row['file']} no longer spells {row['phrase']!r}: delete its row in"
+        f" {check.HELD.name}."
+    )
+
+
+def test_a_prompt_read_names_each_held_phrase_once():
+    """A prompt read names a held row by its phrase, so no phrase holds
+    another, and a mention of one names no other."""
+    phrases = [row["phrase"].casefold() for row in HELD_ROWS]
+    assert [
+        (one, other) for one, other in permutations(phrases, 2) if one in other
+    ] == []
+
+
+def test_a_change_to_a_file_with_held_wording_names_its_held_phrases():
+    table = {
+        "held": [
+            {"file": "prompts/critic.md", "phrase": "one"},
+            {"file": "prompts/extract.md", "phrase": "two"},
+            {"file": "prompts/critic.md", "phrase": "three"},
+        ]
+    }
+    changed = ["docs/guide.md", "prompts/critic.md"]
+
+    assert check.held_phrases(changed, table) == ["one", "three"]
+    assert check.held_phrases(["docs/guide.md"], table) == []
+    assert check.held_phrases(changed, {}) == []
+
+
+HELD_ROW = """
+[[held]]
+file = "prompts/critic.md"
+phrase = "two parts talk"
+rule = "element-term"
+reason = "test"
+"""
+
+
+def test_a_change_to_held_wording_needs_a_prompt_read_from_the_base_table(repo):
+    """The check reads the base commit's held rows, so a pull request that
+    removes the phrase and its row still says what it did with the phrase."""
+    _commit(repo, ".github/scripts/held_wording.toml", HELD_ROW)
+    _commit(repo, "prompts/critic.md", "Here two parts talk.\n")
+    base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
+    _commit(repo, "prompts/critic.md", "Here two elements talk.\n")
+    head = _commit(repo, ".github/scripts/held_wording.toml", "")
+    read = (
+        f"{FULL_SECTION}\n\n{check.PROMPT_HEADING}\n\n"
+        "- `two parts talk`: changed by a measured change, ledger row QA-01."
+    )
+
+    assert _run(repo, base, head, FULL_SECTION) == 1
+    assert _run(repo, base, head, read) == 0
