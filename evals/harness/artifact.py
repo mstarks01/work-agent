@@ -36,6 +36,7 @@ from analysis_service.execution import seed_state
 from analysis_service.graph import STATE_INPUT_TEXT
 from analysis_service.identity import IDENTITY_VERSION
 from analysis_service.parsing import is_version
+from analysis_service.sources import text_digest
 from analysis_service.system_model import FLOW_ID_VERSION
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
 from evals.harness.provenance import (
@@ -166,9 +167,7 @@ def rendered_sources(cases: Iterable[GoldenCase]) -> dict[str, str]:
     rendered text, before the sweep spends.
     """
     return {
-        case.id: hashlib.sha256(
-            seed_state(case.sources)[STATE_INPUT_TEXT].encode("utf-8")
-        ).hexdigest()
+        case.id: text_digest(seed_state(case.sources)[STATE_INPUT_TEXT])
         for case in cases
     }
 
