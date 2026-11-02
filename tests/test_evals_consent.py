@@ -752,6 +752,7 @@ class TestAStoppedSweepSaysSo:
             sweep=Sweep(run=run),
             commit=ARTIFACT_COMMIT,
             corpus="d" * 64,
+            rendered=dict.fromkeys(cases, "e" * 64),
             series=None,
         )
 

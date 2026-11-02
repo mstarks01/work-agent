@@ -500,6 +500,10 @@ reference row on an assertion case takes a fate the same way.
 python -m evals.harness.run replay evals/emissions/*.json --out /tmp/replay.json
 ```
 
+The replay pools only the sweeps that record one input in `rendered_sources`.
+Name the arm of an older sweep with `--arm LABEL=GLOB` to pool it with others
+that read the same input.
+
 An `omitted` count is the ceiling of a prompt change that asks the model to
 read more. An `unresolved` count is not: it waits on a ruling, and a run
 cannot move it. Read the two apart. And read the replay as a ceiling rather

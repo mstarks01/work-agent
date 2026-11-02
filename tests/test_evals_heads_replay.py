@@ -91,6 +91,9 @@ class TestPlacingAHeadOnlySweep:
             mode = "heads"
             path = Path("heads.json")
 
+            def carries(self, name: str) -> bool:
+                return name != "rendered_sources"
+
             def block(self, name: str):
                 if name == "instruction":
                     return [
@@ -105,13 +108,13 @@ class TestPlacingAHeadOnlySweep:
         return Fake()
 
     def test_it_is_placed_by_the_node_it_carried(self) -> None:
-        arm = replay.arm_of(self.artifact("extract", "repair"))
+        arm = replay.arm_of(self.artifact("extract", "repair"), None)
         assert arm.nodes == ("extract",)
         assert arm.instructions == ("extract-digest",)
 
     def test_a_sweep_carrying_neither_is_refused(self) -> None:
         with pytest.raises(ValueError, match="cannot be placed on"):
-            replay.arm_of(self.artifact("repair"))
+            replay.arm_of(self.artifact("repair"), None)
 
 
 class TestGradingAHeadOnlySweep:

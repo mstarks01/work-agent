@@ -32,6 +32,8 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.certification import CertifyResult
+from analysis_service.execution import seed_state
+from analysis_service.graph import STATE_INPUT_TEXT
 from analysis_service.identity import IDENTITY_VERSION
 from analysis_service.parsing import is_version
 from analysis_service.system_model import FLOW_ID_VERSION
@@ -42,6 +44,7 @@ from evals.harness.provenance import (
     RunProvenance,
     checkout_state,
 )
+from evals.harness.reference import GoldenCase
 
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 
@@ -151,6 +154,23 @@ def corpus_digest(corpus_dir: Path = CORPUS_DIR) -> str:
         digest.update(path.relative_to(corpus_dir).as_posix().encode("utf-8"))
         digest.update(hashlib.sha256(path.read_bytes()).digest())
     return digest.hexdigest()
+
+
+def rendered_sources(cases: Iterable[GoldenCase]) -> dict[str, str]:
+    """Each case's digest of its Sources as the graph renders them for a model.
+
+    The rendered text is what the model reads, so the digest moves when a
+    Source moves and when the render moves, such as a change to the diagram
+    reader. The corpus digest moves for neither of the two. Rendered through
+    :func:`~analysis_service.execution.seed_state`, the one writer of the
+    rendered text, before the sweep spends.
+    """
+    return {
+        case.id: hashlib.sha256(
+            seed_state(case.sources)[STATE_INPUT_TEXT].encode("utf-8")
+        ).hexdigest()
+        for case in cases
+    }
 
 
 @dataclass(frozen=True)
@@ -357,6 +377,13 @@ ENVELOPE_KEYS: tuple[str, ...] = (
     "stopped",
     "series",
     "completion",
+    # Declared without a version bump, on the ``flow_identity_version``
+    # precedent: ``carries`` says whether an artifact holds it. One digest per
+    # case the sweep selected, from :func:`rendered_sources`, so a sweep that
+    # the hold stopped short keeps the digests of its peers. ``replay`` places a
+    # sweep on an arm by it. It covers the corpus Sources only: the answered
+    # and withheld modes add an answers Source after it is taken.
+    "rendered_sources",
 )
 
 #: What a **re-score** writes and a sweep never does, which is why these are
@@ -458,6 +485,7 @@ def build(
     sweep: Sweep,
     commit: RepoCommit,
     corpus: str,
+    rendered: Mapping[str, str],
     series: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     """The whole artifact: the sweep's envelope, plus every instrument's keys.
@@ -472,9 +500,10 @@ def build(
     ``trusted`` rides beside the aggregates so nothing downstream folds an
     uncertified run into a trusted number unaware.
 
-    ``commit`` and ``corpus`` are passed in rather than computed here, because
-    a sweep that cannot name its own repository state should stop before it
-    spends the money — ``command_run`` resolves both in its first second. By
+    ``commit``, ``corpus`` and ``rendered`` are passed in rather than computed
+    here, because a sweep that cannot name its own repository state or its input
+    should stop before it spends the money — ``command_run`` resolves all three
+    before the consent gate. By
     the time this runs, the answer has already been paid for.
 
     ``completion`` is what every aggregate below it is conditional on. Scoring
@@ -506,6 +535,7 @@ def build(
         "trusted": trusted,
         "repo_commit": commit.model_dump(),
         "corpus_digest": corpus,
+        "rendered_sources": dict(rendered),
         # Which rule spelled every flow ID in this artifact and its report
         # bundle (ADR 0037 rule 4). The version the writing code holds, because
         # every ID in the bundle came out of that code.
