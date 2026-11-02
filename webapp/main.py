@@ -1358,6 +1358,12 @@ async def _json_body(request: Request, limit: int) -> object:
         return None
 
 
+async def _job_body(request: Request, answers: JobAnswers) -> object:
+    """A job route's body, read by :func:`_json_body` under the deployment's
+    raw-body guard, :func:`~analysis_service.api.max_body_bytes`."""
+    return await _json_body(request, max_body_bytes(answers.limits))
+
+
 _RELOAD_MESSAGE = (
     "settings.env changed after this page loaded. Reload the page, then make"
     " the change again."
@@ -1612,7 +1618,7 @@ def create_app(
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
         current = cell.read(unavailable)
-        raw = await _json_body(request, max_body_bytes(current.answers.limits))
+        raw = await _job_body(request, current.answers)
         try:
             body = _body_of(raw, _FileUpload)
             upload = _FileUpload.model_validate(body)
@@ -1788,7 +1794,7 @@ def create_app(
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
         answers = cell.read(unavailable).answers
-        body = await _json_body(request, max_body_bytes(answers.limits))
+        body = await _job_body(request, answers)
         sent = body.get("title") if isinstance(body, dict) else None
         if not isinstance(sent, str):
             return _message(400, _NAME_REFUSED)
@@ -1811,7 +1817,7 @@ def create_app(
             return forbidden
         current = cell.read(unavailable)
         answers = current.answers
-        raw = await _json_body(request, max_body_bytes(answers.limits))
+        raw = await _job_body(request, answers)
         try:
             body = _body_of(raw, _Submission)
         except _UnknownKey as exc:
@@ -1870,9 +1876,7 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            submitted = read_answers(
-                await _json_body(request, max_body_bytes(answers.limits))
-            )
+            submitted = read_answers(await _job_body(request, answers))
         except BodyRefused as refused:
             message = await _refusal_words(refused, workspace, answers, run_id)
             if refused.over_a_bound:
@@ -1913,9 +1917,7 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            amendment = read_amendment(
-                await _json_body(request, max_body_bytes(answers.limits))
-            )
+            amendment = read_amendment(await _job_body(request, answers))
         except BodyRefused as refused:
             return _message(400, str(refused))
         owner_id = await workspace.owner_id(answers, run_id)
@@ -1990,9 +1992,7 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            corrections = read_corrections(
-                await _json_body(request, max_body_bytes(answers.limits))
-            )
+            corrections = read_corrections(await _job_body(request, answers))
         except BodyRefused as refused:
             return _message(
                 400, await _refusal_words(refused, workspace, answers, run_id)

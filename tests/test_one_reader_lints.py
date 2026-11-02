@@ -1530,3 +1530,36 @@ def test_a_dropped_claim_is_built_only_by_its_constructor():
     to. A producer that raises on a long value costs the job the report the
     mark exists to preserve."""
     assert _sites(lambda node: _calls(node, "DroppedClaim")) == []
+
+
+def _applies_the_body_slack(node: ast.AST) -> bool:
+    """Whether ``node`` reads ``_BODY_SLACK`` or scales a byte budget. A string
+    repeated to the budget's length is a body, not a bound."""
+    slack = _is_name(node, "_BODY_SLACK") and isinstance(node.ctx, ast.Load)
+    if not (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult)):
+        return slack
+    sides = (node.left, node.right)
+    budget = any(
+        isinstance(side, ast.Attribute) and side.attr == "max_total_bytes"
+        for side in sides
+    )
+    text = any(
+        isinstance(side, ast.Constant) and isinstance(side.value, str | bytes)
+        for side in sides
+    )
+    return budget and not text
+
+
+def test_the_raw_body_guard_has_one_reader():
+    """Only ``max_body_bytes`` derives the raw-body guard from the byte
+    budget, and only the ``/v1`` app and the web app's job routes ask it, so
+    the two drivers refuse one body size."""
+    searched = (*FILES, *source_files(*TESTS))
+
+    assert _sites(_applies_the_body_slack, searched) == [
+        ("src/analysis_service/api.py", "max_body_bytes")
+    ]
+    assert _sites(lambda node: _calls(node, "max_body_bytes")) == [
+        ("src/analysis_service/api.py", "create_app"),
+        ("webapp/main.py", "_job_body"),
+    ]

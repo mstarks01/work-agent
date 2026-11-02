@@ -2007,6 +2007,43 @@ def test_a_row_rule_is_defined_once_and_read_by_its_pages(rule):
         assert f"{rule}(" in page_javascript(page), f"{page} does not call {rule}"
 
 
+#: A read of a question's key by position: an index into a key, or a key
+#: unpacked into names. A string key that a method splits is no question's key.
+_KEY_BY_POSITION = re.compile(r"\bkey\s*\[|\[[\w\s,]*\]\s*=\s*[\w.]*\bkey\b(?!\s*\.)")
+
+#: The definitions that read a key by position, both through ``KEY_FIELDS``:
+#: ``keyRef`` names each part, and ``withElement`` writes a key in that order.
+_KEY_LAYOUT = re.compile(
+    r"^const (?:keyRef|withElement) = .*?;$", re.DOTALL | re.MULTILINE
+)
+
+
+def test_a_key_is_read_by_position_only_through_key_fields():
+    """``keyRef`` is the one reader of which part of a key is which. A page
+    that reads ``key[1]`` itself is a second reader of ``UNKNOWN_KEY_FIELDS``,
+    and it reads the wrong part once the order moves."""
+    layout = _KEY_LAYOUT.findall(page_javascript("question_list.js"))
+    found = [
+        (name, match)
+        for name in STATIC_SCRIPTS
+        for match in _KEY_BY_POSITION.findall(
+            _KEY_LAYOUT.sub("", page_javascript(name))
+        )
+    ]
+
+    assert len(layout) == 2 and all(_KEY_BY_POSITION.search(rule) for rule in layout)
+    assert not found, (
+        f"{found} read a question's key by position. Read it by name with keyRef."
+    )
+
+
+def test_the_key_position_lint_sees_a_positional_read():
+    """A positive control on the lint above."""
+    reads = "const attribute = row.q.key[1];\nconst [element] = q.key;\n"
+
+    assert len(_KEY_BY_POSITION.findall(reads)) == 2
+
+
 def run_list_rules(program: str) -> object:
     """The JSON ``program`` prints, run in node after the rules
     question_list.js shares with both pages.
