@@ -1,0 +1,23 @@
+{
+  "actor": "a staff user of the rota app",
+  "capability_scope": "the rota app's own sign-in",
+  "note": "An account is not a factor, and the text does not say whether the code comes beside a password or in its place, so the reader leaves the second factor out.",
+  "reading": {
+    "capabilities": [
+      {
+        "capability": "authentication",
+        "source_label": "System description",
+        "quote": "Each staff user signs in to the rota app"
+      },
+      {
+        "capability": "one-time-codes",
+        "source_label": "System description",
+        "quote": "Each staff user signs in to the rota app with their own account and a one-time code"
+      }
+    ]
+  },
+  "rule_break_quote": "Each staff user signs in to the rota app with their own account and a one-time code",
+  "expected": {
+    "V6.4.4": "unknown"
+  }
+}
