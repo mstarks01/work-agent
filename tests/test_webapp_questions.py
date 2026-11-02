@@ -635,7 +635,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         _FORM_HARNESS.replace("SEARCH", json.dumps(search))
         .replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
         .replace("FORMATS", json.dumps(json.dumps(_FORMAT_TABLE)))
-        .replace("REFUSALS", json.dumps(json.dumps(file_refusals(64))))
+        .replace("REFUSALS", json.dumps(json.dumps(file_refusals(64, 3))))
         .replace("PAGE_LABELS", json.dumps(json.dumps(PAGE_SOURCE_LABELS)))
         + script
         + "\n(async () => {\n"
@@ -2275,6 +2275,28 @@ calls.push({ line: line(), ticks: ticks(), rows: rowsOf().map(r => own(r).value)
             "rows": ["none", "none", "none"],
         },
     ]
+
+
+def test_cover_every_part_waits_for_a_shared_answer():
+    """With an empty shared answer, "Cover every part" is disabled, so it
+    ticks no element and copies no empty value. A value enables it, and an
+    empty value disables it again (ADR 0113)."""
+    first, second = valid_model().data_flows[:2]
+    facts = [_control_row(first), _control_row(second)]
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+const all = shared[0].children.find(c => c.tag === "button" && c.textContent === "Cover every part");
+const state = child(shared[0].children[0], "select");
+calls.push({ disabled: all.disabled === true });
+state.value = "none"; state.listeners.change();
+calls.push({ disabled: all.disabled === true });
+state.value = ""; state.listeners.change();
+calls.push({ disabled: all.disabled === true });
+"""
+    )
+    seen = [c["disabled"] for c in _run_form_script(steps)["calls"] if "disabled" in c]
+    assert seen == [True, False, True]
 
 
 def test_undo_puts_back_the_shared_answer_and_each_part_it_wrote():

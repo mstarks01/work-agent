@@ -556,6 +556,23 @@ def test_one_shared_answer_saves_the_answer_for_every_element_ticked(page):
     assert share["answer"]["key"][0] == ""
 
 
+def test_cover_every_part_waits_for_a_shared_answer(page):
+    """The button "Cover every part" is disabled while the shared answer is
+    empty, so a click copies no empty value. A choice enables it (ADR 0113)."""
+    pause(page)
+    shared = page.locator("#list .shared-controls select").first
+    shared.wait_for()
+    box = shared.locator("xpath=ancestor::details[contains(@class, 'question-group')]")
+    cover = box.get_by_role("button", name="Cover every part")
+    assert cover.is_disabled()
+    shared.select_option("yes")
+    assert cover.is_enabled()
+    shared.select_option("")
+    assert cover.is_disabled()
+    ticks = box.locator("input.share-answer").all()
+    assert not any(tick.is_checked() for tick in ticks)
+
+
 def test_a_ticked_choice_row_keeps_its_title_beside_the_tick(page):
     """On a wide page a choice row is "split", and a row of a shared box has a
     tick. The title sits in the column after the tick, at its full width."""

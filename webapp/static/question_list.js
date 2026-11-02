@@ -89,9 +89,12 @@ const questionList = ({
   };
   // The line beside a shared answer that says which elements it covers: each
   // ticked element, and the elements the saved share covers that the box does
-  // not list (ADR 0114).
+  // not list (ADR 0114). "Cover every part" copies the shared answer, so it is
+  // disabled while the shared answer is empty (ADR 0113).
   const showCovers = (box) => {
     if (!box || !box.coverLine) return;
+    const answered = Boolean(box.sharedAnswer && box.sharedAnswer());
+    box.coverAllButton.disabled = !answered;
     const members = box.rows.filter((row) => row.kind === "fact");
     const before = heldElsewhere(box.held, members).length;
     const parts = [
@@ -100,7 +103,7 @@ const questionList = ({
     ];
     box.coverLine.textContent = parts.length
       ? `This answer covers: ${parts.join(", ")}`
-      : box.sharedAnswer && box.sharedAnswer()
+      : answered
         ? "This answer covers no part yet. Tick each part it covers, or use Cover every part."
         : "This answer covers no part yet.";
   };

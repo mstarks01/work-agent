@@ -117,7 +117,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Any, Literal, get_args
+from typing import Annotated, Any, Literal, TypedDict, get_args
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -1253,13 +1253,26 @@ _ADMISSION_MESSAGES: dict[str, str] = {
 }
 
 
-def file_refusals(max_bytes: int) -> dict[str, str]:
-    """The refusals that ``text_file.js`` shows for a file it checks before
-    the server does, in the server's words (:func:`upload_refusal`)."""
+#: The key of each refusal that ``text_file.js`` and ``files.js`` show for a
+#: file they check before the server does.
+FileRefusal = Literal["too_large", "not_plain_text", "no_text", "full"]
+
+
+class FilesLimits(TypedDict):
+    """The limits that ``files.js`` reads."""
+
+    max_owner_files: int
+    max_bytes: int
+    name_chars: int
+
+
+def file_refusals(max_bytes: int, max_files: int) -> dict[FileRefusal, str]:
+    """Each :data:`FileRefusal` in the server's words (:func:`upload_refusal`)."""
     return {
         "too_large": too_large(max_bytes),
         "not_plain_text": NOT_PLAIN_TEXT,
         "no_text": NO_TEXT,
+        "full": over_limit(max_files),
     }
 
 
@@ -1471,7 +1484,10 @@ def create_app(
                 source_limit=str(current.answers.limits.max_total_bytes),
                 source_formats=_SOURCE_FORMATS,
                 file_refusals=script_json(
-                    file_refusals(current.answers.limits.max_total_bytes)
+                    file_refusals(
+                        current.answers.limits.max_total_bytes,
+                        current.max_owner_files,
+                    )
                 ),
                 upload_accept=_UPLOAD_ACCEPT,
                 page_labels=script_json(PAGE_SOURCE_LABELS),
@@ -1573,7 +1589,7 @@ def create_app(
         current = cell.read(
             lambda: response(diagnostic_page(state, env), status_code=503)
         )
-        limits = {
+        limits: FilesLimits = {
             "max_owner_files": current.max_owner_files,
             "max_bytes": current.answers.limits.max_total_bytes,
             "name_chars": MAX_LABEL_CHARS,
@@ -1590,8 +1606,7 @@ def create_app(
                 sidebar=_SIDEBAR,
                 source_formats=_SOURCE_FORMATS,
                 file_refusals=script_json(
-                    file_refusals(limits["max_bytes"])
-                    | {"full": over_limit(current.max_owner_files)}
+                    file_refusals(limits["max_bytes"], limits["max_owner_files"])
                 ),
                 upload_accept=_UPLOAD_ACCEPT,
                 files_limits=script_json(limits),

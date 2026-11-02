@@ -85,7 +85,7 @@ from evals.harness.reference import (
     load_case,
     refuse_holdout,
 )
-from evals.harness.run_record import Selections, run_record
+from evals.harness.run_record import Selections, run_record_for
 from evals.reference_facts import load_facts, signed_proposal
 
 #: What ``--prepare-today`` hands ``prepare`` as the catalog: none, which is a
@@ -336,21 +336,18 @@ def command_lane_replay(args: argparse.Namespace) -> int:
             )
         if args.append is not None:
             inputs[args.append] = {}
-        record = (
-            None
-            if args.out is None
-            else run_record(
-                "lane-replay",
-                {
-                    "case": args.case,
-                    "lane": args.lane,
-                    "framework": args.framework,
-                    "fresh_leads": args.fresh_leads,
-                    "prepare_today": args.prepare_today,
-                    "corpus_digest": corpus_digest(),
-                },
-                inputs,
-            )
+        record = run_record_for(
+            [args.out],
+            "lane-replay",
+            {
+                "case": args.case,
+                "lane": args.lane,
+                "framework": args.framework,
+                "fresh_leads": args.fresh_leads,
+                "prepare_today": args.prepare_today,
+                "corpus_digest": corpus_digest(),
+            },
+            inputs,
         )
     except (CorpusError, EvalRunError, ProvenanceError) as error:
         print(error, file=sys.stderr)
