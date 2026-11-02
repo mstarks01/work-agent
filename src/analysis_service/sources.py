@@ -356,6 +356,11 @@ class Source(BaseModel):
 def text_digest(text: str) -> str:
     """The sha256 hex digest of ``text``, over its UTF-8 bytes.
 
+    **The one digest rule of a text.** A source, a quote, a node's instruction,
+    an execution identity and each key the eval harness derives from a text all
+    read it here, so a change to it moves every digest the archive records.
+    Replay the archive before any change (``docs/agents/one-rule-one-reader.md``).
+
     **What a support span pins a quote to.** A span names offsets into the
     exact retained text, so a source that changes underneath it names different
     words. The digest is what lets a reader see that, and it is recomputed and
