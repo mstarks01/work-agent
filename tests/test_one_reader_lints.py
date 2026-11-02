@@ -1535,7 +1535,11 @@ def test_a_dropped_claim_is_built_only_by_its_constructor():
 def _applies_the_body_slack(node: ast.AST) -> bool:
     """Whether ``node`` reads ``_BODY_SLACK`` or scales a byte budget. A string
     repeated to the budget's length is a body, not a bound."""
-    slack = _is_name(node, "_BODY_SLACK") and isinstance(node.ctx, ast.Load)
+    slack = (
+        isinstance(node, ast.Name)
+        and node.id == "_BODY_SLACK"
+        and isinstance(node.ctx, ast.Load)
+    )
     if not (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult)):
         return slack
     sides = (node.left, node.right)
