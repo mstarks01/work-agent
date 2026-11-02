@@ -24,7 +24,7 @@ import string
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args
 
 HERE = Path(__file__).parent
 RUNS = HERE / "runs"
@@ -112,22 +112,7 @@ Column = Literal[
     "note",
 ]
 
-COLUMNS: tuple[Column, ...] = (
-    "n",
-    "check",
-    "group",
-    "case",
-    "title",
-    "description",
-    "elements",
-    "mitigations",
-    "question",
-    "verdicts",
-    "verdict",
-    "duplicate_of",
-    "pair_of",
-    "note",
-)
+COLUMNS: tuple[Column, ...] = get_args(Column)
 
 
 def runs(check: Check) -> list[tuple[str, dict]]:

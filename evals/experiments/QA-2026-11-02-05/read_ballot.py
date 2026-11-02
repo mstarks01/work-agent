@@ -5,10 +5,11 @@ each ``n`` must appear once, each issued column must be unchanged, each verdict
 must be in its check's set, and ``duplicate_of`` and ``pair_of`` must name
 another row of the same check and the same group, and a pair's two drafts
 must share a flow of the case's model. A duplicate names a row that is not a
-duplicate itself. A row may be in one pair at most, and a link written on both rows counts once. A file that breaks one of
-these, or a row with more or fewer cells than the header, is refused by
-name. The file may carry the byte-order mark a spreadsheet
-writes.
+duplicate itself. A row may be in one pair at most, and a link written on
+both rows counts once. An ``item4`` row ruled ``same`` names one target store.
+A file that breaks one of these, or a row with more or fewer cells than the
+header, is refused by name. The file may carry the byte-order mark a
+spreadsheet writes.
 
 The counts are the ones the E2 and E3 falsifiers read:
 
@@ -19,9 +20,10 @@ The counts are the ones the E2 and E3 falsifiers read:
   run that has none. A copy control fails in a run with 0; a no-read control
   fails in a run with more than 0.
 * E2: the ``right``, ``wrong``, ``duplicate`` and ``unsure`` rulings, and the
-  pairs and the duplicates by group.
+  pairs and the duplicates of each group, with 0 for a group that has none.
 
-Usage, from the repository root: ``read_ballot.py``.
+Usage, from the repository root: ``read_ballot.py``. It prints the counts and
+writes them to ``runs/ballot-read.json``.
 """
 
 import csv
@@ -29,16 +31,16 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast, get_args
 
 sys.path.insert(0, str(Path(__file__).parent))
-from build_ballot import CHECKS, COLUMNS, Check, Column, runs
+from build_ballot import CHECKS, COLUMNS, HERE, RUNS, Check, runs
 
 from evals.harness.reference import load_case
 
-HERE = Path(__file__).parent
-#: The columns the ruler fills in; every other column must come back unchanged.
-RULED: tuple[Column, ...] = ("verdict", "duplicate_of", "pair_of", "note")
+#: A column the ruler fills in; every other column must come back unchanged.
+Ruled = Literal["verdict", "duplicate_of", "pair_of", "note"]
+RULED: tuple[Ruled, ...] = get_args(Ruled)
 
 
 class BallotError(ValueError):
@@ -116,30 +118,48 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
                 f"row {n}: duplicate_of names row {duplicate['n']}, which is a"
                 " duplicate too; name the row it repeats"
             )
-        if (duplicate is None) != (row["verdict"] != "duplicate"):
+        if row["verdict"] == "duplicate" and duplicate is None:
+            raise BallotError(f"row {n} is ruled duplicate and names no row")
+        if row["verdict"] != "duplicate" and duplicate is not None:
             raise BallotError(
-                f"row {n}: a duplicate names its row, and only a duplicate"
+                f"row {n} names row {duplicate['n']} in duplicate_of and is"
+                f" ruled {row['verdict']!r}, not duplicate"
             )
         pair = _linked(rows, row, "pair_of")
         if pair is not None:
             if (row["verdict"], pair["verdict"]) != ("right", "right"):
-                raise BallotError(f"row {n}: a pair links two right rows")
+                raise BallotError(
+                    f"row {n} ({row['verdict']!r}) names row {pair['n']}"
+                    f" ({pair['verdict']!r}) in pair_of; both must be right"
+                )
             flows = elements_of(n) & elements_of(pair["n"]) & flows_of(row["case"])
             if not flows:
-                raise BallotError(f"row {n}: a pair links two drafts at one flow")
+                raise BallotError(
+                    f"rows {n} and {pair['n']} share no flow of case {row['case']}"
+                )
             pairs.add(frozenset((n, pair["n"])))
-    paired = Counter(member for pair in pairs for member in pair)
-    if twice := sorted(n for n, count in paired.items() if count > 1):
+    membership = Counter(member for pair in pairs for member in pair)
+    if twice := sorted(n for n, count in membership.items() if count > 1):
         raise BallotError(f"rows {twice} are each in more than one pair")
 
     targets = CHECKS["item4"].stores
     assert targets is not None
-    places = {
-        (key[n]["run"], store)
-        for n, row in rows.items()
-        if row["check"] == "item4" and row["verdict"] == "same"
-        for store in targets & elements_of(n)
-    }
+    places = set()
+    for n, row in rows.items():
+        if row["check"] == "item4" and row["verdict"] == "same":
+            named = targets & elements_of(n)
+            if len(named) > 1:
+                raise BallotError(
+                    f"row {n} is ruled same and names {len(named)} target stores"
+                )
+            places |= {(key[n]["run"], store) for store in named}
+    groups = sorted({r["group"] for r in rows.values() if r["check"] == "item2"})
+    paired = Counter(rows[min(pair)]["group"] for pair in pairs)
+    duplicates = Counter(
+        r["group"]
+        for r in rows.values()
+        if r["check"] == "item2" and r["verdict"] == "duplicate"
+    )
     return {
         "verdicts": {
             check: dict(
@@ -165,25 +185,19 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
             for check, spec in CHECKS.items()
             if spec.control
         },
-        "e2_pairs_by_group": dict(Counter(rows[min(p)]["group"] for p in pairs)),
-        "e2_duplicates_by_group": dict(
-            Counter(
-                r["group"]
-                for r in rows.values()
-                if r["check"] == "item2" and r["verdict"] == "duplicate"
-            )
-        ),
+        "e2_pairs_by_group": {group: paired[group] for group in groups},
+        "e2_duplicates_by_group": {group: duplicates[group] for group in groups},
     }
 
 
 if __name__ == "__main__":
-    print(
-        json.dumps(
-            read(
-                HERE / "ballot-returned.csv",
-                HERE / "ballot-issued.csv",
-                HERE / "ballot-key.json",
-            ),
-            indent=1,
-        )
+    counts = json.dumps(
+        read(
+            HERE / "ballot-returned.csv",
+            HERE / "ballot-issued.csv",
+            HERE / "ballot-key.json",
+        ),
+        indent=1,
     )
+    (RUNS / "ballot-read.json").write_text(counts + "\n")
+    print(counts)

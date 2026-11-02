@@ -87,9 +87,10 @@ def tree_digests(paths: list[str], read) -> dict[str, str]:
 
 
 def input_digests() -> dict[str, str]:
-    """Each tracked file under ``REQUEST_ROOTS`` with the digest of its text."""
+    """Each tracked file under ``REQUEST_ROOTS``, and this script, which builds
+    the request, with the digest of its text."""
     tracked = subprocess.run(
-        ["git", "ls-files", "-z", "--", *REQUEST_ROOTS],
+        ["git", "ls-files", "-z", "--", *REQUEST_ROOTS, __file__],
         check=True,
         capture_output=True,
         text=True,

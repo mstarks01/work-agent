@@ -41,7 +41,7 @@ class Recording(ScriptedLlm):
 
     requests: list = Field(default_factory=list)
 
-    async def generate_content_async(self, llm_request, stream=False):
+    async def generate_content_async(self, llm_request, stream: bool):
         self.requests.append(llm_request)
         async for response in super().generate_content_async(llm_request, stream):
             yield response
