@@ -16,7 +16,9 @@ here judges a file; each lint keeps its own predicates and declarations.
 from __future__ import annotations
 
 import ast
+import io
 import os
+import tokenize
 from collections.abc import Iterable, Mapping
 from functools import cache
 from pathlib import Path
@@ -183,6 +185,29 @@ def module_name(path: Path) -> str:
     if parts[-1] == "__init__":
         parts = parts[:-1]
     return ".".join(parts)
+
+
+def joined_runs(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    """Consecutive numbered lines joined into one text, at its first line."""
+    runs: list[tuple[int, str]] = []
+    for lineno, text in lines:
+        if runs and lineno == runs[-1][0] + runs[-1][1].count("\n") + 1:
+            runs[-1] = (runs[-1][0], f"{runs[-1][1]}\n{text}")
+        else:
+            runs.append((lineno, text))
+    return runs
+
+
+def comment_runs(path: Path) -> list[tuple[int, str]]:
+    """Each run of comment lines in the Python file at ``path``, joined into
+    one text without its ``#`` marks, at its first line."""
+    source = path.read_text(encoding="utf-8")
+    comments = [
+        (token.start[0], token.string.lstrip("#").strip())
+        for token in tokenize.generate_tokens(io.StringIO(source).readline)
+        if token.type == tokenize.COMMENT
+    ]
+    return joined_runs(comments)
 
 
 def imports(tree: ast.Module) -> dict[str, str]:

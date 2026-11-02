@@ -89,16 +89,18 @@ def _is_name(node: ast.AST, *names: str) -> bool:
 def test_each_store_choice_has_one_reader():
     """Only ``job_store_name`` and ``object_store_name`` choose a store row."""
 
-    def chooses(node: ast.AST) -> bool:
-        return (
+    def chooses(table: str) -> Callable[[ast.AST], bool]:
+        return lambda node: (
             _calls(node, "closed_setting")
             and len(node.args) == 3
-            and _is_name(node.args[2], "JOB_STORES", "OBJECT_STORES")
+            and _is_name(node.args[2], table)
         )
 
-    assert sorted(_sites(chooses)) == [
-        ("src/analysis_service/objects.py", "object_store_name"),
-        ("src/analysis_service/store_backends.py", "job_store_name"),
+    assert _sites(chooses("JOB_STORES")) == [
+        ("src/analysis_service/store_backends.py", "job_store_name")
+    ]
+    assert _sites(chooses("OBJECT_STORES")) == [
+        ("src/analysis_service/objects.py", "object_store_name")
     ]
 
 
@@ -394,9 +396,12 @@ def test_a_reports_rows_have_one_reader():
     its rows through ``report_rows``. ``absent_rows`` is the one other caller,
     because it holds a catalog and no Report.
     """
-    assert _sites(lambda node: _calls(node, "row_controls")) == [
-        ("src/analysis_service/claim_identity.py", "report_rows"),
-        ("src/analysis_service/fixes.py", "absent_rows"),
+    catalog_holder = ("src/analysis_service/fixes.py", "absent_rows")
+    sites = _sites(lambda node: _calls(node, "row_controls"))
+
+    assert catalog_holder in sites
+    assert [site for site in sites if site != catalog_holder] == [
+        ("src/analysis_service/claim_identity.py", "report_rows")
     ]
 
 

@@ -25,7 +25,8 @@ call to it there:
   names as a base, has construction calls that the tree does not show, so the
   lint does not judge its ``__init__``. A read of the class in an annotation,
   in an ``except`` clause, as the owner of an attribute, or in ``isinstance``
-  or ``issubclass`` constructs nothing, so it is no such value read. The lint
+  or ``issubclass`` constructs nothing, so it is no such value read. A class
+  that a ``getattr`` string names is not judged either. The lint
   does not see ``self.__class__(...)``, ``type(other)(...)`` or
   ``dataclasses.replace`` as a construction call, so a class built only those
   ways can be a false hit.
@@ -425,8 +426,10 @@ def _kind(name: str, owner: str, kind: Kind) -> Kind | None:
 def calls_of(function: Judged, found: Uses) -> list[Call] | None:
     """Each call of ``function``, or None where code also reads it as a value."""
     if function.kind == "init":
-        dotted = f"{function.module}.{function.qualified.split('.')[0]}"
-        return None if dotted in found.opaque_values else found.calls[dotted]
+        owner = function.qualified.split(".")[0]
+        dotted = f"{function.module}.{owner}"
+        opaque = dotted in found.opaque_values or owner in found.lookups
+        return None if opaque else found.calls[dotted]
     if function.name in found.lookups:
         return None
     if function.kind == "function":

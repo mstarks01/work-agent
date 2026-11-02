@@ -969,10 +969,9 @@ class AssertionRecord(BaseModel):
         """Resolve one proposal and run the gate over what was built.
 
         **What the node's proposal came to**, read through
-        :meth:`resolved`, the one reader of it. The production ``prepare``
-        node and the assertion eval mode call this method, and the offline
-        replay calls :meth:`resolved`, so a resolver change moves every caller
-        at once.
+        :meth:`resolved`, the one reader of it. Every caller calls this method,
+        except the offline replay, which calls :meth:`resolved`, so a resolver
+        change moves every caller at once.
         The gate runs over the resolver's output rather than being assumed:
         the resolver's contract is that its catalog raises nothing, and here
         is where that contract meets real model output.

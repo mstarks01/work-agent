@@ -38,9 +38,7 @@ An entry that matches no unguarded claim fails, so it cannot outlive its claim.
 from __future__ import annotations
 
 import ast
-import io
 import re
-import tokenize
 from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -53,13 +51,14 @@ from tests.source_tree import (
     PYTHON,
     REPO_ROOT,
     SHORTEST_REASON,
+    comment_runs,
     imports,
     module_name,
     parse,
     source_files,
     without,
 )
-from tests.test_one_reader_lints import ONE_READERS
+from tests.test_one_reader_lints import ONE_READERS, Site, _calls, _is_name
 
 pytestmark = pytest.mark.lint
 
@@ -93,6 +92,11 @@ _TICKED = re.compile(r"`~?([\w.]*\w)(?:\(\))?`")
 #: The statements that define a name a test can require.
 _DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
+#: How many lines after a page-script comment the lint reads for the name the
+#: comment is about. A claim in the page scripts sits on the line above the
+#: name it is about; the reach leaves room for a blank line and a comment.
+_OWNER_REACH = 15
+
 #: The JavaScript forms that name what a comment above them is about.
 _JS_OWNER = re.compile(r"(?:function\s+|const\s+|let\s+)(\w+)")
 
@@ -107,7 +111,7 @@ _RULED = (
 )
 
 #: Each claim that a ruling keeps without a guard, by its file and owner.
-UNGUARDED_CLAIMS: dict[tuple[str, str], str] = dict.fromkeys(
+UNGUARDED_CLAIMS: dict[Site, str] = dict.fromkeys(
     [
         ("evals/critic_review/replay.py", "_reading"),
         ("evals/harness/alignment.py", "protocol_state"),
@@ -205,7 +209,7 @@ class OneReaderClaim:
     named: frozenset[str]
 
     @property
-    def key(self) -> tuple[str, str]:
+    def key(self) -> Site:
         return (self.path, self.owner)
 
 
@@ -213,25 +217,6 @@ def _matches(text: str, first_line: int) -> Iterator[int]:
     """The line of each claim in ``text``, whose first line is ``first_line``."""
     for match in CLAIM.finditer(text):
         yield first_line + text.count("\n", 0, match.start())
-
-
-def _comment_blocks(source: str) -> Iterator[tuple[int, str]]:
-    """Each run of comment lines in Python ``source``, with its first line."""
-    block: list[str] = []
-    start = last = 0
-    for token in tokenize.generate_tokens(io.StringIO(source).readline):
-        if token.type != tokenize.COMMENT:
-            continue
-        line = token.start[0]
-        if block and line != last + 1:
-            yield start, "\n".join(block)
-            block = []
-        if not block:
-            start = line
-        block.append(token.string.lstrip("#:"))
-        last = line
-    if block:
-        yield start, "\n".join(block)
 
 
 def _statements(tree: ast.Module) -> list[ast.stmt]:
@@ -269,7 +254,7 @@ def _python_claims(path: Path) -> Iterator[tuple[int, str]]:
     """Each claim line in a Python file, with its owner."""
     tree = parse(path)
     statements = _statements(tree)
-    for start, text in _comment_blocks(path.read_text(encoding="utf-8")):
+    for start, text in comment_runs(path):
         for line in _matches(text, start):
             following = next((node for node in statements if node.lineno > line), None)
             name = None if following is None else _name_of(following)
@@ -294,15 +279,15 @@ def _script_claims(path: Path) -> Iterator[tuple[int, str]]:
     """Each claim line in a page script, with the name that the code after
     its comment defines first."""
     source = path.read_text(encoding="utf-8")
-    rows = source.splitlines()
+    lines = source.splitlines()
     for comment in _SCRIPT_COMMENT.finditer(source):
         start = source.count("\n", 0, comment.start()) + 1
         end = source.count("\n", 0, comment.end()) + 1
         owner = next(
             (
                 found.group(1)
-                for row in rows[end : end + 15]
-                if (found := _JS_OWNER.search(row))
+                for text in lines[end : end + _OWNER_REACH]
+                if (found := _JS_OWNER.search(text))
             ),
             path.stem,
         )
@@ -313,14 +298,14 @@ def _script_claims(path: Path) -> Iterator[tuple[int, str]]:
 
 def _claims_in(path: Path, name: str) -> list[OneReaderClaim]:
     """Each claim in the file at ``path``, which the claims call ``name``."""
-    rows = path.read_text(encoding="utf-8").splitlines()
+    lines = path.read_text(encoding="utf-8").splitlines()
     read = _python_claims if path.suffix == ".py" else _script_claims
     return [
         OneReaderClaim(
             name,
             line,
             owner,
-            frozenset(_TICKED.findall(" ".join(rows[max(0, line - 2) : line + 1]))),
+            frozenset(_TICKED.findall(" ".join(lines[max(0, line - 2) : line + 1]))),
         )
         for line, owner in read(path)
     ]
@@ -339,7 +324,7 @@ def claims() -> tuple[OneReaderClaim, ...]:
 
 #: The calls whose name argument is the callee a test in
 #: ``tests/test_one_reader_lints.py`` requires.
-_CALLEE_TESTS = frozenset({"_calls", "_is_name"})
+_CALLEE_TESTS = frozenset({_calls.__name__, _is_name.__name__})
 
 
 def _tests(tree: ast.Module) -> Iterator[ast.FunctionDef]:
@@ -349,17 +334,40 @@ def _tests(tree: ast.Module) -> Iterator[ast.FunctionDef]:
             yield node
 
 
-def _asserted_sites(tree: ast.Module) -> Iterator[tuple[str, str]]:
-    """Each ``(path, function)`` site that an ``assert`` in a test spells."""
+def _asserted_sites(tree: ast.Module) -> Iterator[Site]:
+    """Each site that an ``assert`` in a test names as the one site of a rule:
+    the one element of a list or a set that the found sites must equal, or a
+    site that must be among them."""
     for test in _tests(tree):
         for statement in ast.walk(test):
             if not isinstance(statement, ast.Assert):
                 continue
             for node in ast.walk(statement.test):
-                if isinstance(node, ast.Tuple) and len(node.elts) == 2:
-                    path, name = map(_text, node.elts)
-                    if path is not None and name is not None:
-                        yield path, name
+                if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+                    continue
+                (op,) = node.ops
+                sides = (node.left, *node.comparators)
+                if isinstance(op, ast.Eq):
+                    candidates = [
+                        side.elts[0]
+                        for side in sides
+                        if isinstance(side, ast.List | ast.Set) and len(side.elts) == 1
+                    ]
+                elif isinstance(op, ast.In):
+                    candidates = [node.left]
+                else:
+                    continue
+                for candidate in candidates:
+                    if (site := _site(candidate)) is not None:
+                        yield site
+
+
+def _site(node: ast.AST) -> Site | None:
+    """The site that the tuple ``node`` spells, or None."""
+    if not (isinstance(node, ast.Tuple) and len(node.elts) == 2):
+        return None
+    path, name = map(_text, node.elts)
+    return None if path is None or name is None else (path, name)
 
 
 def _text(node: ast.AST | None) -> str | None:
@@ -390,7 +398,7 @@ def _required_callees(tree: ast.Module) -> Iterator[str]:
 
 
 @cache
-def guarded_sites() -> frozenset[tuple[str, str]]:
+def guarded_sites() -> frozenset[Site]:
     """Each ``(path, function)`` site that a lint holds.
 
     - the reader of each ``ONE_READERS`` row;
@@ -438,7 +446,7 @@ def _imported(path: str) -> dict[str, str]:
     return imports(parse(REPO_ROOT / path))
 
 
-def _site_of(reference: str, path: str) -> tuple[str, str]:
+def _site_of(reference: str, path: str) -> Site:
     """The site that the backticked ``reference`` in the file ``path`` names.
 
     A dotted reference names the function in the longest module it starts
@@ -601,6 +609,13 @@ def test_a_site_a_row_exempts_guards_nothing(tmp_path):
 
     assert claim.key == (place, name)
     assert not guarded(claim)
+
+
+def test_a_site_among_several_in_an_assert_guards_nothing():
+    """Negative control: a site that an assert lists beside other sites is no
+    one reader, so it guards nothing."""
+    assert ("src/analysis_service/job_answers.py", "amend") not in guarded_sites()
+    assert ("src/analysis_service/job_answers.py", "missing") in guarded_sites()
 
 
 def test_the_lint_reads_a_real_population():
