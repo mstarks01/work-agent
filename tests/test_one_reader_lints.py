@@ -1525,7 +1525,7 @@ def test_a_request_body_has_one_reader():
 
 
 def test_a_dropped_claim_is_built_only_by_its_constructor():
-    """``DroppedClaim(...)`` past :meth:`~analysis_service.report.DroppedClaim.of`
+    """``DroppedClaim(...)`` past :meth:`~analysis_service.claims.DroppedClaim.of`
     is the second reader of the bounds that ``of`` cuts each agent-written value
     to. A producer that raises on a long value costs the job the report the
     mark exists to preserve."""
