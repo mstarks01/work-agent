@@ -2084,6 +2084,20 @@ ONE_READERS: dict[str, _OneReader] = {
         {},
         "",
     ),
+    "the object credential mode": _OneReader(
+        lambda node: _calls(node, "closed_setting")
+        and len(node.args) == 3
+        and _loads(node.args[1], "OBJECT_CREDENTIALS_VAR"),
+        ("src/analysis_service/objects.py", "_named_mode"),
+        {},
+        "",
+    ),
+    "which process migrates a database": _OneReader(
+        lambda node: _loads_attribute(node, "first_run_migrates"),
+        ("src/analysis_service/sql_store.py", "migrator"),
+        {},
+        "",
+    ),
     "a key file of the s3 store": _OneReader(
         lambda node: _loads(node, "S3_KEY_FILES"),
         ("src/analysis_service/s3_objects.py", "_key_pair"),

@@ -458,12 +458,35 @@ def object_reads(env: Mapping[str, str]) -> tuple[str, ...]:
     """
     mode: CredentialMode | None
     try:
-        mode = closed_setting(
-            env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, _MODES
-        )
+        mode = _named_mode(env)
     except StoreConfigError:
         mode = None
     return OBJECT_STORES[object_store_name(env)].reads_in(mode)
+
+
+def _named_mode(env: Mapping[str, str]) -> CredentialMode:
+    """The credential mode that ``ANALYSIS_OBJECT_CREDENTIALS`` names; fail
+    closed. **The one reader of the object credential mode.**"""
+    return closed_setting(
+        env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, _MODES
+    )
+
+
+def credential_mode(env: Mapping[str, str], store: ObjectStoreName) -> CredentialMode:
+    """The credential mode of the ``store`` row, after the refusal of each
+    object setting that the mode does not read.
+
+    The s3 and gcs stores call it before they read any file. The refusal
+    names the mode, the store and each stray setting, and never a value.
+    """
+    mode = _named_mode(env)
+    refuse_unread(
+        env,
+        ("ANALYSIS_OBJECT_",),
+        OBJECT_STORES[store].reads_in(mode),
+        f"the {mode} mode of the {store} object store",
+    )
+    return mode
 
 
 def build_object_store(env: Mapping[str, str]) -> ObjectStore:

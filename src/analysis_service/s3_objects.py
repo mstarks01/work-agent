@@ -55,14 +55,13 @@ from analysis_service.objects import (
     OBJECT_ENDPOINT_VAR,
     OBJECT_REGION_VAR,
     OBJECT_STORE_VAR,
-    OBJECT_STORES,
     S3_KEY_FILES,
     Addressing,
+    credential_mode,
 )
 from analysis_service.store_settings import (
     StoreConfigError,
     closed_setting,
-    refuse_unread,
 )
 from analysis_service.vendors import REGION, CredentialMode
 
@@ -106,16 +105,7 @@ def _credential_mode(env: Mapping[str, str]) -> CredentialMode:
     does not read."""
     for var in S3_KEY_FILES.values():
         refuse_bare_secret(env, var, StoreConfigError)
-    mode = closed_setting(
-        env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, CREDENTIALS
-    )
-    refuse_unread(
-        env,
-        ("ANALYSIS_OBJECT_",),
-        OBJECT_STORES["s3"].reads_in(mode),
-        f"the {mode} mode of the s3 object store",
-    )
-    return mode
+    return credential_mode(env, "s3")
 
 
 #: Each endpoint host that accepts no ``If-None-Match`` on a write, by its

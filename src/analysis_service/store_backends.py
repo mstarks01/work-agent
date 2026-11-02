@@ -14,6 +14,7 @@ import os
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
+from functools import partial
 from datetime import UTC, datetime, timedelta
 from typing import Literal, get_args
 
@@ -59,10 +60,9 @@ class JobStoreBackend:
     No field has a default, so a new row states every fact.
     """
 
-    #: Builds the store from the environment, the object store, which is
-    #: ``None`` where :attr:`objects` is False, and whether the first-run app
-    #: builds it.
-    build: Callable[[Mapping[str, str], ObjectStore | None, bool], JobStore]
+    #: Builds the store from the environment and the object store, which is
+    #: ``None`` where :attr:`objects` is False.
+    build: Callable[[Mapping[str, str], ObjectStore | None], JobStore]
     #: Whether the store keeps sources and reports in an object store. Where
     #: True, ``ANALYSIS_OBJECT_STORE`` is required; where False, it is refused,
     #: so a half-durable configuration cannot start.
@@ -73,31 +73,31 @@ class JobStoreBackend:
     #: not read. A store that keeps none refuses each other one. The Settings
     #: page shows only these.
     reads: tuple[str, ...]
-    #: What the first-run app does to the store before it builds it: the
-    #: migration of a database that one person owns (ADR 0110).
-    first_run: Callable[[Mapping[str, str]], None]
+    #: Builds the store for the first-run app, from the same two inputs as
+    #: :attr:`build`. It migrates a database that one person owns first
+    #: (ADR 0110).
+    first_run: Callable[[Mapping[str, str], ObjectStore | None], JobStore]
 
 
-def _no_first_run(env: Mapping[str, str]) -> None:
-    """Do nothing: the store holds no schema."""
-
-
-def _sql_first_run(env: Mapping[str, str]) -> None:
-    """Migrate the database where its row allows it."""
-    try:
-        from analysis_service.sql_store import migrate_first_run_database
-    except ModuleNotFoundError:
-        # The build of the store names the missing extra.
-        return
-    migrate_first_run_database(env)
+def _memory_store(env: Mapping[str, str], objects: ObjectStore | None) -> JobStore:
+    """The ``memory`` store. It holds no schema, so the first-run app builds
+    it the same way."""
+    return InMemoryJobStore()
 
 
 def _sql_store(
-    env: Mapping[str, str], objects: ObjectStore | None, first_run: bool
+    env: Mapping[str, str], objects: ObjectStore | None, *, first_run: bool
 ) -> JobStore:
-    """The ``sql`` store, from the ``sql`` extra (ADR 0023)."""
+    """The ``sql`` store, from the ``sql`` extra (ADR 0023). ``first_run`` is
+    whether the first-run app builds it, which
+    :func:`~analysis_service.sql_store.migrator` reads."""
     try:
-        from analysis_service.sql_store import SqlJobStore
+        from analysis_service.sql_store import (
+            SqlJobStore,
+            engine_for,
+            migrate_first_run_database,
+            migrator,
+        )
     except ModuleNotFoundError as missing:
         raise StoreConfigError(
             f"the sql job store needs the sql extra ({missing.name} is not installed):"
@@ -105,23 +105,26 @@ def _sql_store(
         ) from None
     if objects is None:
         raise StoreConfigError("the sql job store needs an object store")
-    return SqlJobStore.from_env(env, objects, first_run=first_run)
+    by = migrator(env, first_run=first_run)
+    if by == "the first-run app":
+        migrate_first_run_database(env)
+    return SqlJobStore(engine_for(env), objects, migrator=by)
 
 
 #: Each job store a deployment can select. The table answers for every name of
 #: :data:`JobStoreName`.
 JOB_STORES: dict[JobStoreName, JobStoreBackend] = {
     "memory": JobStoreBackend(
-        build=lambda env, objects, first_run: InMemoryJobStore(),
+        build=_memory_store,
         objects=False,
         reads=(),
-        first_run=_no_first_run,
+        first_run=_memory_store,
     ),
     "sql": JobStoreBackend(
-        build=_sql_store,
+        build=partial(_sql_store, first_run=False),
         objects=True,
         reads=(DATABASE_URL_VAR, OBJECT_STORE_VAR),
-        first_run=_sql_first_run,
+        first_run=partial(_sql_store, first_run=True),
     ),
 }
 
@@ -162,8 +165,8 @@ def build_store(
     store and opens no connection; :meth:`JobStore.startup_check` checks what
     the store reaches.
 
-    Only the first-run app passes ``first_run``: it runs the row's first-run
-    step after the object store is built and before the store is. The
+    Only the first-run app passes ``first_run``: it builds the store with the
+    row's :attr:`~JobStoreBackend.first_run`, after the object store. The
     ``/v1`` service never migrates (ADR 0110).
     """
     name = job_store_name(env)
@@ -178,9 +181,8 @@ def build_store(
             f"the {name} job store",
         )
         objects = None
-    if first_run:
-        backend.first_run(env)
-    return backend.build(env, objects, first_run)
+    build = backend.first_run if first_run else backend.build
+    return build(env, objects)
 
 
 #: Why a job is deleted: its owner asked, its retention period passed, or the

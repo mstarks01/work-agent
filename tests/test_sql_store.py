@@ -655,7 +655,7 @@ class TestTheDigestCheck:
     )
     def test_a_delete_during_the_read_answers_404(self, env, path, name):
         objects = DeletingReads(build_object_store(env))
-        store = objects.store = JOB_STORES["sql"].build(env, objects, False)
+        store = objects.store = JOB_STORES["sql"].build(env, objects)
         record = completed_job(store)
         objects.deleting = {object_key("alice", record.id, name)}
         with TestClient(app_over(store), raise_server_exceptions=False) as client:
@@ -1094,7 +1094,7 @@ class TestAStoreFailureAsARunStartsOrEnds:
         assert "running" not in statuses(stored)
 
     def test_a_report_put_that_fails(self, env):
-        store = SqlJobStore(engine_for(env), ReportPutFails(env), migrates=False)
+        store = SqlJobStore(engine_for(env), ReportPutFails(env), migrator="the migration step")
         runner = CountingRunner()
         stored = executed(store, runner)
         assert runner.runs == 1
@@ -1128,7 +1128,7 @@ class TestAStoreFailureAsARunStartsOrEnds:
         # commit on a loaded runner; only the hanging put reaches it.
         monkeypatch.setattr(jobs_module, "STORE_TIMEOUT_SECONDS", 1.0)
         store = SqlJobStore(
-            engine_for(env), ReportPutFails(env, hang=True), migrates=False
+            engine_for(env), ReportPutFails(env, hang=True), migrator="the migration step"
         )
         stored = executed(store, CountingRunner())
         assert stored.status == "failed"

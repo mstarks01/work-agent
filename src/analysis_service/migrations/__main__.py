@@ -23,8 +23,9 @@ def main() -> int:
 
     A database at a revision the tree does not hold raises
     :class:`~analysis_service.sql_store.RevisionNotHeld`, which names the
-    remedy. Each database setting the migration reads raises a
-    :class:`StoreConfigError` when it is unusable.
+    remedy, and the line is that message. Each database setting the migration
+    reads raises a :class:`StoreConfigError` when it is unusable, and the
+    line names the setting as a configuration refusal.
     """
     try:
         migrate_database(os.environ)
