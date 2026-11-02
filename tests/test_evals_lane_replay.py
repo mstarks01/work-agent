@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
@@ -229,7 +230,8 @@ def test_the_out_file_starts_with_the_record_of_the_lane_material(
     tmp_path,
     monkeypatch,
 ):
-    """A replay's proposals name the sweep files they were rebuilt from (#2029)."""
+    """A replay's proposals name the sweep files they were rebuilt from (#2029),
+    and each prompt and package file the lane's request was built from."""
     out, _ = recorded
     finished(out, case.id)
 
@@ -260,10 +262,58 @@ def test_the_out_file_starts_with_the_record_of_the_lane_material(
     assert next(iter(held)) == "record"
     assert held["claims"] == []
     assert held["record"]["table"]["lane"] == "spoofing"
-    assert [one["path"] for one in held["record"]["inputs"]] == [
+    digests = {one["path"]: one["sha256"] for one in held["record"]["inputs"]}
+    loaded = [
+        loader.root / f"{name}.md"
+        for loader in (PACKAGE_LOADER, PROMPT_LOADER)
+        for name in loader.names()
+    ]
+    assert digests.keys() == {
         str(out),
         str(case_file(out, case.id, "lanes")),
-    ]
+        *map(str, loaded),
+    }
+    assert all(
+        digests[str(path)] == hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in loaded
+    )
+
+
+def test_a_replay_of_todays_prepare_names_each_domain_pack_file(
+    case,  # noqa: F811
+    tmp_path,
+    monkeypatch,
+):
+    """``prepare`` reads the Domain Packs, so the record names each of them."""
+
+    def scripted(*_):
+        async def call(instruction, turn):
+            return json.dumps({"claims": []})
+
+        return call
+
+    monkeypatch.setattr(lane_replay, "node_call", scripted)
+    monkeypatch.setattr(lane_replay.Deployment, "from_env", lambda: None)
+    written = tmp_path / "proposals.json"
+    args = argparse.Namespace(
+        artifact=None,
+        case=case.id,
+        lane="spoofing",
+        framework="stride",
+        accept_cost="unknown",
+        append=None,
+        fresh_leads=False,
+        prepare_today="none",
+        out=written,
+    )
+
+    assert lane_replay.command_lane_replay(args) == 0
+
+    held = json.loads(written.read_text(encoding="utf-8"))
+    domains = MarkdownLoader(REPO_ROOT / "domains")
+    assert {str(domains.root / f"{name}.md") for name in domains.names()} <= {
+        one["path"] for one in held["record"]["inputs"]
+    }
 
 
 def test_material_without_the_user_turn_is_refused(tmp_path):
