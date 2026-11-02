@@ -71,7 +71,7 @@ def captured(case: Path):
     async def on_node(node: str) -> None:
         pass
 
-    asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+    asyncio.run(AdkPipelineRunner(pipeline, certification=None).run(record, on_node))
     reader = llms[graph.CAPABILITIES_NODE]
     assert isinstance(reader, Recording)
     return reader.requests[0]

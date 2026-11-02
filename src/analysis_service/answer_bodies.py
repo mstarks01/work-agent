@@ -1,4 +1,4 @@
-"""The one reader (:func:`_read`) of each body a job's answer routes take.
+"""Each body a job's answer routes take, read through :func:`_read`.
 
 ``POST /v1/jobs/{id}/answers``, ``/amendments`` and ``/corrections``, and the
 first-run app's ``/answer``, ``/amend`` and ``/correct``, each take a JSON body.

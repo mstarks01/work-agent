@@ -399,12 +399,9 @@ def test_a_reports_rows_have_one_reader():
     its rows through ``report_rows``. ``absent_rows`` is the one other caller,
     because it holds a catalog and no Report.
     """
-    catalog_holder = ("src/analysis_service/fixes.py", "absent_rows")
-    sites = _sites(lambda node: _calls(node, "row_controls"))
-
-    assert catalog_holder in sites
-    assert [site for site in sites if site != catalog_holder] == [
-        ("src/analysis_service/claim_identity.py", "report_rows")
+    assert _sites(lambda node: _calls(node, "row_controls")) == [
+        ("src/analysis_service/claim_identity.py", "report_rows"),
+        ("src/analysis_service/fixes.py", "absent_rows"),
     ]
 
 
@@ -749,7 +746,7 @@ def _config_defaults() -> frozenset[str]:
 #: Each function that reads a repo default of ``CONFIG_PATHS`` without
 #: ``config_path``, and why.
 CONFIG_DEFAULT_READERS: dict[Site, str] = {
-    ("src/analysis_service/deployment.py", "<module>"): (
+    ("src/analysis_service/deployment.py", MODULE_OWNER): (
         "``CONFIG_PATHS`` pairs each default with its variable here"
     ),
     ("evals/harness/exemplar_verbs.py", "lane_verbs"): (
@@ -1069,19 +1066,14 @@ STORED_ANSWER_READERS: dict[Site, str] = {
 }
 
 
-#: The module that reads each body a job's answer routes take.
-ANSWER_BODIES = "src/analysis_service/answer_bodies.py"
-
-
 def test_an_answer_body_has_one_reader():
     """Only ``answer_bodies`` reads an answer out of a request body. The
     ``/v1`` routes and the first-run app both call it, so one site applies
     the keys, shapes and bounds a body meets."""
     assert set(_sites(_validates_an_answer)) == STORED_ANSWER_READERS.keys()
-    validators = _sites(partial(_calls, name="model_validate"))
-    assert [site for site in validators if site[0] == ANSWER_BODIES] == [
-        ("src/analysis_service/answer_bodies.py", "_read")
-    ]
+    assert ("src/analysis_service/answer_bodies.py", "_read") in _sites(
+        partial(_calls, name="model_validate")
+    )
 
 
 def _reads_a_body_key(node: ast.AST) -> bool:
@@ -1258,7 +1250,7 @@ def test_the_shape_of_a_digest_is_spelled_once():
     """Only ``parsing.Sha256Hex`` spells the shape, and each model field that
     holds a digest reads it."""
     assert _sites(_spells_a_digest_shape) == [
-        ("src/analysis_service/parsing.py", "<module>")
+        ("src/analysis_service/parsing.py", MODULE_OWNER)
     ]
 
 
@@ -1292,7 +1284,7 @@ def _spells_a_lane_doc(node: ast.AST) -> bool:
 
 #: Each function that spells ``skill`` for another meaning, and the meaning.
 NOT_A_LANE_DOC: dict[Site, str] = {
-    ("evals/harness/audit.py", "<module>"): (
+    ("evals/harness/audit.py", MODULE_OWNER): (
         "a finding's owner: the skill text as one of the places a fix belongs"
     ),
 }
@@ -1302,7 +1294,7 @@ def test_a_lane_doc_name_is_spelled_once():
     """Only ``frameworks`` spells a lane's two file names; the loader names,
     the package gate and the roster writer read the declarations."""
     assert set(_sites(_spells_a_lane_doc)) - NOT_A_LANE_DOC.keys() == {
-        ("src/analysis_service/frameworks/__init__.py", "<module>")
+        ("src/analysis_service/frameworks/__init__.py", MODULE_OWNER)
     }
 
 
@@ -2004,7 +1996,7 @@ ONE_READERS: dict[str, _OneReader] = {
         _marks_a_read_back,
         ("src/analysis_service/fact_answers.py", "_read_back"),
         {
-            ("src/analysis_service/fact_answers.py", "<module>"): (
+            ("src/analysis_service/fact_answers.py", MODULE_OWNER): (
                 "the context a read-back passes, which the stores write"
             ),
         },
@@ -2020,7 +2012,7 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: _is_constant(node, "unanswered"),
         ("src/analysis_service/fact_answers.py", "fact_status"),
         {
-            ("src/analysis_service/fact_answers.py", "<module>"): (
+            ("src/analysis_service/fact_answers.py", MODULE_OWNER): (
                 "the FactStatus type that declares the set of histories"
             ),
         },
@@ -2161,7 +2153,7 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: _loads(node, "S3_KEY_FILES"),
         ("src/analysis_service/s3_objects.py", "_key_pair"),
         {
-            ("src/analysis_service/objects.py", "<module>"): (
+            ("src/analysis_service/objects.py", MODULE_OWNER): (
                 "the s3 row names the key files as settings it reads, and the"
                 " settings that only the api_key mode reads"
             ),
@@ -2397,6 +2389,17 @@ ONE_READERS: dict[str, _OneReader] = {
         ),
         ("src/analysis_service/deployment.py", "config_path"),
         {},
+        "",
+    ),
+    "a Report's rows": _OneReader(
+        lambda node: _calls(node, "row_controls"),
+        ("src/analysis_service/claim_identity.py", "report_rows"),
+        {
+            ("src/analysis_service/fixes.py", "absent_rows"): (
+                "it holds a catalog and no Report, so it reads the row controls"
+                " of the catalog itself"
+            ),
+        },
         "",
     ),
     "which control a row is about": _OneReader(

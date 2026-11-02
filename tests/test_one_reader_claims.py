@@ -32,7 +32,7 @@ follows as an attribute docstring. A claim spans line breaks, so a claim
 wrapped across two lines is still found. "The one reader" followed by a word
 in ``-ing`` describes a reader and claims nothing, and so does "a single
 source" or "no single source". The rule reads the word, so it also skips a
-noun such as "string"; no claim in the tree has that shape.
+noun such as "string".
 
 :data:`UNGUARDED_CLAIMS` holds each claim that a ruling keeps without a guard.
 An entry that matches no unguarded claim fails, so it cannot outlive its claim.
@@ -98,7 +98,7 @@ _TICKED = re.compile(r"`~?([\w.]*\w)(?:\(\))?`")
 
 #: How many lines after a page-script comment the lint reads for the name the
 #: comment is about: the line below the comment, and one more for a wrapped
-#: declaration. Each claim in the page scripts sits right above its name.
+#: declaration.
 _OWNER_REACH = 2
 
 #: The JavaScript forms that name what a comment above them is about.
@@ -349,7 +349,9 @@ def _tests(tree: ast.Module) -> Iterator[ast.FunctionDef]:
 
 def _asserted_sites(tree: ast.Module) -> Iterator[Site]:
     """Each site that an ``assert`` in a test names as the one site of a rule:
-    the one element of a list or a set that the found sites must equal."""
+    the one element of a list or a set that the found sites must equal. A
+    comprehension filters the found sites to a part of the tree, so an
+    equality with one guards nothing."""
     for test in _tests(tree):
         for statement in ast.walk(test):
             if not isinstance(statement, ast.Assert):
@@ -361,9 +363,12 @@ def _asserted_sites(tree: ast.Module) -> Iterator[Site]:
                     and isinstance(node.ops[0], ast.Eq)
                 ):
                     continue
+                sides = (node.left, *node.comparators)
+                if any(isinstance(side, ast.ListComp | ast.SetComp) for side in sides):
+                    continue
                 candidates = [
                     side.elts[0]
-                    for side in (node.left, *node.comparators)
+                    for side in sides
                     if isinstance(side, ast.List | ast.Set) and len(side.elts) == 1
                 ]
                 for candidate in candidates:
