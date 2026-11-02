@@ -401,6 +401,7 @@ DATA_WALKS: dict[str, str] = {
     ),
     **dict.fromkeys(
         (
+            "tests/test_capability_contrast.py:<module>",
             "tests/test_evals_rule_applicability.py:test_no_fixture_here_is_signed_by_its_drafter",
             "tests/test_evals_withheld.py:test_every_answers_file_applies_once_signed",
             "tests/test_exemplar_fan_in.py:test_every_exemplar_system_has_a_fixture",

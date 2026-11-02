@@ -1,0 +1,28 @@
+{
+  "actor": "a support agent who acts as a staff user",
+  "capability_scope": "the rota app's admin console and the session it opens",
+  "note": "A support agent who acts as another user presents no factor; the sentence states impersonation.",
+  "reading": {
+    "capabilities": [
+      {
+        "capability": "authentication",
+        "source_label": "System description",
+        "quote": "Staff sign in to the rota app with a password"
+      },
+      {
+        "capability": "password-authentication",
+        "source_label": "System description",
+        "quote": "Staff sign in to the rota app with a password"
+      },
+      {
+        "capability": "administrative-interface",
+        "source_label": "System description",
+        "quote": "From the admin console a support agent can open a session in the rota app as any staff user"
+      }
+    ]
+  },
+  "rule_break_quote": "From the admin console a support agent can open a session in the rota app as any staff user",
+  "expected": {
+    "V6.4.4": "unknown"
+  }
+}
