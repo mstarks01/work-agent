@@ -202,24 +202,39 @@ _XDG_PLACE = re.compile(r"^XDG_|(?:^|[/~])\.(?:config|local)(?:/|$)")
 
 
 def test_an_xdg_variable_has_one_reader():
-    """Only ``xdg_dir`` reads an XDG base directory variable or picks its
-    default in the home directory: each other site passes both to it."""
+    """Only ``XDG_BASES`` names an XDG base directory variable or its default
+    in the home directory, and each call of ``xdg_dir`` names a row of it."""
+    from analysis_service import config_files
+
     sites = []
     for path in FILES:
         tree = parse(path)
-        skipped = _docstrings(tree) | {
-            id(arg)
-            for node in ast.walk(tree)
-            if _calls(node, "xdg_dir")
-            for arg in node.args
-        }
+        skipped = _docstrings(tree)
+        if path == Path(config_files.__file__):
+            skipped |= {
+                id(part)
+                for node in ast.walk(tree)
+                if isinstance(node, ast.AnnAssign)
+                and _is_name(node.target, "XDG_BASES")
+                for part in ast.walk(node)
+            }
         sites += [
             f"{path.relative_to(REPO_ROOT).as_posix()}:{node.lineno}"
             for node in ast.walk(tree)
-            if isinstance(node, ast.Constant)
-            and isinstance(node.value, str)
-            and _XDG_PLACE.search(node.value)
-            and id(node) not in skipped
+            if (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and _XDG_PLACE.search(node.value)
+                and id(node) not in skipped
+            )
+            or (
+                _calls(node, "xdg_dir")
+                and not (
+                    len(node.args) == 2
+                    and isinstance(node.args[1], ast.Constant)
+                    and node.args[1].value in config_files.XDG_BASES
+                )
+            )
         ]
     assert not sites
 

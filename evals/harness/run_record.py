@@ -53,6 +53,23 @@ def run_record(
     }
 
 
+def run_record_for(
+    outputs: Iterable[Path | None],
+    command: str,
+    table: Mapping[str, Any],
+    inputs: Mapping[Path, Selections],
+) -> dict[str, Any] | None:
+    """The :func:`run_record` of a run that writes one of ``outputs``.
+
+    None where every output is None, because the run writes no file. A replay
+    asks for the record before its paid call, so a tree with no checkout to
+    ask refuses the run before it spends anything.
+    """
+    if all(output is None for output in outputs):
+        return None
+    return run_record(command, table, inputs)
+
+
 def sweep_inputs(artifacts: Iterable[Path]) -> dict[Path, Selections]:
     """Each sweep artifact and every file its sweep wrote beside it.
 

@@ -47,9 +47,9 @@ PROCESS = "process:web-app"
 
 def prior_of(rates) -> dict[str, PriorRow]:
     """A STRIDE prior with these rates, and an empty row for every other package."""
-    empty = PriorRow(record=None, runs=(), revision=None, cases=0, rates={})
+    empty = PriorRow(record=None, runs=(), cases=0, rates={})
     return {
-        name: PriorRow(record=None, runs=("test",), revision="t", cases=1, rates=rates)
+        name: PriorRow(record=None, runs=("test",), cases=1, rates=rates)
         if name == "stride"
         else empty
         for name in PACKAGES
