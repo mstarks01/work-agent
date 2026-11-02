@@ -4,7 +4,7 @@ A measurement is reproducible only with the commit and tree it ran on, the
 instrument's own table of policies, budgets and options, and each input file
 with the framework selections read on it. Each output file an instrument
 writes starts with this record, so a reader compares two output files by field
-and never by a ledger sentence. ``tests/test_evals_run_record.py`` holds every
+and never by a ledger sentence. ``tests/test_run_record_lints.py`` holds every
 harness writer to it.
 """
 
