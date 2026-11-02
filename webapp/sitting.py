@@ -21,6 +21,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.errors import ConfigError, config_refusal
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import submit as submit_spine
@@ -565,6 +566,9 @@ def main(argv: list[str] | None = None) -> int:
         session = build_session(root, submitted_by, submitted_for, args.case)
     except CorpusError as exc:
         print(corpus_refusal(exc), file=sys.stderr)
+        return 1
+    except ConfigError as exc:
+        print(config_refusal(exc), file=sys.stderr)
         return 1
 
     import uvicorn

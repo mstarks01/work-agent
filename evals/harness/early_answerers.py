@@ -63,6 +63,7 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.open_facts import prepared_model
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
+from evals.harness.bundle import read_report
 from evals.harness.early_policies import Needs, Selection, needs_of, paired
 from evals.harness.early_rounds import dont_know, paused_state
 from evals.harness.rule_applicability import TRUTH_ANSWERS, load_fixtures
@@ -419,7 +420,7 @@ def readings(
 def _readings_of(job: tuple[str, str, Mapping[str, Selection]]) -> list[dict[str, Any]]:
     """One report's readings, for a worker process."""
     case, path, selections = job
-    report = Report.model_validate_json(Path(path).read_text(encoding="utf-8"))
+    report = read_report(Path(path))
     return [asdict(one) for one in readings(case, path, report, selections)]
 
 

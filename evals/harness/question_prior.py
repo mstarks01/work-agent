@@ -35,7 +35,7 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
-from evals.harness.bundle import finished_file
+from evals.harness.bundle import finished_file, read_report
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import (
     CorpusError,
@@ -100,7 +100,7 @@ def samples_of(
         path = finished_file(artifact, case, "report")
         if path is None:
             continue
-        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        report = read_report(path)
         if not replays:
             out.append((case, report.system_model, report_findings(report, framework)))
         for replay in replays:

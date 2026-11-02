@@ -59,9 +59,9 @@ from analysis_service.fact_answers import (
     merged_facts,
 )
 from analysis_service.jobs import Checkpoint
-from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
+from evals.harness.bundle import read_report
 from evals.harness.run_record import Selections, run_record
 
 #: A replay that has not ended by this save is reported as not ending.
@@ -369,7 +369,7 @@ def replays(root: Path, corpus: Path) -> tuple[list[Replay], dict[Path, Selectio
     paths = sorted(root.rglob(f"*{case_suffix('report')}"))
     every: dict[FrameworkName, Mapping[str, Any]] = {}
     for path in paths:
-        job = Report.model_validate_json(path.read_text(encoding="utf-8")).job
+        job = read_report(path).job
         for selection in job.frameworks:
             every.setdefault(selection.name, selection.options)
     for path in paths:
@@ -377,7 +377,7 @@ def replays(root: Path, corpus: Path) -> tuple[list[Replay], dict[Path, Selectio
         blessed_path = corpus / case / "model.json"
         if not blessed_path.is_file():
             continue
-        report = Report.model_validate_json(path.read_text(encoding="utf-8"))
+        report = read_report(path)
         blessed = SystemModel.model_validate_json(
             blessed_path.read_text(encoding="utf-8")
         )

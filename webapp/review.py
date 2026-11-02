@@ -74,12 +74,12 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from analysis_service.claim_identity import report_rows
+from analysis_service.errors import ConfigError, config_refusal
 from analysis_service.frameworks import PACKAGES
-from analysis_service.report import Report
 from evals import verify_corpus
 from evals.harness import baseline, bundle
 from evals.harness import queue as review_queue
-from evals.harness.artifact import load_artifact
+from evals.harness.artifact import ProvenanceError, load_artifact
 from evals.harness.fingerprint import FingerprintError, identifier_of, lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
@@ -94,7 +94,13 @@ from evals.harness.ledger import (
     github_login,
     load,
 )
-from evals.harness.reference import flows_by_case, load_corpus
+from evals.harness.modes import EvalRunError
+from evals.harness.reference import (
+    CorpusError,
+    corpus_refusal,
+    flows_by_case,
+    load_corpus,
+)
 from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
@@ -591,8 +597,8 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], str]
         # digests of the claim it answered, and those are computed from the
         # package's own record -- so a second reading assembled out of a dict
         # here would key a vote to a claim the rest of the harness never sees.
-        # `bundle.runs_from_reports` already reads these files this way.
-        report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
+        # `bundle.read_report` is the one reader of an archived report.
+        report = bundle.read_report(report_path)
         rows = report_rows(report)
         for block in report.analyses:
             findings += [
@@ -637,8 +643,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             " has produced findings. Run `python -m evals.harness.run run"
             " --mode analysis --out artifact.json` first."
         )
-    runs, configs = findings_from_artifacts(args.artifact)
-    session = build_session(runs, args.voter, args.ledger, configs)
+    # Each refusal names the file and the field, in one line, so the reviewer
+    # fixes the input instead of reading a traceback.
+    try:
+        runs, configs = findings_from_artifacts(args.artifact)
+        session = build_session(runs, args.voter, args.ledger, configs)
+    except CorpusError as exc:
+        print(corpus_refusal(exc), file=sys.stderr)
+        return 1
+    except ConfigError as exc:
+        print(config_refusal(exc), file=sys.stderr)
+        return 1
+    except (EvalRunError, ProvenanceError) as exc:
+        print(exc, file=sys.stderr)
+        return 1
     print(f"{len(session.items)} findings waiting for {args.voter}")
     print(f"ledger: {args.ledger}")
     print(f"open http://{HOST}:{PORT}/")

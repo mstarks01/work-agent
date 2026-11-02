@@ -55,6 +55,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from analysis_service.errors import ConfigError, config_refusal
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
@@ -232,6 +233,9 @@ def main(argv: list[str] | None = None) -> int:
         page = build(sittings.CORPUS_DIR, submitted_by, submitted_for)
     except CorpusError as exc:
         print(corpus_refusal(exc), file=sys.stderr)
+        return 1
+    except ConfigError as exc:
+        print(config_refusal(exc), file=sys.stderr)
         return 1
 
     out = Path(args.out)

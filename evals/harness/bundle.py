@@ -27,6 +27,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, get_args
 
+from pydantic import ValidationError
+
 from analysis_service.assertions import (
     GRAPH_BOUND,
     REGISTRY,
@@ -40,6 +42,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.compact import FULL_FORMAT, parse_extraction
+from analysis_service.errors import refusal_text
 from analysis_service.execution import seed_state
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
@@ -50,6 +53,29 @@ from evals.harness import flow_ids, modes, replay
 from evals.harness.archive import CaseKind, archive_bytes, case_suffix
 from evals.harness.artifact import CORPUS_DIR, EvalArtifact, load_artifact
 from evals.harness.reference import GoldenCase, case_ids
+
+
+class UnreadableReport(modes.EvalRunError):
+    """An archived report that today's :class:`Report` refuses.
+
+    A report holds the schema of the day its sweep ran. No reader migrates an
+    archived report, so the harness refuses the file and names the field.
+    """
+
+
+def read_report(path: Path) -> Report:
+    """The report archived at ``path``, read by today's :class:`Report`.
+
+    **The one reader of an archived report.** Raises :class:`UnreadableReport`
+    where the file does not parse, in one line that names the file and each
+    field :class:`Report` refuses.
+    """
+    try:
+        return Report.model_validate_json(path.read_bytes())
+    except ValidationError as error:
+        raise UnreadableReport(
+            f"{path}: today's Report refuses {refusal_text(error)}"
+        ) from None
 
 
 def framework_block(report: Report, framework: FrameworkName) -> FrameworkAnalysis:
@@ -493,7 +519,7 @@ def runs_from_reports(
         proposals_path = finished_file(artifact, case.id, "proposals")
         # A finished case: finished_file returns each path or raises.
         assert drafts_path is not None and proposals_path is not None
-        report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
+        report = read_report(report_path)
         raw = json.loads(drafts_path.read_text(encoding="utf-8"))
         if stray := sorted(set(raw) - set(PACKAGES)):
             raise modes.EvalRunError(

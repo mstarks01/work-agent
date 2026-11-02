@@ -54,6 +54,7 @@ from analysis_service.claims import (
 )
 from analysis_service.critic import CriticOutputError
 from analysis_service.deployment import Deployment
+from analysis_service.errors import ConfigError, config_refusal
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Pipeline
 from analysis_service.identity import build_identity
@@ -2812,7 +2813,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     # sentence `webapp/sitting.py` and the offline page print: the error names
     # the case and the field, and a traceback over it names neither. A sweep
     # that a command cannot read refuses here in one line too: its error names
-    # the file and the missing part.
+    # the file and the missing part. So does a configuration this process
+    # cannot run on: its error names the file or the variable to fix.
     try:
         return args.func(args)
     except CorpusError as exc:
@@ -2820,6 +2822,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     except (ProvenanceError, modes.EvalRunError) as exc:
         print(f"cannot read the sweep: {exc}", file=sys.stderr)
+        return 1
+    except ConfigError as exc:
+        print(config_refusal(exc), file=sys.stderr)
         return 1
 
 

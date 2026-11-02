@@ -39,6 +39,11 @@ class ConfigError(ValueError):
     """
 
 
+def config_refusal(exc: ConfigError) -> str:
+    """The one line a command prints for ``exc`` in place of a traceback."""
+    return f"cannot run on this configuration: {exc}"
+
+
 def error_place(error: Mapping[str, Any]) -> str:
     """Where one pydantic error sits: a dotted path of declared names and indexes.
 
