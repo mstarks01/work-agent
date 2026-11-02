@@ -26,7 +26,10 @@ from fastapi.routing import APIRoute
 from pydantic import TypeAdapter
 
 from analysis_service import deployment, resilience
+from analysis_service.analysis import CONTROL_ATTRIBUTES
+from analysis_service.answer_forms import _max_length
 from analysis_service.answer_state import EARLY_RULES, POLICY_VERSION
+from analysis_service.api import MAX_EVENT_STREAMS_PER_OWNER, max_body_bytes
 from analysis_service.assertions import Basis
 from analysis_service.auth import (
     ALLOWED_ALGORITHMS,
@@ -34,11 +37,25 @@ from analysis_service.auth import (
     AuthConfigError,
     build_verifier,
 )
-from analysis_service.claims import GroundKind, RuledClaim, Spelling, UnknownKey
+from analysis_service.claims import (
+    GROUND_TEXT_MAX_CHARS,
+    GroundKind,
+    RuledClaim,
+    Spelling,
+    UnknownKey,
+)
+from analysis_service.config_files import MAX_VALUE_CHARS
 from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.deployment import ConfigPaths
 from analysis_service.diagrams import _install_argv
-from analysis_service.fact_answers import FactAnswer, FactStatus, fact_kind
+from analysis_service.fact_answers import (
+    MAX_DETAIL_CHARS,
+    MAX_FACT_ANSWERS,
+    FactAnswer,
+    FactStatus,
+    fact_kind,
+)
+from analysis_service.fan_in import BOUND_HOPS
 from analysis_service.frameworks import SCHEMAS
 from analysis_service.jobs import TERMINAL_STATUSES
 from analysis_service.ladder import Rung
@@ -63,7 +80,9 @@ from analysis_service.sources import (
     MAX_SYSTEM_NAME_CHARS,
     SourceKind,
 )
-from analysis_service.system_model import ElementPrefix
+from analysis_service.sql_store import _ADMISSION_LOCK_KEY
+from analysis_service.store_backends import MAX_RETENTION_DAYS
+from analysis_service.system_model import EXCERPT_MAX_CHARS, ElementPrefix, _Element
 from analysis_service.validation import MAX_ELEMENTS
 from analysis_service.vendors import VENDORS, CredentialMode
 from evals.harness.early_rounds import paused_state
@@ -71,6 +90,7 @@ from evals.harness.instruments import INSTRUMENTS
 from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT, guide_files
 from tests.test_api import make_client
+from webapp.main import MAX_RUNS
 
 pytestmark = pytest.mark.lint
 
@@ -78,6 +98,9 @@ DOCS = REPO_ROOT / "docs"
 CONFIGURATION = DOCS / "Configuration.md"
 HTTP_API = DOCS / "HTTP-API.md"
 CONCEPTS = DOCS / "Concepts.md"
+WEB_APP = DOCS / "Web-App.md"
+FIRST_RUN = DOCS / "First-Run.md"
+REPORT_SCHEMA = DOCS / "Report-Schema.md"
 
 #: The guides a reader copies a TOML example from. A record of a past state,
 #: such as ``docs/adr/``, is not a guide, so an old version there is correct.
@@ -89,7 +112,17 @@ SHIPPED_SAMPLING = load_sampling(SHIPPED_PATHS.sampling, env={})
 
 _TOML_FENCE = re.compile(r"^```toml\n(.*?)^```", re.DOTALL | re.MULTILINE)
 _ASSIGNMENT = re.compile(r"`([a-z_]+ = [^`\n]+)`")
-_NUMBER_WORDS = {"three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "ten": 10}
+_NUMBER_WORDS = {
+    "twice": 2,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "ninth": 9,
+    "ten": 10,
+}
 
 
 def section(path: Path, heading: str) -> str:
@@ -863,3 +896,88 @@ def test_the_table_reader_reads_only_the_named_table():
 
     assert tables(text, "C", "D") == [[["`y`", "2"], ["`z`", "3"]]]
     assert tables(text, "A", "D") == []
+
+
+# Bounds: each number a guide copies from a constant.
+
+
+def _numbers(path: Path, pattern: str) -> list[int]:
+    """Each number the pattern's first group reads in the guide, with the
+    guide's wraps read as spaces and its thousands separators dropped. A
+    number word reads as its value."""
+    found = re.findall(pattern, flat(path.read_text(encoding="utf-8")))
+    assert found, f"{path.name} has no sentence that matches {pattern!r}"
+    return [
+        _NUMBER_WORDS[number]
+        if number in _NUMBER_WORDS
+        else int(number.replace(",", ""))
+        for number in found
+    ]
+
+
+#: Each guide sentence that copies a bound, as its guide, the pattern that
+#: reads the number, and the bound.
+BOUND_COPIES: list[tuple[Path, str, int]] = [
+    (
+        WEB_APP,
+        r"the limit is (\w+) the deployment's `max_source_bytes`",
+        max_body_bytes(SHIPPED_RESILIENCE.source_limits())
+        // SHIPPED_RESILIENCE.max_source_bytes,
+    ),
+    (HTTP_API, r"A token may hold at most (\d+) streams", MAX_EVENT_STREAMS_PER_OWNER),
+    (HTTP_API, r"so a (\w+) stream gets `429`", MAX_EVENT_STREAMS_PER_OWNER + 1),
+    (
+        HTTP_API,
+        r"must be unique within the job, at most (\d+) characters",
+        MAX_LABEL_CHARS,
+    ),
+    (
+        HTTP_API,
+        r"one line, at most (\d+) characters, in your own words",
+        MAX_DETAIL_CHARS,
+    ),
+    (HTTP_API, r"that line may hold at most ([\d,]+) characters", EXCERPT_MAX_CHARS),
+    (HTTP_API, r"or a line longer than ([\d,]+) characters", EXCERPT_MAX_CHARS),
+    (HTTP_API, r"more than its limit: (\d+) links", MAX_LINK_ANSWERS),
+    (HTTP_API, r"more than its limit: \d+ links, (\d+) facts", MAX_FACT_ANSWERS),
+    (HTTP_API, r"`pg_advisory_xact_lock\((\d+)\)`", _ADMISSION_LOCK_KEY),
+    (HTTP_API, r"a whole number of days from 1 to (\d+)", MAX_RETENTION_DAYS),
+    (HTTP_API, r"must be a whole number from 1 to (\d+)", MAX_RETENTION_DAYS),
+    (CONFIGURATION, r"a whole number of days from 1 to (\d+)", MAX_RETENTION_DAYS),
+    (CONFIGURATION, r"has ([\d,]+) characters or fewer", MAX_VALUE_CHARS),
+    (CONFIGURATION, r"must have ([\d,]+) characters or fewer", MAX_VALUE_CHARS),
+    (FIRST_RUN, r"keeps at most (\d+) recent runs", MAX_RUNS),
+    (WEB_APP, r"At most (\d+) runs\.", MAX_RUNS),
+    (WEB_APP, r"The app holds at most (\d+) jobs", MAX_RUNS),
+    (WEB_APP, r"The bound of (\d+) runs", MAX_RUNS),
+    (REPORT_SCHEMA, r"the verbatim span, ≤(\d+) chars", GROUND_TEXT_MAX_CHARS),
+    (REPORT_SCHEMA, r"more than (\w+) hops from every place", BOUND_HOPS),
+    (REPORT_SCHEMA, r"the bound is (\w+) such hops", BOUND_HOPS),
+]
+
+
+@pytest.mark.parametrize(
+    ("path", "pattern", "bound"),
+    BOUND_COPIES,
+    ids=[f"{path.name}:{pattern[:32]}" for path, pattern, _ in BOUND_COPIES],
+)
+def test_each_copied_bound_is_its_constant(path, pattern, bound):
+    assert set(_numbers(path, pattern)) == {bound}
+
+
+def test_the_attribute_bound_is_each_attribute_field():
+    """An answer to an attribute other than ``data_description`` is bounded by
+    its field on the element, and every such free-text field takes one bound.
+    A closed attribute, such as ``exposure``, takes one of its choices."""
+    (stated,) = _numbers(
+        HTTP_API, r"An attribute other than `data_description` takes at most (\d+)"
+    )
+    bounds = {
+        _max_length(element, attribute)
+        for element in _Element.__subclasses__()
+        for attribute in (*CONTROL_ATTRIBUTES, "technology", "protocol")
+        if attribute in element.model_fields
+        and element.model_fields[attribute].annotation is str
+    }
+
+    assert bounds == {stated}
