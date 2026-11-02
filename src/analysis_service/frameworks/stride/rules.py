@@ -196,7 +196,7 @@ def _principals_of(catalog: AssertionCatalog, element_id: str) -> tuple[str, ...
     whose own gate rule refuses a basis this service inferred. So a wrong lead
     needs a source that states the wrong thing, rather than a rule that decided
     two names looked alike. Every rule that places a fact about a principal
-    asks this, so the identification has one reader.
+    asks this.
     """
     return tuple(
         subject.id

@@ -593,8 +593,8 @@ def as_compact(model: dict) -> dict:
 
     The measurement's own converter, and the fixture generator
     ``tests/test_compact.py`` drives the equivalence sweep with. Nothing in the
-    service converts this way round — the adapter only expands — so this is the
-    one place the inverse is written, and both readers of it share it.
+    service converts this way round — the adapter only expands — so the
+    measurement and the fixture generator share this inverse.
 
     **The ref is the element's own name slug behind its tag, because that is what
     a model writes.** A positional ref would be shorter and would make this

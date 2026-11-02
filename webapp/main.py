@@ -662,7 +662,7 @@ class CellEmpty(Exception):
 
 @dataclass
 class Cell:
-    """The one place that holds the :class:`Current` (ADR 0093).
+    """Holds the :class:`Current` (ADR 0093).
 
     ``current`` is ``None`` where the Deployment did not build, and the
     diagnostic page then serves. A swap replaces ``current`` in one

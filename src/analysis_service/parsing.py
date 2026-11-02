@@ -21,7 +21,7 @@ or more? ``bool`` is an ``int`` subclass, and ``json`` reads ``NaN`` and
 ``Infinity``, so ``isinstance`` alone is not that question either.
 :func:`non_negative` answers it.
 
-Three more questions about a file's values have one reader each here.
+This module answers three more questions about a file's values.
 :func:`is_version` asks whether a version is the integer a loader expects,
 because TOML and JSON read ``9.0`` and ``true`` as values equal to an integer.
 :func:`strings` asks whether a value is a list of strings, because a string

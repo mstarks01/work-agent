@@ -10,8 +10,8 @@ stop the startup.
 
 The ``gcs`` extra holds the client (ADR 0103). :func:`platform_credentials`
 imports ``google.auth`` on each call, so a missing library raises
-:class:`ModuleNotFoundError` in the caller's startup. The ``gcs`` row is the
-only reader of this module. The Vertex vendor row keeps the ADC chain.
+:class:`ModuleNotFoundError` in the caller's startup. The ``gcs`` row reads
+this module. The Vertex vendor row keeps the ADC chain.
 """
 
 from __future__ import annotations

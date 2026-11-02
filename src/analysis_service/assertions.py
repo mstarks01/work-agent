@@ -727,9 +727,9 @@ class Assertion(BaseModel):
     origin: Origin
     #: Required when ``value`` is :data:`UNKNOWN`, refused otherwise.
     reason: UnknownReason | None = None
-    #: Bounded at :data:`MAX_SPANS` by the gate rather than here, so the rule
-    #: has one reader and a row over it is a reported refusal, not a schema
-    #: error the resolver would have to pre-empt with a copy of the rule.
+    #: Bounded at :data:`MAX_SPANS` by the gate rather than here, so a row over
+    #: it is a reported refusal, not a schema error the resolver would have to
+    #: pre-empt with a copy of the rule.
     support: list[SupportSpan] = Field(default_factory=list)
     #: The assertion IDs an ``inferred`` value rests on.
     premises: list[str] = Field(default_factory=list, max_length=MAX_PREMISES)

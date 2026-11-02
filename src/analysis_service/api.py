@@ -743,7 +743,7 @@ def create_app(
     how long one may run, ``max_active_jobs`` bounds how many one caller may
     have in flight, ``carried_frameworks`` is what a submission may select
     from, and ``carries_catalog`` says whether a job here builds an assertion
-    catalog, which is the only reader of a link answer. All five come from the
+    catalog, which a link answer places a principal in. All five come from the
     deployment wherever there is one; a caller who injects a
     runner instead must state them, because reading a second configuration
     behind their back is how an app comes to enforce bounds its deployment never

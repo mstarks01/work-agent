@@ -15,7 +15,7 @@ import dataclasses
 import importlib
 import re
 from collections.abc import Callable, Iterable, Iterator
-from functools import partial
+from functools import cache, partial
 from itertools import pairwise
 from pathlib import Path
 from typing import TypeGuard
@@ -26,7 +26,15 @@ from analysis_service.analysis import CONTROL_ATTRIBUTES
 from analysis_service.claims import UNKNOWN_KEY_FIELDS, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
 from evals.harness.prices import UnitPrices
-from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
+from tests.source_tree import (
+    PYTHON,
+    REPO_ROOT,
+    TESTS,
+    imports,
+    parse,
+    source_files,
+    without,
+)
 from tests.test_five_class_read import HELD_ROWS
 
 pytestmark = pytest.mark.lint
@@ -664,6 +672,37 @@ def test_each_declared_site_still_reads_the_rule_itself():
     assert ID_DERIVERS.keys() <= set(_sites(_derives_an_id))
     assert STORED_ANSWER_READERS.keys() <= set(_sites(_validates_an_answer))
     assert REPORT_PARSERS.keys() <= set(_sites(_parses_a_report))
+
+
+def _states_a_direction(node: ast.AST) -> bool:
+    """A required ``direction`` field whose ``Literal`` holds ``gap``."""
+    return (
+        isinstance(node, ast.AnnAssign)
+        and _is_name(node.target, "direction")
+        and node.value is None
+        and any(_is_constant(part, "gap") for part in ast.walk(node.annotation))
+    )
+
+
+def _classes_holding(match: Callable[[ast.AST], bool]) -> list[Site]:
+    """Each class in :data:`FILES` whose own body holds a statement ``match``
+    accepts."""
+    return sorted(
+        (path.relative_to(REPO_ROOT).as_posix(), node.name)
+        for path in FILES
+        for node in ast.walk(parse(path))
+        if isinstance(node, ast.ClassDef) and any(map(match, node.body))
+    )
+
+
+def test_a_drafts_direction_has_one_field():
+    """Only ``RequirementProposal`` requires a draft's direction. The claim
+    that the service resolves from it carries a copy with a default, for a
+    report written before the field, so each direction that code reads comes
+    from this one field."""
+    assert _classes_holding(_states_a_direction) == [
+        ("src/analysis_service/frameworks/asvs/record.py", "RequirementProposal")
+    ]
 
 
 def test_the_cell_has_one_reader():
@@ -1852,6 +1891,61 @@ def _digests(node: ast.AST, read: str) -> bool:
     return _calls(node, "sha256") and bool(node.args) and _calls(node.args[0], read)
 
 
+#: The two digest functions of a produced claim.
+_CLAIM_DIGESTS = frozenset(
+    {"evals.harness.content.structural", "evals.harness.content.prose"}
+)
+
+
+@cache
+def _digest_names() -> tuple[frozenset[str], frozenset[str]]:
+    """The local names that an import in :data:`FILES` binds to a digest
+    function, and to the module that holds the digest functions."""
+    bound = [imports(parse(path)).items() for path in FILES]
+    functions = {
+        local for pairs in bound for local, dotted in pairs if dotted in _CLAIM_DIGESTS
+    }
+    modules = {
+        local
+        for pairs in bound
+        for local, dotted in pairs
+        if dotted == "evals.harness.content"
+    }
+    return frozenset(functions), frozenset(modules)
+
+
+def _digests_a_claim(node: ast.AST) -> bool:
+    """A call of a digest function of a produced claim, through any import."""
+    if not isinstance(node, ast.Call):
+        return False
+    functions, modules = _digest_names()
+    func = node.func
+    if isinstance(func, ast.Name):
+        return func.id in functions
+    return (
+        isinstance(func, ast.Attribute)
+        and f"evals.harness.content.{func.attr}" in _CLAIM_DIGESTS
+        and _is_name(func.value, *modules)
+    )
+
+
+def _lists_a_store(node: ast.AST) -> bool:
+    """A ``.list()`` call with no argument: the keys of an object store."""
+    return (
+        isinstance(node, ast.Call)
+        and _loads_attribute(node.func, "list")
+        and not node.args
+        and not node.keywords
+    )
+
+
+def _reads_the_carried_variable(node: ast.AST) -> bool:
+    """A read of ``CARRIED_VAR`` from a mapping, by ``get`` or by subscript."""
+    if isinstance(node, ast.Subscript):
+        return _loads(node.slice, "CARRIED_VAR")
+    return _calls(node, "get") and any(_loads(arg, "CARRIED_VAR") for arg in node.args)
+
+
 @dataclasses.dataclass(frozen=True)
 class _OneReader:
     """A rule that one function reads.
@@ -2453,6 +2547,62 @@ ONE_READERS: dict[str, _OneReader] = {
             ("src/analysis_service/questions.py", "follow_up_needs"): (
                 "it lists the open facts a draft waits on as questions to ask,"
                 " and writes no condition"
+            ),
+        },
+        "",
+    ),
+    "what a queue item shows": _OneReader(
+        lambda node: _calls(node, "Finding"),
+        ("evals/harness/queue.py", "from_claim"),
+        {},
+        "",
+    ),
+    "the digests a queue item carries": _OneReader(
+        _digests_a_claim,
+        ("evals/harness/queue.py", "from_claim"),
+        {
+            ("evals/harness/scorer.py", "_status_of_unmatched"): (
+                "it digests a produced threat to ask whether a vote on it is"
+                " still live, and builds no queue item"
+            ),
+            ("evals/harness/writing.py", "measure_case"): (
+                "it digests a claim's prose to ask whether a vote judged these"
+                " words, and builds no queue item"
+            ),
+        },
+        "",
+    ),
+    "the keys of an object store": _OneReader(
+        _lists_a_store,
+        ("src/analysis_service/sql_store.py", "sweep_orphans"),
+        {},
+        "",
+    ),
+    "the input bounds an eval run reads from the environment": _OneReader(
+        lambda node: _calls(node, "load_resilience"),
+        ("evals/harness/reference.py", "source_limits"),
+        {},
+        "evals/",
+    ),
+    "the carried frameworks variable": _OneReader(
+        _reads_the_carried_variable,
+        ("src/analysis_service/framework_config.py", "load_frameworks"),
+        {},
+        "",
+    ),
+    "the capabilities the sources state": _OneReader(
+        lambda node: _calls(node, "with_stated_capabilities"),
+        ("src/analysis_service/graph.py", "stated"),
+        {},
+        "",
+    ),
+    "the render of a job's sources": _OneReader(
+        lambda node: _calls(node, "render_sources"),
+        ("src/analysis_service/execution.py", "seed_state"),
+        {
+            ("evals/adversarial/verify.py", "fencing_issues"): (
+                "it renders sources to check the fence around them, and it"
+                " drives no graph and shows no job to a model"
             ),
         },
         "",

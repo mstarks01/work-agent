@@ -359,9 +359,9 @@ def key_claim(
     The single spelling of "which version keys this package, and which
     component that version reads". Every site that keys a produced claim goes
     through here — the review queue, the scorer, the sitting page, the writing
-    instrument and the tests that stand in for them — so a finding counted under
-    one key and asked about under another cannot happen by one site being edited
-    and another missed.
+    instrument and the tests that stand in for them — so an edit to the rule
+    here reaches each of them, and none counts a finding under one key while
+    another asks about it under a second key.
 
     ``scope`` is positional and second, beside the framework, because it is the
     half of a place an **Element ID** does not carry and a caller that omitted

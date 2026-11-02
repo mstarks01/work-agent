@@ -29,9 +29,9 @@ Two of the four halves are counted at the grain their names promise, and the
 grain is a property of the drafts rather than of this module:
 
 - ``unknown_controls_cited`` counts an ``(element, attribute)`` pair only where
-  some draft carries an attribute **ground** on exactly that pair. A ground is
-  the one place a draft records which control it rests on, so a citation of the
-  store credits the store's controls one at a time, never all at once.
+  some draft carries an attribute **ground** on exactly that pair. A draft
+  records the control it rests on in a ground, so a citation of the store
+  credits the store's controls one at a time, never all at once.
 - ``candidates_cited`` counts a lead only where **one draft** cites every
   element the lead names. Two drafts that each cite half of a flow's endpoints
   have each looked at half, and a lead is one structural condition rather than

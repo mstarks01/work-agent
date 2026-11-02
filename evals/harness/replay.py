@@ -727,7 +727,7 @@ def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | No
 def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
     """The produced row in the reference's spellings, where a signed alias rules.
 
-    The one place an alias is applied, before any comparison: the subject, a
+    This applies an alias before any comparison: the subject, a
     value that points at another subject, and each scope qualifier are each
     rewritten to the reference's spelling where a signed ruling names the
     produced one. A value and a qualifier are rewritten only under the produced

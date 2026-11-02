@@ -751,10 +751,10 @@ def _every_model(rule: SchemaRule) -> _SchemaRuleFor:
 # requires the match to start the identifier or to follow a dot, so a ``claude-``
 # inside a word — ``my-claude-clone-3`` — is not a Claude.
 #
-# The minor separator is the **union** here, and that is the one place it may
-# be: this is a parse rather than a shape gate, so reading ``4.6`` and ``4-6``
-# as one generation does no harm, while a per-vendor parse would have to key
-# on the vendor the docstring below refuses to key on.
+# The minor separator is the **union** here, and that is safe: this is a parse
+# rather than a shape gate, so reading ``4.6`` and ``4-6`` as one generation
+# does no harm, while a per-vendor parse would have to key on the vendor the
+# docstring below refuses to key on.
 _CLAUDE_GENERATION = re.compile(
     rf"(?:^|\.)claude-(?:{_claude_modern('[-.]')}|{_claude_legacy('[-.]')})"
 )

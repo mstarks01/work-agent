@@ -441,9 +441,8 @@ class FrameworkNodes:
     subgraphs never touch: they fan out from the one prepared model and fan back
     in at ``assemble``, which is the only node that sees both.
 
-    Like :class:`Lane`, this is the one place its names are spelled. A node name
-    and the state key it writes are derived from the same ``name``, so a graph
-    carrying two frameworks cannot cross their wires.
+    A node name and the state key it writes are derived from the same
+    ``name``, so a graph carrying two frameworks cannot cross their wires.
     """
 
     name: FrameworkName
@@ -1045,8 +1044,8 @@ class Analysis:
     service over a job, the eval harness over a corpus case — and neither copies
     a field across itself. Two copies would have to agree with nothing checking
     that they did, and a field added here and missed in one driver would produce
-    a report with a block silently absent. :meth:`into_report` is the one place
-    that mapping lives; a driver hands over the four things the graph cannot
+    a report with a block silently absent. :meth:`into_report` holds that
+    mapping; a driver hands over the four things the graph cannot
     know and reads nothing out of this object itself.
 
     **One shared model, N finished blocks.** The blocks arrive whole — each
@@ -2814,8 +2813,9 @@ def _stated_node_func(keys: GraphKeys) -> Callable[..., Any]:
 
     It runs right behind the reader, ahead of every node that reads the valid
     model, so a pause, its early questions and ``prepare`` all read the
-    capabilities the sources state. The rows are checked here and nowhere
-    else (:func:`~analysis_service.capability_reader.with_stated_capabilities`).
+    capabilities the sources state. The rows are checked here, in ``stated``,
+    and nowhere else
+    (:func:`~analysis_service.capability_reader.with_stated_capabilities`).
     """
 
     def stated(valid_model: dict, ctx, source_texts: dict | None = None) -> dict:
