@@ -1581,7 +1581,7 @@ def _loads(node: ast.AST, name: str) -> bool:
     )
 
 
-def _loads_attribute(node: ast.AST, attr: str) -> bool:
+def _loads_attribute(node: ast.AST, attr: str) -> TypeGuard[ast.Attribute]:
     """Whether ``node`` reads an attribute named ``attr``."""
     return (
         isinstance(node, ast.Attribute)
