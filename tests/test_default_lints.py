@@ -249,28 +249,33 @@ class Uses:
 
 
 #: The calls whose arguments a class may be read in without a construction.
-_TYPE_TESTS = frozenset({"isinstance", "issubclass"})
+_TYPE_TESTS: frozenset[Literal["isinstance", "issubclass"]] = frozenset(
+    {"isinstance", "issubclass"}
+)
 
 
 def _constructs_nothing(tree: ast.Module) -> set[int]:
     """The id of each node in ``tree`` that reads a class without building one:
     an annotation, the owner of an attribute, and an argument of a type test."""
-    quiet: set[int] = set()
+    builds_nothing: set[int] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.arg | ast.AnnAssign) and node.annotation:
-            quiet.update(map(id, ast.walk(node.annotation)))
+            builds_nothing.update(map(id, ast.walk(node.annotation)))
         elif isinstance(node, _FUNCTIONS) and node.returns:
-            quiet.update(map(id, ast.walk(node.returns)))
+            builds_nothing.update(map(id, ast.walk(node.returns)))
         elif isinstance(node, ast.ExceptHandler) and node.type:
-            quiet.update(map(id, ast.walk(node.type)))
+            builds_nothing.update(map(id, ast.walk(node.type)))
         elif isinstance(node, ast.Attribute):
-            quiet.add(id(node.value))
+            builds_nothing.add(id(node.value))
         elif isinstance(node, ast.Call) and _called_name(node) in _TYPE_TESTS:
-            quiet.update(id(part) for arg in node.args for part in ast.walk(arg))
-    return quiet
+            builds_nothing.update(
+                id(part) for arg in node.args for part in ast.walk(arg)
+            )
+    return builds_nothing
 
 
 def _called_name(node: ast.Call) -> str | None:
+    """The name a call calls: a plain name or an attribute, else None."""
     func = node.func
     if isinstance(func, ast.Name):
         return func.id
@@ -290,11 +295,11 @@ def uses(modules: Mapping[str, ast.Module]) -> Uses:
         for cls in tree.body:
             if isinstance(cls, ast.ClassDef):
                 found.calls[f"{module}.{cls.name}"].extend(
-                    _call(node)
+                    _call_shape(node)
                     for node in _own_nodes(cls)
                     if _builds_its_own_type(node)
                 )
-        quiet = _constructs_nothing(tree)
+        builds_nothing = _constructs_nothing(tree)
         for node in ast.walk(tree):
             if id(node) in called or not isinstance(node, ast.Name | ast.Attribute):
                 continue
@@ -303,12 +308,13 @@ def uses(modules: Mapping[str, ast.Module]) -> Uses:
             found.bare_values.add(node.id if isinstance(node, ast.Name) else node.attr)
             if (target := resolver.resolve(node, module)) is not None:
                 found.values.add(target)
-                if id(node) not in quiet:
+                if id(node) not in builds_nothing:
                     found.opaque_values.add(target)
     return found
 
 
-def _call(node: ast.Call) -> Call:
+def _call_shape(node: ast.Call) -> Call:
+    """What one call gives, as the lint matches it."""
     return Call(
         positional=sum(not isinstance(a, ast.Starred) for a in node.args),
         keywords=frozenset(k.arg for k in node.keywords if k.arg),
@@ -341,7 +347,7 @@ def _builds_its_own_type(node: ast.AST) -> TypeGuard[ast.Call]:
 
 def _record_call(node: ast.Call, module: str, resolver: Resolver, found: Uses) -> None:
     """File one call under each way the lint can match it."""
-    call = _call(node)
+    call = _call_shape(node)
     if (target := resolver.resolve(node.func, module)) is not None:
         found.calls[target].append(call)
     if isinstance(node.func, ast.Name):

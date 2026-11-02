@@ -24,9 +24,9 @@ through the imports of the claim's file; a bare name names a function of the
 claim's own file. So a guard is a site, never a bare name.
 
 The owner of a comment is the definition or the assignment that starts on the
-next statement, and otherwise the function or the class that holds it. The owner of a docstring is the
-function or the class it documents, or the name it follows as an attribute
-docstring. A claim spans line breaks, so a claim wrapped across two lines is
+next statement, and otherwise the function or the class that holds it. The
+owner of a docstring is the function or the class it documents, or the name it
+follows as an attribute docstring. A claim spans line breaks, so a claim wrapped across two lines is
 still found. "The one reader" followed by a verb in ``-ing`` describes a
 reader and claims nothing, and so does "a single source" or "no single
 source".
@@ -93,12 +93,12 @@ _TICKED = re.compile(r"`~?([\w.]*\w)(?:\(\))?`")
 _DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
 #: How many lines after a page-script comment the lint reads for the name the
-#: comment is about. A claim in the page scripts sits on the line above the
-#: name it is about; the reach leaves room for a blank line and a comment.
-_OWNER_REACH = 15
+#: comment is about: the line below the comment, and one more for a wrapped
+#: declaration. Each claim in the page scripts sits right above its name.
+_OWNER_REACH = 2
 
 #: The JavaScript forms that name what a comment above them is about.
-_JS_OWNER = re.compile(r"(?:function\s+|const\s+|let\s+)(\w+)")
+_JS_OWNER = re.compile(r"^\s*(?:export\s+)?(?:async\s+)?(?:function|const|let)\s+(\w+)")
 
 #: A run of ``//`` comment lines, or one ``/* */`` comment, in a page script.
 _SCRIPT_COMMENT = re.compile(r"//[^\n]*(?:\n[ \t]*//[^\n]*)*|/\*.*?\*/", re.DOTALL)
@@ -336,8 +336,7 @@ def _tests(tree: ast.Module) -> Iterator[ast.FunctionDef]:
 
 def _asserted_sites(tree: ast.Module) -> Iterator[Site]:
     """Each site that an ``assert`` in a test names as the one site of a rule:
-    the one element of a list or a set that the found sites must equal, or a
-    site that must be among them."""
+    the one element of a list or a set that the found sites must equal."""
     for test in _tests(tree):
         for statement in ast.walk(test):
             if not isinstance(statement, ast.Assert):
@@ -347,16 +346,13 @@ def _asserted_sites(tree: ast.Module) -> Iterator[Site]:
                     continue
                 (op,) = node.ops
                 sides = (node.left, *node.comparators)
-                if isinstance(op, ast.Eq):
-                    candidates = [
-                        side.elts[0]
-                        for side in sides
-                        if isinstance(side, ast.List | ast.Set) and len(side.elts) == 1
-                    ]
-                elif isinstance(op, ast.In):
-                    candidates = [node.left]
-                else:
+                if not isinstance(op, ast.Eq):
                     continue
+                candidates = [
+                    side.elts[0]
+                    for side in sides
+                    if isinstance(side, ast.List | ast.Set) and len(side.elts) == 1
+                ]
                 for candidate in candidates:
                     if (site := _site(candidate)) is not None:
                         yield site
@@ -615,6 +611,7 @@ def test_a_site_among_several_in_an_assert_guards_nothing():
     """Negative control: a site that an assert lists beside other sites is no
     one reader, so it guards nothing."""
     assert ("src/analysis_service/job_answers.py", "amend") not in guarded_sites()
+    assert ("src/analysis_service/fixes.py", "absent_rows") not in guarded_sites()
     assert ("src/analysis_service/job_answers.py", "missing") in guarded_sites()
 
 

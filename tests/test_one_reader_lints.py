@@ -452,15 +452,6 @@ def test_kept_text_has_one_reader():
     assert _sites(tests) == [("src/analysis_service/grounding.py", "keeps_text")]
 
 
-#: Each function that tests a spelling field of an
-#: :class:`~analysis_service.claims.UnknownRef` for its truth, and why it does
-#: not ask ``kind``.
-SPELLING_READERS: dict[Site, str] = {
-    ("src/analysis_service/claims.py", "spellings"): (
-        "it is the reader that ``kind`` reads"
-    ),
-}
-
 #: The fields of :class:`~analysis_service.claims.UnknownRef` that spell a
 #: kind of fact.
 SPELLING_FIELDS = frozenset(
@@ -503,9 +494,11 @@ def _tests_a_spelling(node: ast.AST) -> bool:
 
 
 def test_the_kind_of_an_open_fact_has_one_reader():
-    """Only ``UnknownRef.kind`` routes on which spelling a reference uses."""
-    assert set(_sites(_tests_a_spelling)) == SPELLING_READERS.keys()
-    assert ("src/analysis_service/claims.py", "spellings") in _sites(_tests_a_spelling)
+    """Only ``UnknownRef.spellings`` tests a spelling field for its truth, and
+    ``UnknownRef.kind`` routes on what it returns."""
+    assert _sites(_tests_a_spelling) == [
+        ("src/analysis_service/claims.py", "spellings")
+    ]
 
 
 def test_the_kind_of_an_open_fact_is_not_read_from_two_fields():
@@ -572,7 +565,8 @@ def test_the_layout_of_an_open_facts_key_has_one_reader():
     sites = set(_sites(_reads_a_key_by_position))
     assert sites - KEY_LAYOUT_READERS.keys() == set(), "read a key's parts by key_ref"
     assert KEY_LAYOUT_READERS.keys() <= sites
-    assert ("src/analysis_service/fact_answers.py", "key_ref") in sites
+    senders = {site for site, why in KEY_LAYOUT_READERS.items() if why == _SENT_KEY}
+    assert sites - senders == {("src/analysis_service/fact_answers.py", "key_ref")}
 
 
 def test_the_place_of_a_pydantic_error_has_one_reader():
@@ -667,7 +661,6 @@ def _parses_a_report(node: ast.AST) -> bool:
 
 
 def test_each_declared_site_still_reads_the_rule_itself():
-    assert SPELLING_READERS.keys() <= set(_sites(_tests_a_spelling))
     assert FIELD_PAIR_READERS.keys() <= set(_sites(_tests_two_spelling_fields))
     assert LOC_READERS.keys() <= set(_sites(_reads_loc))
     assert CONFIG_DEFAULT_READERS.keys() <= set(_sites(_reads_a_config_default))
@@ -1073,14 +1066,19 @@ STORED_ANSWER_READERS: dict[Site, str] = {
 }
 
 
+#: The module that reads each body a job's answer routes take.
+ANSWER_BODIES = "src/analysis_service/answer_bodies.py"
+
+
 def test_an_answer_body_has_one_reader():
     """Only ``answer_bodies`` reads an answer out of a request body. The
     ``/v1`` routes and the first-run app both call it, so one site applies
     the keys, shapes and bounds a body meets."""
     assert set(_sites(_validates_an_answer)) == STORED_ANSWER_READERS.keys()
-    assert ("src/analysis_service/answer_bodies.py", "_read") in _sites(
-        partial(_calls, name="model_validate")
-    )
+    validators = _sites(partial(_calls, name="model_validate"))
+    assert [site for site in validators if site[0] == ANSWER_BODIES] == [
+        ("src/analysis_service/answer_bodies.py", "_read")
+    ]
 
 
 def _reads_a_body_key(node: ast.AST) -> bool:
