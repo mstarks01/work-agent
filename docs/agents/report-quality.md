@@ -103,7 +103,10 @@ only store lead, whose question asks who reaches the storage layer. The
 that read such a store. In a blind ruling it stated the access-path threat at
 4 of 8 reference places over two passes, against 1 of 8 without it
 (`QA-2026-10-05-02-E3`). It recovers the two read-grant references (02/6,
-12/8) and neither compromised-reader reference (05/6, 05/7).
+12/8) and neither compromised-reader reference (05/6, 05/7). A caller whose
+flows into the store state no read and at least one `unknown` reaches the
+lane under `callers_of_unknown_operation`, with a conditional question, and
+never as a reader (#2105).
 
 **Prose-only mismatches (8 rows).** A different principal impersonated, a
 different resource flooded, or a defining part missing

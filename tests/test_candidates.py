@@ -5,6 +5,8 @@ fire on. The second is the boundary that makes this design safe at all: a
 candidate is a lead, and nothing downstream can turn one into a finding.
 """
 
+import json
+
 import pytest
 
 from analysis_service.assertions import (
@@ -722,3 +724,93 @@ class TestTheStoreReadersRule:
         ]
         fired = self._fired(model.model_copy(update={"data_flows": flows}))
         assert "store:worker-config" not in fired
+
+    #: Each caller's flows into the store, by the operations they state.
+    SHAPES = (
+        ("process:read", ("read",)),
+        ("process:read-write", ("read-write",)),
+        ("process:unknown", ("unknown",)),
+        ("process:write", ("write",)),
+        ("process:write-unknown", ("write", "unknown")),
+        ("process:read-unknown", ("read", "unknown")),
+    )
+
+    def _shapes_model(self):
+        callers = [caller for caller, _ in self.SHAPES]
+        return SystemModel(
+            processes=[
+                Process(
+                    id=caller,
+                    name=caller.removeprefix("process:"),
+                    technology="x",
+                    trust_zone="boundary:inside",
+                    exposure="internal",
+                    interface_kind="non-web",
+                )
+                for caller in callers
+            ],
+            data_stores=[
+                DataStore(
+                    id="store:vault",
+                    name="vault",
+                    technology="x",
+                    data_classification="confidential",
+                    encryption_at_rest="AES-256",
+                    trust_zone="boundary:inside",
+                    assets=["credentials"],
+                )
+            ],
+            trust_boundaries=[
+                TrustBoundary(id="boundary:inside", name="inside", kind="network")
+            ],
+            data_flows=[
+                flow(
+                    caller, "store:vault", f"{operation} {index}", operations=operation
+                )
+                for caller, operations in self.SHAPES
+                for index, operation in enumerate(operations)
+            ],
+        )
+
+    def test_each_caller_appears_once_at_its_strongest_status(self):
+        (candidate,) = self._fired(self._shapes_model()).values()
+
+        assert candidate.facts["readers"] == (
+            "process:read, process:read-unknown, process:read-write"
+        )
+        assert candidate.facts["callers_of_unknown_operation"] == (
+            "process:unknown, process:write-unknown"
+        )
+        assert "process:write" not in candidate.element_ids
+        assert len(candidate.element_ids) == len(set(candidate.element_ids)) == 6
+
+    def test_the_lane_reads_both_statuses_and_the_conditional_question(self):
+        from analysis_service.graph import FrameworkNodes, framework_lane_inputs
+        from tests.test_prompt_lints import PACKAGE_LOADERS
+
+        inputs = framework_lane_inputs(
+            FrameworkNodes("stride"),
+            self._shapes_model(),
+            {},
+            None,
+            PACKAGE_LOADERS["stride"],
+        )
+        rendered = inputs.artifacts["information-disclosure"]["candidates"]
+        rule = next(rule for rule in RULES if rule.rule_id == self.RULE)
+
+        assert json.dumps(rule.question) in rendered
+        assert "`callers_of_unknown_operation`" in rule.question
+        assert (
+            '"callers_of_unknown_operation": "process:unknown, process:write-unknown"'
+            in rendered
+        )
+
+    def test_a_store_with_only_unknown_callers_names_no_reader(self):
+        model = self._shapes_model()
+        flows = [f for f in model.data_flows if f.source == "process:unknown"]
+        fired = self._fired(model.model_copy(update={"data_flows": flows}))
+
+        assert "readers" not in fired["store:vault"].facts
+        assert fired["store:vault"].facts["callers_of_unknown_operation"] == (
+            "process:unknown"
+        )
