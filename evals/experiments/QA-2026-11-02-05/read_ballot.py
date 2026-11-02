@@ -6,7 +6,8 @@ must be in its check's set, and ``duplicate_of`` and ``pair_of`` must name
 another row of the same check and the same group, and a pair's two drafts
 must share a flow of the case's model. A duplicate names a row that is not a
 duplicate itself. A row may be in one pair at most, and a link written on both rows counts once. A file that breaks one of
-these is refused by name. The file may carry the byte-order mark a spreadsheet
+these, or a row with more or fewer cells than the header, is refused by
+name. The file may carry the byte-order mark a spreadsheet
 writes.
 
 The counts are the ones the E2 and E3 falsifiers read:
@@ -51,6 +52,10 @@ def _rows(path: Path) -> dict[str, dict[str, str]]:
             raise BallotError(f"{path.name}: the header is not {list(COLUMNS)}")
         rows: dict[str, dict[str, str]] = {}
         for row in reader:
+            if None in row or None in row.values():
+                raise BallotError(
+                    f"{path.name}: a row has more or fewer cells than the header"
+                )
             if row["n"] in rows:
                 raise BallotError(f"{path.name}: row {row['n']} appears twice")
             rows[row["n"]] = row
@@ -119,11 +124,7 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
         if pair is not None:
             if (row["verdict"], pair["verdict"]) != ("right", "right"):
                 raise BallotError(f"row {n}: a pair links two right rows")
-            flows = {
-                e
-                for e in elements_of(n) & elements_of(pair["n"])
-                if e.startswith("flow:")
-            }
+            flows = elements_of(n) & elements_of(pair["n"]) & flows_of(row["case"])
             if not flows:
                 raise BallotError(f"row {n}: a pair links two drafts at one flow")
             pairs.add(frozenset((n, pair["n"])))
