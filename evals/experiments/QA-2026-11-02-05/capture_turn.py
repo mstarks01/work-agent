@@ -29,6 +29,7 @@ from analysis_service import graph
 from analysis_service.jobs import JobRecord
 from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.system_model import SystemModel
+from evals.harness.artifact import repo_commit
 from tests.factories import ScriptedLlm, emitted, sample_selection, scripted_pipeline
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -90,7 +91,15 @@ def main(case_dirs: list[str]) -> None:
             "captured_turn": contents,
         }
     REQUEST_CHECK.write_text(
-        json.dumps({"inputs": input_digests(), "cases": checks}, indent=1) + "\n"
+        json.dumps(
+            {
+                "commit": repo_commit().model_dump(),
+                "inputs": input_digests(),
+                "cases": checks,
+            },
+            indent=1,
+        )
+        + "\n"
     )
     print(
         json.dumps(

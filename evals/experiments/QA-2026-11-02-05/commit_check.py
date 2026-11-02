@@ -15,10 +15,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from analysis_service.sources import text_digest
-
 sys.path.insert(0, str(Path(__file__).parent))
-from read_capabilities import REQUEST_ROOTS
+from read_capabilities import REQUEST_ROOTS, tree_digests
 
 #: The package, configuration and domain trees, beside the request roots.
 WIDER = ("frameworks", "config", "domains")
@@ -36,11 +34,9 @@ def digests(commit: str) -> dict[str, str]:
     paths = _git(
         "ls-tree", "-r", "-z", "--name-only", commit, "--", *REQUEST_ROOTS, *WIDER
     )
-    return {
-        path: text_digest(_git("show", f"{commit}:{path}"))
-        for path in paths.split("\0")
-        if path
-    }
+    return tree_digests(
+        paths.split("\0"), lambda path: _git("show", f"{commit}:{path}")
+    )
 
 
 def main(revision: str, run_commit: str) -> None:

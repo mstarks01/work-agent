@@ -94,7 +94,25 @@ CHECKS: Mapping[Check, CheckSpec] = {
     ),
 }
 
-COLUMNS = (
+#: A column of the ballot.
+Column = Literal[
+    "n",
+    "check",
+    "group",
+    "case",
+    "title",
+    "description",
+    "elements",
+    "mitigations",
+    "question",
+    "verdicts",
+    "verdict",
+    "duplicate_of",
+    "pair_of",
+    "note",
+]
+
+COLUMNS: tuple[Column, ...] = (
     "n",
     "check",
     "group",

@@ -81,6 +81,11 @@ async def request_for(case_dir: Path) -> tuple[str, Any]:
 REQUEST_ROOTS = ("src", "prompts", "uv.lock")
 
 
+def tree_digests(paths: list[str], read) -> dict[str, str]:
+    """Each named path, other than an empty one, with the digest ``read`` gives."""
+    return {path: text_digest(read(path)) for path in paths if path}
+
+
 def input_digests() -> dict[str, str]:
     """Each tracked file under ``REQUEST_ROOTS`` with the digest of its text."""
     tracked = subprocess.run(
@@ -89,7 +94,7 @@ def input_digests() -> dict[str, str]:
         capture_output=True,
         text=True,
     ).stdout.split("\0")
-    return {path: text_digest(Path(path).read_text()) for path in tracked if path}
+    return tree_digests(tracked, lambda path: Path(path).read_text())
 
 
 def refuse_unchecked() -> None:

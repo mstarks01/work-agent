@@ -4,7 +4,8 @@ The returned file is ``ballot-returned.csv``. Its header must be ``COLUMNS``,
 each ``n`` must appear once, each issued column must be unchanged, each verdict
 must be in its check's set, and ``duplicate_of`` and ``pair_of`` must name
 another row of the same check and the same group, and a pair's two drafts
-must share a flow. A row may be in one pair at most, and a link written on both rows counts once. A file that breaks one of
+must share a flow of the case's model. A duplicate names a row that is not a
+duplicate itself. A row may be in one pair at most, and a link written on both rows counts once. A file that breaks one of
 these is refused by name. The file may carry the byte-order mark a spreadsheet
 writes.
 
@@ -30,10 +31,13 @@ from pathlib import Path
 from typing import cast
 
 sys.path.insert(0, str(Path(__file__).parent))
-from build_ballot import CHECKS, COLUMNS, Check, runs
+from build_ballot import CHECKS, COLUMNS, Check, Column, runs
+
+from evals.harness.reference import load_case
 
 HERE = Path(__file__).parent
-RULED = ("verdict", "duplicate_of", "pair_of", "note")
+#: The columns the ruler fills in; every other column must come back unchanged.
+RULED: tuple[Column, ...] = ("verdict", "duplicate_of", "pair_of", "note")
 
 
 class BallotError(ValueError):
@@ -85,6 +89,10 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
         for claim in output["claims"]
     }
 
+    def flows_of(case: str) -> set[str]:
+        model = load_case(f"evals/corpus/{case}").model
+        return {flow.id for flow in model.data_flows}
+
     def elements_of(n: str) -> set[str]:
         claim = claims[(key[n]["run"], key[n]["sequence"])]
         return set(claim["affected_element_ids"])
@@ -98,6 +106,11 @@ def read(returned: Path, issued: Path, key_path: Path) -> dict:
         if row["verdict"] not in CHECKS[check].verdicts:
             raise BallotError(f"row {n}: {row['verdict']!r} is not a {check} verdict")
         duplicate = _linked(rows, row, "duplicate_of")
+        if duplicate is not None and duplicate["verdict"] == "duplicate":
+            raise BallotError(
+                f"row {n}: duplicate_of names row {duplicate['n']}, which is a"
+                " duplicate too; name the row it repeats"
+            )
         if (duplicate is None) != (row["verdict"] != "duplicate"):
             raise BallotError(
                 f"row {n}: a duplicate names its row, and only a duplicate"
