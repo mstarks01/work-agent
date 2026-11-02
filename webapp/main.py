@@ -264,6 +264,7 @@ from analysis_service.vendors import (
     missing_sdk,
     vendor_for,
 )
+from webapp import controls_prototype
 from webapp.page import (
     LOOPBACK_HOSTS,
     WORKSPACE_STYLE,
@@ -2020,6 +2021,7 @@ def create_app(
         )
         return JSONResponse({"run": corrected.job_id})
 
+    controls_prototype.mount(app)  # PROTOTYPE #2118, never merges
     return app
 
 
