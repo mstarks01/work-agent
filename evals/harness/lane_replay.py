@@ -17,7 +17,9 @@ real graph run sent.
 
 **The prompt files are today's.** The captured material is the run's, and the
 instruction around it is read from this checkout. The command prints both
-commits, and a replay across a prompt change measures that change.
+commits, and a replay across a prompt change measures that change. The run
+record names each prompt and package file the run loaded, with its digest, so
+a record from a changed tree still shows the text the lane read.
 
 **One extra user part, on request.** ``--append`` sends a file's text as a
 second part of the user turn, after the captured input. ADR 0030's measurement
@@ -85,7 +87,7 @@ from evals.harness.reference import (
     load_case,
     refuse_holdout,
 )
-from evals.harness.run_record import Selections, run_record_for
+from evals.harness.run_record import Selections, loaded, run_record_for
 from evals.reference_facts import load_facts, signed_proposal
 
 #: What ``--prepare-today`` hands ``prepare`` as the catalog: none, which is a
@@ -188,10 +190,12 @@ def fresh_leads(
 
 @dataclass(frozen=True)
 class PreparedToday:
-    """What today's ``prepare`` wrote for one case: the lanes' material and the state."""
+    """What today's ``prepare`` wrote for one case: the lanes' material, the
+    state, and each file its loaders held, for a run record."""
 
     material: dict[str, Any]
     state: dict[str, Any]
+    inputs: dict[Path, Selections]
 
 
 def prepare_today(
@@ -220,17 +224,21 @@ def prepare_today(
         facts = load_facts(REPO_ROOT / DEFAULT_CORPUS / case.id)
         extra[STATE_ASSERTION_PROPOSAL] = signed_proposal(facts).model_dump(mode="json")
     ctx = SimpleNamespace(state=seed_state(case.sources, extra))
+    domains = MarkdownLoader(REPO_ROOT / "domains")
+    package = MarkdownLoader(REPO_ROOT / "frameworks" / framework)
     event = prepare_analysis(
         valid_model,
         ctx,
         GraphKeys.of([framework]),
         [framework],
-        MarkdownLoader(REPO_ROOT / "domains"),
-        {framework: MarkdownLoader(REPO_ROOT / "frameworks" / framework)},
+        domains,
+        {framework: package},
         assertions=arm == "signed",
     )
     run = GraphRun(final_state=ctx.state, node_runs=[], prepared=event.output)
-    return PreparedToday(run.lane_material([framework]), ctx.state)
+    return PreparedToday(
+        run.lane_material([framework]), ctx.state, loaded((domains, package))
+    )
 
 
 def parse(raw: str, framework: FrameworkName) -> BaseModel:
@@ -298,7 +306,9 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 def command_lane_replay(args: argparse.Namespace) -> int:
     """Send one lane request again, and print what the lane proposed."""
     prepared = None
-    inputs: dict[Path, Selections] = {}
+    package_loader = MarkdownLoader(REPO_ROOT / "frameworks" / args.framework)
+    prompt_loader = MarkdownLoader(REPO_ROOT / "prompts")
+    inputs = loaded((package_loader, prompt_loader))
     try:
         refuse_holdout(args.case)
         if (args.artifact is None) == (args.prepare_today is None):
@@ -313,6 +323,7 @@ def command_lane_replay(args: argparse.Namespace) -> int:
         if args.prepare_today is not None:
             prepared = prepare_today(case, args.framework, args.prepare_today)
             material = prepared.material
+            inputs |= prepared.inputs
             print(
                 f"material from today's prepare, catalog {args.prepare_today};"
                 f" prompt files from {repo_commit().commit}"
@@ -321,14 +332,14 @@ def command_lane_replay(args: argparse.Namespace) -> int:
             artifact = load_artifact(args.artifact)
             lanes = lanes_file(artifact, args.case)
             material = material_at(lanes)
-            inputs = {artifact.path: {}, lanes: {}}
+            inputs |= {artifact.path: {}, lanes: {}}
             if args.fresh_leads:
                 material = fresh_leads(
                     material,
                     case,
                     args.framework,
                     args.lane,
-                    MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
+                    package_loader,
                 )
             print(
                 f"material from {artifact.commit.commit}; prompt files"
@@ -366,8 +377,8 @@ def command_lane_replay(args: argparse.Namespace) -> int:
             args.framework,
             args.lane,
             call,
-            MarkdownLoader(REPO_ROOT / "frameworks" / args.framework),
-            MarkdownLoader(REPO_ROOT / "prompts"),
+            package_loader,
+            prompt_loader,
             args.append.read_text(encoding="utf-8") if args.append else None,
         )
     )

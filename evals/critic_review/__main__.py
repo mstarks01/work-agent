@@ -43,7 +43,7 @@ from evals.harness.artifact import ProvenanceError, corpus_digest
 from evals.harness.bundle import check_out
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import node_call
-from evals.harness.run_record import run_record_for
+from evals.harness.run_record import loaded, run_record_for
 
 
 def _one_framework(fixtures: list[CriticFixture]) -> FrameworkName:
@@ -113,12 +113,14 @@ def main(argv: list[str] | None = None) -> int:
     framework = _one_framework(fixtures)
     package = PACKAGES[framework]
     case_id = _one_case(fixtures)
+    package_loader = MarkdownLoader(REPO_ROOT / "frameworks" / framework)
+    prompt_loader = MarkdownLoader(REPO_ROOT / "prompts")
     try:
         record = run_record_for(
             [args.out],
             "critic-review",
             {"framework": framework, "case": case_id, "corpus_digest": corpus_digest()},
-            {CASES: {}},
+            {CASES: {}, **loaded((package_loader, prompt_loader))},
         )
     except ProvenanceError as error:
         print(error, file=sys.stderr)
@@ -139,8 +141,8 @@ def main(argv: list[str] | None = None) -> int:
                 model,
                 corpus_sources(case_id),
                 package,
-                MarkdownLoader(REPO_ROOT / "frameworks" / framework),
-                MarkdownLoader(REPO_ROOT / "prompts"),
+                package_loader,
+                prompt_loader,
                 node,
             )
         )
