@@ -174,6 +174,7 @@ from analysis_service.config_files import (
 )
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
+from analysis_service.diagrams import install_reader, reader_missing
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import (
@@ -2317,6 +2318,11 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     print(f"First-run app on http://{HOST}:{PORT}")
+    if reader_missing():
+        logger.info("installing the diagram reader's packages")
+        install_reader()
+        if missing := reader_missing():
+            logger.warning("an analysis of a diagram Source will fail: %s", missing)
     # Loopback is hard-bound: no flag, no env override. The no-auth posture is
     # only safe here.
     uvicorn.run(create_app(), host=HOST, port=PORT, log_level="warning")

@@ -85,9 +85,9 @@ sparse or inaccurate system model, which limits everything downstream.
 
 <!-- every-vendor -->
 
-You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), and credentials
-for one registered vendor: Vertex AI, Anthropic, OpenAI, Bedrock, the Gemini
-Developer API or OpenRouter.
+You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), Node 20 or
+newer, and credentials for one registered vendor: Vertex AI, Anthropic, OpenAI,
+Bedrock, the Gemini Developer API or OpenRouter.
 
 <!-- /every-vendor -->
 
@@ -95,11 +95,12 @@ Developer API or OpenRouter.
 git clone https://github.com/mstarks01/work-agent.git
 cd work-agent
 uv sync
-npm ci --ignore-scripts --prefix diagram_reader
 ```
 
-The last line installs the diagram reader, which needs Node 20 or newer. Only
-an analysis with a Mermaid diagram uses it.
+The app reads Mermaid diagrams with Mermaid's own parsers, which need Node 20
+or newer. At its first start, the app installs the parsers' locked packages,
+so that start needs a network connection. Where the install fails, the app
+logs a warning that names the command to run.
 
 No model is selected in the shipped configuration. Choose both the `base` model
 (extraction and repair) and the `strong` model (framework analysis and review),
