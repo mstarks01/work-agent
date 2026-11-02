@@ -58,8 +58,8 @@ from tests.factories import (
     translator_of,
 )
 
-# This install's one package's critic nodes. Named per framework now, because
-# two packages each bring their own critic and its bounded re-ask.
+# This install's one package's critic nodes. Named per framework, because two
+# packages each bring their own critic and its bounded re-ask.
 _STRIDE = FrameworkNodes("stride")
 CRITIC_NODE = _STRIDE.node(graph.CRITIC_ROLE)
 #: This graph's node -> tier map, built for the selection above. Not a module
@@ -512,8 +512,8 @@ def test_the_pipeline_binds_retry_and_timeout():
 
     Both ride the adapter. The timeout is read in seconds here because that is
     LiteLLM's unit and the adapter kwarg is the last hop before it — asserting
-    the file's milliseconds against something ADK hands on unchanged is how the
-    bound came to mean 3.5 days.
+    the file's milliseconds against something ADK hands on unchanged would let
+    the bound mean 3.5 days.
     """
     from google.adk.models.lite_llm import LiteLlm
 
@@ -823,7 +823,7 @@ def test_unsetting_temperature_lets_the_same_selection_build(tmp_path):
 
 
 def test_asking_for_more_output_than_the_model_serves_fails_the_build():
-    """The truncation failure, moved from request time to build time.
+    """The truncation failure fails the build, not a request.
 
     Every provider accepts ``max_output_tokens``, so the supported-param gate
     passes an over-ceiling value and the serving model rejects it on node one.

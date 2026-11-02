@@ -948,10 +948,10 @@ class TestAJobDefersWhatItsInputCannotSettle:
     """The split a lane agent makes, and where each half lands.
 
     **Driven through ``PACKAGES["asvs"].record``, which is what the fan-in
-    calls.** The first version of these tests called the override directly on
-    the block class, so they passed while the graph resolved the neutral default
-    and deferred nothing across two live runs. A test that names a class the
-    caller never reaches proves the method works and not that it runs.
+    calls.** A test that calls the override directly on the block class passes
+    even while the graph resolves the neutral default and defers nothing. A
+    test that names a class the caller never reaches proves the method works
+    and not that it runs.
 
     A requirement whose substance needs source code is not a question a
     submitter can answer by writing more. Recorded as a **Scope Entry** rather

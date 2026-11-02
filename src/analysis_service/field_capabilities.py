@@ -1,6 +1,6 @@
 """Capabilities that a closed field of the model proves, written where nothing states them.
 
-A flow that states HTTPS between two of the application's own parts proves
+A flow that states HTTPS between two of the application's own elements proves
 that the application uses TLS, and a process that is internet-facing with a
 web interface proves that it exposes an HTTP service. Asking the owner about
 either one only wastes an answer (ADR 0085).
@@ -18,7 +18,7 @@ later answer replaces the statement this module wrote. Each statement quotes
 the first element that proves it and names the element and the rule in
 :attr:`~analysis_service.system_model.CapabilityStatement.basis`.
 
-The application's own parts are the model's processes and data stores.
+The application's own elements are the model's processes and data stores.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ SECRET_TAGS = frozenset({"credentials", "secrets"})
 
 
 @dataclass(frozen=True)
-class _Parts:
+class _Elements:
     """What the rows read off one model."""
 
     flows: tuple[DataFlow, ...]
@@ -76,7 +76,7 @@ class _Parts:
     assumed: frozenset[tuple[str, str]]
 
     @classmethod
-    def of(cls, model: SystemModel) -> _Parts:
+    def of(cls, model: SystemModel) -> _Elements:
         processes = tuple(model.processes)
         stores = tuple(model.data_stores)
         return cls(
@@ -97,82 +97,84 @@ class _Parts:
         return frozenset({flow.source, flow.destination})
 
 
-def _tls(parts: _Parts) -> Iterator[DataFlow]:
+def _tls(elements: _Elements) -> Iterator[DataFlow]:
     """Stated TLS-family flows with one end that is the application's own."""
-    for flow in parts.stated:
-        if states_inherently(flow, TLS_FAMILY) and parts.ends(flow) & parts.own:
+    for flow in elements.stated:
+        if states_inherently(flow, TLS_FAMILY) and elements.ends(flow) & elements.own:
             yield flow
 
 
-def _tls_client(parts: _Parts) -> Iterator[DataFlow]:
-    return (flow for flow in _tls(parts) if flow.source in parts.process_ids)
+def _tls_client(elements: _Elements) -> Iterator[DataFlow]:
+    return (flow for flow in _tls(elements) if flow.source in elements.process_ids)
 
 
-def _internal(parts: _Parts, states: Callable[[DataFlow], bool]) -> Iterator[DataFlow]:
-    """Stated flows between two of the application's own parts, where ``states``
-    holds of the flow's protocol."""
-    for flow in parts.stated:
-        if parts.ends(flow) <= parts.own and states(flow):
+def _internal(
+    elements: _Elements, states: Callable[[DataFlow], bool]
+) -> Iterator[DataFlow]:
+    """Stated flows between two of the application's own elements, where
+    ``states`` holds of the flow's protocol."""
+    for flow in elements.stated:
+        if elements.ends(flow) <= elements.own and states(flow):
             yield flow
 
 
-def _internal_tls(parts: _Parts) -> Iterator[DataFlow]:
-    return _internal(parts, lambda flow: states_inherently(flow, TLS_FAMILY))
+def _internal_tls(elements: _Elements) -> Iterator[DataFlow]:
+    return _internal(elements, lambda flow: states_inherently(flow, TLS_FAMILY))
 
 
-def _internal_http(parts: _Parts) -> Iterator[DataFlow]:
-    return _internal(parts, lambda flow: states_protocol(flow, HTTP_FAMILY))
+def _internal_http(elements: _Elements) -> Iterator[DataFlow]:
+    return _internal(elements, lambda flow: states_protocol(flow, HTTP_FAMILY))
 
 
-def _internal_service(parts: _Parts) -> Iterator[DataFlow]:
+def _internal_service(elements: _Elements) -> Iterator[DataFlow]:
     """A process and a data store that talk over a TLS-family or HTTP-family protocol."""
     network = (*TLS_FAMILY, *HTTP_FAMILY)
-    for flow in _internal(parts, lambda flow: states_protocol(flow, network)):
-        ends = parts.ends(flow)
-        if ends & parts.process_ids and ends & parts.store_ids:
+    for flow in _internal(elements, lambda flow: states_protocol(flow, network)):
+        ends = elements.ends(flow)
+        if ends & elements.process_ids and ends & elements.store_ids:
             yield flow
 
 
-def _to_system(parts: _Parts) -> Iterator[DataFlow]:
-    for flow in parts.flows:
-        if flow.source in parts.process_ids and flow.destination in parts.systems:
+def _to_system(elements: _Elements) -> Iterator[DataFlow]:
+    for flow in elements.flows:
+        if flow.source in elements.process_ids and flow.destination in elements.systems:
             yield flow
 
 
 def _named(
-    names: tuple[str, ...], ends: Callable[[_Parts, DataFlow], bool]
-) -> Callable[[_Parts], Iterator[DataFlow]]:
+    names: tuple[str, ...], ends: Callable[[_Elements, DataFlow], bool]
+) -> Callable[[_Elements], Iterator[DataFlow]]:
     """Stated flows that name one of ``names``, where ``ends`` holds."""
 
-    def proof(parts: _Parts) -> Iterator[DataFlow]:
-        for flow in parts.stated:
-            if states_protocol(flow, names) and ends(parts, flow):
+    def proof(elements: _Elements) -> Iterator[DataFlow]:
+        for flow in elements.stated:
+            if states_protocol(flow, names) and ends(elements, flow):
                 yield flow
 
     return proof
 
 
-def _own_end(parts: _Parts, flow: DataFlow) -> bool:
-    return bool(parts.ends(flow) & parts.own)
+def _own_end(elements: _Elements, flow: DataFlow) -> bool:
+    return bool(elements.ends(flow) & elements.own)
 
 
-def _sensitive_own_end(parts: _Parts, flow: DataFlow) -> bool:
-    return _own_end(parts, flow) and bool(set(flow.assets) & SENSITIVE_TAGS)
+def _sensitive_own_end(elements: _Elements, flow: DataFlow) -> bool:
+    return _own_end(elements, flow) and bool(set(flow.assets) & SENSITIVE_TAGS)
 
 
-def _process_end(parts: _Parts, flow: DataFlow) -> bool:
-    return bool(parts.ends(flow) & parts.process_ids)
+def _process_end(elements: _Elements, flow: DataFlow) -> bool:
+    return bool(elements.ends(flow) & elements.process_ids)
 
 
-def _process_destination(parts: _Parts, flow: DataFlow) -> bool:
-    return flow.destination in parts.process_ids
+def _process_destination(elements: _Elements, flow: DataFlow) -> bool:
+    return flow.destination in elements.process_ids
 
 
-def _tagged(tags: frozenset[str]) -> Callable[[_Parts], Iterator[Element]]:
+def _tagged(tags: frozenset[str]) -> Callable[[_Elements], Iterator[Element]]:
     """The processes and data stores tagged with one of ``tags``."""
 
-    def proof(parts: _Parts) -> Iterator[Element]:
-        owned: tuple[Process | DataStore, ...] = (*parts.processes, *parts.stores)
+    def proof(elements: _Elements) -> Iterator[Element]:
+        owned: tuple[Process | DataStore, ...] = (*elements.processes, *elements.stores)
         for element in owned:
             if set(element.assets) & tags:
                 yield element
@@ -180,16 +182,16 @@ def _tagged(tags: frozenset[str]) -> Callable[[_Parts], Iterator[Element]]:
     return proof
 
 
-def _web_on_internet(parts: _Parts) -> Iterator[Process]:
-    for process in parts.processes:
+def _web_on_internet(elements: _Elements) -> Iterator[Process]:
+    for process in elements.processes:
         if process.exposure == "internet-facing" and process.interface_kind == "web":
             yield process
 
 
-def _encrypted_store(parts: _Parts) -> Iterator[DataStore]:
+def _encrypted_store(elements: _Elements) -> Iterator[DataStore]:
     """Data stores whose encryption at rest is stated, and not assumed."""
-    for store in parts.stores:
-        assumed = (store.id, "encryption_at_rest") in parts.assumed
+    for store in elements.stores:
+        assumed = (store.id, "encryption_at_rest") in elements.assumed
         if not assumed and control_state(store.encryption_at_rest) == "stated":
             yield store
 
@@ -200,7 +202,7 @@ class FieldCapability:
 
     capability: str
     #: The elements whose fields prove it, in the model's order.
-    proof: Callable[[_Parts], Iterator[Element]]
+    proof: Callable[[_Elements], Iterator[Element]]
     #: Why the fields prove it, in our words.
     basis: str
 
@@ -310,13 +312,13 @@ def with_field_capabilities(model: SystemModel) -> SystemModel:
         for statement in model.capabilities
         if statement.origin != "field"
     }
-    parts = _Parts.of(model)
+    elements = _Elements.of(model)
     proven = []
     for row in FIELD_CAPABILITIES:
         if row.capability in named:
             continue
         cited = next(
-            (e for e in row.proof(parts) if e.source_excerpt and e.source_label),
+            (e for e in row.proof(elements) if e.source_excerpt and e.source_label),
             None,
         )
         if cited is None:

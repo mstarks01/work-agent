@@ -235,8 +235,8 @@ class TestTheSaves:
             assert not before & {tuple(q["key"]) for q in shown["early_questions"]}
         else:
             pytest.fail("the saves never ended")
-        # The stop says why truthfully: the limits held questions back, or a
-        # floor left questions out, exactly where it says so.
+        # The empty-list reason says why truthfully: the limits held questions
+        # back, or a floor left questions out, exactly where it says so.
         assert shown["early_stop"] == (
             "budget-exhausted"
             if shown["early_held_back"]
@@ -3364,7 +3364,7 @@ def test_the_page_opens_the_list_with_the_questions_the_service_counts(case):
     )
     capabilities = [list(q.key) for q in asked.early if q.kind == "capability"]
     if asked.gates["asvs"] != "satisfied":
-        # A framework that will not run as the model reads now asks no
+        # A framework that will not run as the model reads asks no
         # capability (ADR 0067), so the list holds none.
         assert not capabilities
         return
@@ -3845,8 +3845,9 @@ calls.push({{ said: text(ids.questions) }});
 
 
 def test_a_finished_pause_lists_what_stays_open_and_takes_a_held_back_answer():
-    """No stop says every fact is settled (#1542 F2, ADR 0068): the page lists
-    what stays open, and a question no list asks can still be answered."""
+    """No empty-list reason says every fact is settled (#1542 F2, ADR 0068):
+    the page lists what stays open, and a question no list asks can still be
+    answered."""
     low = _text_row(["", "", "", "who signs?", "", ""], "who signs?")
     summary = {
         "introduced": 14,

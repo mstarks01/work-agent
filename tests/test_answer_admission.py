@@ -704,7 +704,7 @@ class TestTheAdaptiveList:
         else:
             pytest.fail("the list never ended")
         # Every answer was "I don't know", so the questions under the floor
-        # are what is left, and the stop says so.
+        # are what is left, and the empty-list reason says so.
         assert body["early_stop"] == "below-floor"
         assert body["early_below_floor"] and not body["early_held_back"]
 

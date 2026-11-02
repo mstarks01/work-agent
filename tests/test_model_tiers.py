@@ -351,8 +351,8 @@ class TestPinValidation:
     """ "Pinned" is per-family: a denylist, plus a shape where one is published.
 
     The denylist half stays deliberately weak, and the guarantee lives on the
-    served-build readback rather than here: an allowlist of numbered builds is
-    what broke when Google retired them, and that risk runs against three
+    served-build readback rather than here: an allowlist of numbered builds
+    breaks when a vendor retires a build, and that risk runs against three
     catalogs. Claude's half is a *shape*, not a list of builds, so a model
     released tomorrow already satisfies it.
     """
@@ -729,14 +729,12 @@ class TestDeclaredCredentialMode:
     def test_an_unbound_tiers_vendor_needs_no_declaration(self, config_path):
         """A vendor no adapter is built for needs no identity.
 
-        The rule this class already stated — "a multi-mode vendor nobody calls
-        needs no identity" — while the code read every tier and so demanded one.
         The shipped node map points nothing at ``review``, so a ``review`` tier
-        naming Bedrock needs no credential, no SDK and no declaration; the
-        loader refused to start without one anyway.
+        naming Bedrock needs no credential, no SDK and no declaration, and the
+        loader starts without one.
 
-        Both readers are :attr:`ModelTierConfig.bound_vendors` now, so the
-        loader cannot demand what the build does not need.
+        Both readers are :attr:`ModelTierConfig.bound_vendors`, so the loader
+        cannot demand what the build does not need.
         """
         tiers = load_model_tiers(
             config_path(

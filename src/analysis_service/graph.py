@@ -77,10 +77,10 @@ its skills through :mod:`analysis_service.skills`, and its prompt through
 ``analyze/stride`` in the tier config becomes ``analyze_stride_spoofing`` and its
 five siblings here. :func:`tier_node_by_graph_node` is the only place that
 correspondence lives. The tier config keys one ``analyze/<framework>`` where the
-graph builds one node per lane, which is ``model_tiers.toml`` v5's own rule: a
+graph builds one node per lane, which is ``model_tiers.toml``'s own rule: a
 lane is a framework's internal fact, and all of them run the same judgement on
-the same tier. The graph names carry the framework as well, and that is the bump
-report schema 3.0 earned. A consumer that keys on ``analyze_spoofing`` in
+the same tier. The graph names carry the framework as well, as report schema
+3.0 defines. A consumer that keys on ``analyze_spoofing`` in
 ``nodes[].node`` does not error; it matches nothing, silently.
 
 The bookends are deliberately deterministic, because mechanical work belongs in

@@ -99,7 +99,7 @@ from tests.test_compact import compact_fixture
 PROJECT_ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 
 #: The selection every test here builds a graph for. A graph is built for one
-#: selection now, so a test asserting about "the nodes" has to say which.
+#: selection, so a test asserting about "the nodes" has to say which.
 FRAMEWORKS = DEFAULT_FRAMEWORKS
 NODES = graph.FrameworkNodes("stride")
 LANES = NODES.lanes
@@ -1399,7 +1399,7 @@ def test_validate_parks_the_normalized_model_the_issues_cite():
 
 
 def test_revalidate_puts_every_uncited_element_back_and_records_it():
-    """#675 D01: the repair prompt asked for it; the gate now enforces it."""
+    """#675 D01: the repair prompt asks for it, and the gate enforces it."""
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     ctx = FakeContext()
@@ -1547,11 +1547,11 @@ def test_prepare_derives_crossings_rather_than_trusting_them(
 
     assert output["element_count"] == 7
     assert output["crossing_count"] == 1
-    # Four, not three, since a flow says what it does: the login flow's
-    # `operations` is `unknown`, and an unstated attribute is a fact an agent
-    # may ground a question on. Nothing about the catalog changed to allow that
-    # — `_attribute_entry` reads every type-specific field through
-    # `control_state`, so the new field is catalogued the day it lands.
+    # Four, because a flow says what it does: the login flow's `operations`
+    # is `unknown`, and an unstated attribute is a fact an agent may ground a
+    # question on. `_attribute_entry` reads every type-specific field through
+    # `control_state`, so the catalog holds each such field with no change of
+    # its own.
     assert output["evidence_count"] == 4
     assert (
         "flow:entity:customer>process:web-app>login"

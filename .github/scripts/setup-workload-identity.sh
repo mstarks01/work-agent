@@ -151,9 +151,9 @@ fi
 # IT NAMES TWO THINGS, AND THE REPOSITORY IS ONLY THE FIRST. `repository_owner`
 # alone still admits every repo under the account, including one an attacker
 # gets a workflow merged into -- so the repository is named. But the repository
-# is where this condition used to stop, and #508 is what that missed: a
-# collaborator who pushes a branch and opens a pull request produces a token
-# whose `repository` claim is identical to main's. Repository scoping cannot
+# alone is not enough (#508): a collaborator who pushes a branch and opens a
+# pull request produces a token whose `repository` claim is identical to
+# main's. Repository scoping cannot
 # tell reviewed code from unreviewed code, so on its own it federates both.
 #
 # `job_workflow_ref` is the claim that can. It carries the ref of the *workflow
@@ -162,18 +162,18 @@ fi
 # already on that ref. It covers a reusable workflow called from elsewhere for
 # the same reason, because the claim names the file that is executing.
 #
-# PIN IT WITH `ref`, NOT WITH A SUFFIX. `endsWith('@refs/heads/main')` was the
-# spelling here, and the `@` is a separator in the middle of a string whose
-# right half the attacker names. `git check-ref-format` accepts a branch called
-# `pwn@refs/heads/main`, and the claim for it ends
+# PIN IT WITH `ref`, NOT WITH A SUFFIX. A suffix check such as
+# `endsWith('@refs/heads/main')` fails, because the `@` is a separator in the
+# middle of a string whose right half the attacker names. `git check-ref-format`
+# accepts a branch called `pwn@refs/heads/main`, and the claim for it ends
 # `...x.yml@refs/heads/pwn@refs/heads/main`, which satisfies the suffix. The
 # `ref` claim carries the run's ref exactly and has no attacker-chosen tail, so
-# comparing it is the check the suffix was trying to be. Both are kept: `ref`
-# decides, and `job_workflow_ref` still refuses a reusable workflow file that
-# lives on another ref.
+# an exact comparison of it is the check a suffix only approximates. The
+# condition holds both: `ref` decides, and `job_workflow_ref` still refuses a
+# reusable workflow file that lives on another ref.
 #
-# This is defence in depth behind the workflow files themselves, which no longer
-# carry a `pull_request` trigger on any credential-bearing job and guard
+# This is defence in depth behind the workflow files themselves, which carry
+# no `pull_request` trigger on any credential-bearing job and guard
 # `workflow_dispatch` with a ref condition. Either layer alone closes the hole;
 # the point of two is that the workflow half lives in a file a collaborator can
 # edit in a pull request, and this half does not.

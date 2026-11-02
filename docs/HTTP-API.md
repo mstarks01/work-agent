@@ -354,7 +354,7 @@ so in `early_stop`, and a send without `"save"` starts it. `answered_early` and 
 with its question, and you can send a new answer to any of them. A question
 with facets stays listed while a facet has no answer.
 
-**A stop does not say every fact is settled**
+**An empty-list reason does not say every fact is settled**
 ([ADR 0068](adr/0068-a-pause-says-what-it-leaves-open.md)). `early_stop` is
 `null` while the job asks something. It is `budget-exhausted` when the limits
 hold questions back, `below-floor` when only questions under a floor are left,
