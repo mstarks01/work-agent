@@ -52,14 +52,28 @@ def _module_file(dotted: str) -> Path | None:
     return None
 
 
+#: The spellings of the flag that is true only for a type checker.
+_TYPE_CHECKING = frozenset({"TYPE_CHECKING", "typing.TYPE_CHECKING"})
+
+
 def _imported(source: Path) -> set[str]:
     """Every ``analysis_service`` module ``source`` imports, dotted.
 
     A ``from`` import names a module or a name inside one, so each name is
     tried as a submodule and kept only where a file stands behind it.
+
+    An import under ``if TYPE_CHECKING:`` never runs, so a change to the module
+    it names cannot change an eval outcome. The walk skips that block and
+    reads its ``else`` branch.
     """
     found = set()
-    for node in ast.walk(parse(source)):
+    pending: list[ast.AST] = [parse(source)]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, ast.If) and ast.unparse(node.test) in _TYPE_CHECKING:
+            pending.extend(node.orelse)
+            continue
+        pending.extend(ast.iter_child_nodes(node))
         if isinstance(node, ast.ImportFrom):
             module = node.module or ""
             if module.startswith("analysis_service"):
@@ -141,6 +155,22 @@ def test_the_closure_is_not_vacuously_empty():
     """Guards the guard: an import walk that finds nothing would agree with anything."""
     reachable = _reachable_from_evals()
     assert {"graph", "report", "sampling", "grounding"} <= reachable
+
+
+def test_the_walk_skips_a_type_only_import(tmp_path):
+    """Positive control: an import under ``if TYPE_CHECKING:`` is not read, and
+    one in its ``else`` branch is."""
+    source = tmp_path / "typed.py"
+    source.write_text(
+        "from typing import TYPE_CHECKING\n"
+        "if TYPE_CHECKING:\n"
+        "    from analysis_service.store_settings import StoreConfigError\n"
+        "else:\n"
+        "    from analysis_service import report\n",
+        encoding="utf-8",
+    )
+
+    assert _imported(source) == {"analysis_service", "analysis_service.report"}
 
 
 def test_the_walk_follows_a_subpackage():

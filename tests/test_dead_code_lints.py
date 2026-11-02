@@ -34,9 +34,12 @@ Every other public name is judged like a private one, in the service as in
 reaches is not API, because no integrator imports it from the package root.
 :data:`NAMED_BY_A_LIBRARY` holds the files whose names a library reads by name.
 
-**A name is matched by its identifier.** A parameter or an attribute with the
-same name as a dead function counts as a use of it, so the dead function is
-not reported.
+**A local is not a use.** A parameter, a local variable or a comprehension
+target that shares a module-level name hides that name inside its scope, so a
+read there is not a use of it, and neither is a keyword argument. An attribute
+read is matched by its identifier, because the scan cannot tell
+``module.name`` from ``obj.name``: an attribute read that shares the name of a
+dead function still hides it.
 
 **A dead cluster is dead.** A map that only a dead function reads looks
 referenced, but the code that reads it is itself dead.
@@ -56,6 +59,7 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Iterable
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -105,6 +109,7 @@ TEST_ONLY: dict[str, str] = {
         " prices the frontier against"
     ),
     "corpus_recall": f"{_PINNED}: trigger recall over the whole corpus",
+    "by_framework": f"{_PINNED}: the trigger overlap of each framework",
     "kind_of": (
         "the reader the archive encoding lint classifies every sealed file"
         " with, so a committed file whose producer nobody declared fails there"
@@ -244,8 +249,65 @@ def _definitions() -> dict[str, str]:
     return found
 
 
-def _used_names(ignoring: frozenset[str], files: Iterable[Path] = SEARCHED) -> set[str]:
-    """Every identifier the files in ``files`` read, call, decorate with or import.
+_FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
+_COMPREHENSIONS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+
+
+def _parameters(args: ast.arguments) -> set[str]:
+    """The names a function or a lambda takes."""
+    every = (*args.posonlyargs, *args.args, *args.kwonlyargs, args.vararg, args.kwarg)
+    return {arg.arg for arg in every if arg is not None}
+
+
+@cache
+def _locals(function: ast.FunctionDef | ast.AsyncFunctionDef) -> frozenset[str]:
+    """The names ``function`` binds in its own scope: its parameters and each
+    name its body binds, less each name it declares ``global``.
+
+    A read of one of these names inside the function reads the local, never
+    the module-level name it shares.
+    """
+    bound = _parameters(function.args)
+    declared_global: set[str] = set()
+    pending: list[ast.AST] = list(function.body)
+    while pending:
+        node = pending.pop()
+        if isinstance(node, (*_FUNCTIONS, ast.ClassDef)):
+            bound.add(node.name)
+            continue
+        if isinstance(node, (ast.Lambda, *_COMPREHENSIONS)):
+            continue
+        if isinstance(node, ast.Name) and not isinstance(node.ctx, ast.Load):
+            bound.add(node.id)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            bound.update(
+                alias.asname or alias.name.split(".")[0] for alias in node.names
+            )
+        elif isinstance(node, (ast.ExceptHandler, ast.MatchAs, ast.MatchStar)):
+            if node.name:
+                bound.add(node.name)
+        elif isinstance(node, ast.MatchMapping) and node.rest:
+            bound.add(node.rest)
+        elif isinstance(node, ast.Global):
+            declared_global.update(node.names)
+        pending.extend(ast.iter_child_nodes(node))
+    return frozenset(bound - declared_global)
+
+
+def _comprehension_locals(
+    node: ast.ListComp | ast.SetComp | ast.DictComp | ast.GeneratorExp,
+) -> set[str]:
+    """The names the ``for`` targets of a comprehension bind."""
+    return {
+        name.id
+        for generator in node.generators
+        for name in ast.walk(generator.target)
+        if isinstance(name, ast.Name)
+    }
+
+
+def _names_read(tree: ast.AST, ignoring: frozenset[str] = frozenset()) -> set[str]:
+    """Every module-level name ``tree`` reads, calls, decorates with or imports.
 
     A definition contributes nothing: ``ast.FunctionDef`` carries its name as a
     plain string rather than an ``ast.Name``, so a helper that only defines
@@ -257,32 +319,58 @@ def _used_names(ignoring: frozenset[str], files: Iterable[Path] = SEARCHED) -> s
     as dead. Store context is excluded for that reason, and an augmented
     assignment is put back by hand: ``X += 1`` binds and reads at one target.
 
+    **A local is not a use.** A parameter, a local variable or a
+    comprehension target that shares a module-level name hides that name
+    inside its scope, so a read there reads the local. A keyword argument is
+    a string on its ``ast.keyword``, never a ``Name``. An attribute read is
+    matched by its identifier, because ``module.name`` reads the module's
+    name and the scan cannot tell a module from another object.
+
     ``ignoring`` names definitions already proved dead. Their bodies are skipped
     entirely, so a name only they reach stops looking reached -- which is what
     finds a helper kept alive by its one dead caller.
     """
     used: set[str] = set()
 
-    def walk(node: ast.AST) -> None:
+    def visit(node: ast.AST, hidden: frozenset[str]) -> None:
+        if isinstance(node, _DEFINITIONS) and node.name in ignoring:
+            return
+        if isinstance(node, _FUNCTIONS):
+            for outer in (*node.decorator_list, node.args, node.returns):
+                if outer is not None:
+                    visit(outer, hidden)
+            inner = hidden | _locals(node)
+            for statement in node.body:
+                visit(statement, inner)
+            return
+        if isinstance(node, ast.Lambda):
+            visit(node.args, hidden)
+            visit(node.body, hidden | _parameters(node.args))
+            return
+        if isinstance(node, _COMPREHENSIONS):
+            hidden = hidden | _comprehension_locals(node)
+        elif isinstance(node, ast.Name):
+            if not isinstance(node.ctx, ast.Store) and node.id not in hidden:
+                used.add(node.id)
+        elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
+            if node.target.id not in hidden:
+                used.add(node.target.id)
+        elif isinstance(node, ast.Attribute):
+            if not isinstance(node.ctx, ast.Store):
+                used.add(node.attr)
+        elif isinstance(node, ast.ImportFrom):
+            used.update(alias.asname or alias.name for alias in node.names)
         for child in ast.iter_child_nodes(node):
-            if isinstance(child, _DEFINITIONS) and child.name in ignoring:
-                continue
-            if isinstance(child, ast.Name):
-                if not isinstance(child.ctx, ast.Store):
-                    used.add(child.id)
-            elif isinstance(child, ast.AugAssign) and isinstance(
-                child.target, ast.Name
-            ):
-                used.add(child.target.id)
-            elif isinstance(child, ast.Attribute):
-                used.add(child.attr)
-            elif isinstance(child, ast.ImportFrom):
-                used.update(alias.asname or alias.name for alias in child.names)
-            walk(child)
+            visit(child, hidden)
 
-    for path in files:
-        walk(parse(path))
+    visit(tree, frozenset())
     return used
+
+
+def _used_names(ignoring: frozenset[str], files: Iterable[Path] = SEARCHED) -> set[str]:
+    """Every module-level name the files in ``files`` read, by
+    :func:`_names_read`."""
+    return set().union(*(_names_read(parse(path), ignoring) for path in files))
 
 
 def unreachable() -> dict[str, str]:
@@ -372,6 +460,54 @@ def test_a_use_in_a_test_is_not_a_production_use():
 
     assert shipped <= everywhere
     assert "unreachable" in everywhere and "unreachable" not in shipped
+
+
+def test_a_local_that_shares_a_name_is_not_a_use():
+    """Positive control on the scopes, on the shape that got through:
+    ``structural_issues`` had no caller, and a parameter of that name read as
+    one.
+
+    A parameter, a local, a comprehension target, a closure's free name and a
+    keyword argument read no module-level name. An import, a call, an
+    attribute read, a ``global`` name, an annotation and a default do.
+    """
+    hidden = ast.parse(
+        "def payload(case, structural_issues):\n"
+        "    return {'issues': list(structural_issues)}\n"
+        "def local():\n"
+        "    gate = 1\n"
+        "    return gate\n"
+        "def target():\n"
+        "    return [row for row in range(3)]\n"
+        "def keyword():\n"
+        "    return dict(spare=1)\n"
+        "def closure(inner):\n"
+        "    return lambda: inner\n"
+    )
+    read = ast.parse(
+        "from m import imported\n"
+        "def call():\n"
+        "    return called()\n"
+        "def attribute(obj):\n"
+        "    return obj.attribute_read\n"
+        "def declared():\n"
+        "    global counter\n"
+        "    counter += 1\n"
+        "def annotated(value: Annotation = default):\n"
+        "    return value\n"
+    )
+
+    assert not {"structural_issues", "gate", "row", "spare", "inner"} & _names_read(
+        hidden
+    )
+    assert {
+        "imported",
+        "called",
+        "attribute_read",
+        "counter",
+        "Annotation",
+        "default",
+    } <= _names_read(read)
 
 
 def test_the_lint_covers_a_real_population():

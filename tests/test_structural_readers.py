@@ -4,9 +4,8 @@ One rule has two readers here, on purpose.
 :class:`~analysis_service.report.Report` refuses an unsound payload at
 validation, and :func:`~evals.harness.structural.report_issues` refuses one
 again over a report that already parsed.
-:mod:`evals.harness.structural` states why the second exists: a payload has to
-be gradeable before it is known to parse, and a gate that would silently weaken
-if somebody relaxed ``Report`` is not a gate.
+:mod:`evals.harness.structural` states why the second exists: a gate that would
+silently weaken if somebody relaxed ``Report`` is not a gate.
 
 Two readers of one rule eventually answer it differently, and each one's own
 test agrees with it, so neither notices. ``evals/harness/structural.py`` names

@@ -559,7 +559,6 @@ LOC_READERS: dict[Site, str] = {
     ("src/analysis_service/validation.py", "parse_and_validate"): _MODEL_KEY,
     ("src/analysis_service/config_files.py", "validation_problems"): _OWN_FILE,
     ("evals/harness/reference.py", "_case_refusal"): _OWN_FILE,
-    ("evals/harness/structural.py", "structural_issues"): _OWN_FILE,
     ("src/analysis_service/fact_writes.py", "_check_attribute_values"): (
         "it names the attribute an answer filled, the last part of a place"
         " that the model's own fields make"
@@ -609,10 +608,6 @@ REPORT_PARSERS: dict[Site, str] = {
     ("src/analysis_service/sql_store.py", "report"): (
         "the job store reads a report from a job row, and refuses one that"
         " does not parse as UnreadableSchema (ADR 0095)"
-    ),
-    ("evals/harness/structural.py", "structural_issues"): (
-        "it checks a payload in memory and returns each refusal as a Tier 1"
-        " issue; it reads no file"
     ),
 }
 

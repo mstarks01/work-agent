@@ -1,20 +1,19 @@
 r"""Tier 1: the structural gates, and the only ones that block.
 
 Thresholds are split by nature, and these are the absolute, per-case,
-zero-tolerance ones. A payload parses as a
-:class:`~analysis_service.report.Report`, its references resolve, its claim IDs
-are unique within each block, its severity bands match
+zero-tolerance ones. A :class:`~analysis_service.report.Report`'s references
+resolve, its claim IDs are unique within each block, its severity bands match
 :func:`~analysis_service.claims.derive_severity_level`, and each block's summary
 counts match its own contents. They gate from day one because they are
 deterministic, free, and already enforced by shipped validators. Must-find
 recall computes and reports, and does not block until baselines exist.
 
 The checks are re-asserted here rather than delegated wholesale to the model
-validator, for two reasons. A raw payload has to be gradeable before it is known
-to parse. And a gate that would silently weaken if somebody relaxed
-:class:`Report` is not a gate. Every failure in a report is listed at once,
-because a run artifact that named one problem per iteration would waste a live
-sweep.
+validator, because a gate that would silently weaken if somebody relaxed
+:class:`Report` is not a gate. They run over the report in front of them, so a
+report edited after it parsed still fails. Every failure in a report is listed
+at once, because a run artifact that named one problem per iteration would
+waste a live sweep.
 
 One rule with two readers drifts, and each reader's own test agrees with it, so
 neither notices. ``tests/test_structural_readers.py`` is what stops that: it
@@ -39,9 +38,6 @@ Re-validating the string would hide that rather than catch it.
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any
-
-from pydantic import ValidationError
 
 from analysis_service.claims import (
     FrameworkAnalysis,
@@ -51,29 +47,8 @@ from analysis_service.frameworks import package_for
 from analysis_service.report import Report
 
 
-def structural_issues(payload: dict[str, Any]) -> list[str]:
-    """Every Tier 1 failure in one report payload, empty if it is sound.
-
-    A payload that will not parse fails here with the validator's own messages
-    rather than an error count: the run artifact is what a human reads to fix
-    the run, and "3 errors" sends them back to the model to find out which.
-    Most Tier 1 properties are enforced by :class:`Report` itself, so a
-    broken payload usually fails at this step; :func:`report_issues` is the
-    same gates applied to an object that already parsed.
-    """
-    try:
-        report = Report.model_validate(payload)
-    except ValidationError as exc:
-        return [
-            "report does not parse as Report:"
-            f" {'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
-            for error in exc.errors()
-        ]
-    return report_issues(report)
-
-
 def report_issues(report: Report) -> list[str]:
-    """The same gates, over an already-parsed report."""
+    """Every Tier 1 failure in ``report``, empty if it is sound."""
     known_ids = {element.id for element in report.system_model.elements()}
     issues = [
         issue for block in report.analyses for issue in _block_issues(block, known_ids)
