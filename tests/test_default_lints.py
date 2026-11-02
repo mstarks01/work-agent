@@ -258,7 +258,8 @@ _TYPE_TESTS: frozenset[Literal["isinstance", "issubclass"]] = frozenset(
 
 def _reads_that_build_nothing(tree: ast.Module) -> set[int]:
     """The id of each node in ``tree`` that reads a class without building one:
-    an annotation, the owner of an attribute, and an argument of a type test."""
+    an annotation, a return annotation, an ``except`` clause, the owner of an
+    attribute, and an argument of a type test."""
     builds_nothing: set[int] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.arg | ast.AnnAssign) and node.annotation:
