@@ -113,6 +113,9 @@ RejectionStep = Literal["evidence", "reasoning", "lane", "duplicate"]
 # :data:`RejectionStep` because archived reports carry it and are re-scored.
 CriticStep = Literal["evidence", "reasoning", "lane"]
 
+#: The ground kinds that cite an attribute of an element.
+AttributeGround = Literal["unknown-attribute", "absent-attribute"]
+
 # What a finding can cite in its own support. Spelled out rather than terse
 # (``unknown`` / ``derived``) because a bare ``unknown`` collides: it is already
 # a legal *attribute value* across the System Model, so ``kind="unknown"`` would
@@ -122,8 +125,7 @@ CriticStep = Literal["evidence", "reasoning", "lane"]
 # kind can tell them apart.
 GroundKind = Literal[
     "quote",
-    "unknown-attribute",
-    "absent-attribute",
+    AttributeGround,
     "derived-fact",
     "absent-element",
     "assertion",
@@ -143,7 +145,7 @@ GroundKind = Literal[
 #: A *stated absence* is not here, under either spelling. "The control is not
 #: there" is a fact in hand, and "put the control in" is a countermeasure an
 #: agent can always name.
-CONDITIONAL_GROUNDS: frozenset[str] = frozenset(
+CONDITIONAL_GROUNDS: frozenset[GroundKind] = frozenset(
     {"unknown-attribute", "unknown-assertion"}
 )
 
@@ -155,14 +157,14 @@ CONDITIONAL_GROUNDS: frozenset[str] = frozenset(
 #: **Here rather than in either reader.** ``fan_in`` snaps the field and
 #: ``coverage`` counts the pairs, and each listed the two kinds for itself, so
 #: a third attribute kind would have reached one of them.
-ATTRIBUTE_GROUNDS: frozenset[str] = frozenset({"unknown-attribute", "absent-attribute"})
+ATTRIBUTE_GROUNDS: frozenset[AttributeGround] = frozenset(get_args(AttributeGround))
 
 #: The two ground kinds whose reference is a row of the **Assertion** catalog.
 #: Both carry ``assertion`` and nothing else, and that value is a digest of the
 #: row's value and scope — so a reader holding the ground alone holds no fact.
 #: Here for the reason the pair above is here: every consumer that has to
 #: resolve one back to its row asks the same question of the same catalog.
-ASSERTION_GROUNDS: frozenset[str] = frozenset({"assertion", "unknown-assertion"})
+ASSERTION_GROUNDS: frozenset[GroundKind] = frozenset({"assertion", "unknown-assertion"})
 
 # How long a claim ID may be. **Not a grammar**: #163 ruled that ``id`` has no
 # shared one, because each package composes its own from its own ``id_format``

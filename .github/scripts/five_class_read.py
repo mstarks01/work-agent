@@ -34,13 +34,14 @@ HEADING = "## Five-class read"
 
 #: The five defect classes, as the class table of ``docs/agents/code-review.md``
 #: names them, in its order.
-CLASSES = (
+DefectClass = Literal[
     "One rule, two readers",
     "A table with a hole",
     "A shape not listed",
     "A bound predicted, not measured",
     "A fact with no reader",
-)
+]
+CLASSES: tuple[DefectClass, ...] = get_args(DefectClass)
 
 BEFORE_HEADING = "## Before the code"
 

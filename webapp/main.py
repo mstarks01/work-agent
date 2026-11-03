@@ -203,6 +203,7 @@ from analysis_service.job_answers import (
     Withheld,
 )
 from analysis_service.jobs import (
+    AdmissionOutcome,
     DeleteRefusal,
     Envelope,
     JobRecord,
@@ -1233,7 +1234,7 @@ _STALE_MESSAGE = (
 #: What the page is told for each admission refusal, keyed by outcome. An
 #: outcome missing here is this app's defect: ``duplicate`` cannot follow from
 #: a page, because ``JobRecord.create`` mints the ID.
-_ADMISSION_MESSAGES: dict[str, str] = {
+_ADMISSION_MESSAGES: dict[AdmissionOutcome, str] = {
     "at_ceiling": "An analysis is already running. Wait for it to finish.",
     "over_rate": "This workspace started too many analyses in the current"
     " window. Wait for the window to roll past the earlier ones.",

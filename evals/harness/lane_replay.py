@@ -44,7 +44,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal, get_args
 
 from google.genai import types
 from pydantic import BaseModel
@@ -92,7 +92,8 @@ from evals.reference_facts import load_facts, signed_proposal
 
 #: What ``--prepare-today`` hands ``prepare`` as the catalog: none, which is a
 #: job with ``ANALYSIS_ASSERTIONS`` off, or the case's signed facts.
-CATALOG_ARMS = ("none", "signed")
+CatalogArm = Literal["none", "signed"]
+CATALOG_ARMS: tuple[CatalogArm, ...] = get_args(CatalogArm)
 
 
 def lane_of(framework: FrameworkName, name: str) -> Lane:

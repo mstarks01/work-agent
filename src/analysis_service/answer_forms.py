@@ -108,7 +108,8 @@ def answer_choices(
 
 
 #: The answers a ``yes-no`` question kind takes.
-YES_NO: tuple[str, ...] = ("yes", "no")
+YesNo = Literal["yes", "no"]
+YES_NO: tuple[YesNo, ...] = get_args(YesNo)
 
 
 #: Starting points for a control answered in free text: common mechanisms, so

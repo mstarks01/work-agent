@@ -43,6 +43,7 @@ from analysis_service.claims import (
     FrameworkName,
     RuledClaim,
     ScopeEntry,
+    VerdictStatus,
 )
 from analysis_service.frameworks.asvs.catalog import requirements_for
 from analysis_service.frameworks.asvs.record import requirement_of
@@ -62,7 +63,7 @@ if TYPE_CHECKING:
 #: The verdicts that assert a requirement applies to this system. ``rejected``
 #: is the critic ruling it does not, which is the negative answer rather than a
 #: missing one — so it is read, not ignored.
-APPLIES: frozenset[str] = frozenset({"confirmed", "needs-info"})
+APPLIES: frozenset[VerdictStatus] = frozenset({"confirmed", "needs-info"})
 
 #: This scorer's package, at the closed type the corpus is keyed by.
 FRAMEWORK: FrameworkName = "asvs"

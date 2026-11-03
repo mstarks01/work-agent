@@ -44,7 +44,7 @@ from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Literal
 
 from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
@@ -62,7 +62,7 @@ BASE_REF = "origin/main"
 
 #: How much a standing may claim for its own author: nothing above what the
 #: base ref already grants. Promotion exists — as a maintainer's edit (#326).
-_RANK = {"contributor": 0, "maintainer": 1}
+_RANK: dict[roster.Standing, int] = {"contributor": 0, "maintainer": 1}
 
 #: The roster, which every kind may carry so a first-timer registers in the
 #: same PR as their first submission.
@@ -123,6 +123,10 @@ class Check:
         return not self.problems
 
 
+#: How many subject directories one submission holds.
+SubjectCount = Literal["one", "many"]
+
+
 @dataclass(frozen=True)
 class Kind:
     """One submission kind: what it proves, stages, and says on the PR.
@@ -167,7 +171,7 @@ class Kind:
     #: reader's whole session, so it says ``"many"`` (ADR 0020); every other
     #: kind keeps the default. A field rather than a check that reads the
     #: kind's name, so a fourth kind still arrives as a table row.
-    subjects: str = "one"
+    subjects: SubjectCount = "one"
     prepare: Callable[[Path, str, argparse.Namespace], None] | None = None
 
 
@@ -254,7 +258,7 @@ def _is_derived(rel: str) -> bool:
     )
 
 
-def _touches_prefix(kind_name: str, root: Path, changed: Sequence[str]) -> bool:
+def _touches_prefix(kind_name: KindName, root: Path, changed: Sequence[str]) -> bool:
     """The ordinary rule: a diff under this kind's tree is a submission of it.
 
     Right for every kind whose tree nothing but a submission writes.
@@ -342,7 +346,7 @@ class _Cardinality:
 #: What :attr:`Kind.subjects` may say. A table keyed by the field's value, so
 #: the count a kind carries is data rather than an ``if`` on a kind name.
 #: ``tests/test_evals_submit.py`` checks it against :data:`KINDS`.
-_SUBJECTS: dict[str, _Cardinality] = {
+_SUBJECTS: dict[SubjectCount, _Cardinality] = {
     "one": _Cardinality(
         line="the change is one {subject} directory",
         problem="a {kind} PR touches exactly one {subject} directory under {prefix}",
@@ -356,7 +360,7 @@ _SUBJECTS: dict[str, _Cardinality] = {
 }
 
 
-def _check_subject_count(root: Path, author: str, kind_name: str) -> Check:
+def _check_subject_count(root: Path, author: str, kind_name: KindName) -> Check:
     kind = KINDS[kind_name]
     rule = _SUBJECTS[kind.subjects]
     words = {"kind": kind_name, "subject": kind.subject, "prefix": kind.prefix}
@@ -368,7 +372,7 @@ def _check_subject_count(root: Path, author: str, kind_name: str) -> Check:
     )
 
 
-def _check_scope(root: Path, author: str, kind_name: str) -> Check:
+def _check_scope(root: Path, author: str, kind_name: KindName) -> Check:
     """Nothing outside the kind's allowlist changed — a dirty tree included.
 
     The delta covers untracked files too, so a scratch file anywhere in the
@@ -913,9 +917,12 @@ def _baseline_closing(root: Path, author: str) -> str:
     return "\n".join(lines)
 
 
+#: The name of each submission kind.
+KindName = Literal["vote", "baseline"]
+
 #: Every submission kind the CLI offers. A new kind arrives as an entry here,
 #: never as a branch in the spine.
-KINDS: dict[str, Kind] = {
+KINDS: dict[KindName, Kind] = {
     "vote": Kind(
         prefix="evals/review/votes/",
         # Nothing but a vote submission writes a file under this tree.
@@ -1009,7 +1016,7 @@ def pr_head(remote: str, author: str, branch: str) -> str:
     return branch if remote == "origin" else f"{author}:{branch}"
 
 
-def open_pr(root: Path, kind_name: str, author: str) -> str:
+def open_pr(root: Path, kind_name: KindName, author: str) -> str:
     """Package the allowlist on a fresh branch and open the PR. Returns the URL.
 
     The branch is built in a throwaway worktree cut from BASE_REF, so the
@@ -1052,7 +1059,7 @@ def open_pr(root: Path, kind_name: str, author: str) -> str:
 # --- the CI side --------------------------------------------------------------
 
 
-def detect_kind(root: Path) -> str | None:
+def detect_kind(root: Path) -> KindName | None:
     """Which kind this diff carries, read off the :data:`KINDS` table.
 
     ``None`` when no kind claims the diff — an ordinary code PR, a roster line
@@ -1191,7 +1198,7 @@ class Outcome:
 
 def submission(
     root: Path,
-    kind_name: str,
+    kind_name: KindName,
     *,
     dry_run: bool,
     args: argparse.Namespace | None,

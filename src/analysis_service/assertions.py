@@ -837,7 +837,7 @@ CatalogIssueCode = Literal[
 #: The issues a submitter's answer draws when it places nothing. None is a
 #: refusal, and each is a fact about the answers one run applies, so a run
 #: drops the ones its checkpoint carries and finds its own again.
-ANSWER_ISSUES: frozenset[str] = frozenset(
+ANSWER_ISSUES: frozenset[CatalogIssueCode] = frozenset(
     {"unmatched-link", "unknown-link-element", "unmatched-answer"}
 )
 
@@ -862,7 +862,7 @@ GATE_REFUSALS: frozenset[str] = (
 #: The refusals of a whole catalog rather than of a row in it: a catalog keyed
 #: by another registry, or one over a count bound. Nothing in such a catalog
 #: can be read, so :func:`quarantine` keeps none of it.
-CATALOG_REFUSALS: frozenset[str] = frozenset(
+CATALOG_REFUSALS: frozenset[CatalogIssueCode] = frozenset(
     {"wrong-registry-version", "too-many-assertions", "too-many-subjects"}
 )
 

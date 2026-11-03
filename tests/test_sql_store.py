@@ -19,6 +19,7 @@ import sqlite3
 import stat
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import get_args
 
 import pytest
 from alembic.autogenerate import compare_metadata
@@ -54,6 +55,7 @@ from analysis_service.sources import Source
 from analysis_service.sql_store import (
     METADATA,
     CorruptObject,
+    RecordObjectField,
     RevisionNotHeld,
     SqlJobStore,
     database_url,
@@ -1181,3 +1183,8 @@ def test_the_migration_creates_the_tables_the_store_reads(tmp_path):
         differences = compare_metadata(MigrationContext.configure(connection), METADATA)
     engine.dispose()
     assert differences == []
+
+
+def test_the_record_object_fields_name_fields_of_a_record():
+    """``RecordObjectField`` spells field names of ``JobRecord`` a second time."""
+    assert set(get_args(RecordObjectField)) <= set(JobRecord.model_fields)

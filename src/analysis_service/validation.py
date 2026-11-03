@@ -51,6 +51,7 @@ from analysis_service.system_model import (
     Assumption,
     CapabilityStatement,
     Element,
+    ElementSourceField,
     ExcerptRepair,
     SystemModel,
     assumable_attributes,
@@ -141,7 +142,9 @@ DIAGRAM_CODES: frozenset[IssueCode] = frozenset(
 #: The fields only :func:`_citation_issues` writes. Named beside the rule so the
 #: rule and :attr:`ValidationIssue.is_citation` cannot drift apart;
 #: ``tests/test_validation.py`` drives the gate both ways and holds them to it.
-CITATION_FIELDS: frozenset[str] = frozenset({"source_label", "source_excerpt"})
+CITATION_FIELDS: frozenset[ElementSourceField] = frozenset(
+    {"source_label", "source_excerpt"}
+)
 
 
 def validate(
@@ -880,7 +883,7 @@ def parse_and_validate(
 #: settles it before this gate runs, so no extraction reaches the repair pass
 #: carrying one. A code absent from this set keeps its element's ID, which is
 #: the safe default: the flows stay pinned.
-RENAMING_CODES: frozenset[str] = frozenset({"duplicate-id", "empty-slug"})
+RENAMING_CODES: frozenset[IssueCode] = frozenset({"duplicate-id", "empty-slug"})
 
 
 def repair_scope(

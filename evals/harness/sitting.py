@@ -54,7 +54,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Literal, cast, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -172,7 +172,7 @@ UNREADABLE = "unreadable"
 #: a state the shape gains arrives here rather than through an ``if``. A key
 #: it does not hold raises, which is the whole reason it is a table: a state
 #: nobody wrote a row for stops the rail rather than drawing a wrong one.
-DRAFT_ROW: Mapping[str, tuple[str, RowState]] = {
+DRAFT_ROW: Mapping[DraftState, tuple[str, RowState]] = {
     "open": ("draft in progress", "draft"),
     "finished": ("finished, not submitted", "finished"),
 }
@@ -578,7 +578,7 @@ def _standing(
         return TO_DO, "todo", True
     if draft.state == UNREADABLE:
         return f"draft unreadable: {draft.path}", "error", False
-    status, state = DRAFT_ROW[draft.state]
+    status, state = DRAFT_ROW[cast(DraftState, draft.state)]
     return status, state, True
 
 

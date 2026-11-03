@@ -206,7 +206,9 @@ def check_out(*paths: str | Path | None) -> None:
             raise modes.EvalRunError(f"{path}: the folder {path.parent} is read-only")
 
 
-def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) -> None:
+def write_reports(
+    out: str, mode: modes.SweepMode, runs: Mapping[str, modes.AnalysisRun]
+) -> None:
     """Persist every finished case's whole report beside the artifact.
 
     A sweep is paid work and the report is the only record of what the agents
@@ -263,7 +265,7 @@ def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) ->
 
 
 def write_assertions(
-    out: str, mode: str, resolved: Mapping[str, modes.AssertionResult]
+    out: str, mode: modes.SweepMode, resolved: Mapping[str, modes.AssertionResult]
 ) -> None:
     """Persist every assertion run beside the artifact, so it can be re-read.
 
@@ -337,7 +339,7 @@ def write_assertions(
 
 
 def write_extractions(
-    out: str, mode: str, extracted: Mapping[str, modes.ExtractionResult]
+    out: str, mode: modes.SweepMode, extracted: Mapping[str, modes.ExtractionResult]
 ) -> None:
     """Persist every extraction beside the artifact, so it can be re-scored.
 
@@ -445,7 +447,7 @@ KEPT_WHEN_FAILED: frozenset[CaseKind] = frozenset(
 #: writes the catalog for a mode that ``replay.KEEPS`` names. A finished
 #: ``heads`` case carries no emission: its outcome holds the catalog alone.
 #: Keyed by ``modes.MODE_ENTRIES``, so a new mode needs a row here.
-FINISHED_KINDS: Mapping[str, frozenset[CaseKind]] = {
+FINISHED_KINDS: Mapping[modes.SweepMode, frozenset[CaseKind]] = {
     "extraction": frozenset({"extraction"}),
     "assertions": frozenset({"assertions"}),
     "heads": frozenset({"assertions"}),

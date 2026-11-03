@@ -36,7 +36,7 @@ import logging
 import os
 import time
 from collections.abc import Callable, Mapping
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import jwt
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -384,7 +384,10 @@ class OidcJwtVerifier:
 
 VerifierFactory = Callable[[Mapping[str, str]], TokenVerifier]
 
-_FACTORIES: dict[str, VerifierFactory] = {
+#: The auth backends ``ANALYSIS_AUTH_PROVIDER`` may name.
+AuthProvider = Literal["oidc"]
+
+_FACTORIES: dict[AuthProvider, VerifierFactory] = {
     "oidc": lambda env: OidcJwtVerifier(
         OidcSettings.from_env(env, prefix="ANALYSIS_OIDC")
     ),
@@ -401,11 +404,10 @@ def build_verifier(env: Mapping[str, str] = os.environ) -> TokenVerifier:
     name = env.get("ANALYSIS_AUTH_PROVIDER", "").strip().lower()
     if not name:
         raise AuthConfigError("set ANALYSIS_AUTH_PROVIDER")
-    try:
-        factory = _FACTORIES[name]
-    except KeyError:
+    if name not in _FACTORIES:
         known = ", ".join(sorted(_FACTORIES))
         raise AuthConfigError(
             f"unknown auth provider {name!r}; known providers: {known}"
-        ) from None
+        )
+    factory = _FACTORIES[name]
     return factory(env)

@@ -2507,7 +2507,19 @@ def _rejection(rejected: Rejected) -> str:
     return f"the graph rejected the model: {detail}"
 
 
-MODE_ENTRIES: dict[str, Entry] = {
+#: Each mode a sweep runs in.
+SweepMode = Literal[
+    "extraction",
+    "assertions",
+    "analysis",
+    "direct-facts",
+    "end-to-end",
+    "heads",
+    "answered",
+    "withheld",
+]
+
+MODE_ENTRIES: dict[SweepMode, Entry] = {
     "extraction": ENTRY_EXTRACT_ONLY,
     "assertions": ENTRY_ASSERT_ONLY,
     "analysis": ENTRY_PREPARE,
@@ -2542,7 +2554,7 @@ EXTRACTING_MODES: frozenset[str] = frozenset(
 #: validity gate and returns an :class:`ExtractionResult`, so a sweep of it has
 #: no report to persist and says so rather than writing an empty file
 #: ([#180](https://github.com/mstarks01/work-agent/issues/180)).
-REPORTING_MODES: frozenset[str] = frozenset(
+REPORTING_MODES: frozenset[SweepMode] = frozenset(
     {"analysis", "answered", "direct-facts", "end-to-end", "withheld"}
 )
 

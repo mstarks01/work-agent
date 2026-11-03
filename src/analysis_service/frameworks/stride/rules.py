@@ -67,7 +67,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.candidates import Fact, Match, Rule, clip_fact, with_effects
 from analysis_service.frameworks import NoRule, PredicateReader
-from analysis_service.system_model import DataFlow, SystemModel
+from analysis_service.system_model import BoundaryKind, DataFlow, SystemModel
 
 __all__ = [
     "ENTERED_ZONE_KINDS",
@@ -87,7 +87,7 @@ SHARED_DEPENDENCY_MIN = 2
 # network hop. ``network`` and ``other`` are excluded: every boundary crossing
 # is already surfaced to every agent, and a rule that fires on all of them adds
 # no attention anywhere.
-ENTERED_ZONE_KINDS = frozenset({"privilege", "tenant"})
+ENTERED_ZONE_KINDS: frozenset[BoundaryKind] = frozenset({"privilege", "tenant"})
 
 # The zone kind a crossing *leaves* to be one as well, and the asymmetry is the
 # point. Entering a ``privilege`` zone is the transition and leaving it is not:
@@ -96,7 +96,7 @@ ENTERED_ZONE_KINDS = frozenset({"privilege", "tenant"})
 # authority to a party we do not control, and outward is a party we do not
 # control reaching a zone we do. That second direction is the multi-tenancy
 # escape, and reading only the destination makes it invisible.
-LEFT_ZONE_KINDS = frozenset({"tenant"})
+LEFT_ZONE_KINDS: frozenset[BoundaryKind] = frozenset({"tenant"})
 
 _clip = clip_fact
 
