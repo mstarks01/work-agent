@@ -175,7 +175,12 @@ class TestBoundaryDigest:
         Assembling the digest from the package's own declaration is what keeps a
         second framework's lanes out of it, whatever the tree happens to hold.
         """
-        two_lanes = dataclasses.replace(STRIDE, lanes=("spoofing", "tampering"))
+        lanes = ("spoofing", "tampering")
+        two_lanes = dataclasses.replace(
+            STRIDE,
+            lanes=lanes,
+            units=tuple(unit for unit in STRIDE.units if unit.lane in lanes),
+        )
         digest = lane_boundary_digest(MarkdownLoader(package_root), two_lanes)
         assert "Lane boundary for repudiation." not in digest
 

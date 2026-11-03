@@ -46,14 +46,15 @@ framework.** A framework whose claims carry a catalog identifier offers every
 grain its catalog publishes: ASVS offers its 17 chapters, 80 sections and 345
 requirements. A framework whose claims carry no catalog identifier offers its
 lanes and nothing finer: STRIDE offers six units. Two contract members carry
-the rule, `units` and `unit_of`. The package gate checks each unit's lane
-against `lanes` and each "inside" link against the set at import. The submit
-check refuses a framework key outside `PACKAGES` and a unit ID outside the
-package's set, and a replay over `evals/emissions/` fails when `unit_of`
-returns an ID outside the set. A row stores the package version beside the
-unit ID. A row whose version differs from the carried package's version is
-shown unticked at submission, because a published catalog renumbers its set
-between releases.
+the rule, `units` and `control_unit_of`. The package gate checks each unit's
+lane against `lanes` and each "inside" link against the set at import. The
+submit check refuses a framework key outside `PACKAGES` and a unit ID outside
+the package's set, and a replay over the Baseline reports under
+`evals/baselines/` and each ASVS reference record of the corpus fails when
+`control_unit_of` returns an ID outside the set. A row stores the package
+version beside the unit ID. A row whose version differs from the carried
+package's version is shown unticked at submission, because a published catalog
+renumbers its set between releases.
 
 **A row names no element.** The Control's scope supplies the element, the
 zone or the whole application, so a row cannot disagree with the scope. One

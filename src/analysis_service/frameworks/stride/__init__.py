@@ -1,6 +1,6 @@
 """The STRIDE framework package: this repo's original analysis, as a package.
 
-Thirteen members and a text root at ``frameworks/stride/``. Everything here is
+Fifteen members and a text root at ``frameworks/stride/``. Everything here is
 *profile* — the tailoring this service applies — and nothing declares a catalog:
 STRIDE is a method rather than a published requirement set, so there is no
 external artifact to carry or to check a declaration against.
@@ -25,6 +25,8 @@ from analysis_service.frameworks import (
     IdRule,
     KnowledgeTables,
     PreconditionResult,
+    Unit,
+    lane_of,
 )
 from analysis_service.frameworks.stride.record import (
     CATEGORY_LETTERS,
@@ -191,6 +193,11 @@ def _rank(claim: Claim) -> Band:
     return band_of(_BANDS, level)
 
 
+def _control_unit_of(claim: Claim) -> str:
+    """A threat's lane, which is the finest unit a method with no catalog offers."""
+    return lane_of(claim) or ""
+
+
 STRIDE = FrameworkPackage(
     name="stride",
     version=STRIDE_VERSION,
@@ -216,4 +223,9 @@ STRIDE = FrameworkPackage(
     predicate_readers=PREDICATE_READERS,
     bands=_BANDS,
     rank=_rank,
+    units=tuple(
+        Unit(id=lane, grain="lane", lane=lane, inside=None)
+        for lane in STRIDE_CATEGORIES
+    ),
+    control_unit_of=_control_unit_of,
 )

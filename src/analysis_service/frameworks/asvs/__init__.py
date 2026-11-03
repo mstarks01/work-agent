@@ -1,6 +1,6 @@
 """The ASVS framework package: a published standard, as a package.
 
-It has thirteen members and a text root at ``frameworks/asvs/``, exactly as STRIDE
+It has fifteen members and a text root at ``frameworks/asvs/``, exactly as STRIDE
 does. What differs is what stands behind them. STRIDE is a method, so its
 ``version`` names this repository's ruleset and it carries no catalog. ASVS is a
 published standard, so ``version`` names the standard's own release, and the 345
@@ -35,13 +35,16 @@ from analysis_service.frameworks import (
     FrameworkPackage,
     IdRule,
     KnowledgeTables,
+    Unit,
 )
 from analysis_service.frameworks.asvs.applicability import applicability_for
 from analysis_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
     CHAPTER_NUMBERS,
+    CHAPTERS,
     LANES,
     REQUIREMENT_BANDS,
+    REQUIREMENTS,
     is_published_requirement,
     requirement_band,
 )
@@ -183,6 +186,31 @@ def _rank(claim: Claim) -> Band:
     return requirement_band(requirement_of(claim.id))
 
 
+def _units() -> tuple[Unit, ...]:
+    """Each chapter, section and requirement the catalog publishes, as a unit."""
+    chapter_of: dict[str, str] = {chapter.lane: chapter.id for chapter in CHAPTERS}
+    sections = {req.section: req.lane for req in REQUIREMENTS}
+    return (
+        *(
+            Unit(id=chapter.id, grain="chapter", lane=chapter.lane, inside=None)
+            for chapter in CHAPTERS
+        ),
+        *(
+            Unit(id=section, grain="section", lane=lane, inside=chapter_of[lane])
+            for section, lane in sections.items()
+        ),
+        *(
+            Unit(id=req.id, grain="requirement", lane=req.lane, inside=req.section)
+            for req in REQUIREMENTS
+        ),
+    )
+
+
+def _control_unit_of(claim: Claim) -> str:
+    """The requirement a claim rules on: the finest grain the catalog publishes."""
+    return DraftRequirementRuling.unit_of(claim)
+
+
 ASVS = FrameworkPackage(
     name="asvs",
     version=ASVS_VERSION,
@@ -217,4 +245,6 @@ ASVS = FrameworkPackage(
     predicate_readers=PREDICATE_READERS,
     bands=REQUIREMENT_BANDS,
     rank=_rank,
+    units=_units(),
+    control_unit_of=_control_unit_of,
 )
