@@ -16,6 +16,7 @@ from analysis_service.system_model import (
     DataFlow,
     Element,
     ElementPrefix,
+    ElementSourceField,
     EmittedSystemModel,
     ExternalEntity,
     FlowIdError,
@@ -34,6 +35,11 @@ from analysis_service.system_model import (
 )
 from analysis_service.validation import validate
 from tests.factories import valid_model
+
+
+def test_the_source_fields_name_fields_of_an_element():
+    """``ElementSourceField`` spells field names of the element model a second time."""
+    assert set(get_args(ElementSourceField)) <= set(ExternalEntity.model_fields)
 
 
 class TestIdentity:

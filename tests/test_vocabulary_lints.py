@@ -150,8 +150,9 @@ PARTIAL: dict[tuple[str, str], str] = {
         "cannot reach"
     ),
     ("analysis_service.assertions", "ANSWER_ISSUES"): (
-        "the codes a submitter's answer draws when it places nothing, which is "
-        "fewer than the codes a catalog can carry"
+        "the codes a submitter's answer draws when it places nothing, so a code"
+        " that refuses a row, or that a row draws whatever the answers, is"
+        " absent by construction"
     ),
     ("analysis_service.assertions", "CATALOG_REFUSALS"): (
         "the codes that refuse a whole catalog, so a code that refuses one row "
@@ -162,29 +163,30 @@ PARTIAL: dict[tuple[str, str], str] = {
         "a fact or its absence is absent by construction"
     ),
     ("analysis_service.claims", "ASSERTION_GROUNDS"): (
-        "the ground kinds whose reference is a row of the assertion catalog, "
-        "which is fewer than the ground kinds that exist"
+        "the ground kinds whose reference is a row of the assertion catalog, so"
+        " a ground that cites a quote, a derived fact, an element or an"
+        " attribute of one is absent by construction"
     ),
     ("analysis_service.open_facts", "_ATTRIBUTE_QUESTIONS"): (
         "the control attributes whose plain question reads badly, so an "
         "attribute whose plain question reads well is absent by construction"
     ),
     ("analysis_service.frameworks.stride.rules", "ENTERED_ZONE_KINDS"): (
-        "the boundary kinds that a crossing enters to transfer authority, which "
-        "a network hop or an unclassified zone does not"
+        "the boundary kinds that a crossing enters to transfer authority, so a"
+        " kind that is no authority boundary is absent by construction"
     ),
     ("analysis_service.frameworks.stride.rules", "LEFT_ZONE_KINDS"): (
         "the boundary kinds that separate parties rather than authority levels,"
-        " so a crossing out of one hands authority across, which a crossing out"
-        " of a privilege, network or unclassified zone does not"
+        " so a kind that separates authority levels within one party, or that is"
+        " no authority boundary, is absent by construction"
     ),
     ("analysis_service.sampling", "OFFERED_PARAMS"): (
         "the sampling params an environment variable may override, so a "
         "reserved or a forbidden param is absent by construction"
     ),
     ("analysis_service.validation", "CITATION_FIELDS"): (
-        "the source fields the citation rule checks, so a field the rule does "
-        "not check, such as the speaker, is absent by construction"
+        "the source fields that say where a source states the element, so a"
+        " field that records who spoke is absent by construction"
     ),
     ("analysis_service.validation", "RENAMING_CODES"): (
         "the codes whose repair may rename an element, so a code whose repair "

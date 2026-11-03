@@ -48,10 +48,11 @@ from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, cast
 from unittest import mock
 
 from analysis_service import answer_state
+from analysis_service.answer_forms import YesNo
 from analysis_service.answer_sets import SentAnswers
 from analysis_service.answer_state import Answers, AnswerState, SavedAnswers
 from analysis_service.capabilities import Presence, lineage
@@ -286,7 +287,6 @@ def _decided(
 
 
 #: The other answer to a capability question.
-YesNo = Literal["yes", "no"]
 TURNED: dict[YesNo, YesNo] = {"yes": "no", "no": "yes"}
 
 

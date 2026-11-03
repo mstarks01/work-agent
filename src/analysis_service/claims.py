@@ -113,6 +113,9 @@ RejectionStep = Literal["evidence", "reasoning", "lane", "duplicate"]
 # :data:`RejectionStep` because archived reports carry it and are re-scored.
 CriticStep = Literal["evidence", "reasoning", "lane"]
 
+#: The ground kinds that cite an attribute of an element.
+AttributeGround = Literal["unknown-attribute", "absent-attribute"]
+
 # What a finding can cite in its own support. Spelled out rather than terse
 # (``unknown`` / ``derived``) because a bare ``unknown`` collides: it is already
 # a legal *attribute value* across the System Model, so ``kind="unknown"`` would
@@ -120,9 +123,6 @@ CriticStep = Literal["evidence", "reasoning", "lane"]
 # attribute". ``absent-attribute`` follows that spelling for the same reason and
 # for one more: the two attribute branches carry identical fields, so only the
 # kind can tell them apart.
-#: The two ground kinds whose reference is an element and an attribute of it.
-AttributeGround = Literal["unknown-attribute", "absent-attribute"]
-
 GroundKind = Literal[
     "quote",
     AttributeGround,
