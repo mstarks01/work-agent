@@ -853,7 +853,7 @@ ANSWER_ISSUES: frozenset[CatalogIssueCode] = frozenset(
 #: rather than left to a reader to remember, because ``tests/test_assertions.py``
 #: holds the gate's fixture table to exactly these, and a new code that is a
 #: refusal must fail there rather than quietly join the exception.
-GATE_REFUSALS: frozenset[str] = (
+GATE_REFUSALS: frozenset[CatalogIssueCode] = (
     frozenset(get_args(CatalogIssueCode))
     - {"graph-contradiction", "support-truncated", "superseded-by-answer"}
     - ANSWER_ISSUES

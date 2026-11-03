@@ -134,6 +134,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
+    ControlAttribute,
     control_state,
     matches_term,
 )
@@ -186,7 +187,7 @@ CONTROL_SCOPE: Mapping[str, str | None] = MappingProxyType(
 _UNDECLARED = "undeclared"
 
 #: The attributes the diagnostic reads, in registry order.
-IN_SCOPE: tuple[str, ...] = tuple(
+IN_SCOPE: tuple[ControlAttribute, ...] = tuple(
     attribute
     for attribute in CONTROL_ATTRIBUTES
     if CONTROL_SCOPE.get(attribute, _UNDECLARED) is None

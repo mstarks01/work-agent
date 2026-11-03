@@ -117,7 +117,7 @@ PORT = 8010
 
 #: The verdicts the endpoint accepts, spelled from the type the ledger declares
 #: so the two cannot drift apart.
-VERDICTS: tuple[str, ...] = get_args(VoteChoice)
+VERDICTS: tuple[VoteChoice, ...] = get_args(VoteChoice)
 
 #: What each package's records rule on, in the words the reviewer reads. A
 #: table rather than one heading, because the two packages do not ask the same
@@ -350,7 +350,7 @@ def create_app(session: Session) -> FastAPI:
                 status_code=422,
                 detail=f"verdict is not one of {', '.join(VERDICTS)}",
             )
-        verdict: VoteChoice = body.verdict  # type: ignore[assignment]
+        verdict: VoteChoice = body.verdict
         try:
             recorded = cast(
                 item.components,

@@ -181,7 +181,7 @@ CASES: dict[str, tuple[str, ...]] = {
 
 
 #: STRIDE's bands, the highest first: the severity bands the lane rates.
-_BANDS: tuple[str, ...] = tuple(reversed(get_args(SeverityLevel)))
+_BANDS: tuple[SeverityLevel, ...] = tuple(reversed(get_args(SeverityLevel)))
 
 
 def _rank(claim: Claim) -> Band:

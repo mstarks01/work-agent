@@ -321,7 +321,7 @@ LANES_REQUIRED_PER_CASE: Mapping[FrameworkName, bool] = {
 #: The expected dispositions a record may name, from the corpus vocabulary
 #: rather than a second list here — a lint spelling its own would pass a value
 #: the loader then refuses.
-ASVS_DISPOSITIONS: frozenset[str] = frozenset(get_args(AsvsDisposition))
+ASVS_DISPOSITIONS: frozenset[AsvsDisposition] = frozenset(get_args(AsvsDisposition))
 
 #: The extra fields each framework's reference record carries, and the checks
 #: over them. Harness data keyed off the closed ``FrameworkName``, beside

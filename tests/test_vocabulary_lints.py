@@ -158,6 +158,14 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the codes that refuse a whole catalog, so a code that refuses one row "
         "of it is absent by construction"
     ),
+    ("analysis_service.assertions", "GATE_REFUSALS"): (
+        "the codes that refuse a row, so a code whose row stands, or that a"
+        " submitter's answer draws, is absent by construction"
+    ),
+    ("analysis_service.basis", "IN_SCOPE"): (
+        "the control attributes the diagnostic measures, so an attribute that"
+        " is declared out of scope, or not declared, is absent by construction"
+    ),
     ("analysis_service.claims", "CONDITIONAL_GROUNDS"): (
         "the ground kinds that say a fact is unstated, so a ground that states "
         "a fact or its absence is absent by construction"
@@ -216,6 +224,15 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the modes whose graph ends in a report, so a mode that stops at "
         "extraction or at the catalog is absent by construction"
     ),
+    ("evals.harness.modes", "EXTRACTING_MODES"): (
+        "the modes whose graph runs extract and so keeps an emission, so a mode"
+        " whose graph does not run extract is absent by construction"
+    ),
+    ("evals.harness.modes", "_DEGRADED"): (
+        "the projection reasons that degrade a value, so a reason that carries"
+        " the catalog's own answer, an absence or an unknown included, is"
+        " absent by construction"
+    ),
     ("evals.harness.near_misses", "ASKABLE"): (
         "the vote statuses a displaced draft may carry and still be asked "
         "about, so the status of a draft a person refused is absent by "
@@ -224,6 +241,11 @@ PARTIAL: dict[tuple[str, str], str] = {
     ("evals.harness.population", "REACHES"): (
         "the routes that put a row in front of a lane, so a route that leaves a "
         "row open, set aside or refused is absent by construction"
+    ),
+    ("evals.harness.replay", "LOSSES"): (
+        "the fates a prompt change can aim at, so a fate that found the"
+        " reference, or that falls on a zone no producer need draw, is absent"
+        " by construction"
     ),
     ("evals.harness.replay", "ROW_LOSSES"): (
         "the row fates a prompt change can aim at, so a fate that keeps the"

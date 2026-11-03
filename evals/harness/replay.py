@@ -164,7 +164,7 @@ FATES: tuple[Fate, ...] = (
 #: reader ruled a producer need not draw, so nothing stood for it and nothing
 #: had to (:func:`~evals.harness.alignment.placeholder_zones`). A produced
 #: zone that pairs with one still reads ``found`` or ``renamed``.
-LOSSES: frozenset[str] = frozenset(FATES) - {"found", "renamed", "placeholder"}
+LOSSES: frozenset[Fate] = frozenset(FATES) - {"found", "renamed", "placeholder"}
 
 #: The fates a produced row can answer a reference row with, which is every
 #: fate that is not an absence. Named apart from :data:`RowFate` because one
