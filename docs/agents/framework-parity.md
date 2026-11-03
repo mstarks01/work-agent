@@ -198,7 +198,7 @@ Start at the places where a one-package assumption survives:
   offers each grain its catalog publishes. A framework whose claims carry
   none offers its lanes. An empty set is valid and offers no rows. The package
   refuses to build when a unit names an undeclared lane or sits inside no unit
-  of the set. `check_unit` is the one check of a row's framework and unit.
+  of the set. `check_unit` checks a row's framework and unit.
   `tests/test_framework_units.py` replays each archived report and fails when
   `unit_of` names a unit outside the set, and `tests/test_future_frameworks.py`
   gives a third package units of its own.
