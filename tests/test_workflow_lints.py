@@ -474,3 +474,114 @@ def test_every_key_file_export_uses_the_registry_suffix():
 
     assert exports, "no workflow exports a key file; the scan is vacuous"
     assert {suffix for _, suffix in exports} == {SECRET_FILE_SUFFIX}, exports
+
+
+#: The text of a step that reads a check script from the pull request's base
+#: commit.
+_BASE_READ = 'git show "$BASE_SHA:'
+
+#: The two shapes of a base read that fail the step where the base holds no
+#: script: a bare read, which ``bash -e`` stops on, and an ``if !`` read whose
+#: block prints a message and exits 1.
+_BARE_READ = re.compile(re.escape(_BASE_READ) + r'[^"]+" > "[^"]+"')
+_GUARDED_READ = re.compile(
+    rf"if ! {_BARE_READ.pattern}; then\n"
+    r'echo "[^"\n]*" >&2\n'
+    r"exit 1\n"
+    r"fi"
+)
+
+#: A line that may come before a base read in its ``run:`` block: a shell
+#: variable set to one word, or ``set -euo pipefail``. Any other line could
+#: open a block, a loop or a group that skips the read, or turn ``-e`` off.
+_PLAIN_LINE = re.compile(r'[A-Za-z_]+=("[^"]*"|\S+)|set -euo pipefail')
+
+
+def _base_reads() -> list[tuple[Path, int]]:
+    """Each workflow code line that reads a script from the base, by index."""
+    return [
+        (workflow, index)
+        for workflow in _workflows()
+        for index, line in enumerate(_code_lines(workflow))
+        if _BASE_READ in line
+    ]
+
+
+def _fails_closed(lines: list[str], index: int) -> bool:
+    """Whether the base read at ``index`` has one of the two shapes that fail
+    the step where the base holds no script, after only plain lines of its
+    ``run:`` block."""
+    stripped = [line.strip() for line in lines]
+    run = max(i for i, line in enumerate(stripped[:index]) if line == "run: |")
+    plain = all(_PLAIN_LINE.fullmatch(line) for line in stripped[run + 1 : index])
+    bare = _BARE_READ.fullmatch(stripped[index])
+    guarded = _GUARDED_READ.fullmatch("\n".join(stripped[index : index + 4]))
+    return plain and bool(bare or guarded)
+
+
+def test_a_base_read_fails_closed_where_the_base_holds_no_script():
+    """A step that runs the pull request's script where the base holds none
+    lets a pull request run its own copy of the check."""
+    reads = _base_reads()
+
+    assert reads, "no workflow reads a script from the base; the scan is vacuous"
+    open_reads = [
+        f"{workflow.name}: {_code_lines(workflow)[index].strip()}"
+        for workflow, index in reads
+        if not _fails_closed(_code_lines(workflow), index)
+    ]
+    assert not open_reads, open_reads
+
+
+_SAMPLE_READ = 'git show "$BASE_SHA:s" > "c"'
+_SAMPLE_GUARD = f'if ! {_SAMPLE_READ}; then\n  echo "no s" >&2\n  exit 1\nfi'
+
+
+def _fails_closed_in_step(step: str) -> bool:
+    lines = ["run: |", *step.splitlines()]
+    index = next(i for i, line in enumerate(lines) if _BASE_READ in line)
+    return _fails_closed(lines, index)
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        _SAMPLE_READ,
+        f'set -euo pipefail\ns=x\ncheck="$RUNNER_TEMP/c"\n{_SAMPLE_GUARD}',
+        f'{_SAMPLE_READ}\nchmod +x "c"',
+    ],
+)
+def test_a_read_that_fails_the_step_is_accepted(step):
+    assert _fails_closed_in_step(step)
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        f'{_SAMPLE_READ} || cp s "c"',
+        f'{_SAMPLE_READ} && chmod +x "c"',
+        f'if ! {_SAMPLE_READ}; then\n  cp s "c"\nfi',
+        f'if ! {_SAMPLE_READ}; then cp s "c"; fi',
+        f'{_SAMPLE_GUARD[:-2]}else\n  cp s "c"\nfi',
+        f'{_SAMPLE_GUARD[:-2]}elif x; then\n  cp s "c"\nfi',
+        (
+            f"if ! {_SAMPLE_READ}; then\n  if [ -n x ]; then\n    exit 1\n  fi\n"
+            'cp s "c"\nfi'
+        ),
+        (
+            f'if git cat-file -e "$BASE_SHA:s"; then\n  {_SAMPLE_READ}\nelse\n'
+            '  cp s "c"\nfi'
+        ),
+        f"if x; then\n  echo a\n  {_SAMPLE_READ}\nfi",
+        (
+            f'if git cat-file -e "$BASE_SHA:s"; then\n{_SAMPLE_GUARD}\nelse\n'
+            '  cp s "c"\nfi'
+        ),
+        f'if x\nthen\n  {_SAMPLE_READ}\nelse\n  cp s "c"\nfi',
+        f'{{\n  {_SAMPLE_READ}\n}} || cp s "c"',
+        f"while x; do\n  {_SAMPLE_READ}\ndone",
+        f"set +e\n{_SAMPLE_READ}",
+    ],
+)
+def test_a_fallback_to_the_pull_request_s_script_is_refused(step):
+    assert not _fails_closed_in_step(step)
