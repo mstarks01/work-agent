@@ -381,8 +381,8 @@ def test_a_long_or_unclosed_credential_is_refused(line, shape):
 def test_a_hostile_line_is_read_in_linear_time(line):
     """Each line holds a hostile run after an assignment. An unquoted value
     with no 256-character bound reads each value to the end of the first line,
-    and a joined-string check with no bound tries each split of the last two
-    runs of spaces. Each takes seconds."""
+    and a joined-string check with two unbounded space quantifiers tries each
+    split of one run of spaces between them. Each takes seconds."""
     started = time.perf_counter()
     credential_hit(line)
     assert time.perf_counter() - started < 1
