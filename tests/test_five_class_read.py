@@ -271,7 +271,9 @@ def repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _run(repo: Path, base: str, head: str, body: str) -> int:
+def _ran(
+    repo: Path, base: str, head: str, body: str
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(SCRIPT), base, head],
         cwd=repo,
@@ -279,7 +281,11 @@ def _run(repo: Path, base: str, head: str, body: str) -> int:
         capture_output=True,
         text=True,
         check=False,
-    ).returncode
+    )
+
+
+def _run(repo: Path, base: str, head: str, body: str) -> int:
+    return _ran(repo, base, head, body).returncode
 
 
 def test_a_code_change_with_no_section_is_refused(repo):
@@ -502,14 +508,7 @@ def test_a_base_with_no_table_stops_the_check(repo, table):
     _commit(repo, "README.md")
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
     head = _commit(repo, "src/module.py")
-    ran = subprocess.run(
-        [sys.executable, str(SCRIPT), base, head],
-        cwd=repo,
-        env={**os.environ, "PR_BODY": FULL_BODY},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    ran = _ran(repo, base, head, FULL_BODY)
 
     assert ran.returncode == 1
     assert f"holds no .github/scripts/{table.name}" in ran.stderr
