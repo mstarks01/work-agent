@@ -249,9 +249,9 @@ PARTIAL: dict[tuple[str, str], str] = {
         " not a binding is absent by construction"
     ),
     ("evals.harness.replay", "ROUTES_OF"): (
-        "the modes whose sweep runs a reading node, so the instructions it"
-        " carries place it on an arm; a mode that starts from the blessed model"
-        " runs no reading node and is absent by construction"
+        "the modes a replay can place on an arm, so a mode whose sweep keeps"
+        " only a report, which a replay does not read, is absent by"
+        " construction"
     ),
     ("evals.harness.replay", "KEEPS"): (
         "the modes whose sweep keeps an emission or a catalog a replay reads, "
