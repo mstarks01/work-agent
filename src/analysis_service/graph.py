@@ -2118,8 +2118,8 @@ def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) 
 
     The two keys are read from state for the reason :func:`route_review` gives,
     and it matters most of all here: this is the node a silent critic *reaches*,
-    so a binding failure would kill the run at the one place built to report why
-    it died.
+    so a binding failure would kill the run at the node whose job is to report
+    why it died.
     """
     state = keys.state(ctx)
     # The second look parked the merged set on ``reviewed`` and routed here, so

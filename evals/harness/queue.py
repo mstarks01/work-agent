@@ -214,8 +214,7 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
 # answered. "Answered" is only this queue's voter's, so a pooled finding that
 # survives was pooled by *somebody else* -- and the row's weight, its position
 # in the order and the reason printed beside it would tell this reviewer how
-# another reviewer voted. The second-opinion pass is the one place that must
-# not be told.
+# another reviewer voted. The second-opinion pass must not learn that.
 #
 # Ranking by the corpus reference sets would be a different row, and would
 # answer the question honestly.
