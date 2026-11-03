@@ -1852,9 +1852,9 @@ def create_app(
         if copies is None:
             await answers.missing(record, "controls")
         model = None
-        if copies and record.status in {"awaiting-answers", "completed"}:
-            # A withheld report shows no model, so its Controls stay pending.
-            with suppress(Withheld):
+        if copies:
+            # A job that serves no model leaves its Controls pending.
+            with suppress(NotCompleted, Withheld):
                 model = (await answers.answerable(record.id, owner_id)).model
         payload["controls_used"] = controls_used(copies, record.control_scopes, model)
         payload["error"] = record.error

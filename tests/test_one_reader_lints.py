@@ -2092,12 +2092,7 @@ ONE_READERS: dict[str, _OneReader] = {
     "what a job's Controls resolve to": _OneReader(
         lambda node: _calls(node, "default_resolution"),
         ("src/analysis_service/job_controls.py", "resolutions"),
-        {
-            ("src/analysis_service/job_controls.py", "resolve_scopes"): (
-                "a save's reason for a copy it leaves out, which the default"
-                " gives where the default leaves the copy out too"
-            ),
-        },
+        {},
         "",
     ),
     "what a new analysis carries": _OneReader(

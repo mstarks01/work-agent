@@ -60,8 +60,9 @@ LeftOutReason = Literal["missing-element", "empty-zone", "unticked"]
 #: zone is an inference, or no source placed it.
 CoverReason = Literal["stated-zone", "zone-inferred", "no-zone-stated"]
 
-#: The refusal of a Control that the owner or the job does not hold. One
-#: sentence for a deleted Control and for another owner's ID, which names no ID.
+#: The refusal of a submission that names a Control the owner does not
+#: hold. One sentence for a deleted Control and for another owner's ID,
+#: which names no ID.
 CONTROL_GONE = (
     "A Control that this analysis names is no longer in Controls. Remove it"
     " from the analysis to continue."
@@ -266,7 +267,7 @@ def match_scope(scope: ControlScope, model: SystemModel) -> ScopeMatch:
         choices = tuple(id_ for id_ in held if element_prefix(id_) == scope.type)
         return ScopeMatch("missing-element", choices=choices)
     outcome = _reached_by(scope, element)
-    if scope.type != "boundary":
+    if not is_zone(element):
         return ScopeMatch(outcome, element)
     covers = zone_covers(model, element)
     if _holds_nothing(covers):
@@ -321,7 +322,7 @@ def _stated(
     if model.get(entry.element) is None:
         raise ValueError(f"{entry.element} is not an element of this model.")
     outcome = _reached_by(scope, entry.element)
-    if scope.type != "boundary":
+    if not is_zone(entry.element):
         if entry.ticked:
             raise ValueError(f"“{name}” protects one element, so it ticks none.")
         return AppliedScope(control=copy.id, outcome=outcome, element=entry.element)
@@ -360,12 +361,10 @@ def resolve_scopes(
             raise ValueError("The save names one Control twice.")
         named[entry.control] = entry
     stated: list[ControlResolution] = []
-    for copy in copies:
+    for copy, default in zip(copies, resolutions(copies, None, model), strict=True):
         if copy.id in named:
             stated.append(_stated(copy, named[copy.id], model))
-            continue
-        default = default_resolution(copy, model)
-        if isinstance(default, LeftOutScope):
+        elif isinstance(default, LeftOutScope):
             stated.append(default)
         else:
             stated.append(LeftOutScope(control=copy.id, reason="unticked"))
@@ -429,7 +428,8 @@ def control_offer(
 
 
 #: What the reopen payload says of a copied Control: its resolution, or
-#: ``pending`` where the job has no model yet to resolve it against.
+#: ``pending`` where the read gets no model to resolve it against: the job
+#: has none yet, or the job does not serve it.
 UsedState = Literal["applied", "left-out", "pending"]
 
 
@@ -439,7 +439,7 @@ def controls_used(
     model: SystemModel | None,
 ) -> list[dict[str, str]]:
     """Each copied Control of a job, read-only, with its :data:`UsedState`.
-    ``model`` is the job's model, or ``None`` where the job has none yet."""
+    ``model`` is the job's model, or ``None`` where the read gets none."""
     states: list[UsedState] = (
         ["pending"] * len(copies)
         if model is None
