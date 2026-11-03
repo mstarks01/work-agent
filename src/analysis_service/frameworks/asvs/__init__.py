@@ -195,9 +195,9 @@ ASVS = FrameworkPackage(
         # chapter therefore appears in the ID, in the lane and in the record from
         # one call, so the three cannot disagree.
         template=ASVS_ID_FORMAT,
-        # Widened from ``AsvsChapter`` to ``str``, because ``IdRule`` keys by
-        # lane and a lane is a plain slug on the contract: the package gate is
-        # what checks this table covers every declared lane.
+        # Keyed by ``str`` rather than ``AsvsChapter``, because ``IdRule`` keys
+        # by lane and a lane is a plain slug on the contract: the package gate
+        # is what checks this table covers every declared lane.
         prefix=MappingProxyType(
             {str(lane): number for lane, number in CHAPTER_NUMBERS.items()}
         ),

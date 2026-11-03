@@ -13,11 +13,11 @@ import pytest
 from analysis_service.parsing import (
     ascii_int,
     is_version,
-    lookup,
     member,
     non_negative,
     signer,
     strings,
+    table_entry,
 )
 
 #: The shapes ``str.isdigit`` passes and ``int`` does not accept as written.
@@ -105,7 +105,7 @@ def test_a_member_is_the_set_member_equal_to_the_value():
     assert member("c", ("a", "b")) is None
 
 
-def test_a_lookup_reads_the_table_or_raises_like_a_subscript():
-    assert lookup({"a": 1}, "a") == 1
+def test_a_table_entry_reads_the_table_or_raises_like_a_subscript():
+    assert table_entry({"a": 1}, "a") == 1
     with pytest.raises(KeyError, match="'c'"):
-        lookup({"a": 1}, "c")
+        table_entry({"a": 1}, "c")

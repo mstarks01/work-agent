@@ -30,7 +30,7 @@ file, because a value of spaces reads as a signature. :data:`Signer` is the
 model field that asks it as the file loads. :data:`Sha256Hex` is the one
 shape of a SHA-256 digest that a model field holds. :func:`member` asks
 which member of a closed set a string is, so a caller gets the set's
-``Literal`` back without a cast, and :func:`lookup` reads a closed table by
+``Literal`` back without a cast, and :func:`table_entry` reads a closed table by
 that member.
 """
 
@@ -81,7 +81,7 @@ def non_negative(value: object) -> TypeGuard[int | float]:
         return False
 
 
-def member(value: object, members: Iterable[_Member]) -> _Member | None:
+def member(value: str, members: Iterable[_Member]) -> _Member | None:
     """The member of ``members`` equal to ``value``, or ``None`` where none is.
 
     The result has the members' type, so a ``str`` read from a field or an ID
@@ -90,7 +90,7 @@ def member(value: object, members: Iterable[_Member]) -> _Member | None:
     return next((one for one in members if one == value), None)
 
 
-def lookup(table: Mapping[_Member, _Value], key: object) -> _Value:
+def table_entry(table: Mapping[_Member, _Value], key: str) -> _Value:
     """What ``table`` holds under the key equal to ``key``.
 
     Raises ``KeyError`` naming ``key`` where no key is equal, as a subscript

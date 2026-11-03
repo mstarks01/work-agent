@@ -64,7 +64,7 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from analysis_service.assertions import AssertionRecord
-from analysis_service.parsing import lookup, member, non_negative
+from analysis_service.parsing import member, non_negative, table_entry
 from analysis_service.sources import text_digest
 from evals.harness import falsify
 from evals.harness.artifact import load_artifact
@@ -823,7 +823,7 @@ def render(readings: Sequence[Reading]) -> str:
             gate = GATES[name]
             limit = f"{gate.direction} {gate.limit} ({gate.unit})"
         else:
-            limit = lookup(PENDING, row.gate).limit or "undeclared"
+            limit = table_entry(PENDING, row.gate).limit or "undeclared"
         lines.append(
             f"| `{row.gate}` | {row.verdict} | {measured} | {baseline}"
             f" | {against} | {limit} |"
@@ -841,7 +841,7 @@ def render(readings: Sequence[Reading]) -> str:
     for row in unread:
         lines.append(f"- `{row.gate}` unread: {row.why}")
     for row in failed:
-        gate = lookup(GATES, row.gate)
+        gate = table_entry(GATES, row.gate)
         lines.append(f"- `{row.gate}`: {gate.question} {gate.why}")
     return "\n".join(lines) + "\n"
 

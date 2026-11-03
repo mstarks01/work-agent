@@ -320,8 +320,8 @@ ProjectedField = Literal[ControlAttribute, "trust_zone"]
 #: Whether two values of one predicate, at one subject and scope, can both hold.
 Multiplicity = Literal["one", "many"]
 
-#: Which element ID prefixes each graph-bound subject type accepts, read off the
-#: element classes so a renamed prefix moves this with it.
+#: Which ID prefixes each subject type accepts. A graph-bound type's prefixes
+#: are read off the element classes, so a renamed prefix moves this with it.
 SUBJECT_PREFIXES: Mapping[SubjectType, frozenset[str]] = MappingProxyType(
     {
         "component": frozenset(element.id_prefix for element in get_args(ZonedElement)),

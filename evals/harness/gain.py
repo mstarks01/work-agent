@@ -47,7 +47,7 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
-from analysis_service.parsing import lookup
+from analysis_service.parsing import table_entry
 from evals.harness import audit
 from evals.harness.artifact import figures_corpus
 from evals.harness.comparison import flagged_cases, held_out_cases
@@ -370,7 +370,7 @@ def render(
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in readings:
-        gate = lookup(GATES, row.gate)
+        gate = table_entry(GATES, row.gate)
         cells = [
             "—" if value is None else f"{value:.4g}"
             for value in (row.measured, row.baseline, row.against_limit)
@@ -382,7 +382,9 @@ def render(
     lines.append("")
     for row in readings:
         if row.verdict == "fail":
-            lines.append(f"- `{row.gate}` fails: {lookup(GATES, row.gate).question}")
+            lines.append(
+                f"- `{row.gate}` fails: {table_entry(GATES, row.gate).question}"
+            )
         elif row.verdict == "inconclusive":
             lines.append(f"- `{row.gate}` unread: {row.why}")
     if all(row.verdict == "pass" for row in readings):
