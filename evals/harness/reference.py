@@ -48,7 +48,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Any, Literal, Self, cast
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
     BaseModel,
@@ -92,7 +92,6 @@ from analysis_service.system_model import (
 )
 from analysis_service.validation import parse_and_validate
 from evals.harness.identity import CaseFlows
-from evals.harness.verbs import check_verb
 
 # Two tiers, because one weight makes every threshold wrong. ``must-find``
 # drives the hard recall gate, ``expected`` a tracked, softer number.
@@ -175,15 +174,7 @@ class ReferenceClaim(BaseModel):
     #: ``None`` where nobody has assigned one, which
     #: ``tests/test_verb_coverage.py`` counts per case. It is what fingerprint
     #: version 2 reads, so the count reaching zero is what lets the default move.
-    verb: str | None = None
-
-    @field_validator("verb")
-    @classmethod
-    def _known_verb(cls, value: str | None) -> str | None:
-        """An unrecognised verb fails here rather than matching nothing later."""
-        if value is not None:
-            check_verb(value)
-        return value
+    verb: ActionVerb | None = None
 
     @property
     def must_find(self) -> bool:
@@ -242,13 +233,8 @@ class Reading(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    verb: str
+    verb: ActionVerb
     affected_element_ids: tuple[str, ...] = Field(min_length=1)
-
-    @field_validator("verb")
-    @classmethod
-    def _known_verb(cls, value: str) -> str:
-        return check_verb(value)
 
 
 #: A person's answer on whether a second reading states a claim's finding.
@@ -1002,10 +988,7 @@ def _load_rulings(
             raise CorpusError(f"{where} cites {', '.join(dangling)}, not in the model")
         # Only an accepted reading must be one the service could file: a
         # refused one accepts nothing, and records what a lane actually wrote.
-        if (
-            ruled.verdict == "same"
-            and ruled.lane not in LANES_OF_VERB[cast(ActionVerb, alternate.verb)]
-        ):
+        if ruled.verdict == "same" and ruled.lane not in LANES_OF_VERB[alternate.verb]:
             raise CorpusError(f"{where}: {alternate.verb!r} is not a {ruled.lane} verb")
         by_index = readings[ruled.verdict]
         by_index[index] = (*by_index.get(index, ()), alternate)

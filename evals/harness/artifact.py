@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from analysis_service.certification import CertifyResult
 from analysis_service.execution import seed_state
@@ -39,6 +39,7 @@ from analysis_service.parsing import is_version
 from analysis_service.sources import text_digest
 from analysis_service.system_model import FLOW_ID_VERSION
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
+from evals.harness.modes import SweepMode
 from evals.harness.provenance import (
     REPO_ROOT,
     ProvenanceError,
@@ -193,7 +194,7 @@ class EvalArtifact:
     """
 
     path: Path
-    mode: str
+    mode: SweepMode
     cases: tuple[str, ...]
     trusted: bool
     structural_failures: tuple[str, ...]
@@ -242,6 +243,9 @@ class EvalArtifact:
     def failed_cases(self) -> frozenset[str]:
         """The cases this sweep ran and wrote no report for, from ``mode_output``."""
         return _failed_cases(self.block("mode_output"))
+
+
+_MODE: TypeAdapter[SweepMode] = TypeAdapter(SweepMode)
 
 
 def load_artifact(path: Path | str) -> EvalArtifact:
@@ -315,9 +319,15 @@ def load_artifact(path: Path | str) -> EvalArtifact:
     trusted = raw.get("trusted", False)
     if not isinstance(trusted, bool):
         raise ProvenanceError(f"{path}: trusted is {trusted!r}, not true or false")
+    try:
+        mode = _MODE.validate_python(raw.get("mode"))
+    except ValidationError as exc:
+        raise ProvenanceError(
+            f"{path}: mode {raw.get('mode')!r} is not a sweep mode"
+        ) from exc
     return EvalArtifact(
         path=path,
-        mode=str(raw.get("mode", "")),
+        mode=mode,
         cases=tuple(str(case) for case in raw.get("cases", ())),
         trusted=trusted,
         structural_failures=tuple(
@@ -476,7 +486,7 @@ def _completion(sweep: Sweep, cases: Sequence[str]) -> dict[str, int]:
 
 def build(
     *,
-    mode: str,
+    mode: SweepMode,
     cases: Sequence[str],
     models: Mapping[str, Any],
     certification: CertifyResult,

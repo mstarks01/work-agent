@@ -64,7 +64,7 @@ import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import Any, NamedTuple, cast, get_args, get_type_hints
+from typing import Any, NamedTuple, get_args, get_type_hints
 
 from analysis_service.model_tiers import TierName
 from analysis_service.parsing import non_negative, strings
@@ -85,7 +85,7 @@ from evals.harness.artifact import (
 )
 from evals.harness.bundle import FINISHED_KINDS, finished_file, reports_dir
 from evals.harness.history import current_commit
-from evals.harness.modes import EvalRunError, SweepMode
+from evals.harness.modes import EvalRunError
 from evals.harness.prices import UnitPrices, price_calls
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
@@ -700,7 +700,7 @@ def _checked_sweep(source: Path, artifact: EvalArtifact, author: str) -> _Checke
         )
     try:
         for case_id in artifact.cases:
-            for kind in FINISHED_KINDS[cast(SweepMode, artifact.mode)]:
+            for kind in FINISHED_KINDS[artifact.mode]:
                 finished_file(artifact, case_id, kind)
     except EvalRunError as error:
         raise BaselineError(f"{source}: {error}") from error
