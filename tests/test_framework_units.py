@@ -20,11 +20,12 @@ from analysis_service.frameworks import (
     FrameworkPackageError,
     Unit,
     check_unit,
+    package_for,
     validate_package,
 )
 from analysis_service.frameworks.asvs.catalog import CHAPTERS, REQUIREMENTS
 from evals.harness.bundle import UnreadableReport, read_report
-from tests.factories import PROJECT_ROOT
+from tests.factories import PROJECT_ROOT, carrying
 
 ARCHIVED_REPORTS = sorted(
     path
@@ -149,16 +150,16 @@ def _archived_claims() -> list[Claim]:
     return claims
 
 
-def _stray_units(
-    packages: dict[str, FrameworkPackage], claims: list[Claim]
-) -> list[tuple[str, str]]:
-    """Each claim ID whose ``unit_of`` names no unit of its package."""
-    return [
-        (claim.id, unit)
-        for claim in claims
-        if (unit := packages[claim.framework].unit_of(claim))
-        not in {known.id for known in packages[claim.framework].units}
-    ]
+def _stray_units(claims: list[Claim]) -> list[tuple[str, str]]:
+    """Each claim whose ``unit_of`` gives a unit that ``check_unit`` refuses."""
+    strays = []
+    for claim in claims:
+        unit = package_for(claim.framework).unit_of(claim)
+        try:
+            check_unit(claim.framework, unit)
+        except ValueError:
+            strays.append((claim.id, unit))
+    return strays
 
 
 @pytest.fixture(scope="module")
@@ -171,14 +172,14 @@ def test_the_replay_reads_claims_of_each_package(archived_claims):
 
 
 def test_unit_of_names_a_unit_of_the_set_for_each_archived_claim(archived_claims):
-    assert _stray_units(dict(PACKAGES), archived_claims) == []
+    assert _stray_units(archived_claims) == []
 
 
-def test_the_replay_fails_where_unit_of_leaves_the_set(archived_claims):
-    stride = PACKAGES["stride"]
-    drifted = replace(stride, unit_of=lambda claim: f"{claim.id}-elsewhere")
+def test_the_replay_fails_where_unit_of_leaves_the_set(monkeypatch, archived_claims):
+    drifted = replace(PACKAGES["stride"], unit_of=lambda claim: f"{claim.id}-elsewhere")
+    carrying(monkeypatch, drifted)
 
-    strays = _stray_units({**PACKAGES, "stride": drifted}, archived_claims)
+    strays = _stray_units(archived_claims)
 
     assert strays
     assert {claim_id for claim_id, _ in strays} <= {

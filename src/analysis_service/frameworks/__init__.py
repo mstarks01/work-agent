@@ -33,7 +33,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Literal, get_args
+from typing import Any, Literal, cast, get_args
 
 from pydantic import BaseModel
 
@@ -672,15 +672,15 @@ def package_for(name: FrameworkName) -> FrameworkPackage:
 def check_unit(framework: str, unit_id: str) -> None:
     """Refuse a Control row whose framework or unit this build does not carry.
 
-    **The one check of a row's unit.** A ``ValueError``, so a Pydantic
-    validator that calls it reports the refusal as a validation error.
+    A ``ValueError``, so a Pydantic validator that calls it reports the
+    refusal as a validation error.
     """
-    package = next((p for name, p in PACKAGES.items() if name == framework), None)
-    if package is None:
+    if framework not in PACKAGES:
         raise ValueError(
             f"framework {framework!r} is not one this build carries;"
             f" it carries {sorted(PACKAGES)}"
         )
+    package = PACKAGES[cast(FrameworkName, framework)]
     if unit_id not in {unit.id for unit in package.units}:
         raise ValueError(f"unit {unit_id!r} is not a unit of framework {framework!r}")
 
