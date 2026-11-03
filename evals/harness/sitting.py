@@ -47,7 +47,6 @@ whole path is free.
 
 from __future__ import annotations
 
-import hashlib
 import os
 import tempfile
 from collections import Counter
@@ -80,6 +79,7 @@ from evals.harness.reference import (
     ReferenceClaim,
     load_case,
     load_corpus,
+    read_digest,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -243,7 +243,7 @@ def draft_root() -> Path:
     importing this module resolves no home directory and a test can pass a
     temporary one instead.
     """
-    return xdg_dir(os.environ, "XDG_STATE_HOME", ".local/state") / "sittings"
+    return xdg_dir(os.environ, "state") / "sittings"
 
 
 def draft_path(root: Path, login: str, case_id: str) -> Path:
@@ -453,9 +453,7 @@ def moved(case_dir: Path, digests: Mapping[str, str]) -> list[str]:
             resolved = target.resolve()
             outside = not resolved.is_relative_to(root)
             readable = not outside and resolved.is_file()
-            digests_match = (
-                readable and hashlib.sha256(resolved.read_bytes()).hexdigest() == digest
-            )
+            digests_match = readable and read_digest(resolved) == digest
         except RESOLVE_ERRORS:
             # Unreadable is not stale-or-not; it is a file this process cannot
             # answer for, and it must not escape as a traceback.
@@ -598,9 +596,7 @@ def read_records(case_dir: Path, files: list[str]) -> list[ReadRecord]:
             raise SittingError(
                 f"{name}: not in the case directory, so it cannot be read"
             )
-        records.append(
-            ReadRecord(file=name, sha256=hashlib.sha256(path.read_bytes()).hexdigest())
-        )
+        records.append(ReadRecord(file=name, sha256=read_digest(path)))
     return records
 
 

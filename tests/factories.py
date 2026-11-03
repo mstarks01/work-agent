@@ -64,6 +64,7 @@ from analysis_service.claims import (
 )
 from analysis_service.compact import FULL_FORMAT, ExtractionFormat
 from analysis_service.conformance import REFERENCE_MODELS
+from analysis_service.engine import Engine
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from analysis_service.frameworks.asvs.record import (
@@ -87,7 +88,7 @@ from analysis_service.graph import (
     build_pipeline,
 )
 from analysis_service.identity import build_identity, execution_fingerprint
-from analysis_service.jobs import Checkpoint, InMemoryJobStore
+from analysis_service.jobs import Checkpoint, InMemoryJobStore, PipelineRunner
 from analysis_service.links import LinkAnswer
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import (
@@ -108,7 +109,7 @@ from analysis_service.report import (
 )
 from analysis_service.retry import ATTEMPTS_METADATA_KEY
 from analysis_service.sampling import SamplingConfig, load_sampling
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
+from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source, SourceLimits
 from analysis_service.system_model import (
     Assumption,
     DataFlow,
@@ -500,6 +501,24 @@ def sample_selection(
     return [FrameworkSelection(name=name) for name in frameworks]
 
 
+def stand_in_engine(
+    runner: PipelineRunner,
+    *,
+    limits: SourceLimits,
+    deadline_seconds: float,
+    frameworks: Sequence[FrameworkSelection],
+) -> Engine:
+    """An engine that runs ``runner`` for each selection and entry, and holds
+    the selection to every package this build carries."""
+    return Engine(
+        lambda selection, entry: runner,
+        carried_frameworks=tuple(PACKAGES),
+        limits=limits,
+        deadline_seconds=deadline_seconds,
+        frameworks=frameworks,
+    )
+
+
 def package_whose_precondition(
     precondition: Any, name: FrameworkName = "stride"
 ) -> FrameworkPackage:
@@ -507,8 +526,8 @@ def package_whose_precondition(
 
     **The one thing this repository cannot otherwise test.** STRIDE's
     precondition is total, so a gate that never runs and a gate that always
-    passes look identical from every seam — which is how the member came to be
-    declared, checked on the corpus side and never called in ``src/``. A package
+    passes look identical from every seam — so a member declared, checked on
+    the corpus side and never called in ``src/`` shows nothing at any seam. A package
     that can refuse is what tells the two apart, and until a second framework
     lands there is no such package to select.
 
@@ -569,7 +588,7 @@ DESCRIPTION_TEXT = (
 """The submitted text every scripted job carries.
 
 Every ``source_excerpt`` in :func:`valid_model` and the quote ground in
-:func:`sample_threat` are verbatim spans of *this string*, because the gate now
+:func:`sample_threat` are verbatim spans of *this string*, because the gate
 checks an excerpt against the source it cites the same way the fan-in checks a
 threat's quote. A fixture citing words its own job never carried is the exact
 defect that check exists to catch, and one used by 29 tests would have failed

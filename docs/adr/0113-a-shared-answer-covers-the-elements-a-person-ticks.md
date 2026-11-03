@@ -40,8 +40,9 @@ own** (maintainer's decision of 2026-11-01). It sits beside the shared answer.
 An element with its own answer, given by hand or before a reload, stays
 unticked. When the shared answer holds a value and no element is ticked, the
 line beside it tells the person to tick the elements it covers or to use the
-button. The elements still start unticked, so a choice alone covers no
-element.
+button. The button is disabled while the shared answer is empty, so it never
+copies an empty value. The elements still start unticked, so a choice alone
+covers no element.
 
 **Unticking an element takes back only what the shared answer wrote.** An
 element that took the shared answer and is then unticked returns to blank. An

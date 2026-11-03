@@ -169,12 +169,13 @@ def _save(
 
 @dataclass(frozen=True)
 class Step:
-    """One listed question of a walk, its answer or ``None`` for a skip, and
-    the choices the walk took up to and with it."""
+    """One listed question of a walk, and its answer, or ``None`` for a skip."""
 
     key: UnknownKey
     answer: FactAnswer | None
-    choices: int
+    #: The running total of choices: every choice of the walk until this step,
+    #: and the choices of this step.
+    choices_so_far: int
 
 
 @dataclass(frozen=True)
@@ -187,7 +188,7 @@ class Walk:
 
     def within(self, budget: int) -> tuple[Step, ...]:
         """The steps taken within ``budget`` choices."""
-        return tuple(step for step in self.steps if step.choices <= budget)
+        return tuple(step for step in self.steps if step.choices_so_far <= budget)
 
 
 def walk(
@@ -221,7 +222,7 @@ def walk(
                 choices += question.decisions
             answered = list(saved.answers.facts)
             skipped = list(saved.skipped)
-            steps.append(Step(key=question.key, answer=reply, choices=choices))
+            steps.append(Step(key=question.key, answer=reply, choices_so_far=choices))
     return Walk(steps=tuple(steps), ended=False)
 
 
@@ -357,7 +358,7 @@ def _read(
     unnecessary = {question.key for question, _ in before.unnecessary}
     unnecessary_after = {question.key for question, _ in after.unnecessary}
     return {
-        "choices": steps[-1].choices if steps else 0,
+        "choices": steps[-1].choices_so_far if steps else 0,
         "asked": len(answers),
         "skipped": len(skips),
         "findings": len(needs.findings),

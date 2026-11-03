@@ -38,20 +38,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from functools import partial
 from typing import Any, Self
 
 from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
-from analysis_service.frameworks import PACKAGES
-from analysis_service.graph import Entry
-from analysis_service.jobs import (
-    JobRecord,
-    NodeCallback,
-    PipelineOutcome,
-    PipelineRunner,
-)
+from analysis_service.graph import ENTRY_EXTRACT
+from analysis_service.job_answers import RunnerFor
+from analysis_service.jobs import JobRecord, NodeCallback, PipelineOutcome
 from analysis_service.links import (
     refuse_owner_file_sources,
     with_link_answers,
@@ -115,35 +110,28 @@ class Engine:
 
     def __init__(
         self,
-        runner: PipelineRunner,
+        runner_for: RunnerFor,
         *,
+        carried_frameworks: Sequence[FrameworkName],
         limits: SourceLimits,
         deadline_seconds: float,
         frameworks: Sequence[FrameworkSelection],
-        runner_for: Callable[[Entry], PipelineRunner] | None = None,
-        carries_catalog: bool = False,
     ) -> None:
-        # The same rule the HTTP route and the web app apply, read through the
-        # one reader all three share. The constructor holds no deployment, so
-        # the names are held to the packages this build carries; which of
-        # those a deployment enables is the runner's own check
-        # (:meth:`~analysis_service.deployment.Deployment.selection`). A
-        # package's options model declares no default, so a selection missing
+        # The same rule the HTTP routes apply, read through the one reader all
+        # three share: the selection in ``carried_frameworks`` order (ADR 0102).
+        # An engine built on a deployment holds the frameworks the deployment
+        # carries. A package's options model declares no default, so a selection missing
         # a value it needs is refused here rather than reaching a block that
         # cannot be built — which would fail after the provider billed every node.
         try:
-            self._frameworks = resolve_selection(list(PACKAGES), frameworks)
+            self._frameworks = resolve_selection(carried_frameworks, frameworks)
         except SelectionError as exc:
             raise EngineInputError(str(exc)) from exc
         # The graph a job runs depends on where it starts: its sources, a
-        # pause after the assertion pass, or a checkpoint it resumes from. An
-        # engine built on a deployment asks it for each; one built on a single
-        # runner (a test stand-in) runs that runner for every entry.
-        self._runner_for = runner_for or (lambda entry: runner)
-        # Whether a job here builds an assertion catalog, which is the only
-        # reader of a link answer. False unless the deployment says so, so an
-        # engine that cannot know refuses one.
-        self._carries_catalog = carries_catalog
+        # pause after the assertion pass, or a checkpoint it resumes from. Each
+        # is looked up by this engine's own selection, so a job and its graph
+        # name the frameworks in one order.
+        self._runner_for = partial(runner_for, self.frameworks)
         self._limits = limits
         self._principals = PrincipalTable()
         self._deadline_seconds = deadline_seconds
@@ -176,10 +164,10 @@ class Engine:
     ) -> Self:
         """An engine on an already-resolved deployment, for one selection.
 
-        For callers that need the configuration *and* the engine — the
-        first-run app reports which vendor a tier selected when the credential
-        check fails, and re-reading the config to find that out is how the two
-        could disagree.
+        For callers that need the configuration *and* the engine — the smoke
+        run (:mod:`analysis_service.smoke`) reports which tiers a deployment
+        selects when a build-time gate fails, and re-reading the config to find
+        that out is how the two could disagree.
 
         ``frameworks`` takes bare names or full
         :class:`~analysis_service.report.FrameworkSelection`\\ s. A bare name is
@@ -192,15 +180,17 @@ class Engine:
             else FrameworkSelection(name=entry)
             for entry in frameworks
         ]
-        names = [selection.name for selection in selections]
-        return cls(
-            deployment.runner(names),
+        engine = cls(
+            deployment.runner,
+            carried_frameworks=deployment.carried_frameworks,
             limits=deployment.resilience.source_limits(),
             deadline_seconds=deployment.job_deadline_seconds(),
             frameworks=selections,
-            runner_for=partial(deployment.runner, names),
-            carries_catalog=deployment.carries_catalog,
         )
+        # Built now rather than at the first job, so the build-time gates of
+        # :meth:`~analysis_service.deployment.Deployment.pipeline` refuse here.
+        engine._runner_for(ENTRY_EXTRACT)
+        return engine
 
     async def analyze(
         self,

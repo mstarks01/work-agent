@@ -81,6 +81,7 @@ and a run confirms.
 
 from __future__ import annotations
 
+import json
 import statistics
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
@@ -106,6 +107,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.evidence import prepared_view
 from analysis_service.grounding import normalize
+from analysis_service.sources import text_digest
 from analysis_service.system_model import (
     FLOW_DELIMITER,
     DataFlow,
@@ -1122,9 +1124,17 @@ def bind_assertions(
     )
 
 
+#: What tells one sweep's input apart from another's on an :class:`Arm`.
+#: ``rendered_sources`` is the artifact's own record of each case's rendered
+#: Sources. ``named`` is the arm a caller named for a sweep that records none.
+#: ``sweep`` is a sweep that records none and that no caller named, so it is
+#: an arm of its own.
+TreatmentBy = Literal["rendered_sources", "named", "sweep"]
+
+
 @dataclass(frozen=True)
 class Arm:
-    """What one archived sweep was: the reading route, and the models that answered it.
+    """What one archived sweep was: the reading route, its input, and the models that answered it.
 
     ``models`` is what answered the archived route, read off the sweep's own
     execution record, never the tier table. Two sweeps with one tier table
@@ -1134,24 +1144,52 @@ class Arm:
     ``nodes`` and ``instructions`` are tuples because a reading route can be
     more than one call, and each call carries its own prompt. A single-call
     route holds one of each, which is every archived sweep.
+
+    ``treatment`` is what the route read, and ``treatment_by`` says where that
+    came from (:data:`TreatmentBy`). Two sweeps with one prompt and one model
+    read different input when a Source or its render moved, such as a change
+    to the diagram reader, and the instruction digest shows neither.
     """
 
     nodes: tuple[str, ...]
     instructions: tuple[str, ...]
     models: tuple[str, ...]
+    treatment: str
+    treatment_by: TreatmentBy
 
     @property
     def label(self) -> str:
         route = "+".join(self.nodes)
         digests = ",".join(digest[:12] for digest in self.instructions)
-        return f"{route}@{digests} on {', '.join(self.models)}"
+        read = TREATMENT_LABELS[self.treatment_by].format(self.treatment)
+        return f"{route}@{digests} on {', '.join(self.models)}, {read}"
 
     def to_json(self) -> dict[str, Any]:
         return {
             "nodes": list(self.nodes),
             "instructions": list(self.instructions),
             "models": list(self.models),
+            "treatment": self.treatment,
+            "treatment_by": self.treatment_by,
         }
+
+
+#: How each kind of treatment prints in an arm's label.
+TREATMENT_LABELS: Mapping[TreatmentBy, str] = {
+    "rendered_sources": "input {:.12}",
+    "named": "arm {!r}",
+    "sweep": "only {}",
+}
+
+
+def rendered_digest(rendered: Mapping[str, str]) -> str:
+    """One digest over a sweep's ``rendered_sources`` block, case by case.
+
+    Sweeps that read the same input for every case they selected share it,
+    so repeats pool and a case's own input never makes an arm of its own.
+    """
+    canonical = json.dumps(dict(rendered), sort_keys=True, separators=(",", ":"))
+    return text_digest(canonical)
 
 
 #: Which reading routes each mode admits, and so which nodes' instructions
@@ -1186,12 +1224,13 @@ KEEPS: Mapping[str, str] = {
 }
 
 
-def arm_of(artifact: EvalArtifact) -> Arm:
-    """Which prompts and which models an archived sweep ran, off its own record.
+def arm_of(artifact: EvalArtifact, named: str | None) -> Arm:
+    """Which prompts, which input and which models an archived sweep ran, off its own record.
 
     One route of :data:`ROUTES_OF`, and one prompt per node of it. A sweep
     carrying the nodes of two routes is two arms and is refused, and so is one
-    that carries the nodes of none.
+    that carries the nodes of none. ``named`` is the arm a caller names for a
+    sweep that records no ``rendered_sources`` block.
     """
     rows = artifact.block("instruction")
     carried = {row["node"] for row in rows}
@@ -1220,7 +1259,59 @@ def arm_of(artifact: EvalArtifact) -> Arm:
                 f" {node}, so the sweep cannot be placed on an arm"
             )
         models.update(execution["requested_model"] for execution in executions)
-    return Arm(tuple(route), tuple(instructions), tuple(sorted(models)))
+    treatment, treatment_by = _treatment_of(artifact, named)
+    return Arm(
+        tuple(route),
+        tuple(instructions),
+        tuple(sorted(models)),
+        treatment,
+        treatment_by,
+    )
+
+
+def _treatment_of(artifact: EvalArtifact, named: str | None) -> tuple[str, TreatmentBy]:
+    """What a sweep read: its own record, else the caller's name, else itself.
+
+    The record wins over a name, because it is what the run rendered. A sweep
+    with neither is never pooled with another: the replay cannot tell whether
+    two such sweeps read one input, and it does not guess.
+    """
+    if artifact.carries("rendered_sources"):
+        rendered = artifact.block("rendered_sources")
+        if not isinstance(rendered, Mapping) or not all(
+            isinstance(digest, str) for digest in rendered.values()
+        ):
+            raise ValueError(
+                f"{artifact.path}: rendered_sources is not a digest per case, so"
+                " the sweep cannot be placed on an arm"
+            )
+        return rendered_digest(rendered), "rendered_sources"
+    if named is not None:
+        return named, "named"
+    return str(artifact.path), "sweep"
+
+
+def unpooled_note(arms: Iterable[Arm]) -> str | None:
+    """Why sweeps with one route, prompt and model print as separate arms.
+
+    ``None`` where no two such sweeps exist. Otherwise the message names the
+    sweeps and the option that pools them.
+    """
+    held: dict[tuple[Any, ...], list[str]] = defaultdict(list)
+    for arm in dict.fromkeys(arms):
+        if arm.treatment_by == "sweep":
+            held[(arm.nodes, arm.instructions, arm.models)].append(arm.treatment)
+    apart = [paths for paths in held.values() if len(paths) > 1]
+    if not apart:
+        return None
+    names = "; ".join(", ".join(Path(path).name for path in paths) for paths in apart)
+    return (
+        f"NOT POOLED: {sum(map(len, apart))} sweep(s) share a route, a prompt and"
+        " a model but carry no rendered_sources block, so nothing records whether"
+        f" they read one input: {names}. Each is its own arm. To pool the sweeps"
+        " that read one input, name their arm with --arm LABEL=GLOB, where GLOB"
+        " matches the artifact file names."
+    )
 
 
 @dataclass(frozen=True)
@@ -1472,6 +1563,9 @@ def render_bindings(sweeps: Sequence[BindingSweep], targets: int) -> None:
     grouped: dict[Arm, list[BindingSweep]] = defaultdict(list)
     for sweep in sweeps:
         grouped[sweep.arm].append(sweep)
+    note = unpooled_note(grouped)
+    if note:
+        print(note)
     for arm, arm_sweeps in grouped.items():
         pool = pooled_bindings(arm_sweeps)
         print(f"\n== {arm.label}: {len(arm_sweeps)} proposal sweep(s)")
@@ -1533,7 +1627,11 @@ TREE_STATE: Mapping[bool | None, str] = {
 
 def render(sweeps: Sequence[SweepReplay], targets: int) -> None:
     """The pooled tables, one per arm, with the elements a change would aim at."""
-    for arm, arm_sweeps in by_arm(sweeps).items():
+    arms = by_arm(sweeps)
+    note = unpooled_note(arms)
+    if note:
+        print(note)
+    for arm, arm_sweeps in arms.items():
         print(f"\n== {arm.label}: {len(arm_sweeps)} sweep(s)")
         for sweep in arm_sweeps:
             state = TREE_STATE[sweep.clean]

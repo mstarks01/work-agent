@@ -41,13 +41,13 @@ saw.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Mapping
 from functools import cache
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Final
 
+from analysis_service.sources import text_digest
 from analysis_service.vendors import ServedTrust, vendor_for_route
 
 #: The identity schema. Bumped whenever the payload gains, loses or re-spells a
@@ -170,7 +170,7 @@ def fingerprint(identity: Mapping[str, Any]) -> str:
     collision here reads as a matching identity.
     """
     canonical = json.dumps(identity, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return text_digest(canonical)
 
 
 def execution_fingerprint(

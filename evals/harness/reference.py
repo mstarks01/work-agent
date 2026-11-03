@@ -40,6 +40,7 @@ it would quietly lower the recall denominator.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -122,18 +123,6 @@ RULINGS_FILE = "rulings.json"
 
 class CorpusError(ValueError):
     """A golden case is missing, malformed, or internally inconsistent."""
-
-
-def corpus_refusal(error: CorpusError) -> str:
-    """The one line a command line prints when the corpus does not load.
-
-    Every entry point that reads the corpus refuses the same way, so the
-    sentence is written here once rather than in each ``main``. The error
-    already names the case, the file and the field it stopped on. A traceback
-    in its place names a pydantic frame, which is nothing the reader whose own
-    case carries the bad entry can act on.
-    """
-    return f"cannot read the corpus: {error}"
 
 
 class ReferenceSeverity(BaseModel):
@@ -549,6 +538,15 @@ class ReadRecord(BaseModel):
     sha256: Sha256Hex
 
 
+def read_digest(path: Path) -> str:
+    """The digest a :class:`ReadRecord` pins: the sha256 of the file's bytes.
+
+    **The one reader of a read file's digest**: a sitting writes it, a reading
+    document prints it, and a later read compares against it.
+    """
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 #: What a sitting records when the person who read the case is not named.
 #: A reserved word rather than an empty field: the read happened, and a blank
 #: reads as a field nobody filled in. Nothing resolves it — no roster lookup,
@@ -847,7 +845,9 @@ def _case_refusal(case_dir: Path, error: ValidationError) -> str:
 def missing_case_files(case_dir: Path) -> list[str]:
     """Which of :data:`CASE_FILES` this directory does not carry, as files.
 
-    **The one reader of "is this a case directory".** The loader raises on the
+    **The one reader of "is this a case directory"** for the loader and the
+    corpus lint. An experiment script under ``evals/experiments`` tests
+    ``case.json`` itself. The loader raises on the
     answer and ``evals/verify_corpus.py`` reports it, and the two asked it
     apart: one listed the three names and called ``is_file``, the other listed
     them again and called ``exists``, so a *directory* named ``case.json``

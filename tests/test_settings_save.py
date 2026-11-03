@@ -536,6 +536,29 @@ class TestAStoreChange:
         assert saved.status_code == 200, saved.text
         assert stat.S_IMODE(database.stat().st_mode) == 0o600
 
+    def test_a_library_that_does_not_load_is_refused_as_a_broken_install(
+        self, tmp_path, monkeypatch
+    ):
+        """Each store converts a missing extra into its own refusal, so an
+        ImportError that reaches the check is a broken install."""
+        client, _ = app_on(tmp_path, hand_written())
+        before = settings_text(tmp_path)
+
+        def broken(env):
+            raise ImportError("cannot import name 'connect' from 'aiosqlite'")
+
+        monkeypatch.setattr(settings_save, "build_app_store", broken)
+        refused = save(client, {"resilience.timeout_ms": "5000"})
+
+        assert refused.status_code == 422, refused.text
+        (error,) = refused.json()["errors"]
+        assert error["message"] == (
+            "the store cannot load a library (cannot import name 'connect' from"
+            " 'aiosqlite'): install analysis-service again with the extra that"
+            " the store needs"
+        )
+        assert settings_text(tmp_path) == before
+
     @pytest.mark.parametrize(
         ("credentials", "message"),
         [

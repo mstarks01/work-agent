@@ -43,7 +43,7 @@ from evals.harness.artifact import ProvenanceError, corpus_digest
 from evals.harness.bundle import check_out
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import node_call
-from evals.harness.run_record import run_record
+from evals.harness.run_record import run_record_for
 
 
 def _one_framework(fixtures: list[CriticFixture]) -> FrameworkName:
@@ -114,18 +114,11 @@ def main(argv: list[str] | None = None) -> int:
     package = PACKAGES[framework]
     case_id = _one_case(fixtures)
     try:
-        record = (
-            None
-            if args.out is None
-            else run_record(
-                "critic-review",
-                {
-                    "framework": framework,
-                    "case": case_id,
-                    "corpus_digest": corpus_digest(),
-                },
-                {CASES: {}},
-            )
+        record = run_record_for(
+            [args.out],
+            "critic-review",
+            {"framework": framework, "case": case_id, "corpus_digest": corpus_digest()},
+            {CASES: {}},
         )
     except ProvenanceError as error:
         print(error, file=sys.stderr)

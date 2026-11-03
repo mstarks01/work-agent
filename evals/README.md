@@ -11,10 +11,10 @@ what a person decided about each finding.
 
 ## Read this before you quote a number
 
-**An agent wrote all of it; review records now identify the subsets people have
+**An agent wrote all of it; review records identify the subsets people have
 read.** Every golden case, every reference claim and every calibration label
 began agent-authored. On 2026-09-21 one **Case Sitting** read all 13 cases and
-marked all 344 recorded claims, so every reference set now carries a human
+marked all 344 recorded claims, so every reference set carries a human
 judgement per claim — `agree`, `reject`, `duplicate` or `unsure`. A mark is a
 reader's answer on a claim as written; it does not make the set exhaustive, and
 the 26 `missing` entries that sitting recorded say where the reader thought it
@@ -213,6 +213,7 @@ somewhere else.
 | Module | What it owns |
 |---|---|
 | `harness/reference.py` | The `ReferenceThreat` type and the fail-closed corpus loader. |
+| `harness/entry_refusal.py` | The one-line refusal of a command line that loads the corpus or a configuration. Each entry point catches `ENTRY_ERRORS` and returns `refuse_entry`. |
 | `harness/bundle.py` | A sweep's report bundle: the per-case report, drafts and proposals files beside an artifact, their writer and reader, and the block accessors every reader of a saved report starts from. Also the extraction and assertion emission files an extraction or assertion sweep writes, and the readers that re-parse them under the code that stands. A head-only sweep's archived catalog is redrawn as it is read: a principal, a credential and an artifact carry an ID that is a pure function of the words a source used, so it is re-derived from the label the archive holds. A graph-bound subject is left exactly as archived, because its ID is an Element ID the run's own model decided. |
 | `harness/structural.py` | The structural gates — the only checks that fail a run. |
 | `harness/scorer.py` | The scoring pipeline: prefilter → rule → match → standing → severity. |
@@ -284,7 +285,7 @@ somewhere else.
 | `harness/artifact.py` | The sweep artifact: one declared shape, written once by `build` and read back through `load_artifact`, which refuses a file missing any declared key. |
 | `harness/archive.py` | The bytes each archived file's producer writes, as one table keyed by file kind. A Baseline holds a file of each kind in that table, in three encodings — a report is UTF-8, the drafts beside it are escaped ASCII, a manifest sorts its keys — and every writer asks here rather than picking one. |
 | `harness/run.py` | The command-line entry point. `score` re-reads the ledger over a finished sweep's saved reports, so a vote reaches the numbers without a second sweep. |
-| `harness/run_record.py` | The run record that each instrument writes first in its output file: the commit and whether the tree was clean, the instrument's table of policies, budgets and options, and each file read with its sha256 and the framework selections read on it. `sweep_inputs` names a sweep's artifact and every case file beside it. `tests/test_run_record_lints.py` holds every harness writer to the record, or to a row that says why its file is not a measurement. No checkout, no record. No credentials. |
+| `harness/run_record.py` | The run record that each instrument writes first in its output file: the commit and whether the tree was clean, the instrument's table of policies, budgets and options, and each file read with its sha256 and the framework selections read on it. `run_record_for` gives the record of a run that writes one of its outputs, or none where it writes none. `sweep_inputs` names a sweep's artifact and every case file beside it. `tests/test_run_record_lints.py` holds every harness writer to the record, or to a row that says why its file is not a measurement. No checkout, no record. No credentials. |
 | `harness/submit.py` | `submit <kind>`: runs a contribution's CI checks locally as a checklist, then packages the kind's allowlist on a fresh branch and opens the PR through `gh`. Kinds live in a table: `vote`, `sitting`, `baseline`. `verify-contribution --author` re-runs those checks in CI against the login GitHub says opened the PR. |
 
 Sampling parameters are **not** here: the harness reads `config/sampling.toml`
@@ -502,6 +503,14 @@ blessed element and every signed reference row:
 python -m evals.harness.run replay evals/emissions/*.json --out replay.json
 ```
 
+The replay pools sweeps into one arm when they ran one route, one prompt and
+one model, and read one input. The input is the artifact's `rendered_sources`
+block: one digest for each case, of the Sources as the graph renders them for
+the model. A change to a Source or to its render, such as the diagram reader,
+moves it. A sweep without the block is an arm of its own, and the replay prints
+`NOT POOLED` with its name. Name the arm of such sweeps with
+`--arm LABEL=GLOB` to pool them. `bind` takes the same option.
+
 The assertion benchmark seeded the blessed model, so its proposals name
 blessed element IDs; a production job resolves them against the graph its own
 extraction produced. `bind` resolves each archived proposal against every
@@ -513,7 +522,7 @@ cited over the extracted graphs against the blessed one:
 
 ```sh
 python -m evals.harness.run bind evals/emissions/20260914T201030Z-assert-model-benchmark/*.json \
-  --graphs evals/emissions/*.json --out bind.json
+  --graphs evals/emissions/*.json --arm 'benchmark=*' --out bind.json
 ```
 
 A `run` fails (exits non-zero) **only** on a structural problem — a report that
@@ -538,7 +547,7 @@ agent-authored, so it measures agreement with them and not correctness.
 Every number here is measured **against the rule and the ledger** — use
 them to compare configurations and track movement, never as absolute scores or
 against another tool's published figures. The reference sets they rest on are
-agent-authored, and every claim in them now carries one reader's mark.
+agent-authored, and every claim in them carries one reader's mark.
 
 **ASVS's differ only in mechanism.** The `applicability` block is a confusion
 matrix over a finite catalog, matched by requirement ID: its claims carry

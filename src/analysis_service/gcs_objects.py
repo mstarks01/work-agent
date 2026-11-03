@@ -57,12 +57,10 @@ from analysis_service.gcp_identity import platform_credentials
 from analysis_service.objects import (
     OBJECT_BUCKET_VAR,
     OBJECT_CREDENTIALS_VAR,
-    OBJECT_STORES,
+    credential_mode,
 )
 from analysis_service.store_settings import (
     StoreConfigError,
-    closed_setting,
-    refuse_unread,
 )
 from analysis_service.vendors import CredentialMode
 
@@ -185,20 +183,12 @@ class GcsObjectStore:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> GcsObjectStore:
-        refuse_unread(
-            env,
-            ("ANALYSIS_OBJECT_",),
-            OBJECT_STORES["gcs"].reads,
-            "the gcs object store",
-        )
+        mode = credential_mode(env, "gcs")
         bucket = env.get(OBJECT_BUCKET_VAR, "").strip()
         if not bucket:
             raise StoreConfigError(f"set {OBJECT_BUCKET_VAR} for the gcs object store")
         if _BUCKET.fullmatch(bucket) is None:
             raise StoreConfigError(f"{OBJECT_BUCKET_VAR} must match {_BUCKET.pattern}")
-        mode = closed_setting(
-            env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, CREDENTIALS
-        )
         credentials = CREDENTIALS[mode](env)
         try:
             client = make_client(credentials)

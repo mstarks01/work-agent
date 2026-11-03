@@ -14,10 +14,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.api import (
-    _BODY_SLACK,
     _REFUSALS,
     BodyLimitMiddleware,
     create_app,
+    max_body_bytes,
 )
 from analysis_service.auth import AuthenticationError
 from analysis_service.budgets import BudgetPolicy
@@ -125,7 +125,8 @@ def make_client(
         job_deadline_seconds=TEST_DEADLINE_SECONDS,
         max_active_jobs=max_active_jobs,
         budget=budget,
-        frameworks=frameworks,
+        carried_frameworks=frameworks,
+        carries_catalog=False,
     )
     return TestClient(app, raise_server_exceptions=raise_server_exceptions), store
 
@@ -186,7 +187,8 @@ class TestInjectedBoundsMustBeStated:
                 runner=StubPipelineRunner(),
                 verifier=FakeVerifier(),
                 limits=TEST_LIMITS,
-                frameworks=DEFAULT_FRAMEWORKS,
+                carried_frameworks=DEFAULT_FRAMEWORKS,
+                carries_catalog=False,
             )
 
     def test_a_runner_without_limits_is_refused(self):
@@ -197,7 +199,8 @@ class TestInjectedBoundsMustBeStated:
                 verifier=FakeVerifier(),
                 job_deadline_seconds=TEST_DEADLINE_SECONDS,
                 max_active_jobs=TEST_MAX_ACTIVE_JOBS,
-                frameworks=DEFAULT_FRAMEWORKS,
+                carried_frameworks=DEFAULT_FRAMEWORKS,
+                carries_catalog=False,
             )
 
     def test_a_runner_without_a_concurrency_ceiling_is_refused(self):
@@ -208,7 +211,8 @@ class TestInjectedBoundsMustBeStated:
                 verifier=FakeVerifier(),
                 limits=TEST_LIMITS,
                 job_deadline_seconds=TEST_DEADLINE_SECONDS,
-                frameworks=DEFAULT_FRAMEWORKS,
+                carried_frameworks=DEFAULT_FRAMEWORKS,
+                carries_catalog=False,
             )
 
 
@@ -227,7 +231,7 @@ class TestEveryCarriedPackageReachesARunner:
         app = create_app(
             deployment=deployment, store=InMemoryJobStore(), verifier=FakeVerifier()
         )
-        carried = tuple(deployment.frameworks)
+        carried = tuple(deployment.carried_frameworks)
 
         runner = app.state.runner_for(carried)
 
@@ -589,7 +593,7 @@ class TestInputLadder:
             headers=auth()
             | {
                 "content-type": "application/json",
-                "content-length": str(TEST_LIMITS.max_total_bytes * 4),
+                "content-length": str(max_body_bytes(TEST_LIMITS) * 2),
             },
         )
         assert response.status_code == 413
@@ -601,7 +605,7 @@ class TestInputLadder:
         # through. Streaming the body from a generator makes httpx send it
         # chunked.
         client, _ = make_client()
-        over_cap = TEST_LIMITS.max_total_bytes * _BODY_SLACK * 2
+        over_cap = max_body_bytes(TEST_LIMITS) * 2
 
         def chunks():
             sent = 0
@@ -1363,7 +1367,7 @@ class TestBodyCapOnEveryPost:
         """Driven through the real app, so a POST route added tomorrow is
         covered by the same test rather than by a path someone remembers."""
         client, _ = make_client()
-        over_cap = b"x" * (TEST_LIMITS.max_total_bytes * _BODY_SLACK * 2)
+        over_cap = b"x" * (max_body_bytes(TEST_LIMITS) * 2)
         paths = [
             route.path.replace("{job_id}", "abc")
             for route in client.app.routes

@@ -212,7 +212,7 @@ def draft_file(tree, case, reviewer="ada") -> Path:
 
 
 def every_mark(app, case=CASE, value="agree"):
-    """A mark on every finding part two offers, which a record now needs."""
+    """A mark on every finding part two offers, which a record needs."""
     payload = app.get(f"/api/part-two?case={case}").json()
     return {target["fingerprint"]: value for target in payload["marks"]}
 

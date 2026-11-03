@@ -157,8 +157,6 @@ class PriorRow:
     record: Mapping[str, Any] | None
     #: The archived runs the rates were counted from, as ``run.py`` was given them.
     runs: tuple[str, ...]
-    #: The commit the command ran at, or ``None`` where no run was counted.
-    revision: str | None
     #: The development cases counted. A holdout case is never counted.
     cases: int
     #: Citations of each attribute or kind, per element of each type.
@@ -168,7 +166,6 @@ class PriorRow:
         return {
             "record": None if self.record is None else dict(self.record),
             "runs": list(self.runs),
-            "revision": self.revision,
             "cases": self.cases,
             "rates": {kind: dict(fields) for kind, fields in self.rates.items()},
         }
@@ -222,7 +219,6 @@ def load_prior(path: Path = QUESTION_PRIOR_PATH) -> Mapping[FrameworkName, Prior
             name: PriorRow(
                 record=row["record"],
                 runs=tuple(row["runs"]),
-                revision=row["revision"],
                 cases=row["cases"],
                 rates=MappingProxyType(
                     {

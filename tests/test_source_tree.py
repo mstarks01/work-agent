@@ -9,7 +9,7 @@ against its own expectation.
 The effect of a disagreement is concrete: ``evals/runs`` holds run artifacts the
 repository does not track, a live run leaves its probe scripts beside them, and
 a reader that judges that directory fails on a file the tree does not hold
-(#942).
+(PR #944).
 
 The named file sets are held the same way: each one against a source that no
 lint reads, such as ``git ls-files`` and the code paths of
@@ -31,12 +31,14 @@ from tests.source_tree import (
     _SKIPPED,
     _SKIPPED_PATHS,
     CONFIG,
+    HOOKS,
     LINT_MARKER,
     MODEL_TEXT,
     NOT_GUIDES,
     PROMPTS,
     PYTHON,
     REPO_ROOT,
+    SHORTEST_REASON,
     TESTS,
     WORKFLOWS,
     guide_files,
@@ -227,7 +229,7 @@ def test_each_named_root_holds_a_tracked_file():
     """A root that holds nothing is a set that reads less than its name says."""
     empty = [
         root
-        for root in (*PYTHON, *TESTS, *CONFIG, *WORKFLOWS, *MODEL_TEXT)
+        for root in (*PYTHON, *TESTS, *CONFIG, *WORKFLOWS, *HOOKS, *MODEL_TEXT)
         if not _tracked(root)
     ]
 
@@ -328,12 +330,122 @@ def test_every_module_that_reads_the_tree_declares_itself_a_lint():
 
 #: The named sets of roots a lint may pass to the walk.
 _ROOT_SETS = frozenset(
-    {"PYTHON", "TESTS", "CONFIG", "WORKFLOWS", "MODEL_TEXT", "WHOLE_TREE"}
+    {"PYTHON", "TESTS", "CONFIG", "WORKFLOWS", "HOOKS", "MODEL_TEXT", "WHOLE_TREE"}
 )
 
 #: The modules that may pass the walk a root of their own: the walk itself, and
 #: this module, whose tests build a tree of their own to walk.
 _THE_WALK = frozenset({"tests/source_tree.py", "tests/test_source_tree.py"})
+
+#: The walks in tests/ over a tree that holds no source file, keyed
+#: ``path:scope``, with the reason. Every other test reads a named set through
+#: :mod:`tests.source_tree`.
+DATA_WALKS: dict[str, str] = {
+    **dict.fromkeys(
+        (
+            "tests/test_asvs.py:TestNothingIsRuledOutByVocabulary.test_no_corpus_model_loses_a_requirement_to_code",
+            "tests/test_compact.py:<module>",
+            "tests/test_corpus_lints.py:TestTheTwoReadersOfTheIdRule.test_both_readers_choose_one_builder_for_every_blessed_element",
+            "tests/test_early_questions.py:<module>",
+            "tests/test_early_questions.py:TestTheFrameworkGates.test_a_framework_whose_precondition_is_total_asks_no_gate_question",
+            "tests/test_evals_alignment.py:case",
+            "tests/test_evals_flow_ids.py:<module>",
+            "tests/test_evals_modes.py:TestTheHarnessSeedsFrameworkOptions.test_every_declared_framework_gets_an_entry",
+            "tests/test_evals_modes.py:TestTheHarnessSeedsFrameworkOptions.test_the_options_satisfy_every_packages_own_model",
+            "tests/test_evals_modes.py:TestTheInitiatorReadingOfAnExtraction.test_every_corpus_case_has_an_initiator_to_measure",
+            "tests/test_evals_reference.py:_copy_case",
+            "tests/test_evals_replay.py:TestAnUnsignedReferenceGradesNothing.test_a_case_without_a_facts_file_is_none",
+            "tests/test_evals_replay.py:TestAnUnsignedReferenceGradesNothing.test_an_unsigned_row_withholds_the_catalog",
+            "tests/test_evals_replay.py:TestEveryReferenceRowTakesOneFate.test_an_unsigned_alias_rewrites_nothing",
+            "tests/test_frameworks.py:_undecidable_models",
+            "tests/test_license_lints.py:test_every_corpus_case_from_an_external_source_names_its_license",
+            "tests/test_rule_coverage.py:TestEveryCrossingKeyedRuleNamesItsInference.leads",
+            "tests/test_rule_coverage.py:models",
+            "tests/test_sitting.py:TestASittingReadsEverySource.test_the_reading_document_pins_the_files_the_app_pins",
+            "tests/test_sitting_app.py:build_tree",
+            "tests/test_stride_lanes_of_verb.py:test_no_blessed_reference_is_misfiled_by_the_table",
+            "tests/test_webapp_questions.py:test_the_page_opens_the_list_with_the_questions_the_service_counts",
+        ),
+        "reads the eval corpus, which holds case data and no source file",
+    ),
+    **dict.fromkeys(
+        (
+            "tests/test_corpus_diagrams.py:test_each_diagram_is_what_the_generator_writes",
+            "tests/test_sources.py:TestTheDiagramType.test_each_corpus_diagram_passes",
+        ),
+        "reads the corpus diagrams that a generator writes, which are case data",
+    ),
+    **dict.fromkeys(
+        (
+            "tests/test_browser.py:test_the_diagram_s_flows_and_labels_stay_clear_on_every_archived_model",
+            "tests/test_early_question_tripwires.py:<module>",
+            "tests/test_evals_baseline.py:test_every_submitter_has_a_roster_line",
+            "tests/test_evals_baseline.py:test_the_repo_wide_walk_holds_every_merged_baseline",
+            "tests/test_evals_early_answerers.py:<module>",
+            "tests/test_evals_early_policies.py:<module>",
+            "tests/test_evals_schema_paths.py:<module>",
+            "tests/test_fixes.py:<module>",
+            "tests/test_open_facts.py:<module>",
+            "tests/test_published_holdout_split.py:_sealed",
+        ),
+        "reads the archived reports of a sealed Baseline, which are run data",
+    ),
+    **dict.fromkeys(
+        (
+            "tests/test_evals_flow_ids.py:TestTheArchiveKeepsItsOwnVersion",
+            "tests/test_evals_replay.py:<module>",
+            "tests/test_evals_replay.py:TestTheArchivedEmissionsReplay.test_every_artifact_carries_its_emissions_beside_it",
+            "tests/test_evals_replay.py:TestTheArchivedEmissionsReplay.test_every_extraction_emission_replays",
+        ),
+        "reads the archived emissions of past runs, which are run data",
+    ),
+    **dict.fromkeys(
+        (
+            "tests/test_capability_contrast.py:<module>",
+            "tests/test_evals_rule_applicability.py:test_no_fixture_here_is_signed_by_its_drafter",
+            "tests/test_evals_withheld.py:test_every_answers_file_applies_once_signed",
+            "tests/test_exemplar_fan_in.py:test_every_exemplar_system_has_a_fixture",
+        ),
+        "reads a fixture set of the tests, which holds data and no source file",
+    ),
+    **dict.fromkeys(
+        (
+            "tests/test_evals_history.py:test_every_map_is_two_full_ids_a_line",
+            "tests/test_ledger_text_lints.py:test_no_experiment_row_lost_an_amount_to_the_shell",
+        ),
+        "reads records that the repository keeps, such as ledger rows, and no source file",
+    ),
+    **dict.fromkeys(
+        (
+            "tests/test_browser.py:test_the_offline_sitting_page_shows_a_restored_mark_keyed_by_an_alias",
+            "tests/test_envelope.py:TestTheRoundTripWritesOneSubmission.test_it_writes_nothing_into_the_case_directory",
+            "tests/test_envelope.py:TestTheRoundTripWritesOneSubmission.test_the_file_is_named_for_its_own_bytes",
+            "tests/test_envelope.py:submitted",
+            "tests/test_envelope.py:written",
+            "tests/test_evals_baseline.py:TestAssembleAndVerify.test_a_refused_later_sweep_copies_nothing",
+            "tests/test_evals_baseline.py:TestAssembleAndVerify.test_an_edited_report_moves_a_digest",
+            "tests/test_evals_leakage.py:test_the_corpus_lint_reports_a_planted_leak",
+            "tests/test_evals_run_reports.py:test_a_case_that_died_leaves_no_report",
+            "tests/test_evals_run_reports.py:test_every_finished_case_keeps_a_report",
+            "tests/test_evals_score.py:TestItRefusesRatherThanScoringHalf.test_an_artifact_with_no_reports_directory_is_refused",
+            "tests/test_evals_submit.py:TestTheCommand.test_a_baseline_runs_end_to_end",
+            "tests/test_object_stores.py:TestTheFilesystemFollowsNoLink.files",
+            "tests/test_offline_sitting.py:TestThePageCarriesTheWholeMethod.test_every_case_rides_in_one_file",
+            "tests/test_settings_env.py:TestTheWriter.test_the_first_write_makes_a_private_directory",
+            "tests/test_settings_save.py:TestASaveThatPasses.test_the_first_save_makes_the_directory_and_the_file_private",
+            "tests/test_sitting.py:snapshot",
+            "tests/test_sitting_app.py:TestDroppingACase.snapshot",
+            "tests/test_sitting_app.py:TestTheDraftStore.test_two_tabs_saving_one_draft_lose_no_save",
+            "tests/test_sitting_app.py:TestTheRail.test_a_drifted_digest_puts_the_case_back_on_the_rail",
+            "tests/test_sitting_app.py:TestTheRailAndTheGateAgree.test_neither_end_reads_the_case_directory",
+            "tests/test_sitting_app.py:TestTheWalkStaysBlind.claims",
+            "tests/test_sitting_app.py:store_bytes",
+        ),
+        "walks a tree that the test builds under its temporary directory",
+    ),
+    "tests/test_asvs.py:test_the_package_root_carries_no_stray_markdown": "reads the package root the way the package gate reads it when it loads a package, so the test and the gate see one tree",
+    "tests/test_model_gate.py:test_every_local_only_switch_litellm_defines_is_set": "reads the source of the installed litellm package, which the repository does not hold",
+}
 
 
 def _own_roots(tree: ast.Module) -> list[int]:
@@ -371,6 +483,127 @@ def test_every_walk_reads_a_named_set():
         f"these walk roots of their own: {found}. Read a named set from"
         " tests/source_tree.py, and leave out a part of it with `without`."
     )
+
+
+#: The calls that list a directory: :class:`~pathlib.Path`'s ``glob``,
+#: ``rglob``, ``iterdir`` and ``walk``, ``os.walk``, and ``glob.glob`` and
+#: ``glob.iglob``.
+_WALKS = frozenset({"glob", "rglob", "iterdir", "walk", "iglob"})
+
+#: The modules a bare walk name comes from, for ``from os import walk``.
+_WALK_MODULES = frozenset({"os", "glob"})
+
+
+def _scope_names(tree: ast.Module) -> dict[ast.AST, str]:
+    """Each node of ``tree`` keyed to the qualified name of the innermost
+    function or class that holds it, or ``<module>``."""
+    names: dict[ast.AST, str] = {}
+
+    def visit(node: ast.AST, scope: str) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+                inner = child.name if scope == "<module>" else f"{scope}.{child.name}"
+            else:
+                inner = scope
+            names[child] = inner
+            visit(child, inner)
+
+    visit(tree, "<module>")
+    return names
+
+
+def _walks(tree: ast.Module) -> list[tuple[str, int]]:
+    """Each call in ``tree`` that lists a directory itself, as its scope and line.
+
+    ``ast.walk`` walks a syntax tree, not a directory, so it is no walk. A
+    receiver that names ``tmp_path`` walks the tree that the test builds.
+    """
+    bare = {
+        alias.asname or alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module in _WALK_MODULES
+        for alias in node.names
+        if alias.name in _WALKS
+    }
+    scopes = _scope_names(tree)
+    return sorted(
+        (scopes[node], node.lineno)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr in _WALKS
+            and not (
+                isinstance(node.func.value, ast.Name) and node.func.value.id == "ast"
+            )
+            and not any(
+                isinstance(name, ast.Name) and name.id == "tmp_path"
+                for name in ast.walk(node.func.value)
+            )
+            or isinstance(node.func, ast.Name)
+            and node.func.id in bare
+        )
+    )
+
+
+def _own_walks() -> dict[str, list[int]]:
+    """Each test scope that lists a directory itself, keyed ``path:scope``."""
+    found: dict[str, list[int]] = {}
+    for path in source_files(*TESTS):
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        if relative in _THE_WALK:
+            continue
+        for scope, line in _walks(parse(path)):
+            found.setdefault(f"{relative}:{scope}", []).append(line)
+    return found
+
+
+def test_no_test_lists_a_source_tree_itself():
+    """A test that lists a directory itself is a second reader of "which files
+    count", and it reads what a checkout accumulates beside what the
+    repository holds. A walk over a data tree, such as the eval corpus or a
+    fixture set, chooses no source file, so it is declared in
+    :data:`DATA_WALKS` with the reason.
+    """
+    found = _own_walks()
+    undeclared = sorted(
+        f"{key}:{line}"
+        for key, lines in found.items()
+        if key not in DATA_WALKS
+        for line in lines
+    )
+    stale = sorted(set(DATA_WALKS) - set(found))
+
+    assert not undeclared, (
+        f"these list a directory themselves: {undeclared}. Read a named set"
+        " from tests/source_tree.py, or declare a walk over a data tree in"
+        " DATA_WALKS with the reason."
+    )
+    assert not stale, f"{stale} walk nothing, so drop them from DATA_WALKS"
+
+
+@pytest.mark.parametrize("key", sorted(DATA_WALKS))
+def test_each_data_walk_says_why(key):
+    assert len(DATA_WALKS[key]) >= SHORTEST_REASON
+
+
+def test_the_walk_lint_sees_each_walk_of_its_own():
+    """A positive control on :func:`_walks`."""
+    tree = ast.parse(
+        "import os\n"
+        "from glob import iglob\n"
+        "def read():\n"
+        "    ROOT.rglob('*.py')\n"
+        "    os.walk(ROOT)\n"
+        "    iglob('src/*')\n"
+        "    ast.walk(tree)\n"
+        "def build(tmp_path):\n"
+        "    (tmp_path / 'a').iterdir()\n"
+        "class Page:\n"
+        "    SCRIPTS = STATIC.glob('*.js')\n"
+    )
+
+    assert _walks(tree) == [("Page", 11), ("read", 4), ("read", 5), ("read", 6)]
 
 
 def test_the_walk_lint_sees_a_root_of_its_own():

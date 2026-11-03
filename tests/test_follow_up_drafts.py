@@ -1,10 +1,9 @@
 """A report's follow-up saves its answers in batches, then runs once (#1542 F3, ADR 0070).
 
-At 2fae7d3, 201 schema-valid conditional threats with distinct unknown
-subjects made the follow-up ask 201 questions, and the answer request admitted
-at most 200 facts. A follow-up could not save a batch without running, and its
-first run used the one follow-up. These tests build that report and answer
-it through the ``/v1`` routes.
+A report can ask more questions than one answer request admits. So a
+follow-up saves its answers as a draft in batches, which runs nothing, and its
+one run reads the draft. These tests build that report and
+answer it through the ``/v1`` routes.
 """
 
 from __future__ import annotations

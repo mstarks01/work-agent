@@ -47,9 +47,9 @@ PROCESS = "process:web-app"
 
 def prior_of(rates) -> dict[str, PriorRow]:
     """A STRIDE prior with these rates, and an empty row for every other package."""
-    empty = PriorRow(record=None, runs=(), revision=None, cases=0, rates={})
+    empty = PriorRow(record=None, runs=(), cases=0, rates={})
     return {
-        name: PriorRow(record=None, runs=("test",), revision="t", cases=1, rates=rates)
+        name: PriorRow(record=None, runs=("test",), cases=1, rates=rates)
         if name == "stride"
         else empty
         for name in PACKAGES
@@ -505,10 +505,10 @@ LEVEL_2 = {"asvs": {"level": 2}}
 
 class TestTheFrameworkGates:
     """A paused job reads each framework's precondition before it asks for it
-    (#1542 F1, ADR 0067). At 2fae7d3 a model whose processes are all
-    ``non-web`` refutes ASVS, and a level 2 pause still asked 15 questions; a
-    model whose interfaces and protocols are unknown is undecidable, and no
-    question asked its ``interface_kind``."""
+    (#1542 F1, ADR 0067). A model whose processes are all ``non-web``
+    refutes ASVS, so a pause asks no ASVS question. A model whose interfaces
+    and protocols are unknown leaves ASVS undecidable, so a pause asks only
+    what decides it, an ``interface_kind`` among them."""
 
     def test_a_refuted_framework_asks_nothing(self):
         asked = _paused(_with_interfaces("non-web"), LEVEL_2)

@@ -40,7 +40,10 @@ from __future__ import annotations
 
 import ast
 import importlib
+import importlib.util
 import re
+from pathlib import Path
+from types import ModuleType
 from typing import get_args
 
 import pytest
@@ -118,13 +121,13 @@ PARTIAL: dict[tuple[str, str], str] = {
 }
 
 
-def _annotated_vocabularies() -> list[tuple[str, str, str]]:
+def _annotated_vocabularies() -> list[tuple[Path, str, str]]:
     """Every ``NAME: container[TheType, ...]`` at a module's top level.
 
     Read off the annotation rather than named, so the pair a module grows
     tomorrow is covered with no edit here.
     """
-    found: list[tuple[str, str, str]] = []
+    found: list[tuple[Path, str, str]] = []
     for path in source_files(*PYTHON):
         try:
             tree = parse(path)
@@ -144,8 +147,20 @@ def _annotated_vocabularies() -> list[tuple[str, str, str]]:
             first = inside.elts[0] if isinstance(inside, ast.Tuple) else inside
             name = getattr(first, "id", "")
             if name and name[0].isupper():
-                found.append((module_name(path), node.target.id, name))
+                found.append((path, node.target.id, name))
     return found
+
+
+def _module(path: Path) -> ModuleType:
+    """The module at ``path``. A CI script sits in no package, so it is loaded
+    from its file."""
+    if not module_name(path).startswith("."):
+        return importlib.import_module(module_name(path))
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _pairs() -> list[tuple[str, str, str, frozenset[str], frozenset[str]]]:
@@ -156,8 +171,9 @@ def _pairs() -> list[tuple[str, str, str, frozenset[str], frozenset[str]]]:
     ``Literal`` of strings is not one of these and is dropped here.
     """
     resolved = []
-    for dotted, constant, type_name in _annotated_vocabularies():
-        module = importlib.import_module(dotted)
+    for path, constant, type_name in _annotated_vocabularies():
+        dotted = module_name(path)
+        module = _module(path)
         if not hasattr(module, constant) or not hasattr(module, type_name):
             continue
         members = get_args(getattr(module, type_name))

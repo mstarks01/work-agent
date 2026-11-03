@@ -105,7 +105,7 @@ def client(runs, tmp_path):
         ledger_path=tmp_path / "votes",
         configs={"01-payments-checkout": "engine-1.2.3"},
     )
-    # A loopback base URL, because the app now refuses any other Host: the
+    # A loopback base URL, because the app refuses any other Host: the
     # default ``testserver`` is exactly the shape a DNS-rebound request wears.
     # The same-origin header rides on the client for the same reason — a real
     # browser sets it on every request the page makes, and the tests that care

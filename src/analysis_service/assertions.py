@@ -58,7 +58,6 @@ that cannot be made answers with an issue rather than with a pass.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
@@ -1259,7 +1258,7 @@ def _value_key(predicate: Predicate, value: str) -> str:
 
 def _digest(text: str) -> str:
     """Twelve hex characters of sha256 — enough to key rows within one artifact."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+    return text_digest(text)[:12]
 
 
 @dataclass(frozen=True)
@@ -1413,35 +1412,6 @@ def _identity(entry: Assertion) -> str:
     return assertion_id(entry) if entry.predicate in REGISTRY else ""
 
 
-def merged(
-    held: AssertionCatalog, found: AssertionCatalog
-) -> tuple[AssertionCatalog, list[CatalogIssue]]:
-    """Two catalogs as one, by the rule :func:`_resolve` merges by.
-
-    Rows that share an identity become one row carrying both spans, through
-    :func:`_merge`, which :func:`_resolve` also calls, so two catalogs
-    stating one fact keep both provenances rather than becoming a duplicate the
-    gate refuses.
-
-    The subject table is rebuilt from the rows that survive, never unioned
-    blindly: a subject nothing names is a row the caller does not hold, and a
-    table carrying it would say the catalog is about something it is silent on.
-    ``held``'s spelling of a subject stands where both name one, because the
-    caller's existing labels are the ones a report already printed.
-
-    The issues are the ``support-truncated`` cuts :func:`_bounded` made, for
-    the caller to record: a merge that crosses the span bound keeps the fact.
-    """
-    kept: dict[str, Assertion] = {}
-    for entry in (*held.entries, *found.entries):
-        identity = assertion_id(entry)
-        standing = kept.get(identity)
-        kept[identity] = entry if standing is None else _merge(standing, entry)
-    entries, cut = _bounded(kept.values())
-    labels = {subject.id: subject for subject in (*found.subjects, *held.subjects)}
-    return _catalog(entries, labels), cut
-
-
 def without(catalog: AssertionCatalog, identities: Collection[str]) -> AssertionCatalog:
     """The catalog with those rows retracted, and no subject left behind.
 
@@ -1460,11 +1430,21 @@ def without(catalog: AssertionCatalog, identities: Collection[str]) -> Assertion
 def _catalog(
     entries: list[Assertion], labels: Mapping[str, Subject]
 ) -> AssertionCatalog:
-    """One catalog over ``entries``, carrying the subjects they name.
+    """One catalog over ``entries``, carrying the subjects they name, by
+    :func:`subjects_of`."""
+    return AssertionCatalog(subjects=subjects_of(entries, labels), entries=entries)
 
-    **The one reader of which subjects a set of rows declares.** The table is
-    derived, for the reason :class:`CatalogProposal` gives: two places to spell
-    one subject eventually spell it two ways.
+
+def subjects_of(
+    entries: Sequence[Assertion], labels: Mapping[str, Subject]
+) -> list[Subject]:
+    """The subjects that ``entries`` name, from ``labels``.
+
+    **The one reader of a catalog's subjects table.** Every writer of a
+    catalog derives the table here, the answer writers in ``links`` and
+    ``fact_writes`` included. The table is derived, for the reason
+    :class:`CatalogProposal` gives: two places to spell one subject eventually
+    spell it two ways.
 
     A row names **two** subjects where its predicate's value is a reference —
     what the row is about, and what it points at. A credential nothing is
@@ -1481,8 +1461,7 @@ def _catalog(
         if predicate is not None and predicate.value == "reference":
             named.add(entry.value)
     named -= UNIVERSAL_TERMS
-    subjects = [labels[subject] for subject in sorted(named) if subject in labels]
-    return AssertionCatalog(subjects=subjects, entries=entries)
+    return [labels[subject] for subject in sorted(named) if subject in labels]
 
 
 def ambiguous_quote(quote: str, haystack: str) -> bool:
@@ -2293,9 +2272,8 @@ def _bounded(
     Rows of one identity each passed the bound alone and may cross it
     together. The merged row keeps the first spans and the cut is recorded,
     rather than refusing a fact for being stated too often or keeping eight
-    spans with nothing to say a ninth was cited. :func:`_resolve` and
-    :func:`merged` both call it. The proposal the emission archive keeps still
-    carries every quote.
+    spans with nothing to say a ninth was cited. :func:`_resolve` calls it.
+    The proposal the emission archive keeps still carries every quote.
     """
     kept = []
     issues = []

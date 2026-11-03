@@ -194,7 +194,7 @@ def test_promote_reprints_values_in_place_and_writes_the_manifest(tmp_path):
 
 
 def test_promoting_a_param_the_file_leaves_unset_raises(tmp_path):
-    """The workflow a temperature sweep now lands on.
+    """The workflow a temperature sweep lands on.
 
     ``temperature`` is unset in the shipped file, so a sweep that measured one
     is asking to *pin* a param rather than to re-pin it. That needs a rationale

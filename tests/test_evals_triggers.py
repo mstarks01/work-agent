@@ -50,11 +50,10 @@ CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 #: *corpus* grew, which says nothing about rule quality, and this one moved
 #: because the *rules* did.
 #:
-#: **The size of the raise is STRIDE's convention, not a new one.** STRIDE's
-#: floors sit at 0.84 and 0.81 of what it measures; ASVS's sat at 0.56 and 0.55,
-#: because they were set against 0.34 / 0.32 and never moved. 0.40 / 0.34 puts
-#: ASVS at 0.83 and 0.81 — the same distance below its own reading, so both
-#: packages now tolerate the same proportional slide before failing.
+#: **ASVS's floors follow STRIDE's convention.** STRIDE's floors sit at 0.84
+#: and 0.81 of what it measures, and 0.40 / 0.34 puts ASVS at 0.83 and 0.81 —
+#: the same distance below its own reading, so both packages tolerate the same
+#: proportional slide before failing.
 #:
 #: The margin is for corpus growth, not for noise. This measurement is
 #: deterministic: it runs the rules over blessed models with no provider call,

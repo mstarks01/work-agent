@@ -60,7 +60,7 @@ def prepared_for(store: Store, case: str = CASE):
 
 
 def every_mark(store: Store, case: str = CASE) -> dict[str, str]:
-    """A mark on every recorded finding, which a record now needs."""
+    """A mark on every recorded finding, which a record needs."""
     prepared = prepared_for(store, case)
     return {target.fingerprint: "agree" for target in prepared.mark_targets}
 

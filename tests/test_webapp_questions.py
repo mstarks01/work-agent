@@ -235,8 +235,8 @@ class TestTheSaves:
             assert not before & {tuple(q["key"]) for q in shown["early_questions"]}
         else:
             pytest.fail("the saves never ended")
-        # The stop says why truthfully: the limits held questions back, or a
-        # floor left questions out, exactly where it says so.
+        # The empty-list reason says why truthfully: the limits held questions
+        # back, or a floor left questions out, exactly where it says so.
         assert shown["early_stop"] == (
             "budget-exhausted"
             if shown["early_held_back"]
@@ -635,7 +635,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         _FORM_HARNESS.replace("SEARCH", json.dumps(search))
         .replace("LIMITS", json.dumps(json.dumps(dict(ANSWER_LIMITS))))
         .replace("FORMATS", json.dumps(json.dumps(_FORMAT_TABLE)))
-        .replace("REFUSALS", json.dumps(json.dumps(file_refusals(64))))
+        .replace("REFUSALS", json.dumps(json.dumps(file_refusals(64, 3))))
         .replace("PAGE_LABELS", json.dumps(json.dumps(PAGE_SOURCE_LABELS)))
         + script
         + "\n(async () => {\n"
@@ -2277,6 +2277,28 @@ calls.push({ line: line(), ticks: ticks(), rows: rowsOf().map(r => own(r).value)
     ]
 
 
+def test_cover_every_part_waits_for_a_shared_answer():
+    """With an empty shared answer, "Cover every part" is disabled, so it
+    ticks no element and copies no empty value. A value enables it, and an
+    empty value disables it again (ADR 0113)."""
+    first, second = valid_model().data_flows[:2]
+    facts = [_control_row(first), _control_row(second)]
+    steps = (
+        _SHARED_STEPS.replace("FACTS", json.dumps(facts))
+        + """
+const all = shared[0].children.find(c => c.tag === "button" && c.textContent === "Cover every part");
+const state = child(shared[0].children[0], "select");
+calls.push({ disabled: all.disabled === true });
+state.value = "none"; state.listeners.change();
+calls.push({ disabled: all.disabled === true });
+state.value = ""; state.listeners.change();
+calls.push({ disabled: all.disabled === true });
+"""
+    )
+    seen = [c["disabled"] for c in _run_form_script(steps)["calls"] if "disabled" in c]
+    assert seen == [True, False, True]
+
+
 def test_undo_puts_back_the_shared_answer_and_each_part_it_wrote():
     """Undo restores the answer before the last change, and each element it
     wrote (ADR 0114)."""
@@ -3364,7 +3386,7 @@ def test_the_page_opens_the_list_with_the_questions_the_service_counts(case):
     )
     capabilities = [list(q.key) for q in asked.early if q.kind == "capability"]
     if asked.gates["asvs"] != "satisfied":
-        # A framework that will not run as the model reads now asks no
+        # A framework that will not run as the model reads asks no
         # capability (ADR 0067), so the list holds none.
         assert not capabilities
         return
@@ -3845,8 +3867,9 @@ calls.push({{ said: text(ids.questions) }});
 
 
 def test_a_finished_pause_lists_what_stays_open_and_takes_a_held_back_answer():
-    """No stop says every fact is settled (#1542 F2, ADR 0068): the page lists
-    what stays open, and a question no list asks can still be answered."""
+    """No empty-list reason says every fact is settled (#1542 F2, ADR 0068):
+    the page lists what stays open, and a question no list asks can still be
+    answered."""
     low = _text_row(["", "", "", "who signs?", "", ""], "who signs?")
     summary = {
         "introduced": 14,

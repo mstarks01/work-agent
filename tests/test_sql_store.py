@@ -54,6 +54,7 @@ from analysis_service.sources import Source
 from analysis_service.sql_store import (
     METADATA,
     CorruptObject,
+    RevisionNotHeld,
     SqlJobStore,
     database_url,
     engine_for,
@@ -102,7 +103,7 @@ def app_over(store: JobStore, runner=None):
         job_deadline_seconds=TEST_DEADLINE_SECONDS,
         max_active_jobs=TEST_MAX_ACTIVE_JOBS,
         budget=SEEDING_BUDGET,
-        frameworks=DEFAULT_FRAMEWORKS,
+        carried_frameworks=DEFAULT_FRAMEWORKS,
         carries_catalog=True,
     )
 
@@ -255,10 +256,10 @@ class TestTheStartupRefusals:
                 "UPDATE alembic_version SET version_num = 'r9999'"
             )
         engine.dispose()
-        with pytest.raises(
-            StoreConfigError, match="holds no revision r9999.*delete its file"
-        ) as refused:
+        with pytest.raises(RevisionNotHeld, match="r9999, which this build") as refused:
             start(env)
+        assert "delete its file" in str(refused.value)
+        assert "python -m analysis_service.migrations" in str(refused.value)
         assert database not in str(refused.value)
 
     @pytest.mark.parametrize(
@@ -1093,7 +1094,9 @@ class TestAStoreFailureAsARunStartsOrEnds:
         assert "running" not in statuses(stored)
 
     def test_a_report_put_that_fails(self, env):
-        store = SqlJobStore(engine_for(env), ReportPutFails(env))
+        store = SqlJobStore(
+            engine_for(env), ReportPutFails(env), migrator="the migration step"
+        )
         runner = CountingRunner()
         stored = executed(store, runner)
         assert runner.runs == 1
@@ -1126,7 +1129,11 @@ class TestAStoreFailureAsARunStartsOrEnds:
         # The bound covers every store call, so it leaves room for an SQLite
         # commit on a loaded runner; only the hanging put reaches it.
         monkeypatch.setattr(jobs_module, "STORE_TIMEOUT_SECONDS", 1.0)
-        store = SqlJobStore(engine_for(env), ReportPutFails(env, hang=True))
+        store = SqlJobStore(
+            engine_for(env),
+            ReportPutFails(env, hang=True),
+            migrator="the migration step",
+        )
         stored = executed(store, CountingRunner())
         assert stored.status == "failed"
         assert stored.measured_tokens == METERED

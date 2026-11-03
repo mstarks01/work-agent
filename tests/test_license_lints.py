@@ -35,7 +35,7 @@ import json
 import re
 import subprocess
 import tomllib
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
@@ -43,6 +43,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.frameworks import CONTENT_LICENSE
+from tests.source_tree import WHOLE_TREE, held_files, matching
 
 pytestmark = pytest.mark.lint
 
@@ -61,19 +62,6 @@ def _pyproject() -> dict:
 #: What this repo licenses its own work under, read from the one place that
 #: decides it rather than repeated here.
 REPO_LICENSE = _pyproject()["project"]["license"]
-
-#: Directories with nothing this repo authored or ships.
-SKIPPED_DIRS = frozenset(
-    {
-        ".git",
-        ".venv",
-        "__pycache__",
-        ".mypy_cache",
-        ".pytest_cache",
-        ".ruff_cache",
-        "node_modules",
-    }
-)
 
 #: How many consecutive words identify where a passage came from.
 #:
@@ -128,14 +116,12 @@ class ThirdPartyWork:
 
     def paths(self) -> frozenset[Path]:
         """Every file this work governs, with directories and globs expanded."""
-        found: set[Path] = set()
-        for pattern in self.governed:
-            for match in sorted(REPO_ROOT.glob(pattern)):
-                if match.is_dir():
-                    found.update(p for p in match.rglob("*") if p.is_file())
-                elif match.is_file():
-                    found.add(match)
-        return frozenset(found)
+        matches = [match for pattern in self.governed for match in matching(pattern)]
+        return frozenset(
+            path
+            for path in held_files(*WHOLE_TREE)
+            if any(path == match or path.is_relative_to(match) for match in matches)
+        )
 
 
 ASVS_CATALOG = "src/analysis_service/frameworks/asvs/catalog.json"
@@ -217,19 +203,19 @@ def fingerprints(text: str) -> set[tuple[str, ...]]:
     }
 
 
-def _ignored(root: Path) -> frozenset[Path]:
-    """The paths under ``root`` that git ignores, which this repo never ships.
+def _ignored() -> frozenset[Path]:
+    """The paths that git ignores, which this repo never ships.
 
     A run's failure dump under ``evals/runs/`` holds the lane prompts, so it
     quotes the standard; it can never be committed. An untracked file git does
-    not ignore stays in scope, because it can be. Outside a repository, as in
-    a test's temporary directory, nothing is ignored.
+    not ignore stays in scope, because it can be. Outside a repository nothing
+    is ignored.
     """
     listed = subprocess.run(
         [
             "git",
             "-C",
-            str(root),
+            str(REPO_ROOT),
             "ls-files",
             "--others",
             "--ignored",
@@ -243,29 +229,34 @@ def _ignored(root: Path) -> frozenset[Path]:
     if listed.returncode:
         return frozenset()
     return frozenset(
-        (root / entry.decode()).resolve()
+        (REPO_ROOT / entry.decode()).resolve()
         for entry in listed.stdout.split(b"\0")
         if entry
     )
 
 
+def _shippable() -> list[Path]:
+    """Every file the repository holds that git does not ignore."""
+    ignored = _ignored()
+    return [
+        path
+        for path in held_files(*WHOLE_TREE)
+        if not ignored.intersection((path, *path.parents))
+    ]
+
+
 def leaks(
-    root: Path, governed: frozenset[Path], protected: set[tuple[str, ...]]
+    paths: Iterable[Path],
+    governed: frozenset[Path],
+    protected: set[tuple[str, ...]],
 ) -> dict[Path, str]:
-    """Ungoverned files under ``root`` holding a protected passage.
+    """The files of ``paths`` outside ``governed`` that hold a protected passage.
 
     Returns one offending passage per file, because the fix is the same whether
     a file took one sentence or forty.
     """
     found: dict[Path, str] = {}
-    ignored = _ignored(root)
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or SKIPPED_DIRS.intersection(
-            path.relative_to(root).parts
-        ):
-            continue
-        if ignored.intersection((path, *path.parents)):
-            continue
+    for path in sorted(paths):
         if path in governed:
             continue
         shared = fingerprints(path.read_text(errors="ignore")) & protected
@@ -305,7 +296,7 @@ def test_every_governed_path_exists(name):
     who tries to check it.
     """
     work = THIRD_PARTY[name]
-    empty = [pattern for pattern in work.governed if not list(REPO_ROOT.glob(pattern))]
+    empty = [pattern for pattern in work.governed if not matching(pattern)]
 
     assert not empty, (
         f"{name} declares {empty}, which matches no file. Either the text moved"
@@ -322,7 +313,7 @@ def test_no_upstream_sentence_appears_in_an_ungoverned_file(governed, upstream_w
     It reads like ordinary prose, so review does not catch it and neither does
     any other test in this suite.
     """
-    offenders = leaks(REPO_ROOT, governed, upstream_words)
+    offenders = leaks(_shippable(), governed, upstream_words)
 
     formatted = "\n".join(
         f"  {path.relative_to(REPO_ROOT)}: {passage}"
@@ -354,25 +345,9 @@ def test_the_scan_catches_a_sentence_pasted_in_another_format(tmp_path):
     )
     (tmp_path / "clean.md").write_text("A file that borrows nothing at all.")
 
-    found = leaks(tmp_path, frozenset(), fingerprints(borrowed))
+    found = leaks(tmp_path.iterdir(), frozenset(), fingerprints(borrowed))
 
     assert list(found) == [tmp_path / "copied.md"]
-
-
-def test_a_checkout_under_a_skipped_name_is_still_scanned(tmp_path):
-    """A skip name is matched inside the scanned tree, never in the folders
-    above it, so a checkout under ``.venv`` is not a checkout of nothing."""
-    borrowed = (
-        "Verify that the application encodes every value it writes into a"
-        " response for the context that value is written into."
-    )
-    root = tmp_path / ".venv" / "checkout"
-    root.mkdir(parents=True)
-    (root / "copied.md").write_text(borrowed)
-
-    assert list(leaks(root, frozenset(), fingerprints(borrowed))) == [
-        root / "copied.md"
-    ]
 
 
 def test_a_governed_file_is_not_reported_against_itself(tmp_path):
@@ -384,7 +359,7 @@ def test_a_governed_file_is_not_reported_against_itself(tmp_path):
     source = tmp_path / "catalog.json"
     source.write_text(f'{{"text": "{borrowed}"}}')
 
-    assert not leaks(tmp_path, frozenset({source}), fingerprints(borrowed))
+    assert not leaks(tmp_path.iterdir(), frozenset({source}), fingerprints(borrowed))
 
 
 @pytest.mark.parametrize("name", sorted(THIRD_PARTY), ids=lambda name: name.split()[1])
@@ -405,7 +380,7 @@ def test_notice_names_every_governed_path(name):
     unnamed = sorted(
         relative
         for pattern in THIRD_PARTY[name].governed
-        for match in REPO_ROOT.glob(pattern)
+        for match in matching(pattern)
         if (relative := str(match.relative_to(REPO_ROOT))) not in notice
     )
 

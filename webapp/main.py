@@ -117,7 +117,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Any, Literal, get_args
+from typing import Annotated, Any, Literal, TypedDict, get_args
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -174,7 +174,7 @@ from analysis_service.config_files import (
 )
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
-from analysis_service.diagrams import install_reader, reader_missing
+from analysis_service.diagrams import install_reader, reader_fault
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import (
@@ -829,14 +829,14 @@ class Startup:
     every route that would run a model is replaced by the diagnostic page, so
     no analysis can run on a model nobody chose — fail-closed, but explained.
 
-    ``frameworks`` is what this install carries, which is what the picker
+    ``carried_frameworks`` is what this install carries, which is what the picker
     offers and what the one submission allow-lists against. It is not itself a
     selection and it is never used as one: a submission names its own, and the
     form ships with every box unticked.
     """
 
     settings: Settings | None
-    frameworks: tuple[FrameworkName, ...]
+    carried_frameworks: tuple[FrameworkName, ...]
     tiers: ModelTierConfig | None
     error: ConfigError | None
 
@@ -853,7 +853,7 @@ class Startup:
                 limits=settings.limits,
                 ceiling=1,
                 budget=settings.budget,
-                frameworks=self.frameworks,
+                carried_frameworks=self.carried_frameworks,
                 carries_catalog=settings.carries_catalog,
                 gate=settings.gate,
             ),
@@ -889,11 +889,11 @@ def build_startup(env: Mapping[str, str]) -> Startup:
     deployment = None
     try:
         deployment = Deployment.from_env(env)
-        deployment.runner(deployment.frameworks)
+        deployment.runner(deployment.carried_frameworks)
     except ConfigError as exc:
         logger.error("the Deployment did not build: %s", exc)
         tiers = deployment.tiers if deployment is not None else None
-        return Startup(settings=None, frameworks=(), tiers=tiers, error=exc)
+        return Startup(settings=None, carried_frameworks=(), tiers=tiers, error=exc)
     return Startup(
         settings=Settings(
             runner_for=deployment.runner,
@@ -904,7 +904,7 @@ def build_startup(env: Mapping[str, str]) -> Startup:
             carries_catalog=deployment.carries_catalog,
             gate=deployment.gate,
         ),
-        frameworks=deployment.frameworks,
+        carried_frameworks=deployment.carried_frameworks,
         tiers=deployment.tiers,
         error=None,
     )
@@ -1149,7 +1149,7 @@ def _corrections_payload(
     ADR 0114).
 
     Each answer carries its current value with every correction in. A
-    corrected answer is its part's own, whatever share covered the part.
+    corrected answer is its element's own, whatever share covered the element.
     """
     corrected = {fact.key for fact in corrections}
     answers = merged_facts(answered, corrections)
@@ -1253,13 +1253,26 @@ _ADMISSION_MESSAGES: dict[str, str] = {
 }
 
 
-def file_refusals(max_bytes: int) -> dict[str, str]:
-    """The refusals that ``text_file.js`` shows for a file it checks before
-    the server does, in the server's words (:func:`upload_refusal`)."""
+#: The key of each refusal that ``text_file.js`` and ``files.js`` show for a
+#: file they check before the server does.
+FileRefusal = Literal["too_large", "not_plain_text", "no_text", "full"]
+
+
+class FilesLimits(TypedDict):
+    """The limits that ``files.js`` reads."""
+
+    max_owner_files: int
+    max_bytes: int
+    name_chars: int
+
+
+def file_refusals(max_bytes: int, max_files: int) -> dict[FileRefusal, str]:
+    """Each :data:`FileRefusal` in the server's words (:func:`upload_refusal`)."""
     return {
         "too_large": too_large(max_bytes),
         "not_plain_text": NOT_PLAIN_TEXT,
         "no_text": NO_TEXT,
+        "full": over_limit(max_files),
     }
 
 
@@ -1358,6 +1371,12 @@ async def _json_body(request: Request, limit: int) -> object:
         return None
 
 
+async def _job_body(request: Request, answers: JobAnswers) -> object:
+    """A job route's body, read by :func:`_json_body` under the deployment's
+    raw-body guard, :func:`~analysis_service.api.max_body_bytes`."""
+    return await _json_body(request, max_body_bytes(answers.limits))
+
+
 _RELOAD_MESSAGE = (
     "settings.env changed after this page loaded. Reload the page, then make"
     " the change again."
@@ -1408,7 +1427,7 @@ def create_app(
     except SettingsFileError as exc:
         logger.error("settings.env was refused at startup: %s", exc)
         env = process_env
-        startup = Startup(settings=None, frameworks=(), tiers=None, error=exc)
+        startup = Startup(settings=None, carried_frameworks=(), tiers=None, error=exc)
     if workspace is None:
         store = build_app_store(env)
         logger.info("job store: %s", type(store).__name__)
@@ -1465,13 +1484,16 @@ def create_app(
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
-                frameworks=_framework_fields(current.answers.frameworks),
+                frameworks=_framework_fields(current.answers.carried_frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
                 source_limit=str(current.answers.limits.max_total_bytes),
                 source_formats=_SOURCE_FORMATS,
                 file_refusals=script_json(
-                    file_refusals(current.answers.limits.max_total_bytes)
+                    file_refusals(
+                        current.answers.limits.max_total_bytes,
+                        current.max_owner_files,
+                    )
                 ),
                 upload_accept=_UPLOAD_ACCEPT,
                 page_labels=script_json(PAGE_SOURCE_LABELS),
@@ -1573,7 +1595,7 @@ def create_app(
         current = cell.read(
             lambda: response(diagnostic_page(state, env), status_code=503)
         )
-        limits = {
+        limits: FilesLimits = {
             "max_owner_files": current.max_owner_files,
             "max_bytes": current.answers.limits.max_total_bytes,
             "name_chars": MAX_LABEL_CHARS,
@@ -1590,8 +1612,7 @@ def create_app(
                 sidebar=_SIDEBAR,
                 source_formats=_SOURCE_FORMATS,
                 file_refusals=script_json(
-                    file_refusals(limits["max_bytes"])
-                    | {"full": over_limit(current.max_owner_files)}
+                    file_refusals(limits["max_bytes"], limits["max_owner_files"])
                 ),
                 upload_accept=_UPLOAD_ACCEPT,
                 files_limits=script_json(limits),
@@ -1612,7 +1633,7 @@ def create_app(
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
         current = cell.read(unavailable)
-        raw = await _json_body(request, max_body_bytes(current.answers.limits))
+        raw = await _job_body(request, current.answers)
         try:
             body = _body_of(raw, _FileUpload)
             upload = _FileUpload.model_validate(body)
@@ -1788,7 +1809,7 @@ def create_app(
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
         answers = cell.read(unavailable).answers
-        body = await _json_body(request, max_body_bytes(answers.limits))
+        body = await _job_body(request, answers)
         sent = body.get("title") if isinstance(body, dict) else None
         if not isinstance(sent, str):
             return _message(400, _NAME_REFUSED)
@@ -1811,7 +1832,7 @@ def create_app(
             return forbidden
         current = cell.read(unavailable)
         answers = current.answers
-        raw = await _json_body(request, max_body_bytes(answers.limits))
+        raw = await _job_body(request, answers)
         try:
             body = _body_of(raw, _Submission)
         except _UnknownKey as exc:
@@ -1870,9 +1891,7 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            submitted = read_answers(
-                await _json_body(request, max_body_bytes(answers.limits))
-            )
+            submitted = read_answers(await _job_body(request, answers))
         except BodyRefused as refused:
             message = await _refusal_words(refused, workspace, answers, run_id)
             if refused.over_a_bound:
@@ -1913,9 +1932,7 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            amendment = read_amendment(
-                await _json_body(request, max_body_bytes(answers.limits))
-            )
+            amendment = read_amendment(await _job_body(request, answers))
         except BodyRefused as refused:
             return _message(400, str(refused))
         owner_id = await workspace.owner_id(answers, run_id)
@@ -1990,9 +2007,7 @@ def create_app(
         current = cell.read(unavailable)
         answers = current.answers
         try:
-            corrections = read_corrections(
-                await _json_body(request, max_body_bytes(answers.limits))
-            )
+            corrections = read_corrections(await _job_body(request, answers))
         except BodyRefused as refused:
             return _message(
                 400, await _refusal_words(refused, workspace, answers, run_id)
@@ -2251,6 +2266,22 @@ def _sdk_item(vendor: VendorName) -> str:
     )
 
 
+def prepare_diagram_reader() -> None:
+    """Install the diagram reader's packages where the reader cannot read a
+    valid flowchart, then read one again (ADR 0122).
+
+    Where the second reading also fails, it logs a warning that names the
+    fault, and it returns, so the app still starts: a job with no diagram
+    does not need the reader.
+    """
+    if reader_fault() is None:
+        return
+    logger.info("installing the diagram reader's packages")
+    install_reader()
+    if fault := reader_fault():
+        logger.warning("the diagram reader cannot read a diagram Source: %s", fault)
+
+
 def _env_var_item(var: str, is_set: bool) -> str:
     """One variable's row — presence only, never the value (OWASP A09)."""
     css_class, label = ("set", "set") if is_set else ("not", "NOT SET")
@@ -2318,11 +2349,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     print(f"First-run app on http://{HOST}:{PORT}")
-    if reader_missing():
-        logger.info("installing the diagram reader's packages")
-        install_reader()
-        if missing := reader_missing():
-            logger.warning("an analysis of a diagram Source will fail: %s", missing)
+    prepare_diagram_reader()
     # Loopback is hard-bound: no flag, no env override. The no-auth posture is
     # only safe here.
     uvicorn.run(create_app(), host=HOST, port=PORT, log_level="warning")

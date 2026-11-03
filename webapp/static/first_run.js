@@ -1088,7 +1088,7 @@
   });
   // Whether a dropped answer waits for the submitter to choose an element, by its
   // reason (CarriedReason).
-  const waitsForPart = {
+  const waitsForElement = {
     "missing-element": true,
     "not-taken": false,
   };
@@ -1099,7 +1099,7 @@
     // The change review: what this run kept from the earlier analysis, what
     // it did not keep, and what waits for the submitter to choose an element.
     const kept = (data.carried_kept || []).length + (data.carried_kept_links || []).length;
-    const waiting = dropped.filter((a) => waitsForPart[a.reason]).length;
+    const waiting = dropped.filter((a) => waitsForElement[a.reason]).length;
     const notKept = dropped.length - waiting + (data.carried_dropped_links || []).length;
     if (kept + waiting + notKept) {
       const parts = [`${counted(kept, "answer is", "answers are")} kept and marked under Your answers`];
@@ -1154,7 +1154,7 @@
       carried.append(box);
     }
     const others = [
-      ...dropped.filter((a) => !waitsForPart[a.reason]).map((a) => `${a.label} — ${answerText(a)}`),
+      ...dropped.filter((a) => !waitsForElement[a.reason]).map((a) => `${a.label} — ${answerText(a)}`),
       ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${linkAnswerText(a)}`),
     ];
     if (others.length) {
@@ -1191,15 +1191,15 @@
     title.textContent = `What your description says (${counted(detected.length, "part", "parts")})`;
     review.append(title, hint("These facts were read from your description. Where one is wrong, or"
       + " a part is missing, say so in the box after the questions."));
-    for (const part of detected) {
+    for (const element of detected) {
       const line = document.createElement("p");
       const name = document.createElement("b");
-      name.textContent = part.name;
-      const facts = part.facts.map((fact) => `${fact.attribute.replaceAll("_", " ")}: ${fact.value}`
+      name.textContent = element.name;
+      const facts = element.facts.map((fact) => `${fact.attribute.replaceAll("_", " ")}: ${fact.value}`
         + (fact.inferred ? ` (inferred: ${fact.inferred})` : ""));
-      line.append(name, ` (${TYPES[part.type]})`, facts.length ? ` — ${facts.join("; ")}` : "");
+      line.append(name, ` (${TYPES[element.type]})`, facts.length ? ` — ${facts.join("; ")}` : "");
       review.append(line);
-      if (part.excerpt) review.append(hint(`From ${part.source_label}: “${part.excerpt}”`));
+      if (element.excerpt) review.append(hint(`From ${element.source_label}: “${element.excerpt}”`));
     }
     detectedBox.append(review);
   };

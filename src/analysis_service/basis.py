@@ -275,12 +275,13 @@ Measurability = Literal["measurable", "uncited", "tokenless"]
 
 
 class StatedControl(NamedTuple):
-    """One stated in-scope control, with the tokens to look for and where.
+    """One stated in-scope control, with the tokens to look for and where, as
+    :func:`control_measurability` yields it.
 
-    **The one reader of "which values does this diagnostic measure".** Both
-    rungs of the published measurement and the shipped
-    :func:`unbased_controls` walk the model through :func:`control_measurability`, so
-    a denominator and a rate can never be computed over two different sets.
+    That walk is the one reader of "which values does this diagnostic
+    measure". Both rungs of the published measurement and the shipped
+    :func:`unbased_controls` walk the model through it, so a denominator and a
+    rate can never be computed over two different sets.
     """
 
     element_id: str
@@ -459,7 +460,7 @@ def coverage(model: SystemModel, sources: Mapping[str, str]) -> Coverage:
 
 
 class _Scan:
-    """One call's token searches: cached, and spent against a budget.
+    """One call's token searches: cached, and counted against a budget.
 
     Two things make the naive walk cost what it does. It lower-cases the source
     once per element, and it searches the same token against the same source

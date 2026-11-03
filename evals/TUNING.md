@@ -307,7 +307,7 @@ lands from now on sharpens it and costs nothing extra.
 
 Extraction is graded on element IDs, which are derived from names, so a model
 that identifies a component correctly and names it its own way scores as though
-it found nothing. Those are two different questions and the score now asks both:
+it found nothing. Those are two different questions and the score asks both:
 
 - **Naming-policy conformity** — `endpoint_recall`. Did the extraction keep the
   source's wording, which is what `extract.md` rule 3 asks for?
@@ -499,6 +499,10 @@ reference row on an assertion case takes a fate the same way.
 ```bash
 python -m evals.harness.run replay evals/emissions/*.json --out /tmp/replay.json
 ```
+
+The replay pools only the sweeps that record one input in `rendered_sources`.
+Name the arm of an older sweep with `--arm LABEL=GLOB` to pool it with others
+that read the same input.
 
 An `omitted` count is the ceiling of a prompt change that asks the model to
 read more. An `unresolved` count is not: it waits on a ruling, and a run

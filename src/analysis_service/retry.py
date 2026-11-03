@@ -183,7 +183,7 @@ class RefusedCompletionError(UnfinishedCompletionError):
 
 
 class RetryBudgetExhausted(RuntimeError):
-    """A retry was refused because the process had spent its retry budget.
+    """A retry was refused because the process had used up its retry budget.
 
     Raised in place of the transient error that would have been retried, so the
     job fails naming the budget rather than the 429 — a run that dies here died
@@ -250,7 +250,7 @@ _LOWEST_SERVER_STATUS_CODE = 500
 #: Whether a stated rate-limit dimension clears on the timescale a retry waits.
 #: **Not every 429 is a moment.** A request-per-minute ceiling is one, and a
 #: spend cap is not: asking again in eight seconds reaches the same refusal,
-#: having spent an attempt, a budget token and the wall-clock of a paid job.
+#: having used an attempt, a budget token and the wall-clock time of a paid job.
 #:
 #: The pinned translator states the dimension on the exception. Measured on
 #: litellm 1.104.0: every ``RateLimitError`` carries ``category`` (defaulting to
@@ -425,7 +425,7 @@ def _asks_a_longer_wait_than_we_take(failure: ProviderFailure) -> bool:
     Read as evidence rather than as a delay. A provider that says "come back in
     an hour" has answered the question a retry exists to ask — will asking again
     shortly work — and the answer is no. Sleeping the hour would park a paid job
-    on a third party's number; sleeping less and asking anyway spends an attempt
+    on a third party's number; sleeping less and asking anyway uses an attempt
     and a budget token to reach the same refusal.
 
     Only a stated hint decides this. A failure carrying none is judged by its

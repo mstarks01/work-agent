@@ -74,12 +74,12 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from analysis_service.claim_identity import report_rows
-from analysis_service.errors import ConfigError, config_refusal
 from analysis_service.frameworks import PACKAGES
 from evals import verify_corpus
 from evals.harness import baseline, bundle
 from evals.harness import queue as review_queue
 from evals.harness.artifact import ProvenanceError, load_artifact
+from evals.harness.entry_refusal import ENTRY_ERRORS, refuse_entry
 from evals.harness.fingerprint import FingerprintError, identifier_of, lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
@@ -96,8 +96,6 @@ from evals.harness.ledger import (
 )
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import (
-    CorpusError,
-    corpus_refusal,
     flows_by_case,
     load_corpus,
 )
@@ -648,12 +646,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         runs, configs = findings_from_artifacts(args.artifact)
         session = build_session(runs, args.voter, args.ledger, configs)
-    except CorpusError as exc:
-        print(corpus_refusal(exc), file=sys.stderr)
-        return 1
-    except ConfigError as exc:
-        print(config_refusal(exc), file=sys.stderr)
-        return 1
+    except ENTRY_ERRORS as exc:
+        return refuse_entry(exc)
     except (EvalRunError, ProvenanceError) as exc:
         print(exc, file=sys.stderr)
         return 1

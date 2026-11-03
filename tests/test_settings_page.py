@@ -42,9 +42,12 @@ from analysis_service.store_settings import (
 )
 from analysis_service.vendors import REGION, VENDORS, CredentialMode, vendor_for
 from tests.factories import PROJECT_ROOT, TEST_TIER_ENV, declared_env, secret_env
+from tests.source_tree import PYTHON, module_name, parse, source_files
 from webapp import settings_page
 from webapp.settings_page import EXAMPLES, IAM_SETUP, SETTINGS
 from webapp.settings_view import _CONTROLS
+
+pytestmark = pytest.mark.lint
 
 
 def test_numeric_controls_follow_the_loader_parsers():
@@ -208,15 +211,14 @@ def _closed_settings() -> list[tuple[str, list[str]]]:
     """Each Deployment Setting variable that a loader reads with
     :func:`~analysis_service.store_settings.closed_setting`, and the set that the loader passes it.
 
-    The scan reads each call in the source of the package, and evaluates its
+    The scan reads each call in the Python the project runs, and evaluates its
     setting and its table in the namespace of the module of the call. A call
     whose setting is not a variable, such as the driver of the database URL,
     names a part of a free-text value, so the scan leaves it out.
     """
-    package = PROJECT_ROOT / "src" / "analysis_service"
     found = {}
-    for path in sorted(package.glob("*.py")):
-        tree = ast.parse(path.read_text())
+    for path in source_files(*PYTHON):
+        tree = parse(path)
         calls = [
             node
             for node in ast.walk(tree)
@@ -226,7 +228,7 @@ def _closed_settings() -> list[tuple[str, list[str]]]:
         ]
         if not calls:
             continue
-        namespace = vars(importlib.import_module(f"analysis_service.{path.stem}"))
+        namespace = vars(importlib.import_module(module_name(path)))
         for call in calls:
             variable = eval(ast.unparse(call.args[1]), namespace)
             if variable in deployment_variables():

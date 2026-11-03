@@ -7,7 +7,9 @@ under the heading :data:`HEADING`, with one entry for each class.
 
 A change to a module that decides what a prompt says the code does also needs
 a prompt read: the heading :data:`PROMPT_HEADING`, with one entry for each
-prompt that the table :data:`TABLE` pairs with the module.
+prompt that the table :data:`TABLE` pairs with the module. A change to a file
+with a row in the table :data:`HELD` names each held phrase of that file in
+the same section.
 
     five_class_read.py <base sha> <head sha>   reads the body from PR_BODY
 """
@@ -23,7 +25,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 HEADING = "## Five-class read"
 
@@ -74,6 +76,23 @@ TABLE = Path(__file__).with_name("prompt_outcomes.toml")
 #: that lands later is paired with its own text with no edit to the table.
 PACKAGE = "{package}"
 
+#: The table of held wording in model text, beside this script. :func:`main`
+#: reads the base branch's copy, as it does for :data:`TABLE`.
+HELD = Path(__file__).with_name("held_wording.toml")
+
+#: A rule that a held row may name.
+HeldRule = Literal["spend", "money", "element-term"]
+
+#: Each rule a held row may name, against what the rule is.
+RULES: dict[HeldRule, str] = {
+    "spend": "the SPEND lint of tests/test_history_prose_lints.py",
+    "money": "the MONEY lint of tests/test_history_prose_lints.py",
+    "element-term": (
+        "the GLOSSARY.md Element entry: code and model text say element, and"
+        " only page copy says part"
+    ),
+}
+
 
 def readers(table: Mapping[str, Any]) -> dict[str, tuple[str, ...]]:
     """Each module pattern against the prompts it decides, from the table.
@@ -122,6 +141,12 @@ def prompts_to_read(
         if any(root.glob(prompt))
         and not any(other != prompt and fnmatchcase(prompt, other) for other in named)
     )
+
+
+def held_phrases(paths: Iterable[str], table: Mapping[str, Any]) -> list[str]:
+    """Each phrase that a held row of ``table`` holds in a file in ``paths``."""
+    changed = set(paths)
+    return [row["phrase"] for row in table.get("held", ()) if row["file"] in changed]
 
 
 #: An HTML comment, closed or open to the end of the body. GitHub does not
@@ -223,16 +248,16 @@ def changed_paths(base: str, head: str) -> list[str]:
     return [path for path in listed.split("\0") if path]
 
 
-def table_text(base: str) -> str:
-    """The text of :data:`TABLE` at ``base``, or of this script's own copy where
+def table_text(base: str, table: Path) -> str:
+    """The text of ``table`` at ``base``, or of this script's own copy where
     ``base`` holds none."""
     shown = subprocess.run(
-        ["git", "show", f"{base}:.github/scripts/{TABLE.name}"],
+        ["git", "show", f"{base}:.github/scripts/{table.name}"],
         capture_output=True,
         text=True,
         check=False,
     )
-    return shown.stdout if shown.returncode == 0 else TABLE.read_text(encoding="utf-8")
+    return shown.stdout if shown.returncode == 0 else table.read_text(encoding="utf-8")
 
 
 def main(argv: list[str]) -> int:
@@ -255,19 +280,23 @@ def main(argv: list[str]) -> int:
         status = 1
     else:
         print("The body holds a five-class read.")
-    prompts = prompts_to_read(paths, readers(tomllib.loads(table_text(base))))
-    unread = missing(body, PROMPT_HEADING, prompts) if prompts else []
+    to_read = prompts_to_read(
+        paths, readers(tomllib.loads(table_text(base, TABLE)))
+    ) + held_phrases(paths, tomllib.loads(table_text(base, HELD)))
+    unread = missing(body, PROMPT_HEADING, to_read) if to_read else []
     if unread:
         print(
             "The pull request changes a module that decides what a prompt says,"
-            " and its body lacks: "
+            " or a file with held wording, and its body lacks: "
             + "; ".join(unread)
             + f". Add a {PROMPT_HEADING!r} section with one entry for each of"
-            f" {', '.join(prompts)}.",
+            f" {', '.join(to_read)}. The entry for a held phrase says what the"
+            " pull request did with it: changed it by a measured change, with"
+            f" the ledger row, or kept it ({HELD.name}).",
             file=sys.stderr,
         )
         status = 1
-    elif prompts:
+    elif to_read:
         print("The body holds a prompt read.")
     return status
 

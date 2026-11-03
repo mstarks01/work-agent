@@ -35,7 +35,7 @@ from analysis_service.claims import (
     UnknownRef,
     Verdict,
 )
-from analysis_service.engine import Engine, EngineInputError
+from analysis_service.engine import EngineInputError
 from analysis_service.evidence import (
     evidence_catalog,
     known_proposals,
@@ -68,6 +68,7 @@ from analysis_service.frameworks.asvs.record import (
     requirement_of,
 )
 from analysis_service.frameworks.asvs.roster import replace_roster, roster_block
+from analysis_service.jobs import StubPipelineRunner
 from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.report import (
     FrameworkSelection,
@@ -76,7 +77,12 @@ from analysis_service.report import (
 from analysis_service.skills import lane_skill_doc
 from analysis_service.sources import SourceLimits
 from analysis_service.system_model import CapabilityStatement, Process, SystemModel
-from tests.factories import PROJECT_ROOT, sample_draft, valid_model
+from tests.factories import (
+    PROJECT_ROOT,
+    sample_draft,
+    stand_in_engine,
+    valid_model,
+)
 
 ASVS = PACKAGES["asvs"]
 STRIDE = PACKAGES["stride"]
@@ -146,8 +152,8 @@ def test_the_engine_refuses_a_selection_missing_an_option_it_needs():
     would otherwise fail after the provider billed every node.
     """
     with pytest.raises(EngineInputError) as caught:
-        Engine(
-            runner=None,
+        stand_in_engine(
+            StubPipelineRunner(),
             limits=SourceLimits(max_total_bytes=1, max_sources=1),
             deadline_seconds=1.0,
             frameworks=[FrameworkSelection(name="asvs")],
@@ -177,8 +183,6 @@ def test_the_catalog_is_the_published_standard():
 def test_one_lane_is_one_chapter_in_the_standards_own_order():
     assert ASVS.lanes == LANES
     assert [chapter.id for chapter in CHAPTERS] == [f"V{n}" for n in range(1, 18)]
-    dirs = sorted(path.name for path in (ASVS_ROOT / "lanes").iterdir())
-    assert dirs == sorted(LANES)
 
 
 @pytest.mark.parametrize("lane", LANES)
@@ -948,10 +952,10 @@ class TestAJobDefersWhatItsInputCannotSettle:
     """The split a lane agent makes, and where each half lands.
 
     **Driven through ``PACKAGES["asvs"].record``, which is what the fan-in
-    calls.** The first version of these tests called the override directly on
-    the block class, so they passed while the graph resolved the neutral default
-    and deferred nothing across two live runs. A test that names a class the
-    caller never reaches proves the method works and not that it runs.
+    calls.** A test that calls the override directly on the block class passes
+    even while the graph resolves the neutral default and defers nothing. A
+    test that names a class the caller never reaches proves the method works
+    and not that it runs.
 
     A requirement whose substance needs source code is not a question a
     submitter can answer by writing more. Recorded as a **Scope Entry** rather

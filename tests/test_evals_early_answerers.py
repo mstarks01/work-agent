@@ -36,7 +36,7 @@ BASELINE = next(
 def test_a_walk_takes_at_most_its_budget_one_question_a_save(who, effects):
     walked = walk(valid_model(), LEVEL_2, ANSWERERS[who], effects=effects, budget=10)
     assert walked.steps, "a control: the list asks something"
-    taken = [step.choices for step in walked.steps]
+    taken = [step.choices_so_far for step in walked.steps]
     assert taken == sorted(set(taken)), "each save takes at least one choice"
     assert taken[-1] >= 10 or walked.ended
     assert taken[-2] < 10 or len(taken) == 1, "the walk stops once it takes 10"
@@ -48,7 +48,7 @@ def test_a_walk_takes_at_most_its_budget_one_question_a_save(who, effects):
 
 def test_a_skip_takes_one_choice_and_answers_nothing():
     walked = walk(valid_model(), LEVEL_2, ANSWERERS["skip"], effects=True, budget=5)
-    assert [step.choices for step in walked.steps] == [1, 2, 3, 4, 5]
+    assert [step.choices_so_far for step in walked.steps] == [1, 2, 3, 4, 5]
     assert all(step.answer is None for step in walked.steps)
 
 

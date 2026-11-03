@@ -1,10 +1,10 @@
 """A finding can wait on some facets of a question, and an answer can carry a detail (#1542 F6, ADR 0073).
 
-At 2fae7d3 a finding referenced a whole question kind, so an answer covered
-it only once every facet was known: a finding that needed only who acted
-stayed uncovered while the log's protection was unknown. A yes or no answer
-also had no place for an exception. These tests drive the follow-up's
-coverage, a report's conditions, the critic's prompt and the answer's line.
+A finding names the facets it waits on, so an answer covers it once those
+facets are known: a finding that needs only who acted is covered while the
+log's protection is still unknown. A yes or no answer has a place for an
+exception. These tests drive the follow-up's coverage, a report's
+conditions, the critic's prompt and the answer's line.
 """
 
 from __future__ import annotations

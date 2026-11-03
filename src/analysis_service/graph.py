@@ -77,10 +77,10 @@ its skills through :mod:`analysis_service.skills`, and its prompt through
 ``analyze/stride`` in the tier config becomes ``analyze_stride_spoofing`` and its
 five siblings here. :func:`tier_node_by_graph_node` is the only place that
 correspondence lives. The tier config keys one ``analyze/<framework>`` where the
-graph builds one node per lane, which is ``model_tiers.toml`` v5's own rule: a
+graph builds one node per lane, which is ``model_tiers.toml``'s own rule: a
 lane is a framework's internal fact, and all of them run the same judgement on
-the same tier. The graph names carry the framework as well, and that is the bump
-report schema 3.0 earned. A consumer that keys on ``analyze_spoofing`` in
+the same tier. The graph names carry the framework as well, as report schema
+3.0 defines. A consumer that keys on ``analyze_spoofing`` in
 ``nodes[].node`` does not error; it matches nothing, silently.
 
 The bookends are deliberately deterministic, because mechanical work belongs in
@@ -110,7 +110,6 @@ critic seams here.
 from __future__ import annotations
 
 import functools
-import hashlib
 import json
 import logging
 from collections.abc import Callable, Collection, Mapping, Sequence
@@ -242,7 +241,7 @@ from analysis_service.skills import (
     compose_domain_skills,
     compose_lane_skills,
 )
-from analysis_service.sources import render_fenced
+from analysis_service.sources import render_fenced, text_digest
 from analysis_service.system_model import (
     BoundaryCrossing,
     EmittedSystemModel,
@@ -3355,7 +3354,7 @@ def instruction_sizes(llm_nodes: Sequence[LlmAgent]) -> dict[str, InstructionSiz
             raise TypeError(f"node {node.name!r} carries a computed instruction")
         sizes[node.name] = InstructionSize(
             tokens=estimate_tokens(node.instruction),
-            sha256=hashlib.sha256(node.instruction.encode("utf-8")).hexdigest(),
+            sha256=text_digest(node.instruction),
         )
     return sizes
 
@@ -3387,7 +3386,7 @@ def instruction_digest(llm_nodes: Sequence[LlmAgent]) -> str:
         sort_keys=True,
         separators=(",", ":"),
     )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return text_digest(payload)
 
 
 def _node_sampling(

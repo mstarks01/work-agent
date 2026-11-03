@@ -1308,17 +1308,18 @@ class RuledClaim(Claim):
     verdict: Verdict
 
     def waits_on(self) -> list[UnknownRef]:
-        """The open facts this claim waits on: its ``needs-info`` verdict's
-        ``related_unknowns``, or none for any other verdict.
+        """The open facts this claim waits on: its verdict's
+        ``related_unknowns``.
 
-        **The one reader of "what a finding waits on"** (ADR 0094). The card,
-        the open-facts grouping and the follow-up's counts and order call it.
-        A ground the critic dismissed in ``immaterial_unknowns`` is not one;
+        The card, the open-facts grouping and the follow-up's counts and order
+        read it (ADR 0094). The validator of :class:`Verdict` is the one rule
+        of which verdict waits: it refuses ``related_unknowns`` on any status
+        but ``needs-info``, and an empty list on ``needs-info``. So a site that
+        reads ``verdict.related_unknowns`` reads the same facts. A ground the
+        critic dismissed in ``immaterial_unknowns`` is not one;
         :func:`~analysis_service.critic.complete_rulings` adds every other
         unknown ground to ``related_unknowns``.
         """
-        if self.verdict.status != "needs-info":
-            return []
         return list(self.verdict.related_unknowns)
 
     def rules_on_unit(self) -> bool:
@@ -1699,7 +1700,7 @@ class RepairedQuote(BaseModel):
 
     The ladder refused what the agent wrote, and
     :func:`~analysis_service.grounding.repair_prepared` found a window of the named
-    source near enough to hand back. The ground now carries that window — the
+    source near enough to hand back. The ground carries that window — the
     submitter's words — and this mark carries what the agent wrote, so the
     substitution is on the record rather than silent. ``similarity`` is the
     ratio that licensed it.
@@ -2830,7 +2831,7 @@ class FrameworkAnalysis(BaseModel):
 
         Uniqueness stops at the block on purpose. #163 ruled that ``id`` has no
         shared grammar, so two packages composing ``1.2.5`` and ``1.2.5`` for
-        unrelated things is legal — and every mark that points at a claim now
+        unrelated things is legal — and every mark that points at a claim
         lives in the same block as the claim it points at, so nothing resolves
         an ID across a boundary.
 

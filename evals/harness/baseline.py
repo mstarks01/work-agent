@@ -68,6 +68,7 @@ from typing import Any, NamedTuple, get_args, get_type_hints
 
 from analysis_service.model_tiers import TierName
 from analysis_service.parsing import non_negative, strings
+from analysis_service.sources import text_digest
 from analysis_service.vendors import vendor_for_route
 
 # The tier whose model names a baseline. Spelled, not indexed: a position in
@@ -223,9 +224,7 @@ class BaselineIdentity:
 
     @property
     def hash(self) -> str:
-        return hashlib.sha256(
-            json.dumps(self.to_json(), sort_keys=True).encode("utf-8")
-        ).hexdigest()
+        return text_digest(json.dumps(self.to_json(), sort_keys=True))
 
     @property
     def name(self) -> str:
@@ -264,9 +263,10 @@ def recorded_upstreams(
 ) -> dict[str, tuple[str, ...]]:
     """Every upstream the record names, per tier on an aggregator route.
 
-    The one reader of the question "which provider served this tier", for the
-    identity and for the rule that refuses a tier it cannot answer. Keyed only
-    by the tiers whose vendor does not route to one provider: a direct vendor
+    The reader of the question "which provider served this tier" for the
+    identity and for the rule that refuses a tier it cannot answer.
+    :meth:`~evals.harness.provenance.RunProvenance.tier_identities` folds the
+    same field for the artifact's tier summary. Keyed only by the tiers whose vendor does not route to one provider: a direct vendor
     is its own upstream, names none in its responses, and has nothing here to
     read. An aggregator tier whose executions name no upstream maps to an
     empty tuple rather than being absent, so the rule can tell "the record is

@@ -1225,7 +1225,9 @@ class InMemoryJobStore:
     def _resumed_by(self, parent_id: str) -> str | None:
         """The resumed job of ``parent_id`` that locks it, if any.
 
-        **The one reader of "does this job still take answers".** A job takes
+        **The in-memory store's reader of "does this job still take
+        answers".** ``SqlJobStore._resumed_by`` is the SQL store's, and both ask
+        :func:`locks_its_parent`. A job takes
         one resumed job: a report's follow-up runs the analysis once (ADR
         0054), and a paused job's answers start one analysis. A job an
         amendment started locks its paused job the same way (ADR 0072). A

@@ -99,7 +99,7 @@ from tests.test_compact import compact_fixture
 PROJECT_ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 
 #: The selection every test here builds a graph for. A graph is built for one
-#: selection now, so a test asserting about "the nodes" has to say which.
+#: selection, so a test asserting about "the nodes" has to say which.
 FRAMEWORKS = DEFAULT_FRAMEWORKS
 NODES = graph.FrameworkNodes("stride")
 LANES = NODES.lanes
@@ -1399,7 +1399,7 @@ def test_validate_parks_the_normalized_model_the_issues_cite():
 
 
 def test_revalidate_puts_every_uncited_element_back_and_records_it():
-    """#675 D01: the repair prompt asked for it; the gate now enforces it."""
+    """#675 D01: the repair prompt asks for it, and the gate enforces it."""
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     ctx = FakeContext()
@@ -1547,11 +1547,11 @@ def test_prepare_derives_crossings_rather_than_trusting_them(
 
     assert output["element_count"] == 7
     assert output["crossing_count"] == 1
-    # Four, not three, since a flow says what it does: the login flow's
-    # `operations` is `unknown`, and an unstated attribute is a fact an agent
-    # may ground a question on. Nothing about the catalog changed to allow that
-    # — `_attribute_entry` reads every type-specific field through
-    # `control_state`, so the new field is catalogued the day it lands.
+    # Four, because a flow says what it does: the login flow's `operations`
+    # is `unknown`, and an unstated attribute is a fact an agent may ground a
+    # question on. `_attribute_entry` reads every type-specific field through
+    # `control_state`, so the catalog holds each such field with no change of
+    # its own.
     assert output["evidence_count"] == 4
     assert (
         "flow:entity:customer>process:web-app>login"
@@ -2914,7 +2914,7 @@ def test_a_trigger_after_the_report_is_built_builds_it_no_second_time(domain_loa
 
     Two frameworks that finish before either of their triggers is scheduled both
     find every framework finished. The second one would compose the same blocks
-    from the same parked artifacts, so it spends the time and changes nothing;
+    from the same parked artifacts, so it takes the time and changes nothing;
     the written report is what says the pass already happened.
     """
     model = valid_model().model_dump(mode="json")
@@ -3569,21 +3569,6 @@ class TestNoPromptWritesItsOwnFence:
 
         assert lines[0] == "````", "the body's backtick run sized the fence"
         assert lines[0] == lines[-1]
-
-    def test_no_prompt_file_writes_a_fence_around_a_placeholder(self):
-        """The lint. A fence written beside a ``{placeholder}`` is the shape
-        this class exists to keep out, whatever the value turns out to hold."""
-        import re
-
-        offenders = []
-        for path in sorted((PROJECT_ROOT / "prompts").glob("*.md")):
-            text = path.read_text(encoding="utf-8")
-            if re.search(r"`{3,}\s*\n\{[a-z_]+\}\s*\n`{3,}", text):
-                offenders.append(path.name)
-        assert not offenders, (
-            f"{offenders} fence a placeholder in the file. Interpolate the value"
-            " on its own line and let render_fenced size the fence over it."
-        )
 
 
 class TestTheReviseCount:

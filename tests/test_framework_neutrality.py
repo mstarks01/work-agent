@@ -148,6 +148,16 @@ DECLARED: dict[str, str] = {
         "This code is that framework's: it prints the matches `e8_count.py`"
         " counts, beside their drafts, through the same identity."
     ),
+    "evals/experiments/QA-2026-11-02-03/trace_baselines.py": (
+        "This code is that framework's. It traces two references through the"
+        " lane that a lead points at a place, and matches a draft by action and"
+        " place. A package whose claims carry a catalog identifier is led by"
+        " requirement, so it has no place-led lane to trace."
+    ),
+    "evals/experiments/QA-2026-11-02-03/trace_lane_input.py": (
+        "This code is that framework's: it prints the lane input that"
+        " `trace_baselines.py` reads, for the same lane."
+    ),
     "evals/experiments/QA-2026-10-31-02/build_answers.py": (
         "A recorded experiment's script. It reads the STRIDE prior because the"
         " experiment measures the STRIDE lanes; the ASVS prior holds no"
@@ -230,8 +240,8 @@ DECLARED: dict[str, str] = {
         "The scoring pass is that package's, because grading an open claim set"
         " is not a per-case fold; it names the block it grades so a sweep of"
         " another package skips it rather than fails in it. The"
-        " per-case mechanical dispatch that used to branch here is now"
-        " `PACKAGE_SCORERS`, a table keyed by framework."
+        " per-case mechanical dispatch is `PACKAGE_SCORERS`, a table keyed by"
+        " framework."
     ),
     "webapp/review.py": (
         "QUESTIONS is a table keyed by framework, checked against PACKAGES at"

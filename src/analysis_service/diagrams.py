@@ -15,9 +15,9 @@ write the wrong word.
 **Two readings, and an install fault that is neither.** A diagram the parsers
 read is a :class:`DiagramStructure`. One they cannot read, through a syntax
 error or another diagram type, is a :class:`DiagramRefusal`, and extraction
-reads that diagram as text. A missing Node or package raises
-:class:`DiagramReaderMissing`, because reading the diagram another way would
-make the same job run two ways on two deployments.
+reads that diagram as text. A missing reader, Node or package, or a Node that
+cannot run, raises :class:`DiagramReaderMissing`, because reading the diagram
+another way would make the same job run two ways on two deployments.
 """
 
 from __future__ import annotations
@@ -28,7 +28,9 @@ import subprocess
 from contextlib import suppress
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+from analysis_service.errors import refusal_text
 
 __all__ = [
     "Arrow",
@@ -43,7 +45,7 @@ __all__ = [
     "install_reader",
     "node_names",
     "read_diagram",
-    "reader_missing",
+    "reader_fault",
 ]
 
 #: The longest a reading may take, and the most memory Node may hold for it.
@@ -135,22 +137,29 @@ def node_names(label: str) -> tuple[str, ...]:
 
 
 class DiagramReaderMissing(RuntimeError):
-    """Node or the reader's packages are not installed."""
+    """An install fault: the reader, Node or the reader's packages are not
+    installed, or Node cannot run."""
 
 
 def read_diagram(text: str) -> DiagramReading:
     """The structure of one diagram, or why it has none.
 
-    Raises :class:`DiagramReaderMissing` where Node or a package is missing. A
-    reading that runs past :data:`READ_TIMEOUT_SECONDS`, or that Node ends with
-    no reading, is a refusal: the fault is in the diagram, and extraction can
-    still read its text.
+    Raises :class:`DiagramReaderMissing` where the reader's script, Node or a
+    package is missing, or where Node cannot run. A reading that runs past
+    :data:`READ_TIMEOUT_SECONDS`, or that Node ends with no JSON object on its
+    last line, is a refusal: the fault is in the diagram, and extraction can
+    still read its text. A structure of a shape that :class:`DiagramStructure`
+    refuses raises its :class:`~pydantic.ValidationError`.
     """
     # Imported here: the deployment module reaches the gate, which reads the
     # types above, so a module-level import closes a cycle.
     from analysis_service.deployment import DEFAULT_DIAGRAM_READER_DIR
 
     script = DEFAULT_DIAGRAM_READER_DIR / "read.mjs"
+    if not script.is_file():
+        raise DiagramReaderMissing(
+            f"the diagram reader is not installed: {script} does not exist"
+        )
     install = " ".join(_install_argv())
     try:
         done = subprocess.run(
@@ -166,6 +175,11 @@ def read_diagram(text: str) -> DiagramReading:
         raise DiagramReaderMissing(
             f"a diagram Source needs Node to read it; install Node, then run: {install}"
         ) from exc
+    except OSError as exc:
+        raise DiagramReaderMissing(
+            f"Node cannot run the diagram reader ({exc.strerror}); check the"
+            " install of Node"
+        ) from exc
     except subprocess.TimeoutExpired:
         return DiagramRefusal(
             refused=f"the reading took longer than {READ_TIMEOUT_SECONDS} s"
@@ -177,6 +191,8 @@ def read_diagram(text: str) -> DiagramReading:
     try:
         found = json.loads(done.stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError):
+        found = None
+    if not isinstance(found, dict):
         return DiagramRefusal(
             refused=f"the reader ended with code {done.returncode} and no reading"
         )
@@ -187,16 +203,25 @@ def read_diagram(text: str) -> DiagramReading:
     )
 
 
-def reader_missing() -> str | None:
-    """Why the diagram reader cannot run, or ``None`` where it can.
+def reader_fault() -> str | None:
+    """Why the diagram reader cannot read a valid flowchart, or ``None`` where
+    it can.
 
     It reads one small flowchart, so it asks :func:`read_diagram` the same
-    question that a diagram Source asks.
+    question that a diagram Source asks. Each outcome but a structure is a
+    fault: an install fault, a refusal, and a structure of the wrong shape.
     """
     try:
-        read_diagram("flowchart LR\n  a --> b\n")
+        reading = read_diagram("flowchart LR\n  a --> b\n")
     except DiagramReaderMissing as missing:
         return str(missing)
+    except ValidationError as exc:
+        return (
+            "the diagram reader gave a structure of the wrong shape:"
+            f" {refusal_text(exc)}"
+        )
+    if isinstance(reading, DiagramRefusal):
+        return f"the diagram reader refused a valid flowchart: {reading.refused}"
     return None
 
 
@@ -217,10 +242,11 @@ def _install_argv() -> list[str]:
 def install_reader() -> None:
     """Install the reader's locked packages (ADR 0122).
 
-    It does nothing where npm is missing, and it ignores a failed install,
-    because :func:`reader_missing` then names the step for a person to run.
+    It does nothing where npm is missing or cannot run, and it ignores a
+    failed install, because :func:`reader_fault` then names the step for a
+    person to run.
     """
-    with suppress(FileNotFoundError, subprocess.TimeoutExpired):
+    with suppress(OSError, subprocess.TimeoutExpired):
         subprocess.run(
             _install_argv(),
             capture_output=True,

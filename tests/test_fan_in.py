@@ -707,7 +707,7 @@ class TestQuoteVerification:
         assert len(joined.marks.dropped_claims) == 3
 
     def test_a_refused_quote_near_the_source_is_repaired_and_marked(self, model):
-        """The ground now carries the submitter's words, and the mark carries
+        """The ground carries the submitter's words, and the mark carries
         the agent's, so the substitution is on the record. A repaired quote
         verifies, so it is never also marked unverified, and a claim resting on
         it alone is not groundless."""

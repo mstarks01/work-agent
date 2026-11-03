@@ -57,7 +57,7 @@ _FROZEN = frozenset({"research"})
 #: Directories the repository does not hold, by their place rather than by name.
 #: ``evals/runs`` holds run artifacts the repository does not track, and a live
 #: run leaves its probe scripts beside them, so a lint that reads that directory
-#: judges a file the tree does not hold (#942). ``.claude/worktrees`` holds whole
+#: judges a file the tree does not hold (PR #944). ``.claude/worktrees`` holds whole
 #: checkouts at other revisions, while ``.claude/skills`` beside it is tracked
 #: prose. Anchored rather than added to :data:`_SKIPPED`, so a future module
 #: directory that happens to be called ``runs`` stays under every lint.
@@ -84,6 +84,9 @@ CONFIG: tuple[str, ...] = ("config",)
 
 #: The GitHub Actions workflows.
 WORKFLOWS: tuple[str, ...] = (".github/workflows",)
+
+#: The git hooks, which carry no suffix.
+HOOKS: tuple[str, ...] = (".githooks",)
 
 #: Every file the repository holds.
 WHOLE_TREE: tuple[str, ...] = (".",)
@@ -224,6 +227,18 @@ def without(paths: Iterable[Path], left_out: Mapping[str, str]) -> list[Path]:
     if stale:
         raise ValueError(f"{stale} leave out no file of the set, so drop them")
     return kept
+
+
+def matching(pattern: str) -> list[Path]:
+    """Each file or directory the repository holds that the glob ``pattern``
+    names, relative to :data:`REPO_ROOT`. A directory counts when it holds a
+    file the repository holds."""
+    held = held_files(*WHOLE_TREE)
+    return sorted(
+        match
+        for match in REPO_ROOT.glob(pattern)
+        if any(path == match or path.is_relative_to(match) for path in held)
+    )
 
 
 def prompt_files() -> list[Path]:

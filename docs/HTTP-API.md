@@ -354,7 +354,7 @@ so in `early_stop`, and a send without `"save"` starts it. `answered_early` and 
 with its question, and you can send a new answer to any of them. A question
 with facets stays listed while a facet has no answer.
 
-**A stop does not say every fact is settled**
+**An empty-list reason does not say every fact is settled**
 ([ADR 0068](adr/0068-a-pause-says-what-it-leaves-open.md)). `early_stop` is
 `null` while the job asks something. It is `budget-exhausted` when the limits
 hold questions back, `below-floor` when only questions under a floor are left,
@@ -1268,6 +1268,31 @@ remove it and make it again. For SQLite, delete the file. For PostgreSQL,
 drop the database and create it again. Then run the command. The new
 database holds no jobs. A database at a revision that this build does not
 hold, such as one from a later build, takes the same repair.
+
+#### The diagram reader step
+
+The service reads a `diagram` Source with Mermaid's own parsers, which run in
+Node (ADR 0121). The service installs nothing at its startup. Before you
+start it, install Node 20 or newer. Then install the reader's locked packages
+from the checkout:
+
+```bash
+npm ci --ignore-scripts --prefix diagram_reader
+```
+
+`npm ci` installs only the versions that `package-lock.json` locks, and
+`--ignore-scripts` runs no package's own install script. A wheel install
+holds the reader at `analysis_service/_bundled/diagram_reader`, in the
+directory of the installed package. Give that directory to `--prefix`, as a
+user that can write to it. This command prints it:
+
+```bash
+python -c "from analysis_service.deployment import DEFAULT_DIAGRAM_READER_DIR as d; print(d)"
+```
+
+Without Node or the packages, a job with a `diagram` Source fails, and the
+service log names the install step. A job with no diagram does not need the
+reader.
 
 ### The startup
 

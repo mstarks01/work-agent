@@ -348,8 +348,8 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     purpose: every field an :class:`~analysis_service.graph.Analysis` and a
     :class:`~analysis_service.report.Report` share is one the eval seam has
     to be *asked* to carry, and a field added to both without a decision here
-    is exactly how ``coverage`` came to be computed at the fan-in for a sweep
-    that then read an empty list for it.
+    can be computed at the fan-in for a sweep that then reads an empty list
+    for it.
 
     The marks are pinned through
     :class:`~analysis_service.claims.AnalysisMarks`, which is the one field

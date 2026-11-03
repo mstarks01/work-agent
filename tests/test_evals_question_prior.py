@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -49,7 +50,6 @@ def test_the_command_writes_one_row_and_keeps_the_others(tmp_path):
                 "asvs": {
                     "record": None,
                     "runs": ["kept"],
-                    "revision": "r",
                     "cases": 1,
                     "rates": {"Process": {"authentication": 0.5}},
                 },
@@ -71,7 +71,7 @@ def test_the_command_writes_one_row_and_keeps_the_others(tmp_path):
     record = table["stride"].record
     assert record is not None
     assert record["command"] == "question-prior"
-    assert record["commit"] == table["stride"].revision
+    assert re.fullmatch(r"[0-9a-f]{40}", record["commit"])
     assert BASELINE in {entry["path"] for entry in record["inputs"]}
     assert table["stride"].cases == 13
     assert table["stride"].rates["DataFlow"]["authentication"] > 0

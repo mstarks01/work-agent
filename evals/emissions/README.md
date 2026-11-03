@@ -14,6 +14,15 @@ on the day. The artifact records the commit, whether the tree was clean, the
 corpus digest, the models and the instruction digest of the node, so the
 replay places each sweep on an arm from the record rather than from its name.
 
+An arm is also the input that the route read. A sweep today records the digest
+of each case's rendered Sources in `rendered_sources`, and the replay pools the
+sweeps whose digests agree. No sweep in this archive records that block. The
+commit does not identify the input either, because one commit ran several
+input sets here. So the replay pools none of these sweeps by itself, and it
+prints `NOT POOLED` with the names. To pool sweeps that read one input, name
+their arm with `--arm LABEL=GLOB`, where the glob matches the artifact file
+names. Repeat the option for each arm.
+
 Replay them with:
 
 ```sh
@@ -55,7 +64,8 @@ To price a later `extract.md` change, replay that arm as the before side if the
 prompt has not moved since, and say so in the experiment row:
 
 ```sh
-python -m evals.harness.run replay evals/emissions/20261017T-1813-name-rule/after-r*.json
+python -m evals.harness.run replay evals/emissions/20261017T-1813-name-rule/after-r*.json \
+  --arm 'after=after-r*'
 ```
 
 The heads sweep reads through `extract` and `assert` and keeps the catalog its
@@ -71,8 +81,9 @@ one the directory does. The corpus moved between them, so replay both sides
 rather than reading a recorded figure off either:
 
 ```sh
-python -m evals.harness.run replay evals/emissions/20260919T-naming-rule/r*.json
-python -m evals.harness.run replay evals/emissions/20260918T-placement-rule/after-r*.json
+python -m evals.harness.run replay evals/emissions/20260919T-naming-rule/r*.json --arm 'naming=r*'
+python -m evals.harness.run replay evals/emissions/20260918T-placement-rule/after-r*.json \
+  --arm 'placement=after-r*'
 ```
 
 Read on 2026-09-19, `found` per sweep goes 114.8 to 128.3, which is 6.6 sd on

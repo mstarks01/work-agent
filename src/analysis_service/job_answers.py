@@ -387,8 +387,8 @@ class JobAnswers:
 
     ``runner_for`` looks a runner up by selection and entry. ``limits`` bounds
     what a job may carry, ``ceiling`` how many jobs one owner may have in
-    flight, and ``budget`` the tokens a window admits. ``frameworks`` is what
-    the deployment carries, in ``config/frameworks.toml`` order, which is
+    flight, and ``budget`` the tokens a window admits. ``carried_frameworks``
+    is what the deployment carries, in ``config/frameworks.toml`` order, which is
     what a submission selects from and the order its report's blocks take
     (ADR 0102). ``carries_catalog``
     says whether a job here builds an assertion catalog. A link answer places
@@ -404,9 +404,9 @@ class JobAnswers:
     limits: SourceLimits
     ceiling: int
     budget: BudgetPolicy
-    frameworks: Sequence[FrameworkName]
+    carried_frameworks: Sequence[FrameworkName]
     carries_catalog: bool
-    gate: CertificationGate | None = None
+    gate: CertificationGate | None
 
     def withheld(self, record: JobRecord) -> CertifyResult | None:
         """The certification that withholds this job's output, or ``None``.
@@ -580,7 +580,7 @@ class JobAnswers:
         hears about the limit; both answers refuse it, and neither runs a
         model.
         """
-        selection = resolve_selection(self.frameworks, submission.frameworks)
+        selection = resolve_selection(self.carried_frameworks, submission.frameworks)
         if submission.links and not self.carries_catalog:
             raise NoCatalog()
         sources = list(submission.sources)

@@ -29,7 +29,6 @@ each case's ``source_sha256`` from its ``source.md``.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sys
@@ -558,8 +557,9 @@ SOURCE_FIELDS = frozenset(("kind", "label", "file", "sha256"))
 
 
 def source_sha256(source_path: Path) -> str:
-    """One source's digest, over the exact submitted bytes."""
-    return hashlib.sha256(source_path.read_bytes()).hexdigest()
+    """One source's digest: :func:`~analysis_service.sources.text_digest` of the
+    text a run submits, read as the corpus loader reads it."""
+    return text_digest(source_path.read_text(encoding="utf-8"))
 
 
 def declared_sources(case_dir: Path, meta: dict) -> dict[str, str]:

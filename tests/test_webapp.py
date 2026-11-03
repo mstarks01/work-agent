@@ -35,6 +35,7 @@ from analysis_service import (
     StubPipelineRunner,
 )
 from analysis_service.answer_shares import SharedAnswer
+from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.api import JOB_REFUSAL_STATUS, max_body_bytes
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import UNKNOWN_KEY_FIELDS
@@ -75,10 +76,13 @@ from tests.factories import (
 from webapp.main import (
     OPERATOR,
     PAGE_SOURCE_LABELS,
+    FileRefusal,
+    FilesLimits,
     Settings,
     Startup,
     Workspace,
     create_app,
+    file_refusals,
     render_report,
 )
 from webapp.settings_save import MAX_SAVE_BYTES
@@ -140,7 +144,7 @@ def stub_settings(runner=None, catalog: bool = False) -> Settings:
 def startup_for(tiers, runner=None, catalog: bool = False) -> Startup:
     return Startup(
         settings=stub_settings(runner, catalog),
-        frameworks=CARRIED,
+        carried_frameworks=CARRIED,
         tiers=tiers,
         error=None,
     )
@@ -157,7 +161,7 @@ def broken_client(tiers):
     """The app as it comes up when the vendor's credentials are missing."""
     startup = Startup(
         settings=None,
-        frameworks=(),
+        carried_frameworks=(),
         tiers=tiers,
         error=ProviderAuthError(
             "vendor 'vertex' needs ANALYSIS_VERTEX_PROJECT; it is unset or empty"
@@ -617,7 +621,7 @@ def test_a_framework_this_install_does_not_carry_is_refused(tiers):
         app=create_app(
             Startup(
                 settings=stub_settings(),
-                frameworks=(narrow,),
+                carried_frameworks=(narrow,),
                 tiers=tiers,
                 error=None,
             )
@@ -1090,10 +1094,12 @@ def test_the_first_run_page_words_each_empty_list_reason():
 def test_the_first_run_page_reads_each_carried_reason():
     """``first_run.js`` says for each
     :data:`~analysis_service.answer_state.CarriedReason` whether a dropped
-    answer waits for a part, and for no other reason."""
+    answer waits for an element, and for no other reason."""
     from analysis_service.answer_state import CarriedReason
 
-    assert _table_keys("first_run.js", "waitsForPart") == set(get_args(CarriedReason))
+    assert _table_keys("first_run.js", "waitsForElement") == set(
+        get_args(CarriedReason)
+    )
 
 
 def test_the_first_run_page_names_each_element_type():
@@ -1798,7 +1804,7 @@ def test_a_config_error_spelling_the_placeholder_is_not_substituted(tiers):
     page = diagnostic_page(
         Startup(
             settings=None,
-            frameworks=(),
+            carried_frameworks=(),
             tiers=tiers,
             error=ConfigError("__CSP_NONCE__"),
         ),
@@ -1867,6 +1873,17 @@ PAGE_SCRIPTS = {
     "webapp/report_view.html": ("sidebar.js", "answer_editor.js", "report_view.js"),
 }
 
+#: Every client script the apps serve, as :data:`PAGE_SCRIPTS` names them.
+#: :func:`~tests.test_reader_lints.test_every_client_script_belongs_to_a_page`
+#: holds the set to the files in ``webapp/static``.
+STATIC_SCRIPTS = sorted(
+    {
+        name
+        for value in PAGE_SCRIPTS.values()
+        for name in ((value,) if isinstance(value, str) else value)
+    }
+)
+
 #: A ``<script>`` block a page template is allowed to fill itself. Each one
 #: holds values rather than code: a page's injected values keep their escape
 #: at the template, where :func:`~webapp.page.script_json` decides how each is
@@ -1917,26 +1934,6 @@ def test_a_page_template_carries_no_script_body(source):
     )
 
 
-def test_every_client_script_belongs_to_a_page():
-    """A script file nothing serves is dead code nothing would notice.
-
-    The reverse of the sweep above, over the same table: that one holds a page
-    to its file, and this one holds a file to its page.
-    """
-    named = {
-        name
-        for value in PAGE_SCRIPTS.values()
-        for name in ((value,) if isinstance(value, str) else value)
-    }
-    from webapp.page import _STATIC
-
-    on_disk = {path.name for path in _STATIC.glob("*.js")}
-    assert on_disk == named, (
-        f"webapp/static holds {sorted(on_disk - named)} that no page names, and"
-        f" the table names {sorted(named - on_disk)} that is not there."
-    )
-
-
 #: The pages that take an answer, and what builds an answer's input. Each
 #: marker is a piece of an answer input that only the shared builder spells.
 ANSWER_PAGES = ("report_view.js", "first_run.js", "question_list.js")
@@ -1978,12 +1975,6 @@ def test_a_page_builds_an_answer_input_with_the_shared_builder(page):
     )
 
 
-#: Every client script the app serves.
-STATIC_SCRIPTS = sorted(
-    path.name for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-)
-
-
 #: The rules the question list's pages share, each with the pages that read
 #: it. question_list.js defines each one.
 SHARED_ROW_RULES: dict[str, tuple[str, ...]] = {
@@ -2018,6 +2009,43 @@ def test_a_row_rule_is_defined_once_and_read_by_its_pages(rule):
     )
     for page in SHARED_ROW_RULES[rule]:
         assert f"{rule}(" in page_javascript(page), f"{page} does not call {rule}"
+
+
+#: A read of a question's key by position: an index into a key, or a key
+#: unpacked into names. A string key that a method splits is no question's key.
+_KEY_BY_POSITION = re.compile(r"\bkey\s*\[|\[[\w\s,]*\]\s*=\s*[\w.]*\bkey\b(?!\s*\.)")
+
+#: The definitions that read a key by position, both through ``KEY_FIELDS``:
+#: ``keyRef`` names each part, and ``withElement`` writes a key in that order.
+_KEY_LAYOUT = re.compile(
+    r"^const (?:keyRef|withElement) = .*?;$", re.DOTALL | re.MULTILINE
+)
+
+
+def test_a_key_is_read_by_position_only_through_key_fields():
+    """``keyRef`` is the one reader of which part of a key is which. A page
+    that reads ``key[1]`` itself is a second reader of ``UNKNOWN_KEY_FIELDS``,
+    and it reads the wrong part once the order moves."""
+    layout = _KEY_LAYOUT.findall(page_javascript("question_list.js"))
+    found = [
+        (name, match)
+        for name in STATIC_SCRIPTS
+        for match in _KEY_BY_POSITION.findall(
+            _KEY_LAYOUT.sub("", page_javascript(name))
+        )
+    ]
+
+    assert len(layout) == 2 and all(_KEY_BY_POSITION.search(rule) for rule in layout)
+    assert not found, (
+        f"{found} read a question's key by position. Read it by name with keyRef."
+    )
+
+
+def test_the_key_position_lint_sees_a_positional_read():
+    """A positive control on the lint above."""
+    reads = "const attribute = row.q.key[1];\nconst [element] = q.key;\n"
+
+    assert len(_KEY_BY_POSITION.findall(reads)) == 2
 
 
 def run_list_rules(program: str) -> object:
@@ -2137,9 +2165,9 @@ def test_the_link_group_heading_is_spelled_once():
     ``question_list.js``, and each page and the export read it there."""
     heading = "Match each user, team or account to a part of your system"
     spelled = {
-        path.name: page_javascript(path.name).count(heading)
-        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        if heading in page_javascript(path.name)
+        name: page_javascript(name).count(heading)
+        for name in STATIC_SCRIPTS
+        if heading in page_javascript(name)
     }
 
     assert spelled == {"question_list.js": 1}
@@ -2175,14 +2203,12 @@ def test_the_question_index_is_built_once_for_both_pages():
     page and on the first-run page: it hides a box with no row that shows and
     counts the rows of each box that does. A page keeps only its click."""
     defined = [
-        path.name
-        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        if "const indexGroups = " in page_javascript(path.name)
+        name
+        for name in STATIC_SCRIPTS
+        if "const indexGroups = " in page_javascript(name)
     ]
     spelled = [
-        path.name
-        for path in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
-        if "question-group-" in page_javascript(path.name)
+        name for name in STATIC_SCRIPTS if "question-group-" in page_javascript(name)
     ]
 
     assert defined == spelled == ["question_list.js"]
@@ -2307,7 +2333,7 @@ def test_a_run_whose_runner_cannot_be_built_names_the_setting(tiers, caplog):
 
     startup = Startup(
         settings=replace(stub_settings(), runner_for=unconfigured),
-        frameworks=CARRIED,
+        carried_frameworks=CARRIED,
         tiers=tiers,
         error=None,
     )
@@ -2402,18 +2428,6 @@ def test_every_workspace_page_takes_the_one_sidebar(name):
     template = (PROJECT_ROOT / "webapp" / name).read_text(encoding="utf-8")
     assert "<!--sidebar-->" in template
     assert 'id="sidebar-navigation"' not in template
-
-
-def test_no_page_words_a_count_with_a_bracketed_plural():
-    """A page words a count with ``counted``, never "finding(s)"."""
-    pages = [*(PROJECT_ROOT / "webapp" / "static").glob("*.js")]
-    pages += [*(PROJECT_ROOT / "webapp").glob("*.html")]
-    bracketed = {
-        page.name: found
-        for page in pages
-        if (found := re.findall(r"[a-z]\(s\)", page.read_text(encoding="utf-8")))
-    }
-    assert bracketed == {}
 
 
 class TestOwnerFilesInAnAnalysis:
@@ -2599,12 +2613,46 @@ def test_no_page_script_words_a_refusal_the_server_words():
         part for sentence in sentences for part in sentence.split("7") if len(part) > 12
     ]
     spelled = [
-        (script.name, fragment)
-        for script in (PROJECT_ROOT / "webapp" / "static").glob("*.js")
+        (script, fragment)
+        for script in STATIC_SCRIPTS
         for fragment in fragments
-        if fragment in script.read_text(encoding="utf-8")
+        if fragment
+        in (PROJECT_ROOT / "webapp" / "static" / script).read_text(encoding="utf-8")
     ]
     assert not spelled
+
+
+def test_the_file_scripts_read_only_a_file_refusal():
+    """``text_file.js`` and ``files.js`` read each
+    :data:`~webapp.main.FileRefusal` that :func:`~webapp.main.file_refusals`
+    sends, and no other key. A key the server does not send shows nothing."""
+    read = {
+        key
+        for script in STATIC_SCRIPTS
+        for key in re.findall(r"\brefusals\.(\w+)", page_javascript(script))
+    }
+    assert set(file_refusals(7, 7)) == set(get_args(FileRefusal))
+    assert read == set(get_args(FileRefusal))
+
+
+def test_the_files_page_reads_only_a_files_limit():
+    """``files.js`` reads each :class:`~webapp.main.FilesLimits` key and no
+    other. A key the server does not send reads as ``undefined``."""
+    read = set(re.findall(r"\blimits\.(\w+)", page_javascript("files.js")))
+    assert read == FilesLimits.__required_keys__
+
+
+def test_each_page_reads_only_an_answer_limit():
+    """A script reads only a key of
+    :data:`~analysis_service.answer_state.ANSWER_LIMITS`. A key the server does
+    not send reads as ``undefined``, and a cap of ``undefined`` caps nothing."""
+    read = {
+        key
+        for script in STATIC_SCRIPTS
+        for key in re.findall(r"\bANSWER_LIMITS\.(\w+)", page_javascript(script))
+    }
+    assert read
+    assert read <= ANSWER_LIMITS.keys()
 
 
 def test_the_page_names_a_label_for_each_source_it_makes():
