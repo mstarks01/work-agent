@@ -478,26 +478,64 @@ def test_every_key_file_export_uses_the_registry_suffix():
 
 #: The text of a step that reads a check script from the pull request's base
 #: commit.
-_BASE_COPY = 'git show "$BASE_SHA:'
+_BASE_READ = 'git show "$BASE_SHA:'
 
 
-def _base_copy_workflows() -> list[Path]:
+def _base_reads() -> list[tuple[Path, int]]:
+    """Each workflow line that reads a script from the base, with its index."""
     return [
-        workflow
+        (workflow, index)
         for workflow in _workflows()
-        if any(_BASE_COPY in line for line in _code_lines(workflow))
+        for index, line in enumerate(_code_lines(workflow))
+        if _BASE_READ in line
     ]
 
 
-def test_a_base_copy_check_never_copies_the_pull_request_s_script():
-    """A step that copied the pull request's script where the base held none
-    let a pull request run its own copy of the check."""
-    readers = _base_copy_workflows()
+def _fails_closed(lines: list[str], index: int) -> bool:
+    """Whether the base read at ``index`` fails the step where the base holds
+    no script: a ``git show`` outside any ``if`` block, which ``bash -e`` stops
+    on, or an ``if ! git show`` block that ends in ``exit 1`` and has no
+    ``else``."""
+    line = lines[index].strip()
+    if "||" in line:
+        return False
+    if line.startswith("git show"):
+        before = lines[index - 1].strip() if index else ""
+        return not before.endswith("then") and before != "else"
+    if not line.startswith("if ! git show"):
+        return False
+    block = []
+    for later in lines[index + 1 :]:
+        if later.strip() == "fi":
+            break
+        block.append(later.strip())
+    return "exit 1" in block and "else" not in block
 
-    assert readers, "no workflow reads a script from the base; the scan is vacuous"
-    copying = [
-        workflow.name
-        for workflow in readers
-        if any(line.lstrip().startswith("cp ") for line in _code_lines(workflow))
+
+def test_a_base_read_fails_closed_where_the_base_holds_no_script():
+    """A step that runs the pull request's script where the base holds none
+    lets a pull request run its own copy of the check."""
+    reads = _base_reads()
+
+    assert reads, "no workflow reads a script from the base; the scan is vacuous"
+    open_reads = [
+        f"{workflow.name}:{index}"
+        for workflow, index in reads
+        if not _fails_closed(_code_lines(workflow), index)
     ]
-    assert not copying, copying
+    assert not open_reads, open_reads
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        'git show "$BASE_SHA:$s" > "$c" || cp "$s" "$c"',
+        'if ! git show "$BASE_SHA:$s" > "$c"; then\n  cp "$s" "$c"\nfi',
+        'if ! git show "$BASE_SHA:$s" > "$c"; then\n  echo x\nelse\n  exit 1\nfi',
+        'if git cat-file -e "$BASE_SHA:$s"; then\n  git show "$BASE_SHA:$s" > "$c"',
+    ],
+)
+def test_a_fallback_to_the_pull_request_s_script_is_refused(step):
+    lines = step.splitlines()
+    index = next(i for i, line in enumerate(lines) if _BASE_READ in line)
+    assert not _fails_closed(lines, index)
