@@ -330,7 +330,9 @@ def _proposal_position(proposal: Mapping[str, Any]) -> object:
 
 
 def _holding(
-    position: str | None, items: Sequence[_Item], stated: Callable[[_Item], object]
+    position: str | None,
+    items: Sequence[_Item],
+    stated_position: Callable[[_Item], object],
 ) -> list[_Item]:
     """The items that state the reference's ruled position, or all of them.
 
@@ -339,7 +341,7 @@ def _holding(
     reference, because the scorer's gate refuses every other: an empty result
     is a ``position`` loss at whichever stage found the action at the place.
     """
-    return [item for item in items if holds_position(position, stated(item))]
+    return [item for item in items if holds_position(position, stated_position(item))]
 
 
 def _proposed_at(
