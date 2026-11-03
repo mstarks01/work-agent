@@ -1414,7 +1414,7 @@ class SqlJobStore:
                 if await self._resumed_by(connection, parent) is not None:
                     return Admission(outcome="resumed_already", active=0)
                 if revision != record.parent_revision:
-                    return Admission(outcome="parent_moved", active=0)
+                    return Admission(outcome="parent_stale", active=0)
             counted = await connection.execute(_counted(budget.window_start()))
             held: list[Envelope | UsageRow] = []
             for row in counted.all():

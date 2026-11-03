@@ -726,7 +726,7 @@ RefusalOutcome = Literal[
     "over_owner_budget",
     "over_global_budget",
     "resumed_already",
-    "parent_moved",
+    "parent_stale",
     "parent_missing",
     "principal_exists",
 ]
@@ -1320,7 +1320,7 @@ class InMemoryJobStore:
             if self._resumed_by(parent) is not None:
                 return Admission(outcome="resumed_already", active=0)
             if parent_record.revision != record.parent_revision:
-                return Admission(outcome="parent_moved", active=0)
+                return Admission(outcome="parent_stale", active=0)
 
         admission = check_bounds(record, self._rows(), ceiling=ceiling, budget=budget)
         if admission.outcome == "admitted":
