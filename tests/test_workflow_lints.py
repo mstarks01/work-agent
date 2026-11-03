@@ -480,9 +480,21 @@ def test_every_key_file_export_uses_the_registry_suffix():
 #: commit.
 _BASE_READ = 'git show "$BASE_SHA:'
 
+#: The two shapes of a base read that fail the step where the base holds no
+#: script: a bare read outside any shell ``if`` block, which ``bash -e`` stops
+#: on, and an ``if !`` read whose block prints a message and exits 1.
+_BARE_READ = re.compile(r'git show "\$BASE_SHA:[^"]+" > "[^"]+"')
+_GUARDED_READ = re.compile(
+    r'if ! git show "\$BASE_SHA:[^"]+" > "[^"]+"; then\n'
+    r'echo "[^"\n]*" >&2\n'
+    r"exit 1\n"
+    r"fi"
+)
+_BLOCK_OPEN = re.compile(r"if .*; then")
+
 
 def _base_reads() -> list[tuple[Path, int]]:
-    """Each workflow line that reads a script from the base, with its index."""
+    """Each workflow code line that reads a script from the base, by index."""
     return [
         (workflow, index)
         for workflow in _workflows()
@@ -492,24 +504,15 @@ def _base_reads() -> list[tuple[Path, int]]:
 
 
 def _fails_closed(lines: list[str], index: int) -> bool:
-    """Whether the base read at ``index`` fails the step where the base holds
-    no script: a ``git show`` outside any ``if`` block, which ``bash -e`` stops
-    on, or an ``if ! git show`` block that ends in ``exit 1`` and has no
-    ``else``."""
-    line = lines[index].strip()
-    if "||" in line:
-        return False
-    if line.startswith("git show"):
-        before = lines[index - 1].strip() if index else ""
-        return not before.endswith("then") and before != "else"
-    if not line.startswith("if ! git show"):
-        return False
-    block = []
-    for later in lines[index + 1 :]:
-        if later.strip() == "fi":
-            break
-        block.append(later.strip())
-    return "exit 1" in block and "else" not in block
+    """Whether the base read at ``index`` has one of the two shapes that fail
+    the step where the base holds no script."""
+    stripped = [line.strip() for line in lines]
+    depth = sum(
+        bool(_BLOCK_OPEN.fullmatch(line)) - (line == "fi") for line in stripped[:index]
+    )
+    bare = depth == 0 and _BARE_READ.fullmatch(stripped[index])
+    guarded = _GUARDED_READ.fullmatch("\n".join(stripped[index : index + 4]))
+    return bool(bare or guarded)
 
 
 def test_a_base_read_fails_closed_where_the_base_holds_no_script():
@@ -519,20 +522,42 @@ def test_a_base_read_fails_closed_where_the_base_holds_no_script():
 
     assert reads, "no workflow reads a script from the base; the scan is vacuous"
     open_reads = [
-        f"{workflow.name}:{index}"
+        f"{workflow.name}: {_code_lines(workflow)[index].strip()}"
         for workflow, index in reads
         if not _fails_closed(_code_lines(workflow), index)
     ]
     assert not open_reads, open_reads
 
 
+_READ = 'git show "$BASE_SHA:s" > "c"'
+
+
 @pytest.mark.parametrize(
     "step",
     [
-        'git show "$BASE_SHA:$s" > "$c" || cp "$s" "$c"',
-        'if ! git show "$BASE_SHA:$s" > "$c"; then\n  cp "$s" "$c"\nfi',
-        'if ! git show "$BASE_SHA:$s" > "$c"; then\n  echo x\nelse\n  exit 1\nfi',
-        'if git cat-file -e "$BASE_SHA:$s"; then\n  git show "$BASE_SHA:$s" > "$c"',
+        _READ,
+        f'echo a\n{_READ}\nchmod +x "c"',
+        f'if ! {_READ}; then\n  echo "no s" >&2\n  exit 1\nfi',
+    ],
+)
+def test_a_read_that_fails_the_step_is_accepted(step):
+    lines = step.splitlines()
+    index = next(i for i, line in enumerate(lines) if _BASE_READ in line)
+    assert _fails_closed(lines, index)
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        f'{_READ} || cp s "c"',
+        f'{_READ} && chmod +x "c"',
+        f'if ! {_READ}; then\n  cp s "c"\nfi',
+        f'if ! {_READ}; then cp s "c"; fi\nif x; then\n  echo "y" >&2\n  exit 1\nfi',
+        f'if ! {_READ}; then\n  echo "no s" >&2\n  exit 1\nelse\n  cp s "c"\nfi',
+        f'if ! {_READ}; then\n  echo "no s" >&2\n  exit 1\nelif x; then\n  cp s "c"\nfi',
+        f'if ! {_READ}; then\n  if [ -n x ]; then\n    exit 1\n  fi\n  cp s "c"\nfi',
+        f'if git cat-file -e "$BASE_SHA:s"; then\n  {_READ}\nelse\n  cp s "c"\nfi',
+        f"if x; then\n  echo a\n  {_READ}\nfi",
     ],
 )
 def test_a_fallback_to_the_pull_request_s_script_is_refused(step):
