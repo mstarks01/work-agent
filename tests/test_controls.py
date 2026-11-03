@@ -313,6 +313,11 @@ class TestTheEvidenceRules:
             'raise ValueError("bad token: " + str(t))',
             "x = 'secret=' + s",
             'header = "Bearer token: " + t',
+            'log.info("password: " + pw + " set")',
+            'logger.debug("token=" + tok + ", user=" + user)',
+            "raise ValueError('bad token: ' + t + ' for ' + u)",
+            'msg = "token: " + t + "."',
+            'password: "********"',
         ],
     )
     def test_a_line_that_sets_no_literal_value_passes(self, line):
@@ -355,9 +360,18 @@ def test_a_long_or_unclosed_credential_is_refused(line, shape):
     )
 
 
-def test_a_hostile_line_is_read_in_linear_time():
-    """Many starts that each read 256 characters of a value and then fail."""
-    line = ("token=" * 42 + " ") * 400
+@pytest.mark.parametrize(
+    "line",
+    [
+        "token=" * 17_000,
+        'password="' * 10_000,
+        ("token=" * 42 + " ") * 400,
+        "token: " + "a" * 100_000,
+    ],
+)
+def test_a_hostile_line_is_read_in_linear_time(line):
+    """Each line holds many starts of an assignment. A scan that read each value
+    to the end of the line would take seconds on the first two."""
     started = time.perf_counter()
-    assert credential_hit(line) is None
+    credential_hit(line)
     assert time.perf_counter() - started < 1

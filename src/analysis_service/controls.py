@@ -322,9 +322,10 @@ class EvidenceRefusal:
 #: redacts nothing (ADR 0127). An assignment counts only where it sets a
 #: literal value: a quoted string that closes, a quoted or an unquoted run of
 #: 256 characters, or an unquoted value at the end of its line that holds a
-#: digit or a symbol. So a type name, a reference and a string that a quote
-#: closes before the assignment pass. Each start reads at most 257 characters
-#: of a value, so one scan of a line stays linear.
+#: digit or a symbol. A value that starts with a reference, a mask, a space or
+#: a joining character does not count, so a type name, a masked value and a
+#: string that ends at the assignment and joins another value pass. Each start
+#: reads at most 257 characters of a value, so one scan of a line stays linear.
 CredentialShape = Literal[
     "a private key block",
     "a cloud access key ID",
@@ -344,8 +345,8 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
     ),
     "a password, secret or token set to a value": re.compile(
         r"(?i)(?<![\w.-])[\w.-]*(?:password|passwd|secret|token)[\"']?\s*[:=]\s*"
-        r"(?:\"(?![$<{%\"])(?:[^\"\n]{1,256}\"|[^\"\n]{256})"
-        r"|'(?![$<{%'])(?:[^'\n]{1,256}'|[^'\n]{256})"
+        r"(?:\"(?![$<{%*\"\s,)+])(?:[^\"\n]{1,256}\"|[^\"\n]{256})"
+        r"|'(?![$<{%*'\s,)+])(?:[^'\n]{1,256}'|[^'\n]{256})"
         rf"|(?![$<{{%*])(?:(?={_UNQUOTED}{{0,255}}[\d!@^&*+~?/\\|]){_UNQUOTED}{{1,256}}\s*$"
         rf"|{_UNQUOTED}{{256}}))"
     ),

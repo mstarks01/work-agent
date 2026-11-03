@@ -2358,8 +2358,11 @@ class SqlJobStore:
         if file is None:
             return None
         data = await self._objects.get(evidence_key(owner_id, control_id, evidence_id))
-        listed = _listed(await self.get_control(control_id, owner_id), evidence_id)
-        if data is None and listed is None:
+        if (
+            data is None
+            and _listed(await self.get_control(control_id, owner_id), evidence_id)
+            is None
+        ):
             # A delete or a replace removed the file after this read found it.
             return None
         if data is None or not hmac.compare_digest(object_digest(data), file.sha256):
