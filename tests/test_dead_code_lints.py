@@ -103,6 +103,10 @@ _PINNED = (
 #: as a property of the name, never as a ticket number. Delete the name and its
 #: tests instead when the reason is only that the tests exist.
 TEST_ONLY: dict[str, str] = {
+    "check_unit": (
+        "the one check of a Control row's unit, which the Control store and the"
+        " submit check of #2153 and #2154 call"
+    ),
     "measure_direction": (
         "the one aggregation ADR 0031 pins its direction numbers with, and the"
         " instrument a later candidate rule is priced through"

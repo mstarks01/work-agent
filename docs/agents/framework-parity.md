@@ -192,6 +192,17 @@ Start at the places where a one-package assumption survives:
   `tests/test_future_frameworks.py` drives a third package with three bands, a
   dense catalog, an empty prior and a gate on a field no prior names.
 
+- **The units a Control row names.** The package declares `units`, the closed
+  set of things its framework judges, and `unit_of`, the unit of one of its
+  claims (ADR 0123). A framework whose claims carry a catalog identifier
+  offers each grain its catalog publishes. A framework whose claims carry
+  none offers its lanes. An empty set is valid and offers no rows. The package
+  refuses to build when a unit names an undeclared lane or sits inside no unit
+  of the set. `check_unit` is the one check of a row's framework and unit.
+  `tests/test_framework_units.py` replays each archived report and fails when
+  `unit_of` names a unit outside the set, and `tests/test_future_frameworks.py`
+  gives a third package units of its own.
+
 - **Which class the service asks for.** A package overriding a neutral hook has
   to put it on the class the *caller* reaches, not merely on one of its own.
   An override on a class the caller does not reach resolves to the neutral

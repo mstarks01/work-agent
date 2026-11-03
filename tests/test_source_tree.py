@@ -341,6 +341,10 @@ _THE_WALK = frozenset({"tests/source_tree.py", "tests/test_source_tree.py"})
 #: ``path:scope``, with the reason. Every other test reads a named set through
 #: :mod:`tests.source_tree`.
 DATA_WALKS: dict[str, str] = {
+    "tests/test_framework_units.py:<module>": (
+        "replays the archived reports of the Baselines and the past runs, which"
+        " are run data"
+    ),
     **dict.fromkeys(
         (
             "tests/test_asvs.py:TestNothingIsRuledOutByVocabulary.test_no_corpus_model_loses_a_requirement_to_code",

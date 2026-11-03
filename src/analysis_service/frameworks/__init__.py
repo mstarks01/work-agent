@@ -28,6 +28,7 @@ runs before an adapter binds and before an instruction composes.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -74,6 +75,9 @@ __all__ = [
     "PreconditionFacts",
     "PreconditionResult",
     "PredicateReader",
+    "Unit",
+    "UnitGrain",
+    "check_unit",
     "lane_of",
     "package_for",
     "run_precondition",
@@ -301,11 +305,31 @@ class IdRule:
         return True if self.known is None else self.known(lane, key)
 
 
+#: The grain of one unit: what the framework calls the thing a Control row names.
+UnitGrain = Literal["lane", "chapter", "section", "requirement"]
+
+
+@dataclass(frozen=True)
+class Unit:
+    """One unit a Control row can name: a thing the framework judges (ADR 0123).
+
+    ``id`` is the framework's own identifier, ``lane`` the lane that judges the
+    unit, and ``inside`` the ID of the unit that holds this one, or ``None`` at
+    the top. A unit carries no label: a published catalog's text keeps its own
+    licence, so a reader takes the label from the catalog.
+    """
+
+    id: str
+    grain: UnitGrain
+    lane: str
+    inside: str | None
+
+
 @dataclass(frozen=True)
 class FrameworkPackage:
     """One security framework as an object the service can run.
 
-    Thirteen members, plus text under one root by convention.
+    Fifteen members, plus text under one root by convention.
 
     ``name``
         The closed :data:`~analysis_service.claims.FrameworkName`. A package
@@ -370,6 +394,16 @@ class FrameworkPackage:
         follow-up asks first for the facts that the highest band of
         conditional findings waits on. How important a claim is, is judgement
         about a framework's own method, so a package declares it.
+    ``units``
+        The units a Control row can name, as a closed table of :class:`Unit`
+        rows. A framework whose claims carry a catalog identifier offers each
+        grain its catalog publishes; a framework whose claims carry none offers
+        its lanes. An empty table is valid and offers no rows. The package
+        refuses to build where a unit names an undeclared lane, an ``inside``
+        link names no unit of the table, or two units share an ID.
+    ``unit_of``
+        The ID of the unit one of this package's claims sits in, at the finest
+        grain the package offers.
     """
 
     name: FrameworkName
@@ -385,6 +419,15 @@ class FrameworkPackage:
     predicate_readers: Mapping[str, PredicateReader]
     bands: tuple[str, ...]
     rank: Callable[[Claim], Band]
+    units: tuple[Unit, ...]
+    unit_of: Callable[[Claim], str]
+
+    def __post_init__(self) -> None:
+        if issues := _unit_issues(self):
+            raise FrameworkPackageError(
+                f"framework package {self.name!r} declares ill-formed units: "
+                + "; ".join(issues)
+            )
 
     def rules_for(self, lane: str) -> tuple[Rule, ...]:
         """This package's rules in one lane, in declaration order."""
@@ -408,6 +451,22 @@ class FrameworkPackage:
         :class:`~analysis_service.claims.Severity`, so the name says the type.
         """
         return "severity" in self.record.model_fields
+
+
+def _unit_issues(package: FrameworkPackage) -> list[str]:
+    """Each unit sits in a declared lane and inside a unit of the same table."""
+    counts = Counter(unit.id for unit in package.units)
+    issues: list[str] = []
+    if repeated := sorted(unit for unit, count in counts.items() if count > 1):
+        issues.append(f"units repeat {', '.join(repeated)}")
+    if stray := sorted({unit.lane for unit in package.units} - set(package.lanes)):
+        issues.append(f"units name undeclared lanes: {', '.join(stray)}")
+    if orphans := sorted(
+        {unit.inside for unit in package.units if unit.inside is not None}
+        - counts.keys()
+    ):
+        issues.append(f"units sit inside no unit of the table: {', '.join(orphans)}")
+    return issues
 
 
 @dataclass(frozen=True)
@@ -455,6 +514,22 @@ class FrameworkSchemas:
     ruled_record: type[RuledClaim]
     block: type[FrameworkAnalysis]
     key_field: str
+
+
+def lane_of(claim: Claim) -> str | None:
+    """The lane a claim was reached in, read from the field its package stamps.
+
+    ``None`` for a package whose claims carry no lane field. The one reader for
+    the seams that key a claim by its lane:
+    :func:`~analysis_service.claim_identity.finding_key` and the grounds count in
+    ``evals/harness/grounds.py``. A reference record carries its lane in the
+    same declared field, which ``evals/verify_corpus.py`` reads. The scorer
+    keys a claim's identity by its lane too, and the corpus records one action
+    at one place in two lanes as two findings, so a check that ignored the lane
+    deleted what the reference set counts.
+    """
+    field = PACKAGES[claim.framework].id_rule.lane_field
+    return getattr(claim, field) if field else None
 
 
 def _asvs_package() -> FrameworkPackage:
@@ -521,22 +596,6 @@ PACKAGES: Mapping[FrameworkName, FrameworkPackage] = MappingProxyType(
 SCHEMAS: Mapping[FrameworkName, FrameworkSchemas] = MappingProxyType(
     {"asvs": _asvs_schemas(), "stride": _stride_schemas()}
 )
-
-
-def lane_of(claim: Claim) -> str | None:
-    """The lane a claim was reached in, read from the field its package stamps.
-
-    ``None`` for a package whose claims carry no lane field. The one reader for
-    the seams that key a claim by its lane:
-    :func:`~analysis_service.claim_identity.finding_key` and the grounds count in
-    ``evals/harness/grounds.py``. A reference record carries its lane in the
-    same declared field, which ``evals/verify_corpus.py`` reads. The scorer
-    keys a claim's identity by its lane too, and the corpus records one action
-    at one place in two lanes as two findings, so a check that ignored the lane
-    deleted what the reference set counts.
-    """
-    field = PACKAGES[claim.framework].id_rule.lane_field
-    return getattr(claim, field) if field else None
 
 
 #: The licence governing each package's *text*, as an SPDX identifier, keyed the
@@ -608,6 +667,22 @@ def package_for(name: FrameworkName) -> FrameworkPackage:
     refused by :func:`validate_package` before anything binds.
     """
     return PACKAGES[name]
+
+
+def check_unit(framework: str, unit_id: str) -> None:
+    """Refuse a Control row whose framework or unit this build does not carry.
+
+    **The one check of a row's unit.** A ``ValueError``, so a Pydantic
+    validator that calls it reports the refusal as a validation error.
+    """
+    package = next((p for name, p in PACKAGES.items() if name == framework), None)
+    if package is None:
+        raise ValueError(
+            f"framework {framework!r} is not one this build carries;"
+            f" it carries {sorted(PACKAGES)}"
+        )
+    if unit_id not in {unit.id for unit in package.units}:
+        raise ValueError(f"unit {unit_id!r} is not a unit of framework {framework!r}")
 
 
 def reads_capabilities(selection: Iterable[FrameworkName]) -> bool:
