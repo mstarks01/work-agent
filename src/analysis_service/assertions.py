@@ -695,10 +695,10 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
 def parse_predicate(name: str) -> PredicateName | None:
     """The predicate of :data:`REGISTRY` that ``name`` names, or ``None``.
 
-    **The per-row check of a predicate.** A row holds its predicate as a
-    ``str``, so a row that names no registered predicate still loads. The
-    gate refuses that row alone, as ``unknown-predicate``, and every other
-    reader that calls this passes over it.
+    A row holds its predicate as a ``str``, so a row that names no registered
+    predicate still loads. Each reader that calls this decides what that row
+    gets: the gate and the resolver refuse it alone, as ``unknown-predicate``,
+    and a reader that only describes rows passes over it.
     """
     return member(name, REGISTRY)
 

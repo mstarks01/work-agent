@@ -1,9 +1,9 @@
-"""The per-row check of each table that a ``str`` field names a key of.
+"""The parser of each table that a ``str`` field names a key of.
 
 A stored row holds the key as a ``str``, so a row with a key the table does
-not hold still loads. The per-row check is the parser: it gives a key the
-table holds back as the table's ``Literal``, and the reader refuses any other
-key on that row alone, with the code and message it states.
+not hold still loads. The parser gives a key the table holds back as the
+table's ``Literal``. A check refuses any other key on that row alone, with
+the code and message it states, and a label shows the key as written.
 """
 
 from __future__ import annotations

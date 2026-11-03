@@ -1476,10 +1476,10 @@ def lineage_issues(table: Mapping[_Key, Capability]) -> list[str]:
 def parse_capability_key(name: str) -> CapabilityKey | None:
     """The key of :data:`CAPABILITIES` that ``name`` names, or ``None``.
 
-    **The per-row check of a capability key.** A statement, a reader's row and
-    an open fact hold the key as a ``str``, so one that names no capability
-    still loads. The gate refuses that statement alone, as
-    ``invalid-reference``, and a label shows the key as it is written.
+    A statement, a reader's row and an open fact hold the key as a ``str``,
+    so one that names no capability still loads. Each reader that calls this
+    decides what that one gets: a check refuses it, and a label shows the key
+    as it is written.
     """
     return member(name, CAPABILITIES)
 
