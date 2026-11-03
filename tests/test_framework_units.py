@@ -3,8 +3,9 @@
 A package declares ``units``, its closed set of unit rows, and ``unit_of``, the
 unit one of its claims sits in. The package gate checks the table when the
 package is built, :func:`~analysis_service.frameworks.check_unit` checks a
-row's framework and unit, and a replay over the Baseline reports and the
-corpus references holds ``unit_of`` to the set through that check.
+row's framework and unit, and a replay over the Baseline reports and each
+ASVS reference record of the corpus holds ``unit_of`` to the set through that
+check.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from analysis_service.frameworks.asvs.catalog import CHAPTERS, REQUIREMENTS
 from analysis_service.frameworks.asvs.record import DraftRequirementRuling
 from evals.harness.artifact import CORPUS_DIR
 from evals.harness.bundle import read_report
-from evals.harness.reference import ReferenceRequirement, load_corpus
+from evals.harness.reference import load_corpus
 from tests.factories import PROJECT_ROOT, carrying
 
 BASELINE_REPORTS = sorted((PROJECT_ROOT / "evals/baselines").rglob("*.report.json"))
@@ -131,10 +132,10 @@ def test_the_unit_check_refuses_another_package_s_unit():
         check_unit("asvs", "spoofing")
 
 
-# --- The replay over the archived claims --------------------------------------
+# --- The unit replay ---------------------------------------------------------
 
 
-def _archived_claims() -> list[Claim]:
+def _replayed_claims() -> list[Claim]:
     """The claims of each Baseline report, and a claim for each ASVS reference.
 
     The Baselines hold the committed claims of a run. They are STRIDE only, so
@@ -152,9 +153,7 @@ def _archived_claims() -> list[Claim]:
             framework="asvs",
         )
         for case in load_corpus(CORPUS_DIR)
-        if "asvs" in case.references
-        for ref in case.claims_for("asvs")
-        if isinstance(ref, ReferenceRequirement)
+        for ref in case.requirements_for("asvs").values()
     ]
     return claims
 
@@ -172,25 +171,25 @@ def _stray_units(claims: list[Claim]) -> list[tuple[str, str]]:
 
 
 @pytest.fixture(scope="module")
-def archived_claims() -> list[Claim]:
-    return _archived_claims()
+def replayed_claims() -> list[Claim]:
+    return _replayed_claims()
 
 
-def test_the_replay_reads_claims_of_each_package(archived_claims):
-    assert {claim.framework for claim in archived_claims} == set(PACKAGES)
+def test_the_replay_reads_claims_of_each_package(replayed_claims):
+    assert {claim.framework for claim in replayed_claims} == set(PACKAGES)
 
 
-def test_unit_of_names_a_unit_of_the_set_for_each_archived_claim(archived_claims):
-    assert _stray_units(archived_claims) == []
+def test_unit_of_names_a_unit_of_the_set_for_each_replayed_claim(replayed_claims):
+    assert _stray_units(replayed_claims) == []
 
 
-def test_the_replay_fails_where_unit_of_leaves_the_set(monkeypatch, archived_claims):
+def test_the_replay_fails_where_unit_of_leaves_the_set(monkeypatch, replayed_claims):
     drifted = replace(PACKAGES["stride"], unit_of=lambda claim: f"{claim.id}-elsewhere")
     carrying(monkeypatch, drifted)
 
-    strays = _stray_units(archived_claims)
+    strays = _stray_units(replayed_claims)
 
     assert strays
     assert {claim_id for claim_id, _ in strays} <= {
-        claim.id for claim in archived_claims if claim.framework == "stride"
+        claim.id for claim in replayed_claims if claim.framework == "stride"
     }
