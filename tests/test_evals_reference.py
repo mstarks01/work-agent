@@ -443,6 +443,54 @@ def test_a_ruling_that_no_longer_fits_its_claim_fails_closed(tmp_path, edit, mes
         load_case(_ruled_case(tmp_path, edit))
 
 
+def _position(case_dir: Path, position: str = "outside") -> dict:
+    """A position ruling on reference 5 of :data:`RULED_CASE`, by its own fields."""
+    claim = load_case(case_dir).stride_claims()[5]
+    return {
+        "lane": claim.category,
+        "reference": {
+            "verb": claim.verb,
+            "affected_element_ids": list(claim.affected_element_ids),
+        },
+        "position": position,
+        "ruling": "The draft's attacker is the one the claim describes.",
+        "reviewed_by": "mstarks01",
+        "source": "a test",
+    }
+
+
+def test_a_ruled_position_loads_on_the_claim_it_names(tmp_path):
+    case_dir = _ruled_case(tmp_path)
+    ruled = _ruled_case(
+        tmp_path / "ruled", lambda r: r.update(positions=[_position(case_dir)])
+    )
+
+    assert load_case(ruled).ruled_positions == {5: "outside"}
+    assert load_case(case_dir).ruled_positions == {}
+
+
+@pytest.mark.parametrize(
+    ("positions", "message"),
+    [
+        (lambda one: [one, {**one, "position": "on-path"}], "a second position"),
+        (
+            lambda one: [{**one, "reference": {**one["reference"], "verb": "read"}}],
+            "names 0 reference claims",
+        ),
+        (lambda one: [{**one, "position": "inside"}], "rulings.json"),
+    ],
+    ids=["two-positions", "claim-moved", "unknown-position"],
+)
+def test_a_position_ruling_that_does_not_fit_fails_closed(tmp_path, positions, message):
+    one = _position(_ruled_case(tmp_path))
+    with pytest.raises(CorpusError, match=message):
+        load_case(
+            _ruled_case(
+                tmp_path / "ruled", lambda r: r.update(positions=positions(one))
+            )
+        )
+
+
 def test_a_repeated_source_label_is_refused_at_load(tmp_path):
     """The loader refuses the sources the service refuses: one rule, one reader."""
     case_dir = tmp_path / "16-library-lending-interview"

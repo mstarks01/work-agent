@@ -31,7 +31,7 @@ framework's own findings sit in its own block under `analyses`.
 
 ```python
 class Report:
-    schema_version: str  # "3.2"
+    schema_version: str  # "3.3"
     disclaimer: str  # the SERVICE's: AI-generated, not human-reviewed
     job: Job  # id, status="completed", timestamps, revise_rounds, frameworks
     input: InputRef  # system_name + one ref per submitted source
@@ -158,13 +158,17 @@ require at least one.
 ```python
 class Threat(RuledClaim):
     category: StrideCategory  # spoofing | tampering | repudiation | ...
+    attacker_position: AttackerPosition | None  # outside | on-path | ...
     severity: Severity
     mitigations: list[Mitigation]  # {summary, detail}
     confidence: Rating | None  # low | medium | high (critic-calibrated)
     recommendation: RecommendationReading | None  # {sound, note}
 ```
 
-Five fields, and nothing else. `confidence` is `null` only on a threat that
+Six fields, and nothing else. `attacker_position` is where the attacker stands
+when it acts: `outside`, `on-path`, `storage-copy`, `in-component` or
+`authorized-principal`. It is `null` only on a threat that a run wrote before
+the field existed. `confidence` is `null` only on a threat that
 code rejected for its lane, because nobody rated it. `recommendation` is the
 critic's reading of the threat's `mitigations`. It is `null` where the critic
 made none, and on every rejected threat.
@@ -1277,3 +1281,9 @@ version before it. Read it when you load an archived report.
   for a consumer that reads only the 3.1 fields. A route that parses a stored
   3.1 job record answers `409` (see
   [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
+- **Version 3.3:** each STRIDE threat carries `attacker_position`, where the
+  attacker stands when it acts: `outside`, `on-path`, `storage-copy`,
+  `in-component` or `authorized-principal`. It is `null` only on a threat that
+  a run wrote before the field existed. Additive for a consumer that reads only
+  the 3.2 fields. A route that parses a stored 3.2 job record answers `409`
+  (see [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).

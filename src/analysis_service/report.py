@@ -197,7 +197,11 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # ``origin``, which names its writer: ``assertion-pass`` or ``answer``. Every
 # span of an ``answer`` row quotes the answers Source, and no span of another
 # row quotes it. A stored 3.1 job record gets 409 ``UnreadableSchema``.
-SCHEMA_VERSION = "3.2"
+#
+# Version 3.3: each STRIDE threat carries ``attacker_position``, from a closed
+# set of five, and ``None`` only on a threat a run wrote before the field. A
+# stored 3.2 job record gets 409 ``UnreadableSchema``.
+SCHEMA_VERSION = "3.3"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
 # one framework. It does not say "threat model": that is false of a report

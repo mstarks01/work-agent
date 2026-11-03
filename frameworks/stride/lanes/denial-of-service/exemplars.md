@@ -19,6 +19,7 @@ The model states no rate limiting. Silence is not a control — rate likelihood 
     "process:ledger-service"
   ],
   "verb": "flood",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:entity:customer>process:web-api>submit-payment"
   ],
@@ -61,6 +62,7 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
     "flow:process:ledger-service>store:accounts-db>read-write-balances"
   ],
   "verb": "flood",
+  "attacker_position": "outside",
   "evidence_refs": [],
   "quotes": [
     {
@@ -101,6 +103,7 @@ Written against exemplar system B. The trigger is an `unknown` on an element rat
     "flow:process:mqtt-broker>process:stream-processor>consume-topic"
   ],
   "verb": "flood",
+  "attacker_position": "outside",
   "evidence_refs": [
     "unknown:process:stream-processor:exposure",
     "crossing:flow:process:mqtt-broker>process:stream-processor>consume-topic"

@@ -49,7 +49,7 @@ from typing import Any, Literal, get_args
 from google.genai import types
 from pydantic import BaseModel
 
-from analysis_service.claims import FrameworkName
+from analysis_service.claims import FrameworkName, ProposalBatch
 from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphRun, seed_state
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
@@ -395,6 +395,7 @@ def command_lane_replay(args: argparse.Namespace) -> int:
         written = {"record": record, **dumped}
         args.out.write_text(json.dumps(written, indent=2) + "\n", encoding="utf-8")
     if prepared is not None and args.framework == SCORED:
+        assert isinstance(batch, ProposalBatch)
         matched = lane_must_finds(case, prepared.state, args.lane, batch)
         print(f"must-finds matched: {list(matched)}")
     return 0

@@ -1001,6 +1001,49 @@ def test_the_reason_a_claim_rests_on_has_one_writer():
     ]
 
 
+#: The names a comparison of an attacker position uses: the parameters of
+#: ``scorer.holds_position``, the reader ``losses._holding`` takes, and the loss
+#: report's two position readers.
+_POSITION_NAMES = frozenset(
+    {
+        "ruled_position",
+        "stated_position",
+        "position_of",
+        "_draft_position",
+        "_proposal_position",
+    }
+)
+
+
+def _names_a_position(side: ast.AST) -> bool:
+    """Whether ``side`` is a draft's position, a ruled one, or a read of either."""
+    if isinstance(side, ast.Attribute):
+        return side.attr in {
+            "attacker_position",
+            "ruled_positions",
+        } or _names_a_position(side.value)
+    if isinstance(side, ast.Name):
+        return side.id in _POSITION_NAMES
+    if isinstance(side, ast.Call):
+        return _names_a_position(side.func) or any(
+            isinstance(arg, ast.Constant) and arg.value == "attacker_position"
+            for arg in side.args
+        )
+    if isinstance(side, ast.Subscript):
+        return _names_a_position(side.value)
+    return False
+
+
+def _compares_a_position(node: ast.AST) -> bool:
+    """Whether ``node`` compares an attacker position: a draft's
+    ``attacker_position``, a value read from ``ruled_positions``, a call to a
+    position reader, or a parameter of ``holds_position``. A local name that
+    holds a position, or a position reader, under another name is not seen."""
+    return isinstance(node, ast.Compare) and any(
+        _names_a_position(side) for side in (node.left, *node.comparators)
+    )
+
+
 def _spells_an_assertion_id(node: ast.AST) -> bool:
     """Whether ``node`` writes or reads the ``assertion:`` prefix of an ID."""
     return isinstance(node, ast.Constant) and str(node.value).startswith("assertion:")
@@ -1964,6 +2007,12 @@ class _OneReader:
 
 #: Each rule a docstring calls "the one reader" of, by the rule's name.
 ONE_READERS: dict[str, _OneReader] = {
+    "the position rule": _OneReader(
+        _compares_a_position,
+        ("evals/harness/scorer.py", "holds_position"),
+        {},
+        "",
+    ),
     "a version segment": _OneReader(
         _parses_a_version_segment,
         ("evals/harness/content.py", "stored_version"),

@@ -290,6 +290,16 @@ A cited assertion row adds its control too: the attribute its predicate
 projects into, or the predicate's own name. With the assertion pass on, a
 stated control reaches the mechanism through its row (ADR 0062).
 
+A draft's **Attacker Position** is not part of the key or the mechanism. Two
+drafts at one key with two positions are one finding to a vote unless their
+mechanisms are apart. The position rule has one reader in the evals,
+`scorer.holds_position`. The scorer gate calls it to match a reference with a
+ruled position only to a draft that states it, and the loss report calls it to
+charge a miss to `position`. A `ONE_READERS` row in
+`tests/test_one_reader_lints.py` refuses a comparison of a draft's position, a
+ruled position or a position reader in any other function; a local name that
+holds a position, or a position reader, under another name is not seen.
+
 ### A vote also records what it judged
 
 The rule above recognises a **topic**, and is blind to what a claim says. That

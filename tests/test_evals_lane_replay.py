@@ -18,7 +18,10 @@ from pathlib import Path
 import pytest
 
 from analysis_service.frameworks import LANE_CLOSING_DOC, PACKAGES
-from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.frameworks.stride.record import (
+    ArchivedThreatProposals,
+    DraftThreat,
+)
 from analysis_service.graph import FrameworkNodes
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import lane_closing
@@ -500,7 +503,9 @@ def test_each_lane_scores_the_must_finds_the_run_drafts_match(recorded, case):  
     by_lane = {
         index
         for lane, batch in proposals["stride"].items()
-        for index in lane_must_finds(case, prepared.state, lane, batch)
+        for index in lane_must_finds(
+            case, prepared.state, lane, ArchivedThreatProposals.model_validate(batch)
+        )
     }
     whole = {
         pair.reference_index

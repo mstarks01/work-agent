@@ -1178,7 +1178,13 @@ def test_the_unit_of_a_draft_is_its_requirement():
     draft = DraftRequirementRuling.model_validate(
         {
             **sample_draft("S-01").model_dump(
-                exclude={"category", "verb", "severity", "mitigations"}
+                exclude={
+                    "category",
+                    "verb",
+                    "attacker_position",
+                    "severity",
+                    "mitigations",
+                }
             ),
             "id": "v5.0.0-6.2.1",
             "chapter": "authentication",

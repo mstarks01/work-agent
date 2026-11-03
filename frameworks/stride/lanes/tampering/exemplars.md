@@ -22,6 +22,7 @@ Two shapes, one test: what does the fix protect? This draft is `alter-in-transit
     "process:ledger-service"
   ],
   "verb": "alter-in-transit",
+  "attacker_position": "on-path",
   "evidence_refs": [
     "crossing:flow:process:web-api>process:ledger-service>post-transfer",
     "absent:flow:process:web-api>process:ledger-service>post-transfer:authentication",
@@ -61,6 +62,7 @@ Two shapes, one test: what does the fix protect? This draft is `alter-in-transit
     "process:ledger-service"
   ],
   "verb": "alter",
+  "attacker_position": "outside",
   "evidence_refs": [],
   "quotes": [
     {
@@ -102,6 +104,7 @@ Written against exemplar system B. The submitter's own words are the trigger her
     "store:telemetry-store"
   ],
   "verb": "forge",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:process:mqtt-broker>process:stream-processor>consume-topic",
     "unknown:flow:process:mqtt-broker>process:stream-processor>consume-topic:authentication"

@@ -154,6 +154,11 @@ DECLARED: dict[str, str] = {
         " reads capabilities: a package whose units carry an applicability"
         " expression."
     ),
+    "evals/experiments/QA-2026-10-09-03/summarize.py": (
+        "This code is that framework's. It reads the stored answers of a lane"
+        " that drafts by a verb and a place, and scores them against the"
+        " must-finds of that package's references."
+    ),
     "evals/experiments/QA-2026-11-02-05/mechanism_proxy.py": (
         "This code is that framework's. It reads the must-finds of a package"
         " whose references a lane drafts by a verb and a place, and the drafts"
@@ -1121,6 +1126,7 @@ COUNT_WORDS = {
     8: "eight",
     9: "nine",
     10: "ten",
+    11: "eleven",
     17: "seventeen",
 }
 
