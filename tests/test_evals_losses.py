@@ -246,6 +246,69 @@ def test_a_killed_draft_at_the_place_with_the_reference_verb_is_the_critics(
     assert loss.draft_id == draft.id
 
 
+def _ruled_at_zero(case):
+    return replace(case, ruled_positions=MappingProxyType({0: "in-component"}))
+
+
+@pytest.mark.parametrize(
+    ("stated", "cause"),
+    [("storage-copy", "position"), ("in-component", "critic")],
+    ids=["another", "same"],
+)
+def test_a_killed_draft_with_another_position_is_a_position_loss(
+    case, flows, stated, cause
+):
+    """A critic fix cannot recover a draft the scorer's gate would refuse."""
+    reference = case.stride_claims()[0]
+    draft = at(reference, 1, reference.verb).model_copy(
+        update={"attacker_position": stated}
+    )
+
+    charged = charge(_ruled_at_zero(case), flows, [draft], [])
+
+    assert by_index(charged)[0].cause == cause
+
+
+def test_a_merge_names_the_claim_that_states_the_ruled_position(
+    merge_case, merge_flows
+):
+    """Two claims carry the action at the place; the row names the one the
+    gate accepts, not the lower ID."""
+    case, flows = merge_case, merge_flows
+    references = case.stride_claims()
+    first, second = next(
+        (i, j)
+        for i, left in enumerate(references)
+        for j, right in enumerate(references)
+        if i < j
+        and left.category == right.category
+        and left.verb == right.verb
+        and endpoint_subset(
+            left.affected_element_ids, right.affected_element_ids, flows
+        )
+    )
+    other = at(references[first], 1, references[first].verb).model_copy(
+        update={"attacker_position": "storage-copy"}
+    )
+    holding = at(references[first], 2, references[first].verb).model_copy(
+        update={"attacker_position": "in-component"}
+    )
+    ruled = replace(
+        case,
+        ruled_positions=MappingProxyType(
+            {first: "in-component", second: "in-component"}
+        ),
+    )
+
+    charged = by_index(
+        charge(ruled, flows, [other, holding], [promote(other), promote(holding)])
+    )
+
+    (missed,) = [i for i in (first, second) if i in charged]
+    assert charged[missed].cause == "merged"
+    assert charged[missed].draft_id == holding.id
+
+
 def test_a_killed_draft_at_a_ruled_reading_is_the_critics(case, flows):
     """The ladder reads every reading the scorer accepts (``stride_readings``),
     so a draft the critic killed at a ruled place charges the critic."""
@@ -950,6 +1013,24 @@ class TestAFanInDrop:
         assert loss.fan_in_reasons == ("quote not in source",)
         assert loss.place_relation == "equal"
         assert not charged.proposed_nothing
+
+    @pytest.mark.parametrize(
+        ("stated", "cause"),
+        [(None, "position"), ("in-component", "fan-in")],
+        ids=["unstated", "same"],
+    )
+    def test_a_lost_proposal_with_another_position_is_a_position_loss(
+        self, case, flows, stated, cause
+    ):
+        """A fan-in fix cannot recover a proposal the scorer's gate would refuse."""
+        reference = case.stride_claims()[0]
+        proposed = proposed_at(reference, reference.verb)
+        if stated is not None:
+            proposed[reference.category]["claims"][0]["attacker_position"] = stated
+
+        charged = charge(_ruled_at_zero(case), flows, [], [], proposed=proposed)
+
+        assert by_index(charged)[0].cause == cause
 
     def test_lanes_that_proposed_nothing_have_no_fan_in_row_and_say_so(
         self, case, flows

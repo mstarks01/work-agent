@@ -20,10 +20,13 @@ Eight causes, decided in this order for one missed reference:
   whether one nests inside the other: containment is how a draft answering
   another question lands on this cause, and a ceiling is priced on the equal
   rows.
-* ``position``: surviving claims cite the place with the reference's own
-  action, and a person ruled the reference an attacker position that none of
-  them states. The lane wrote the action against another attacker, which the
-  scorer's position gate refuses.
+* ``position``: claims cite the place with the reference's own action, and a
+  person ruled the reference an attacker position that none of them states.
+  The lane wrote the action against another attacker, which the scorer's
+  position gate refuses. Each later stage reads the same rule: a draft the
+  critic killed and a proposal the fan-in lost answer the reference only where
+  they state its ruled position, so a stage that finds the action at the place
+  and only other positions charges ``position``, not itself.
 * ``merged``: a surviving claim cites the place with the reference's own
   action, read through the equivalence table the identity rule reads, and the
   scorer assigned it to a sibling reference. Two references at
@@ -74,9 +77,9 @@ has no loss to charge, and an unlisted draft is the queue's to judge.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, get_args
+from typing import Any, Literal, TypeVar, get_args
 
 from analysis_service.claims import ASSERTION_GROUNDS, DroppedClaim, FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
@@ -311,6 +314,30 @@ def _at_place(
     ]
 
 
+_Item = TypeVar("_Item")
+
+
+def _draft_position(draft: DraftThreat) -> str | None:
+    return draft.attacker_position
+
+
+def _proposal_position(proposal: Mapping[str, Any]) -> object:
+    return proposal.get("attacker_position")
+
+
+def _holding(
+    position: str | None, items: Sequence[_Item], stated: Callable[[_Item], object]
+) -> list[_Item]:
+    """The items that state the reference's ruled position, or all of them.
+
+    A reference with no ruled position takes any position, so every item holds.
+    Where a person ruled one, only an item that states it can answer the
+    reference, because the scorer's gate refuses every other: an empty result
+    is a ``position`` loss at whichever stage found the action at the place.
+    """
+    return [item for item in items if position is None or stated(item) == position]
+
+
 def _proposed_at(
     reference_ids: Sequence[str],
     lane_batch: object,
@@ -460,6 +487,7 @@ def attribute_case(
     for index in score.missed:
         reference = references[index]
         lane = reference.category
+        position = case.ruled_positions.get(index)
         verb = reference.verb
         if verb is None:
             # ``tests/test_verb_coverage.py`` holds every STRIDE reference to a
@@ -483,19 +511,14 @@ def attribute_case(
         if found is not None:
             read_verb, place, at_place = found
             claim = _charged_to(at_place, read_verb)
-            position = case.ruled_positions.get(index)
-            stated = {
-                one.attacker_position
-                for one in at_place
-                if same_action(one.verb, read_verb)
-            }
-            charged: Cause = (
-                "verb"
-                if not same_action(claim.verb, read_verb)
-                else "position"
-                if position is not None and position not in stated
-                else "merged"
-            )
+            charged: Cause = "verb"
+            if same_action(claim.verb, read_verb):
+                with_action = [
+                    one for one in at_place if same_action(one.verb, read_verb)
+                ]
+                held = _holding(position, with_action, _draft_position)
+                charged = "merged" if held else "position"
+                claim = _charged_to(held or with_action, read_verb)
             losses.append(
                 Loss(
                     index,
@@ -554,13 +577,14 @@ def attribute_case(
             # ID is the whole of the choice — and it is still a choice, so the
             # same reader makes it.
             read_verb, place, killed_here = found
-            draft = _charged_to(killed_here, read_verb)
+            held = _holding(position, killed_here, _draft_position)
+            draft = _charged_to(held or killed_here, read_verb)
             losses.append(
                 Loss(
                     index,
                     lane,
                     index in must_find,
-                    "critic",
+                    "critic" if held else "position",
                     verb,
                     draft_id=draft.id,
                     draft_verb=draft.verb,
@@ -580,7 +604,11 @@ def attribute_case(
         )
         if offered is not None:
             read_verb, place, proposed_here = offered
-            proposal = min(proposed_here, key=lambda claim: str(claim.get("title", "")))
+            held_proposals = _holding(position, proposed_here, _proposal_position)
+            proposal = min(
+                held_proposals or proposed_here,
+                key=lambda claim: str(claim.get("title", "")),
+            )
             title = str(proposal.get("title", ""))
             # The draft the fan-in made of this proposal, if it kept one: the
             # fan-in keeps a proposal's title and action, and assigns the ID.
@@ -606,7 +634,7 @@ def attribute_case(
                     index,
                     lane,
                     index in must_find,
-                    "fan-in",
+                    "fan-in" if held_proposals else "position",
                     verb,
                     draft_id=kept[0].id if kept else None,
                     draft_verb=proposal["verb"],

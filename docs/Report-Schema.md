@@ -31,7 +31,7 @@ framework's own findings sit in its own block under `analyses`.
 
 ```python
 class Report:
-    schema_version: str  # "3.2"
+    schema_version: str  # "3.3"
     disclaimer: str  # the SERVICE's: AI-generated, not human-reviewed
     job: Job  # id, status="completed", timestamps, revise_rounds, frameworks
     input: InputRef  # system_name + one ref per submitted source
