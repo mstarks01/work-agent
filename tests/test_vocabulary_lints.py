@@ -42,10 +42,12 @@ a table that code reads by a key that is not a literal, is a closed set when
 its value has one of these shapes. The list is complete: :func:`_shape` counts
 these shapes and no other.
 
-- a tuple or set display of string literals, which may unpack another value
-  with ``*``: ``("a", "b")``, ``{"a", *OTHER}``;
-- a dict display whose keys are string literals, which may unpack another
-  value with ``**``: ``{"a": 1, **OTHER}``;
+- a tuple or set display of string literals and values unpacked with ``*``,
+  which holds a string literal or unpacks a counted value: ``("a", "b")``,
+  ``{"a", *OTHER}``, ``(*COUNTED,)``;
+- a dict display whose keys are string literals and values unpacked with
+  ``**``, which holds a string literal key or unpacks a counted value:
+  ``{"a": 1, **OTHER}``, ``{**COUNTED}``;
 - a set comprehension or a dict comprehension;
 - ``|``, ``-``, ``&``, ``^`` or ``+`` with a counted operand;
 - ``get_args(Kind)``;
@@ -300,28 +302,28 @@ PARTIAL: dict[tuple[str, str], str] = {
         " the value or leaves it is absent by construction"
     ),
     ("analysis_service.evidence", "ASSERTION_GLOSSES"): (
-        "the ground kinds a catalog row glosses, so a ground whose reference is"
-        " a quote, a derived fact or an attribute is absent by construction"
+        "the ground kinds that cite a catalog row, so a ground that cites no row"
+        " is absent by construction"
     ),
     ("analysis_service.graph", "_REFUSALS"): (
         "the precondition results that stop a framework, so the result that"
         " lets it run is absent by construction"
     ),
     ("analysis_service.links", "_LINK_REFUSALS"): (
-        "the issue codes a link answer draws when it places nothing, so a code"
-        " that only another kind of row draws is absent by construction"
+        "the issue codes raised for a link answer that places nothing, so a"
+        " code raised only for another kind of row is absent by construction"
     ),
     ("analysis_service.system_model", "ENDPOINT_PREFIXES"): (
-        "the prefixes a flow endpoint may carry, so a flow or a boundary, which"
-        " is never an endpoint, is absent by construction"
+        "the element types that sit in a zone, so a type that sits in no zone"
+        " is absent by construction"
     ),
     ("evals.harness.applicability", "EVIDENCE_FOR_DISPOSITION"): (
         "the dispositions that ask for a kind of evidence, so a disposition"
         " that rules without evidence is absent by construction"
     ),
     ("evals.harness.modes", "NAMED_TYPES"): (
-        "the element types a submitter's own text names, so a flow or a zone,"
-        " whose name the model coins, is absent by construction"
+        "the element types whose name the submitter's text holds, so a type"
+        " whose name the model coins is absent by construction"
     ),
     ("evals.harness.replay", "KEEPS"): (
         "the modes whose sweep keeps an emission or a catalog a replay reads, "
@@ -607,9 +609,15 @@ OPEN: dict[tuple[str, str], str] = {
     ),
 }
 
-#: The follow-up that empties :data:`PENDING`.
-_TYPE_THE_SOURCE = (
+#: The follow-up for an entry of :data:`PENDING` whose source is a ``str``.
+_PENDING_FOLLOW_UP = (
     "; the follow-up types that source with the Literal after an archive replay"
+)
+
+#: The follow-up for an entry of :data:`PENDING` whose ``Literal`` sits in a
+#: module that imports the set's module.
+_MOVE_THE_LITERAL = (
+    "; the follow-up names the Literal in a module that both modules import"
 )
 
 #: A closed set whose read keys are ``str`` at their source, by module and name,
@@ -619,77 +627,81 @@ _TYPE_THE_SOURCE = (
 #: whose set carries its ``Literal``.
 PENDING: dict[tuple[str, str], str] = {
     ("analysis_service.answer_forms", "CONTROL_SUGGESTIONS"): (
-        "read by an open fact's attribute name, which is a str field" + _TYPE_THE_SOURCE
+        "read by an open fact's attribute name, which is a str field"
+        + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.answer_forms", "_ATTRIBUTE_CHOICES"): (
-        "read by an open fact's attribute name, which is a str field" + _TYPE_THE_SOURCE
+        "read by an open fact's attribute name, which is a str field"
+        + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.assertions", "GRAPH_BOUND"): (
         "built from the keys of SUBJECT_PREFIXES, whose read key is a str"
-        + _TYPE_THE_SOURCE
+        + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.assertions", "QUALIFIED_SPELLING"): (
-        "read by a projection's attribute, which is a str field" + _TYPE_THE_SOURCE
+        "read by a projection's attribute, which is a str field" + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.assertions", "REGISTRY"): (
         "read by a row's predicate, which is a str field in the catalog, the"
-        " corpus and the replay rows" + _TYPE_THE_SOURCE
+        " corpus and the replay rows" + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.assertions", "SUBJECT_PREFIXES"): (
         "read by a subject type that a reference fact parses out of a subject ID"
-        " as a str" + _TYPE_THE_SOURCE
+        " as a str" + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.assertions", "_ELEMENT_TYPES"): (
         "read by the prefix that a str element ID carries before its colon"
-        + _TYPE_THE_SOURCE
+        + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.capabilities", "CAPABILITIES"): (
         "read by a capability key, which is a str field and a str parameter"
-        + _TYPE_THE_SOURCE
+        + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.compact", "COMPACT_ELEMENTS"): (
         "read by a model group name, which a str tuple of groups or a str"
-        " parameter holds" + _TYPE_THE_SOURCE
+        " parameter holds" + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.compact", "REF_TAGS"): (
         "read by a model group name, which a str tuple of groups or a str"
-        " parameter holds" + _TYPE_THE_SOURCE
+        " parameter holds" + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.frameworks.asvs.catalog", "CHAPTER_NUMBERS"): (
-        "built from a catalog chapter's lane, which is a str field" + _TYPE_THE_SOURCE
+        "read by a catalog chapter's lane, which is a str field, and its Literal"
+        " sits in a module that imports this one" + _MOVE_THE_LITERAL
     ),
     ("analysis_service.graph", "LANE_ARTIFACTS"): (
-        "read by an artifact name, which is a str parameter" + _TYPE_THE_SOURCE
+        "read by an artifact name, which is a str parameter" + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.question_kinds", "QUESTION_KINDS"): (
-        "read by an open fact's question kind, which is a str field" + _TYPE_THE_SOURCE
+        "read by an open fact's question kind, which is a str field"
+        + _PENDING_FOLLOW_UP
     ),
     ("evals.harness.attribution", "STAGE_FOR_OBSERVED"): (
         "read by an observation's kind, whose Literal is inline in a module that"
         " imports this one, so no name for it resolves here at run time"
-        + _TYPE_THE_SOURCE
+        + _MOVE_THE_LITERAL
     ),
     ("evals.harness.falsify", "PROBES"): (
-        "read by a probe name, which is a str parameter" + _TYPE_THE_SOURCE
+        "read by a probe name, which is a str parameter" + _PENDING_FOLLOW_UP
     ),
     ("evals.harness.gain", "GATES"): (
-        "read by a ledger row's gate, which is a str field" + _TYPE_THE_SOURCE
+        "read by a ledger row's gate, which is a str field" + _PENDING_FOLLOW_UP
     ),
     ("evals.harness.modes", "PROJECTION_COMPARED"): (
-        "read by a projection's attribute, which is a str field" + _TYPE_THE_SOURCE
+        "read by a projection's attribute, which is a str field" + _PENDING_FOLLOW_UP
     ),
     ("evals.harness.modes", "STATE_REDUCED"): (
         "built from the keys of a scored-attribute table keyed by str"
-        + _TYPE_THE_SOURCE
+        + _PENDING_FOLLOW_UP
     ),
     ("evals.harness.promotion", "BASELINE"): (
-        "read by a gate's figure name, which is a str field" + _TYPE_THE_SOURCE
+        "read by a gate's figure name, which is a str field" + _PENDING_FOLLOW_UP
     ),
     ("evals.harness.promotion", "GATES"): (
-        "read by a ledger row's gate, which is a str field" + _TYPE_THE_SOURCE
+        "read by a ledger row's gate, which is a str field" + _PENDING_FOLLOW_UP
     ),
     ("evals.harness.promotion", "PENDING"): (
-        "read by a ledger row's gate, which is a str field" + _TYPE_THE_SOURCE
+        "read by a ledger row's gate, which is a str field" + _PENDING_FOLLOW_UP
     ),
 }
 
@@ -704,16 +716,33 @@ def _strings(nodes: Sequence[ast.expr | None]) -> bool:
     return bool(nodes) and all(_string(node) for node in nodes)
 
 
+def _members(
+    members: Sequence[ast.expr], known: Callable[[ast.expr], Shape | None]
+) -> bool:
+    """Whether ``members`` are the members of a counted display: each a string
+    literal or an unpacked value, and one at least a string literal or an
+    unpacked counted value."""
+    unpacked = [member.value for member in members if isinstance(member, ast.Starred)]
+    literal = [member for member in members if not isinstance(member, ast.Starred)]
+    return all(_string(member) for member in literal) and (
+        bool(literal) or any(_operand_shape(one, known) for one in unpacked)
+    )
+
+
 def _shape(value: ast.expr, known: Callable[[ast.expr], Shape | None]) -> Shape | None:
     """The shape of ``value`` when it is one of the shapes the module docstring
     lists, or None. ``known`` gives the shape of a constant a name reads."""
     match value:
-        case ast.Dict(keys=keys) if keys and all(
-            key is None or _string(key) for key in keys
+        case ast.Dict(keys=keys, values=values) if _members(
+            [
+                key if key else ast.Starred(one)
+                for key, one in zip(keys, values, strict=True)
+            ],
+            known,
         ):
             return "table"
-        case ast.Tuple(elts=members) | ast.Set(elts=members) if members and all(
-            isinstance(member, ast.Starred) or _string(member) for member in members
+        case ast.Tuple(elts=members) | ast.Set(elts=members) if _members(
+            members, known
         ):
             return "set"
         case ast.SetComp():
@@ -725,28 +754,29 @@ def _shape(value: ast.expr, known: Callable[[ast.expr], Shape | None]) -> Shape 
             op=ast.BitOr() | ast.Sub() | ast.BitAnd() | ast.BitXor() | ast.Add(),
             right=right,
         ):
-            return _operand(left, known) or _operand(right, known)
+            return _operand_shape(left, known) or _operand_shape(right, known)
         case ast.Call(func=ast.Name(id="get_args"), args=[_]):
             return "set"
         case ast.Call(func=ast.Attribute(value=ast.Name(id="dict"), attr="fromkeys")):
             return "table"
         case ast.Call(func=ast.Attribute(value=receiver, attr="copy"), args=[]):
-            return _operand(receiver, known)
+            return _operand_shape(receiver, known)
         case ast.Call(func=ast.Attribute(value=receiver, attr="keys"), args=[]) if (
-            _operand(receiver, known) == "table"
+            _operand_shape(receiver, known) == "table"
         ):
             return "set"
         case ast.Call(func=ast.Attribute(value=receiver, attr=method), args=others) if (
             method in _SET_METHODS
-            and any(_operand(one, known) for one in (receiver, *others))
+            and any(_operand_shape(one, known) for one in (receiver, *others))
         ):
             return "set"
         case ast.Call(func=ast.Name(id=call), args=[member], keywords=[]) if (
             call in _SET_CALLS | _TABLE_CALLS
         ):
-            built = _operand(member, known) or (
+            built = _operand_shape(member, known) or (
                 isinstance(member, ast.ListComp | ast.GeneratorExp)
-                or isinstance(member, ast.List)
+                or call in _SET_CALLS
+                and isinstance(member, ast.List)
                 and _strings(member.elts)
             )
             if built:
@@ -754,7 +784,7 @@ def _shape(value: ast.expr, known: Callable[[ast.expr], Shape | None]) -> Shape 
     return None
 
 
-def _operand(
+def _operand_shape(
     value: ast.expr, known: Callable[[ast.expr], Shape | None]
 ) -> Shape | None:
     """The shape of an operand of an operator, a method or a call: a listed
@@ -900,7 +930,7 @@ def test_no_pending_declaration_outlives_its_table():
     both = sorted(set(PENDING) & set(OPEN))
 
     assert not stale, (
-        f"{stale} carry their Literal or are no longer read as a set; delete"
+        f"{stale} carry their Literal or are not read as a set; delete"
         " each PENDING entry"
     )
     assert not both, f"{both} are declared both open and pending"
@@ -995,13 +1025,17 @@ SUM = 1 + 2
 ALIAS = BASE
 SORTED_CALL = sorted(load())
 FROZEN_CALL = frozenset(load())
+UNPACKED_CALL = (*load(),)
+UNPACKED_TABLE_CALL = {**load()}
+LITERAL_AND_CALL = ("a", *load())
+TABLE_OF_A_LIST = dict(["a", "b"])
 """
 
 
 def test_the_sweep_counts_every_listed_shape_and_no_other():
-    """Each shape the module docstring lists is found, with its shape, and an
-    integer or type operator, a bare name and a call around an unknown value
-    are not. ``shapes`` comes first, so a name it imports is found on the
+    """Each shape the module docstring lists is found, with its shape. An
+    integer or type operator, a bare name, a call or a display around an
+    unknown value, and ``dict`` around a list display are not. ``shapes`` comes first, so a name it imports is found on the
     second pass."""
     trees = [("shapes", ast.parse(_SHAPES)), ("control", ast.parse(_CONTROL))]
     found = {
@@ -1015,7 +1049,7 @@ def test_the_sweep_counts_every_listed_shape_and_no_other():
     sets = {"BASE", "SET_COMPREHENSION", "FROM_A_LIST", "FROM_A_GENERATOR"}
     sets |= {"UNION", "DIFFERENCE", "INTERSECTION", "SYMMETRIC", "JOINED"}
     sets |= {"IMPORTED_COPY", "ARGS", "SET_OF_ARGS", "METHOD", "COPY", "KEYS"}
-    sets |= {"STARRED", "SORTED"}
+    sets |= {"STARRED", "SORTED", "LITERAL_AND_CALL"}
     assert found == dict.fromkeys(tables, "table") | dict.fromkeys(sets, "set")
 
 

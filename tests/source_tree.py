@@ -77,8 +77,8 @@ FROZEN_PROSE = ("docs/research", "evals/experiments")
 #: its day.
 EXPERIMENTS = "evals/experiments"
 
-#: The part of :data:`PYTHON` that no lint of the live rules reads, keyed for
-#: :func:`without`.
+#: The part of :data:`PYTHON` that a lint of a live rule may leave out, with
+#: the reason, keyed for :func:`without`.
 EXPERIMENT_SCRIPTS: Mapping[str, str] = {
     EXPERIMENTS: (
         "an audit script there runs one experiment as it ran on its day, so it"
