@@ -317,9 +317,10 @@ A save sends `control_scopes` to `/answer/{run}`: one entry for each Control
 that applies, with its element and, for a zone, the ticked elements. A
 Control with no entry is left out. A later save can tick it again. "Keep this
 name" sends `POST /workspace/controls/{control_id}/aliases`, which appends the
-name to the Control's aliases. A job that does not pause applies each match
-as the pause first shows it. An analysis that you open again lists
-`controls_used` from its own copy.
+name to the Control's aliases. A job that does not pause takes the default
+resolution: each match as the pause first shows it. An analysis that you
+open again lists `controls_used` from its own copy, with the state
+`applied` or `left-out`, or `pending` before the job has a model.
 
 ## The Settings page
 

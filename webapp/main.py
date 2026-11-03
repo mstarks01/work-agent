@@ -112,7 +112,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from contextlib import asynccontextmanager, nullcontext
+from contextlib import asynccontextmanager, nullcontext, suppress
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
@@ -1772,11 +1772,6 @@ def create_app(
         document = control.document
         scope = document.scope
         try:
-            alias_id = ControlScope(type=scope.type, name=alias).name_id()
-            if alias_id in scope.element_ids():
-                return _message(
-                    409, f"“{alias}” already names what “{document.name}” protects."
-                )
             widened = ControlScope.model_validate(
                 scope.model_dump() | {"aliases": [*scope.aliases, alias]}
             )
@@ -1856,7 +1851,12 @@ def create_app(
         copies = await store.controls(record.id, owner_id)
         if copies is None:
             await answers.missing(record, "controls")
-        payload["controls_used"] = controls_used(copies, record.control_scopes)
+        model = None
+        if copies and record.status in {"awaiting-answers", "completed"}:
+            # A withheld report shows no model, so its Controls stay pending.
+            with suppress(Withheld):
+                model = (await answers.answerable(record.id, owner_id)).model
+        payload["controls_used"] = controls_used(copies, record.control_scopes, model)
         payload["error"] = record.error
         payload["issues"] = [
             {"code": issue.code, "message": issue.message}

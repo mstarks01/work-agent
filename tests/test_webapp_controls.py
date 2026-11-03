@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.controls import Control, ControlDocument
+from analysis_service.job_controls import NOT_COPIED
 from analysis_service.jobs import Checkpoint, InMemoryJobStore, PipelineAwaiting
 from analysis_service.principals import Identity, Principal
 from analysis_service.sources import text_digest
@@ -326,6 +327,17 @@ class TestTheSave:
         assert refused.status_code == 400
         assert "outside" in refused.json()["message"]
 
+    def test_an_empty_zone_saved_with_no_tick_is_left_out(self, owner):
+        zone = owner.keep("Perimeter", {"type": "boundary", "name": "DMZ"})
+        run_id = owner.paused(zone)
+        saved = owner.save(run_id, [{"control": zone, "element": "boundary:dmz"}])
+        assert saved.status_code == 200, saved.text
+        assert owner.offer(run_id)["Perimeter"]["resolution"] == {
+            "state": "left-out",
+            "control": zone,
+            "reason": "empty-zone",
+        }
+
     def test_two_entries_for_one_control_are_refused(self, owner):
         sso = owner.keep("SSO", {"type": "application"})
         refused = owner.save(owner.paused(sso), [{"control": sso}, {"control": sso}])
@@ -337,7 +349,7 @@ class TestTheSave:
         other = owner.keep("Other", {"type": "application"})
         refused = owner.save(owner.paused(sso), [{"control": other}])
         assert refused.status_code == 400
-        assert other not in refused.json()["message"]
+        assert refused.json()["message"] == NOT_COPIED
 
     def test_many_controls_resolve_to_one_element(self, owner):
         waf = owner.keep("WAF", {"type": "process", "name": "Web App"})
@@ -379,11 +391,24 @@ class TestTheSubmission:
         after = owner.client.get(f"/workspace/runs/{run_id}").json()
         assert after == before
         assert after["controls_used"] == [
-            {"id": sso, "name": "SSO", "state": "pending"}
+            {"id": sso, "name": "SSO", "state": "applied"}
         ]
         copies = asyncio.run(owner.store.controls(run_id, owner.owner_id()))
         assert [copy.document.name for copy in copies] == ["SSO"]
         assert copies[0].evidence[0].text == "SSO: on\n"
+
+    def test_a_job_that_does_not_pause_lists_the_default(self, owner):
+        sso = owner.keep("SSO", {"type": "application"})
+        billing = owner.keep("Billing", {"type": "process", "name": "Billing"})
+        started = owner.submit(sso, billing, questions=False)
+        assert started.status_code == 200, started.text
+        run_id = started.json()["run"]
+        assert ran(owner.client, run_id) == "completed"
+        used = owner.client.get(f"/workspace/runs/{run_id}").json()["controls_used"]
+        assert [(entry["name"], entry["state"]) for entry in used] == [
+            ("SSO", "applied"),
+            ("Billing", "left-out"),
+        ]
 
     def test_a_job_with_no_control_lists_none(self, owner):
         run_id = owner.paused()
@@ -486,8 +511,8 @@ class TestKeepThisName:
         held = asyncio.run(owner.store.get_control(billing, owner.owner_id()))
         assert held.document.scope.aliases == ["Web App"]
         again = self.alias(owner, billing, "web app")
-        assert again.status_code == 409
-        assert "already" in again.json()["message"]
+        assert again.status_code == 400
+        assert "twice" in again.json()["message"]
 
     def test_an_alias_another_scope_holds_is_refused(self, owner):
         owner.keep("WAF", {"type": "process", "name": "Web App"})

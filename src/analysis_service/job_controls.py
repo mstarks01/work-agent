@@ -23,6 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.controls import (
     CONTROL_ID,
+    EVIDENCE_ID,
     Control,
     ControlDocument,
     ControlRow,
@@ -37,6 +38,7 @@ from analysis_service.system_model import (
     UNKNOWN,
     SystemModel,
     element_prefix,
+    is_zone,
 )
 
 #: How a scope that applies reached its element. ``application`` needs no
@@ -49,7 +51,9 @@ MatchOutcome = Literal[
 #: an alias, or its zone matched and no element holds the zone.
 NoMatch = Literal["missing-element", "empty-zone"]
 
-#: Why a copied Control does not apply to the job.
+#: Why a copied Control does not apply to the job. ``unticked`` is a scope
+#: that matched with no element ticked: the owner left it out, or a zone
+#: holds only candidates that the default does not tick.
 LeftOutReason = Literal["missing-element", "empty-zone", "unticked"]
 
 #: Why an element is a candidate of a zone scope: its zone is stated, its
@@ -63,6 +67,10 @@ CONTROL_GONE = (
     " from the analysis to continue."
 )
 
+#: The refusal of a pause save that names a Control the job did not copy. It
+#: names no ID either.
+NOT_COPIED = "The save names a Control that this analysis did not copy."
+
 _ElementId = Annotated[str, Field(max_length=ELEMENT_ID_MAX_CHARS, pattern=ELEMENT_ID)]
 
 
@@ -71,7 +79,7 @@ class CopiedEvidence(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, serialize_by_alias=True)
 
-    id: str
+    id: str = Field(pattern=EVIDENCE_ID)
     name: str
     evidence_class: EvidenceClass = Field(alias="class")
     sha256: Sha256Hex
@@ -161,7 +169,7 @@ class AppliedScope(BaseModel):
     def element_ids(self) -> tuple[str, ...]:
         """The elements the Control covers: the element of an element scope,
         each ticked element of a zone, and none for the whole application."""
-        if self.covers:
+        if is_zone(self.element):
             return tuple(cover.element for cover in self.covers if cover.ticked)
         return (self.element,) if self.element else ()
 
@@ -226,6 +234,22 @@ def zone_covers(model: SystemModel, boundary_id: str) -> tuple[CoveredElement, .
     return tuple(covers)
 
 
+def _holds_nothing(covers: Sequence[CoveredElement]) -> bool:
+    """Whether a zone with the candidates ``covers`` is an empty zone: no
+    element has the zone, stated or inferred."""
+    return all(cover.reason == "no-zone-stated" for cover in covers)
+
+
+def _reached_by(scope: ControlScope, element: str) -> MatchOutcome:
+    """How ``scope`` reached ``element``: its name, an alias, or the owner's
+    choice."""
+    if element == scope.name_id():
+        return "matched-by-name"
+    if element in scope.alias_ids():
+        return "matched-by-alias"
+    return "owner-mapped"
+
+
 def match_scope(scope: ControlScope, model: SystemModel) -> ScopeMatch:
     """Match ``scope`` to ``model`` by element ID: the name, then each alias.
 
@@ -235,18 +259,17 @@ def match_scope(scope: ControlScope, model: SystemModel) -> ScopeMatch:
     if scope.type == "application":
         return ScopeMatch("application")
     held = [element.id for element in model.elements()]
-    outcome: MatchOutcome = "matched-by-name"
-    element = scope.name_id()
-    if element not in held:
-        outcome = "matched-by-alias"
-        element = next((id_ for id_ in scope.alias_ids() if id_ in held), "")
+    element = next(
+        (id_ for id_ in (scope.name_id(), *scope.alias_ids()) if id_ in held), ""
+    )
     if not element:
         choices = tuple(id_ for id_ in held if element_prefix(id_) == scope.type)
         return ScopeMatch("missing-element", choices=choices)
+    outcome = _reached_by(scope, element)
     if scope.type != "boundary":
         return ScopeMatch(outcome, element)
     covers = zone_covers(model, element)
-    if all(cover.reason == "no-zone-stated" for cover in covers):
+    if _holds_nothing(covers):
         return ScopeMatch("empty-zone", element, covers)
     return ScopeMatch(outcome, element, covers)
 
@@ -254,12 +277,13 @@ def match_scope(scope: ControlScope, model: SystemModel) -> ScopeMatch:
 def _applied(
     control: str, outcome: MatchOutcome, element: str, covers: Sequence[CoveredElement]
 ) -> ControlResolution:
-    """The resolution of a scope that found ``element``: a zone with no tick
-    is left out."""
-    if covers and not any(cover.ticked for cover in covers):
-        empty = all(cover.reason == "no-zone-stated" for cover in covers)
+    """The resolution of a scope that reached ``element``. A zone applies
+    only with a ticked element: an empty zone, or a zone with no tick, is
+    left out."""
+    if is_zone(element) and not any(cover.ticked for cover in covers):
         return LeftOutScope(
-            control=control, reason="empty-zone" if empty else "unticked"
+            control=control,
+            reason="empty-zone" if _holds_nothing(covers) else "unticked",
         )
     return AppliedScope(
         control=control, outcome=outcome, element=element, covers=list(covers)
@@ -296,12 +320,7 @@ def _stated(
         )
     if model.get(entry.element) is None:
         raise ValueError(f"{entry.element} is not an element of this model.")
-    if entry.element == scope.name_id():
-        outcome: MatchOutcome = "matched-by-name"
-    elif entry.element in scope.alias_ids():
-        outcome = "matched-by-alias"
-    else:
-        outcome = "owner-mapped"
+    outcome = _reached_by(scope, entry.element)
     if scope.type != "boundary":
         if entry.ticked:
             raise ValueError(f"“{name}” protects one element, so it ticks none.")
@@ -329,27 +348,27 @@ def resolve_scopes(
     the copies' order, or a :class:`ValueError` that names the first fault.
 
     An entry names a Control the job holds, once. A copy with no entry is
-    left out: with its no-match reason where its scope matched nothing, else
-    ``unticked``. Many Controls may resolve to one element.
+    left out: with the reason its default gives where the default leaves it
+    out, else ``unticked``. Many Controls may resolve to one element.
     """
     held = {copy.id for copy in copies}
     named: dict[str, ControlScopeEntry] = {}
     for entry in entries:
         if entry.control not in held:
-            raise ValueError(CONTROL_GONE)
+            raise ValueError(NOT_COPIED)
         if entry.control in named:
             raise ValueError("The save names one Control twice.")
         named[entry.control] = entry
-    stated = []
+    stated: list[ControlResolution] = []
     for copy in copies:
         if copy.id in named:
             stated.append(_stated(copy, named[copy.id], model))
             continue
-        reason: LeftOutReason = "unticked"
-        match match_scope(copy.document.scope, model).outcome:
-            case "missing-element" | "empty-zone" as no_match:
-                reason = no_match
-        stated.append(LeftOutScope(control=copy.id, reason=reason))
+        default = default_resolution(copy, model)
+        if isinstance(default, LeftOutScope):
+            stated.append(default)
+        else:
+            stated.append(LeftOutScope(control=copy.id, reason="unticked"))
     return stated
 
 
@@ -363,7 +382,6 @@ def resolutions(
     **The one reader of what a job's Controls resolve to.** ``scopes`` is
     what the job row holds: the resolution a pause save stated for each copy,
     or ``None`` where no save stated one, and each copy takes its default.
-    The offer at the pause, the fact writer and the critic view read it.
     """
     if scopes is None:
         return [default_resolution(copy, model) for copy in copies]
@@ -410,24 +428,24 @@ def control_offer(
     return offer
 
 
-#: What the reopen payload says of a copied Control: what a pause save
-#: stated, or ``pending`` where no save stated it, and the default against
-#: the model decides it.
+#: What the reopen payload says of a copied Control: its resolution, or
+#: ``pending`` where the job has no model yet to resolve it against.
 UsedState = Literal["applied", "left-out", "pending"]
 
 
 def controls_used(
-    copies: Sequence[CopiedControl], scopes: Sequence[ControlResolution] | None
+    copies: Sequence[CopiedControl],
+    scopes: Sequence[ControlResolution] | None,
+    model: SystemModel | None,
 ) -> list[dict[str, str]]:
-    """Each copied Control of a job, read-only, with its :data:`UsedState`."""
-    stated: dict[str, UsedState] = {
-        scope.control: scope.state for scope in scopes or ()
-    }
+    """Each copied Control of a job, read-only, with its :data:`UsedState`.
+    ``model`` is the job's model, or ``None`` where the job has none yet."""
+    states: list[UsedState] = (
+        ["pending"] * len(copies)
+        if model is None
+        else [resolution.state for resolution in resolutions(copies, scopes, model)]
+    )
     return [
-        {
-            "id": copy.id,
-            "name": copy.document.name,
-            "state": stated.get(copy.id, "pending"),
-        }
-        for copy in copies
+        {"id": copy.id, "name": copy.document.name, "state": state}
+        for copy, state in zip(copies, states, strict=True)
     ]

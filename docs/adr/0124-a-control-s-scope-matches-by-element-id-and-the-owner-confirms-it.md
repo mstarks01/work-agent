@@ -66,8 +66,9 @@ candidate list, and two entries for one Control. Two Controls may resolve to
 one element, because a system has many protections on one part.
 
 **The job keeps the scope as authored and the outcome.** The copy holds the
-type, the name and the aliases at copy time. The job row's `control_scopes`
-holds one resolution per copy: the match outcome from `application`,
+type, the name and the aliases at copy time. A pause save writes one
+resolution per copy to the job row's `control_scopes`, and a job with no
+save takes the default of each copy: the match outcome from `application`,
 `matched-by-name`, `matched-by-alias`, `owner-mapped`, the element ID the
 scope resolved to, and for a zone each covered element with its reason and its
 tick; or, for a Control the owner left out, the reason `missing-element`,
