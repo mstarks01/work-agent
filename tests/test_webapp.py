@@ -53,6 +53,7 @@ from analysis_service.owner_files import (
     CONTROL_CHARACTER,
     NO_TEXT,
     NOT_PLAIN_TEXT,
+    NOT_UTF_8,
     OwnerFile,
     name_in_use,
     over_limit,
@@ -2607,7 +2608,7 @@ def test_no_page_script_words_a_refusal_the_server_words():
     """The server renders each refusal that the page's own checks of a file
     show (:func:`~webapp.main.file_refusals`), so the two cannot word one
     refusal two ways. A script that spells one again fails here."""
-    sentences = [too_large(7), NOT_PLAIN_TEXT, NO_TEXT, over_limit(7)]
+    sentences = [too_large(7), NOT_UTF_8, NOT_PLAIN_TEXT, NO_TEXT, over_limit(7)]
     fragments = [
         part for sentence in sentences for part in sentence.split("7") if len(part) > 12
     ]

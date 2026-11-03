@@ -27,12 +27,14 @@ from analysis_service.aws_identity import PLATFORM_METHODS, platform_session
 from analysis_service.objects import (
     OBJECT_STORES,
     S3_KEY_FILES,
+    ControlKey,
     FileKey,
     FilesystemObjectStore,
     JobKey,
     ObjectStore,
     ObjectStoreName,
     build_object_store,
+    evidence_key,
     file_key,
     key_parts,
     object_key,
@@ -523,16 +525,42 @@ def test_s3_env_refuses_to_run_without_moto(tmp_path):
 
 
 class TestTheKeyRules:
-    """A job key has three parts and a file key two (ADR 0118)."""
+    """A job key and an evidence key have three parts and a file key two
+    (ADRs 0118 and 0127)."""
 
     JOB = "job-" + "a" * 32
     FILE = "file-" + "b" * 32
+    CONTROL = "control-" + "c" * 32
+    EVIDENCE = "evidence-" + "d" * 32
 
     def test_each_shape_round_trips_with_its_type(self):
         assert key_parts(object_key("alice", self.JOB, "sources.json")) == JobKey(
             "alice", self.JOB, "sources.json"
         )
         assert key_parts(file_key("alice", self.FILE)) == FileKey("alice", self.FILE)
+        assert key_parts(
+            evidence_key("alice", self.CONTROL, self.EVIDENCE)
+        ) == ControlKey("alice", self.CONTROL, self.EVIDENCE)
+
+    @pytest.mark.parametrize(
+        ("owner_id", "control_id", "evidence_id"),
+        [
+            ("Alice", "control-" + "c" * 32, "evidence-" + "d" * 32),
+            ("../alice", "control-" + "c" * 32, "evidence-" + "d" * 32),
+            ("alice", "control-" + "C" * 32, "evidence-" + "d" * 32),
+            ("alice", "control-" + "c" * 31, "evidence-" + "d" * 32),
+            ("alice", "job-" + "c" * 32, "evidence-" + "d" * 32),
+            ("alice", "control-" + "c" * 32, "evidence-" + "d" * 33),
+            ("alice", "control-" + "c" * 32, "file-" + "d" * 32),
+            ("alice", "control-" + "c" * 32, "sources.json"),
+            ("alice", "control-" + "c" * 32, "evidence-" + "d" * 32 + "/x"),
+        ],
+    )
+    def test_an_evidence_key_refuses_each_part_outside_its_shape(
+        self, owner_id, control_id, evidence_id
+    ):
+        with pytest.raises(ValueError):
+            evidence_key(owner_id, control_id, evidence_id)
 
     @pytest.mark.parametrize(
         ("owner_id", "file_id"),
@@ -558,6 +586,10 @@ class TestTheKeyRules:
             "alice/" + "file-" + "b" * 32 + "/sources.json",
             "alice/" + "file-" + "b" * 32 + "/",
             "tenant/alice/" + "file-" + "b" * 32,
+            "alice/" + "control-" + "c" * 32 + "/sources.json",
+            "alice/" + "control-" + "c" * 32 + "/" + "file-" + "b" * 32,
+            "alice/" + "job-" + "a" * 32 + "/" + "evidence-" + "d" * 32,
+            "alice/" + "control-" + "c" * 32,
         ],
     )
     def test_a_key_no_builder_gives_has_no_parts(self, key):

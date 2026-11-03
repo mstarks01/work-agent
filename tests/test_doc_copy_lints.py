@@ -256,6 +256,8 @@ INPUT_LIMITS = {
     "max_source_bytes": SHIPPED_RESILIENCE.max_source_bytes,
     "max_sources": SHIPPED_RESILIENCE.max_sources,
     "max_owner_files": SHIPPED_RESILIENCE.max_owner_files,
+    "max_controls": SHIPPED_RESILIENCE.max_controls,
+    "max_control_evidence": SHIPPED_RESILIENCE.max_control_evidence,
     "job_deadline_ms": SHIPPED_RESILIENCE.job_deadline_ms,
     "max_active_jobs": SHIPPED_RESILIENCE.max_active_jobs,
     "label": MAX_LABEL_CHARS,

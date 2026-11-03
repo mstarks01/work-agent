@@ -80,6 +80,7 @@ from analysis_service.frameworks.asvs.catalog import (
     requirements_for,
 )
 from analysis_service.parsing import table_entry
+from analysis_service.sources import EvidenceClass
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -447,7 +448,7 @@ class RequirementProposal(Proposal):
     # `""` is a legal value — it is the ordinary answer, meaning the agent
     # ruled — but it must be *chosen* rather than fallen into. The enum is
     # what keeps a required field from becoming an invented one.
-    needs_evidence: Literal["", "prose", "code", "config", "people"]
+    needs_evidence: Literal["", "prose", EvidenceClass]
     # REQUIRED, WITH NO DEFAULT, for the reason ``needs_evidence`` is: the
     # schema obliges an answer where a prompt alone does not. Closed, so a
     # spelling outside the three is an invalid proposal rather than a fourth

@@ -896,6 +896,10 @@ ID_DERIVERS: dict[Site, str] = {
         "a non-graph subject is no element, and its ID takes the derivation an"
         " element ID has from its type prefix and its name"
     ),
+    ("src/analysis_service/controls.py", "_scope_id"): (
+        "a Control's scope holds a name and aliases of an element type, not an"
+        " element, and a match asks for the ID each name derives (ADR 0124)"
+    ),
     ("evals/verify_corpus.py", "_check_aliases"): (
         "an alias is a name and the type of the element it names, not an"
         " element, and the corpus check asks for the ID that name derives, a"
@@ -2148,7 +2152,7 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "a submission or a read-back": _OneReader(
         _marks_a_read_back,
-        ("src/analysis_service/fact_answers.py", "_read_back"),
+        ("src/analysis_service/fact_answers.py", "read_back"),
         {
             ("src/analysis_service/fact_answers.py", MODULE_OWNER): (
                 "the context a read-back passes, which the stores write"

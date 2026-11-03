@@ -117,6 +117,10 @@ def too_large(max_bytes: int) -> str:
     )
 
 
+#: The refusal of a file that is not strict UTF-8. The page decodes a file and
+#: shows it; the server shows it for a text that holds a lone surrogate.
+NOT_UTF_8 = "The page could not read this file as UTF-8 text. Upload a plain text file."
+
 #: The refusal of a file that holds a control character.
 NOT_PLAIN_TEXT = "This file holds control characters, so it is not a plain text file."
 

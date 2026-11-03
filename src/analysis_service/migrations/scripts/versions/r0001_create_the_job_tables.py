@@ -1,5 +1,5 @@
 """Create the tables of the sql job store: principals, jobs, job_events,
-usage_rows and owner_files.
+usage_rows, owner_files and controls.
 
 Revision ID: 0001
 Revises:
@@ -106,8 +106,24 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.UniqueConstraint("owner_id", "name"),
     )
+    op.create_table(
+        "controls",
+        sa.Column("id", sa.String(64), primary_key=True),
+        sa.Column(
+            "owner_id",
+            sa.String(64),
+            sa.ForeignKey("principals.owner_id"),
+            nullable=False,
+            index=True,
+        ),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("document", sa.Text(), nullable=False),
+        sa.UniqueConstraint("owner_id", "name"),
+    )
 
 
 def downgrade() -> None:
-    for table in ("owner_files", "usage_rows", "job_events", "jobs", "principals"):
+    tables = ("controls", "owner_files", "usage_rows", "job_events", "jobs")
+    for table in (*tables, "principals"):
         op.drop_table(table)

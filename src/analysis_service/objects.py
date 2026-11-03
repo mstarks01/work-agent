@@ -1,9 +1,10 @@
-"""The object store: where the ``sql`` job store keeps sources, reports and
-Owner Files (ADRs 0065 and 0118).
+"""The object store: where the ``sql`` job store keeps sources, reports,
+Owner Files and the evidence of Controls (ADRs 0065, 0118 and 0127).
 
 A job's sources and its report are each one object, under the key that
 :func:`object_key` gives. An Owner File's text is one object, under the key
-that :func:`file_key` gives. The job store writes each object once, writes the
+that :func:`file_key` gives, and so is one evidence file of a Control, under
+the key that :func:`evidence_key` gives. The job store writes each object once, writes the
 object before the row that names it, and keeps the SHA-256 of each object in
 that row. So this module stores bytes and checks nothing about them, and the
 job store checks the digest on each read.
@@ -26,6 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol, cast, get_args
 
+from analysis_service.controls import CONTROL_ID_PATTERN, EVIDENCE_ID_PATTERN
 from analysis_service.jobs import JOB_ID_PATTERN
 from analysis_service.owner_files import OWNER_FILE_ID_PATTERN
 from analysis_service.store_settings import (
@@ -76,6 +78,20 @@ def file_key(owner_id: str, file_id: str) -> str:
     return f"{_owner_part(owner_id)}/{file_id}"
 
 
+def evidence_key(owner_id: str, control_id: str, evidence_id: str) -> str:
+    """The key of one evidence file of a Control:
+    ``<owner-id>/<control-id>/<evidence-id>``.
+
+    **The one rule for an evidence key** (ADR 0127). It has three parts, as a
+    job key has, and the second part's prefix tells the two apart.
+    """
+    if not CONTROL_ID_PATTERN.fullmatch(control_id):
+        raise ValueError("a Control ID is not a key part")
+    if not EVIDENCE_ID_PATTERN.fullmatch(evidence_id):
+        raise ValueError("an evidence ID is not a key part")
+    return f"{_owner_part(owner_id)}/{control_id}/{evidence_id}"
+
+
 @dataclass(frozen=True)
 class JobKey:
     """The parts of a key that :func:`object_key` gives."""
@@ -93,15 +109,28 @@ class FileKey:
     file_id: str
 
 
-def key_parts(key: str) -> JobKey | FileKey | None:
-    """The parts of ``key``, typed by its shape, or ``None`` where neither
-    :func:`object_key` nor :func:`file_key` can give ``key``.
+@dataclass(frozen=True)
+class ControlKey:
+    """The parts of a key that :func:`evidence_key` gives."""
 
-    The two builders check each part, so this function holds no rule of its
-    own.
+    owner_id: str
+    control_id: str
+    evidence_id: str
+
+
+def key_parts(key: str) -> JobKey | FileKey | ControlKey | None:
+    """The parts of ``key``, typed by its shape, or ``None`` where no builder
+    of :func:`object_key`, :func:`file_key` and :func:`evidence_key` can give
+    ``key``.
+
+    The builders check each part, so this function holds no rule of its own.
     """
     parts = key.split("/")
     try:
+        if len(parts) == 3 and CONTROL_ID_PATTERN.fullmatch(parts[1]):
+            owner_id, control_id, evidence_id = parts
+            evidence_key(owner_id, control_id, evidence_id)
+            return ControlKey(owner_id, control_id, evidence_id)
         if len(parts) == 3:
             owner_id, job_id, name = parts
             object_key(owner_id, job_id, cast(ObjectName, name))
@@ -303,9 +332,9 @@ def _delete(root: Path, parts: list[str]) -> bool:
             os.unlink(name, dir_fd=folder)
     except FileNotFoundError:
         return False
-    # The job's directory goes with its last object. An owner's directory
-    # stays: every job and every Owner File of the owner writes under it, so
-    # a removal could race another write.
+    # A job's or a Control's directory goes with its last object. An owner's
+    # directory stays: every job, Owner File and Control of the owner writes
+    # under it, so a removal could race another write.
     if len(folders) < 2:
         return True
     with (

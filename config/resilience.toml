@@ -42,7 +42,7 @@
 # down still works and is still the blunt instrument; the budget is what makes
 # reaching for it rare.
 
-version = 9
+version = 10
 attempts = 3
 timeout_ms = 300000
 
@@ -122,6 +122,13 @@ max_sources = 10
 # one owner's store finite: one Owner File is at most `max_source_bytes`, so
 # an owner holds at most `max_owner_files` times that many bytes of them.
 max_owner_files = 100
+
+# How many Controls one owner keeps on the web app's Controls page, and how
+# many evidence files one Control holds. A save over either is refused.
+# Controls do not expire, and one evidence file is at most `max_source_bytes`,
+# so these two bound one owner's Controls.
+max_controls = 50
+max_control_evidence = 10
 
 # THE ONLY BOUND ON A CALLER (#113). Everything else in this file bounds one
 # request, one job's input, or one job's duration. None of them bounds the

@@ -143,7 +143,7 @@ FACET_ANSWERS: tuple[str, ...] = ("yes", "no", "not applicable")
 STORED: Mapping[str, bool] = MappingProxyType({"stored": True})
 
 
-def _read_back(info: ValidationInfo) -> bool:
+def read_back(info: ValidationInfo) -> bool:
     """True where the service reads back an answer it admitted earlier.
 
     **The one reader of "is this a submission or a read-back".** Each rule
@@ -178,7 +178,7 @@ class FactAnswer(BaseModel):
         **The one writer of a facet answer's value**, at admission. An
         answer read back under :data:`STORED` keeps the value it holds.
         """
-        if _read_back(info) or not isinstance(data, dict) or data.get("facets") is None:
+        if read_back(info) or not isinstance(data, dict) or data.get("facets") is None:
             return data
         facets, key = data["facets"], data.get("key")
         question = ""
@@ -235,7 +235,7 @@ class FactAnswer(BaseModel):
             case ("assertion",):
                 read = {"assertion": ref.assertion}
             case ("subject",):
-                if not (_read_back(info) or quotable(ref.subject)):
+                if not (read_back(info) or quotable(ref.subject)):
                     raise ValueError(
                         "a subject is one line, with no double quote and no"
                         " control or formatting character"

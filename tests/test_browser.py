@@ -30,6 +30,7 @@ import pytest
 
 from analysis_service.assertions import ABSENT, Assertion, AssertionCatalog, Subject
 from analysis_service.jobs import Checkpoint, PipelineAwaiting
+from analysis_service.owner_files import NOT_UTF_8
 from analysis_service.system_model import (
     SystemModel,
     derive_element_id,
@@ -1298,7 +1299,7 @@ def test_an_uploaded_transcript_alone_starts_an_analysis(page):
 
     upload("call.txt", b"\x89PNG\r\n\x1a\n\x00\x00")
     page.wait_for_selector("#problem", state="visible")
-    assert "UTF-8" in page.inner_text("#problem")
+    assert page.inner_text("#problem") == NOT_UTF_8
     assert page.is_hidden("#transcript-note")
 
     upload("call.txt", "Ana: the web app talks to a database. — Ben: yes.".encode())
