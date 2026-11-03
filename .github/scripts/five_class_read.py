@@ -87,8 +87,7 @@ PROMPT_HEADING = "## Prompt read"
 
 #: The table that pairs each prompt with the modules that decide what it says,
 #: beside this script. :func:`main` reads the base branch's copy, as the
-#: workflow runs the base branch's copy of this script, and falls back to this
-#: one where the base holds none.
+#: workflow runs the base branch's copy of this script.
 TABLE = Path(__file__).with_name("prompt_outcomes.toml")
 
 #: The placeholder in a module pattern or a prompt path that stands for a
@@ -271,15 +270,21 @@ def changed_paths(base: str, head: str) -> list[str]:
 
 
 def table_text(base: str, table: Path) -> str:
-    """The text of ``table`` at ``base``, or of this script's own copy where
-    ``base`` holds none."""
+    """The text of ``table`` at ``base``. A base that holds no copy stops the
+    check with an error that names the table."""
+    path = f".github/scripts/{table.name}"
     shown = subprocess.run(
-        ["git", "show", f"{base}:.github/scripts/{table.name}"],
+        ["git", "show", f"{base}:{path}"],
         capture_output=True,
         text=True,
         check=False,
     )
-    return shown.stdout if shown.returncode == 0 else table.read_text(encoding="utf-8")
+    if shown.returncode:
+        raise SystemExit(
+            f"The base commit {base} holds no {path}, so the check"
+            f" cannot read it: {shown.stderr.strip()}"
+        )
+    return shown.stdout
 
 
 def main(argv: list[str]) -> int:

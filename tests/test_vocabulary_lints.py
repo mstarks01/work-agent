@@ -140,15 +140,6 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the packages holding a lane no case exercises, which a package whose"
         " every lane is exercised does not appear in"
     ),
-    ("analysis_service.api", "_REFUSALS"): (
-        "the outcomes that refuse a submission, so the outcome that admits one "
-        "is absent by construction, and so is the one a minted ID cannot reach"
-    ),
-    ("webapp.main", "_ADMISSION_MESSAGES"): (
-        "the outcomes that refuse a page's submission, so the outcome that "
-        "admits one is absent by construction, and so is the one a minted ID "
-        "cannot reach"
-    ),
     ("analysis_service.assertions", "ANSWER_ISSUES"): (
         "the codes a submitter's answer draws when it places nothing, so a code"
         " that refuses a row, or that a row draws whatever the answers, is"
@@ -157,6 +148,15 @@ PARTIAL: dict[tuple[str, str], str] = {
     ("analysis_service.assertions", "CATALOG_REFUSALS"): (
         "the codes that refuse a whole catalog, so a code that refuses one row "
         "of it is absent by construction"
+    ),
+    ("analysis_service.assertions", "GATE_REFUSALS"): (
+        "the codes that refuse a row or a whole catalog, so a code whose row"
+        " stands, whose row an answer replaces, or that a submitter's answer"
+        " draws, is absent by construction"
+    ),
+    ("analysis_service.basis", "IN_SCOPE"): (
+        "the control attributes the diagnostic measures, so an attribute that"
+        " is declared out of scope, or not declared, is absent by construction"
     ),
     ("analysis_service.claims", "CONDITIONAL_GROUNDS"): (
         "the ground kinds that say a fact is unstated, so a ground that states "
@@ -185,8 +185,8 @@ PARTIAL: dict[tuple[str, str], str] = {
         "reserved or a forbidden param is absent by construction"
     ),
     ("analysis_service.validation", "CITATION_FIELDS"): (
-        "the source fields that locate the cited passage, its label and its"
-        " excerpt, so a field that records who spoke is absent by construction"
+        "the source fields the gate checks against the job's sources, so a"
+        " field that is never gated is absent by construction"
     ),
     ("analysis_service.validation", "RENAMING_CODES"): (
         "the codes whose repair may rename an element, so a code whose repair "
@@ -216,6 +216,15 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the modes whose graph ends in a report, so a mode that stops at "
         "extraction or at the catalog is absent by construction"
     ),
+    ("evals.harness.modes", "EXTRACTING_MODES"): (
+        "the modes whose graph runs extract and so keeps an emission, so a mode"
+        " whose graph does not run extract is absent by construction"
+    ),
+    ("evals.harness.modes", "_DEGRADED"): (
+        "the projection reasons that degrade a value, so a reason that carries"
+        " the catalog's own answer, an absence or an unknown included, is"
+        " absent by construction"
+    ),
     ("evals.harness.near_misses", "ASKABLE"): (
         "the vote statuses a displaced draft may carry and still be asked "
         "about, so the status of a draft a person refused is absent by "
@@ -224,6 +233,11 @@ PARTIAL: dict[tuple[str, str], str] = {
     ("evals.harness.population", "REACHES"): (
         "the routes that put a row in front of a lane, so a route that leaves a "
         "row open, set aside or refused is absent by construction"
+    ),
+    ("evals.harness.replay", "LOSSES"): (
+        "the fates a prompt change can aim at, so a fate that found the"
+        " reference, or that falls on a zone no producer need draw, is absent"
+        " by construction"
     ),
     ("evals.harness.replay", "ROW_LOSSES"): (
         "the row fates a prompt change can aim at, so a fate that keeps the"
@@ -236,8 +250,9 @@ PARTIAL: dict[tuple[str, str], str] = {
         " not a binding is absent by construction"
     ),
     ("evals.harness.replay", "ROUTES_OF"): (
-        "the modes whose sweep keeps an emission or a catalog a replay reads, "
-        "so a mode that keeps only reports is absent by construction"
+        "the modes a replay can place on an arm, so a mode whose sweep keeps"
+        " only a report, which a replay does not read, is absent by"
+        " construction"
     ),
     ("evals.harness.replay", "KEEPS"): (
         "the modes whose sweep keeps an emission or a catalog a replay reads, "

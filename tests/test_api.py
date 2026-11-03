@@ -35,6 +35,7 @@ from analysis_service.jobs import (
     NodeCallback,
     PipelineOutcome,
     PipelineRejected,
+    RefusalOutcome,
     StubPipelineRunner,
 )
 from analysis_service.parsing import ascii_int
@@ -1052,16 +1053,18 @@ class TestAdmissionOutcomes:
     """Every outcome the store can answer has one answer here, and only one starts a job."""
 
     def test_the_table_and_the_literal_agree(self):
-        """A new outcome is placed on purpose: a 429 with its message, or a defect.
+        """A new outcome is placed on purpose: a status with its message, or a defect.
 
-        Without this, a seventh outcome would fall through the refusal table.
+        Without this, a new outcome would fall through the refusal table.
         The route fails closed on anything that is not an admission, so the
         fall-through is a 500 rather than a started job, but a refusal that
-        deserves its 429 would still be answered as a defect.
+        deserves its status would still be answered as a defect.
         """
-        answered = set(_REFUSALS) | {"admitted", "duplicate"}
-
-        assert answered == set(get_args(AdmissionOutcome))
+        assert set(_REFUSALS) == set(get_args(RefusalOutcome))
+        assert set(get_args(AdmissionOutcome)) - set(get_args(RefusalOutcome)) == {
+            "admitted",
+            "duplicate",
+        }
 
     def test_an_outcome_the_table_does_not_know_starts_no_job(self, caplog):
         client, store = make_client(raise_server_exceptions=False)

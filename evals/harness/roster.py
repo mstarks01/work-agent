@@ -43,7 +43,7 @@ Standing = Literal["maintainer", "contributor"]
 #: listed again. Every published number states which of these its series
 #: includes; there is no third class and no per-voter weight — standing selects
 #: which votes a series reads, never how much a vote counts.
-STANDINGS: frozenset[str] = frozenset(get_args(Standing))
+STANDINGS: frozenset[Standing] = frozenset(get_args(Standing))
 
 #: The login shape the ledger enforces on ``voter``, **called** rather than
 #: spelled again: the roster refuses a key that could never name a vote file,

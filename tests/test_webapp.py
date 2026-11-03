@@ -45,9 +45,9 @@ from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.job_answers import OWNER_FILE_GONE
 from analysis_service.jobs import (
     JOB_ID_PATTERN,
-    AdmissionOutcome,
     InMemoryJobStore,
     JobRecord,
+    RefusalOutcome,
 )
 from analysis_service.owner_files import (
     CONTROL_CHARACTER,
@@ -802,9 +802,7 @@ def test_the_admission_messages_and_the_literal_agree():
     a page cannot cause."""
     from webapp.main import _ADMISSION_MESSAGES
 
-    answered = set(_ADMISSION_MESSAGES) | {"admitted", "duplicate"}
-
-    assert answered == set(get_args(AdmissionOutcome))
+    assert set(_ADMISSION_MESSAGES) == set(get_args(RefusalOutcome))
 
 
 def test_a_refused_submission_deletes_no_finished_job(tiers):

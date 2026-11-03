@@ -841,7 +841,8 @@ ANSWER_ISSUES: frozenset[CatalogIssueCode] = frozenset(
     {"unmatched-link", "unknown-link-element", "unmatched-answer"}
 )
 
-#: Every code that refuses a row: every code but three and the answer issues.
+#: Every code that refuses a row or a whole catalog: every code but three and
+#: the answer issues.
 #:
 #: :data:`CatalogIssueCode` holds what a report's ``assertions.issues`` can say.
 #: ``graph-contradiction`` is not a refusal: the row stands, stays settled and
@@ -853,7 +854,7 @@ ANSWER_ISSUES: frozenset[CatalogIssueCode] = frozenset(
 #: rather than left to a reader to remember, because ``tests/test_assertions.py``
 #: holds the gate's fixture table to exactly these, and a new code that is a
 #: refusal must fail there rather than quietly join the exception.
-GATE_REFUSALS: frozenset[str] = (
+GATE_REFUSALS: frozenset[CatalogIssueCode] = (
     frozenset(get_args(CatalogIssueCode))
     - {"graph-contradiction", "support-truncated", "superseded-by-answer"}
     - ANSWER_ISSUES

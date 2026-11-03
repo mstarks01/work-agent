@@ -57,7 +57,7 @@ OPTIONS: Mapping[FrameworkName, Mapping[str, Any]] = {
 
 #: Each case is read with each framework selected alone. Self-completing: a
 #: package missing from :data:`OPTIONS` raises here.
-SELECTIONS: Mapping[str, Mapping[FrameworkName, Mapping[str, Any]]] = {
+SELECTIONS: Mapping[FrameworkName, Mapping[FrameworkName, Mapping[str, Any]]] = {
     name: {name: OPTIONS[name]} for name in PACKAGES
 }
 

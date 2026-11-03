@@ -1758,7 +1758,7 @@ def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScor
 #: Read off the projection's own reasons rather than listed again, so a reason
 #: added to :data:`~analysis_service.assertions.ProjectionReason` is counted the
 #: day it lands.
-_DEGRADED: frozenset[str] = frozenset(get_args(ProjectionReason)) - {
+_DEGRADED: frozenset[ProjectionReason] = frozenset(get_args(ProjectionReason)) - {
     "stated",
     "absent",
     "unknown",
@@ -2546,7 +2546,7 @@ MODE_ENTRIES: dict[SweepMode, Entry] = {
 #: The modes whose graph runs ``extract``, and so the ones whose sweep keeps
 #: an emission beside its artifact. Read off the entries rather than listed,
 #: so a mode added tomorrow answers by the entry it builds.
-EXTRACTING_MODES: frozenset[str] = frozenset(
+EXTRACTING_MODES: frozenset[SweepMode] = frozenset(
     mode for mode, entry in MODE_ENTRIES.items() if entry in EXTRACTING_ENTRIES
 )
 
