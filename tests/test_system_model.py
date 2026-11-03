@@ -38,8 +38,9 @@ from tests.factories import valid_model
 
 
 def test_the_source_fields_name_fields_of_an_element():
-    """``ElementSourceField`` spells field names of the element model a second time."""
-    assert set(get_args(ElementSourceField)) <= set(ExternalEntity.model_fields)
+    """``ElementSourceField`` spells field names of each element type a second time."""
+    for element_type in get_args(Element):
+        assert set(get_args(ElementSourceField)) <= set(element_type.model_fields)
 
 
 class TestIdentity:

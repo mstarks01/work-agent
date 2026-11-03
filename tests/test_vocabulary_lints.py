@@ -164,8 +164,8 @@ PARTIAL: dict[tuple[str, str], str] = {
     ),
     ("analysis_service.claims", "ASSERTION_GROUNDS"): (
         "the ground kinds whose reference is a row of the assertion catalog, so"
-        " a ground that cites a quote, a derived fact, an element or an"
-        " attribute of one is absent by construction"
+        " a ground whose reference is not a catalog row is absent by"
+        " construction"
     ),
     ("analysis_service.open_facts", "_ATTRIBUTE_QUESTIONS"): (
         "the control attributes whose plain question reads badly, so an "
@@ -185,8 +185,8 @@ PARTIAL: dict[tuple[str, str], str] = {
         "reserved or a forbidden param is absent by construction"
     ),
     ("analysis_service.validation", "CITATION_FIELDS"): (
-        "the source fields that say where a source states the element, so a"
-        " field that records who spoke is absent by construction"
+        "the source fields that locate the cited passage, its label and its"
+        " excerpt, so a field that records who spoke is absent by construction"
     ),
     ("analysis_service.validation", "RENAMING_CODES"): (
         "the codes whose repair may rename an element, so a code whose repair "

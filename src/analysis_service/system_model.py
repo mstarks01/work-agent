@@ -65,7 +65,7 @@ AssetTag = Literal[
 ]
 CORE_ASSET_TAGS: frozenset[AssetTag] = frozenset(get_args(AssetTag))
 
-#: The element fields that record where a source states the element.
+#: The element fields that record the source of the element, and who spoke.
 ElementSourceField = Literal["source_excerpt", "source_label", "source_speaker"]
 
 
