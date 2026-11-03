@@ -1784,12 +1784,17 @@ def create_app(
             ),
             {},
             limits=current.control_limits,
+            read_at=control.updated_at,
         )
         match outcome:
             case "replaced":
                 return JSONResponse({"aliases": widened.aliases})
             case "absent":
                 return _message(404, _NO_SUCH_CONTROL)
+            case "moved":
+                return _message(
+                    409, "This Control changed at the same time. Try again."
+                )
             case "alias_in_use":
                 return _message(
                     409, f"Another Control's scope already holds “{alias}”."
@@ -1851,21 +1856,28 @@ def create_app(
         copies = await store.controls(record.id, owner_id)
         if copies is None:
             await answers.missing(record, "controls")
-        model = None
-        if copies:
-            # A job that serves no model leaves its Controls pending.
+        # A waiting job's questions and its Controls' model come from one
+        # read. A job that serves no model leaves its Controls pending.
+        asked = None
+        if record.status == "awaiting-answers":
+            asked = await answers.answerable(
+                record.id, owner_id, sources=sources, controls=copies
+            )
+        elif copies:
             with suppress(NotCompleted, Withheld):
-                model = (await answers.answerable(record.id, owner_id)).model
-        payload["controls_used"] = controls_used(copies, record.control_scopes, model)
+                asked = await answers.answerable(
+                    record.id, owner_id, sources=sources, controls=copies
+                )
+        payload["controls_used"] = controls_used(
+            copies, record.control_scopes, None if asked is None else asked.model
+        )
         payload["error"] = record.error
         payload["issues"] = [
             {"code": issue.code, "message": issue.message}
             for issue in record.validation_issues
         ]
-        if record.status == "awaiting-answers":
-            payload["questions"] = {"run": record.id} | await answers.questions(
-                record.id, owner_id
-            )
+        if asked is not None and record.status == "awaiting-answers":
+            payload["questions"] = {"run": record.id} | await answers.payload_of(asked)
         return JSONResponse(payload)
 
     @app.delete("/workspace/runs/{run_id}")

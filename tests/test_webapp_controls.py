@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.controls import Control, ControlDocument
+from analysis_service.job_answers import JobAnswers
 from analysis_service.job_controls import NOT_COPIED
 from analysis_service.jobs import Checkpoint, InMemoryJobStore, PipelineAwaiting
 from analysis_service.principals import Identity, Principal
@@ -422,6 +423,16 @@ class TestTheSubmission:
         assert started.status_code == 200, started.text
         run_id = started.json()["run"]
         assert ran(owner.client, run_id) == "failed"
+        used = owner.client.get(f"/workspace/runs/{run_id}").json()["controls_used"]
+        assert used == [{"id": sso, "name": "SSO", "state": "pending"}]
+
+    def test_a_withheld_report_lists_each_control_pending(self, owner, monkeypatch):
+        sso = owner.keep("SSO", {"type": "application"})
+        started = owner.submit(sso, questions=False)
+        assert started.status_code == 200, started.text
+        run_id = started.json()["run"]
+        assert ran(owner.client, run_id) == "completed"
+        monkeypatch.setattr(JobAnswers, "withheld", lambda self, record: object())
         used = owner.client.get(f"/workspace/runs/{run_id}").json()["controls_used"]
         assert used == [{"id": sso, "name": "SSO", "state": "pending"}]
 
