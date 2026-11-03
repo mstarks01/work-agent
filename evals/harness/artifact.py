@@ -486,7 +486,7 @@ def _completion(sweep: Sweep, cases: Sequence[str]) -> dict[str, int]:
 
 def build(
     *,
-    mode: str,
+    mode: SweepMode,
     cases: Sequence[str],
     models: Mapping[str, Any],
     certification: CertifyResult,

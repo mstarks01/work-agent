@@ -59,6 +59,7 @@ from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.bundle import finished_file, reports_dir
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import CaseFlows, endpoint_form
+from evals.harness.modes import SweepMode
 from evals.harness.provenance import ProvenanceError
 from evals.harness.reference import MUST_FIND
 from evals.harness.scorer import ratio
@@ -110,7 +111,7 @@ class ScoredRun:
     label: str
     #: The corpus every reference coordinate below indexes into.
     corpus_digest: str
-    mode: str
+    mode: SweepMode
     models: dict[str, Any]
     matched: dict[Scope, frozenset[str]]
     references: dict[Scope, int]

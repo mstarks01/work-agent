@@ -159,7 +159,7 @@ def test_reference_threat_loads_an_action_verb():
 
 
 def test_reference_threat_rejects_a_verb_outside_the_vocabulary():
-    with pytest.raises(ValidationError, match="input_value='steal'"):
+    with pytest.raises(ValidationError, match="steal"):
         ReferenceThreat.model_validate(_THREAT | {"verb": "steal"})
 
 
@@ -453,7 +453,7 @@ def test_a_case_without_rulings_reads_its_claims_alone(tmp_path):
         ),
         (
             lambda r: r["stride"][0]["reading"].update(verb="steal"),
-            "input_value='steal'",
+            "steal",
         ),
         (lambda r: r.update(case="01-payments-checkout"), "names case"),
         (lambda r: r.update(asvs=[]), "rulings.json"),
