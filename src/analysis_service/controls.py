@@ -250,10 +250,10 @@ ControlAdmission = Literal[
 ]
 
 #: What one :meth:`~analysis_service.jobs.JobStore.replace_control` call did.
-#: ``absent`` where the owner holds no Control of the ID, and ``moved`` where
+#: ``absent`` where the owner holds no Control of the ID, and ``stale`` where
 #: a save changed the Control after the caller read it.
 ControlReplacement = Literal[
-    "replaced", "absent", "moved", "name_in_use", "alias_in_use"
+    "replaced", "absent", "stale", "name_in_use", "alias_in_use"
 ]
 
 

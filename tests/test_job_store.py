@@ -2463,7 +2463,10 @@ class TestControls:
         assert (
             asyncio.run(
                 store.replace_control(
-                    foreign, {}, limits=CONTROL_LIMITS, read_at=held.updated_at
+                    foreign,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
                 )
             )
             == "absent"
@@ -2586,14 +2589,14 @@ class TestControls:
         renamed = edited(held, name="Renamed")
         outcome = asyncio.run(
             store.replace_control(
-                renamed, {}, limits=CONTROL_LIMITS, read_at=held.updated_at
+                renamed, {}, limits=CONTROL_LIMITS, expected_updated_at=held.updated_at
             )
         )
         assert outcome == "replaced"
         assert asyncio.run(store.list_controls("alice")) == [renamed]
         assert renamed.updated_at > held.updated_at
 
-    def test_a_replace_of_a_control_that_moved_changes_nothing(self, store):
+    def test_a_replace_of_a_stale_control_changes_nothing(self, store):
         """Of two edits that read one version, only the first lands."""
         held, _ = save(store)
         first = edited(held, name="First")
@@ -2601,7 +2604,10 @@ class TestControls:
         assert (
             asyncio.run(
                 store.replace_control(
-                    first, {}, limits=CONTROL_LIMITS, read_at=held.updated_at
+                    first,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
                 )
             )
             == "replaced"
@@ -2609,10 +2615,13 @@ class TestControls:
         assert (
             asyncio.run(
                 store.replace_control(
-                    second, {}, limits=CONTROL_LIMITS, read_at=held.updated_at
+                    second,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
                 )
             )
-            == "moved"
+            == "stale"
         )
         assert asyncio.run(store.get_control(held.document.id, "alice")) == first
 
@@ -2624,7 +2633,10 @@ class TestControls:
         assert (
             asyncio.run(
                 store.replace_control(
-                    changed, new_texts, limits=CONTROL_LIMITS, read_at=held.updated_at
+                    changed,
+                    new_texts,
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
                 )
             )
             == "replaced"
@@ -2643,7 +2655,10 @@ class TestControls:
         assert (
             asyncio.run(
                 store.replace_control(
-                    changed, {}, limits=CONTROL_LIMITS, read_at=held.updated_at
+                    changed,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
                 )
             )
             == "replaced"
@@ -2659,7 +2674,10 @@ class TestControls:
         assert (
             asyncio.run(
                 store.replace_control(
-                    named, {}, limits=CONTROL_LIMITS, read_at=held.updated_at
+                    named,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
                 )
             )
             == "name_in_use"
@@ -2671,7 +2689,10 @@ class TestControls:
         assert (
             asyncio.run(
                 store.replace_control(
-                    aliased, {}, limits=CONTROL_LIMITS, read_at=held.updated_at
+                    aliased,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
                 )
             )
             == "alias_in_use"
@@ -2684,7 +2705,10 @@ class TestControls:
         changed = edited(held, evidence=added.document.evidence)
         refused = asyncio.run(
             store.replace_control(
-                changed, texts, limits=CONTROL_LIMITS, read_at=held.updated_at
+                changed,
+                texts,
+                limits=CONTROL_LIMITS,
+                expected_updated_at=held.updated_at,
             )
         )
         assert isinstance(refused, EvidenceRefusal)
@@ -2698,7 +2722,10 @@ class TestControls:
         with pytest.raises(ValueError, match="another digest"):
             asyncio.run(
                 store.replace_control(
-                    changed, {}, limits=CONTROL_LIMITS, read_at=held.updated_at
+                    changed,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
                 )
             )
 
@@ -2709,7 +2736,10 @@ class TestControls:
         with pytest.raises(ValueError, match="no text"):
             asyncio.run(
                 store.replace_control(
-                    changed, {}, limits=CONTROL_LIMITS, read_at=held.updated_at
+                    changed,
+                    {},
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=held.updated_at,
                 )
             )
 
@@ -2852,7 +2882,10 @@ class TestControlEvidenceObjects:
         assert (
             asyncio.run(
                 store.replace_control(
-                    refused, new_texts, limits=CONTROL_LIMITS, read_at=first.updated_at
+                    refused,
+                    new_texts,
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=first.updated_at,
                 )
             )
             == "name_in_use"
@@ -2863,7 +2896,10 @@ class TestControlEvidenceObjects:
         assert (
             asyncio.run(
                 store.replace_control(
-                    changed, new_texts, limits=CONTROL_LIMITS, read_at=first.updated_at
+                    changed,
+                    new_texts,
+                    limits=CONTROL_LIMITS,
+                    expected_updated_at=first.updated_at,
                 )
             )
             == "replaced"
@@ -2888,7 +2924,10 @@ class TestControlEvidenceObjects:
 
         async def replaced_first(key: str) -> bytes | None:
             await store.replace_control(
-                changed, new_texts, limits=CONTROL_LIMITS, read_at=first.updated_at
+                changed,
+                new_texts,
+                limits=CONTROL_LIMITS,
+                expected_updated_at=first.updated_at,
             )
             return await read(key)
 

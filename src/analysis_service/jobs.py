@@ -1052,17 +1052,18 @@ class JobStore(Protocol):
         texts: Mapping[str, str],
         *,
         limits: ControlLimits,
-        read_at: datetime,
+        expected_updated_at: datetime,
     ) -> ControlReplacement | EvidenceRefusal:
         """Replace the owner's Control of ``control``'s ID in place, and keep no
         earlier version.
 
         ``texts`` holds the text of each evidence file that the store does not
         hold yet. The checks are those of :meth:`add_control` but the count,
-        and a Control that the owner does not hold is ``absent``. ``read_at``
-        is the ``updated_at`` of the Control the caller read: where a save
-        changed it since, the replace is ``moved`` and changes nothing, so of
-        two edits that read one version only the first lands. The store
+        and a Control that the owner does not hold is ``absent``.
+        ``expected_updated_at`` is the ``updated_at`` of the Control the
+        caller read: where a save changed it since, the replace is ``stale``
+        and changes nothing, so of two edits that read one version only the
+        first lands. The store
         removes each evidence file that the new document no longer lists.
         """
         ...
@@ -1791,13 +1792,13 @@ class InMemoryJobStore:
         texts: Mapping[str, str],
         *,
         limits: ControlLimits,
-        read_at: datetime,
+        expected_updated_at: datetime,
     ) -> ControlReplacement | EvidenceRefusal:
         held = self._owned_control(control.document.id, control.owner_id)
         if held is None:
             return "absent"
-        if held[0].updated_at != read_at:
-            return "moved"
+        if held[0].updated_at != expected_updated_at:
+            return "stale"
         refused = control_refusal(control.document, texts, limits=limits)
         if refused is not None:
             return refused

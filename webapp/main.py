@@ -1784,14 +1784,14 @@ def create_app(
             ),
             {},
             limits=current.control_limits,
-            read_at=control.updated_at,
+            expected_updated_at=control.updated_at,
         )
         match outcome:
             case "replaced":
                 return JSONResponse({"aliases": widened.aliases})
             case "absent":
                 return _message(404, _NO_SUCH_CONTROL)
-            case "moved":
+            case "stale":
                 return _message(
                     409, "This Control changed at the same time. Try again."
                 )

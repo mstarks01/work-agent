@@ -2317,7 +2317,7 @@ class SqlJobStore:
         texts: Mapping[str, str],
         *,
         limits: ControlLimits,
-        read_at: datetime,
+        expected_updated_at: datetime,
     ) -> ControlReplacement | EvidenceRefusal:
         """Put each new evidence text, then update the row under the owner's
         lock, then remove each evidence object that the new document no
@@ -2325,15 +2325,15 @@ class SqlJobStore:
         held = await self.get_control(control.document.id, control.owner_id)
         if held is None:
             return "absent"
-        if held.updated_at != read_at:
-            return "moved"
+        if held.updated_at != expected_updated_at:
+            return "stale"
         refused = control_refusal(control.document, texts, limits=limits)
         if refused is not None:
             return refused
         check_texts(control.document, texts, held.document.evidence)
         keys = await self._put_evidence(control, texts)
         try:
-            outcome = await self._update_control(control, texts, read_at)
+            outcome = await self._update_control(control, texts, expected_updated_at)
         except BaseException:
             await self._remove(keys)
             raise
@@ -2351,11 +2351,12 @@ class SqlJobStore:
         return outcome
 
     async def _update_control(
-        self, control: Control, texts: Mapping[str, str], read_at: datetime
-    ) -> Control | Literal["absent", "moved", "name_in_use", "alias_in_use"]:
+        self, control: Control, texts: Mapping[str, str], expected_updated_at: datetime
+    ) -> Control | Literal["absent", "stale", "name_in_use", "alias_in_use"]:
         """Write the row of ``control`` under the owner's lock, and return the
-        Control that it replaced. A row that a save changed after ``read_at``
-        is ``moved``, so a save in between never lands under this one."""
+        Control that it replaced. A row whose ``updated_at`` is not
+        ``expected_updated_at`` is ``stale``, so a save in between never
+        lands under this one."""
         owned = (controls.c.id == control.document.id) & (
             controls.c.owner_id == control.owner_id
         )
@@ -2368,8 +2369,8 @@ class SqlJobStore:
                 if row is None:
                     return "absent"
                 held = _control(row)
-                if held.updated_at != read_at:
-                    return "moved"
+                if held.updated_at != expected_updated_at:
+                    return "stale"
                 check_texts(control.document, texts, held.document.evidence)
                 refused = await self._scope_refusal(connection, control)
                 if refused is not None:

@@ -74,8 +74,10 @@ parent's Controls object with no store read; a follow-up job with
 
 **An edit replaces in place, a delete keeps nothing, and nothing expires.** An
 edit replaces the row's document and `updated_at`, adds or removes evidence
-objects, and keeps no earlier version. A reopened analysis lists "Controls
-used" from the job's copy. A delete removes the row first and then each
+objects, and keeps no earlier version. An edit names the `updated_at` of the
+version it read, and the store refuses it as `stale` where a save changed
+the Control since. A reopened analysis lists "Controls used" from the job's
+copy. A delete removes the row first and then each
 evidence object, keeps no tombstone and no usage row, and is allowed while a
 job uses the Control. A Control stays until the owner deletes it, and
 `max_controls` keeps the store finite.
