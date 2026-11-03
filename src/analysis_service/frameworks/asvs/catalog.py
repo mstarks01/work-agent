@@ -42,6 +42,7 @@ __all__ = [
     "CHAPTER_NUMBERS",
     "LANES",
     "REQUIREMENTS",
+    "AsvsChapter",
     "AsvsLevel",
     "Chapter",
     "Requirement",
@@ -70,6 +71,30 @@ AsvsLevel = Literal[1, 2, 3]
 #: The levels, as a value the catalog's own checks can test a requirement against.
 ASVS_LEVELS: tuple[AsvsLevel, ...] = get_args(AsvsLevel)
 
+#: One lane, spelled where a type checker can read it. The catalog is the source
+#: of truth and this restates it, so the two are checked against each other at
+#: import: a chapter the catalog adds and this omits would give the report a
+#: field that cannot hold its own lane.
+AsvsChapter = Literal[
+    "encoding-and-sanitization",
+    "validation-and-business-logic",
+    "web-frontend-security",
+    "api-and-web-service",
+    "file-handling",
+    "authentication",
+    "session-management",
+    "authorization",
+    "self-contained-tokens",
+    "oauth-and-oidc",
+    "cryptography",
+    "secure-communication",
+    "configuration",
+    "data-protection",
+    "secure-coding-and-architecture",
+    "security-logging-and-error-handling",
+    "webrtc",
+]
+
 _CATALOG_PATH = Path(__file__).with_name("catalog.json")
 
 #: The SHA-256 of the catalog file this build was reviewed against. A catalog
@@ -91,7 +116,7 @@ class Chapter:
 
     id: str
     name: str
-    lane: str
+    lane: AsvsChapter
 
     @property
     def number(self) -> str:
@@ -160,11 +185,17 @@ CHAPTERS, REQUIREMENTS, _PAYLOAD_VERSION, _PAYLOAD_SHA256 = _load(_CATALOG_PATH)
 #: This package's lanes, in chapter order. The chapter order is the standard's,
 #: and it is not alphabetical: V1 through V17 is how the standard numbers its
 #: own chapters, and a reader who infers a ranking from it reads the standard's.
-LANES: tuple[str, ...] = tuple(chapter.lane for chapter in CHAPTERS)
+LANES: tuple[AsvsChapter, ...] = tuple(chapter.lane for chapter in CHAPTERS)
+
+if set(get_args(AsvsChapter)) != set(LANES):
+    raise ValueError(
+        f"AsvsChapter names {sorted(get_args(AsvsChapter))}, but the catalog"
+        f" declares {sorted(LANES)}"
+    )
 
 #: One lane against the chapter number its identifiers carry, which is the
 #: package's ``id_rule`` prefix table.
-CHAPTER_NUMBERS: Mapping[str, str] = MappingProxyType(
+CHAPTER_NUMBERS: Mapping[AsvsChapter, str] = MappingProxyType(
     {chapter.lane: chapter.number for chapter in CHAPTERS}
 )
 
@@ -194,7 +225,10 @@ def requirement_id(lane: str, key: object) -> str:
     agent gives the rest. :func:`~analysis_service.frameworks.asvs.record.
     requirement_of` reads the same pair back off a composed claim ID.
     """
-    return f"V{CHAPTER_NUMBERS[lane]}.{key}"
+    chapter = next((chapter for chapter in LANES if chapter == lane), None)
+    if chapter is None:
+        raise KeyError(lane)
+    return f"V{CHAPTER_NUMBERS[chapter]}.{key}"
 
 
 _REQUIREMENT_IDS: frozenset[str] = frozenset(req.id for req in REQUIREMENTS)

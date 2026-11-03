@@ -25,7 +25,7 @@ from collections import Counter
 from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, ClassVar, Literal, Self, get_args, get_origin
+from typing import Any, ClassVar, Literal, Self, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -195,6 +195,10 @@ class FlowParts:
     label: str
 
 
+#: A flow identity version that :data:`FLOW_ID_RULES` declares.
+FlowIdVersion = Literal[1, 2]
+
+
 @dataclass(frozen=True)
 class FlowIdRule:
     """One version of the flow identity: its shape, its builder and its decoder.
@@ -207,7 +211,7 @@ class FlowIdRule:
     admitted by the schema and recognised by the shape reader on the same line.
     """
 
-    version: int
+    version: FlowIdVersion
     #: The unanchored regular expression one ID of this version matches.
     pattern: str
     build: Callable[[str, str, str], str]
@@ -289,11 +293,8 @@ FLOW_ID_RULES: Mapping[int, FlowIdRule] = MappingProxyType(
 #: Each version's shape, anchored: what :func:`parse_flow_id` holds an ID to
 #: before it decodes, and what :func:`flow_id_version` asks to find out which
 #: rule wrote one.
-_FLOW_ID_SHAPES = MappingProxyType(
-    {
-        version: re.compile(rf"^{rule.pattern}$")
-        for version, rule in FLOW_ID_RULES.items()
-    }
+_FLOW_ID_SHAPES: Mapping[FlowIdVersion, re.Pattern[str]] = MappingProxyType(
+    {rule.version: re.compile(rf"^{rule.pattern}$") for rule in FLOW_ID_RULES.values()}
 )
 
 #: The version this service writes. Version 1 omits the endpoints' type
@@ -340,7 +341,7 @@ def parse_flow_id(flow_id: str, version: int) -> FlowParts:
     not element IDs, and hand a caller parts that name nothing.
     """
     rule = flow_id_rule(version)
-    if not _FLOW_ID_SHAPES[version].match(flow_id):
+    if not _FLOW_ID_SHAPES[rule.version].match(flow_id):
         raise FlowIdError(
             f"{flow_id!r} is not a version {version} flow ID; that version"
             f" writes {rule.pattern}"
@@ -435,6 +436,19 @@ BoundaryKind = Literal["network", "privilege", "tenant", "other"]
 #: The ``id_prefix`` of each element class, which also names its type where a
 #: page shows an element.
 ElementPrefix = Literal["entity", "process", "store", "flow", "boundary"]
+
+#: Every element type prefix.
+_ELEMENT_PREFIXES: tuple[ElementPrefix, ...] = get_args(ElementPrefix)
+
+
+def element_prefix(element_id: str) -> ElementPrefix | None:
+    """The element type prefix ``element_id`` carries before its first colon.
+
+    ``None`` where that part is no element type prefix. An ID with no colon is
+    read whole, so ``flow`` alone reads as the prefix ``flow``.
+    """
+    prefix = element_id.split(":", 1)[0]
+    return next((known for known in _ELEMENT_PREFIXES if known == prefix), None)
 
 
 class _Element(BaseModel):
@@ -1198,17 +1212,17 @@ def mentioned_ids(description: str) -> list[str]:
     return [match.group().rstrip("-") for match in _MENTION_RE.finditer(description)]
 
 
+#: A field of a :class:`SystemModel` that holds elements.
+ElementGroup = Literal[
+    "external_entities", "processes", "data_stores", "data_flows", "trust_boundaries"
+]
+
 #: The five fields of a :class:`SystemModel` that hold elements, in the order
-#: :meth:`SystemModel.elements` walks them. Read off the model's own fields —
-#: every list-typed field whose items are an element — so a sixth group joins
-#: here, the walk and the repair overlay together, or not at all.
-ELEMENT_GROUPS: tuple[str, ...] = tuple(
-    name
-    for name, info in SystemModel.model_fields.items()
-    if get_origin(info.annotation) is list
-    and isinstance(get_args(info.annotation)[0], type)
-    and issubclass(get_args(info.annotation)[0], _Element)
-)
+#: :meth:`SystemModel.elements` walks them. ``tests/test_system_model.py`` holds
+#: them to the model's own fields — every list-typed field whose items are an
+#: element — so a sixth group joins here, the walk and the repair overlay
+#: together, or fails that test.
+ELEMENT_GROUPS: tuple[ElementGroup, ...] = get_args(ElementGroup)
 
 
 def duplicate_ids(elements: Iterable[Element]) -> dict[str, int]:

@@ -59,7 +59,7 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import Any, Literal, TypeGuard
 
 from pydantic import ValidationError
 
@@ -82,7 +82,17 @@ from evals.harness.replay import (
 #: unset. Recorded as values rather than as a path, because the artifacts are
 #: under the gitignored ``evals/runs/`` and a budget nobody can re-read is a
 #: number with no provenance.
-BASELINE: Mapping[str, float] = MappingProxyType(
+#: A figure the baseline arm recorded, which a gate's limit is relative to.
+Figure = Literal[
+    "charge_usd",
+    "node_seconds",
+    "must_find_coverage",
+    "reference_coverage",
+    "claims",
+    "required_fact_recall",
+]
+
+BASELINE: Mapping[Figure, float] = MappingProxyType(
     {
         "charge_usd": 0.2791,
         "node_seconds": 165.4,
@@ -151,6 +161,28 @@ BASELINE_RUN = (
 
 Unit = Literal["ratio", "count", "sd"]
 GateResult = Literal["pass", "fail", "inconclusive"]
+
+#: A gate of :data:`GATES`.
+GateName = Literal[
+    "charge",
+    "latency",
+    "backs-claims",
+    "structural-refusals",
+    "critical-fixtures",
+    "must-find-coverage",
+    "required-fact-recall",
+    "reference-coverage",
+]
+
+#: A gate of :data:`PENDING`.
+PendingName = Literal["review-population", "support-shares", "case-diversity"]
+
+#: A gate of :data:`evals.harness.gain.GATES`. Stated here because
+#: :class:`Reading` carries it and the gain module imports this one.
+GainGateName = Literal["volume", "reviewed", "rejected-rate"]
+
+#: Every gate a :class:`Reading` can name.
+ReadGate = Literal[GateName, PendingName, GainGateName]
 
 
 # Each reader returns ``None`` where the artifact does not carry the figure at
@@ -361,13 +393,13 @@ class Gate:
     limit: float
     #: Which way passes: a figure at most the limit, or at least it.
     direction: Literal["at-most", "at-least"]
-    against: str = ""
+    against: Figure | Literal[""] = ""
     why: str = ""
 
 
 #: Every gate the promotion is read against. Resource gates first, because they
 #: are the ones one pair can answer.
-GATES: Mapping[str, Gate] = MappingProxyType(
+GATES: Mapping[GateName, Gate] = MappingProxyType(
     {
         "charge": Gate(
             question="does a job cost more than the budget allows?",
@@ -503,7 +535,7 @@ class Pending:
 #: The measurement design #926 settled on 2026-09-23 (option (c) of the
 #: support-gate decision, with the owner's corrections), as gates nobody can
 #: read yet. A name here is never also in :data:`GATES`.
-PENDING: Mapping[str, Pending] = MappingProxyType(
+PENDING: Mapping[PendingName, Pending] = MappingProxyType(
     {
         "review-population": Pending(
             question="which rows is semantic support measured over?",
@@ -562,7 +594,7 @@ PENDING: Mapping[str, Pending] = MappingProxyType(
 class Reading:
     """One gate, read against one pair of runs."""
 
-    gate: str
+    gate: ReadGate
     verdict: GateResult
     #: What the treatment run measured, or ``None`` where the artifact carries
     #: no such figure.
@@ -574,6 +606,16 @@ class Reading:
     #: difference in standard deviations. ``None`` where nothing can be read.
     against_limit: float | None
     why: str = ""
+
+
+def _is_gate(name: ReadGate) -> TypeGuard[GateName]:
+    """Whether ``name`` is a gate of :data:`GATES`."""
+    return name in GATES
+
+
+def _is_pending(name: ReadGate) -> TypeGuard[PendingName]:
+    """Whether ``name`` is a gate of :data:`PENDING`."""
+    return name in PENDING
 
 
 def _ratio(measured: float, baseline: float) -> float | None:
@@ -654,8 +696,9 @@ def read_recall(repeats: Sequence[Sequence[Path]]) -> Reading:
     the baseline in units of :data:`RECALL_SPREAD`, which is how the baseline
     itself was measured.
     """
-    name = "required-fact-recall"
+    name: GateName = "required-fact-recall"
     gate = GATES[name]
+    assert gate.against, name
     baseline = BASELINE[gate.against]
 
     def unread(why: str) -> Reading:
@@ -688,7 +731,7 @@ def _assert_models(path: Path) -> frozenset[str]:
 
 
 def read_gate(
-    name: str,
+    name: GateName,
     artifact: Mapping[str, Any],
     report: Mapping[str, Any],
     *,
@@ -785,12 +828,13 @@ def render(readings: Sequence[Reading]) -> str:
         baseline = "—" if row.baseline is None else f"{row.baseline:.4g}"
         against = "—" if row.against_limit is None else f"{row.against_limit:.3f}"
         measured = "—" if row.measured is None else f"{row.measured:.4g}"
-        gate = GATES.get(row.gate)
-        limit = (
-            f"{gate.direction} {gate.limit} ({gate.unit})"
-            if gate is not None
-            else PENDING[row.gate].limit or "undeclared"
-        )
+        if _is_gate(row.gate):
+            gate = GATES[row.gate]
+            limit = f"{gate.direction} {gate.limit} ({gate.unit})"
+        elif _is_pending(row.gate):
+            limit = PENDING[row.gate].limit or "undeclared"
+        else:
+            raise KeyError(row.gate)
         lines.append(
             f"| `{row.gate}` | {row.verdict} | {measured} | {baseline}"
             f" | {against} | {limit} |"
@@ -808,6 +852,8 @@ def render(readings: Sequence[Reading]) -> str:
     for row in unread:
         lines.append(f"- `{row.gate}` unread: {row.why}")
     for row in failed:
+        if not _is_gate(row.gate):
+            raise KeyError(row.gate)
         lines.append(
             f"- `{row.gate}`: {GATES[row.gate].question} {GATES[row.gate].why}"
         )

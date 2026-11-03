@@ -576,9 +576,30 @@ def _valid_inference(reference: SignedReference, case: GoldenCase) -> Corruption
     )
 
 
+#: A probe of :data:`PROBES`.
+ProbeName = Literal[
+    "perfect-reading",
+    "mfa-enforced",
+    "support-copied",
+    "empty-citation",
+    "stopword-mechanism",
+    "removed-assertion",
+    "renamed-flow",
+    "deleted-parallel-interaction",
+    "signature-is-not-authentication",
+    "destination-is-not-authentication",
+    "control-name-elsewhere",
+    "absence-inferred",
+    "scope-dropped",
+    "paraphrase",
+    "identity-and-provenance",
+    "changed-source",
+    "valid-inference",
+]
+
 #: Every probe, keyed by the criterion it answers. A key here is never an arm:
 #: ``tests/test_evals_falsification.py`` holds the two namespaces apart.
-PROBES: Mapping[str, Probe] = MappingProxyType(
+PROBES: Mapping[ProbeName, Probe] = MappingProxyType(
     {
         "perfect-reading": Probe("01-payments-checkout", _perfect),
         "mfa-enforced": Probe(
@@ -708,7 +729,7 @@ class Outcome:
         return not self.broke
 
 
-def run_probe(name: str, case: GoldenCase, reference: SignedReference) -> Outcome:
+def run_probe(name: ProbeName, case: GoldenCase, reference: SignedReference) -> Outcome:
     """Corrupt this case's perfect reading one way, and read both instruments."""
     probe = PROBES[name]
     corrupted = probe.corrupt(reference, case)
@@ -837,8 +858,8 @@ def render(found: Sequence[Outcome]) -> str:
     for name, probe in PROBES.items():
         if probe.note:
             lines.append(f"- `{name}` reaches part of its criterion: {probe.note}")
-    for name, why in sorted(UNPROBED.items()):
-        lines.append(f"- no probe for `{name}`: {why}")
+    for criterion, why in sorted(UNPROBED.items()):
+        lines.append(f"- no probe for `{criterion}`: {why}")
     return "\n".join(lines) + "\n"
 
 
@@ -959,7 +980,7 @@ class Reading:
 
 
 def reading(
-    name: str, case: GoldenCase, reference: SignedReference, *, reviewed: bool
+    name: ProbeName, case: GoldenCase, reference: SignedReference, *, reviewed: bool
 ) -> Reading:
     """One probe's corruption, ready for analysis preparation.
 
@@ -998,7 +1019,7 @@ def reading(
 
 
 def consume_probe(
-    name: str, case: GoldenCase, reference: SignedReference, *, reviewed: bool
+    name: ProbeName, case: GoldenCase, reference: SignedReference, *, reviewed: bool
 ) -> Consumed:
     """Drive one probe's corruption through the job, reviewed or not."""
     built = reading(name, case, reference, reviewed=reviewed)

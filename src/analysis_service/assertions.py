@@ -67,7 +67,7 @@ from typing import Literal, NamedTuple, Self, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from analysis_service.analysis import ABSENT_WORD, control_state
+from analysis_service.analysis import ABSENT_WORD, ControlAttribute, control_state
 from analysis_service.grounding import (
     IndexedSource,
     fragments,
@@ -96,9 +96,11 @@ from analysis_service.system_model import (
     DataClassification,
     DataFlow,
     Element,
+    ElementPrefix,
     SystemModel,
     TrustBoundary,
     ZonedElement,
+    element_prefix,
     make_element_id,
     normalize_name,
 )
@@ -138,6 +140,7 @@ __all__ = [
     "Contradiction",
     "Origin",
     "Predicate",
+    "ProjectedField",
     "Projection",
     "ProjectionReason",
     "Qualifier",
@@ -162,6 +165,7 @@ __all__ = [
     "contradictions",
     "disputed",
     "offered",
+    "parse_subject_type",
     "project",
     "projected_attribute",
     "projection_fields",
@@ -263,6 +267,18 @@ SubjectType = Literal[
     "artifact",
 ]
 
+#: Every subject type.
+_SUBJECT_TYPES: tuple[SubjectType, ...] = get_args(SubjectType)
+
+
+def parse_subject_type(value: str) -> SubjectType:
+    """``value`` as a subject type, or raise :class:`ValueError` naming it."""
+    found = next((kind for kind in _SUBJECT_TYPES if kind == value), None)
+    if found is None:
+        raise ValueError(f"unknown subject type {value!r}")
+    return found
+
+
 #: What a **Scope** qualifier says. Closed, because a reader routes on it.
 QualifierKind = Literal[
     "principal", "operation", "resource", "environment", "condition"
@@ -298,12 +314,15 @@ ProposedReason = Literal["silent", "hedged"]
 #: How a predicate's value is read.
 ValueKind = Literal["text", "term", "reference"]
 
+#: A graph field a predicate projects into.
+ProjectedField = Literal[ControlAttribute, "trust_zone"]
+
 #: Whether two values of one predicate, at one subject and scope, can both hold.
 Multiplicity = Literal["one", "many"]
 
 #: Which element ID prefixes each graph-bound subject type accepts, read off the
 #: element classes so a renamed prefix moves this with it.
-SUBJECT_PREFIXES: Mapping[str, frozenset[str]] = MappingProxyType(
+SUBJECT_PREFIXES: Mapping[SubjectType, frozenset[str]] = MappingProxyType(
     {
         "component": frozenset(element.id_prefix for element in get_args(ZonedElement)),
         "interaction": frozenset({DataFlow.id_prefix}),
@@ -315,17 +334,17 @@ SUBJECT_PREFIXES: Mapping[str, frozenset[str]] = MappingProxyType(
 )
 
 #: Which element class each ID prefix names, read off the five element classes.
-_ELEMENT_TYPES: Mapping[str, type[BaseModel]] = MappingProxyType(
+_ELEMENT_TYPES: Mapping[ElementPrefix, type[BaseModel]] = MappingProxyType(
     {element_type.id_prefix: element_type for element_type in get_args(Element)}
 )
 
 #: Every prefix the element schema uses.
-_ELEMENT_PREFIXES: frozenset[str] = frozenset(_ELEMENT_TYPES)
+_ELEMENT_PREFIXES: frozenset[ElementPrefix] = frozenset(_ELEMENT_TYPES)
 
 #: The subject types whose ID is an **Element ID**, and whose subject the model
 #: must therefore hold. Derived rather than listed again: a type is graph-bound
 #: exactly when its prefixes are the schema's.
-GRAPH_BOUND: frozenset[str] = frozenset(
+GRAPH_BOUND: frozenset[SubjectType] = frozenset(
     subject_type
     for subject_type, prefixes in SUBJECT_PREFIXES.items()
     if prefixes <= _ELEMENT_PREFIXES
@@ -388,7 +407,7 @@ class Predicate:
     refers_to: frozenset[SubjectType] = frozenset()
     requires: tuple[str, ...] = ()
     multiplicity: Multiplicity = "one"
-    projects_into: str = ""
+    projects_into: ProjectedField | Literal[""] = ""
     #: Whether the sources must *state* this predicate's value, so an inference
     #: is refused rather than recorded.
     #:
@@ -1131,7 +1150,7 @@ class Conflict:
     values: tuple[str, ...]
 
 
-def subject_id(subject_type: str, name: str) -> str:
+def subject_id(subject_type: SubjectType, name: str) -> str:
     """The deterministic ID a non-graph subject's type and name imply.
 
     Graph-bound subjects have no call here: their ID is the **Element ID** the
@@ -1522,7 +1541,7 @@ def conflicts(catalog: AssertionCatalog) -> tuple[Conflict, ...]:
     return tuple(found)
 
 
-def projection_fields() -> Mapping[str, str]:
+def projection_fields() -> Mapping[str, ProjectedField]:
     """Which graph field each projecting predicate is authoritative for.
 
     Read off :data:`REGISTRY` rather than listed again. ``tests/test_assertions.py``
@@ -2595,7 +2614,7 @@ class Projection:
     """
 
     element_id: str
-    attribute: str
+    attribute: ProjectedField
     value: str
     reason: ProjectionReason
     rows: tuple[str, ...]
@@ -2628,7 +2647,7 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
     order.
     """
     subjects = {subject.id: subject for subject in catalog.subjects}
-    grouped: dict[tuple[str, str], list[tuple[str, Assertion]]] = {}
+    grouped: dict[tuple[str, ProjectedField], list[tuple[str, Assertion]]] = {}
     for entry in catalog.entries:
         attribute = projected_attribute(entry.predicate, entry.subject)
         held = subjects.get(entry.subject)
@@ -2855,15 +2874,17 @@ SETTLING_REASONS: frozenset[ProjectionReason] = frozenset(
 #: an **Element ID**, and anything after the sentinel there is a value the
 #: schema or the validity gate refuses. Keyed by the graph field and held to
 #: :func:`projection_fields` by ``tests/test_assertions.py``.
-QUALIFIED_SPELLING: Mapping[str, Literal["prose", "bare"]] = MappingProxyType(
-    {
-        "authentication": "prose",
-        "encryption_in_transit": "prose",
-        "encryption_at_rest": "prose",
-        "data_classification": "prose",
-        "exposure": "bare",
-        "trust_zone": "bare",
-    }
+QUALIFIED_SPELLING: Mapping[ProjectedField, Literal["prose", "bare"]] = (
+    MappingProxyType(
+        {
+            "authentication": "prose",
+            "encryption_in_transit": "prose",
+            "encryption_at_rest": "prose",
+            "data_classification": "prose",
+            "exposure": "bare",
+            "trust_zone": "bare",
+        }
+    )
 )
 
 #: What a qualified ``unknown`` says happened, keyed by every reason that
@@ -3061,7 +3082,7 @@ def qualified(
     return text[: CONTROL_VALUE_MAX_CHARS - 1] + "…"
 
 
-def projected_attribute(predicate: str, subject: str) -> str:
+def projected_attribute(predicate: str, subject: str) -> ProjectedField | Literal[""]:
     """The graph attribute a row of ``predicate`` about ``subject`` reaches, or ``""``.
 
     **The one reader of "does this row reach a graph field".** A predicate
@@ -3072,7 +3093,7 @@ def projected_attribute(predicate: str, subject: str) -> str:
     predicate would leave a legal row on a Process with neither a projection
     nor an evidence entry (#926). :func:`project` and :func:`offered` both ask this.
     """
-    attribute = projection_fields().get(predicate, "")
+    attribute = projection_fields().get(predicate)
     return attribute if attribute and attribute in _attributes_of(subject) else ""
 
 
@@ -3120,13 +3141,13 @@ def _attributes_of(element_id: str) -> frozenset[str]:
     Read off the element classes by ID prefix, so a field moved between types
     moves this with it.
     """
-    element_type = _ELEMENT_TYPES.get(element_id.split(":", 1)[0])
-    return frozenset(element_type.model_fields) if element_type else frozenset()
+    prefix = element_prefix(element_id)
+    return frozenset(_ELEMENT_TYPES[prefix].model_fields) if prefix else frozenset()
 
 
 def _projected(
     element_id: str,
-    attribute: str,
+    attribute: ProjectedField,
     rows: list[tuple[str, Assertion]],
     subjects: Mapping[str, Subject],
 ) -> Projection:

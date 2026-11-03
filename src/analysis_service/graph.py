@@ -344,7 +344,10 @@ ROLES: tuple[str, ...] = (
 # other people's leads, and the material genuinely differs per lane — the candidate
 # rules that selected the corpus documents fired per lane, and the rule counts
 # behind the scope differ per category.
-LANE_ARTIFACTS: Mapping[str, str] = MappingProxyType(
+#: An artifact a lane agent is given, by the prompt placeholder it fills.
+LaneArtifact = Literal["candidates", "scope", "reference_notes", "prior_cases"]
+
+LANE_ARTIFACTS: Mapping[LaneArtifact, str] = MappingProxyType(
     {
         "candidates": "candidates",
         "scope": "scope",
@@ -394,7 +397,7 @@ class Lane:
         """Where this lane agent parks its proposals for its framework's merge."""
         return f"drafts_{self.slug}"
 
-    def key(self, artifact: str) -> str:
+    def key(self, artifact: LaneArtifact) -> str:
         """Where ``prepare`` parks one of this lane's inputs."""
         return f"{LANE_ARTIFACTS[artifact]}_{self.slug}"
 
@@ -412,7 +415,7 @@ class Lane:
             **{name: f"{{{self.key(name)}}}" for name in LANE_ARTIFACTS},
         }
 
-    def state(self, artifacts: Mapping[str, str]) -> dict[str, str]:
+    def state(self, artifacts: Mapping[LaneArtifact, str]) -> dict[str, str]:
         """This lane's state entries, given one rendered value per artifact.
 
         Keyed by placeholder on the way in and by state key on the way out,
@@ -2288,7 +2291,7 @@ class LaneInputs:
     """What one framework's lanes are given, and what the prepare node records."""
 
     #: Lane name -> the four rendered artifacts, keyed by placeholder.
-    artifacts: Mapping[str, Mapping[str, str]]
+    artifacts: Mapping[str, Mapping[LaneArtifact, str]]
     candidates: Mapping[str, CandidateSet]
     ruled_out: Mapping[str, str]
     ruled_in: Mapping[str, str]
@@ -2322,7 +2325,7 @@ def framework_lane_inputs(
     ]
     notes_by_lane = select_per_lane(package.knowledge.notes, fired_by_lane, MAX_NOTES)
     cases_by_lane = select_per_lane(package.knowledge.cases, fired_by_lane, MAX_CASES)
-    artifacts: dict[str, dict[str, str]] = {}
+    artifacts: dict[str, dict[LaneArtifact, str]] = {}
     retrieved: list[str] = []
     ruled_out: dict[str, str] = {}
     ruled_in: dict[str, str] = {}

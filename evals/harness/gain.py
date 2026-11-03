@@ -44,14 +44,20 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import Any, Literal, TypeGuard
 
 from analysis_service.claims import FrameworkName
 from evals.harness import audit
 from evals.harness.artifact import figures_corpus
 from evals.harness.comparison import flagged_cases, held_out_cases
 from evals.harness.instruments import Cases
-from evals.harness.promotion import Reading, in_spreads, read_spread
+from evals.harness.promotion import (
+    GainGateName,
+    ReadGate,
+    Reading,
+    in_spreads,
+    read_spread,
+)
 
 #: One figure, read from one artifact over the cases a selector keeps, or
 #: ``None`` where the artifact carries no such figure.
@@ -258,7 +264,7 @@ class GainGate:
     limit: float
 
 
-GATES: Mapping[str, GainGate] = MappingProxyType(
+GATES: Mapping[GainGateName, GainGate] = MappingProxyType(
     {
         "volume": GainGate(
             question="did the candidate say more than the spread explains?",
@@ -279,7 +285,12 @@ GATES: Mapping[str, GainGate] = MappingProxyType(
 )
 
 
-def _reader(framework: FrameworkName, gate: str) -> Reader | None:
+def _is_gate(name: ReadGate) -> TypeGuard[GainGateName]:
+    """Whether ``name`` is a gate of :data:`GATES`."""
+    return name in GATES
+
+
+def _reader(framework: FrameworkName, gate: GainGateName) -> Reader | None:
     readers = READERS[framework]
     return {
         "volume": readers.volume,
@@ -320,7 +331,7 @@ def read(
 
 
 def _decide(
-    name: str,
+    name: GainGateName,
     gate: GainGate,
     before: float | None,
     after: float | None,
@@ -364,6 +375,8 @@ def render(
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in readings:
+        if not _is_gate(row.gate):
+            raise KeyError(row.gate)
         gate = GATES[row.gate]
         cells = [
             "—" if value is None else f"{value:.4g}"
@@ -375,7 +388,7 @@ def render(
         )
     lines.append("")
     for row in readings:
-        if row.verdict == "fail":
+        if row.verdict == "fail" and _is_gate(row.gate):
             lines.append(f"- `{row.gate}` fails: {GATES[row.gate].question}")
         elif row.verdict == "inconclusive":
             lines.append(f"- `{row.gate}` unread: {row.why}")

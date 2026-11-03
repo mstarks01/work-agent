@@ -1,13 +1,14 @@
 """Tests for the canonical System Model schema and derived boundary crossings."""
 
 import re
-from typing import get_args
+from typing import get_args, get_origin
 
 import pytest
 from pydantic import ValidationError
 
 from analysis_service.compact import CompactDataStore
 from analysis_service.system_model import (
+    ELEMENT_GROUPS,
     ELEMENT_ID,
     FLOW_DELIMITER,
     FLOW_ID_RULES,
@@ -25,6 +26,7 @@ from analysis_service.system_model import (
     SystemModel,
     TrustBoundary,
     derive_element_id,
+    element_prefix,
     flow_id_version,
     flow_label,
     make_element_id,
@@ -41,6 +43,32 @@ def test_the_source_fields_name_fields_of_an_element():
     """``ElementSourceField`` spells field names of each element type a second time."""
     for element_type in get_args(Element):
         assert set(get_args(ElementSourceField)) <= set(element_type.model_fields)
+
+
+def test_the_element_groups_are_the_models_element_fields_in_order():
+    """Each list field of a ``SystemModel`` whose items are an element, in order."""
+    fields = tuple(
+        name
+        for name, info in SystemModel.model_fields.items()
+        if get_origin(info.annotation) is list
+        and get_args(info.annotation)[0] in get_args(Element)
+    )
+
+    assert ELEMENT_GROUPS == fields
+
+
+@pytest.mark.parametrize(
+    ("element_id", "prefix"),
+    [
+        ("store:orders-db", "store"),
+        ("flow:a>b>c", "flow"),
+        ("flow", "flow"),
+        ("principal:shopper", None),
+        ("", None),
+    ],
+)
+def test_an_element_prefix_is_the_part_before_the_first_colon(element_id, prefix):
+    assert element_prefix(element_id) == prefix
 
 
 class TestIdentity:

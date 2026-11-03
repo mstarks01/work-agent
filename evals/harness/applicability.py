@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from analysis_service.claims import (
     Claim,
@@ -49,6 +49,7 @@ from analysis_service.frameworks.asvs.catalog import requirements_for
 from analysis_service.frameworks.asvs.record import requirement_of
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness import attribution, audit
+from evals.harness.attribution import ObservedKind
 from evals.harness.reference import (
     DISPOSITION_FOR_EVIDENCE,
     AsvsDisposition,
@@ -394,9 +395,7 @@ class Observation:
     of evidence that would settle the requirement.
     """
 
-    kind: Literal[
-        "confirmed", "needs-info", "rejected", "not-applicable", "deferred", "silent"
-    ]
+    kind: ObservedKind
     needs: str = ""
 
 
