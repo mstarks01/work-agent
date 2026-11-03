@@ -76,8 +76,9 @@ not asked. Three tables hold the exceptions, each with a reason:
   free text, file names, provider errors or corpus data;
 - :data:`PARTIAL`: a set that names part of its ``Literal``;
 - :data:`PENDING`: a closed set whose read keys, or the keys it is built
-  from, are ``str`` at their source, so it cannot carry its ``Literal`` until
-  that source does.
+  from, are a plain ``str`` or ``int`` at their source, or whose ``Literal``
+  sits only in a module that imports the set's module, so it cannot carry its
+  ``Literal`` yet.
 
 The closed-set sweep leaves out :data:`~tests.source_tree.EXPERIMENTS_LEFT_OUT`.
 """
@@ -314,7 +315,7 @@ PARTIAL: dict[tuple[str, str], str] = {
     ),
     ("analysis_service.links", "_LINK_REFUSALS"): (
         "the issue codes raised for a link answer that places nothing, so a"
-        " code raised only for another kind of row is absent by construction"
+        " code raised for anything but a link answer is absent by construction"
     ),
     ("analysis_service.system_model", "ENDPOINT_PREFIXES"): (
         "the element types that sit in a zone, so a type that sits in no zone"
@@ -322,7 +323,7 @@ PARTIAL: dict[tuple[str, str], str] = {
     ),
     ("evals.harness.applicability", "EVIDENCE_FOR_DISPOSITION"): (
         "the dispositions that ask for a kind of evidence, so a disposition"
-        " that rules without evidence is absent by construction"
+        " that asks for no evidence is absent by construction"
     ),
     ("evals.harness.modes", "NAMED_TYPES"): (
         "the element types whose name the submitter's text holds, so a type"
@@ -502,6 +503,12 @@ Shape = Literal["set", "table"]
 #: A module's dotted name and its parsed tree.
 ModuleTree = tuple[str, ast.Module]
 
+#: The reason of each open table keyed by the requirement IDs of a catalog file.
+_CATALOG_ROW_IDS = (
+    "requirement IDs read from the rows of a catalog file, which holds them as"
+    " data and not as a type"
+)
+
 #: A table that code reads as a set and that is open by design, and why. The
 #: reason is a property of the table: it is a fixed list that filters free text,
 #: file names, provider errors or corpus data, so no value in the code carries
@@ -509,7 +516,8 @@ ModuleTree = tuple[str, ast.Module]
 #: refuses an entry that names no such table.
 OPEN: dict[tuple[str, str], str] = {
     ("analysis_service.auth", "_CANONICAL_ALGORITHMS"): (
-        "a list of algorithm names that filters the free text of a token header"
+        "a table of algorithm names that maps the free text of an operator's"
+        " algorithm setting to the canonical spelling"
     ),
     ("analysis_service.compact", "OMITTABLE_FIELDS"): (
         "field names read off a pydantic model at import, so the model and not"
@@ -520,25 +528,16 @@ OPEN: dict[tuple[str, str], str] = {
         " classes and not a Literal states them"
     ),
     ("analysis_service.frameworks.asvs.applicability", "APPLICABILITY"): (
-        "requirement IDs read from the rows of a catalog file, which holds them"
-        " as data and not as a type"
+        _CATALOG_ROW_IDS
     ),
     ("analysis_service.frameworks.asvs.applicability", "RATIONALES"): (
-        "requirement IDs read from the rows of a catalog file, which holds them"
-        " as data and not as a type"
+        _CATALOG_ROW_IDS
     ),
-    ("analysis_service.frameworks.asvs.catalog", "_LEVEL_BY_ID"): (
-        "requirement IDs read from the rows of a catalog file, which holds them"
-        " as data and not as a type"
-    ),
+    ("analysis_service.frameworks.asvs.catalog", "_LEVEL_BY_ID"): (_CATALOG_ROW_IDS),
     ("analysis_service.frameworks.asvs.catalog", "_REQUIREMENT_IDS"): (
-        "requirement IDs read from the rows of a catalog file, which holds them"
-        " as data and not as a type"
+        _CATALOG_ROW_IDS
     ),
-    ("analysis_service.frameworks.asvs.catalog", "_TEXT_BY_ID"): (
-        "requirement IDs read from the rows of a catalog file, which holds them"
-        " as data and not as a type"
-    ),
+    ("analysis_service.frameworks.asvs.catalog", "_TEXT_BY_ID"): (_CATALOG_ROW_IDS),
     ("analysis_service.model_tiers", "LLM_NODES"): (
         "node names that hold one entry for each role of each framework in the"
         " registry, so a new framework adds a member"
@@ -550,10 +549,6 @@ OPEN: dict[tuple[str, str], str] = {
     ("analysis_service.sql_store", "_JSON_FIELDS"): (
         "column names read off the table schema at import, so the schema and"
         " not a Literal states them"
-    ),
-    ("analysis_service.system_model", "_FLOW_ID_SHAPES"): (
-        "integer versions that a stored flow ID writes, keyed by the rule"
-        " registry and not by a string Literal"
     ),
     ("evals.harness.artifact", "DECLARED_KEYS"): (
         "keys gathered from each instrument in the registry, so a new"
@@ -612,7 +607,10 @@ OPEN: dict[tuple[str, str], str] = {
     ),
 }
 
-#: The follow-up for an entry of :data:`PENDING` whose source is a ``str``.
+#: The source of each pending table read by a ledger row's gate.
+_LEDGER_GATE = "read by a ledger row's gate, which is a str field"
+
+#: The follow-up for an entry of :data:`PENDING` whose source is a plain value.
 _PENDING_FOLLOW_UP = (
     "; the follow-up states a Literal of the keys where none exists, types that"
     " source with it, and replays the archive first where the source is a"
@@ -625,11 +623,14 @@ _MOVE_THE_LITERAL = (
     "; the follow-up names the Literal in a module that both modules import"
 )
 
-#: A closed set whose read keys, or the keys it is built from, are ``str`` at
-#: their source, by module and name, with that source. The set cannot carry its
-#: ``Literal`` while a ``str`` reaches it: mypy refuses a ``str`` key in a table
-#: lookup, and a ``str`` member where a set of the ``Literal`` is built. :func:`test_no_pending_declaration_outlives_its_table` refuses an entry
-#: whose set carries its ``Literal``.
+#: A closed set that cannot carry its ``Literal`` yet, by module and name, with
+#: the cause. Either its read keys, or the keys it is built from, are a plain
+#: ``str`` or ``int`` at their source, and mypy refuses such a key in a table
+#: lookup or such a member where a set of the ``Literal`` is built. Or its
+#: ``Literal`` sits only in a module that imports the set's module, so no name
+#: for it resolves there at run time.
+#: :func:`test_no_pending_declaration_outlives_its_table` refuses an entry whose
+#: set carries its ``Literal``.
 PENDING: dict[tuple[str, str], str] = {
     ("analysis_service.answer_forms", "CONTROL_SUGGESTIONS"): (
         "read by an open fact's attribute name, which is a str field"
@@ -640,8 +641,8 @@ PENDING: dict[tuple[str, str], str] = {
         + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.assertions", "GRAPH_BOUND"): (
-        "built from the keys of SUBJECT_PREFIXES, whose read key is a str"
-        + _PENDING_FOLLOW_UP
+        "built from the subject types of the subject-prefix table, whose read"
+        " key is a str" + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.assertions", "QUALIFIED_SPELLING"): (
         "read by a projection's attribute, which is a str field" + _PENDING_FOLLOW_UP
@@ -672,7 +673,13 @@ PENDING: dict[tuple[str, str], str] = {
     ),
     ("analysis_service.frameworks.asvs.catalog", "CHAPTER_NUMBERS"): (
         "read by a catalog chapter's lane, which is a str field, and its Literal"
-        " sits in a module that imports this one" + _MOVE_THE_LITERAL
+        " sits in a module that imports this one"
+        + _MOVE_THE_LITERAL
+        + _PENDING_FOLLOW_UP
+    ),
+    ("analysis_service.system_model", "_FLOW_ID_SHAPES"): (
+        "read by a version number parsed out of a stored flow ID, which is an int"
+        + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.graph", "LANE_ARTIFACTS"): (
         "read by an artifact name, which is a str parameter" + _PENDING_FOLLOW_UP
@@ -689,9 +696,7 @@ PENDING: dict[tuple[str, str], str] = {
     ("evals.harness.falsify", "PROBES"): (
         "read by a probe name, which is a str parameter" + _PENDING_FOLLOW_UP
     ),
-    ("evals.harness.gain", "GATES"): (
-        "read by a ledger row's gate, which is a str field" + _PENDING_FOLLOW_UP
-    ),
+    ("evals.harness.gain", "GATES"): (_LEDGER_GATE + _PENDING_FOLLOW_UP),
     ("evals.harness.modes", "PROJECTION_COMPARED"): (
         "read by a projection's attribute, which is a str field" + _PENDING_FOLLOW_UP
     ),
@@ -702,12 +707,8 @@ PENDING: dict[tuple[str, str], str] = {
     ("evals.harness.promotion", "BASELINE"): (
         "read by a gate's figure name, which is a str field" + _PENDING_FOLLOW_UP
     ),
-    ("evals.harness.promotion", "GATES"): (
-        "read by a ledger row's gate, which is a str field" + _PENDING_FOLLOW_UP
-    ),
-    ("evals.harness.promotion", "PENDING"): (
-        "read by a ledger row's gate, which is a str field" + _PENDING_FOLLOW_UP
-    ),
+    ("evals.harness.promotion", "GATES"): (_LEDGER_GATE + _PENDING_FOLLOW_UP),
+    ("evals.harness.promotion", "PENDING"): (_LEDGER_GATE + _PENDING_FOLLOW_UP),
 }
 
 
@@ -1043,6 +1044,11 @@ SORTED_LIST = sorted(["b", "a"])
 TABLE_OF_A_LIST_COMPREHENSION = dict([(kind, 1) for kind in get_args(Kind)])
 TABLE_OF_A_GENERATOR = dict((kind, 1) for kind in get_args(Kind))
 SORTED_WITH_A_KEYWORD = sorted(BASE, reverse=True)
+MIXED_LITERALS = ("a", 1)
+NAME_KEYED = {NAME: 1}
+EMPTY = ()
+KEYS_OF_A_SET = frozenset(BASE.keys())
+UNION_OF_AN_UNKNOWN = load().union(BASE)
 TABLE_OF_A_LIST = dict(["a", "b"])
 """
 
@@ -1050,9 +1056,10 @@ TABLE_OF_A_LIST = dict(["a", "b"])
 def test_the_sweep_counts_every_listed_shape_and_no_other():
     """Each shape the module docstring lists is found, with its shape. An
     integer or type operator, a bare name, a call or a display around an
-    unknown value, ``dict`` around a list display and a call with a keyword
-    are not. ``shapes`` comes first, so a name it imports is found on the
-    second pass."""
+    unknown value, ``dict`` around a list display, a call with a keyword, a
+    display with a literal that is no string or a key that is no literal, an
+    empty display and ``keys()`` of a set are not. ``shapes`` comes first, so a
+    name it imports is found on the second pass."""
     trees = [("shapes", ast.parse(_SHAPES)), ("control", ast.parse(_CONTROL))]
     found = {
         name: shape
@@ -1068,7 +1075,7 @@ def test_the_sweep_counts_every_listed_shape_and_no_other():
     sets |= {"IMPORTED_COPY", "ARGS", "SET_OF_ARGS", "METHOD", "COPY", "KEYS"}
     sets |= {"STARRED", "SORTED", "LITERAL_AND_CALL", "UNPACKED_ONLY", "SET_CALL"}
     sets |= {"DIFFERENCE_METHOD", "INTERSECTION_METHOD", "SYMMETRIC_METHOD"}
-    sets |= {"SORTED_LIST"}
+    sets |= {"SORTED_LIST", "UNION_OF_AN_UNKNOWN"}
     assert found == dict.fromkeys(tables, "table") | dict.fromkeys(sets, "set")
 
 
