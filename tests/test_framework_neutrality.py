@@ -659,9 +659,9 @@ def test_the_declaration_does_not_rot(literals):
 
     Each way of reaching one keeps it here. A module can name a package, import
     its record, or give a thing a framework's name that no open decision
-    excuses, and a declaration is stale only when it does none of the three — otherwise removing a literal from a
-    module that still imports the record would drop the reason and the entry
-    together.
+    excuses, and a declaration is stale only when it does none of the three —
+    otherwise removing a literal from a module that still imports the record
+    would drop the reason and the entry together.
     """
     reaching = set(literals) | set(package_importers()) | set(unexcused_names())
     stale = sorted(set(DECLARED) - reaching)

@@ -12,8 +12,8 @@ Usage, from the repository root:
 * ``position_ballot.py record`` reads ``position-ballot-returned.csv``. Each
   ``accept`` and ``change`` row becomes one entry in its case's
   ``rulings.json`` ``positions``, signed by the ruler; an ``any`` row writes
-  nothing. Each case is then reloaded, and any exception restores every
-  rulings file as it was.
+  nothing. Each case is then reloaded, and any exception restores each
+  rulings file it wrote as it was.
 """
 
 import csv
@@ -248,8 +248,12 @@ def answered(
             raise ValueError(
                 f"row {row['n']}: verdict {verdict!r} is not one of {VERDICTS}"
             )
-        if (verdict == "change") != bool(position):
-            raise ValueError(f"row {row['n']}: only a change verdict names a position")
+        if verdict == "change" and not position:
+            raise ValueError(f"row {row['n']}: a change verdict names a position")
+        if verdict != "change" and position:
+            raise ValueError(
+                f"row {row['n']}: an {verdict!r} verdict names no position"
+            )
         if position and position not in POSITIONS:
             raise ValueError(f"row {row['n']}: {position!r} is not a position")
         if verdict == "change" and position == row["proposed"]:
