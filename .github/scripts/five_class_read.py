@@ -3,9 +3,9 @@
 The pre-merge review reads a diff against the five defect classes of
 ``docs/agents/code-review.md`` and puts the result in the pull request body,
 under the heading :data:`HEADING`, with one entry for each class. The author
-also reads the classes that come back in fixes before the author writes the
-code, and puts the answers under the heading :data:`BEFORE_HEADING`, with one entry
-for each class of :data:`RECURRING`.
+also reads the classes that come back in fixes before the code exists. The
+author puts the answers under the heading :data:`BEFORE_HEADING`, with one
+entry for each class of :data:`RECURRING`.
 ``.github/workflows/five-class.yml`` runs this over each pull request.
 
 A change to a module that decides what a prompt says the code does also needs
