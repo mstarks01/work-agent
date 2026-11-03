@@ -55,15 +55,32 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-[#2111](https://github.com/mstarks01/work-agent/issues/2111) — **Controls**: an owner's durable record of a protection
-the system has, which writes facts before the lanes and names framework units the critic judges per finding.
-Charted 2026-11-02. The map branch is `docs/wayfinder-live-map-2111`.
+**None.** The last map, [#2111](https://github.com/mstarks01/work-agent/issues/2111), is under
+Completed maps. Chart a new one only against the bar at the end of this file.
 
 ### Completed maps
 
 A completed map lives as a closed GitHub issue. Its tickets' resolution comments hold the reasoning,
 and the code holds the current state, so read the code first. Each map below settles the rules named
 beside it.
+
+- [#2111](https://github.com/mstarks01/work-agent/issues/2111) — **Controls**: an owner's durable
+  record of a protection the system has, such as a firewall at the edge or a rate limit on an API.
+  The spec [#2148](https://github.com/mstarks01/work-agent/issues/2148) holds the build.
+  - A Control writes facts before the lanes, in the `FactAnswer` shape, and names framework units
+    in a table keyed by framework. The critic is the one judge of a row; the service holds no
+    "mitigated" state. Each package declares `units` and `unit_of` (ADR 0123).
+  - A scope is the application, a zone by name or an element by name, with aliases. A match is
+    element ID equality, a zone fans out ticked, and the owner confirms each match (ADR 0124).
+  - A Control fills only an open fact; own answers lie over it and it lies over carried answers.
+    `fact_origin` is the one reader of a fact's rung (ADR 0125).
+  - The critic judges each row in a `control` step, answers every shown row, and a row un-defers
+    its unit through `partition_proposals` (ADR 0126).
+  - A Control is a row in `controls` with evidence objects, a job copies it into
+    `<owner-id>/<job-id>/controls.json`, and `/v1` refuses it with 422 (ADR 0127).
+  - The page is variant A of the prototype on the branch `prototype/controls-2118`.
+  - A Control on a flow, a suggested Control, an authoring-time warning, who classifies a document,
+    and a corpus disposition for a settled row stay in the fog.
 
 - [#2057](https://github.com/mstarks01/work-agent/issues/2057) — a Files section in the web app,
   where an owner keeps **Owner File**s, such as call transcripts and Mermaid diagrams. The spec
