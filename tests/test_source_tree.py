@@ -342,8 +342,7 @@ _THE_WALK = frozenset({"tests/source_tree.py", "tests/test_source_tree.py"})
 #: :mod:`tests.source_tree`.
 DATA_WALKS: dict[str, str] = {
     "tests/test_framework_units.py:<module>": (
-        "replays the archived reports of the Baselines and the past runs, which"
-        " are run data"
+        "replays the archived reports of the Baselines, which are run data"
     ),
     **dict.fromkeys(
         (

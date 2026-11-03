@@ -199,9 +199,9 @@ Start at the places where a one-package assumption survives:
   none offers its lanes. An empty set is valid and offers no rows. The package
   refuses to build when a unit names an undeclared lane or sits inside no unit
   of the set. `check_unit` checks a row's framework and unit.
-  `tests/test_framework_units.py` replays each archived report and fails when
-  `unit_of` names a unit outside the set, and `tests/test_future_frameworks.py`
-  gives a third package units of its own.
+  `tests/test_framework_units.py` replays each Baseline report and each corpus
+  reference record, and fails when `unit_of` names a unit outside the set.
+  `tests/test_future_frameworks.py` gives a third package units of its own.
 
 - **Which class the service asks for.** A package overriding a neutral hook has
   to put it on the class the *caller* reaches, not merely on one of its own.

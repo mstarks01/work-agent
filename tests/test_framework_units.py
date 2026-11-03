@@ -3,8 +3,8 @@
 A package declares ``units``, its closed set of unit rows, and ``unit_of``, the
 unit one of its claims sits in. The package gate checks the table when the
 package is built, :func:`~analysis_service.frameworks.check_unit` checks a
-row's framework and unit, and a replay over the archived reports holds
-``unit_of`` to the set through that check.
+row's framework and unit, and a replay over the Baseline reports and the
+corpus references holds ``unit_of`` to the set through that check.
 """
 
 from __future__ import annotations
@@ -24,14 +24,14 @@ from analysis_service.frameworks import (
     validate_package,
 )
 from analysis_service.frameworks.asvs.catalog import CHAPTERS, REQUIREMENTS
-from evals.harness.bundle import UnreadableReport, read_report
+from analysis_service.frameworks.asvs.record import DraftRequirementRuling
+from evals.harness.artifact import CORPUS_DIR
+from evals.harness.bundle import read_report
+from evals.harness.reference import ReferenceRequirement, load_corpus
 from tests.factories import PROJECT_ROOT, carrying
 
-ARCHIVED_REPORTS = sorted(
-    path
-    for root in ("evals/baselines", "evals/runs")
-    for path in (PROJECT_ROOT / root).rglob("*.report.json")
-)
+BASELINE_REPORTS = sorted((PROJECT_ROOT / "evals/baselines").rglob("*.report.json"))
+_KEY_OF = {req.id: req.key for req in REQUIREMENTS}
 
 
 def _members(package: FrameworkPackage) -> dict[str, object]:
@@ -131,22 +131,31 @@ def test_the_unit_check_refuses_another_package_s_unit():
         check_unit("asvs", "spoofing")
 
 
-# --- The replay over the archived reports ------------------------------------
+# --- The replay over the archived claims --------------------------------------
 
 
 def _archived_claims() -> list[Claim]:
-    """Each claim of each archived report that today's reader accepts.
+    """The claims of each Baseline report, and a claim for each ASVS reference.
 
-    A report that today's ``Report`` refuses holds an older schema, and no reader
-    migrates an archived report, so the replay leaves it out.
+    The Baselines hold the committed claims of a run. They are STRIDE only, so
+    each ASVS reference record of the corpus becomes a claim whose ID the
+    package's own ID rule composes.
     """
     claims: list[Claim] = []
-    for path in ARCHIVED_REPORTS:
-        try:
-            report = read_report(path)
-        except UnreadableReport:
-            continue
+    for path in BASELINE_REPORTS:
+        report = read_report(path)
         claims += [claim for block in report.analyses for claim in block.claims]
+    asvs = PACKAGES["asvs"]
+    claims += [
+        DraftRequirementRuling.model_construct(
+            id=asvs.compose_id(ref.chapter, _KEY_OF[ref.requirement]),
+            framework="asvs",
+        )
+        for case in load_corpus(CORPUS_DIR)
+        if "asvs" in case.references
+        for ref in case.claims_for("asvs")
+        if isinstance(ref, ReferenceRequirement)
+    ]
     return claims
 
 
