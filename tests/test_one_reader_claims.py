@@ -94,7 +94,6 @@ CLAIM = re.compile(
     r"|\bno\s+(?:other|second)\s+reader\b"
     r"|\bthe\s+only\s+places?\b"
     r"|\bthe\s+(?:one|single|sole)\s+places?\b"
-    r"(?!\s+(?:this\s+goes\s+wrong|that\s+must\s+not|built\s+to)\b)"
     r"|\bone\s+site\b"
     r"|(?<!\bnames\s)\bnowhere\s+else\b"
     r"|\bthe\s+(?:single|sole)\s+source\b"
@@ -582,15 +581,15 @@ def test_the_claim_pattern_finds_a_claim_and_skips_a_description():
         "split here and judged nowhere\n    else.",
         "The catalog is the sole source of truth for evidence.",
         "the single source of truth",
+        "the one place built to hold the rule",
+        "the one place that must not change",
+        "the one place this goes wrong",
     ]
     described = [
         "and no single source is at fault.",
         'a check that dropped a "not" would be the one reader lying to the rest.',
         "a single source of text",
         "Where drafts live when a caller names nowhere else.",
-        "The second-opinion pass is the one place that must\nnot be told.",
-        "That means the one place this goes wrong is the place people try it.",
-        "it would kill the run at the one place built to report why it died.",
         "is the defect the single reader in that module exists to prevent.",
         "the single reader in another file applies it.",
         "a single reader of the page",
