@@ -26,6 +26,9 @@ and the smell list.
 
 CI requires a `## Five-class read` section, with one entry for each class,
 in the body of each pull request that changes code.
+Before you write code, read each row of the table of classes that come back in
+fixes as a question. Write each answer in a `## Before the code` section of the
+pull request body. CI requires that section too.
 
 A round starts from `git tag -l 'reviewed/*' --sort=-creatordate | head -1` and
 ends in a new annotated `reviewed/<date>` tag. Read that tag's message before
