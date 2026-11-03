@@ -839,8 +839,8 @@ class TestTheParentLock:
                 parent, "alice", NO_ANSWERS, [], [], 0, renames=(), control_scopes=None
             )
         )
-        moved = reserve(store, amendment(parent, revision=0))
-        assert moved == Admission(outcome="parent_moved", active=0)
+        stale = reserve(store, amendment(parent, revision=0))
+        assert stale == Admission(outcome="parent_stale", active=0)
         asyncio.run(admit(store, amendment(parent, revision=1)))
 
     @pytest.mark.parametrize("child", [follow_up, amendment])

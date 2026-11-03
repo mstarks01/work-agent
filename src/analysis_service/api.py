@@ -642,7 +642,7 @@ _REFUSALS: dict[RefusalOutcome, tuple[int, Callable[[Admission, int], str]]] = {
             " answer returned; answer again only if that job fails"
         ),
     ),
-    "parent_moved": (
+    "parent_stale": (
         409,
         lambda admission, ceiling: (
             "the saved answers changed while this request read them; read the"
