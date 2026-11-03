@@ -246,7 +246,8 @@ def answered(
         verdict, position = answer["verdict"], answer["position"]
         if verdict not in VERDICTS:
             raise ValueError(
-                f"row {row['n']}: the verdict {verdict!r} is not one of {VERDICTS}"
+                f"row {row['n']}: the verdict {verdict!r} is not one of {VERDICTS};"
+                " name one"
             )
         if verdict == "change" and not position:
             raise ValueError(
