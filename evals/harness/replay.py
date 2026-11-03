@@ -107,6 +107,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.evidence import prepared_view
 from analysis_service.grounding import normalize
+from analysis_service.parsing import table_entry
 from analysis_service.sources import text_digest
 from analysis_service.system_model import (
     FLOW_DELIMITER,
@@ -741,7 +742,7 @@ def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
     reference it points at. The alias is keyed by the whole **Element ID**, so a
     ruling about a zone reaches no value naming a process.
     """
-    predicate = REGISTRY[produced.predicate]
+    predicate = table_entry(REGISTRY, produced.predicate)
     own = reference.subject_aliases.get(produced.subject)
     subject = produced.subject if own is None else own.to
     value = produced.value
@@ -777,7 +778,7 @@ def _compares_exactly(predicate: str) -> bool:
     one of the layer's own subjects — a credential or a principal slugged
     from whatever the model wrote — are a reader's question.
     """
-    registered = REGISTRY[predicate]
+    registered = table_entry(REGISTRY, predicate)
     if registered.value == "term":
         return True
     return registered.value == "reference" and bool(registered.refers_to & GRAPH_BOUND)
@@ -1106,7 +1107,7 @@ def bind_assertions(
             # predicates that take no reference. A term predicate carrying a
             # term outside its vocabulary draws this same code, and reading
             # `refers_to` directly ended the replay with a bare StopIteration.
-            wanted = referent_type(REGISTRY[row.predicate])
+            wanted = referent_type(table_entry(REGISTRY, row.predicate))
             blessed_id = (
                 None if wanted is None else snap_subject(wanted, row.value, case.model)
             )

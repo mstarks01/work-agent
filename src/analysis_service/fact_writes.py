@@ -34,7 +34,7 @@ from analysis_service.assertions import (
     projected_attribute,
     subjects_of,
 )
-from analysis_service.capabilities import CAPABILITIES, lineage
+from analysis_service.capabilities import lineage, parse_capability_key
 from analysis_service.fact_answers import (
     FactAnswer,
     answer_facets,
@@ -47,7 +47,7 @@ from analysis_service.fact_answers import (
     merged_facts,
 )
 from analysis_service.open_facts import open_attribute, prepared_model
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.question_kinds import parse_question_kind
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import (
     CapabilityStatement,
@@ -127,7 +127,7 @@ def check_fact_answers(
             raise ValueError(f"facts[{at}]: a key names one fact, in one spelling")
         kind = answer.kind
         if kind == "question":
-            if question not in QUESTION_KINDS or model.get(element_id) is None:
+            if parse_question_kind(question) is None or model.get(element_id) is None:
                 raise ValueError(
                     f"facts[{at}]: no question of that kind on that element"
                 )
@@ -151,7 +151,7 @@ def check_fact_answers(
         ):
             raise ValueError(f"facts[{at}]: no open assertion row by that ID")
         elif kind == "capability":
-            if capability not in CAPABILITIES:
+            if parse_capability_key(capability) is None:
                 raise ValueError(f"facts[{at}]: no capability by that name")
             known = stated.get(capability)
             if (
@@ -229,7 +229,7 @@ def _check_capability_lineage(
         return
     held = answered_model(prepared, merged_facts(earlier, answers)).capability_facts()
     for key, fact in held.items():
-        if fact.state != "present" or key not in CAPABILITIES:
+        if fact.state != "present" or parse_capability_key(key) is None:
             continue
         for ancestor in lineage(key):
             absent = ancestor in held and held[ancestor].state == "absent"

@@ -18,8 +18,8 @@ checks a field against a computed set, the provider-facing schema has to state
 that set, because a model asked for a string of 1 to 100 characters will
 eventually write prose into it. A field with a length bound and no enum admits
 a sentence; the `Ground` comment records this failure from the critic, 132
-times in six runs. Grep `validation.py` for `not in`: each one is a
-gate check whose schema may say only `max_length`.
+times in six runs. Grep `validation.py` for `not in` and for a `parse_` call
+tested `is None`: each one is a gate check whose schema may say only `max_length`.
 
 **Prefer the enum in `json_schema_extra` to a validator.** A value outside the
 set then stays an `invalid-reference` that names its element, so `repair_scope`

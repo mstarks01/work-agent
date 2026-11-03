@@ -107,8 +107,8 @@ from analysis_service.open_facts import (
     open_attribute,
     prepared_model,
 )
-from analysis_service.parsing import non_negative
-from analysis_service.question_kinds import QUESTION_KINDS, Facet
+from analysis_service.parsing import non_negative, table_entry
+from analysis_service.question_kinds import QUESTION_KINDS, Facet, parse_question_kind
 from analysis_service.system_model import Element, SystemModel
 
 __all__ = [
@@ -343,7 +343,7 @@ class EarlyQuestion:
 
 def _open_key(model: SystemModel, element: Element, field: str) -> UnknownKey | None:
     """The fact this field asks about this element, or ``None`` where it is not open."""
-    if field in QUESTION_KINDS:
+    if parse_question_kind(field) is not None:
         return UnknownRef(element_id=element.id, question=field).key
     if open_attribute(model, element.id, field):
         return UnknownRef(element_id=element.id, attribute=field).key
@@ -511,7 +511,7 @@ def _unread_reason(key: UnknownKey, names: Mapping[str, str]) -> str:
         return PRIOR_REASON
     ref = key_ref(key)
     return KIND_REASON.format(
-        covers=QUESTION_KINDS[ref.question].covers,
+        covers=table_entry(QUESTION_KINDS, ref.question).covers,
         element=names.get(ref.element_id, ref.element_id),
     )
 
@@ -652,7 +652,7 @@ def capability_questions(
         questions[key] = EarlyQuestion(
             key=ref.key,
             kind="capability",
-            label=CAPABILITIES[key].question,
+            label=table_entry(CAPABILITIES, key).question,
             reasons=(f"An answer settles whether up to {counts[key]} units apply.",),
             choices=YES_NO,
             form="choice",
@@ -661,7 +661,7 @@ def capability_questions(
             max_length=answer_limit(ref.key, model),
             group=group,
             group_heading=heading,
-            element=CAPABILITIES[key].question,
+            element=table_entry(CAPABILITIES, key).question,
             frameworks=tuple(helps[key]),
             score=float(counts[key]),
             framework_bands=tuple(own[key]),

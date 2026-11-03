@@ -28,7 +28,37 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
 
-__all__ = ["ALL_FACET_IDS", "MAX_FACETS", "QUESTION_KINDS", "Facet", "QuestionKind"]
+from analysis_service.parsing import member
+
+__all__ = [
+    "ALL_FACET_IDS",
+    "MAX_FACETS",
+    "QUESTION_KINDS",
+    "Facet",
+    "QuestionKind",
+    "QuestionKindName",
+    "parse_question_kind",
+]
+
+
+#: The name of each kind of :data:`QUESTION_KINDS`.
+QuestionKindName = Literal[
+    "capacity-limits",
+    "audit-evidence",
+    "authorization-scope",
+    "stored-copy-integrity",
+    "stored-copy-access",
+    "reachability",
+    "provenance",
+    "code-execution",
+    "physical-access",
+    "content-validation",
+    "destination",
+    "security-configuration",
+    "failure-handling",
+    "update-process",
+    "data-exposure",
+]
 
 
 @dataclass(frozen=True)
@@ -62,7 +92,7 @@ class QuestionKind:
     facets: tuple[Facet, ...]
 
 
-QUESTION_KINDS: Mapping[str, QuestionKind] = MappingProxyType(
+QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
     {
         "capacity-limits": QuestionKind(
             template="What limits bound the requests and work {element} accepts:"
@@ -268,6 +298,18 @@ QUESTION_KINDS: Mapping[str, QuestionKind] = MappingProxyType(
         ),
     }
 )
+
+
+def parse_question_kind(name: str) -> QuestionKindName | None:
+    """The kind of :data:`QUESTION_KINDS` that ``name`` names, or ``None``.
+
+    A reference holds the kind as a ``str``, so a report that names a kind
+    this table does not hold still loads. Each reader that calls this decides
+    what that reference gets: a check refuses it, and a label shows the kind
+    as it is written.
+    """
+    return member(name, QUESTION_KINDS)
+
 
 #: Every facet ID some kind has, which a reference may name.
 ALL_FACET_IDS: frozenset[str] = frozenset(

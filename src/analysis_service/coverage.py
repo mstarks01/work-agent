@@ -64,6 +64,7 @@ from analysis_service.claims import (
     LaneCoverage,
 )
 from analysis_service.frameworks import FrameworkPackage
+from analysis_service.parsing import table_entry
 from analysis_service.references import canonical
 from analysis_service.system_model import SystemModel, mentioned_ids
 
@@ -166,7 +167,7 @@ def _open(applicability: Sequence[ApplicabilityEntry], units: Sequence[str]) -> 
         for key in entry.missing:
             by_question.setdefault(key, []).append(entry.unit)
     settled_by = "; ".join(
-        f"{CAPABILITIES[key].question} ({', '.join(open_units)})"
+        f"{table_entry(CAPABILITIES, key).question} ({', '.join(open_units)})"
         for key, open_units in by_question.items()
     )
     return (

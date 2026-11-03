@@ -79,6 +79,7 @@ from analysis_service.frameworks.asvs.catalog import (
     requirement_text,
     requirements_for,
 )
+from analysis_service.parsing import table_entry
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -349,7 +350,9 @@ def _entry(unit: str, decision: Decision) -> ApplicabilityEntry:
     """One requirement's decision as the entry a report carries."""
     why = RATIONALES[unit]
     if decision.state == "unknown":
-        asked = "; ".join(CAPABILITIES[key].question for key in decision.missing)
+        asked = "; ".join(
+            table_entry(CAPABILITIES, key).question for key in decision.missing
+        )
         return ApplicabilityEntry(
             unit=unit,
             state="unknown",
