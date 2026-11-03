@@ -7,7 +7,9 @@ is prepared again as the call prepared it, and
 :func:`~evals.harness.descendants.lane_drafts` turns its proposals into
 drafts. A ruled reference of the lane is reached when a draft
 matches it by verb and place with no ruled position, and it agrees when a
-reaching draft states the ruled position. Writes ``runs/<prefix>-read.json``.
+reaching draft states the ruled position. Writes ``runs/<prefix>-read.json``,
+or ``runs/<prefix>-<name>.json`` with ``score_stage.py <prefix> <name>``, which
+scores the same calls under the rulings of a later day.
 """
 
 import json
@@ -129,10 +131,11 @@ def totals(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    (prefix,) = sys.argv[1:]
+    prefix, *named = sys.argv[1:]
+    name = named[0] if named else "read"
     rows = [read_run(path) for path in sorted(RUNS.glob(f"{prefix}-[0-9]*.json"))]
     result = {"rows": rows, "totals": totals(rows)}
-    (RUNS / f"{prefix}-read.json").write_text(
+    (RUNS / f"{prefix}-{name}.json").write_text(
         json.dumps(result, indent=2) + "\n", encoding="utf-8"
     )
     print(json.dumps(result["totals"], indent=2))

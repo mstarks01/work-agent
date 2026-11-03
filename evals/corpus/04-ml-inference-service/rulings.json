@@ -71,19 +71,6 @@
       "reference": {
         "verb": "read",
         "affected_element_ids": [
-          "store:inference-log"
-        ]
-      },
-      "position": "outside",
-      "ruling": "The ballot proposed outside, and the ruler accepted it.",
-      "reviewed_by": "mstarks01",
-      "source": "QA-2026-11-02-05 position ballot row 26"
-    },
-    {
-      "lane": "information-disclosure",
-      "reference": {
-        "verb": "read",
-        "affected_element_ids": [
           "store:redis-feature-store"
         ]
       },
