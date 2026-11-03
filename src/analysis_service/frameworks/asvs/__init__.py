@@ -206,9 +206,9 @@ def _units() -> tuple[Unit, ...]:
     )
 
 
-def _unit_of(claim: Claim) -> str:
+def _control_unit_of(claim: Claim) -> str:
     """The requirement a claim rules on: the finest grain the catalog publishes."""
-    return requirement_of(claim.id)
+    return DraftRequirementRuling.unit_of(claim)
 
 
 ASVS = FrameworkPackage(
@@ -246,5 +246,5 @@ ASVS = FrameworkPackage(
     bands=REQUIREMENT_BANDS,
     rank=_rank,
     units=_units(),
-    unit_of=_unit_of,
+    control_unit_of=_control_unit_of,
 )

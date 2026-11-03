@@ -401,9 +401,13 @@ class FrameworkPackage:
         its lanes. An empty table is valid and offers no rows. The package
         refuses to build where a unit names an undeclared lane, an ``inside``
         link names no unit of the table, or two units share an ID.
-    ``unit_of``
-        The ID of the unit one of this package's claims sits in, at the finest
-        grain the package offers.
+    ``control_unit_of``
+        The ID of the unit in ``units`` that one of this package's claims sits
+        in, at the finest grain the package offers. It differs from the record
+        hook :meth:`~analysis_service.claims.Claim.unit_of`, which names the
+        unit of the scope list a draft can be refused on: a framework with no
+        catalog has no scope unit, and it still offers its lanes as Control
+        units.
     """
 
     name: FrameworkName
@@ -420,7 +424,7 @@ class FrameworkPackage:
     bands: tuple[str, ...]
     rank: Callable[[Claim], Band]
     units: tuple[Unit, ...]
-    unit_of: Callable[[Claim], str]
+    control_unit_of: Callable[[Claim], str]
 
     def __post_init__(self) -> None:
         if issues := _unit_issues(self):

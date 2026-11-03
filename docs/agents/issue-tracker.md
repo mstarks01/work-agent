@@ -69,7 +69,7 @@ beside it.
   The spec [#2148](https://github.com/mstarks01/work-agent/issues/2148) holds the build.
   - A Control writes facts before the lanes, in the `FactAnswer` shape, and names framework units
     in a table keyed by framework. The critic is the one judge of a row; the service holds no
-    "mitigated" state. Each package declares `units` and `unit_of` (ADR 0123).
+    "mitigated" state. Each package declares `units` and `control_unit_of` (ADR 0123).
   - A scope is the application, a zone by name or an element by name, with aliases. A match is
     element ID equality, a zone fans out ticked, and the owner confirms each match (ADR 0124).
   - A Control fills only an open fact; own answers lie over it and it lies over carried answers.

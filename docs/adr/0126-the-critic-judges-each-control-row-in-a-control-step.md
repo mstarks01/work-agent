@@ -27,9 +27,9 @@ about a `config` requirement would reach no critic.
 **The service puts a `controls` key on each draft's critic view.** For one
 draft it picks each applied Control whose resolved elements hold the draft's
 affected element, or whose scope is the application, and each row of that
-Control whose unit equals the draft's unit from `unit_of` or is a unit it sits
-inside. An entry carries the Control's ID and name, the row's unit ID with its
-label, the resolved scope, and each document of the job's copy as a
+Control whose unit equals the draft's unit from `control_unit_of` or is a unit
+it sits inside. An entry carries the Control's ID and name, the row's unit ID
+with its label, the resolved scope, and each document of the job's copy as a
 service-copied excerpt with its class and digest. The critic never sees a
 document the service did not copy. Both passes of the critic round get the key.
 
@@ -81,7 +81,8 @@ terms and two worked cases.
 ## Considered options
 
 - **The rows rendered once in the input.** Rejected: the critic then matches
-  units and elements itself, a second reader of `unit_of` and the scope reader.
+  units and elements itself, a second reader of `control_unit_of` and the scope
+  reader.
 - **An excerpt ground on the verdict.** Rejected: the verdict holds no ground,
   and the copy holds the bytes.
 - **A fifth scope state such as `control-stated`.** Rejected: one ruling

@@ -1,10 +1,11 @@
 """The units a Control row can name, on each **Framework Package** (ADR 0123).
 
-A package declares ``units``, its closed set of unit rows, and ``unit_of``, the
+A package declares ``units``, its closed set of unit rows, and
+``control_unit_of``, the
 unit one of its claims sits in. The package gate checks the table when the
 package is built, :func:`~analysis_service.frameworks.check_unit` checks a
 row's framework and unit, and a replay over the Baseline reports and each
-ASVS reference record of the corpus holds ``unit_of`` to the set through that
+ASVS reference record of the corpus holds ``control_unit_of`` to the set through that
 check.
 """
 
@@ -39,7 +40,7 @@ def _members(package: FrameworkPackage) -> dict[str, object]:
     return {field.name: getattr(package, field.name) for field in fields(package)}
 
 
-@pytest.mark.parametrize("member", ["units", "unit_of"])
+@pytest.mark.parametrize("member", ["units", "control_unit_of"])
 def test_a_package_that_lacks_a_unit_member_cannot_be_built(member):
     members = _members(PACKAGES["stride"])
     del members[member]
@@ -49,12 +50,12 @@ def test_a_package_that_lacks_a_unit_member_cannot_be_built(member):
 
 
 @pytest.mark.parametrize("name", sorted(PACKAGES))
-def test_each_package_declares_units_and_unit_of(name):
+def test_each_package_declares_units_and_control_unit_of(name):
     package = PACKAGES[name]
 
     assert package.units
     assert all(isinstance(unit, Unit) for unit in package.units)
-    assert callable(package.unit_of)
+    assert callable(package.control_unit_of)
 
 
 def test_a_unit_in_an_undeclared_lane_fails_when_the_package_is_built():
@@ -159,10 +160,10 @@ def _replayed_claims() -> list[Claim]:
 
 
 def _stray_units(claims: list[Claim]) -> list[tuple[str, str]]:
-    """Each claim whose ``unit_of`` gives a unit that ``check_unit`` refuses."""
+    """Each claim whose ``control_unit_of`` gives a unit that ``check_unit`` refuses."""
     strays = []
     for claim in claims:
-        unit = package_for(claim.framework).unit_of(claim)
+        unit = package_for(claim.framework).control_unit_of(claim)
         try:
             check_unit(claim.framework, unit)
         except ValueError:
@@ -179,12 +180,18 @@ def test_the_replay_reads_claims_of_each_package(replayed_claims):
     assert {claim.framework for claim in replayed_claims} == set(PACKAGES)
 
 
-def test_unit_of_names_a_unit_of_the_set_for_each_replayed_claim(replayed_claims):
+def test_control_unit_of_names_a_unit_of_the_set_for_each_replayed_claim(
+    replayed_claims,
+):
     assert _stray_units(replayed_claims) == []
 
 
-def test_the_replay_fails_where_unit_of_leaves_the_set(monkeypatch, replayed_claims):
-    drifted = replace(PACKAGES["stride"], unit_of=lambda claim: f"{claim.id}-elsewhere")
+def test_the_replay_fails_where_control_unit_of_leaves_the_set(
+    monkeypatch, replayed_claims
+):
+    drifted = replace(
+        PACKAGES["stride"], control_unit_of=lambda claim: f"{claim.id}-elsewhere"
+    )
     carrying(monkeypatch, drifted)
 
     strays = _stray_units(replayed_claims)

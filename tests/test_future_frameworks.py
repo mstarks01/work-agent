@@ -93,7 +93,7 @@ def third(monkeypatch):
         precondition=_operations_stated,
         precondition_facts=_operations_facts,
         units=THIRD_UNITS,
-        unit_of=lambda claim: THIRD_UNITS[1].id,
+        control_unit_of=lambda claim: THIRD_UNITS[1].id,
     )
     carrying(monkeypatch, package)
     # The planner's modules read the registry by the name they imported.

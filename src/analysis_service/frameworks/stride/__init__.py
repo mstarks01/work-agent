@@ -193,7 +193,7 @@ def _rank(claim: Claim) -> Band:
     return band_of(_BANDS, level)
 
 
-def _unit_of(claim: Claim) -> str:
+def _control_unit_of(claim: Claim) -> str:
     """A threat's lane, which is the finest unit a method with no catalog offers."""
     return lane_of(claim) or ""
 
@@ -227,5 +227,5 @@ STRIDE = FrameworkPackage(
         Unit(id=lane, grain="lane", lane=lane, inside=None)
         for lane in STRIDE_CATEGORIES
     ),
-    unit_of=_unit_of,
+    control_unit_of=_control_unit_of,
 )
