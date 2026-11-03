@@ -308,6 +308,11 @@ class TestTheEvidenceRules:
             "The password policy: twelve characters at least.",
             "token: os.environ",
             'password = ""',
+            'log.info("password: " + pw)',
+            "print('token=', tok)",
+            'raise ValueError("bad token: " + str(t))',
+            "x = 'secret=' + s",
+            'header = "Bearer token: " + t',
         ],
     )
     def test_a_line_that_sets_no_literal_value_passes(self, line):
@@ -350,10 +355,9 @@ def test_a_long_or_unclosed_credential_is_refused(line, shape):
     )
 
 
-@pytest.mark.parametrize(
-    "line", ["token=" * 17_000, 'password="' * 10_000, "token: " + "a" * 100_000]
-)
-def test_a_hostile_line_is_read_in_linear_time(line):
+def test_a_hostile_line_is_read_in_linear_time():
+    """Many starts that each read 256 characters of a value and then fail."""
+    line = ("token=" * 42 + " ") * 400
     started = time.perf_counter()
-    credential_hit(line)
+    assert credential_hit(line) is None
     assert time.perf_counter() - started < 1

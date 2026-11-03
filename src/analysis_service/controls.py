@@ -320,10 +320,11 @@ class EvidenceRefusal:
 #: The credential shapes the service knows, by the words a refusal names them
 #: with. An evidence file that holds one is refused by line, and the service
 #: redacts nothing (ADR 0127). An assignment counts only where it sets a
-#: literal value: a quoted string, or an unquoted value that holds a digit or a
-#: symbol, or that runs 256 characters. So a type name or a reference passes.
-#: Each start reads at most 256 characters of a value, so one scan of a line
-#: stays linear.
+#: literal value: a quoted string that closes, a quoted or an unquoted run of
+#: 256 characters, or an unquoted value at the end of its line that holds a
+#: digit or a symbol. So a type name, a reference and a string that a quote
+#: closes before the assignment pass. Each start reads at most 257 characters
+#: of a value, so one scan of a line stays linear.
 CredentialShape = Literal[
     "a private key block",
     "a cloud access key ID",
@@ -343,7 +344,8 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
     ),
     "a password, secret or token set to a value": re.compile(
         r"(?i)(?<![\w.-])[\w.-]*(?:password|passwd|secret|token)[\"']?\s*[:=]\s*"
-        r"(?:([\"'])(?![$<{%\"'])[^\n]"
+        r"(?:\"(?![$<{%\"])(?:[^\"\n]{1,256}\"|[^\"\n]{256})"
+        r"|'(?![$<{%'])(?:[^'\n]{1,256}'|[^'\n]{256})"
         rf"|(?![$<{{%*])(?:(?={_UNQUOTED}{{0,255}}[\d!@^&*+~?/\\|]){_UNQUOTED}{{1,256}}\s*$"
         rf"|{_UNQUOTED}{{256}}))"
     ),

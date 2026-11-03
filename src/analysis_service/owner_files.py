@@ -19,7 +19,6 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from analysis_service.errors import error_place
 from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import (
     DIAGRAM_TYPES,
@@ -196,9 +195,7 @@ def upload_refusal(
         )
     try:
         Source(kind=kind, label=name, text=text)
-    except ValidationError as exc:
-        if "text" in {error_place(error) for error in exc.errors()}:
-            return NO_TEXT
+    except ValidationError:
         return (
             f"Give the file a name of at most {MAX_LABEL_CHARS} characters, on one"
             " line, with no control or formatting characters."
