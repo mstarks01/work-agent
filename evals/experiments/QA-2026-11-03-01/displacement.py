@@ -13,7 +13,8 @@ of :data:`STUDIES` names a run folder and the files of each arm:
 Each ``read`` of a store is given a class by its text:
 
 * ``compromised-reader``: the title or description says the attacker
-  compromises the reader or runs code in it;
+  compromises the reader or runs code in it, in words such as "compromised",
+  "code in", "code running in" or "code executing in";
 * ``grant-holder``: otherwise, the draft cites the authentication fact of a
   flow into the store, so its attacker reads through access to the store;
 * ``other``: every other read of a store, such as a storage copy.
@@ -52,7 +53,9 @@ STUDIES: dict[str, tuple[Path, dict[str, tuple[str, ...]]]] = {
         },
     ),
 }
-COMPROMISE = re.compile(r"\w*compromis\w*|code running|runs? code", re.IGNORECASE)
+COMPROMISE = re.compile(
+    r"\w*compromis\w*|\bcode (?:running |executing )?in\b|runs? code", re.IGNORECASE
+)
 STORE_AUTH = re.compile(r"(?:unknown|absent):flow:\S*>store:\S*:authentication")
 
 

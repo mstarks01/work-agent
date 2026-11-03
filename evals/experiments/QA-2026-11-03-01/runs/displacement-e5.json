@@ -1,9 +1,8 @@
 {
   "counts": {
     "with-exemplar": {
-      "compromised-reader": 7,
-      "other": 31,
-      "grant-holder": 5
+      "compromised-reader": 17,
+      "other": 26
     },
     "without-exemplar": {
       "other": 27,
@@ -46,8 +45,8 @@
       {
         "run": "id-03",
         "title": "Code in the scheduler can read every landing-bucket extract through its existing access",
-        "class": "grant-holder",
-        "because": "unknown:flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files:authentication"
+        "class": "compromised-reader",
+        "because": "Code in"
       },
       {
         "run": "id-03",
@@ -76,14 +75,14 @@
       {
         "run": "id-04",
         "title": "Code in the model server can read confidential Redis features through its existing access",
-        "class": "other",
-        "because": ""
+        "class": "compromised-reader",
+        "because": "Code in"
       },
       {
         "run": "id-04",
         "title": "Code in the model server can copy model artifacts through its service account",
         "class": "compromised-reader",
-        "because": "runs code"
+        "because": "Code in"
       },
       {
         "run": "id-05",
@@ -100,14 +99,14 @@
       {
         "run": "id-05",
         "title": "Code in the worker can read queued jobs through the worker's queue access",
-        "class": "grant-holder",
-        "because": "unknown:flow:process:background-worker-process>store:message-queue>consume-job:authentication"
+        "class": "compromised-reader",
+        "because": "Code in"
       },
       {
         "run": "id-05",
         "title": "Code in the worker can read database records through the worker's database access",
-        "class": "grant-holder",
-        "because": "unknown:flow:process:background-worker-process>store:database>read-write-records:authentication"
+        "class": "compromised-reader",
+        "because": "Code in"
       },
       {
         "run": "id-06",
@@ -155,7 +154,7 @@
         "run": "id-10",
         "title": "Code running in the public web server can read CMS records through its database access",
         "class": "compromised-reader",
-        "because": "Code running"
+        "because": "Code running in"
       },
       {
         "run": "id-11",
@@ -172,14 +171,14 @@
       {
         "run": "id-11",
         "title": "Code in the scheduling service can read the rota database through its existing access",
-        "class": "grant-holder",
-        "because": "unknown:flow:process:scheduling-service>store:rota-database>read-write-rotas:authentication"
+        "class": "compromised-reader",
+        "because": "Code in"
       },
       {
         "run": "id-11",
         "title": "Code in the payroll system can read exports through the file-share collection path",
-        "class": "grant-holder",
-        "because": "unknown:flow:entity:payroll-system>store:file-share>collect-payroll-export:authentication"
+        "class": "compromised-reader",
+        "because": "Code in"
       },
       {
         "run": "id-12",
@@ -203,7 +202,7 @@
         "run": "id-12",
         "title": "Code running in the supplier master service may read the raw landing-bucket extract through its unverified access path",
         "class": "compromised-reader",
-        "because": "Code running"
+        "because": "Code running in"
       },
       {
         "run": "id-13",
@@ -221,7 +220,7 @@
         "run": "id-13",
         "title": "Unverified database authentication may let code in the dispatch API read the dispatch corpus",
         "class": "compromised-reader",
-        "because": "runs code"
+        "because": "code in"
       },
       {
         "run": "id-14",
@@ -238,14 +237,14 @@
       {
         "run": "id-14",
         "title": "Code executing in the authorization server can read the identity database through its existing grant",
-        "class": "other",
-        "because": ""
+        "class": "compromised-reader",
+        "because": "Code executing in"
       },
       {
         "run": "id-14",
         "title": "Code executing in the rewards API can read all ledger records through the API's access",
-        "class": "other",
-        "because": ""
+        "class": "compromised-reader",
+        "because": "Code executing in"
       },
       {
         "run": "id-15",
@@ -262,14 +261,14 @@
       {
         "run": "id-15",
         "title": "Code in the billing app can read every tenant through the shared database account",
-        "class": "other",
-        "because": ""
+        "class": "compromised-reader",
+        "because": "Code in"
       },
       {
         "run": "id-15",
         "title": "Code in the billing app can retrieve every tenant's PDFs through one bucket credential",
-        "class": "other",
-        "because": ""
+        "class": "compromised-reader",
+        "because": "Code in"
       }
     ],
     "without-exemplar": [
