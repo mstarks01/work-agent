@@ -44,7 +44,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from analysis_service.actions import VerbError
 from analysis_service.assertions import CatalogProposal
@@ -1842,7 +1842,6 @@ def replay_artifact(
             f"{path}: a {loaded.mode} sweep keeps no emission this instrument reads;"
             f" it replays {sorted(replay.ROUTES_OF)}"
         )
-    mode = cast(modes.SweepMode, loaded.mode)
     present = [case for case in cases if case.id in loaded.cases]
     if not present:
         raise modes.EvalRunError(f"{path}: none of its cases are in {corpus_dir}")
@@ -1864,7 +1863,7 @@ def replay_artifact(
             **graded,
         )
 
-    if replay.KEEPS[mode] == "extraction":
+    if replay.KEEPS[loaded.mode] == "extraction":
         extracted = extractions_from_reports(loaded, held)
         return sweep(
             extractions=tuple(

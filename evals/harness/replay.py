@@ -87,7 +87,7 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, cast, get_args
+from typing import Any, Literal, get_args
 
 from analysis_service.assertions import (
     ABSENT,
@@ -1235,10 +1235,9 @@ def arm_of(artifact: EvalArtifact, named: str | None) -> Arm:
     """
     rows = artifact.block("instruction")
     carried = {row["node"] for row in rows}
-    mode = cast(SweepMode, artifact.mode)
-    routes = [route for route in ROUTES_OF[mode] if set(route) <= carried]
+    routes = [route for route in ROUTES_OF[artifact.mode] if set(route) <= carried]
     if len(routes) != 1:
-        spelled = ["+".join(route) for route in ROUTES_OF[mode]]
+        spelled = ["+".join(route) for route in ROUTES_OF[artifact.mode]]
         raise ValueError(
             f"{artifact.path}: the instruction block names {len(routes)} of"
             f" {spelled}, so the sweep cannot be placed on one arm"

@@ -342,6 +342,27 @@ class TestLoadingFailsClosed:
         with pytest.raises(ProvenanceError, match="trusted"):
             load_artifact(path)
 
+    def test_a_sweep_mode_loads_as_written(self, tmp_path, sampling):
+        path = write_artifact(tmp_path, provenance(sampling), mode="heads")
+
+        assert load_artifact(path).mode == "heads"
+
+    @pytest.mark.parametrize("value", ["", "end_to_end", None])
+    def test_a_mode_outside_the_sweep_modes_is_refused(self, tmp_path, sampling, value):
+        path = write_artifact(tmp_path, provenance(sampling), mode=value)
+
+        with pytest.raises(ProvenanceError, match="is not a sweep mode"):
+            load_artifact(path)
+
+    def test_an_artifact_with_no_mode_is_refused(self, tmp_path, sampling):
+        path = write_artifact(tmp_path, provenance(sampling))
+        payload = json.loads(path.read_text())
+        del payload["mode"]
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+        with pytest.raises(ProvenanceError, match="is not a sweep mode"):
+            load_artifact(path)
+
     def test_an_artifact_with_no_provenance_block_is_refused(self, tmp_path, sampling):
         path = write_artifact(tmp_path, provenance(sampling))
         payload = json.loads(path.read_text())

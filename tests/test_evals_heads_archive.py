@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -117,6 +118,11 @@ def test_every_mode_says_which_files_a_finished_case_writes() -> None:
         "FINISHED_KINDS and MODE_ENTRIES disagree: give each mode one row in"
         " evals/harness/bundle.py, and no other."
     )
+
+
+def test_the_run_command_and_the_loader_read_one_set_of_modes() -> None:
+    """``--mode`` offers ``MODE_ENTRIES``; ``load_artifact`` admits ``SweepMode``."""
+    assert set(modes.MODE_ENTRIES) == set(get_args(modes.SweepMode))
 
 
 @pytest.mark.parametrize("mode", sorted(modes.MODE_ENTRIES))

@@ -54,7 +54,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Literal, cast, get_args
+from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -166,7 +166,8 @@ DraftState = Literal["open", "finished"]
 #: What the store reports for a draft it cannot read. It is not a state the
 #: file can name: no file says this about itself, and a file that will not
 #: read cannot say anything about itself at all.
-UNREADABLE = "unreadable"
+Unreadable = Literal["unreadable"]
+UNREADABLE: Unreadable = "unreadable"
 
 #: What a live draft puts on its rail row, keyed by the state in the file so
 #: a state the shape gains arrives here rather than through an ``if``. A key
@@ -228,8 +229,7 @@ class Draft(BaseModel):
 class DraftStatus:
     """What the store says about one case, for the rail that reads it."""
 
-    #: A :data:`DraftState`, or :data:`UNREADABLE`.
-    state: str
+    state: DraftState | Unreadable
     #: The file itself, because the refusal an unreadable draft gets names it.
     path: Path
 
@@ -578,7 +578,7 @@ def _standing(
         return TO_DO, "todo", True
     if draft.state == UNREADABLE:
         return f"draft unreadable: {draft.path}", "error", False
-    status, state = DRAFT_ROW[cast(DraftState, draft.state)]
+    status, state = DRAFT_ROW[draft.state]
     return status, state, True
 
 
