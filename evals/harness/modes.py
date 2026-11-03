@@ -40,6 +40,7 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
 from analysis_service.analysis import (
+    ControlAttribute,
     comparable_asset_tags,
     control_state,
 )
@@ -329,7 +330,12 @@ class _Scored(NamedTuple):
     states: bool
 
 
-_SCORED_ATTRIBUTES: Mapping[str, _Scored] = {
+#: An attribute the extraction scorer compares.
+ScoredAttribute = Literal[
+    "kind", "interface_kind", "assets", "operations", "protocol", ControlAttribute
+]
+
+_SCORED_ATTRIBUTES: Mapping[ScoredAttribute, _Scored] = {
     "kind": _Scored(str, states=False),
     "exposure": _Scored(str, states=False),
     "interface_kind": _Scored(str, states=False),
@@ -345,7 +351,7 @@ _SCORED_ATTRIBUTES: Mapping[str, _Scored] = {
 #: The scored fields whose comparison reads a state rather than the fact. Taken
 #: off the table rather than listed beside it, so the two cannot disagree about
 #: which fields those are.
-STATE_REDUCED: frozenset[str] = frozenset(
+STATE_REDUCED: frozenset[ScoredAttribute] = frozenset(
     name for name, scored in _SCORED_ATTRIBUTES.items() if scored.states
 )
 
@@ -1230,7 +1236,7 @@ def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
     checks = [check for score in scores for check in score.attributes]
     compared = Counter(check.key for check in checks)
     agreed = Counter(check.key for check in checks if check.agrees)
-    order = list(_SCORED_ATTRIBUTES)
+    order: list[str] = list(_SCORED_ATTRIBUTES)
     keys = sorted(compared, key=lambda key: (order.index(key.split(".", 1)[1]), key))
     return {
         "compared": len(checks),
@@ -1766,6 +1772,10 @@ _DEGRADED: frozenset[ProjectionReason] = frozenset(get_args(ProjectionReason)) -
 }
 
 
+#: An attribute a projected value is compared on.
+ComparedAttribute = Literal[ScoredAttribute, "trust_zone"]
+
+
 #: How a projected value is compared with the blessed attribute, keyed by the
 #: graph field it projects into. :data:`_SCORED_ATTRIBUTES` is the one reader of
 #: how a scored field reduces — a closed vocabulary such as ``exposure`` by its
@@ -1779,7 +1789,7 @@ _DEGRADED: frozenset[ProjectionReason] = frozenset(get_args(ProjectionReason)) -
 #: into that has no entry here raises at the first projection, which
 #: ``tests/test_evals_modes.py`` holds against
 #: :func:`~analysis_service.assertions.projection_fields`.
-PROJECTION_COMPARED: Mapping[str, Callable[[Any], str]] = {
+PROJECTION_COMPARED: Mapping[ComparedAttribute, Callable[[Any], str]] = {
     **{name: scored.reduce for name, scored in _SCORED_ATTRIBUTES.items()},
     "trust_zone": str,
 }

@@ -47,11 +47,17 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
+from analysis_service.parsing import table_entry
 from evals.harness import audit
 from evals.harness.artifact import figures_corpus
 from evals.harness.comparison import flagged_cases, held_out_cases
 from evals.harness.instruments import Cases
-from evals.harness.promotion import Reading, in_spreads, read_spread
+from evals.harness.promotion import (
+    GainGateName,
+    Reading,
+    in_spreads,
+    read_spread,
+)
 
 #: One figure, read from one artifact over the cases a selector keeps, or
 #: ``None`` where the artifact carries no such figure.
@@ -258,7 +264,7 @@ class GainGate:
     limit: float
 
 
-GATES: Mapping[str, GainGate] = MappingProxyType(
+GATES: Mapping[GainGateName, GainGate] = MappingProxyType(
     {
         "volume": GainGate(
             question="did the candidate say more than the spread explains?",
@@ -279,7 +285,7 @@ GATES: Mapping[str, GainGate] = MappingProxyType(
 )
 
 
-def _reader(framework: FrameworkName, gate: str) -> Reader | None:
+def _reader(framework: FrameworkName, gate: GainGateName) -> Reader | None:
     readers = READERS[framework]
     return {
         "volume": readers.volume,
@@ -320,7 +326,7 @@ def read(
 
 
 def _decide(
-    name: str,
+    name: GainGateName,
     gate: GainGate,
     before: float | None,
     after: float | None,
@@ -364,7 +370,7 @@ def render(
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in readings:
-        gate = GATES[row.gate]
+        gate = table_entry(GATES, row.gate)
         cells = [
             "—" if value is None else f"{value:.4g}"
             for value in (row.measured, row.baseline, row.against_limit)
@@ -376,7 +382,9 @@ def render(
     lines.append("")
     for row in readings:
         if row.verdict == "fail":
-            lines.append(f"- `{row.gate}` fails: {GATES[row.gate].question}")
+            lines.append(
+                f"- `{row.gate}` fails: {table_entry(GATES, row.gate).question}"
+            )
         elif row.verdict == "inconclusive":
             lines.append(f"- `{row.gate}` unread: {row.why}")
     if all(row.verdict == "pass" for row in readings):

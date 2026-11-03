@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
 from types import MappingProxyType
-from typing import Any, Literal, Self, get_args
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -72,7 +72,7 @@ from analysis_service.frameworks.asvs.applicability import (
 from analysis_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
     CHAPTER_NUMBERS,
-    LANES,
+    AsvsChapter,
     AsvsLevel,
     requirement_band,
     requirement_id,
@@ -84,7 +84,6 @@ from analysis_service.system_model import SystemModel
 __all__ = [
     "ASVS_ID_FORMAT",
     "AsvsAnalysis",
-    "AsvsChapter",
     "AsvsOptions",
     "AsvsSummary",
     "DraftRequirementRuling",
@@ -95,36 +94,6 @@ __all__ = [
     "build_asvs_summary",
     "requirement_of",
 ]
-
-#: One lane, spelled where a type checker can read it. The catalog is the source
-#: of truth and this restates it, so the two are checked against each other at
-#: import: a chapter the catalog adds and this omits would give the report a
-#: field that cannot hold its own lane.
-AsvsChapter = Literal[
-    "encoding-and-sanitization",
-    "validation-and-business-logic",
-    "web-frontend-security",
-    "api-and-web-service",
-    "file-handling",
-    "authentication",
-    "session-management",
-    "authorization",
-    "self-contained-tokens",
-    "oauth-and-oidc",
-    "cryptography",
-    "secure-communication",
-    "configuration",
-    "data-protection",
-    "secure-coding-and-architecture",
-    "security-logging-and-error-handling",
-    "webrtc",
-]
-
-if set(get_args(AsvsChapter)) != set(LANES):
-    raise ValueError(
-        f"AsvsChapter names {sorted(get_args(AsvsChapter))}, but the catalog"
-        f" declares {sorted(LANES)}"
-    )
 
 #: The ``str.format`` template this package's IDs are composed from. It is the
 #: standard's own version-safe reference — ``v5.0.0-1.2.5`` — so a claim cites

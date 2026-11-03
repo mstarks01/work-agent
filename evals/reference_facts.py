@@ -72,6 +72,8 @@ from analysis_service.assertions import (
     CatalogProposal,
     QualifierKind,
     QuoteProposal,
+    SubjectType,
+    parse_subject_type,
     subject_id,
 )
 from analysis_service.claims import FrameworkName
@@ -213,8 +215,8 @@ class SubjectAlias(BaseModel):
         return value
 
     @property
-    def subject_type(self) -> str:
-        return self.subject.split(":", 1)[0]
+    def subject_type(self) -> SubjectType:
+        return parse_subject_type(self.subject.split(":", 1)[0])
 
     @property
     def alias_ids(self) -> list[str]:

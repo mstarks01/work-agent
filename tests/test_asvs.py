@@ -55,12 +55,12 @@ from analysis_service.frameworks.asvs.catalog import (
     CHAPTERS,
     LANES,
     REQUIREMENTS,
+    AsvsChapter,
     AsvsLevel,
     requirements_for,
 )
 from analysis_service.frameworks.asvs.record import (
     AsvsAnalysis,
-    AsvsChapter,
     AsvsOptions,
     DraftRequirementRuling,
     RequirementProposal,

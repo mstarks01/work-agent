@@ -333,6 +333,23 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the modes whose sweep keeps an emission or a catalog a replay reads, "
         "so a mode that keeps only reports is absent by construction"
     ),
+    ("analysis_service.assertions", "GRAPH_BOUND"): (
+        "the subject types whose ID is an element ID, so a type whose subject is"
+        " this layer's own is absent by construction"
+    ),
+    ("analysis_service.compact", "_ENDPOINT_GROUPS"): (
+        "the element groups a flow endpoint may name, so a group whose elements"
+        " sit in no zone is absent by construction"
+    ),
+    ("evals.harness.attribution", "STAGE_FOR_OBSERVED"): (
+        "the observation kinds that charge a wrong routing of an applied"
+        " requirement to a stage, so a kind the matrix also counts as missed,"
+        " or that says nothing, is absent by construction"
+    ),
+    ("evals.harness.modes", "STATE_REDUCED"): (
+        "the scored attributes whose comparison reads a state, so an attribute"
+        " compared by its value is absent by construction"
+    ),
 }
 
 
@@ -503,7 +520,8 @@ Shape = Literal["set", "table"]
 #: A module's dotted name and its parsed tree.
 ModuleTree = tuple[str, ast.Module]
 
-#: The reason of each open table keyed by the requirement IDs of a catalog file.
+#: The reason of each open set or table built from the requirement IDs of a
+#: catalog file.
 _CATALOG_ROW_IDS = (
     "requirement IDs read from the rows of a catalog file, which holds them as"
     " data and not as a type"
@@ -533,11 +551,11 @@ OPEN: dict[tuple[str, str], str] = {
     ("analysis_service.frameworks.asvs.applicability", "RATIONALES"): (
         _CATALOG_ROW_IDS
     ),
-    ("analysis_service.frameworks.asvs.catalog", "_LEVEL_BY_ID"): (_CATALOG_ROW_IDS),
+    ("analysis_service.frameworks.asvs.catalog", "_LEVEL_BY_ID"): _CATALOG_ROW_IDS,
     ("analysis_service.frameworks.asvs.catalog", "_REQUIREMENT_IDS"): (
         _CATALOG_ROW_IDS
     ),
-    ("analysis_service.frameworks.asvs.catalog", "_TEXT_BY_ID"): (_CATALOG_ROW_IDS),
+    ("analysis_service.frameworks.asvs.catalog", "_TEXT_BY_ID"): _CATALOG_ROW_IDS,
     ("analysis_service.model_tiers", "LLM_NODES"): (
         "node names that hold one entry for each role of each framework in the"
         " registry, so a new framework adds a member"
@@ -607,20 +625,11 @@ OPEN: dict[tuple[str, str], str] = {
     ),
 }
 
-#: The source of each pending table read by a ledger row's gate.
-_LEDGER_GATE = "read by a ledger row's gate, which is a str field"
-
 #: The follow-up for an entry of :data:`PENDING` whose source is a plain value.
 _PENDING_FOLLOW_UP = (
     "; the follow-up states a Literal of the keys where none exists, types that"
     " source with it, and replays the archive first where the source is a"
     " stored field"
-)
-
-#: The follow-up for an entry of :data:`PENDING` whose ``Literal`` sits in a
-#: module that imports the set's module.
-_MOVE_THE_LITERAL = (
-    "; the follow-up names the Literal in a module that both modules import"
 )
 
 #: A closed set that cannot carry its ``Literal`` yet, by module and name, with
@@ -640,75 +649,18 @@ PENDING: dict[tuple[str, str], str] = {
         "read by an open fact's attribute name, which is a str field"
         + _PENDING_FOLLOW_UP
     ),
-    ("analysis_service.assertions", "GRAPH_BOUND"): (
-        "built from the subject types of the subject-prefix table, whose read"
-        " key is a str" + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.assertions", "QUALIFIED_SPELLING"): (
-        "read by a projection's attribute, which is a str field" + _PENDING_FOLLOW_UP
-    ),
     ("analysis_service.assertions", "REGISTRY"): (
         "read by a row's predicate, which is a str field in the catalog, the"
         " corpus and the replay rows" + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.assertions", "SUBJECT_PREFIXES"): (
-        "read by a subject type that a reference fact parses out of a subject ID"
-        " as a str" + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.assertions", "_ELEMENT_TYPES"): (
-        "read by the prefix that a str element ID carries before its colon"
-        + _PENDING_FOLLOW_UP
     ),
     ("analysis_service.capabilities", "CAPABILITIES"): (
         "read by a capability key, which is a str field and a str parameter"
         + _PENDING_FOLLOW_UP
     ),
-    ("analysis_service.compact", "COMPACT_ELEMENTS"): (
-        "read by a model group name, which a str tuple of groups or a str"
-        " parameter holds" + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.compact", "REF_TAGS"): (
-        "read by a model group name, which a str tuple of groups or a str"
-        " parameter holds" + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.frameworks.asvs.catalog", "CHAPTER_NUMBERS"): (
-        "read by a catalog chapter's lane, which is a str field, and its Literal"
-        " sits in a module that imports this one"
-        + _MOVE_THE_LITERAL
-        + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.system_model", "_FLOW_ID_SHAPES"): (
-        "read by a version number parsed out of a stored flow ID, which is an int"
-        + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.graph", "LANE_ARTIFACTS"): (
-        "read by an artifact name, which is a str parameter" + _PENDING_FOLLOW_UP
-    ),
     ("analysis_service.question_kinds", "QUESTION_KINDS"): (
         "read by an open fact's question kind, which is a str field"
         + _PENDING_FOLLOW_UP
     ),
-    ("evals.harness.attribution", "STAGE_FOR_OBSERVED"): (
-        "read by an observation's kind, whose Literal is inline in a module that"
-        " imports this one, so no name for it resolves here at run time"
-        + _MOVE_THE_LITERAL
-    ),
-    ("evals.harness.falsify", "PROBES"): (
-        "read by a probe name, which is a str parameter" + _PENDING_FOLLOW_UP
-    ),
-    ("evals.harness.gain", "GATES"): (_LEDGER_GATE + _PENDING_FOLLOW_UP),
-    ("evals.harness.modes", "PROJECTION_COMPARED"): (
-        "read by a projection's attribute, which is a str field" + _PENDING_FOLLOW_UP
-    ),
-    ("evals.harness.modes", "STATE_REDUCED"): (
-        "built from the keys of a scored-attribute table keyed by str"
-        + _PENDING_FOLLOW_UP
-    ),
-    ("evals.harness.promotion", "BASELINE"): (
-        "read by a gate's figure name, which is a str field" + _PENDING_FOLLOW_UP
-    ),
-    ("evals.harness.promotion", "GATES"): (_LEDGER_GATE + _PENDING_FOLLOW_UP),
-    ("evals.harness.promotion", "PENDING"): (_LEDGER_GATE + _PENDING_FOLLOW_UP),
 }
 
 
