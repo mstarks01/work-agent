@@ -80,6 +80,34 @@ So the check does not guard a pull request that changes
 `.github/workflows/five-class.yml`. The reviewer of such a pull request reads
 the workflow diff.
 
+### The step before the code
+
+A defect that the standards read finds costs a new head and a new CI run. Stop
+the recurring classes before the code exists.
+
+Before you add a function, a constant, a table, a type, a check or a claim in
+a comment, go through each row of the table "The classes that come back in
+fixes" in [the standards read](#the-standards-read-before-the-merge) as a
+question. For a second reader, search the tree for an existing reader of the
+same rule. Search by the name, by the literal values and by the data that the
+code reads.
+
+Record each answer in the pull request body, under the heading
+`## Before the code`, with one entry for each class by its name in that table.
+Each entry gives the class, the search you ran, and the result. A result is
+"existing reader: `path:symbol`", "none found" or "not touched by this
+change". CI requires the section on each pull request that changes a code
+path, and reads it the way it reads `## Five-class read`.
+`.github/scripts/five_class_read.py` holds the class names, and
+`tests/test_five_class_read.py` holds them to the table.
+
+Two rules keep a search small:
+
+- Count the matches first, with `grep -c` or `grep -l`. Narrow a wide search
+  before you read its lines.
+- Give a wide search to a read-only sub-task, so that only its conclusion
+  enters your context.
+
 ### The standards read before the merge
 
 The author of a diff reads it against the five classes, but the author also
@@ -118,16 +146,17 @@ overrides it:
 | Refused Bequest | a subclass that does not fit what its base says |
 
 **The classes that come back in fixes.** The review of 2026-11-02 found these
-in the fix pull requests of the review before it:
+in the fix pull requests of the review before it. The author asks each
+question before the code, and the reader asks it again of the diff:
 
-| Class | What the reader checks |
+| Class | The question |
 |---|---|
 | A second reader | each new helper or rule: is there one reader, and does a lint refuse a second? |
 | A claim with no guard | each claim that a rule has one reader (`CLAIM`): does it sit on a guard or name one in backticks? A guard is the reader of a `ONE_READERS` row or the one site of a one-site `==` assert. Only a ruling keeps a claim in `UNGUARDED_CLAIMS` |
-| A closed set with no `Literal` | each table or tuple of string keys that code reads as a set |
+| A closed set with no `Literal` | each table or tuple of string keys that code reads as a set: does a `Literal` state the set? |
 | A default only a test omits | each new default: does a caller outside `tests/` omit it? |
 | A type that says the wrong thing | each new exception: does its base describe it? |
-| A name for the wrong thing | each rename: does the new name say what the value holds? |
+| A name for the wrong thing | each new name or rename: does the name say what the value holds? |
 
 ## The five defect classes
 

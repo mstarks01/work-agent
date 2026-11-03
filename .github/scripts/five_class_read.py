@@ -2,7 +2,10 @@
 
 The pre-merge review reads a diff against the five defect classes of
 ``docs/agents/code-review.md`` and puts the result in the pull request body,
-under the heading :data:`HEADING`, with one entry for each class.
+under the heading :data:`HEADING`, with one entry for each class. The author
+also goes through the classes that come back in fixes before writing the code,
+and puts the answers under the heading :data:`BEFORE_HEADING`, with one entry
+for each class of :data:`RECURRING`.
 ``.github/workflows/five-class.yml`` runs this over each pull request.
 
 A change to a module that decides what a prompt says the code does also needs
@@ -25,7 +28,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 HEADING = "## Five-class read"
 
@@ -38,6 +41,22 @@ CLASSES = (
     "A bound predicted, not measured",
     "A fact with no reader",
 )
+
+BEFORE_HEADING = "## Before the code"
+
+#: A class that comes back in fixes, as the table "The classes that come back
+#: in fixes" of ``docs/agents/code-review.md`` names it.
+RecurringClass = Literal[
+    "A second reader",
+    "A claim with no guard",
+    "A closed set with no `Literal`",
+    "A default only a test omits",
+    "A type that says the wrong thing",
+    "A name for the wrong thing",
+]
+
+#: Each class that comes back in fixes, in the order of its table.
+RECURRING: tuple[RecurringClass, ...] = get_args(RecurringClass)
 
 #: The paths that hold code or model content, as ``fnmatch`` patterns, where
 #: ``*`` also matches ``/``. ``tests/`` is one: the lints and gates live there,
@@ -204,14 +223,15 @@ def missing(
     """What the body lacks: the heading, each name its section does not name,
     and each name with no text between it and the next entry.
 
-    Asterisks are dropped from the section and from each name, because
-    Markdown uses them for bold text and a prompt path uses them for a glob.
+    Asterisks and backticks are dropped from the section and from each name,
+    because Markdown uses them for bold text and for code, and a prompt path
+    uses an asterisk for a glob.
     """
     names = tuple(names)
     text = section(body, heading)
     if text is None:
         return [heading]
-    folded = " ".join(text.replace("*", "").casefold().split())
+    folded = " ".join(_folded(text).split())
     found = sorted(
         (folded.find(_folded(name)), name) for name in names if _folded(name) in folded
     )
@@ -231,9 +251,10 @@ def missing(
     ]
 
 
-def _folded(name: str) -> str:
-    """``name`` as :func:`missing` searches the section for it."""
-    return name.replace("*", "").casefold()
+def _folded(text: str) -> str:
+    """``text`` with no asterisk and no backtick, casefolded, as :func:`missing`
+    compares a section and a name."""
+    return text.replace("*", "").replace("`", "").casefold()
 
 
 def changed_paths(base: str, head: str) -> list[str]:
@@ -280,6 +301,19 @@ def main(argv: list[str]) -> int:
         status = 1
     else:
         print("The body holds a five-class read.")
+    unasked = missing(body, BEFORE_HEADING, RECURRING)
+    if unasked:
+        print(
+            "The pull request changes a code path, and its body lacks: "
+            + "; ".join(unasked)
+            + f". Add a {BEFORE_HEADING!r} section with one entry for each class"
+            ' of "The classes that come back in fixes" in'
+            " docs/agents/code-review.md: the search you ran and its result.",
+            file=sys.stderr,
+        )
+        status = 1
+    else:
+        print("The body holds the step before the code.")
     to_read = prompts_to_read(
         paths, readers(tomllib.loads(table_text(base, TABLE)))
     ) + held_phrases(paths, tomllib.loads(table_text(base, HELD)))
