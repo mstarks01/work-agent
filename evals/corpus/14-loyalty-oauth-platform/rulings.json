@@ -1,0 +1,49 @@
+{
+  "case": "14-loyalty-oauth-platform",
+  "positions": [
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "elicit",
+        "affected_element_ids": [
+          "flow:entity:member>entity:partner-app>return-with-authorization-code",
+          "process:authorization-server"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 104"
+    },
+    {
+      "lane": "repudiation",
+      "reference": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "flow:entity:partner-app>process:rewards-api>call-rewards-api",
+          "store:points-ledger",
+          "entity:member"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 105"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "flow:entity:partner-app>process:rewards-api>call-rewards-api",
+          "entity:partner-app",
+          "process:rewards-api"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 107"
+    }
+  ]
+}

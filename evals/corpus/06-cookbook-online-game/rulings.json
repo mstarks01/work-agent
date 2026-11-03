@@ -44,5 +44,117 @@
       "reviewed_by": "mstarks01",
       "source": "ballot-2026-10-24 row 5: 06-cookbook-online-game S-05"
     }
+  ],
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:process:game-client>process:lobby>matchmaking",
+          "process:lobby"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 35"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:process:game-client>process:game-server>gameplay-traffic",
+          "process:game-server"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 36"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "forge",
+        "affected_element_ids": [
+          "process:game-client",
+          "flow:process:game-client>process:game-server>gameplay-traffic"
+        ]
+      },
+      "position": "in-component",
+      "ruling": "The player modifies the modeled game client on a host they control and uses that client's channel to send the actions.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 37"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:player-database"
+        ]
+      },
+      "position": "storage-copy",
+      "ruling": "The ballot proposed storage-copy, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 39"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "intercept",
+        "affected_element_ids": [
+          "flow:process:game-client>process:lobby>matchmaking",
+          "flow:process:game-client>process:game-server>gameplay-traffic"
+        ]
+      },
+      "position": "on-path",
+      "ruling": "The ballot proposed on-path, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 40"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "process:lobby",
+          "flow:process:game-client>process:lobby>matchmaking"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 41"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "process:game-server",
+          "flow:process:game-client>process:game-server>gameplay-traffic"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 42"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "forge",
+        "affected_element_ids": [
+          "flow:process:lobby>process:game-server>hand-over-match"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 44"
+    }
   ]
 }
