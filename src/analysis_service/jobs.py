@@ -680,7 +680,7 @@ def ended(record: Envelope) -> bool:
 
 # What one admission attempt did.
 #
-# Four refusals rather than one, because they clear at different times and a
+# Four bound refusals rather than one, because they clear at different times and a
 # caller needs to know which: ``at_ceiling`` clears when one of their jobs
 # finishes, ``over_rate`` and ``over_owner_budget`` clear as the window rolls
 # past their older jobs, and ``over_global_budget`` is a deployment-wide bound

@@ -150,8 +150,9 @@ PARTIAL: dict[tuple[str, str], str] = {
         "of it is absent by construction"
     ),
     ("analysis_service.assertions", "GATE_REFUSALS"): (
-        "the codes that refuse a row, so a code whose row stands, or that a"
-        " submitter's answer draws, is absent by construction"
+        "the codes that refuse a row, so a code whose row stands, whose row an"
+        " answer replaces, or that a submitter's answer draws, is absent by"
+        " construction"
     ),
     ("analysis_service.basis", "IN_SCOPE"): (
         "the control attributes the diagnostic measures, so an attribute that"
