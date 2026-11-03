@@ -39,6 +39,7 @@ __all__ = [
     "CONTROL_SUGGESTIONS",
     "YES_NO",
     "AnswerForm",
+    "ChoiceAttribute",
     "answer_choices",
     "answer_form",
     "answer_limit",
@@ -60,13 +61,13 @@ def _closed(model: SystemModel, element_id: str, attribute: str) -> tuple[str, .
 
 #: The attributes whose answers come from the registry or the model, and not
 #: from their own annotation.
-_ChoiceAttribute = Literal["data_classification", "trust_zone"]
+ChoiceAttribute = Literal["data_classification", "trust_zone"]
 
 #: The answers an attribute takes, where they are not free text. Keyed by
 #: attribute, so an attribute with a closed set it does not name here falls
 #: back to its own annotation rather than to free text.
 _ATTRIBUTE_CHOICES: Mapping[
-    _ChoiceAttribute, Callable[[SystemModel, str], tuple[str, ...]]
+    ChoiceAttribute, Callable[[SystemModel, str], tuple[str, ...]]
 ] = MappingProxyType(
     {
         "data_classification": lambda model, element_id: tuple(
