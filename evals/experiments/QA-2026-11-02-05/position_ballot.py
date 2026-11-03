@@ -249,18 +249,23 @@ def answered(
                 f"row {row['n']}: the verdict {verdict!r} is not one of {VERDICTS}"
             )
         if verdict == "change" and not position:
-            raise ValueError(f"row {row['n']}: the verdict 'change' names a position")
+            raise ValueError(
+                f"row {row['n']}: the verdict 'change' needs a position; add one"
+            )
         if verdict != "change" and position:
             raise ValueError(
-                f"row {row['n']}: the verdict {verdict!r} names no position"
+                f"row {row['n']}: the verdict {verdict!r} takes no position; remove it"
             )
         if position and position not in POSITIONS:
             raise ValueError(f"row {row['n']}: {position!r} is not a position")
         if verdict == "change" and position == row["proposed"]:
-            raise ValueError(f"row {row['n']}: a change names the proposed position")
+            raise ValueError(
+                f"row {row['n']}: the verdict 'change' needs another position than"
+                " the proposal; mark the row accept or name another"
+            )
         if verdict != "accept" and not answer["note"].strip():
             raise ValueError(
-                f"row {row['n']}: the verdict {verdict!r} states its reason"
+                f"row {row['n']}: the verdict {verdict!r} needs a note; add the reason"
             )
     return list(returned)
 
