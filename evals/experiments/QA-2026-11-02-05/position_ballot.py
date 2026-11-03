@@ -11,9 +11,12 @@ Usage, from the repository root:
 * ``position_ballot.py issue`` writes ``position-ballot-issued.csv``.
 * ``position_ballot.py record`` reads ``position-ballot-returned.csv``. Each
   ``accept`` and ``change`` row becomes one entry in its case's
-  ``rulings.json`` ``positions``, signed by the ruler; an ``any`` row writes
-  nothing. Each case is then reloaded, and any exception restores each
-  rulings file it wrote as it was.
+  ``rulings.json`` ``positions``, signed by the ruler.
+* ``position_ballot.py record-any`` reads the same file and writes each
+  ``any`` row to ``any_positions``, with the ruler's note as the ruling.
+
+Each mode reloads each case it wrote, and any exception restores each rulings
+file it wrote as it was.
 """
 
 import csv
@@ -56,6 +59,12 @@ POSITIONS: tuple[AttackerPosition, ...] = get_args(AttackerPosition)
 #: How the ``elements`` column joins a claim's place.
 PLACE_SEP = "; "
 SIGNER = "mstarks01"
+#: The ``rulings.json`` list each verdict is written to.
+RulingKey = Literal["positions", "any_positions"]
+RECORDED: Mapping[RulingKey, tuple[Verdict, ...]] = {
+    "positions": ("accept", "change"),
+    "any_positions": ("any",),
+}
 BALLOT = "QA-2026-11-02-05 position ballot"
 
 OUT: AttackerPosition = "outside"
@@ -309,17 +318,22 @@ def _ruling(row: Mapping[str, str], case_dir: Path) -> dict[str, Any]:
     }
 
 
-def record(rows: Sequence[Mapping[str, str]], corpus_dir: Path = CORPUS_DIR) -> int:
-    """Write each ``accept`` and ``change`` row as a position ruling, and reload.
+def record(
+    rows: Sequence[Mapping[str, str]],
+    corpus_dir: Path = CORPUS_DIR,
+    key: RulingKey = "positions",
+) -> int:
+    """Write each row of the verdicts :data:`RECORDED` names for ``key``, and reload.
 
-    Returns how many rulings were written. Any exception restores each rulings
-    file it wrote as it was, so a partly written ballot never stays in the tree.
+    An ``any_positions`` entry carries no position. Returns how many rulings
+    were written. Any exception restores each rulings file it wrote as it was,
+    so a partly written ballot never stays in the tree.
     """
     written: dict[Path, bytes | None] = {}
     added = 0
     try:
         for row in rows:
-            if row["verdict"] == "any":
+            if row["verdict"] not in RECORDED[key]:
                 continue
             case_dir = corpus_dir / row["case"]
             path = case_dir / RULINGS_FILE
@@ -330,7 +344,10 @@ def record(rows: Sequence[Mapping[str, str]], corpus_dir: Path = CORPUS_DIR) -> 
                 if path.is_file()
                 else {"case": case_dir.name}
             )
-            data.setdefault("positions", []).append(_ruling(row, case_dir))
+            entry = _ruling(row, case_dir)
+            if key == "any_positions":
+                del entry["position"]
+            data.setdefault(key, []).append(entry)
             path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
             added += 1
         for path in written:
@@ -358,5 +375,9 @@ if __name__ == "__main__":
     elif sys.argv[1:] == ["record"]:
         count = record(answered(read_rows(ISSUED), read_rows(RETURNED)))
         print(f"{count} position rulings written", file=sys.stderr)
+    elif sys.argv[1:] == ["record-any"]:
+        rows = answered(read_rows(ISSUED), read_rows(RETURNED))
+        count = record(rows, key="any_positions")
+        print(f"{count} any-position rulings written", file=sys.stderr)
     else:
-        sys.exit("usage: position_ballot.py issue|record")
+        sys.exit("usage: position_ballot.py issue|record|record-any")

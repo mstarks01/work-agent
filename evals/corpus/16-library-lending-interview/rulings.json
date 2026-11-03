@@ -43,5 +43,33 @@
       "reviewed_by": "mstarks01",
       "source": "QA-2026-11-02-05 position ballot row 119"
     }
+  ],
+  "any_positions": [
+    {
+      "lane": "repudiation",
+      "reference": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "flow:entity:desk-staff>process:lending-api>change-loans-by-hand",
+          "entity:desk-staff"
+        ]
+      },
+      "ruling": "Every manual change under the shared login has the same attribution gap, whoever operated the desk.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 116"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "process:lending-api",
+          "flow:process:library-app>process:lending-api>loan-and-reservation-requests"
+        ]
+      },
+      "ruling": "The claim expressly covers both a signed-in member and an unauthenticated caller.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 118"
+    }
   ]
 }

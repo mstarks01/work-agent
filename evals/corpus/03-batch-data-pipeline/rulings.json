@@ -136,5 +136,20 @@
       "reviewed_by": "mstarks01",
       "source": "QA-2026-11-02-05 position ballot row 21"
     }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "process:spark-transform-job"
+        ]
+      },
+      "ruling": "The finding requires a write to the landed records but specifies no route to that write.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 18"
+    }
   ]
 }

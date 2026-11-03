@@ -172,5 +172,33 @@
       "reviewed_by": "mstarks01",
       "source": "QA-2026-11-02-05 position ballot row 76"
     }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:cdn-bucket",
+          "entity:cdn"
+        ]
+      },
+      "ruling": "The attacker must replace a stored asset. The claim does not specify how they obtain write access.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 72"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:cdn-bucket",
+          "flow:entity:reader>entity:cdn>asset-fetch"
+        ]
+      },
+      "ruling": "The attacker must plant the asset, but the claim leaves open how the writer gains bucket access.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 75"
+    }
   ]
 }

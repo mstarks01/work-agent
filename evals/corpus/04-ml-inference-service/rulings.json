@@ -71,19 +71,6 @@
       "reference": {
         "verb": "read",
         "affected_element_ids": [
-          "store:inference-log"
-        ]
-      },
-      "position": "outside",
-      "ruling": "The ballot proposed outside, and the ruler accepted it.",
-      "reviewed_by": "mstarks01",
-      "source": "QA-2026-11-02-05 position ballot row 26"
-    },
-    {
-      "lane": "information-disclosure",
-      "reference": {
-        "verb": "read",
-        "affected_element_ids": [
           "store:redis-feature-store"
         ]
       },
@@ -105,6 +92,33 @@
       "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
       "reviewed_by": "mstarks01",
       "source": "QA-2026-11-02-05 position ballot row 28"
+    }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:model-registry-bucket",
+          "flow:process:model-server>store:model-registry-bucket>load-artifact"
+        ]
+      },
+      "ruling": "Replacing the registry artifact requires write access. The claim leaves the writer's position open.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 24"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:inference-log"
+        ]
+      },
+      "ruling": "Change to any.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-03-01, the maintainer's answer of 2026-11-03 on 04/8, which replaces the outside ruling of QA-2026-11-02-05 position ballot row 26"
     }
   ]
 }

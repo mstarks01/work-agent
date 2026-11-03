@@ -123,5 +123,57 @@
       "reviewed_by": "mstarks01",
       "source": "QA-2026-11-02-05 position ballot row 59"
     }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:directory",
+          "process:identity-broker"
+        ]
+      },
+      "ruling": "A directory write is required, but the route by which the attacker changes the group is unspecified.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 54"
+    },
+    {
+      "lane": "repudiation",
+      "reference": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
+          "store:audit-log"
+        ]
+      },
+      "ruling": "The logging gap applies to the franchise sign-in regardless of who initiated it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 55"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "recover-credential",
+        "affected_element_ids": [
+          "store:key-store"
+        ]
+      },
+      "ruling": "The private key must be extractable. The claim does not establish whether the attacker calls a store interface, controls a reader or obtains the stored bytes.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 56"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "disable",
+        "affected_element_ids": [
+          "process:identity-broker"
+        ]
+      },
+      "ruling": "The claim specifies the broker outage but gives no mechanism for causing it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 57"
+    }
   ]
 }

@@ -163,5 +163,33 @@
       "reviewed_by": "mstarks01",
       "source": "QA-2026-11-02-05 position ballot row 68"
     }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
+          "process:web-api"
+        ]
+      },
+      "ruling": "Operating the macros is required. The claim does not specify the operator's account or require code execution in the spreadsheet process.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 63"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "flow:process:fax-gateway>entity:customer>confirmation-fax",
+          "process:fax-gateway"
+        ]
+      },
+      "ruling": "The wrong recipient gets the fax through normal delivery. No attacker's interface access or on-path interception is required.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 67"
+    }
   ]
 }
