@@ -491,7 +491,8 @@ def _position(case_dir: Path, position: str = "outside") -> dict:
 def test_a_ruled_position_loads_on_the_claim_it_names(tmp_path):
     case_dir = _ruled_case(tmp_path)
     ruled = _ruled_case(
-        tmp_path / "ruled", lambda r: r.update(positions=[_position(case_dir)])
+        tmp_path / "ruled",
+        lambda r: r.update(positions=[_position(case_dir)], any_positions=[]),
     )
 
     assert load_case(ruled).ruled_positions == {5: "outside"}
@@ -564,7 +565,8 @@ def test_a_position_ruling_that_does_not_fit_fails_closed(tmp_path, positions, m
     with pytest.raises(CorpusError, match=message):
         load_case(
             _ruled_case(
-                tmp_path / "ruled", lambda r: r.update(positions=positions(one))
+                tmp_path / "ruled",
+                lambda r: r.update(positions=positions(one), any_positions=[]),
             )
         )
 
