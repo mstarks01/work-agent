@@ -26,11 +26,13 @@ from analysis_service.assertions import (
     assertion_id,
     identity_parts,
     read_assertion_id,
+    registered_predicate,
 )
-from analysis_service.capabilities import CAPABILITIES
+from analysis_service.capabilities import CAPABILITIES, capability_key
 from analysis_service.claims import AttributeGround, UnknownRef
 from analysis_service.evidence import evidence_catalog, prepared_view
-from analysis_service.question_kinds import QUESTION_KINDS
+from analysis_service.parsing import table_entry
+from analysis_service.question_kinds import QUESTION_KINDS, question_kind
 from analysis_service.system_model import (
     ZONE_ATTRIBUTE,
     DataFlow,
@@ -137,7 +139,7 @@ def _assertion_statement(
     """
     subjects = {subject.id: subject.label for subject in catalog.subjects}
     row = next(entry for entry in catalog.entries if assertion_id(entry) == identity)
-    predicate = REGISTRY[row.predicate]
+    predicate = table_entry(REGISTRY, row.predicate)
     subject = subjects.get(row.subject) or names.get(row.subject, row.subject)
     value = row.value
     if predicate.value == "reference":
@@ -199,12 +201,13 @@ def assertion_label(
         return UNWORDED_ASSERTION
     subjects = {subject.id: subject.label for subject in catalog.subjects}
     for entry in catalog.entries:
-        if entry.predicate not in REGISTRY:
+        name = registered_predicate(entry.predicate)
+        if name is None:
             continue
         if identity_parts(entry)[:3] != asked[:3]:
             continue
         subject = subjects.get(entry.subject) or names.get(entry.subject, entry.subject)
-        question = REGISTRY[entry.predicate].question.format(subject=subject)
+        question = REGISTRY[name].question.format(subject=subject)
         if not entry.scope:
             return question
         scope = "; ".join(f"{each.kind}: {each.value}" for each in entry.scope)
@@ -250,11 +253,13 @@ def label_of(
                     return f"What does {source} do when it connects to {destination}?"
     match ref.kind:
         case "capability":
-            capability = CAPABILITIES.get(ref.capability)
-            return capability.question if capability else ref.capability
+            key = capability_key(ref.capability)
+            return CAPABILITIES[key].question if key else ref.capability
         case "question":
-            kind = QUESTION_KINDS.get(ref.question)
-            return kind.template.format(element=where) if kind else ref.question
+            name = question_kind(ref.question)
+            if name is None:
+                return ref.question
+            return QUESTION_KINDS[name].template.format(element=where)
         case "assertion":
             return assertion_label(ref.assertion, names, catalog)
         case "attribute":
@@ -282,8 +287,8 @@ def group_of(ref: UnknownRef) -> tuple[str, str]:
             return "assertions", "What the description leaves open"
         case "subject":
             return "subjects", "Other questions"
-        case "question" if ref.question in QUESTION_KINDS:
-            template = QUESTION_KINDS[ref.question].template
+        case "question" if (name := question_kind(ref.question)) is not None:
+            template = QUESTION_KINDS[name].template
             heading = template.replace("{element}'s", "its").replace("{element}", "it")
             return ref.question, heading
         case "attribute":

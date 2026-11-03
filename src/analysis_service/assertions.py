@@ -78,7 +78,7 @@ from analysis_service.grounding import (
     placements,
     verify_quote,
 )
-from analysis_service.parsing import Sha256Hex, member
+from analysis_service.parsing import Sha256Hex, member, table_entry
 from analysis_service.references import canonical
 from analysis_service.sources import (
     ANSWERS_LABEL,
@@ -140,6 +140,7 @@ __all__ = [
     "Contradiction",
     "Origin",
     "Predicate",
+    "PredicateName",
     "ProjectedField",
     "Projection",
     "ProjectionReason",
@@ -172,6 +173,7 @@ __all__ = [
     "qualified",
     "quarantine",
     "referent_type",
+    "registered_predicate",
     "settled",
     "snap_subject",
     "span_source",
@@ -317,6 +319,33 @@ ValueKind = Literal["text", "term", "reference"]
 #: A graph field a predicate projects into.
 ProjectedField = Literal[ControlAttribute, "trust_zone"]
 
+#: The name of each predicate of :data:`REGISTRY`.
+PredicateName = Literal[
+    "authentication-mechanism",
+    "credential-presented",
+    "mfa-requirement",
+    "authorization-grant",
+    "credential-sharing",
+    "credential-rotation",
+    "credential-custody",
+    "credential-expiry",
+    "credential-lifetime",
+    "credential-revocation",
+    "transport-encryption",
+    "storage-encryption",
+    "data-classification",
+    "signature-verification",
+    "origin-verification",
+    "destination-verification",
+    "internet-exposure",
+    "network-membership",
+    "administrative-authority",
+    "tenant-ownership",
+    "record-attribution",
+    "content-validation",
+    "represented-by",
+]
+
 #: Whether two values of one predicate, at one subject and scope, can both hold.
 Multiplicity = Literal["one", "many"]
 
@@ -444,7 +473,7 @@ class Predicate:
 #: (ADR 0010's three tests, applied in ADR 0034). A predicate is a fact about
 #: the submitted sources rather than about a method, so every lane of every
 #: framework reads the same rows.
-REGISTRY: Mapping[str, Predicate] = MappingProxyType(
+REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
     {
         "authentication-mechanism": Predicate(
             meaning="how the initiator of this interaction proves who it is",
@@ -661,6 +690,16 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         ),
     }
 )
+
+
+def registered_predicate(name: str) -> PredicateName | None:
+    """The predicate of :data:`REGISTRY` that ``name`` names, or ``None``.
+
+    **The per-row check of a predicate.** A row holds its predicate as a
+    ``str``, so a row that names no registered predicate still loads, and the
+    reader that calls this refuses that row alone, as ``unknown-predicate``.
+    """
+    return member(name, REGISTRY)
 
 
 class Qualifier(BaseModel):
@@ -1238,7 +1277,7 @@ def identity_parts(assertion: Assertion) -> IdentityParts:
     Raises ``KeyError`` for a predicate the registry does not hold, as
     :func:`assertion_id` does and for the same reason.
     """
-    predicate = REGISTRY[assertion.predicate]
+    predicate = table_entry(REGISTRY, assertion.predicate)
     return IdentityParts(
         assertion.predicate,
         assertion.subject,
@@ -1399,7 +1438,7 @@ def quarantine(
     kept = []
     removed = []
     for entry in catalog.entries:
-        if entry.predicate not in REGISTRY:
+        if registered_predicate(entry.predicate) is None:
             reasons: set[CatalogIssueCode] = {"unknown-predicate"}
         else:
             reasons = (
@@ -1426,7 +1465,7 @@ def quarantine(
 
 def _identity(entry: Assertion) -> str:
     """The row's identity, or ``""`` where its predicate is unregistered."""
-    return assertion_id(entry) if entry.predicate in REGISTRY else ""
+    return assertion_id(entry) if registered_predicate(entry.predicate) else ""
 
 
 def without(catalog: AssertionCatalog, identities: Collection[str]) -> AssertionCatalog:
@@ -1474,8 +1513,8 @@ def subjects_of(
     named = set()
     for entry in entries:
         named.add(entry.subject)
-        predicate = REGISTRY.get(entry.predicate)
-        if predicate is not None and predicate.value == "reference":
+        name = registered_predicate(entry.predicate)
+        if name is not None and REGISTRY[name].value == "reference":
             named.add(entry.value)
     named -= UNIVERSAL_TERMS
     return [labels[subject] for subject in sorted(named) if subject in labels]
@@ -1532,7 +1571,7 @@ def conflicts(catalog: AssertionCatalog) -> tuple[Conflict, ...]:
         stated = tuple(sorted(values))
         if len(stated) < 2:
             continue
-        one_only = REGISTRY[predicate].multiplicity == "one"
+        one_only = table_entry(REGISTRY, predicate).multiplicity == "one"
         if one_only or ABSENT in stated:
             found.append(Conflict(subject, predicate, scope, stated))
     return tuple(found)
@@ -1657,7 +1696,10 @@ def admissible(entry: Assertion) -> bool:
     A row is admissible when its predicate is registered and its assessment is
     one :data:`PROJECTS_UNDER` admits.
     """
-    return entry.predicate in REGISTRY and PROJECTS_UNDER[entry.assessment]
+    return (
+        registered_predicate(entry.predicate) is not None
+        and PROJECTS_UNDER[entry.assessment]
+    )
 
 
 def answered(entry: Assertion) -> bool:
@@ -1753,7 +1795,7 @@ def catalog_issues(
     rows = tuple(
         (entry, assertion_id(entry))
         for entry in catalog.entries
-        if entry.predicate in REGISTRY
+        if registered_predicate(entry.predicate)
     )
     identities = frozenset(identity for _, identity in rows)
 
@@ -1764,7 +1806,7 @@ def catalog_issues(
             subject=entry.subject,
         )
         for entry in catalog.entries
-        if entry.predicate not in REGISTRY
+        if registered_predicate(entry.predicate) is None
     )
     for entry, identity in rows:
         issues.extend(_entry_issues(entry, identity, by_id, checked))
@@ -1820,7 +1862,7 @@ def _entry_issues(
     checked: Mapping[str, _Checked],
 ) -> list[CatalogIssue]:
     """Everything decidable about one assertion on its own."""
-    predicate = REGISTRY[entry.predicate]
+    predicate = table_entry(REGISTRY, entry.predicate)
     issues = []
 
     def refuse(code: CatalogIssueCode, message: str) -> None:
@@ -2350,10 +2392,11 @@ def _resolve_row(
             )
         )
 
-    predicate = REGISTRY.get(row.predicate)
-    if predicate is None:
+    name = registered_predicate(row.predicate)
+    if name is None:
         drop("unknown-predicate", f"{row.predicate!r} is not a registered predicate")
         return None
+    predicate = REGISTRY[name]
 
     subject = _subject(row.subject_type, row.subject, element_ids, labels)
     if subject is None:
@@ -3196,7 +3239,8 @@ def _compatible(rows: Sequence[Assertion]) -> bool:
     contradiction, and so is a second value of a predicate that holds one.
     """
     return all(
-        REGISTRY[entry.predicate].multiplicity == "many" and entry.value != ABSENT
+        table_entry(REGISTRY, entry.predicate).multiplicity == "many"
+        and entry.value != ABSENT
         for entry in rows
     )
 

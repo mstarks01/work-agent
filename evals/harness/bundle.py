@@ -38,6 +38,7 @@ from analysis_service.assertions import (
     CatalogProposal,
     Quarantined,
     project,
+    registered_predicate,
     subject_id,
 )
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
@@ -732,8 +733,8 @@ def _redrawn_entry(entry, moved: Mapping[str, str]):
     update: dict[str, str] = {}
     if entry.subject in moved:
         update["subject"] = moved[entry.subject]
-    predicate = REGISTRY.get(entry.predicate)
-    names_a_subject = predicate is not None and predicate.value == "reference"
+    name = registered_predicate(entry.predicate)
+    names_a_subject = name is not None and REGISTRY[name].value == "reference"
     if names_a_subject and entry.value in moved:
         update["value"] = moved[entry.value]
     return entry.model_copy(update=update) if update else entry

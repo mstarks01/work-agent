@@ -13,11 +13,13 @@ from typing import Literal, get_args, get_origin
 
 from pydantic import BaseModel
 
+from analysis_service.analysis import ControlAttribute
 from analysis_service.assertions import (
     ABSENT,
     REGISTRY,
     UNKNOWN,
     AssertionCatalog,
+    registered_predicate,
 )
 from analysis_service.claims import UnknownKey
 from analysis_service.fact_answers import (
@@ -29,7 +31,8 @@ from analysis_service.fact_answers import (
     fact_line,
     key_ref,
 )
-from analysis_service.question_kinds import QUESTION_KINDS, Facet
+from analysis_service.parsing import member
+from analysis_service.question_kinds import QUESTION_KINDS, Facet, question_kind
 from analysis_service.system_model import EXCERPT_MAX_CHARS, SystemModel
 
 __all__ = [
@@ -55,20 +58,24 @@ def _closed(model: SystemModel, element_id: str, attribute: str) -> tuple[str, .
     return tuple(value for value in get_args(annotation) if value != UNKNOWN)
 
 
+#: The attributes whose answers come from the registry or the model, and not
+#: from their own annotation.
+ChoiceAttribute = Literal["data_classification", "trust_zone"]
+
 #: The answers an attribute takes, where they are not free text. Keyed by
 #: attribute, so an attribute with a closed set it does not name here falls
 #: back to its own annotation rather than to free text.
-_ATTRIBUTE_CHOICES: Mapping[str, Callable[[SystemModel, str], tuple[str, ...]]] = (
-    MappingProxyType(
-        {
-            "data_classification": lambda model, element_id: tuple(
-                sorted(REGISTRY["data-classification"].terms)
-            ),
-            "trust_zone": lambda model, element_id: tuple(
-                boundary.id for boundary in model.trust_boundaries
-            ),
-        }
-    )
+_ATTRIBUTE_CHOICES: Mapping[
+    ChoiceAttribute, Callable[[SystemModel, str], tuple[str, ...]]
+] = MappingProxyType(
+    {
+        "data_classification": lambda model, element_id: tuple(
+            sorted(REGISTRY["data-classification"].terms)
+        ),
+        "trust_zone": lambda model, element_id: tuple(
+            boundary.id for boundary in model.trust_boundaries
+        ),
+    }
 )
 
 
@@ -80,22 +87,22 @@ def answer_choices(
     if ref.kind == "capability":
         return YES_NO
     if ref.kind == "question":
-        asked = QUESTION_KINDS.get(ref.question)
-        return YES_NO if asked is not None and asked.answer == "yes-no" else ()
+        name = question_kind(ref.question)
+        yes_no = name is not None and QUESTION_KINDS[name].answer == "yes-no"
+        return YES_NO if yes_no else ()
     if ref.kind == "attribute":
-        special = _ATTRIBUTE_CHOICES.get(ref.attribute)
-        return (
-            special(model, ref.element_id)
-            if special
-            else _closed(model, ref.element_id, ref.attribute)
-        )
+        special = member(ref.attribute, _ATTRIBUTE_CHOICES)
+        if special is None:
+            return _closed(model, ref.element_id, ref.attribute)
+        return _ATTRIBUTE_CHOICES[special](model, ref.element_id)
     if ref.kind == "assertion" and catalog is not None:
         row = answered_row(catalog, ref.assertion)
         if row is None:
             return ()
-        predicate = REGISTRY.get(row.predicate)
-        if predicate is None:
+        registered = registered_predicate(row.predicate)
+        if registered is None:
             return ()
+        predicate = REGISTRY[registered]
         if predicate.value == "term":
             return (*sorted(predicate.terms), ABSENT)
         if predicate.value == "reference":
@@ -118,7 +125,7 @@ YES_NO: tuple[YesNo, ...] = get_args(YesNo)
 #: ``tests/test_questions.py`` derives from the element classes. The words come
 #: from the corpus's signed models where they name one, and a suggestion is
 #: never an answer until the submitter sends it.
-CONTROL_SUGGESTIONS: Mapping[str, tuple[str, ...]] = MappingProxyType(
+CONTROL_SUGGESTIONS: Mapping[ControlAttribute, tuple[str, ...]] = MappingProxyType(
     {
         "authentication": (
             "session cookie after a password login",
@@ -162,17 +169,19 @@ def answer_form(
         return "facets"
     if answer_choices(key, model, catalog):
         return "choice"
-    control = (
-        fact_kind(key) == "attribute" and key_ref(key).attribute in CONTROL_SUGGESTIONS
-    )
+    control = fact_kind(key) == "attribute" and _suggested(key) is not None
     return "control" if control else "text"
 
 
 def answer_suggestions(key: UnknownKey) -> tuple[str, ...]:
     """Common mechanisms for a control answered in free text, or empty."""
-    if fact_kind(key) != "attribute":
-        return ()
-    return CONTROL_SUGGESTIONS.get(key_ref(key).attribute, ())
+    attribute = _suggested(key) if fact_kind(key) == "attribute" else None
+    return () if attribute is None else CONTROL_SUGGESTIONS[attribute]
+
+
+def _suggested(key: UnknownKey) -> ControlAttribute | None:
+    """The attribute of :data:`CONTROL_SUGGESTIONS` this key names, or ``None``."""
+    return member(key_ref(key).attribute, CONTROL_SUGGESTIONS)
 
 
 def answer_limit(key: UnknownKey, model: SystemModel) -> int:

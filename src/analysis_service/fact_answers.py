@@ -70,7 +70,8 @@ from analysis_service.claims import (
 )
 from analysis_service.grounding import normalize
 from analysis_service.open_facts import element_names, label_of
-from analysis_service.question_kinds import QUESTION_KINDS, Facet
+from analysis_service.parsing import table_entry
+from analysis_service.question_kinds import QUESTION_KINDS, Facet, question_kind
 from analysis_service.sources import FORMATTING_CATEGORIES, plain_name, quotable
 from analysis_service.system_model import SystemModel
 
@@ -183,7 +184,8 @@ class FactAnswer(BaseModel):
         question = ""
         if isinstance(key, list | tuple) and len(key) == len(UNKNOWN_KEY_FIELDS):
             question = dict(zip(UNKNOWN_KEY_FIELDS, key, strict=True))["question"]
-        kind = QUESTION_KINDS.get(question)
+        name = question_kind(question)
+        kind = None if name is None else QUESTION_KINDS[name]
         if kind is None or kind.answer != "facets":
             raise ValueError("facets answer only a question kind that has facets")
         if not isinstance(facets, dict) or not facets:
@@ -337,10 +339,10 @@ def fact_line(fact: FactAnswer) -> str:
     """
     ref = key_ref(fact.key)
     if fact.kind == "capability":
-        asked = CAPABILITIES[ref.capability].question
+        asked = table_entry(CAPABILITIES, ref.capability).question
         line = f'Asked "{asked}", the answer is "{fact.value}".'
     elif fact.kind == "question":
-        kind = QUESTION_KINDS[ref.question]
+        kind = table_entry(QUESTION_KINDS, ref.question)
         asked = kind.template.format(element=ref.element_id)
         line = f'Asked "{asked}", the answer is "{fact.value}".'
     elif fact.kind == "attribute":
@@ -382,12 +384,10 @@ def detail_note(detail: str) -> str:
 
 def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
     """The facets a question kind is answered in, or empty."""
-    kind = (
-        QUESTION_KINDS.get(key_ref(key).question)
-        if fact_kind(key) == "question"
-        else None
+    name = (
+        question_kind(key_ref(key).question) if fact_kind(key) == "question" else None
     )
-    return () if kind is None else kind.facets
+    return () if name is None else QUESTION_KINDS[name].facets
 
 
 def answered_row(catalog: AssertionCatalog, identity: str) -> Assertion | None:

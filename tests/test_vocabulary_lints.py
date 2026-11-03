@@ -69,16 +69,12 @@ name that reads a constant of one, in its own module or through an import.
 :func:`test_a_closed_set_states_its_literal` asks each closed set for the
 annotation that names its ``Literal``, and the pair check above then holds the
 members to the type. A table that is only iterated, or read by literal keys, is
-not asked. Three tables hold the exceptions, each with a reason:
+not asked. Two tables hold the exceptions, each with a reason:
 
 - :data:`OPEN`: a set whose members come from data, a registry or user input,
   or whose source the lint cannot decide, such as a fixed list that filters
   free text, file names, provider errors or corpus data;
-- :data:`PARTIAL`: a set that names part of its ``Literal``;
-- :data:`PENDING`: a closed set whose read keys, or the keys it is built
-  from, are a plain ``str`` or ``int`` at their source, or whose ``Literal``
-  sits only in a module that imports the set's module, so it cannot carry its
-  ``Literal`` yet.
+- :data:`PARTIAL`: a set that names part of its ``Literal``.
 
 The closed-set sweep leaves out :data:`~tests.source_tree.EXPERIMENTS_LEFT_OUT`.
 """
@@ -125,6 +121,10 @@ _CONTAINERS = frozenset({"tuple", "frozenset", "set", "list", "dict", "Mapping"}
 PARTIAL: dict[tuple[str, str], str] = {
     ("evals.experiments.QA-2026-11-02-05.control_ballot", "CONTROL_CHECKS"): (
         "the checks of the item 4 control arm, which has no spoofing runs"
+    ),
+    ("analysis_service.answer_forms", "CONTROL_SUGGESTIONS"): (
+        "the control attributes answered in free text, so an attribute with a"
+        " closed set of values is absent by construction"
     ),
     ("analysis_service.claims", "ARCHIVED_UNRECONCILED_KINDS"): (
         "the kinds only archived reports carry, which is fewer than the kinds"
@@ -625,44 +625,6 @@ OPEN: dict[tuple[str, str], str] = {
     ),
 }
 
-#: The follow-up for an entry of :data:`PENDING` whose source is a plain value.
-_PENDING_FOLLOW_UP = (
-    "; the follow-up states a Literal of the keys where none exists, types that"
-    " source with it, and replays the archive first where the source is a"
-    " stored field"
-)
-
-#: A closed set that cannot carry its ``Literal`` yet, by module and name, with
-#: the cause. Either its read keys, or the keys it is built from, are a plain
-#: ``str`` or ``int`` at their source, and mypy refuses such a key in a table
-#: lookup or such a member where a set of the ``Literal`` is built. Or its
-#: ``Literal`` sits only in a module that imports the set's module, so no name
-#: for it resolves there at run time.
-#: :func:`test_no_pending_declaration_outlives_its_table` refuses an entry whose
-#: set carries its ``Literal``.
-PENDING: dict[tuple[str, str], str] = {
-    ("analysis_service.answer_forms", "CONTROL_SUGGESTIONS"): (
-        "read by an open fact's attribute name, which is a str field"
-        + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.answer_forms", "_ATTRIBUTE_CHOICES"): (
-        "read by an open fact's attribute name, which is a str field"
-        + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.assertions", "REGISTRY"): (
-        "read by a row's predicate, which is a str field in the catalog, the"
-        " corpus and the replay rows" + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.capabilities", "CAPABILITIES"): (
-        "read by a capability key, which is a str field and a str parameter"
-        + _PENDING_FOLLOW_UP
-    ),
-    ("analysis_service.question_kinds", "QUESTION_KINDS"): (
-        "read by an open fact's question kind, which is a str field"
-        + _PENDING_FOLLOW_UP
-    ),
-}
-
 
 def _string(node: ast.expr | None) -> bool:
     """Whether ``node`` is a string literal."""
@@ -860,7 +822,7 @@ def test_a_closed_set_states_its_literal():
     annotation is the claim :func:`test_a_constant_enumerates_the_type_it_is_annotated_with`
     holds to the members.
     """
-    bare = sorted(READ_AS_SETS - ANNOTATED - set(OPEN) - set(PENDING))
+    bare = sorted(READ_AS_SETS - ANNOTATED - set(OPEN))
 
     assert not bare, (
         f"{bare} are read as sets and carry no Literal. Annotate each with the"
@@ -877,21 +839,6 @@ def test_no_open_declaration_outlives_its_table():
 
     assert not stale, f"{stale} are no open table read as a set; delete each entry"
     assert not thin, f"state a reason for {thin}"
-
-
-def test_no_pending_declaration_outlives_its_table():
-    """An entry of :data:`PENDING` names a constant read as a set, with no
-    Literal, and no entry of :data:`OPEN` names it too."""
-    stale = sorted(
-        key for key in PENDING if key not in READ_AS_SETS or key in ANNOTATED
-    )
-    both = sorted(set(PENDING) & set(OPEN))
-
-    assert not stale, (
-        f"{stale} carry their Literal or are not read as a set; delete"
-        " each PENDING entry"
-    )
-    assert not both, f"{both} are declared both open and pending"
 
 
 _CONTROL = """
