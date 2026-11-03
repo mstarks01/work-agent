@@ -53,6 +53,7 @@ import pytest
 
 from tests.source_tree import (
     DEFINITIONS,
+    EXPERIMENT_SCRIPTS,
     PYTHON,
     REPO_ROOT,
     SHORTEST_REASON,
@@ -69,18 +70,9 @@ from tests.test_one_reader_lints import MODULE_OWNER, ONE_READERS, Site
 
 pytestmark = pytest.mark.lint
 
-#: The parts of :data:`~tests.source_tree.PYTHON` the lint leaves out, with the
-#: reason.
-LEFT_OUT: dict[str, str] = {
-    "evals/experiments": (
-        "an audit script there runs one experiment as it ran on its day, so it"
-        " records the rule of that day and no live code calls it"
-    ),
-}
-
 #: The files the lint reads: the Python the project runs, and the page scripts
 #: beside it.
-FILES = without(source_files(*PYTHON, suffixes=(".py", ".js")), LEFT_OUT)
+FILES = without(source_files(*PYTHON, suffixes=(".py", ".js")), EXPERIMENT_SCRIPTS)
 
 
 #: The words that make a one-reader claim, with any whitespace between them.

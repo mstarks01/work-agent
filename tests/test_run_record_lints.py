@@ -7,7 +7,14 @@ import ast
 
 import pytest
 
-from tests.source_tree import PYTHON, REPO_ROOT, parse, source_files, without
+from tests.source_tree import (
+    EXPERIMENTS,
+    PYTHON,
+    REPO_ROOT,
+    parse,
+    source_files,
+    without,
+)
 
 pytestmark = pytest.mark.lint
 
@@ -17,7 +24,7 @@ LEFT_OUT = {
     "webapp": "the first-run app writes settings and owner files, never a measurement",
     "examples": "the examples call the service and write no eval measurement file",
     ".github/scripts": "the CI scripts check a pull request and write no measurement",
-    "evals/experiments": (
+    EXPERIMENTS: (
         "each script there is the frozen record of one experiment, and the"
         " ledger row names its revision"
     ),

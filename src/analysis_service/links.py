@@ -41,6 +41,7 @@ from analysis_service.assertions import (
     Assertion,
     AssertionCatalog,
     CatalogIssue,
+    CatalogIssueCode,
     Subject,
     SupportSpan,
     answer,
@@ -367,7 +368,7 @@ def apply_answers(
 #: Why a link answer places nothing, by the issue :func:`apply_answers` raises
 #: for it. The issue's own message repeats what the caller sent, which a
 #: report may show its owner and a refusal never repeats.
-_LINK_REFUSALS: Mapping[str, str] = MappingProxyType(
+_LINK_REFUSALS: Mapping[CatalogIssueCode, str] = MappingProxyType(
     {
         "unmatched-link": "no principal in this catalog has that name,"
         " so the answer places nothing",

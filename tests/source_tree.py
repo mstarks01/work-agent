@@ -73,6 +73,19 @@ _SKIPPED_PATHS = ("evals/runs", ".claude/worktrees")
 #: reads a kind of prose these trees do not hold adds its own trees to this one.
 FROZEN_PROSE = ("docs/research", "evals/experiments")
 
+#: The tree of audit scripts, each of which runs one experiment as it ran on
+#: its day.
+EXPERIMENTS = "evals/experiments"
+
+#: The part of :data:`PYTHON` that no lint of the live rules reads, keyed for
+#: :func:`without`.
+EXPERIMENT_SCRIPTS: Mapping[str, str] = {
+    EXPERIMENTS: (
+        "an audit script there runs one experiment as it ran on its day, so it"
+        " records the rule of that day and no live code calls it"
+    ),
+}
+
 #: The Python the project runs: the service, the web app, every eval tool, the
 #: examples and the scripts CI runs. Every Python file the repository tracks
 #: sits under one of these roots or under :data:`TESTS`, except the frozen

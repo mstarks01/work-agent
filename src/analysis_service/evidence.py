@@ -104,6 +104,7 @@ from analysis_service.claims import (
     Claim,
     DroppedClaim,
     Ground,
+    GroundKind,
     InvalidProposal,
     Proposal,
     UnknownClaimIdentity,
@@ -771,13 +772,13 @@ def _reviewed(row: Assertion) -> str:
 #: raises here, where a branch would let it fall through to the attribute
 #: sentence below and gloss a resolved row as an unstated attribute.
 #: ``tests/test_evidence.py`` compares the keys against the set.
-ASSERTION_GLOSSES: Mapping[str, Callable[[Assertion, Mapping[str, Subject]], str]] = (
-    MappingProxyType(
-        {
-            "assertion": _assertion_gloss,
-            "unknown-assertion": _open_question_gloss,
-        }
-    )
+ASSERTION_GLOSSES: Mapping[
+    GroundKind, Callable[[Assertion, Mapping[str, Subject]], str]
+] = MappingProxyType(
+    {
+        "assertion": _assertion_gloss,
+        "unknown-assertion": _open_question_gloss,
+    }
 )
 
 

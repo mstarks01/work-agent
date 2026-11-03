@@ -51,6 +51,7 @@ from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness import attribution, audit
 from evals.harness.reference import (
     DISPOSITION_FOR_EVIDENCE,
+    AsvsDisposition,
     CaseFramework,
     GoldenCase,
     ReferenceRequirement,
@@ -403,7 +404,7 @@ class Observation:
 #: so the two cannot drift. ``not-applicable`` and ``gap-from-prose`` are absent:
 #: neither asks for evidence, and :func:`satisfies` answers them before it looks
 #: here.
-EVIDENCE_FOR_DISPOSITION: Mapping[str, str] = MappingProxyType(
+EVIDENCE_FOR_DISPOSITION: Mapping[AsvsDisposition, str] = MappingProxyType(
     {disposition: kind for kind, disposition in DISPOSITION_FOR_EVIDENCE.items()}
 )
 
@@ -450,10 +451,10 @@ def observe(
 
 
 def satisfies(
-    disposition: str,
+    disposition: AsvsDisposition,
     observation: Observation,
     carried: Collection[str],
-    also_acceptable: Collection[str],
+    also_acceptable: Collection[AsvsDisposition],
 ) -> bool:
     """Whether one run's answer is one this case accepts.
 
@@ -490,7 +491,7 @@ def satisfies(
 
 
 def _routed(
-    disposition: str, observation: Observation, carried: Collection[str]
+    disposition: AsvsDisposition, observation: Observation, carried: Collection[str]
 ) -> bool:
     """Whether the run reached the evidence one route asks for."""
     wanted = EVIDENCE_FOR_DISPOSITION[disposition]
@@ -504,13 +505,13 @@ class Judged:
     """One requirement a case judged, the run answered, and the scorer compared."""
 
     requirement: str
-    expected: str
+    expected: AsvsDisposition
     observed: Observation
     ok: bool
     #: The other routes this record accepts. Carried into the artifact so a
     #: reader can tell an answer that scored right on an alternate from one
     #: that matched the case's first choice.
-    also_acceptable: tuple[str, ...] = ()
+    also_acceptable: tuple[AsvsDisposition, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         entry = {
