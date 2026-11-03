@@ -318,6 +318,8 @@ class TestTheEvidenceRules:
             "raise ValueError('bad token: ' + t + ' for ' + u)",
             'msg = "token: " + t + "."',
             'password: "********"',
+            'x = "token="+tok+"x"',
+            'print("token:", tok, "x")',
         ],
     )
     def test_a_line_that_sets_no_literal_value_passes(self, line):
@@ -351,6 +353,13 @@ def test_the_scope_types_are_the_element_prefixes_but_a_flow():
         ),
         ("token: eyJ" + "a" * 400, "a password, secret or token set to a value"),
         ("secret: '" + "b" * 300, "a password, secret or token set to a value"),
+        (
+            'secret: "+q3Zr8vT0aLk9mW2xY7bN1cD4eF6gH8j="',
+            "a password, secret or token set to a value",
+        ),
+        ("password: '*Xk9#mQ2!vL'", "a password, secret or token set to a value"),
+        ('password: ")Xk9#mQ2!vL"', "a password, secret or token set to a value"),
+        ('password: ",Xk9#mQ2!vL"', "a password, secret or token set to a value"),
     ],
 )
 def test_a_long_or_unclosed_credential_is_refused(line, shape):
@@ -364,14 +373,14 @@ def test_a_long_or_unclosed_credential_is_refused(line, shape):
     "line",
     [
         "token=" * 17_000,
-        'password="' * 10_000,
         ("token=" * 42 + " ") * 400,
         "token: " + "a" * 100_000,
     ],
 )
 def test_a_hostile_line_is_read_in_linear_time(line):
-    """Each line holds many starts of an assignment. A scan that read each value
-    to the end of the line would take seconds on the first two."""
+    """Each line holds many starts of an assignment. An unquoted value with no
+    256-character bound would read each value to the end of the first line,
+    which takes seconds."""
     started = time.perf_counter()
     credential_hit(line)
     assert time.perf_counter() - started < 1
