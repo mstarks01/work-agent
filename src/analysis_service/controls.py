@@ -325,8 +325,9 @@ class EvidenceRefusal:
 #: digit or a symbol. A quoted value does not count where it starts with a
 #: reference or a space, where it is only a mask of ``*``, or where it joins a
 #: name to another string, as ``"token=" + tok + "x"`` does. So a type name, a
-#: masked value and a joined log string pass. Each start reads at most 257
-#: characters of a value, so one scan of a line stays linear.
+#: masked value and a joined log string pass. An empty string does not count
+#: either. Each start reads at most 257 characters of a value, so one scan of
+#: a line stays linear.
 CredentialShape = Literal[
     "a private key block",
     "a cloud access key ID",
@@ -346,9 +347,9 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
     ),
     "a password, secret or token set to a value": re.compile(
         r"(?i)(?<![\w.-])[\w.-]*(?:password|passwd|secret|token)[\"']?\s*[:=]\s*"
-        r"(?:\"(?![$<{%\"\s]|\*+\"|[,)+]\s*[\w.]*\s*(?:[,)+]|\"))"
+        r"(?:\"(?![$<{%\"\s]|\*+\"|[,)+]\s{0,8}[\w.]{0,64}\s{0,8}(?:[,)+]|\"))"
         r"(?:[^\"\n]{1,256}\"|[^\"\n]{256})"
-        r"|'(?![$<{%'\s]|\*+'|[,)+]\s*[\w.]*\s*(?:[,)+]|'))"
+        r"|'(?![$<{%'\s]|\*+'|[,)+]\s{0,8}[\w.]{0,64}\s{0,8}(?:[,)+]|'))"
         r"(?:[^'\n]{1,256}'|[^'\n]{256})"
         rf"|(?![$<{{%*])(?:(?={_UNQUOTED}{{0,255}}[\d!@^&*+~?/\\|]){_UNQUOTED}{{1,256}}\s*$"
         rf"|{_UNQUOTED}{{256}}))"
