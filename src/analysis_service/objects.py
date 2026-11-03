@@ -37,9 +37,10 @@ from analysis_service.store_settings import (
 )
 from analysis_service.vendors import CredentialMode
 
-#: The two objects of a job. A job has one report, which the service writes
-#: once, so no name carries a revision.
-ObjectName = Literal["sources.json", "report.json"]
+#: The objects of a job: its sources, its report and its copy of the
+#: Controls it applies (ADR 0127). The service writes each one once, so no
+#: name carries a revision.
+ObjectName = Literal["sources.json", "report.json", "controls.json"]
 
 #: An owner ID is a UUIDv4 that the service generates (ADR 0064). This shape
 #: admits only lowercase letters, digits and hyphens, so no part of a key can

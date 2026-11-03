@@ -2089,6 +2089,12 @@ ONE_READERS: dict[str, _OneReader] = {
         {},
         "",
     ),
+    "what a job's Controls resolve to": _OneReader(
+        lambda node: _calls(node, "default_resolution"),
+        ("src/analysis_service/job_controls.py", "resolutions"),
+        {},
+        "",
+    ),
     "what a new analysis carries": _OneReader(
         _renames_the_carried_answers,
         ("src/analysis_service/jobs.py", "held_answers"),

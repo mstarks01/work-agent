@@ -37,6 +37,7 @@ from analysis_service.controls import (
     EvidenceRefusal,
 )
 from analysis_service.fact_answers import FactAnswer
+from analysis_service.job_controls import CopiedControl, LeftOutScope
 from analysis_service.jobs import (
     NON_LOCKING_STATUSES,
     RECORD_FIELDS,
@@ -85,6 +86,7 @@ from tests.sql_stores import (
     server_marks,
     sql_env,
 )
+from tests.test_controls import CONTROL_ID, copied_control
 from tests.test_parsing import ISDIGIT_TRAPS
 from tests.test_pause import waiting
 
@@ -833,7 +835,9 @@ class TestTheParentLock:
     def test_a_child_read_off_an_older_revision_is_refused(self, store):
         parent = waiting(store)
         assert asyncio.run(
-            store.save_answers(parent, "alice", NO_ANSWERS, [], [], 0, renames=())
+            store.save_answers(
+                parent, "alice", NO_ANSWERS, [], [], 0, renames=(), control_scopes=None
+            )
         )
         moved = reserve(store, amendment(parent, revision=0))
         assert moved == Admission(outcome="parent_moved", active=0)
@@ -882,7 +886,16 @@ class TestTheParentLock:
 
         async def race():
             return await asyncio.gather(
-                store.save_answers(parent, "alice", NO_ANSWERS, [], [], 0, renames=()),
+                store.save_answers(
+                    parent,
+                    "alice",
+                    NO_ANSWERS,
+                    [],
+                    [],
+                    0,
+                    renames=(),
+                    control_scopes=None,
+                ),
                 reserving(store, amendment(parent, revision=0)),
             )
 
@@ -898,7 +911,14 @@ class TestTheSaves:
         def save(revision):
             return asyncio.run(
                 store.save_answers(
-                    job, record.owner_id, NO_ANSWERS, [], [], revision, renames=()
+                    job,
+                    record.owner_id,
+                    NO_ANSWERS,
+                    [],
+                    [],
+                    revision,
+                    renames=(),
+                    control_scopes=None,
                 )
             )
 
@@ -910,7 +930,9 @@ class TestTheSaves:
         job = waiting(store)
         given = AnswerSet(facts=(FactAnswer(key=KEY, value="unknown"),))
         assert asyncio.run(
-            store.save_answers(job, "alice", given, [KEY], [], 0, renames=())
+            store.save_answers(
+                job, "alice", given, [KEY], [], 0, renames=(), control_scopes=None
+            )
         )
         saved = asyncio.run(store.get(job))
         assert saved.revision == 1
@@ -921,15 +943,21 @@ class TestTheSaves:
     def test_a_save_is_refused_on_a_foreign_finished_or_locked_job(self, store):
         job = waiting(store)
         assert not asyncio.run(
-            store.save_answers(job, "mallory", NO_ANSWERS, [], [], 0, renames=())
+            store.save_answers(
+                job, "mallory", NO_ANSWERS, [], [], 0, renames=(), control_scopes=None
+            )
         )
         done = completed(store)
         assert not asyncio.run(
-            store.save_answers(done, "alice", NO_ANSWERS, [], [], 0, renames=())
+            store.save_answers(
+                done, "alice", NO_ANSWERS, [], [], 0, renames=(), control_scopes=None
+            )
         )
         asyncio.run(admit(store, amendment(job)))
         assert not asyncio.run(
-            store.save_answers(job, "alice", NO_ANSWERS, [], [], 0, renames=())
+            store.save_answers(
+                job, "alice", NO_ANSWERS, [], [], 0, renames=(), control_scopes=None
+            )
         )
         assert asyncio.run(store.get(job)).revision == 0
 
@@ -997,6 +1025,70 @@ class TestTheSaves:
         assert asyncio.run(store.set_title(job, "alice", "Orders"))
         asyncio.run(store.save(held))
         assert asyncio.run(store.get(job)).title == "Orders"
+
+
+class TestTheControlsCopy:
+    """A job keeps its own copy of its Controls (ADR 0127), and a pause save
+    keeps their resolution on the row (ADR 0124)."""
+
+    def copied(self, store) -> tuple[str, CopiedControl]:
+        copy = copied_control()
+        record = new_record()
+        record.controls = [copy]
+        asyncio.run(admit(store, record))
+        return record.id, copy
+
+    def test_the_copy_reads_back_for_its_owner_only(self, store):
+        job, copy = self.copied(store)
+        assert asyncio.run(store.controls(job, "alice")) == [copy]
+        assert asyncio.run(store.get(job)).controls == [copy]
+        assert asyncio.run(store.controls(job, "mallory")) is None
+        assert asyncio.run(store.owned(job, "alice")).controls == []
+
+    def test_a_job_with_no_control_holds_no_copy(self, store):
+        record = new_record()
+        asyncio.run(admit(store, record))
+        assert asyncio.run(store.controls(record.id, "alice")) == []
+
+    def test_a_job_with_no_control_writes_no_object(self, held):
+        store, objects = held
+        record = new_record()
+        asyncio.run(admit(store, record))
+        key = object_key("alice", record.id, "controls.json")
+        assert asyncio.run(objects.get(key)) is None
+
+    def test_a_copy_that_fails_its_digest_raises(self, held):
+        store, objects = held
+        job, _ = self.copied(store)
+        key = object_key("alice", job, "controls.json")
+        asyncio.run(objects.delete(key))
+        asyncio.run(objects.put(key, b"[]"))
+        with pytest.raises(sql_store.CorruptObject):
+            asyncio.run(store.controls(job, "alice"))
+        with pytest.raises(sql_store.CorruptObject):
+            asyncio.run(store.get(job))
+
+    def test_a_delete_removes_the_copy(self, held):
+        store, objects = held
+        record = new_record()
+        record.controls = [copied_control()]
+        record.transition("running")
+        record.transition("failed")
+        asyncio.run(admit(store, record))
+        assert isinstance(asyncio.run(store.delete(record.id, "alice")), int)
+        key = object_key("alice", record.id, "controls.json")
+        assert asyncio.run(objects.get(key)) is None
+
+    def test_a_save_keeps_the_resolution(self, store):
+        job = waiting(store)
+        stated = [LeftOutScope(control=CONTROL_ID, reason="unticked")]
+        assert asyncio.run(
+            store.save_answers(
+                job, "alice", NO_ANSWERS, [], [], 0, renames=(), control_scopes=stated
+            )
+        )
+        assert asyncio.run(store.get(job)).control_scopes == stated
+        assert asyncio.run(store.owned(job, "alice")).control_scopes == stated
 
 
 class TestTheSaveContract:
@@ -1811,7 +1903,9 @@ class TestTheSchemaVersion:
         record.schema_version = version
         asyncio.run(store.save(record))
         assert asyncio.run(
-            store.save_answers(job, "alice", NO_ANSWERS, (), (), 0, renames=())
+            store.save_answers(
+                job, "alice", NO_ANSWERS, (), (), 0, renames=(), control_scopes=None
+            )
         )
         reads = [
             asyncio.run(store.get(job)),

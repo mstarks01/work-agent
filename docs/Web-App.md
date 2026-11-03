@@ -289,6 +289,38 @@ a chosen file is gone, the submission is refused and the form shows the file
 as "Missing". An analysis that you open again lists "Files used" from its own
 copies.
 
+## Controls in an analysis
+
+A **Control** records a protection that your systems already have, and it
+names what it protects: the whole application, one zone or one element
+(ADR 0124). The submission sends the IDs of the Controls you tick in
+`controls`, and the job copies each one, with the text of each evidence file
+(ADR 0127). A later edit or delete changes no job. When a ticked Control is
+gone, the submission is refused.
+
+The model exists only after the extraction, so the pause shows the match. The
+questions of a paused analysis list each copied Control in `controls`: what
+it matched, and why where it matched nothing.
+
+- **A match is an equal element ID**, from the name, then from each alias. A
+  similar name proposes nothing. The whole application always matches.
+- **A zone lists its elements.** An element that the description places in
+  the zone is ticked. An element that the service placed there by an
+  inference (`zone-inferred`), and an element that no source placed
+  (`no-zone-stated`), are listed unticked.
+- **No match has a reason.** `missing-element` lists the elements of the
+  scope's type to choose from. `empty-zone` is a zone that holds no element.
+- **A row of another package version is unticked.** A unit can change its
+  meaning between two versions of a catalog.
+
+A save sends `control_scopes` to `/answer/{run}`: one entry for each Control
+that applies, with its element and, for a zone, the ticked elements. A
+Control with no entry is left out. A later save can tick it again. "Keep this
+name" sends `POST /workspace/controls/{control_id}/aliases`, which appends the
+name to the Control's aliases. A job that does not pause applies each match
+as the pause first shows it. An analysis that you open again lists
+`controls_used` from its own copy.
+
 ## The Settings page
 
 **Settings**, beside **Analyses**, shows each Deployment Setting in one table

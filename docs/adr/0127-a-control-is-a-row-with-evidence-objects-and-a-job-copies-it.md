@@ -59,12 +59,15 @@ replaces it in that one place.
 **A job copies each applied Control into a third object,
 `<owner-id>/<job-id>/controls.json`.**
 The name joins `ObjectName`, and the row gets a nullable `controls_sha256`. A
-job with no Control writes no object. The object holds one entry per applied
-Control: the Control's ID, name and document as copied, each evidence file's
-name, class, SHA-256 and text, the resolved scope (ADR 0124), the facts with
-their state (ADR 0125), and each left-out Control's ID and reason. The rulings
-of the rows stay in the report (ADR 0126). The object is written at submission
-and rewritten at a pause save. The critic's excerpts are copied from this
+job with no Control writes no object. The object holds one entry per Control
+that the submission named: the document as copied, each evidence file's name,
+class, SHA-256 and text, and each row with its version check. The store
+writes the object once, at the submission, as it writes the sources. What
+the job derives later, the resolution of each scope (ADR 0124) and the facts
+with their state (ADR 0125), is a column of the job row: a rewrite of the
+object must delete it before the put, and a read during the save would see
+a digest failure. The rulings of the rows stay in the report (ADR 0126). The
+critic's excerpts are copied from this
 object, never from the owner's row. A Resumed Job and an Amendment copy the
 parent's Controls object with no store read; a follow-up job with
 `answers_from` reads the store again.

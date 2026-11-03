@@ -34,6 +34,7 @@ from analysis_service.api import create_app
 from analysis_service.carried_renames import ElementRename
 from analysis_service.certification import CertifyResult
 from analysis_service.fact_answers import FactAnswer
+from analysis_service.job_controls import AppliedScope
 from analysis_service.jobs import (
     GENERIC_FAILURE_MESSAGE,
     RESTART_FAILURE_MESSAGE,
@@ -81,6 +82,7 @@ from tests.test_api import (
     auth,
     submission,
 )
+from tests.test_controls import CONTROL_ID, copied_control
 from tests.test_job_store import DeletingReads, follow_up, new_record
 from tests.test_resume import LINK
 from tests.test_webapp_questions import PausingRunner
@@ -538,6 +540,12 @@ def every_field(owner_id: str = "alice") -> JobRecord:
     record.revision = 2
     record.carried_renames = [
         ElementRename(earlier="store:orders-database", element="store:orders-db")
+    ]
+    record.controls = [copied_control()]
+    record.control_scopes = [
+        AppliedScope(
+            control=CONTROL_ID, outcome="matched-by-name", element="store:orders-db"
+        )
     ]
     record.checkpoint = held
     record.validation_issues = [

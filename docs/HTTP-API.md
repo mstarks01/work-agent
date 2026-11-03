@@ -651,6 +651,7 @@ or waits on it. The analysis does not run again. A correction carries the
 | `409` | The job is neither completed nor waiting on answers, its report is withheld, its report carries no catalog, or it is [from an older schema version](#a-job-from-an-older-schema-version). Or the job's answers already started a job that is in flight or finished: a job takes one resumed job, and takes answers again only where that job failed, was rejected, was stopped, or is unreadable with a stored status other than `completed` or `awaiting-answers`. Or the answers would start a job that selects a framework this deployment no longer carries, after a change of `ANALYSIS_FRAMEWORKS_CARRIED`; the message names the framework. A save, a draft and a correction start no job, so they still pass. |
 | `413` | The job's sources with the answers composed in are over this deployment's size or count limit. A save is refused too, so no saved answer holds a job that no start could run. |
 | `422` | An entry of `links` or `facts` is malformed, or a list holds more than its limit: 50 links, 200 facts. |
+| `422` | The body has a `control_scopes` key. Only the web app applies Controls (ADR 0127). |
 
 **Or answer in a new submission** of the same system, beside the sources. That
 job extracts everything again, and a principal the new run spells differently
@@ -708,6 +709,7 @@ when a deployment changes vendor. Shape is checked before size:
 | `422` | A `links` entry names an `element` that is not an entity, process or store ID, or `none`; or there are more than 50 entries. |
 | `422` | `frameworks` is missing or empty. The message for an empty list says that a job must select at least one framework. There is no default, so an omitted selection is a malformed submission rather than an implied one. |
 | `422` | `frameworks` names a framework this deployment does not carry, or names one twice. The message names it; order carries nothing, so a repeat is a mistake rather than a preference. |
+| `422` | The body has a `controls` key or a `control_scopes` key. Only the web app applies Controls, so a `/v1` job holds no Controls and its report has no Controls section (ADR 0127). |
 | `422` | Two sources share a `label`. Refused at any size — a label is a citation key, so a repeated one leaves every excerpt naming it ambiguous. The message names the repeated labels. |
 | `413` | More sources than the deployment allows. The message names the count and the limit. |
 | `413` | The sources total more bytes than allowed. There is no per-source cap, so the message names **no** culprit — it carries a per-label byte breakdown instead, because the overspend belongs to the sum. |

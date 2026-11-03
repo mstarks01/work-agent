@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from typing import Any, NoReturn
 
@@ -59,6 +59,13 @@ from analysis_service.errors import ConfigError, refusal_text
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.fact_writes import LineageConflict
 from analysis_service.graph import Entry
+from analysis_service.job_controls import (
+    CONTROL_GONE,
+    ControlScopeEntry,
+    CopiedControl,
+    control_offer,
+    resolve_scopes,
+)
 from analysis_service.jobs import (
     JOB_ID_PATTERN,
     Admission,
@@ -310,7 +317,20 @@ class Answerable:
                 # pause; a finished report shows its model itself.
                 "detected_facts": detected_facts(self.model) if state.waiting else [],
             }
+            | self._controls()
         )
+
+    def _controls(self) -> dict[str, Any]:
+        """The offer of each copied Control at the pause (ADR 0124). A job
+        with no copy, which each ``/v1`` job is, gets no key."""
+        record = self.record
+        if not record.controls or record.status != "awaiting-answers":
+            return {}
+        return {
+            "controls": control_offer(
+                record.controls, record.control_scopes, self.model
+            )
+        }
 
 
 @dataclass(frozen=True)
@@ -345,7 +365,8 @@ class Submission:
     passed :func:`~analysis_service.sources.clean_system_name` already: each
     route refuses an unclean name in its own way. ``answers_from`` names the
     earlier job whose answers the new job carries (ADR 0079). ``owner_files``
-    names the Owner Files whose text the new job copies (ADR 0119).
+    names the Owner Files whose text the new job copies (ADR 0119), and
+    ``controls`` the Controls it copies (ADR 0127).
     """
 
     sources: Sequence[Source]
@@ -355,6 +376,7 @@ class Submission:
     questions: bool = False
     answers_from: str | None = None
     owner_files: Sequence[str] = ()
+    controls: Sequence[str] = ()
 
 
 @dataclass(frozen=True)
@@ -505,6 +527,10 @@ class JobAnswers:
         if sources is None:
             await self.missing(record, "sources")
         record.sources = sources
+        controls = await store.controls(job_id, owner_id)
+        if controls is None:
+            await self.missing(record, "controls")
+        record.controls = controls
         if record.status == "awaiting-answers":
             # The questions are read off what the head built, so they answer
             # to the head's verdict as a report answers to its run's.
@@ -586,6 +612,7 @@ class JobAnswers:
         sources = list(submission.sources)
         self._refusing(refuse_owner_file_sources, sources)
         sources += await self.owner_file_sources(identity, submission.owner_files)
+        controls = await self.control_copies(identity, submission.controls)
         if sources:
             sources = self._refusing(with_link_answers, sources, submission.links)
         breach = self.limits.breach(sources)
@@ -602,6 +629,7 @@ class JobAnswers:
             system_name=submission.system_name,
             answers=AnswerSet(links=tuple(submission.links)),
             carried=carried,
+            controls=controls,
             ask_questions=submission.questions,
             reserved_tokens=budgets.estimate(sources, selection),
         )
@@ -650,23 +678,81 @@ class JobAnswers:
             )
         return sources
 
+    async def control_copies(
+        self, identity: Identity, control_ids: Sequence[str]
+    ) -> list[CopiedControl]:
+        """A copy of each Control that ``control_ids`` names, with the text of
+        each evidence file (ADR 0127).
+
+        The identity's principal is read with no create, as
+        :meth:`owner_file_sources` reads it, and one read lists the owner's
+        Controls. A missing ID and another owner's ID get one refusal, which
+        names no ID, and so does an evidence file that a delete removed during
+        the copy.
+        """
+        if not control_ids:
+            return []
+        if len(set(control_ids)) != len(control_ids):
+            raise Refused("The analysis names one Control twice.")
+        held = await self.store.principal(identity)
+        owned = (
+            {}
+            if held is None
+            else {
+                control.document.id: control
+                for control in await self.store.list_controls(held.owner_id)
+            }
+        )
+        copies = []
+        for control_id in control_ids:
+            control = owned.get(control_id)
+            if control is None:
+                raise Refused(CONTROL_GONE)
+            texts = {}
+            for file in control.document.evidence:
+                text = await self.store.read_evidence(
+                    control_id, file.id, control.owner_id
+                )
+                if text is None:
+                    raise Refused(CONTROL_GONE)
+                texts[file.id] = text
+            copies.append(CopiedControl.of(control, texts))
+        return copies
+
     async def answer(
-        self, job_id: str, owner_id: str, answers: Answers, *, start: Start
+        self,
+        job_id: str,
+        owner_id: str,
+        answers: Answers,
+        *,
+        start: Start,
+        control_scopes: Sequence[ControlScopeEntry] | None = None,
     ) -> DraftSaved | AnswersSaved | Started:
         """Keep the answers or a draft, or start the Resumed Job the answers start.
 
         A save keeps a waiting job's answers or a finished report's draft, and
         starts nothing. A send without ``save`` starts the Resumed Job, which
         is admitted as a new job against the ceiling and the budget, because
-        its lanes and critics spend model calls.
+        its lanes and critics spend model calls. ``control_scopes`` states the
+        resolution of each copied Control of a waiting job (ADR 0124); left
+        out, the job keeps the resolution it holds. The Resumed Job copies the
+        Controls and their resolution, and reads no Control from the store.
         """
         if answers.given.links and not self.carries_catalog:
             raise NoCatalog()
         answerable = await self.answerable(job_id, owner_id)
         parent = answerable.record
         state = answerable.state()
+        scopes = parent.control_scopes
+        if control_scopes is not None:
+            if parent.status != "awaiting-answers":
+                raise Refused("A Control's match is confirmed at the pause.")
+            scopes = self._refusing(
+                resolve_scopes, control_scopes, parent.controls, answerable.model
+            )
+        sent = replace(answers, resolves_controls=control_scopes is not None)
         outcome = await anyio.to_thread.run_sync(
-            partial(self._refusing, state.answer, answers, limits=self.limits)
+            partial(self._refusing, state.answer, sent, limits=self.limits)
         )
         if isinstance(outcome, SavedDraft):
             if not await self.store.save_draft(
@@ -687,6 +773,7 @@ class JobAnswers:
                 outcome.skipped,
                 outcome.revision,
                 renames=outcome.renames,
+                control_scopes=scopes,
             ):
                 raise SaveConflict(
                     "the job no longer waits on answers, or another save landed"
@@ -710,6 +797,8 @@ class JobAnswers:
                 follow_up=outcome.follow_up,
             ),
             parent_revision=parent.revision,
+            controls=parent.controls,
+            control_scopes=scopes,
             reserved_tokens=budgets.estimate(
                 outcome.sources, parent.whole_frameworks()
             ),
@@ -729,7 +818,9 @@ class JobAnswers:
 
         The new job reads the paused job's sources with the amendment added,
         pauses again, and carries the paused job's answers, which its own
-        questions take where they still ask them.
+        questions take where they still ask them. It copies the paused job's
+        Controls with no store read, and matches them again against its own
+        model.
         """
         answerable = await self.answerable(job_id, owner_id)
         parent = answerable.record
@@ -749,6 +840,7 @@ class JobAnswers:
             amends=parent.id,
             parent_revision=parent.revision,
             carried=parent.held_answers(),
+            controls=parent.controls,
             reserved_tokens=budgets.estimate(
                 amended.sources, parent.whole_frameworks()
             ),

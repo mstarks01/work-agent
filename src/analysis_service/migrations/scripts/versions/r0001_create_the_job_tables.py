@@ -23,6 +23,7 @@ _JSON_COLUMNS = (
     "resumption",
     "carried",
     "carried_renames",
+    "control_scopes",
     "checkpoint",
     "validation_issues",
     "certification",
@@ -66,6 +67,7 @@ def upgrade() -> None:
         *(sa.Column(name, sa.Text(), nullable=False) for name in _JSON_COLUMNS),
         sa.Column("sources_sha256", sa.String(64), nullable=False),
         sa.Column("report_sha256", sa.String(64)),
+        sa.Column("controls_sha256", sa.String(64)),
     )
     op.create_table(
         "job_events",
