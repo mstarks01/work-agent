@@ -498,6 +498,55 @@ def test_a_ruled_position_loads_on_the_claim_it_names(tmp_path):
     assert 5 not in load_case(case_dir).ruled_positions
 
 
+def _any_position(case_dir: Path) -> dict:
+    """An any-position ruling on reference 5 of :data:`RULED_CASE`."""
+    return {
+        key: value for key, value in _position(case_dir).items() if key != "position"
+    }
+
+
+def test_an_any_position_ruling_binds_its_claim_and_scores_no_position(tmp_path):
+    case_dir = _ruled_case(tmp_path)
+    ruled = _ruled_case(
+        tmp_path / "ruled",
+        lambda r: r.update(positions=[], any_positions=[_any_position(case_dir)]),
+    )
+
+    assert 5 not in load_case(ruled).ruled_positions
+
+
+@pytest.mark.parametrize(
+    ("edit", "message"),
+    [
+        (
+            lambda one, any_one: {"positions": [one], "any_positions": [any_one]},
+            "a second position",
+        ),
+        (
+            lambda one, any_one: {"positions": [], "any_positions": [any_one] * 2},
+            "a second position",
+        ),
+        (
+            lambda one, any_one: {
+                "positions": [],
+                "any_positions": [
+                    {**any_one, "reference": {**any_one["reference"], "verb": "read"}}
+                ],
+            },
+            "names 0 reference claims",
+        ),
+    ],
+    ids=["position-and-any", "two-any", "claim-moved"],
+)
+def test_an_any_position_ruling_that_does_not_fit_fails_closed(tmp_path, edit, message):
+    case_dir = _ruled_case(tmp_path)
+    one, any_one = _position(case_dir), _any_position(case_dir)
+    with pytest.raises(CorpusError, match=message):
+        load_case(
+            _ruled_case(tmp_path / "ruled", lambda r: r.update(edit(one, any_one)))
+        )
+
+
 @pytest.mark.parametrize(
     ("positions", "message"),
     [
