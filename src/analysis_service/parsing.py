@@ -28,18 +28,23 @@ because TOML and JSON read ``9.0`` and ``true`` as values equal to an integer.
 in that place reads one character at a time. :func:`signer` asks who signed a
 file, because a value of spaces reads as a signature. :data:`Signer` is the
 model field that asks it as the file loads. :data:`Sha256Hex` is the one
-shape of a SHA-256 digest that a model field holds.
+shape of a SHA-256 digest that a model field holds. :func:`member` asks
+which member of a closed set a string is, so a caller gets the set's
+``Literal`` back without a cast.
 """
 
 from __future__ import annotations
 
 import math
 import re
-from typing import Annotated, TypeGuard
+from collections.abc import Iterable
+from typing import Annotated, TypeGuard, TypeVar
 
 from pydantic import BeforeValidator, Field
 
 _ASCII_DIGITS = re.compile(r"[0-9]+")
+
+_Member = TypeVar("_Member")
 
 
 def ascii_int(value: str, *, max_digits: int) -> int | None:
@@ -72,6 +77,15 @@ def non_negative(value: object) -> TypeGuard[int | float]:
         return math.isfinite(value) and value >= 0
     except OverflowError:
         return False
+
+
+def member(value: object, members: Iterable[_Member]) -> _Member | None:
+    """The member of ``members`` equal to ``value``, or ``None`` where none is.
+
+    The result has the members' type, so a ``str`` read from a field or an ID
+    comes back as the ``Literal`` of the set it was checked against.
+    """
+    return next((one for one in members if one == value), None)
 
 
 def is_version(value: object, expected: int) -> bool:

@@ -331,6 +331,10 @@ ROLES: tuple[str, ...] = (
 )
 
 
+#: An artifact a lane agent is given, by the prompt placeholder it fills.
+LaneArtifact = Literal["candidates", "scope", "reference_notes", "prior_cases"]
+
+
 # The per-lane artifacts, as ``{placeholder}`` in ``analyze.md`` against the
 # state-key prefix it resolves to. **The only place that correspondence
 # lives**: :meth:`Lane.prompt_bindings` reads it to substitute, and
@@ -344,9 +348,6 @@ ROLES: tuple[str, ...] = (
 # other people's leads, and the material genuinely differs per lane — the candidate
 # rules that selected the corpus documents fired per lane, and the rule counts
 # behind the scope differ per category.
-#: An artifact a lane agent is given, by the prompt placeholder it fills.
-LaneArtifact = Literal["candidates", "scope", "reference_notes", "prior_cases"]
-
 LANE_ARTIFACTS: Mapping[LaneArtifact, str] = MappingProxyType(
     {
         "candidates": "candidates",

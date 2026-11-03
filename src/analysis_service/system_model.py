@@ -35,6 +35,7 @@ from analysis_service.capabilities import (
     Presence,
     StatedPresence,
 )
+from analysis_service.parsing import member
 from analysis_service.references import canonical
 from analysis_service.sources import MAX_LABEL_CHARS, check_answer_quotes
 
@@ -447,8 +448,7 @@ def element_prefix(element_id: str) -> ElementPrefix | None:
     ``None`` where that part is no element type prefix. An ID with no colon is
     read whole, so ``flow`` alone reads as the prefix ``flow``.
     """
-    prefix = element_id.split(":", 1)[0]
-    return next((known for known in _ELEMENT_PREFIXES if known == prefix), None)
+    return member(element_id.split(":", 1)[0], _ELEMENT_PREFIXES)
 
 
 class _Element(BaseModel):

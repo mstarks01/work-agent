@@ -78,7 +78,7 @@ from analysis_service.grounding import (
     placements,
     verify_quote,
 )
-from analysis_service.parsing import Sha256Hex
+from analysis_service.parsing import Sha256Hex, member
 from analysis_service.references import canonical
 from analysis_service.sources import (
     ANSWERS_LABEL,
@@ -273,7 +273,7 @@ _SUBJECT_TYPES: tuple[SubjectType, ...] = get_args(SubjectType)
 
 def parse_subject_type(value: str) -> SubjectType:
     """``value`` as a subject type, or raise :class:`ValueError` naming it."""
-    found = next((kind for kind in _SUBJECT_TYPES if kind == value), None)
+    found = member(value, _SUBJECT_TYPES)
     if found is None:
         raise ValueError(f"unknown subject type {value!r}")
     return found

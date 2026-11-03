@@ -33,6 +33,7 @@ from typing import Literal, get_args
 
 from analysis_service.bands import Band, band_of
 from analysis_service.frameworks import FrameworkPackageError
+from analysis_service.parsing import member
 
 __all__ = [
     "ASVS_LEVELS",
@@ -193,8 +194,8 @@ if set(get_args(AsvsChapter)) != set(LANES):
         f" declares {sorted(LANES)}"
     )
 
-#: One lane against the chapter number its identifiers carry, which is the
-#: package's ``id_rule`` prefix table.
+#: One lane against the chapter number its identifiers carry. The package's
+#: ``id_rule`` prefix table is this table keyed by ``str``.
 CHAPTER_NUMBERS: Mapping[AsvsChapter, str] = MappingProxyType(
     {chapter.lane: chapter.number for chapter in CHAPTERS}
 )
@@ -225,7 +226,7 @@ def requirement_id(lane: str, key: object) -> str:
     agent gives the rest. :func:`~analysis_service.frameworks.asvs.record.
     requirement_of` reads the same pair back off a composed claim ID.
     """
-    chapter = next((chapter for chapter in LANES if chapter == lane), None)
+    chapter = member(lane, LANES)
     if chapter is None:
         raise KeyError(lane)
     return f"V{CHAPTER_NUMBERS[chapter]}.{key}"

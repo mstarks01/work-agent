@@ -1772,6 +1772,10 @@ _DEGRADED: frozenset[ProjectionReason] = frozenset(get_args(ProjectionReason)) -
 }
 
 
+#: An attribute a projected value is compared on.
+ComparedAttribute = Literal[ScoredAttribute, "trust_zone"]
+
+
 #: How a projected value is compared with the blessed attribute, keyed by the
 #: graph field it projects into. :data:`_SCORED_ATTRIBUTES` is the one reader of
 #: how a scored field reduces — a closed vocabulary such as ``exposure`` by its
@@ -1785,9 +1789,6 @@ _DEGRADED: frozenset[ProjectionReason] = frozenset(get_args(ProjectionReason)) -
 #: into that has no entry here raises at the first projection, which
 #: ``tests/test_evals_modes.py`` holds against
 #: :func:`~analysis_service.assertions.projection_fields`.
-#: An attribute a projected value is compared on.
-ComparedAttribute = Literal[ScoredAttribute, "trust_zone"]
-
 PROJECTION_COMPARED: Mapping[ComparedAttribute, Callable[[Any], str]] = {
     **{name: scored.reduce for name, scored in _SCORED_ATTRIBUTES.items()},
     "trust_zone": str,

@@ -172,6 +172,9 @@ class TestTheFlowIdentityIsVersioned:
         with pytest.raises(FlowIdError, match="splits 3 ways"):
             parse_flow_id("flow:a-to-b-to-c:read", version=1)
 
+    def test_each_rule_is_keyed_by_its_own_version(self):
+        assert all(key == rule.version for key, rule in FLOW_ID_RULES.items())
+
     def test_the_versions_shapes_are_disjoint(self):
         """Each version's own output is read back as that version and no other."""
         for version, rule in FLOW_ID_RULES.items():

@@ -44,16 +44,16 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Literal, TypeGuard
+from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
+from analysis_service.parsing import member
 from evals.harness import audit
 from evals.harness.artifact import figures_corpus
 from evals.harness.comparison import flagged_cases, held_out_cases
 from evals.harness.instruments import Cases
 from evals.harness.promotion import (
     GainGateName,
-    ReadGate,
     Reading,
     in_spreads,
     read_spread,
@@ -285,9 +285,12 @@ GATES: Mapping[GainGateName, GainGate] = MappingProxyType(
 )
 
 
-def _is_gate(name: ReadGate) -> TypeGuard[GainGateName]:
-    """Whether ``name`` is a gate of :data:`GATES`."""
-    return name in GATES
+def _gate(row: Reading) -> GainGate:
+    """The gate of :data:`GATES` that ``row`` reads, or raise ``KeyError``."""
+    name = member(row.gate, GATES)
+    if name is None:
+        raise KeyError(row.gate)
+    return GATES[name]
 
 
 def _reader(framework: FrameworkName, gate: GainGateName) -> Reader | None:
@@ -375,9 +378,7 @@ def render(
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in readings:
-        if not _is_gate(row.gate):
-            raise KeyError(row.gate)
-        gate = GATES[row.gate]
+        gate = _gate(row)
         cells = [
             "—" if value is None else f"{value:.4g}"
             for value in (row.measured, row.baseline, row.against_limit)
@@ -388,8 +389,8 @@ def render(
         )
     lines.append("")
     for row in readings:
-        if row.verdict == "fail" and _is_gate(row.gate):
-            lines.append(f"- `{row.gate}` fails: {GATES[row.gate].question}")
+        if row.verdict == "fail":
+            lines.append(f"- `{row.gate}` fails: {_gate(row).question}")
         elif row.verdict == "inconclusive":
             lines.append(f"- `{row.gate}` unread: {row.why}")
     if all(row.verdict == "pass" for row in readings):

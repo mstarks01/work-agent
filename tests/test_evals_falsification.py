@@ -167,6 +167,8 @@ class TestAProbeThatCostsNothingFails:
             return falsify.Corruption(rows)
 
         probe = falsify.Probe(case_id="01-payments-checkout", corrupt=corrupt)
+        # The stub replaces the whole table under a real key, because
+        # ``run_probe`` takes a ``ProbeName``. It is not the real probe.
         monkeypatch.setattr(falsify, "PROBES", {"absence-inferred": probe})
         case = next(
             case
