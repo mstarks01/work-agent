@@ -271,11 +271,7 @@ def score_applicability(
     level = declared_level(case)
     universe = {requirement.id for requirement in requirements_for(level)}
 
-    references = [
-        reference
-        for reference in case.references.get(FRAMEWORK) or ()
-        if isinstance(reference, ReferenceRequirement)
-    ]
+    references = case.requirement_records(FRAMEWORK)
     positives, negatives = split_references(references)
     expected = {reference.requirement for reference in positives}
     must_find = {
@@ -670,11 +666,7 @@ def score_dispositions(
     catalog identifier — a verdict status, a scope state, an evidence kind. No
     claim prose is read, so a model's text cannot move a number (OWASP LLM01).
     """
-    references = [
-        reference
-        for reference in case.references.get(FRAMEWORK) or ()
-        if isinstance(reference, ReferenceRequirement)
-    ]
+    references = case.requirement_records(FRAMEWORK)
     applied_by_id = {
         requirement_of(claim.id): claim
         for claim in block.claims
@@ -1082,11 +1074,7 @@ def score_yield(
     came back, and a draft the fan-in never delivered was never the critic's to
     rule on.
     """
-    positives, negatives = split_references(
-        reference
-        for reference in case.references.get(FRAMEWORK) or ()
-        if isinstance(reference, ReferenceRequirement)
-    )
+    positives, negatives = split_references(case.requirement_records(FRAMEWORK))
     expected = {reference.requirement for reference in positives}
     negative = {reference.requirement for reference in negatives}
     # Read from the list a claim sits in, not from its verdict: the two lists
