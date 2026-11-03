@@ -19,7 +19,6 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from analysis_service.errors import error_place
 from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import (
     DIAGRAM_TYPES,
@@ -117,6 +116,11 @@ def too_large(max_bytes: int) -> str:
     )
 
 
+#: The refusal of a file that is not strict UTF-8. The page decodes a file and
+#: shows it, and :func:`text_refusal` shows it for a text that holds a lone
+#: surrogate.
+NOT_UTF_8 = "The page could not read this file as UTF-8 text. Upload a plain text file."
+
 #: The refusal of a file that holds a control character.
 NOT_PLAIN_TEXT = "This file holds control characters, so it is not a plain text file."
 
@@ -132,6 +136,28 @@ def over_limit(limit: int) -> str:
     )
 
 
+def text_refusal(text: str, *, max_bytes: int, too_large: str) -> str | None:
+    """Why ``text`` is not a plain text file of at most ``max_bytes``, or
+    ``None``.
+
+    **The one rule of an uploaded text**, for an Owner File and for an
+    evidence file of a Control. The checks run in the page's order: strict
+    UTF-8, the size, no control character, then some text. ``too_large`` is
+    the refusal of a text over the size.
+    """
+    try:
+        data = text.encode("utf-8")
+    except UnicodeEncodeError:
+        return NOT_UTF_8
+    if len(data) > max_bytes:
+        return too_large
+    if CONTROL_CHARACTER.search(text):
+        return NOT_PLAIN_TEXT
+    if not text.strip():
+        return NO_TEXT
+    return None
+
+
 def upload_refusal(
     name: str,
     kind: SourceKind,
@@ -144,8 +170,8 @@ def upload_refusal(
     """Why an upload to Files is refused, or ``None`` where it passes.
 
     **The one rule of an upload's content.** The checks run in the page's
-    order: the kind the format's row allows, the size, the text, the name and
-    the diagram type. A name in ``page_labels`` is refused, because a job
+    order: the kind the format's row allows, the text (:func:`text_refusal`),
+    the name and the diagram type. A name in ``page_labels`` is refused, because a job
     that also holds the page's own Source of that label would repeat it. The
     name and the text then pass the :class:`~analysis_service.sources.Source`
     rules, because a job copies the file as a Source with the name as its
@@ -154,10 +180,9 @@ def upload_refusal(
     row = FORMATS[format]
     if kind not in row.kinds:
         return f"A {row.label} file cannot be a {kind}."
-    if len(text.encode("utf-8")) > max_bytes:
-        return too_large(max_bytes)
-    if CONTROL_CHARACTER.search(text):
-        return NOT_PLAIN_TEXT
+    refusal = text_refusal(text, max_bytes=max_bytes, too_large=too_large(max_bytes))
+    if refusal is not None:
+        return refusal
     if name in page_labels:
         return (
             f"The page uses the name “{name}” for its own sources. Give this file a"
@@ -170,9 +195,7 @@ def upload_refusal(
         )
     try:
         Source(kind=kind, label=name, text=text)
-    except ValidationError as exc:
-        if "text" in {error_place(error) for error in exc.errors()}:
-            return NO_TEXT
+    except ValidationError:
         return (
             f"Give the file a name of at most {MAX_LABEL_CHARS} characters, on one"
             " line, with no control or formatting characters."

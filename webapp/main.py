@@ -230,6 +230,7 @@ from analysis_service.open_facts import (
 from analysis_service.owner_files import (
     NO_TEXT,
     NOT_PLAIN_TEXT,
+    NOT_UTF_8,
     OWNER_FILE_ID_PATTERN,
     OwnerFile,
     name_in_use,
@@ -1253,7 +1254,7 @@ _ADMISSION_MESSAGES: dict[RefusalOutcome, str] = {
 
 #: The key of each refusal that ``text_file.js`` and ``files.js`` show for a
 #: file they check before the server does.
-FileRefusal = Literal["too_large", "not_plain_text", "no_text", "full"]
+FileRefusal = Literal["too_large", "not_utf_8", "not_plain_text", "no_text", "full"]
 
 
 class FilesLimits(TypedDict):
@@ -1268,6 +1269,7 @@ def file_refusals(max_bytes: int, max_files: int) -> dict[FileRefusal, str]:
     """Each :data:`FileRefusal` in the server's words (:func:`upload_refusal`)."""
     return {
         "too_large": too_large(max_bytes),
+        "not_utf_8": NOT_UTF_8,
         "not_plain_text": NOT_PLAIN_TEXT,
         "no_text": NO_TEXT,
         "full": over_limit(max_files),

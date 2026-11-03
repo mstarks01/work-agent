@@ -25,7 +25,7 @@ const textFile = (() => {
     try {
       text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
     } catch {
-      return { error: "The page could not read this file as UTF-8 text. Upload a plain text file." };
+      return { error: refusals.not_utf_8 };
     }
     if (CONTROL.test(text)) return { error: refusals.not_plain_text };
     if (!text.trim()) return { error: refusals.no_text };

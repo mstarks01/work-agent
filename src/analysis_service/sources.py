@@ -246,6 +246,11 @@ _BACKTICK_RUN = re.compile(r"`+")
 #: answer.
 CARRIED_EVIDENCE_KINDS: tuple[str, ...] = ("prose",)
 
+#: The kinds of evidence beside prose: the class an owner states for each
+#: evidence file of a Control (ADR 0127), and the kinds a package names where
+#: prose cannot settle a claim. No job carries one yet.
+EvidenceClass = Literal["code", "config", "people"]
+
 
 def check_answer_quotes(origin: str, labels: Sequence[str]) -> None:
     """Raise :class:`ValueError` unless the row of ``origin`` that quotes the

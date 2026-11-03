@@ -268,6 +268,7 @@ class TestTheStartupRefusals:
         ("change", "difference"),
         [
             ("DROP TABLE owner_files", "no owner_files table"),
+            ("DROP TABLE controls", "no controls table"),
             (
                 "ALTER TABLE jobs DROP COLUMN carried_renames",
                 "no jobs.carried_renames column",

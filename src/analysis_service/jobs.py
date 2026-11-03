@@ -37,6 +37,7 @@ from collections.abc import (
     Callable,
     Iterable,
     Iterator,
+    Mapping,
     Sequence,
 )
 from dataclasses import dataclass, field
@@ -61,6 +62,16 @@ from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.carried_renames import MAX_RENAMES, ElementRename, renamed
 from analysis_service.certification import CertifyResult
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, UnknownKey
+from analysis_service.controls import (
+    Control,
+    ControlAdmission,
+    ControlLimits,
+    ControlReplacement,
+    EvidenceRefusal,
+    check_texts,
+    control_refusal,
+    names_another_scope,
+)
 from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
 from analysis_service.links import MAX_HELD_LINKS
@@ -982,6 +993,69 @@ class JobStore(Protocol):
         """
         ...
 
+    async def add_control(
+        self,
+        control: Control,
+        texts: Mapping[str, str],
+        *,
+        limits: ControlLimits,
+        principal: Principal | None,
+    ) -> ControlAdmission | EvidenceRefusal:
+        """Keep the Control ``control`` and the text of each evidence file it
+        lists, by evidence ID (ADR 0127).
+
+        The evidence passes :func:`~analysis_service.controls.control_refusal`
+        before the store writes anything. **Counting and adding is one step**,
+        as in :meth:`add_file`: an owner who holds ``limits.max_controls``
+        Controls gets ``over_limit``, a scope whose alias names another
+        Control's scope gets ``alias_in_use``
+        (:func:`~analysis_service.controls.names_another_scope`), and a name
+        that the owner already uses gets ``name_in_use``. ``principal`` is as
+        in :meth:`add_file`. A text that does not fit the evidence list raises
+        (:func:`~analysis_service.controls.check_texts`) and keeps nothing, and
+        so does a Control ID that the store holds, whoever its owner is.
+        """
+        ...
+
+    async def list_controls(self, owner_id: str) -> list[Control]:
+        """Every Control of the owner, the latest save first."""
+        ...
+
+    async def get_control(self, control_id: str, owner_id: str) -> Control | None:
+        """The owned Control, or ``None``, also where the Control is another
+        owner's, so an ID tells nothing about another owner."""
+        ...
+
+    async def replace_control(
+        self, control: Control, texts: Mapping[str, str], *, limits: ControlLimits
+    ) -> ControlReplacement | EvidenceRefusal:
+        """Replace the owner's Control of ``control``'s ID in place, and keep no
+        earlier version.
+
+        ``texts`` holds the text of each evidence file that the store does not
+        hold yet. The checks are those of :meth:`add_control` but the count,
+        and a Control that the owner does not hold is ``absent``. The store
+        removes each evidence file that the new document no longer lists.
+        """
+        ...
+
+    async def delete_control(self, control_id: str, owner_id: str) -> bool:
+        """Delete the owned Control and each evidence file, and keep nothing.
+
+        False where the owner holds no such Control. A job that applied the
+        Control keeps its own copy, so a delete changes no job.
+        """
+        ...
+
+    async def read_evidence(
+        self, control_id: str, evidence_id: str, owner_id: str
+    ) -> str | None:
+        """The text of one evidence file of the owned Control, or ``None``
+        where the owner holds no such Control or the Control lists no such
+        file. A text whose digest does not match the document raises.
+        """
+        ...
+
 
 def stored_report(report: Report) -> bytes:
     """The report as a store holds it: its JSON, as UTF-8."""
@@ -1153,6 +1227,7 @@ class InMemoryJobStore:
         self._usage: dict[str, UsageRow] = {}
         self._principals = PrincipalTable()
         self._files: dict[str, tuple[OwnerFile, str]] = {}
+        self._controls: dict[str, tuple[Control, dict[str, str]]] = {}
 
     def _rows(self) -> Iterator[JobRecord | UsageRow]:
         """Every job admission counts: the records held, and the usage rows left."""
@@ -1596,6 +1671,115 @@ class InMemoryJobStore:
             return False
         del self._files[file_id]
         return True
+
+    def _owned_control(
+        self, control_id: str, owner_id: str
+    ) -> tuple[Control, dict[str, str]] | None:
+        held = self._controls.get(control_id)
+        return None if held is None or held[0].owner_id != owner_id else held
+
+    def _scope_refusal(
+        self, control: Control
+    ) -> Literal["alias_in_use", "name_in_use"] | None:
+        """``alias_in_use`` or ``name_in_use`` against the owner's other
+        Controls, in that order, as the ``sql`` store finds them."""
+        others = [
+            held.document
+            for held, _ in self._controls.values()
+            if held.owner_id == control.owner_id
+            and held.document.id != control.document.id
+        ]
+        scope = control.document.scope
+        if any(names_another_scope(scope, other.scope) for other in others):
+            return "alias_in_use"
+        if any(other.name == control.document.name for other in others):
+            return "name_in_use"
+        return None
+
+    async def add_control(
+        self,
+        control: Control,
+        texts: Mapping[str, str],
+        *,
+        limits: ControlLimits,
+        principal: Principal | None,
+    ) -> ControlAdmission | EvidenceRefusal:
+        """Count and add as one step: the body awaits nothing, as
+        :meth:`reserve` states."""
+        if principal is not None and principal.owner_id != control.owner_id:
+            raise ValueError(
+                f"control {control.document.id} names another owner than its principal"
+            )
+        refused = control_refusal(control.document, texts, limits=limits)
+        if refused is not None:
+            return refused
+        check_texts(control.document, texts)
+        if control.document.id in self._controls:
+            raise ValueError(f"the store already holds control {control.document.id}")
+        if principal is None:
+            if not self._principals.holds(control.owner_id):
+                raise ValueError(f"owner {control.owner_id} holds no principal")
+        elif self._principals.find(principal.identity) is not None:
+            return "principal_exists"
+        owned = [
+            held
+            for held, _ in self._controls.values()
+            if held.owner_id == control.owner_id
+        ]
+        if len(owned) >= limits.max_controls:
+            return "over_limit"
+        scope_refusal = self._scope_refusal(control)
+        if scope_refusal is not None:
+            return scope_refusal
+        if principal is not None:
+            self._principals.add(principal)
+        self._controls[control.document.id] = (control, dict(texts))
+        return "added"
+
+    async def list_controls(self, owner_id: str) -> list[Control]:
+        owned = [
+            held for held, _ in self._controls.values() if held.owner_id == owner_id
+        ]
+        return sorted(
+            owned, key=lambda held: (held.updated_at, held.document.id), reverse=True
+        )
+
+    async def get_control(self, control_id: str, owner_id: str) -> Control | None:
+        held = self._owned_control(control_id, owner_id)
+        return None if held is None else held[0]
+
+    async def replace_control(
+        self, control: Control, texts: Mapping[str, str], *, limits: ControlLimits
+    ) -> ControlReplacement | EvidenceRefusal:
+        held = self._owned_control(control.document.id, control.owner_id)
+        if held is None:
+            return "absent"
+        refused = control_refusal(control.document, texts, limits=limits)
+        if refused is not None:
+            return refused
+        stored, stored_texts = held
+        check_texts(control.document, texts, stored.document.evidence)
+        scope_refusal = self._scope_refusal(control)
+        if scope_refusal is not None:
+            return scope_refusal
+        kept = {**stored_texts, **texts}
+        self._controls[control.document.id] = (
+            control,
+            {file.id: kept[file.id] for file in control.document.evidence},
+        )
+        return "replaced"
+
+    async def delete_control(self, control_id: str, owner_id: str) -> bool:
+        if self._owned_control(control_id, owner_id) is None:
+            return False
+        del self._controls[control_id]
+        return True
+
+    async def read_evidence(
+        self, control_id: str, evidence_id: str, owner_id: str
+    ) -> str | None:
+        held = self._owned_control(control_id, owner_id)
+        return None if held is None else held[1].get(evidence_id)
 
     async def fail_in_flight(self) -> list[str]:
         """Fail each queued or running job with :data:`RESTART_FAILURE_MESSAGE`.

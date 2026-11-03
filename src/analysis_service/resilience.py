@@ -104,6 +104,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.config_files import read_toml, validation_problems
+from analysis_service.controls import ControlLimits
 from analysis_service.errors import ConfigError
 from analysis_service.parsing import is_version
 from analysis_service.retry import RetryBudget, RetryPolicy
@@ -122,7 +123,7 @@ from analysis_service.vendors import UPSTREAM_SLUG
 # guide asks for a timeout above ten minutes, so the shipped row states thirty
 # minutes for both bounds. The table is required, and a deployment that wants
 # no per-upstream bound writes an empty one and means it.
-SUPPORTED_VERSION = 9
+SUPPORTED_VERSION = 10
 
 _ENV_PREFIX = "ANALYSIS_"
 
@@ -131,6 +132,8 @@ TIMEOUT_MS_VAR = f"{_ENV_PREFIX}TIMEOUT_MS"
 MAX_SOURCE_BYTES_VAR = f"{_ENV_PREFIX}MAX_SOURCE_BYTES"
 MAX_SOURCES_VAR = f"{_ENV_PREFIX}MAX_SOURCES"
 MAX_OWNER_FILES_VAR = f"{_ENV_PREFIX}MAX_OWNER_FILES"
+MAX_CONTROLS_VAR = f"{_ENV_PREFIX}MAX_CONTROLS"
+MAX_CONTROL_EVIDENCE_VAR = f"{_ENV_PREFIX}MAX_CONTROL_EVIDENCE"
 JOB_DEADLINE_MS_VAR = f"{_ENV_PREFIX}JOB_DEADLINE_MS"
 RETRY_BUDGET_RATIO_VAR = f"{_ENV_PREFIX}RETRY_BUDGET_RATIO"
 MAX_ACTIVE_JOBS_VAR = f"{_ENV_PREFIX}MAX_ACTIVE_JOBS"
@@ -148,6 +151,8 @@ ENV_OVERRIDES: dict[str, tuple[str, Callable[[str], float]]] = {
     "max_source_bytes": (MAX_SOURCE_BYTES_VAR, int),
     "max_sources": (MAX_SOURCES_VAR, int),
     "max_owner_files": (MAX_OWNER_FILES_VAR, int),
+    "max_controls": (MAX_CONTROLS_VAR, int),
+    "max_control_evidence": (MAX_CONTROL_EVIDENCE_VAR, int),
     "job_deadline_ms": (JOB_DEADLINE_MS_VAR, int),
     "retry_budget_ratio": (RETRY_BUDGET_RATIO_VAR, float),
     "max_active_jobs": (MAX_ACTIVE_JOBS_VAR, int),
@@ -213,6 +218,10 @@ class ResilienceConfig(BaseModel):
     #: How many Owner Files one owner keeps (ADR 0118). Owner Files do not
     #: expire, so this bound keeps one owner's store finite.
     max_owner_files: int = Field(ge=1)
+    #: How many Controls one owner keeps, and how many evidence files one
+    #: Control holds (ADR 0127). Controls do not expire either.
+    max_controls: int = Field(ge=1)
+    max_control_evidence: int = Field(ge=1)
     job_deadline_ms: int = Field(gt=0)
     retry_budget_ratio: float = Field(gt=0, le=1)
     max_active_jobs: int = Field(ge=1)
@@ -290,6 +299,15 @@ class ResilienceConfig(BaseModel):
         """The input bounds, as the value every entry point checks against."""
         return SourceLimits(
             max_total_bytes=self.max_source_bytes, max_sources=self.max_sources
+        )
+
+    def control_limits(self) -> ControlLimits:
+        """The bounds on an owner's Controls. One evidence file is at most
+        what one job's sources may carry."""
+        return ControlLimits(
+            max_controls=self.max_controls,
+            max_evidence=self.max_control_evidence,
+            max_evidence_bytes=self.max_source_bytes,
         )
 
     def request_timeout_seconds(self, upstreams: Iterable[str]) -> float:
