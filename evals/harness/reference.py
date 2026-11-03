@@ -292,6 +292,23 @@ class RuledPosition(BaseModel):
     source: str = Field(min_length=1, max_length=300)
 
 
+class RuledAnyPosition(BaseModel):
+    """A person's ruling that no attacker position decides one STRIDE reference.
+
+    The finding holds whatever the attacker's position, so the scorer holds
+    the claim to none. The record names its claim as :class:`RuledPosition`
+    does, and the loader refuses a claim that carries both kinds of ruling.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    lane: StrideCategory
+    reference: Reading
+    ruling: str = Field(min_length=1, max_length=1000)
+    reviewed_by: Annotated[str, BeforeValidator(signer), Field(max_length=100)]
+    source: str = Field(min_length=1, max_length=300)
+
+
 class CaseRulings(BaseModel):
     """One case's :data:`RULINGS_FILE`, keyed by framework."""
 
@@ -300,6 +317,7 @@ class CaseRulings(BaseModel):
     case: str
     stride: tuple[RuledReading, ...] = ()
     positions: tuple[RuledPosition, ...] = ()
+    any_positions: tuple[RuledAnyPosition, ...] = ()
 
 
 #: What a case expects the service to conclude about one requirement it applies.
@@ -957,8 +975,10 @@ def _load_rulings(
     carry, and a verb the lane does not admit. The last is
     :data:`~analysis_service.frameworks.stride.record.LANES_OF_VERB`, the table
     the service files drafts by, so a ruling cannot accept a draft the service
-    itself would refuse. A claim takes one ruled position at most, so a second
-    one is refused rather than left to the order of the file.
+    itself would refuse. A claim takes one position ruling at most, a position
+    or an ``any_positions`` entry, so a second one is refused rather than left
+    to the order of the file. An ``any_positions`` entry adds nothing to
+    ``ruled_positions``.
     """
     fields = {"same": "ruled_readings", "different": "refused_readings"}
     path = case_dir / RULINGS_FILE
@@ -999,6 +1019,13 @@ def _load_rulings(
         if index in positions:
             raise CorpusError(f"{where} rules a second position on one claim")
         positions[index] = ruled_position.position
+    unscored: set[int] = set()
+    for number, ruled_any in enumerate(rulings.any_positions):
+        where = f"{case_dir.name}: {RULINGS_FILE} any-position ruling {number}"
+        index = _named(references, ruled_any.lane, ruled_any.reference, where)
+        if index in positions or index in unscored:
+            raise CorpusError(f"{where} rules a second position on one claim")
+        unscored.add(index)
     return {
         **{
             field: MappingProxyType(readings[verdict])
