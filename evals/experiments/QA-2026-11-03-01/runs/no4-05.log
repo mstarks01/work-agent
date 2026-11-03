@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- Job messages may be intercepted between the web tier and message queue | ['flow:process:web-application>store:message-queue>enqueue-job', 'process:web-application', 'store:message-queue']
+- Queued job contents may be intercepted by an observer of the worker read path | ['flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process', 'store:message-queue']
+- Database records may be intercepted on the worker database connection | ['flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process', 'store:database']
+- Queue credentials may be intercepted while the web application reads configuration | ['flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application', 'store:web-application-config']
+- Database credentials may be intercepted while the worker reads configuration | ['flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process', 'store:worker-config']
+- A queue storage copy may disclose queued work if at-rest encryption is absent | ['store:message-queue']
+- A database storage copy may disclose application and log records if unencrypted | ['store:database']
+- A copied web configuration store may reveal queue credentials if unencrypted | ['store:web-application-config']
+- A copied worker configuration store may reveal database credentials if unencrypted | ['store:worker-config']
+- A compromised worker may read queued jobs if queue reader authentication is weak | ['store:message-queue', 'flow:process:background-worker-process>store:message-queue>consume-job', 'process:background-worker-process']
+- A compromised worker may read database records if database access is not narrowly authenticated | ['store:database', 'flow:process:background-worker-process>store:database>read-write-records', 'process:background-worker-process']
+- Compromise of the internet-facing web application may expose queue credentials | ['store:web-application-config', 'flow:process:web-application>store:web-application-config>read-configuration', 'process:web-application']
+- A compromised worker may recover database credentials from worker configuration | ['store:worker-config', 'flow:process:background-worker-process>store:worker-config>read-configuration', 'process:background-worker-process']
+spent: $0.0599 reported
+must-finds matched: [6, 7]

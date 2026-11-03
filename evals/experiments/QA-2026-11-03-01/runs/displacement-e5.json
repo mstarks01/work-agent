@@ -1,0 +1,524 @@
+{
+  "counts": {
+    "with-exemplar": {
+      "compromised-reader": 7,
+      "other": 31,
+      "grant-holder": 5
+    },
+    "without-exemplar": {
+      "other": 27,
+      "compromised-reader": 10,
+      "grant-holder": 4
+    }
+  },
+  "reads": {
+    "with-exemplar": [
+      {
+        "run": "id-01",
+        "title": "A storage copy could expose all confidential orders if encryption at rest is absent",
+        "class": "compromised-reader",
+        "because": "compromise"
+      },
+      {
+        "run": "id-02",
+        "title": "An unencrypted telemetry-lake copy could disclose customer occupancy data",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-02",
+        "title": "An unencrypted Pub/Sub retention copy may expose sensor-reading payloads",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-03",
+        "title": "A storage copy could expose all landing-bucket extracts if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-03",
+        "title": "A warehouse storage copy could disclose the normalized claims corpus",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-03",
+        "title": "Code in the scheduler can read every landing-bucket extract through its existing access",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files:authentication"
+      },
+      {
+        "run": "id-03",
+        "title": "Dataset-wide analyst access discloses member-identifying claims beyond a need-to-know scope",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-04",
+        "title": "A storage copy may disclose model artifacts if registry encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-04",
+        "title": "A Redis storage copy may disclose confidential customer features",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-04",
+        "title": "A copy of the inference log may disclose raw user prompts if unencrypted at rest",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-04",
+        "title": "Code in the model server can read confidential Redis features through its existing access",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-04",
+        "title": "Code in the model server can copy model artifacts through its service account",
+        "class": "compromised-reader",
+        "because": "runs code"
+      },
+      {
+        "run": "id-05",
+        "title": "A queue storage copy may disclose job messages if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-05",
+        "title": "A database storage copy may disclose application and log records if unencrypted",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-05",
+        "title": "Code in the worker can read queued jobs through the worker's queue access",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:background-worker-process>store:message-queue>consume-job:authentication"
+      },
+      {
+        "run": "id-05",
+        "title": "Code in the worker can read database records through the worker's database access",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:background-worker-process>store:database>read-write-records:authentication"
+      },
+      {
+        "run": "id-06",
+        "title": "A storage copy may expose all player records if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-06",
+        "title": "A storage copy may expose match statistics if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-06",
+        "title": "Compromise of a player-database reader may expose the player-account corpus",
+        "class": "compromised-reader",
+        "because": "Compromise"
+      },
+      {
+        "run": "id-06",
+        "title": "Compromise of the game-server reader may expose match statistics",
+        "class": "compromised-reader",
+        "because": "Compromise"
+      },
+      {
+        "run": "id-09",
+        "title": "A copied user-database volume may disclose customer and payment data",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-09",
+        "title": "A copied delivery-address file may disclose customer locations",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-10",
+        "title": "A storage copy could disclose CMS accounts if MySQL encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-10",
+        "title": "Code running in the public web server can read CMS records through its database access",
+        "class": "compromised-reader",
+        "because": "Code running"
+      },
+      {
+        "run": "id-11",
+        "title": "A copied rota database may disclose all colleague records if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-11",
+        "title": "A copied payroll file share may disclose exports if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-11",
+        "title": "Code in the scheduling service can read the rota database through its existing access",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:scheduling-service>store:rota-database>read-write-rotas:authentication"
+      },
+      {
+        "run": "id-11",
+        "title": "Code in the payroll system can read exports through the file-share collection path",
+        "class": "grant-holder",
+        "because": "unknown:flow:entity:payroll-system>store:file-share>collect-payroll-export:authentication"
+      },
+      {
+        "run": "id-12",
+        "title": "Vendor document-store copies may expose supplier documents if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-12",
+        "title": "A storage-layer copy of the landing bucket may disclose the nightly supplier extract",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-12",
+        "title": "A storage-layer copy of the supplier database may disclose supplier records",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-12",
+        "title": "Code running in the supplier master service may read the raw landing-bucket extract through its unverified access path",
+        "class": "compromised-reader",
+        "because": "Code running"
+      },
+      {
+        "run": "id-13",
+        "title": "A storage copy could expose dispatch records if database encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-13",
+        "title": "A copied schedule archive may disclose all partner work plans if unencrypted at rest",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-13",
+        "title": "Unverified database authentication may let code in the dispatch API read the dispatch corpus",
+        "class": "compromised-reader",
+        "because": "runs code"
+      },
+      {
+        "run": "id-14",
+        "title": "A copied identity-database volume may reveal credentials if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-14",
+        "title": "A copied points-ledger volume may disclose every member's rewards history if unencrypted",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-14",
+        "title": "Code executing in the authorization server can read the identity database through its existing grant",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-14",
+        "title": "Code executing in the rewards API can read all ledger records through the API's access",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-15",
+        "title": "Tenant database snapshots may expose all companies' records if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-15",
+        "title": "PDF-bucket copies may disclose every tenant's invoices if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-15",
+        "title": "Code in the billing app can read every tenant through the shared database account",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "id-15",
+        "title": "Code in the billing app can retrieve every tenant's PDFs through one bucket credential",
+        "class": "other",
+        "because": ""
+      }
+    ],
+    "without-exemplar": [
+      {
+        "run": "no4-01",
+        "title": "A copied orders database may disclose shopper and payment data if storage encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-02",
+        "title": "A telemetry-lake snapshot could reveal customer occupancy data if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-02",
+        "title": "Persisted Pub/Sub messages may disclose PII if storage encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-03",
+        "title": "A landing-bucket storage copy could expose partner health extracts",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-03",
+        "title": "A claims-warehouse storage copy could disclose the normalized corpus",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-03",
+        "title": "A compromised scheduler can read every landing-bucket extract",
+        "class": "compromised-reader",
+        "because": "compromised"
+      },
+      {
+        "run": "no4-04",
+        "title": "A copied Redis volume could disclose customer financial features if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-04",
+        "title": "A copied inference-log dataset could expose raw user prompts if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-04",
+        "title": "A copied model-registry store could disclose artifacts if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-04",
+        "title": "A compromised model server can read all registry artifacts available to its service account",
+        "class": "compromised-reader",
+        "because": "compromised"
+      },
+      {
+        "run": "no4-04",
+        "title": "Unauthenticated Redis access may expose all customer feature records",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:model-server>store:redis-feature-store>read-features:authentication"
+      },
+      {
+        "run": "no4-05",
+        "title": "A queue storage copy may disclose queued work if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-05",
+        "title": "A database storage copy may disclose application and log records if unencrypted",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-05",
+        "title": "A compromised worker may read queued jobs if queue reader authentication is weak",
+        "class": "compromised-reader",
+        "because": "compromised"
+      },
+      {
+        "run": "no4-05",
+        "title": "A compromised worker may read database records if database access is not narrowly authenticated",
+        "class": "compromised-reader",
+        "because": "compromised"
+      },
+      {
+        "run": "no4-06",
+        "title": "A copied player database may disclose player records if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-06",
+        "title": "A copied stats database may disclose match statistics if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-06",
+        "title": "Compromise of an existing player-database reader can disclose player records in bulk",
+        "class": "compromised-reader",
+        "because": "Compromise"
+      },
+      {
+        "run": "no4-06",
+        "title": "Compromise of a game server can expose match statistics through its existing database access",
+        "class": "compromised-reader",
+        "because": "Compromise"
+      },
+      {
+        "run": "no4-09",
+        "title": "A storage copy of the user database may expose customer and payment data",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-09",
+        "title": "A storage copy of the delivery-address flat file may expose customer addresses",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-09",
+        "title": "Compromise of the web API may expose user-database records through an unverified read path",
+        "class": "compromised-reader",
+        "because": "Compromise"
+      },
+      {
+        "run": "no4-10",
+        "title": "An unencrypted MySQL storage copy could disclose CMS account data",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-11",
+        "title": "A copied rota database may reveal colleague records if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-11",
+        "title": "A copied payroll file share may reveal exports if at-rest encryption is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-11",
+        "title": "An unverified database read path may expose the full rota corpus",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:scheduling-service>store:rota-database>read-write-rotas:authentication"
+      },
+      {
+        "run": "no4-11",
+        "title": "An unverified payroll-share read path may disclose weekly exports",
+        "class": "grant-holder",
+        "because": "unknown:flow:entity:payroll-system>store:file-share>collect-payroll-export:authentication"
+      },
+      {
+        "run": "no4-12",
+        "title": "Vendor-platform document copies may disclose supplier paperwork if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-12",
+        "title": "A copied landing-bucket extract may reveal supplier data if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-12",
+        "title": "A copied supplier database may disclose supplier records if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-12",
+        "title": "An over-broad landing-bucket read grant could expose the nightly supplier extract",
+        "class": "grant-holder",
+        "because": "unknown:flow:process:supplier-master-service>store:landing-bucket>load-extract:authentication"
+      },
+      {
+        "run": "no4-13",
+        "title": "A copied dispatch database may expose crew records if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-13",
+        "title": "A copied schedule archive may reveal all planned work if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-13",
+        "title": "A compromised dispatch API can read the complete dispatch database through its existing read path",
+        "class": "compromised-reader",
+        "because": "compromised"
+      },
+      {
+        "run": "no4-14",
+        "title": "Identity-database copies may disclose member credentials and PII if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-14",
+        "title": "Points-ledger copies may expose all member balances if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-15",
+        "title": "A storage copy of the tenant database exposes all companies if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-15",
+        "title": "A storage copy of the PDF bucket exposes invoice records if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-15",
+        "title": "A render-queue storage copy can reveal invoice identifiers if encryption at rest is absent",
+        "class": "other",
+        "because": ""
+      },
+      {
+        "run": "no4-15",
+        "title": "A compromised billing app can read the entire tenant database through its shared account",
+        "class": "compromised-reader",
+        "because": "compromised"
+      },
+      {
+        "run": "no4-15",
+        "title": "A compromised billing app can read every tenant's PDFs through the shared bucket credential",
+        "class": "compromised-reader",
+        "because": "compromised"
+      }
+    ]
+  }
+}

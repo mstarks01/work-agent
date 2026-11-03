@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- Supplier paperwork may be intercepted on the unverified public-to-vendor portal path | ['flow:entity:supplier>process:supplier-portal>upload-documents', 'entity:supplier', 'process:supplier-portal']
+- Category-manager document reviews may be exposed on an unverified corporate-to-vendor connection | ['flow:entity:category-manager>process:supplier-portal>review-documents', 'entity:category-manager', 'process:supplier-portal']
+- Uploaded documents may be visible on the portal-to-document-store path | ['flow:process:supplier-portal>store:document-store>store-documents', 'process:supplier-portal', 'store:document-store']
+- The nightly supplier extract may be intercepted between the vendor and landing bucket | ['flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract', 'entity:portal-vendor', 'store:landing-bucket']
+- The supplier master service may receive the landing extract over an unverified internal channel | ['flow:process:supplier-master-service>store:landing-bucket>load-extract', 'process:supplier-master-service', 'store:landing-bucket']
+- Supplier records may be intercepted while the master service writes the database | ['flow:process:supplier-master-service>store:supplier-database>write-supplier-records', 'process:supplier-master-service', 'store:supplier-database']
+- Vendor-platform document copies may disclose supplier paperwork if encryption at rest is absent | ['store:document-store']
+- A copied landing-bucket extract may reveal supplier data if encryption at rest is absent | ['store:landing-bucket']
+- A copied supplier database may disclose supplier records if encryption at rest is absent | ['store:supplier-database']
+- An over-broad landing-bucket read grant could expose the nightly supplier extract | ['store:landing-bucket', 'flow:process:supplier-master-service>store:landing-bucket>load-extract', 'process:supplier-master-service']
+spent: $0.0532 reported
+must-finds matched: []
