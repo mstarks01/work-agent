@@ -201,7 +201,8 @@ def write(ballot: Sequence[Mapping[str, str]], path: Path) -> None:
         writer.writerows(ballot)
 
 
-def _read(path: Path) -> list[dict[str, str]]:
+def read_rows(path: Path) -> list[dict[str, str]]:
+    """The rows of a ballot CSV, each keyed by its column."""
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
 
@@ -213,8 +214,8 @@ def returned_rows(issued: Path, returned: Path) -> list[dict[str, str]]:
     carried column it does carry must read exactly as issued, so an answer is
     never recorded against a row the reader was not shown.
     """
-    issued_rows = {row["n"]: row for row in _read(issued)}
-    answers = _read(returned)
+    issued_rows = {row["n"]: row for row in read_rows(issued)}
+    answers = read_rows(returned)
     numbers = [row.get("n", "") for row in answers]
     if sorted(numbers) != sorted(issued_rows) or len(set(numbers)) != len(numbers):
         raise ValueError(

@@ -37,7 +37,7 @@ from evals.harness.losses import CAUSES, attribute_case, pooled
 from evals.harness.reference import Reading, load_case
 from evals.harness.scorer import score_case
 from evals.harness.triggers import case_trigger_recall
-from tests.eval_factories import draft_threat, promote, unreconciled
+from tests.eval_factories import draft_threat, promote, ruled_position, unreconciled
 from tests.test_evals_applicability import Block
 
 CASE_DIR = (
@@ -126,14 +126,19 @@ def accepted(case, claim, flows):
     return Ledger([vote])
 
 
-def at(reference, sequence, verb):
-    """A draft at the reference's own place, with the verb given."""
+def at(case, reference, sequence, verb):
+    """A draft at the reference's own place, with the verb given.
+
+    It states the position the case ruled on the reference, as a live lane
+    states one.
+    """
     return draft_threat(
         sequence,
         reference.category,
         f"draft {sequence}",
         element_ids=reference.affected_element_ids,
         verb=verb,
+        attacker_position=ruled_position(case, reference),
     )
 
 
@@ -172,7 +177,7 @@ def _one_element_over(case, flows):
 def test_a_surviving_claim_at_the_place_with_another_verb_is_a_verb_loss(case, flows):
     reference = case.stride_claims()[0]
     other = "guess-credential" if reference.verb != "guess-credential" else "replay"
-    draft = at(reference, 1, other)
+    draft = at(case, reference, 1, other)
 
     charged = charge(case, flows, [draft], [promote(draft)])
 
@@ -193,7 +198,7 @@ def test_a_claim_with_the_action_and_another_position_is_a_position_loss(
 ):
     """The scorer's position gate refuses the claim, and the row names the gate."""
     reference = case.stride_claims()[0]
-    draft = at(reference, 1, reference.verb).model_copy(
+    draft = at(case, reference, 1, reference.verb).model_copy(
         update={"attacker_position": stated}
     )
     ruled = replace(case, ruled_positions=MappingProxyType({0: "in-component"}))
@@ -223,7 +228,7 @@ def test_two_references_at_one_place_under_one_verb_leave_one_merged(
     ]
     assert pair, "the merge case carries such a pair"
     first, second = pair[0]
-    draft = at(references[first], 1, references[first].verb)
+    draft = at(case, references[first], 1, references[first].verb)
 
     charged = by_index(charge(case, flows, [draft], [promote(draft)]))
 
@@ -237,7 +242,7 @@ def test_a_killed_draft_at_the_place_with_the_reference_verb_is_the_critics(
     case, flows
 ):
     reference = case.stride_claims()[0]
-    draft = at(reference, 1, reference.verb)
+    draft = at(case, reference, 1, reference.verb)
 
     charged = charge(case, flows, [draft], [])
 
@@ -260,7 +265,7 @@ def test_a_killed_draft_with_another_position_is_a_position_loss(
 ):
     """A critic fix cannot recover a draft the scorer's gate would refuse."""
     reference = case.stride_claims()[0]
-    draft = at(reference, 1, reference.verb).model_copy(
+    draft = at(case, reference, 1, reference.verb).model_copy(
         update={"attacker_position": stated}
     )
 
@@ -287,10 +292,10 @@ def test_a_merge_names_the_claim_that_states_the_ruled_position(
             left.affected_element_ids, right.affected_element_ids, flows
         )
     )
-    other = at(references[first], 1, references[first].verb).model_copy(
+    other = at(case, references[first], 1, references[first].verb).model_copy(
         update={"attacker_position": "storage-copy"}
     )
-    holding = at(references[first], 2, references[first].verb).model_copy(
+    holding = at(case, references[first], 2, references[first].verb).model_copy(
         update={"attacker_position": "in-component"}
     )
     ruled = replace(
@@ -327,7 +332,12 @@ def test_a_killed_draft_at_a_ruled_reading_is_the_critics(case, flows):
         },
     )
     draft = draft_threat(
-        1, reference.category, "draft 1", element_ids=(elsewhere,), verb=reference.verb
+        1,
+        reference.category,
+        "draft 1",
+        element_ids=(elsewhere,),
+        verb=reference.verb,
+        attacker_position=ruled_position(case, reference),
     )
 
     assert by_index(charge(case, flows, [draft], []))[0].cause in {"place", "unled"}
@@ -346,7 +356,7 @@ def test_an_equivalent_verb_is_the_reference_action(case, flows, monkeypatch):
     reference = case.stride_claims()[0]
     other = "guess-credential" if reference.verb != "guess-credential" else "replay"
     monkeypatch.setattr(verbs, "EQUIVALENT", (frozenset({reference.verb, other}),))
-    draft = at(reference, 1, other)
+    draft = at(case, reference, 1, other)
 
     killed = by_index(charge(case, flows, [draft], []))[0]
     assert killed.cause == "critic"
@@ -363,7 +373,7 @@ def test_a_killed_draft_with_another_verb_is_still_a_verb_loss_only_if_it_surviv
     charges nothing to the critic; the reference falls through to its lead."""
     reference = case.stride_claims()[0]
     other = "guess-credential" if reference.verb != "guess-credential" else "replay"
-    draft = at(reference, 1, other)
+    draft = at(case, reference, 1, other)
 
     charged = charge(case, flows, [draft], [])
 
@@ -384,7 +394,7 @@ def test_nothing_at_the_place_charges_the_lead_or_its_absence(case, flows):
 
 def test_every_miss_is_charged_once_and_a_match_is_not(case, flows):
     reference = case.stride_claims()[0]
-    draft = at(reference, 1, reference.verb)
+    draft = at(case, reference, 1, reference.verb)
 
     charged = charge(case, flows, [draft], [promote(draft)])
 
@@ -396,7 +406,7 @@ def test_every_miss_is_charged_once_and_a_match_is_not(case, flows):
 def test_pooled_counts_and_the_verb_pairs(case, flows):
     reference = case.stride_claims()[0]
     other = "guess-credential" if reference.verb != "guess-credential" else "replay"
-    draft = at(reference, 1, other)
+    draft = at(case, reference, 1, other)
     row = charge(case, flows, [draft], [promote(draft)])
 
     totals = pooled([row, row])
@@ -443,7 +453,7 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
 
     def test_a_kill_the_first_pass_ruled_cleanly_charges_no_re_ask(self, case, flows):
         reference = case.stride_claims()[0]
-        draft = at(reference, 1, reference.verb)
+        draft = at(case, reference, 1, reference.verb)
 
         charged = charge(case, flows, [draft], [])
 
@@ -453,7 +463,7 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
         self, case, flows
     ):
         reference = case.stride_claims()[0]
-        draft = at(reference, 1, reference.verb)
+        draft = at(case, reference, 1, reference.verb)
 
         charged = charge(
             case, flows, [draft], [], unreconciled=[unreconciled(draft.id)]
@@ -466,7 +476,7 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
         """Every cause that names a draft can be charged, not only the critic."""
         reference = case.stride_claims()[0]
         other = "guess-credential" if reference.verb != "guess-credential" else "replay"
-        draft = at(reference, 1, other)
+        draft = at(case, reference, 1, other)
 
         charged = charge(
             case,
@@ -487,7 +497,7 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
 
     def test_the_fold_counts_the_rows_and_the_kinds_apart(self, case, flows):
         reference = case.stride_claims()[0]
-        draft = at(reference, 1, reference.verb)
+        draft = at(case, reference, 1, reference.verb)
         charged = charge(
             case,
             flows,
@@ -508,7 +518,7 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
 
     def test_the_render_says_so_only_when_a_row_carries_one(self, case, flows, capsys):
         reference = case.stride_claims()[0]
-        draft = at(reference, 1, reference.verb)
+        draft = at(case, reference, 1, reference.verb)
 
         losses.render([charge(case, flows, [draft], [])])
         assert "first critic pass fumbled" not in capsys.readouterr().out
@@ -594,7 +604,7 @@ class TestADisplacedRow:
     def test_the_other_causes_never_carry_the_field(self, case, flows):
         reference = case.stride_claims()[0]
         other = "guess-credential" if reference.verb != "guess-credential" else "replay"
-        draft = at(reference, 1, other)
+        draft = at(case, reference, 1, other)
         charged = charge(case, flows, [draft], [promote(draft)])
         assert by_index(charged)[0].displaced_draft_id is None
 
@@ -614,6 +624,7 @@ class TestAMisfiledMiss:
             "filed in the wrong lane",
             element_ids=reference.affected_element_ids,
             verb=reference.verb,
+            attacker_position=ruled_position(case, reference),
         )
         charged = charge(case, flows, [draft], [promote(draft)])
         loss = by_index(charged)[index]
@@ -637,6 +648,7 @@ class TestAMisfiledMiss:
             "elsewhere",
             element_ids=reference.affected_element_ids,
             verb=reference.verb,
+            attacker_position=ruled_position(case, reference),
         )
         charged = charge(case, flows, [draft], [promote(draft)])
         assert by_index(charged)[index].cause not in ("place", "unled")
@@ -656,7 +668,7 @@ class TestHowTheTwoPlacesRelate:
     def test_one_place_spelled_the_same_way_is_equal(self, case, flows):
         reference = case.stride_claims()[0]
         other = "guess-credential" if reference.verb != "guess-credential" else "replay"
-        draft = at(reference, 1, other)
+        draft = at(case, reference, 1, other)
         charged = charge(case, flows, [draft], [promote(draft)])
         loss = by_index(charged)[0]
 
@@ -709,7 +721,7 @@ class TestHowTheTwoPlacesRelate:
     def test_the_fold_counts_the_verb_rows_by_relation(self, case, flows):
         reference = case.stride_claims()[0]
         other = "guess-credential" if reference.verb != "guess-credential" else "replay"
-        draft = at(reference, 1, other)
+        draft = at(case, reference, 1, other)
         charged = charge(case, flows, [draft], [promote(draft)])
         totals = pooled([charged])
 
@@ -723,7 +735,7 @@ class TestHowTheTwoPlacesRelate:
     def test_the_render_says_how_the_verb_rows_split(self, case, flows, capsys):
         reference = case.stride_claims()[0]
         other = "guess-credential" if reference.verb != "guess-credential" else "replay"
-        draft = at(reference, 1, other)
+        draft = at(case, reference, 1, other)
         losses.render([charge(case, flows, [draft], [promote(draft)])])
 
         assert "1 equal" in capsys.readouterr().out
@@ -770,8 +782,8 @@ def test_two_claims_at_one_place_charge_the_same_cause_in_either_order(
     case, flows = merge_case, merge_flows
     reference = case.stride_claims()[merge_pair(case, flows)[0]]
     other = "guess-credential" if reference.verb != "guess-credential" else "replay"
-    same_verb = at(reference, 1, reference.verb)
-    other_verb = at(reference, 2, other)
+    same_verb = at(case, reference, 1, reference.verb)
+    other_verb = at(case, reference, 2, other)
     produced = [promote(same_verb), promote(other_verb)]
 
     forward = by_index(charge(case, flows, [same_verb, other_verb], produced))
@@ -804,8 +816,8 @@ def test_a_claim_carrying_the_references_action_wins_over_one_that_does_not(
     reference = case.stride_claims()[first]
     other = "guess-credential" if reference.verb != "guess-credential" else "replay"
     # The wrong-verb claim is listed first, so report order argues for "verb".
-    other_verb = at(reference, 1, other)
-    same_verb = at(reference, 2, reference.verb)
+    other_verb = at(case, reference, 1, other)
+    same_verb = at(case, reference, 2, reference.verb)
 
     charged = by_index(
         charge(
@@ -886,9 +898,9 @@ class TestWhatTheAssertionLayerBacked:
     """
 
     @staticmethod
-    def resting_on_a_row(reference, sequence=1):
+    def resting_on_a_row(case, reference, sequence=1):
         """A draft at the reference's place, grounded on an assertion row."""
-        return at(reference, sequence, reference.verb).model_copy(
+        return at(case, reference, sequence, reference.verb).model_copy(
             update={
                 "grounds": [
                     Ground(
@@ -901,7 +913,7 @@ class TestWhatTheAssertionLayerBacked:
 
     def test_a_claim_resting_on_a_row_that_matched_is_counted(self, case, flows):
         reference = case.stride_claims()[0]
-        draft = self.resting_on_a_row(reference)
+        draft = self.resting_on_a_row(case, reference)
         charged = charge(case, flows, [draft], [promote(draft)])
 
         backed = charged.assertion_backed
@@ -929,7 +941,7 @@ class TestWhatTheAssertionLayerBacked:
     ):
         """``ASSERTION_GROUNDS`` holds both kinds, and this reads it rather than listing one."""
         reference = case.stride_claims()[0]
-        draft = at(reference, 1, reference.verb).model_copy(
+        draft = at(case, reference, 1, reference.verb).model_copy(
             update={
                 "grounds": [
                     Ground(kind="unknown-assertion", assertion="assertion:x~y~~z")
@@ -948,7 +960,7 @@ class TestWhatTheAssertionLayerBacked:
         with ``ANALYSIS_ASSERTIONS`` set.
         """
         reference = case.stride_claims()[0]
-        draft = at(reference, 1, reference.verb)
+        draft = at(case, reference, 1, reference.verb)
         charged = charge(case, flows, [draft], [promote(draft)])
 
         assert charged.assertion_backed == losses.AssertionBacking()
@@ -966,26 +978,26 @@ class TestWhatTheAssertionLayerBacked:
     def test_it_rides_inside_the_instrument_s_own_keys(self, case, flows):
         """A new top-level artifact key moves ``ARTIFACT_VERSION`` and re-seals every Baseline."""
         reference = case.stride_claims()[0]
-        draft = self.resting_on_a_row(reference)
+        draft = self.resting_on_a_row(case, reference)
         block = losses.artifact([charge(case, flows, [draft], [promote(draft)])])
 
         assert set(block) == {"losses", "losses_aggregate"}
         assert block["losses_aggregate"]["assertion_backed"]["matched"] == 1
 
 
-def proposed_at(reference, verb, title="proposed at the place"):
-    """The lanes' archived proposals, holding one claim at the reference's place."""
-    return {
-        reference.category: {
-            "claims": [
-                {
-                    "title": title,
-                    "verb": verb,
-                    "affected_element_ids": list(reference.affected_element_ids),
-                }
-            ]
-        }
+def proposed_at(reference, verb, title="proposed at the place", position=None):
+    """The lanes' archived proposals, holding one claim at the reference's place.
+
+    The claim states ``position`` when one is given, and no position otherwise.
+    """
+    claim = {
+        "title": title,
+        "verb": verb,
+        "affected_element_ids": list(reference.affected_element_ids),
     }
+    if position is not None:
+        claim["attacker_position"] = position
+    return {reference.category: {"claims": [claim]}}
 
 
 class TestAFanInDrop:
@@ -1002,7 +1014,9 @@ class TestAFanInDrop:
             flows,
             [],
             [],
-            proposed=proposed_at(reference, reference.verb),
+            proposed=proposed_at(
+                reference, reference.verb, position=ruled_position(case, reference)
+            ),
             dropped=[mark],
         )
 
@@ -1052,7 +1066,7 @@ class TestAFanInDrop:
     def test_a_draft_the_critic_killed_is_charged_before_the_fan_in(self, case, flows):
         """The critic saw the finding, so the fan-in did not lose it."""
         reference = case.stride_claims()[0]
-        killed = at(reference, 1, reference.verb)
+        killed = at(case, reference, 1, reference.verb)
 
         charged = charge(
             case,
@@ -1083,9 +1097,11 @@ class TestAFanInDrop:
     def test_a_removal_with_no_mark_names_no_reason(self, case, flows):
         reference = case.stride_claims()[0]
 
-        charged = charge(
-            case, flows, [], [], proposed=proposed_at(reference, reference.verb)
+        proposed = proposed_at(
+            reference, reference.verb, position=ruled_position(case, reference)
         )
+
+        charged = charge(case, flows, [], [], proposed=proposed)
 
         loss = by_index(charged)[0]
         assert loss.cause == "fan-in"
@@ -1107,6 +1123,7 @@ class TestAFanInDrop:
             "proposed at the place",
             element_ids=[elsewhere],
             verb=reference.verb,
+            attacker_position=ruled_position(case, reference),
         )
         mark = UnresolvedReference(
             claim_id=narrowed.id, element_id=lost, reason=BEYOND_GROUNDS
@@ -1117,7 +1134,9 @@ class TestAFanInDrop:
             flows,
             [narrowed],
             [promote(narrowed)],
-            proposed=proposed_at(reference, reference.verb),
+            proposed=proposed_at(
+                reference, reference.verb, position=ruled_position(case, reference)
+            ),
             cut=[mark],
         )
 

@@ -45,5 +45,133 @@
       "reviewed_by": "mstarks01",
       "source": "ballot-2026-10-24 row 13: 13-dispatch-control-plane I-02"
     }
+  ],
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "use-credential",
+        "affected_element_ids": [
+          "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
+          "process:schedule-importer",
+          "process:dispatch-api"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 95"
+    },
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "impersonate",
+        "affected_element_ids": [
+          "flow:process:dispatch-console>process:dispatch-api>live-job-status",
+          "process:dispatch-api"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 96"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "forge",
+        "affected_element_ids": [
+          "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
+          "process:schedule-importer",
+          "process:dispatch-api"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 97"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter-in-transit",
+        "affected_element_ids": [
+          "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+          "process:dispatch-api"
+        ]
+      },
+      "position": "on-path",
+      "ruling": "The ballot proposed on-path, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 98"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "intercept",
+        "affected_element_ids": [
+          "flow:process:dispatch-console>process:dispatch-api>live-job-status"
+        ]
+      },
+      "position": "on-path",
+      "ruling": "The ballot proposed on-path, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 99"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "read",
+        "affected_element_ids": [
+          "store:dispatch-database"
+        ]
+      },
+      "position": "storage-copy",
+      "ruling": "The ballot proposed storage-copy, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 100"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "process:dispatch-api",
+          "flow:process:dispatch-console>process:dispatch-api>live-job-status"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 101"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "ride-session",
+        "affected_element_ids": [
+          "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+          "process:dispatch-api"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 102"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "ride-session",
+        "affected_element_ids": [
+          "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
+          "flow:process:dispatch-console>process:dispatch-api>live-job-status"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 103"
+    }
   ]
 }

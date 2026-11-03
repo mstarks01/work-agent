@@ -48,7 +48,11 @@ def unruled(tree: Path, case: str = CASE) -> int:
     moves one that ``rulings.json`` leaves alone, read through :func:`load_case`.
     """
     golden = load_case(tree / "evals" / "corpus" / case)
-    named = {*golden.ruled_readings, *golden.refused_readings}
+    named = {
+        *golden.ruled_readings,
+        *golden.refused_readings,
+        *golden.ruled_positions,
+    }
     return next(
         index for index in range(len(golden.stride_claims())) if index not in named
     )

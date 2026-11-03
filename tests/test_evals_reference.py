@@ -495,7 +495,7 @@ def test_a_ruled_position_loads_on_the_claim_it_names(tmp_path):
     )
 
     assert load_case(ruled).ruled_positions == {5: "outside"}
-    assert load_case(case_dir).ruled_positions == {}
+    assert 5 not in load_case(case_dir).ruled_positions
 
 
 @pytest.mark.parametrize(

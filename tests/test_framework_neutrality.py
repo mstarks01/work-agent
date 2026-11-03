@@ -159,6 +159,14 @@ DECLARED: dict[str, str] = {
         " that drafts by a verb and a place, and scores them against the"
         " must-finds of that package's references."
     ),
+    "evals/experiments/QA-2026-11-02-05/position_rescore.py": (
+        "This code is that framework's. It counts the matches on the must-finds"
+        " that carry an attacker position, and only that package's drafts state one."
+    ),
+    "evals/experiments/QA-2026-11-02-05/position_ballot.py": (
+        "This code is that framework's. It records the attacker position of a"
+        " reference claim, and only that package's drafts state a position."
+    ),
     "evals/experiments/QA-2026-11-02-05/mechanism_proxy.py": (
         "This code is that framework's. It reads the must-finds of a package"
         " whose references a lane drafts by a verb and a place, and the drafts"
@@ -589,6 +597,19 @@ def test_a_new_framework_literal_is_declared(literals):
     )
 
 
+def unexcused_names() -> dict[str, list[str]]:
+    """Each file's framework-named identifiers that no open decision excuses."""
+    found = {
+        name: sorted(
+            word
+            for word in words
+            if not any(word.startswith(open_) for open_ in OPEN_BY_DECISION)
+        )
+        for name, words in framework_named_identifiers().items()
+    }
+    return {name: words for name, words in found.items() if words}
+
+
 def test_a_framework_named_thing_is_declared_or_open(literals):
     """A class or a value may not carry a framework's name unexplained.
 
@@ -600,15 +621,8 @@ def test_a_framework_named_thing_is_declared_or_open(literals):
     in :data:`OPEN_BY_DECISION`, so somebody decided to keep it and said why.
     """
     unexplained = {
-        name: sorted(
-            word
-            for word in words
-            if not any(word.startswith(open_) for open_ in OPEN_BY_DECISION)
-        )
-        for name, words in framework_named_identifiers().items()
-        if name not in DECLARED
+        name: words for name, words in unexcused_names().items() if name not in DECLARED
     }
-    unexplained = {name: words for name, words in unexplained.items() if words}
 
     assert not unexplained, (
         f"these name a framework on a thing that serves every framework:"
@@ -643,15 +657,17 @@ def test_every_open_decision_gives_a_reason():
 def test_the_declaration_does_not_rot(literals):
     """A file that stops reaching one framework has to leave the list.
 
-    Either way of reaching one keeps it here. A module can name a package or
-    import its record, and a declaration is stale only when it does neither —
+    Each way of reaching one keeps it here. A module can name a package, import
+    its record, or give a thing a framework's name that no open decision
+    excuses, and a declaration is stale only when it does none of the three —
     otherwise removing a literal from a module that still imports the record
     would drop the reason and the entry together.
     """
-    reaching = set(literals) | set(package_importers())
+    reaching = set(literals) | set(package_importers()) | set(unexcused_names())
     stale = sorted(set(DECLARED) - reaching)
     assert not stale, (
-        f"these files no longer name or import a framework and are still"
+        f"these files no longer name a framework, import its record or give a"
+        f" thing a framework's name that no open decision excuses, and are still"
         f" declared: {stale}. Remove them."
     )
 
