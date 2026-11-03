@@ -75,9 +75,11 @@ NO_VOTES = "no votes when sealed"
 #: Baseline's figures, so none is borrowed from elsewhere.
 UNSPREAD = "spread unmeasured"
 
+#: The heading of each table a framework block prints.
+PartHeading = Literal["development cases", "held-out cases"]
+
 #: The two tables each framework block prints, keyed by the heading each
 #: carries, with whether it reads the held-out cases.
-PartHeading = Literal["development cases", "held-out cases"]
 PARTS: Mapping[PartHeading, bool] = {"development cases": False, "held-out cases": True}
 
 

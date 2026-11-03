@@ -120,10 +120,12 @@ CriticStep = Literal["evidence", "reasoning", "lane"]
 # attribute". ``absent-attribute`` follows that spelling for the same reason and
 # for one more: the two attribute branches carry identical fields, so only the
 # kind can tell them apart.
+#: The two ground kinds whose reference is an element and an attribute of it.
+AttributeGround = Literal["unknown-attribute", "absent-attribute"]
+
 GroundKind = Literal[
     "quote",
-    "unknown-attribute",
-    "absent-attribute",
+    AttributeGround,
     "derived-fact",
     "absent-element",
     "assertion",
@@ -155,9 +157,7 @@ CONDITIONAL_GROUNDS: frozenset[GroundKind] = frozenset(
 #: **Here rather than in either reader.** ``fan_in`` snaps the field and
 #: ``coverage`` counts the pairs, and each listed the two kinds for itself, so
 #: a third attribute kind would have reached one of them.
-ATTRIBUTE_GROUNDS: frozenset[GroundKind] = frozenset(
-    {"unknown-attribute", "absent-attribute"}
-)
+ATTRIBUTE_GROUNDS: frozenset[AttributeGround] = frozenset(get_args(AttributeGround))
 
 #: The two ground kinds whose reference is a row of the **Assertion** catalog.
 #: Both carry ``assertion`` and nothing else, and that value is a digest of the

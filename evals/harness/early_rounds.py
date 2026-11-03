@@ -141,7 +141,7 @@ def _in_part(rest: str | None) -> Answerer:
     return answer
 
 
-#: The answerers, keyed by name.
+#: The name of each answerer.
 AnswererName = Literal[
     "capability-yes",
     "capability-no",
@@ -152,6 +152,7 @@ AnswererName = Literal[
     "facets-mixed-unknown",
 ]
 
+#: The answerers, keyed by name.
 ANSWERERS: Mapping[AnswererName, Answerer] = {
     "capability-yes": _capabilities("yes"),
     "capability-no": _capabilities("no"),

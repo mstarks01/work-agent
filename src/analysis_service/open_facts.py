@@ -18,7 +18,6 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import cast
 
 from analysis_service.analysis import ControlAttribute, control_state
 from analysis_service.assertions import (
@@ -29,7 +28,7 @@ from analysis_service.assertions import (
     read_assertion_id,
 )
 from analysis_service.capabilities import CAPABILITIES
-from analysis_service.claims import GroundKind, UnknownRef
+from analysis_service.claims import AttributeGround, UnknownRef
 from analysis_service.evidence import evidence_catalog, prepared_view
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.system_model import (
@@ -79,7 +78,7 @@ def element_names(model: SystemModel) -> Mapping[str, str]:
 
 
 #: How a reader sees each attribute state the evidence catalog offers.
-_GROUND_STATE: dict[GroundKind, str] = {
+_GROUND_STATE: dict[AttributeGround, str] = {
     "unknown-attribute": "unstated",
     "absent-attribute": "stated absent",
 }
@@ -164,7 +163,7 @@ _ATTRIBUTE_QUESTIONS: dict[ControlAttribute, tuple[str, str]] = {
 def _attribute_questions(attribute: str) -> tuple[str, str]:
     """The question an attribute asks of one element, and of each one listed."""
     if attribute in _ATTRIBUTE_QUESTIONS:
-        return _ATTRIBUTE_QUESTIONS[cast(ControlAttribute, attribute)]
+        return _ATTRIBUTE_QUESTIONS[attribute]
     name = attribute_words(attribute)
     return (
         f"What is the {name} for {{element}}?",

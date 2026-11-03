@@ -36,7 +36,7 @@ import logging
 import os
 import time
 from collections.abc import Callable, Mapping
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Literal, Protocol
 
 import jwt
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -409,5 +409,5 @@ def build_verifier(env: Mapping[str, str] = os.environ) -> TokenVerifier:
         raise AuthConfigError(
             f"unknown auth provider {name!r}; known providers: {known}"
         )
-    factory = _FACTORIES[cast(AuthProvider, name)]
+    factory = _FACTORIES[name]
     return factory(env)

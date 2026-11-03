@@ -705,8 +705,7 @@ def case_transport() -> None:
     print(f"{'TOTAL':34}{total_full:9}{total_compact:9}{saved:7.1f}%")
 
 
-#: Every case, by the name the command line takes. A table rather than a
-#: dispatch chain, so a case added here is runnable without a second edit.
+#: The name of each bench case.
 BenchCase = Literal[
     "repair",
     "spent-deadline",
@@ -718,6 +717,8 @@ BenchCase = Literal[
     "transport",
 ]
 
+#: Every case, by the name the command line takes. A table rather than a
+#: dispatch chain, so a case added here is runnable without a second edit.
 CASES: dict[BenchCase, Callable[[], None]] = {
     "repair": case_repair,
     "spent-deadline": case_spent_deadline,

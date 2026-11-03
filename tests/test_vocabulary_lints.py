@@ -161,17 +161,9 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the ground kinds that say a fact is unstated, so a ground that states "
         "a fact or its absence is absent by construction"
     ),
-    ("analysis_service.claims", "ATTRIBUTE_GROUNDS"): (
-        "the ground kinds whose reference is an element and an attribute of it, "
-        "which is fewer than the ground kinds that exist"
-    ),
     ("analysis_service.claims", "ASSERTION_GROUNDS"): (
         "the ground kinds whose reference is a row of the assertion catalog, "
         "which is fewer than the ground kinds that exist"
-    ),
-    ("analysis_service.open_facts", "_GROUND_STATE"): (
-        "the ground kinds that state an attribute's state, which a ground that "
-        "cites a quote, an element or a catalog row does not"
     ),
     ("analysis_service.open_facts", "_ATTRIBUTE_QUESTIONS"): (
         "the control attributes whose plain question reads badly, so an "
@@ -182,8 +174,9 @@ PARTIAL: dict[tuple[str, str], str] = {
         "a network hop or an unclassified zone does not"
     ),
     ("analysis_service.frameworks.stride.rules", "LEFT_ZONE_KINDS"): (
-        "the boundary kinds that a crossing leaves to transfer authority, which "
-        "is the tenant zone and no zone whose authority is inside it"
+        "the boundary kinds that separate parties rather than authority levels,"
+        " so a crossing out of one hands authority across, which a crossing out"
+        " of a privilege, network or unclassified zone does not"
     ),
     ("analysis_service.sampling", "OFFERED_PARAMS"): (
         "the sampling params an environment variable may override, so a "
@@ -231,12 +224,14 @@ PARTIAL: dict[tuple[str, str], str] = {
         "row open, set aside or refused is absent by construction"
     ),
     ("evals.harness.replay", "ROW_LOSSES"): (
-        "the fates of a reference row that lose its fact, so a fate that keeps "
-        "the fact is absent by construction"
+        "the row fates a prompt change can aim at, so a fate that keeps the"
+        " fact, spells it another way, or records a row no producer should"
+        " write is absent by construction"
     ),
     ("evals.harness.replay", "BIND_LOSSES"): (
-        "the fates of a binding that lose it, so a fate that keeps or refuses "
-        "the binding is absent by construction"
+        "the fates that lose a binding, so a fate that binds the row, falls on"
+        " a subject no graph decides, or refuses the row for a reason that is"
+        " not a binding is absent by construction"
     ),
     ("evals.harness.replay", "ROUTES_OF"): (
         "the modes whose sweep keeps an emission or a catalog a replay reads, "
@@ -333,6 +328,9 @@ def _pairs() -> list[tuple[str, str, str, frozenset[str], frozenset[str]]]:
 
 PAIRS = _pairs()
 
+#: Each constant annotated with a vocabulary, by module and name.
+ANNOTATED = {(module, constant) for module, constant, *_ in PAIRS}
+
 
 def test_the_sweep_finds_something():
     """Guards the guard: an empty discovery reads exactly like a clean tree."""
@@ -383,8 +381,7 @@ def test_no_declaration_outlives_its_subset():
 
 def test_every_declaration_names_a_constant_that_exists():
     """A declaration for a constant nobody discovers is coverage that checks nothing."""
-    known = {(module, constant) for module, constant, _, _, _ in PAIRS}
-    unknown = sorted(key for key in PARTIAL if key not in known)
+    unknown = sorted(key for key in PARTIAL if key not in ANNOTATED)
 
     assert not unknown, (
         f"PARTIAL names {unknown}, which this sweep does not find. The constant"
@@ -481,7 +478,7 @@ def _shape(value: ast.expr) -> Shape | None:
     return None
 
 
-def _closed_sets(modules: Iterable[ModuleTree]) -> dict[tuple[str, str], Shape]:
+def _string_constants(modules: Iterable[ModuleTree]) -> dict[tuple[str, str], Shape]:
     """Every module-level constant of string literals, by module and name."""
     found: dict[tuple[str, str], Shape] = {}
     for module, tree in modules:
@@ -500,11 +497,11 @@ def _referent(
     node: ast.expr,
     module: str,
     bound: Mapping[str, str],
-    closed: Container[tuple[str, str]],
+    constants: Container[tuple[str, str]],
 ) -> tuple[str, str] | None:
     """The module and the name of the constant ``node`` reads, or None."""
     match node:
-        case ast.Name(id=name) if (module, name) in closed:
+        case ast.Name(id=name) if (module, name) in constants:
             return (module, name)
         case ast.Name(id=name) if name in bound:
             source, _, constant = bound[name].rpartition(".")
@@ -515,9 +512,9 @@ def _referent(
 
 
 def _set_reads(
-    modules: Iterable[ModuleTree], closed: Mapping[tuple[str, str], Shape]
+    modules: Iterable[ModuleTree], constants: Mapping[tuple[str, str], Shape]
 ) -> set[tuple[str, str]]:
-    """Each constant of ``closed`` that code reads as a set: by ``in`` or
+    """Each constant of ``constants`` that code reads as a set: by ``in`` or
     ``not in``, or a table by a key that is not a literal."""
     read: set[tuple[str, str]] = set()
     for module, tree in modules:
@@ -542,15 +539,15 @@ def _set_reads(
                 case _:
                     continue
             for one in asked:
-                found = _referent(one, module, bound, closed)
-                if found and closed.get(found) in shapes:
+                found = _referent(one, module, bound, constants)
+                if found and constants.get(found) in shapes:
                     read.add(found)
     return read
 
 
 TREES = [(module_name(path), parse(path)) for path in source_files(*PYTHON)]
-CLOSED = _closed_sets(TREES)
-READ_AS_SETS = _set_reads(TREES, CLOSED)
+CONSTANTS = _string_constants(TREES)
+READ_AS_SETS = _set_reads(TREES, CONSTANTS)
 
 
 def test_the_closed_set_sweep_finds_something():
@@ -569,8 +566,7 @@ def test_a_closed_set_states_its_literal():
     annotation is the claim :func:`test_a_constant_enumerates_the_type_it_is_annotated_with`
     holds to the members.
     """
-    annotated = {(module, constant) for module, constant, *_ in PAIRS}
-    bare = sorted(READ_AS_SETS - annotated - set(OPEN))
+    bare = sorted(READ_AS_SETS - ANNOTATED - set(OPEN))
 
     assert not bare, (
         f"{bare} are read as sets and carry no Literal. Annotate each with the"
@@ -582,8 +578,7 @@ def test_a_closed_set_states_its_literal():
 
 def test_no_open_declaration_outlives_its_table():
     """An entry of :data:`OPEN` names a constant read as a set, with no Literal."""
-    annotated = {(module, constant) for module, constant, *_ in PAIRS}
-    stale = sorted(key for key in OPEN if key not in READ_AS_SETS or key in annotated)
+    stale = sorted(key for key in OPEN if key not in READ_AS_SETS or key in ANNOTATED)
     thin = sorted(key for key, reason in OPEN.items() if len(reason) < SHORTEST_REASON)
 
     assert not stale, f"{stale} are no open table read as a set; delete each entry"
@@ -624,7 +619,7 @@ def test_the_sweep_reads_membership_and_variable_keys_only():
     numbers are not."""
     trees = [("control", ast.parse(_CONTROL))]
 
-    assert _set_reads(trees, _closed_sets(trees)) == {
+    assert _set_reads(trees, _string_constants(trees)) == {
         ("control", "CHECKED"),
         ("control", "KEYED"),
     }
@@ -634,7 +629,7 @@ def test_the_sweep_follows_an_import():
     """A read in another module, through either form of import, is found."""
     trees = [("control", ast.parse(_CONTROL)), ("user", ast.parse(_IMPORTER))]
 
-    assert _set_reads(trees, _closed_sets(trees)) == {
+    assert _set_reads(trees, _string_constants(trees)) == {
         ("control", "CHECKED"),
         ("control", "KEYED"),
         ("control", "ITERATED"),

@@ -917,11 +917,11 @@ def _baseline_closing(root: Path, author: str) -> str:
     return "\n".join(lines)
 
 
-#: Every submission kind the CLI offers. A new kind arrives as an entry here,
-#: never as a branch in the spine.
-#: Each submission kind the CLI offers.
+#: The name of each submission kind.
 KindName = Literal["vote", "baseline"]
 
+#: Every submission kind the CLI offers. A new kind arrives as an entry here,
+#: never as a branch in the spine.
 KINDS: dict[KindName, Kind] = {
     "vote": Kind(
         prefix="evals/review/votes/",

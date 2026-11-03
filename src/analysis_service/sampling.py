@@ -108,9 +108,6 @@ ReasoningEffort = Literal["low", "medium", "high"]
 #: alone and refuses a model without it. ``tool`` allows the two tool rungs.
 StructuredOutput = Literal["auto", "native", "tool"]
 
-# Env override surface: only these params are overridable. A var naming any
-# other param — reserved (``candidate_count``) or forbidden — raises.
-_ENV_PREFIX = "ANALYSIS_SAMPLING_"
 #: Each field of :class:`TierSampling`, by name.
 SamplingParam = Literal[
     "temperature",
@@ -124,6 +121,10 @@ SamplingParam = Literal[
     "constrain_output",
     "structured_output",
 ]
+
+# Env override surface: only these params are overridable. A var naming any
+# other param — reserved (``candidate_count``) or forbidden — raises.
+_ENV_PREFIX = "ANALYSIS_SAMPLING_"
 OFFERED_PARAMS: tuple[SamplingParam, ...] = (
     "temperature",
     "top_p",
