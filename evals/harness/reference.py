@@ -296,8 +296,8 @@ class RuledAnyPosition(BaseModel):
     """A person's ruling that no attacker position decides one STRIDE reference.
 
     The finding holds whatever the attacker's position, so the scorer holds
-    the claim to none. The record keeps the question from being asked again,
-    and it names its claim as :class:`RuledPosition` does.
+    the claim to none. The record names its claim as :class:`RuledPosition`
+    does, and the loader refuses a claim that carries both kinds of ruling.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

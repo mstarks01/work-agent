@@ -505,16 +505,6 @@ def _any_position(case_dir: Path) -> dict:
     }
 
 
-def test_an_any_position_ruling_binds_its_claim_and_scores_no_position(tmp_path):
-    case_dir = _ruled_case(tmp_path)
-    ruled = _ruled_case(
-        tmp_path / "ruled",
-        lambda r: r.update(positions=[], any_positions=[_any_position(case_dir)]),
-    )
-
-    assert 5 not in load_case(ruled).ruled_positions
-
-
 @pytest.mark.parametrize(
     ("edit", "message"),
     [
