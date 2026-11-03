@@ -77,7 +77,12 @@ def zoned_model():
 class ZonedRunner(PausingRunner):
     """Pauses on :func:`zoned_model`."""
 
+    #: Whether the next run raises, so its job fails.
+    fails = False
+
     async def run(self, job, on_node):
+        if self.fails:
+            raise RuntimeError("the run failed")
         if job.pauses():
             checkpoint = Checkpoint(
                 system_model=zoned_model(), assertions=HELD.assertions
@@ -409,6 +414,16 @@ class TestTheSubmission:
             ("SSO", "applied"),
             ("Billing", "left-out"),
         ]
+
+    def test_a_job_that_serves_no_model_lists_each_control_pending(self, owner):
+        sso = owner.keep("SSO", {"type": "application"})
+        owner.runner.fails = True
+        started = owner.submit(sso, questions=False)
+        assert started.status_code == 200, started.text
+        run_id = started.json()["run"]
+        assert ran(owner.client, run_id) == "failed"
+        used = owner.client.get(f"/workspace/runs/{run_id}").json()["controls_used"]
+        assert used == [{"id": sso, "name": "SSO", "state": "pending"}]
 
     def test_a_job_with_no_control_lists_none(self, owner):
         run_id = owner.paused()

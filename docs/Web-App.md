@@ -321,7 +321,7 @@ name to the Control's aliases. A job that does not pause takes the default
 resolution: each match as the pause first shows it. An analysis that you
 open again lists `controls_used` from its own copy, with the state
 `applied` or `left-out`, or `pending` where the job serves no model: it
-has none yet, or its report is withheld.
+has none yet, or it does not serve one.
 
 ## The Settings page
 
