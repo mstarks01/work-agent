@@ -156,5 +156,33 @@
       "reviewed_by": "mstarks01",
       "source": "QA-2026-11-02-05 position ballot row 44"
     }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:stats-database",
+          "flow:process:game-server>store:stats-database>read-write-stats"
+        ]
+      },
+      "ruling": "The claim specifies altered statistics but no access mechanism.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 38"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "abuse-grant",
+        "affected_element_ids": [
+          "process:moderation-website",
+          "entity:customer-support-staff"
+        ]
+      },
+      "ruling": "Access to the moderation tool is required. The claim does not say whether the attacker uses a support account or controls the tool itself.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 43"
+    }
   ]
 }

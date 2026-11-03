@@ -69,5 +69,20 @@
       "reviewed_by": "mstarks01",
       "source": "QA-2026-11-02-05 position ballot row 34"
     }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:web-application-config",
+          "process:web-application"
+        ]
+      },
+      "ruling": "Changing the config is the prerequisite. The claim does not distinguish a config interface from local access.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 31"
+    }
   ]
 }

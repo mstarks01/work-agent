@@ -265,5 +265,33 @@
       "reviewed_by": "mstarks01",
       "source": "QA-2026-11-02-05 position ballot row 94"
     }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "flow:process:supplier-master-service>store:landing-bucket>load-extract"
+        ]
+      },
+      "ruling": "The loaded file must be altered. The claim does not specify a writer identity or an access path.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 88"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "disable",
+        "affected_element_ids": [
+          "store:landing-bucket",
+          "process:supplier-master-service"
+        ]
+      },
+      "ruling": "The claim depends on a missed load and gives no mechanism for stopping it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 91"
+    }
   ]
 }

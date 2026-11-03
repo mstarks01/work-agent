@@ -136,5 +136,33 @@
       "reviewed_by": "mstarks01",
       "source": "QA-2026-11-02-05 position ballot row 15"
     }
+  ],
+  "any_positions": [
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "plant",
+        "affected_element_ids": [
+          "store:firmware-bucket",
+          "entity:sensor-node"
+        ]
+      },
+      "ruling": "Bucket write access is required. The finding does not specify how the writer obtained or exercised it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 11"
+    },
+    {
+      "lane": "repudiation",
+      "reference": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "entity:sensor-node",
+          "store:telemetry-lake"
+        ]
+      },
+      "ruling": "The shared fleet key defeats per-device attribution regardless of who disputes the reading.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 12"
+    }
   ]
 }
