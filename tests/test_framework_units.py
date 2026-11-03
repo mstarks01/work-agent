@@ -1,12 +1,11 @@
 """The units a Control row can name, on each **Framework Package** (ADR 0123).
 
 A package declares ``units``, its closed set of unit rows, and
-``control_unit_of``, the
-unit one of its claims sits in. The package gate checks the table when the
-package is built, :func:`~analysis_service.frameworks.check_unit` checks a
-row's framework and unit, and a replay over the Baseline reports and each
-ASVS reference record of the corpus holds ``control_unit_of`` to the set through that
-check.
+``control_unit_of``, the unit one of its claims sits in. The package gate checks
+the table when the package is built,
+:func:`~analysis_service.frameworks.check_unit` checks a row's framework and
+unit, and a replay over the Baseline reports and each ASVS reference record of
+the corpus holds ``control_unit_of`` to the set through that check.
 """
 
 from __future__ import annotations

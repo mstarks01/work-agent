@@ -929,9 +929,9 @@ def unit_rows(report: Report) -> dict[str, list[dict[str, str]]]:
     """Per framework, the units its block answers for, with each one's own text.
 
     **The join is here because the knowledge is here.** Which claim rules on
-    which unit is a package's answer (``unit_of``) and what a unit says is a
-    package's answer (``text_of_unit``); the report page holds neither and must
-    not learn them. So the server pairs them and the page renders what it is
+    which unit is a package's answer (the record hook ``unit_of``) and what a
+    unit says is a package's answer (``text_of_unit``); the report page holds
+    neither and must not learn them. So the server pairs them and the page renders what it is
     handed.
 
     A framework whose claims are an open set contributes an empty list: no
