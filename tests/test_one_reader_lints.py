@@ -1001,6 +1001,29 @@ def test_the_reason_a_claim_rests_on_has_one_writer():
     ]
 
 
+def _compares_a_position(node: ast.AST) -> bool:
+    """Whether ``node`` compares an attacker position by hand."""
+    if not isinstance(node, ast.Compare):
+        return False
+    return any(
+        (isinstance(side, ast.Attribute) and side.attr == "attacker_position")
+        or (
+            isinstance(side, ast.Call)
+            and any(
+                isinstance(arg, ast.Constant) and arg.value == "attacker_position"
+                for arg in side.args
+            )
+        )
+        for side in (node.left, *node.comparators)
+    )
+
+
+def test_the_position_rule_has_one_reader():
+    """Only ``holds_position`` decides whether a draft's position answers a ruled
+    reference, so the scorer gate and the loss report cannot disagree."""
+    assert _sites(_compares_a_position) == []
+
+
 def _spells_an_assertion_id(node: ast.AST) -> bool:
     """Whether ``node`` writes or reads the ``assertion:`` prefix of an ID."""
     return isinstance(node, ast.Constant) and str(node.value).startswith("assertion:")

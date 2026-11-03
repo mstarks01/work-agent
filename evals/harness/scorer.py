@@ -564,6 +564,18 @@ def _match_in_lane(
     return own, ruled
 
 
+def holds_position(ruled: str | None, stated: object) -> bool:
+    """Whether a draft that states ``stated`` can answer a reference ruled ``ruled``.
+
+    A reference with no ruled position takes any draft. A ruled one takes only
+    a draft that states that position, so a draft that states another one, or
+    none, cannot answer it. The scorer's gate and the loss report both call
+    this, and ``test_the_position_rule_has_one_reader`` refuses a comparison of
+    a position anywhere else.
+    """
+    return ruled is None or stated == ruled
+
+
 def _rule(
     matcher: Matcher, case: GoldenCase, reference_index: int, threat: DraftThreat
 ) -> tuple[ClaimRuling, bool]:
@@ -580,7 +592,7 @@ def _rule(
     """
     reference = case.stride_claims()[reference_index]
     position = case.ruled_positions.get(reference_index)
-    if position is not None and threat.attacker_position != position:
+    if not holds_position(position, threat.attacker_position):
         return ClaimRuling(
             match=False,
             rationale=f"a person ruled the reference's attacker {position}, and"

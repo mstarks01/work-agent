@@ -1,4 +1,4 @@
-"""What lost each STRIDE reference a run missed: the verb, the fan-in, the critic, the place, or no lead.
+"""What lost each STRIDE reference a run missed, charged to one of eight causes.
 
 The scorer says *which* references a run missed. This says *why*, from the
 same rulings, so a fix carries its ceiling before anybody pays for a run: an
@@ -9,7 +9,9 @@ below records one observation per miss rather than every contributor. Read the
 ceiling before a paid sweep. On the first Baseline, one exemplar edit had a
 ceiling of five must-finds of 129, inside the run-to-run band.
 
-Eight causes, decided in this order for one missed reference:
+Eight causes. For one missed reference, each stage below is asked in this
+order, and the first that finds the finding charges it; ``position`` is the one
+cause a stage charges in place of its own:
 
 * ``verb``: a surviving claim in the reference's lane cites the same place —
   one endpoint-resolved element set contains the other, the identity rule's
@@ -86,11 +88,13 @@ from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.parsing import strings
 from evals.harness.identity import CaseFlows, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import CaseScore, VoteStatus
+from evals.harness.scorer import CaseScore, VoteStatus, holds_position
 from evals.harness.triggers import case_trigger_recall
 from evals.harness.verbs import same_action
 
-#: The causes a miss is charged to, in the order they are decided.
+#: The causes a miss is charged to, in the order of the stages that decide
+#: them. ``position`` can come from the surviving-claim, ``critic`` or
+#: ``fan-in`` stage.
 Cause = Literal[
     "verb", "position", "merged", "misfiled", "critic", "fan-in", "place", "unled"
 ]
@@ -335,7 +339,7 @@ def _holding(
     reference, because the scorer's gate refuses every other: an empty result
     is a ``position`` loss at whichever stage found the action at the place.
     """
-    return [item for item in items if position is None or stated(item) == position]
+    return [item for item in items if holds_position(position, stated(item))]
 
 
 def _proposed_at(

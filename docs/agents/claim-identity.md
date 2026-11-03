@@ -292,10 +292,10 @@ stated control reaches the mechanism through its row (ADR 0062).
 
 A draft's **Attacker Position** is not part of the key or the mechanism. Two
 drafts at one key with two positions are one finding to a vote unless their
-mechanisms are apart. The position has two readers in the evals: the scorer
-matches a reference with a ruled position only to a draft that states it, and
-the loss report charges a miss to `position` where the action is at the place
-and the ruled position is not.
+mechanisms are apart. The position rule has one reader in the evals,
+`scorer.holds_position`. The scorer gate calls it to match a reference with a
+ruled position only to a draft that states it, and the loss report calls it to
+charge a miss to `position`. A lint refuses a second comparison.
 
 ### A vote also records what it judged
 
