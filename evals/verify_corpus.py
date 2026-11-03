@@ -92,7 +92,7 @@ from evals.reference_facts import (
     reference_catalog,
 )
 
-SOURCE_KINDS = frozenset(get_args(SourceKind))
+SOURCE_KINDS: frozenset[SourceKind] = frozenset(get_args(SourceKind))
 
 CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 CALIBRATION_PATH = Path(__file__).resolve().parent / "calibration_labels" / "pairs.json"
@@ -170,15 +170,17 @@ UNASSIGNABLE: dict[tuple[str, str], str] = {
 
 #: The rating vocabulary, off the type that declares it rather than listed
 #: again -- the same rule the tier set below follows, for the same reason.
-RATINGS = frozenset(get_args(Rating))
+RATINGS: frozenset[Rating] = frozenset(get_args(Rating))
 #: The tier vocabulary, off the type that declares it rather than listed again.
 #: A second list is how the corpus lint comes to admit a tier the scorer cannot
 #: read, or refuse one it can.
-TIERS = frozenset(get_args(Tier))
+TIERS: frozenset[Tier] = frozenset(get_args(Tier))
 #: Which proximities a reference set may declare, off the type the reference
 #: record declares them with. A second list here is how the corpus lint comes
 #: to refuse a proximity the scorer reads.
-EXEMPLAR_PROXIMITY = frozenset(get_args(ExemplarProximity))
+EXEMPLAR_PROXIMITY: frozenset[ExemplarProximity] = frozenset(
+    get_args(ExemplarProximity)
+)
 CASE_FIELDS = frozenset(
     (
         "id",

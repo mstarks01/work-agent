@@ -27,6 +27,7 @@ from analysis_service.claims import UNKNOWN_KEY_FIELDS, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
 from evals.harness.prices import UnitPrices
 from tests.source_tree import (
+    EXPERIMENTS_LEFT_OUT,
     PYTHON,
     REPO_ROOT,
     TESTS,
@@ -47,17 +48,8 @@ Site = tuple[str, str]
 MODULE_OWNER = "<module>"
 
 
-#: The parts of :data:`~tests.source_tree.PYTHON` no lint here walks, with
-#: the reason.
-LEFT_OUT: dict[str, str] = {
-    "evals/experiments": (
-        "an audit script there runs one experiment as it ran on its day, so it"
-        " records the rule of that day and no live code calls it"
-    ),
-}
-
 #: The files each lint walks.
-FILES = without(source_files(*PYTHON), LEFT_OUT)
+FILES = without(source_files(*PYTHON), EXPERIMENTS_LEFT_OUT)
 
 
 def _sites(

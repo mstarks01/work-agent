@@ -123,6 +123,7 @@ from analysis_service.system_model import (
     UNKNOWN,
     DataFlow,
     Element,
+    ElementPrefix,
     ExternalEntity,
     FlowIdError,
     ModelIndex,
@@ -437,7 +438,7 @@ def _endpoint_keys(ids: Iterable[str]) -> frozenset[str]:
 #: added tomorrow is in this population unless somebody rules it out — the
 #: direction that fails loudly. A hand-typed triple would have left it silently
 #: outside both readers.
-NAMED_TYPES: tuple[str, ...] = tuple(
+NAMED_TYPES: tuple[ElementPrefix, ...] = tuple(
     sorted(
         element.id_prefix
         for element in get_args(Element)

@@ -2497,7 +2497,7 @@ def _framework_block(
 # because the remedy differs: ``refuted`` says do not name this framework for
 # this system, and ``undecidable`` says the input never said, which the
 # submitter answers by submitting more.
-_REFUSALS: Mapping[str, Refusal] = MappingProxyType(
+_REFUSALS: Mapping[PreconditionResult, Refusal] = MappingProxyType(
     {
         "refuted": Refusal(
             "not-applicable",
@@ -2513,7 +2513,9 @@ _REFUSALS: Mapping[str, Refusal] = MappingProxyType(
 )
 
 
-def _refusal(package: FrameworkPackage, result: object) -> Refusal | None:
+def _refusal(
+    package: FrameworkPackage, result: PreconditionResult | None
+) -> Refusal | None:
     """Why this framework did not run, as a scope state and a reason, or ``None``.
 
     What the reason is *used for* is the block's own — the neutral base answers
@@ -2526,7 +2528,7 @@ def _refusal(package: FrameworkPackage, result: object) -> Refusal | None:
     model and runs no gate, and reporting a refusal there would describe one that
     never happened.
     """
-    refusal = _REFUSALS.get(str(result))
+    refusal = _REFUSALS.get(result or "satisfied")
     if refusal is None:
         return None
     return Refusal(refusal.state, refusal.reason.format(framework=package.name))

@@ -38,7 +38,15 @@ from evals.harness.archive import CaseKind, case_suffix
 from evals.harness.bundle import REPORTS_SUFFIX
 from evals.harness.reference import CASE_FILES, MUST_FIND
 from evals.harness.roster import STANDINGS
-from tests.source_tree import PYTHON, REPO_ROOT, TESTS, parse, source_files, without
+from tests.source_tree import (
+    EXPERIMENTS_LEFT_OUT,
+    PYTHON,
+    REPO_ROOT,
+    TESTS,
+    parse,
+    source_files,
+    without,
+)
 from tests.test_webapp import STATIC_SCRIPTS
 from webapp import main, offline_sitting, review, sitting
 from webapp.page import client_script
@@ -696,15 +704,7 @@ def test_the_unknown_comparison_scan_finds_one_when_there_is_one(tmp_path):
 # moves, and its own test still passes.
 
 #: The production files, less the scripts an audit ran.
-_CASE_NAME_FILES = without(
-    source_files(*PYTHON),
-    {
-        "evals/experiments": (
-            "the scripts an audit ran on the day, as frozen evidence, so no"
-            " lint holds them to the live rule"
-        ),
-    },
-)
+_CASE_NAME_FILES = without(source_files(*PYTHON), EXPERIMENTS_LEFT_OUT)
 
 
 def _case_name_spellings() -> frozenset[str]:
