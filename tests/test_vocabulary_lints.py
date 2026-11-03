@@ -140,15 +140,6 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the packages holding a lane no case exercises, which a package whose"
         " every lane is exercised does not appear in"
     ),
-    ("analysis_service.api", "_REFUSALS"): (
-        "the outcomes that refuse a submission, so the outcome that admits one "
-        "is absent by construction, and so is the one a minted ID cannot reach"
-    ),
-    ("webapp.main", "_ADMISSION_MESSAGES"): (
-        "the outcomes that refuse a page's submission, so the outcome that "
-        "admits one is absent by construction, and so is the one a minted ID "
-        "cannot reach"
-    ),
     ("analysis_service.assertions", "ANSWER_ISSUES"): (
         "the codes a submitter's answer draws when it places nothing, so a code"
         " that refuses a row, or that a row draws whatever the answers, is"

@@ -28,13 +28,13 @@ from analysis_service.errors import MAX_RENDERED_ERRORS, ConfigError
 from analysis_service.jobs import (
     JOB_ID_PATTERN,
     RESTART_FAILURE_MESSAGE,
-    AdmissionOutcome,
     InMemoryJobStore,
     JobRecord,
     JobStatus,
     NodeCallback,
     PipelineOutcome,
     PipelineRejected,
+    RefusalOutcome,
     StubPipelineRunner,
 )
 from analysis_service.parsing import ascii_int
@@ -1059,9 +1059,7 @@ class TestAdmissionOutcomes:
         fall-through is a 500 rather than a started job, but a refusal that
         deserves its 429 would still be answered as a defect.
         """
-        answered = set(_REFUSALS) | {"admitted", "duplicate"}
-
-        assert answered == set(get_args(AdmissionOutcome))
+        assert set(_REFUSALS) == set(get_args(RefusalOutcome))
 
     def test_an_outcome_the_table_does_not_know_starts_no_job(self, caplog):
         client, store = make_client(raise_server_exceptions=False)

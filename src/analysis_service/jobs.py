@@ -691,18 +691,21 @@ def ended(record: Envelope) -> bool:
 # the caller submits again under the owner ID that admission created.
 # ``parent_missing`` says the owner holds no job under the ID that the record's
 # parent names: a delete removed it after the caller read it.
-AdmissionOutcome = Literal[
-    "admitted",
+#
+# ``RefusalOutcome`` is every outcome that refuses a submission a caller can
+# make, so each one has an answer the caller reads. It leaves out ``admitted``,
+# which refuses nothing, and ``duplicate``, which no caller can cause.
+RefusalOutcome = Literal[
     "at_ceiling",
     "over_rate",
     "over_owner_budget",
     "over_global_budget",
-    "duplicate",
     "resumed_already",
     "parent_moved",
     "parent_missing",
     "principal_exists",
 ]
+AdmissionOutcome = Literal["admitted", "duplicate", RefusalOutcome]
 
 
 @dataclass(frozen=True)

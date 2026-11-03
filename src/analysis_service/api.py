@@ -97,13 +97,13 @@ from analysis_service.job_answers import (
 )
 from analysis_service.jobs import (
     Admission,
-    AdmissionOutcome,
     DeleteRefusal,
     Envelope,
     JobRecord,
     JobStatus,
     JobStore,
     PipelineRunner,
+    RefusalOutcome,
     event_frames,
     execute_job,
     is_follow_up,
@@ -605,7 +605,7 @@ def _status_view(record: Envelope) -> JobStatusView:
 # status: a bound that clears with time is a 429, a job that already has its
 # resumed job is a 409, and a parent that a delete removed reads as a missing
 # job, with its 404.
-_REFUSALS: dict[AdmissionOutcome, tuple[int, Callable[[Admission, int], str]]] = {
+_REFUSALS: dict[RefusalOutcome, tuple[int, Callable[[Admission, int], str]]] = {
     "at_ceiling": (
         429,
         lambda admission, ceiling: (
