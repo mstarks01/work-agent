@@ -35,9 +35,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from analysis_service.claims import FrameworkName
+from analysis_service.claims import FrameworkName, ProposalBatch
 from analysis_service.fan_in import fan_in
-from analysis_service.frameworks import PACKAGES, schemas_for
+from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import (
     ArchivedThreatProposals,
     DraftThreat,
@@ -148,7 +148,7 @@ def replay_case(
 
 
 def lane_must_finds(
-    case: GoldenCase, state: Mapping[str, Any], lane: str, batch: Any
+    case: GoldenCase, state: Mapping[str, Any], lane: str, batch: ProposalBatch
 ) -> tuple[int, ...]:
     """The must-find references one lane's proposals match, before any critic.
 
@@ -161,7 +161,7 @@ def lane_must_finds(
     model = SystemModel.model_validate(state[STATE_VALID_MODEL])
     session = GraphKeys.of([FRAMEWORK]).state(SimpleNamespace(state=state))
     merged = fan_in(
-        {lane: schemas_for(FRAMEWORK).proposals.model_validate(batch)},
+        {lane: batch},
         nodes.package,
         model,
         state[STATE_SOURCE_TEXTS],

@@ -1281,3 +1281,9 @@ version before it. Read it when you load an archived report.
   for a consumer that reads only the 3.1 fields. A route that parses a stored
   3.1 job record answers `409` (see
   [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
+- **Version 3.3:** each STRIDE threat carries `attacker_position`, where the
+  attacker stands when it acts: `outside`, `on-path`, `storage-copy`,
+  `in-component` or `authorized-principal`. It is `null` only on a threat that
+  a run wrote before the field existed. Additive for a consumer that reads only
+  the 3.2 fields. A route that parses a stored 3.2 job record answers `409`
+  (see [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).

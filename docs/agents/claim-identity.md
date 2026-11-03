@@ -290,6 +290,11 @@ A cited assertion row adds its control too: the attribute its predicate
 projects into, or the predicate's own name. With the assertion pass on, a
 stated control reaches the mechanism through its row (ADR 0062).
 
+A draft's **Attacker Position** is not part of the key or the mechanism. Two
+drafts at one key with two positions are one finding to a vote unless their
+cited controls are apart. The position has one reader in the evals: the scorer
+matches a reference with a ruled position only to a draft that states it.
+
 ### A vote also records what it judged
 
 The rule above recognises a **topic**, and is blind to what a claim says. That

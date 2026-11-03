@@ -88,10 +88,12 @@ StrideCategory = Literal[
 #: place, and encryption at rest stops only the first. The position tells them
 #: apart, so the scorer can hold a draft to the position a reference rests on.
 #:
-#: * ``outside`` reaches the system only through the interfaces it exposes.
+#: * ``outside`` reaches the target only through an interface the target
+#:   exposes, also with a credential it took from an element.
 #: * ``on-path`` observes or alters the traffic of a flow.
 #: * ``storage-copy`` holds a copy of a store's media, backup or snapshot.
-#: * ``in-component`` runs code in, or holds the identity of, a modelled element.
+#: * ``in-component`` runs code in a modelled element, or controls its host, and
+#:   acts with that element's access.
 #: * ``authorized-principal`` is a legitimate account that acts beyond its purpose.
 AttackerPosition = Literal[
     "outside",

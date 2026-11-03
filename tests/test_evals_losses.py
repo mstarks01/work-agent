@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
@@ -180,6 +181,26 @@ def test_a_surviving_claim_at_the_place_with_another_verb_is_a_verb_loss(case, f
     assert (loss.reference_verb, loss.draft_verb) == (reference.verb, other)
     assert loss.draft_id == draft.id
     assert loss.must_find is (reference.tier == "must-find")
+
+
+@pytest.mark.parametrize(
+    ("stated", "cause"),
+    [("storage-copy", "position"), (None, "position"), ("in-component", None)],
+    ids=["another", "unstated", "same"],
+)
+def test_a_claim_with_the_action_and_another_position_is_a_position_loss(
+    case, flows, stated, cause
+):
+    """The scorer's position gate refuses the claim, and the row names the gate."""
+    reference = case.stride_claims()[0]
+    draft = at(reference, 1, reference.verb).model_copy(
+        update={"attacker_position": stated}
+    )
+    ruled = replace(case, ruled_positions=MappingProxyType({0: "in-component"}))
+
+    charged = by_index(charge(ruled, flows, [draft], [promote(draft)]))
+
+    assert (charged[0].cause if 0 in charged else None) == cause
 
 
 def test_two_references_at_one_place_under_one_verb_leave_one_merged(

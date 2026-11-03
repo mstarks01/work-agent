@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import get_args
 
 import pytest
-from pydantic import ValidationError
 
 from analysis_service.frameworks.stride.record import (
     ArchivedThreatProposals,

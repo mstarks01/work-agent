@@ -9,7 +9,7 @@ below records one observation per miss rather than every contributor. Read the
 ceiling before a paid sweep. On the first Baseline, one exemplar edit had a
 ceiling of five must-finds of 129, inside the run-to-run band.
 
-Seven causes, decided in this order for one missed reference:
+Eight causes, decided in this order for one missed reference:
 
 * ``verb``: a surviving claim in the reference's lane cites the same place —
   one endpoint-resolved element set contains the other, the identity rule's
@@ -20,6 +20,10 @@ Seven causes, decided in this order for one missed reference:
   whether one nests inside the other: containment is how a draft answering
   another question lands on this cause, and a ceiling is priced on the equal
   rows.
+* ``position``: surviving claims cite the place with the reference's own
+  action, and a person ruled the reference an attacker position that none of
+  them states. The lane wrote the action against another attacker, which the
+  scorer's position gate refuses.
 * ``merged``: a surviving claim cites the place with the reference's own
   action, read through the equivalence table the identity rule reads, and the
   scorer assigned it to a sibling reference. Two references at
@@ -84,9 +88,12 @@ from evals.harness.triggers import case_trigger_recall
 from evals.harness.verbs import same_action
 
 #: The causes a miss is charged to, in the order they are decided.
-Cause = Literal["verb", "merged", "misfiled", "critic", "fan-in", "place", "unled"]
+Cause = Literal[
+    "verb", "position", "merged", "misfiled", "critic", "fan-in", "place", "unled"
+]
 CAUSES: tuple[Cause, ...] = (
     "verb",
+    "position",
     "merged",
     "misfiled",
     "critic",
@@ -476,12 +483,25 @@ def attribute_case(
         if found is not None:
             read_verb, place, at_place = found
             claim = _charged_to(at_place, read_verb)
+            position = case.ruled_positions.get(index)
+            stated = {
+                one.attacker_position
+                for one in at_place
+                if same_action(one.verb, read_verb)
+            }
+            charged: Cause = (
+                "verb"
+                if not same_action(claim.verb, read_verb)
+                else "position"
+                if position is not None and position not in stated
+                else "merged"
+            )
             losses.append(
                 Loss(
                     index,
                     lane,
                     index in must_find,
-                    "merged" if same_action(claim.verb, read_verb) else "verb",
+                    charged,
                     verb,
                     draft_id=claim.id,
                     draft_verb=claim.verb,

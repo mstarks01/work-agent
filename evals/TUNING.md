@@ -450,7 +450,8 @@ it as a number: must-finds of 129.
 
 **Read the archived misses.** Every scored sweep carries two blocks that charge
 each miss to what lost it. `losses` is STRIDE's: the verb (the lane cited the
-place and wrote another action), `merged`, `misfiled` (the finding sits in
+place and wrote another action), `position` (the lane wrote the action against
+another attacker than the one a person ruled), `merged`, `misfiled` (the finding sits in
 another lane), the critic, `fan-in` (the lane proposed it and the fan-in
 removed it, or narrowed its elements off the place), the place (a rule led
 there and nothing was drafted), or `unled`. A `place` or `unled` row also says
