@@ -11,9 +11,9 @@ contract as ``embed.py``; only the call changes.
 **The failure worth knowing about**: ``analyze_sync`` refuses to run inside an
 already-running event loop. It cannot work there — it wraps ``asyncio.run``,
 which raises on a running loop — so it raises a ``RuntimeError`` saying so
-instead of deadlocking. That means the one place this goes wrong is the place
-people most often try it: a sync helper called from async code, where it looks
-fine until the first request. If you are anywhere inside an event loop, use
+instead of deadlocking. So the call fails where people most often try it: a
+sync helper called from async code, where it looks fine until the first
+request. If you are anywhere inside an event loop, use
 ``embed.py``'s ``await engine.analyze(...)`` instead.
 """
 
