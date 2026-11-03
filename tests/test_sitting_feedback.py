@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
+from tests.test_sitting_app import unruled
 from webapp import sitting
 from webapp.page import client_script
 
@@ -446,7 +447,7 @@ def test_a_record_whose_set_moved_is_sent_back_to_the_case(tmp_path: Path, monke
     monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
     path = tree / "evals" / "corpus" / CASE / "claims" / "stride.json"
     claims = json.loads(path.read_text("utf-8"))
-    claims[0]["verb"] = "replay"
+    claims[unruled(tree, CASE)]["verb"] = "replay"
     path.write_text(json.dumps(claims, indent=2) + "\n", encoding="utf-8")
 
     response = client.post("/api/contribute", json={"reviewer": "anonymous"})

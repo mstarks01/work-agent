@@ -24,6 +24,7 @@ from evals.harness.reference import flows_by_case, load_case
 from evals.harness.scorer import (
     candidate_claim,
     exemplar_delta,
+    holds_position,
     score_case,
     unlisted_for_promotion,
 )
@@ -32,6 +33,7 @@ from tests.eval_factories import (
     cast,
     draft_threat,
     produced_threat,
+    ruled_position,
     threat_for,
 )
 
@@ -102,8 +104,14 @@ def test_matches_reference_via_recorded_labels(case, labelled_pairs, no_votes):
         for index, reference in enumerate(case.claims_for("stride"))
         if reference.claim == pair.reference_claim
     )
+    reference = case.claims_for("stride")[reference_index]
     produced = [
-        threat_for(case.claims_for("stride")[reference_index], 1, pair.candidate_claim)
+        threat_for(
+            reference,
+            1,
+            pair.candidate_claim,
+            attacker_position=ruled_position(case, reference),
+        )
     ]
     matcher = ScriptedMatcher([(pair.reference_claim, pair.candidate_claim)])
 
@@ -137,9 +145,10 @@ def test_assignment_is_one_to_one(case, no_votes):
     # must consume one reference between them; without this recall inflates and
     # stops meaning anything.
     reference = case.claims_for("stride")[0]
+    position = ruled_position(case, reference)
     produced = [
-        threat_for(reference, 1, "Claim one."),
-        threat_for(reference, 2, "Claim two."),
+        threat_for(reference, 1, "Claim one.", attacker_position=position),
+        threat_for(reference, 2, "Claim two.", attacker_position=position),
     ]
     matcher = ScriptedMatcher(
         [(reference.claim, "Claim one."), (reference.claim, "Claim two.")]
@@ -159,7 +168,14 @@ def test_must_find_references_win_assignment_ties(case, no_votes):
         for ref in case.claims_for("stride")
         if not ref.must_find and ref.category == must_find.category
     )
-    produced = [threat_for(must_find, 1, "Ambiguous claim.")]
+    produced = [
+        threat_for(
+            must_find,
+            1,
+            "Ambiguous claim.",
+            attacker_position=ruled_position(case, must_find),
+        )
+    ]
     matcher = ScriptedMatcher(
         [(must_find.claim, "Ambiguous claim."), (expected.claim, "Ambiguous claim.")]
     )
@@ -200,7 +216,12 @@ class TestTheRejectedRateCarriesItsDenominators:
     def test_a_matched_finding_is_produced_and_never_eligible(self, case, no_votes):
         listed = case.stride_claims()[0]
         produced = [
-            produced_threat(1, listed.category, listed.claim),
+            produced_threat(
+                1,
+                listed.category,
+                listed.claim,
+                attacker_position=ruled_position(case, listed),
+            ),
             produced_threat(2, "spoofing", "A grounded but unlisted claim."),
         ]
         matcher = ScriptedMatcher([(listed.claim, listed.claim)])
@@ -478,6 +499,7 @@ def test_element_disagreement_is_scored_not_filtered(case, no_votes):
             reference.category,
             "Same action, different element.",
             element_ids=["store:orders-db"],
+            attacker_position=ruled_position(case, reference),
         )
     ]
     matcher = ScriptedMatcher([(reference.claim, "Same action, different element.")])
@@ -496,7 +518,14 @@ def test_misfiled_threat_is_a_lane_error_and_not_a_recall_hit(case, no_votes):
     reference = next(
         ref for ref in case.claims_for("stride") if ref.category == "tampering"
     )
-    produced = [produced_threat(1, "spoofing", "Filed in the wrong lane.")]
+    produced = [
+        produced_threat(
+            1,
+            "spoofing",
+            "Filed in the wrong lane.",
+            attacker_position=ruled_position(case, reference),
+        )
+    ]
     matcher = ScriptedMatcher([(reference.claim, "Filed in the wrong lane.")])
 
     score = score_case(case, produced, matcher, no_votes)
@@ -523,6 +552,7 @@ def test_severity_calibration_is_arithmetic(case, no_votes):
             element_ids=reference.affected_element_ids,
             likelihood="low",
             impact="medium",
+            attacker_position=ruled_position(case, reference),
         )
     ]
     matcher = ScriptedMatcher([(reference.claim, "Right threat, softer severity.")])
@@ -547,9 +577,13 @@ def test_recall_and_artifact_over_the_whole_labelled_set(
     }
     produced = [
         threat_for(
-            claims_by_reference[pair.reference_claim], index + 1, pair.candidate_claim
+            reference,
+            index + 1,
+            pair.candidate_claim,
+            attacker_position=ruled_position(case, reference),
         )
         for index, pair in enumerate(matches)
+        for reference in [claims_by_reference[pair.reference_claim]]
     ]
     matcher = ScriptedMatcher(
         (pair.reference_claim, pair.candidate_claim) for pair in matches
@@ -569,11 +603,20 @@ def test_recall_and_artifact_over_the_whole_labelled_set(
     artifact = score.to_json()
     assert artifact["counts"]["produced"] == len(produced)
     # One ruling per pair asked about. A reference with a ruled reading asks
-    # the matcher once per reading, so calls are counted by pair.
+    # the matcher once per reading, so calls are counted by pair. A pair the
+    # position rule refuses is ruled without a call.
     asked = {
         (call.reference_claim, call.candidate_claim) for call in matcher.claim_calls
     }
-    assert len(artifact["rulings"]) == len(asked)
+    stated = {threat.id: threat.attacker_position for threat in produced}
+    refused = sum(
+        not holds_position(
+            case.ruled_positions.get(ruling["reference_index"]),
+            stated[ruling["threat_id"]],
+        )
+        for ruling in artifact["rulings"]
+    )
+    assert len(artifact["rulings"]) == len(asked) + refused
     assert all(ruling["rationale"] for ruling in artifact["rulings"])
 
 
@@ -697,6 +740,7 @@ def test_a_ruled_reading_never_takes_a_threat_a_claims_own_reading_matched():
         "A portal action is reachable without its role",
         element_ids=("process:supplier-portal",),
         verb="escalate",
+        attacker_position=ruled_position(case, case.stride_claims()[14]),
     )
     matcher = SubsetVerbIdentity(flows_by_case([case]))
 

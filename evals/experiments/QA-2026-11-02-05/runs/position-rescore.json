@@ -1,0 +1,48 @@
+{
+  "command": "python -m evals.harness.run score <first non-baseline JSON of evals/baselines/<name>/> --corpus <corpus> --out <file>",
+  "before_corpus": "evals/corpus at ac8a07b4922427fd8f1bf2e3545aab127b0d6db0",
+  "after_corpus": "evals/corpus with the 94 position rulings",
+  "series": "all",
+  "baselines": {
+    "2198870-gpt-5.6-terra-6cd39a95": {
+      "before": {
+        "must_find_matched": 64,
+        "must_find_total": 103
+      },
+      "after": {
+        "must_find_matched": 13,
+        "must_find_total": 103
+      }
+    },
+    "6bff717-gpt-5.6-terra-24dda4db": {
+      "before": {
+        "must_find_matched": 70,
+        "must_find_total": 103
+      },
+      "after": {
+        "must_find_matched": 15,
+        "must_find_total": 103
+      }
+    },
+    "d3f1898-gpt-5.6-terra-29929443": {
+      "before": {
+        "must_find_matched": 55,
+        "must_find_total": 103
+      },
+      "after": {
+        "must_find_matched": 12,
+        "must_find_total": 103
+      }
+    },
+    "d4edd64-gpt-5.6-terra-fd1c49af": {
+      "before": {
+        "must_find_matched": 55,
+        "must_find_total": 103
+      },
+      "after": {
+        "must_find_matched": 10,
+        "must_find_total": 103
+      }
+    }
+  }
+}

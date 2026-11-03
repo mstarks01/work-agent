@@ -24,7 +24,13 @@ from evals.harness.identity import CaseFlows
 from evals.harness.ledger import Ledger
 from evals.harness.reference import load_case
 from evals.harness.scorer import score_case
-from tests.eval_factories import ScriptedMatcher, cast, draft_threat, promote
+from tests.eval_factories import (
+    ScriptedMatcher,
+    cast,
+    draft_threat,
+    promote,
+    ruled_position,
+)
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 CONTROL_CASE = CORPUS_DIR / "01-payments-checkout"
@@ -35,8 +41,12 @@ def case():
     return load_case(CONTROL_CASE)
 
 
-def _draft_for(reference, sequence: int):
-    """A draft aimed squarely at one reference, claiming it verbatim."""
+def _draft_for(case, reference, sequence: int):
+    """A draft aimed squarely at one reference, claiming it verbatim.
+
+    It states the position the case ruled on the reference, as a live lane
+    states one.
+    """
     return draft_threat(
         sequence,
         reference.category,
@@ -44,6 +54,7 @@ def _draft_for(reference, sequence: int):
         element_ids=reference.affected_element_ids,
         likelihood=reference.severity.likelihood,
         impact=reference.severity.impact,
+        attacker_position=ruled_position(case, reference),
     )
 
 
@@ -124,7 +135,7 @@ def test_a_ruled_needs_info_threat_is_keyed_too(case):
 
 
 def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
-    kept = _draft_for(_must_find(case), 1)
+    kept = _draft_for(case, _must_find(case), 1)
     junk = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
@@ -151,7 +162,7 @@ def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
 
 def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
     reference = _must_find(case)
-    killed = _draft_for(reference, 1)
+    killed = _draft_for(case, reference, 1)
 
     scored = score_case_with_yield(
         case,
@@ -176,7 +187,7 @@ def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
 
 def test_expected_tier_kills_are_separated_from_must_find(case):
     reference = _expected(case)
-    killed = _draft_for(reference, 1)
+    killed = _draft_for(case, reference, 1)
 
     result = score_case_with_yield(
         case,
@@ -195,7 +206,7 @@ def test_expected_tier_kills_are_separated_from_must_find(case):
 
 def test_the_post_critic_score_is_the_scorer_verbatim(case):
     reference = _must_find(case)
-    kept = _draft_for(reference, 1)
+    kept = _draft_for(case, reference, 1)
     junk = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
@@ -219,7 +230,7 @@ def test_the_post_critic_score_is_the_scorer_verbatim(case):
 
 def test_the_scored_claim_is_the_same_string_on_both_sides(case):
     reference = _must_find(case)
-    draft = _draft_for(reference, 1)
+    draft = _draft_for(case, reference, 1)
     matcher = _identity_matcher([draft])
 
     score_case_with_yield(
@@ -241,7 +252,7 @@ def test_a_critic_edit_to_the_title_is_a_real_second_question(case):
     # ruled on the rewrite rather than silently credited with the draft's
     # ruling.
     reference = _must_find(case)
-    draft = _draft_for(reference, 1)
+    draft = _draft_for(case, reference, 1)
     reworded = promote(draft.model_copy(update={"title": "Reworded by the critic."}))
     matcher = _identity_matcher([draft])
 
@@ -262,7 +273,7 @@ def test_a_critic_edit_to_the_title_is_a_real_second_question(case):
 
 def test_aggregate_pools_counts_rather_than_averaging_rates(case):
     reference = _must_find(case)
-    kept = _draft_for(reference, 1)
+    kept = _draft_for(case, reference, 1)
     junk = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
@@ -302,7 +313,7 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     from evals.harness import modes, run
 
     reference = _must_find(case)
-    kept = _draft_for(reference, 1)
+    kept = _draft_for(case, reference, 1)
     junk = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
@@ -337,7 +348,7 @@ def test_a_case_with_no_stride_proposal_is_charged_as_proposing_nothing(case):
     """
     from evals.harness import modes, run
 
-    kept = _draft_for(_must_find(case), 1)
+    kept = _draft_for(case, _must_find(case), 1)
     analysis = modes.AnalysisRun(
         report=_report_with(case, [promote(kept)]),
         drafts={"stride": (kept,)},
@@ -368,7 +379,7 @@ def test_a_holdout_case_is_scored_and_charged_no_losses(case):
     held = dataclasses.replace(
         case, meta=case.meta.model_copy(update={"holdout": True})
     )
-    kept = _draft_for(_must_find(case), 1)
+    kept = _draft_for(case, _must_find(case), 1)
     analysis = modes.AnalysisRun(
         report=_report_with(case, [promote(kept)]), drafts={"stride": (kept,)}
     )
@@ -436,7 +447,7 @@ def _report_with(case, threats):
 
 
 def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
-    draft = _draft_for(_must_find(case), 1)
+    draft = _draft_for(case, _must_find(case), 1)
 
     result = score_case_with_yield(
         case,
@@ -458,8 +469,8 @@ def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
 def test_a_kill_another_draft_made_good_is_gross_but_not_lost(case):
     """Two drafts at one reference; the critic kills one; the reference survives."""
     reference = _must_find(case)
-    first = _draft_for(reference, 1)
-    second = _draft_for(reference, 2)
+    first = _draft_for(case, reference, 1)
+    second = _draft_for(case, reference, 2)
     result = score_case_with_yield(
         case,
         [first, second],
@@ -479,7 +490,7 @@ def test_a_kill_another_draft_made_good_is_gross_but_not_lost(case):
 
 def test_a_kill_nothing_made_good_is_lost(case):
     reference = _must_find(case)
-    killed = _draft_for(reference, 1)
+    killed = _draft_for(case, reference, 1)
     result = score_case_with_yield(
         case,
         [killed],
@@ -497,7 +508,7 @@ def test_a_kill_nothing_made_good_is_lost(case):
 def test_the_critic_stated_cause_rides_on_the_kill(case):
     """Read off the block's own verdict; every kill without one is ``unstated``."""
     reference = _must_find(case)
-    killed = _draft_for(reference, 1)
+    killed = _draft_for(case, reference, 1)
     rejected = promote(
         killed,
         verdict=Verdict(
@@ -541,8 +552,8 @@ def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
     from tests.test_evals_applicability import Block
 
     reference = _must_find(case)
-    killed = _draft_for(reference, 1)
-    saved = _draft_for(_expected(case), 2)
+    killed = _draft_for(case, reference, 1)
+    saved = _draft_for(case, _expected(case), 2)
     flows = CaseFlows.of_graph(ModelIndex.of(case.model).flow_endpoints)
     matcher = SubsetVerbIdentity({case.id: flows})
     produced = [promote(saved)]
