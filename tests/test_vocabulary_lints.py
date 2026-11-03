@@ -590,11 +590,6 @@ OPEN: dict[tuple[str, str], str] = {
     ("evals.build_review_docs", "HAND_WRITTEN"): (
         "case directory names, which the corpus holds as data and not as a type"
     ),
-    ("evals.experiments.QA-2026-11-02-05.position_ballot", "PROPOSED"): (
-        "the must-finds of the corpus, keyed by case and reference index, which"
-        " grow with the corpus; issue refuses a key that names no must-find and"
-        " a must-find with no key"
-    ),
     ("evals.harness.archive", "KIND_NAMES"): (
         "whole file names that filter the files an archive directory holds"
     ),
