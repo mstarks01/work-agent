@@ -1,0 +1,9 @@
+material from today's prepare, catalog signed; prompt files from bee48c8e0e5a5d370156020b52e22496d5bff33f
+- Shopper order data may be readable across the public-to-storefront boundary | ['flow:entity:shopper>process:storefront-api>place-order', 'entity:shopper', 'process:storefront-api']
+- Settlement confirmations may be readable on the processor webhook path | ['flow:entity:card-processor>process:storefront-api>settlement-webhook', 'entity:card-processor', 'process:storefront-api']
+- Order and address data may be readable between the storefront and order service | ['flow:process:storefront-api>process:order-service>submit-order', 'process:storefront-api', 'process:order-service']
+- Order database traffic may expose the confidential order corpus in transit | ['flow:process:order-service>store:orders-db>read-write-orders', 'process:order-service', 'store:orders-db']
+- A copied orders database may disclose shopper and payment data if storage encryption is absent | ['store:orders-db']
+- Recovering the order-service database password enables bulk reading of orders | ['process:order-service', 'flow:process:order-service>store:orders-db>read-write-orders', 'store:orders-db']
+spent: $0.0484 reported
+must-finds matched: [10, 11]

@@ -103,3 +103,34 @@ reported stage 3 total over $0.90.
 
 The number of proposals is reported beside stage 1 (132) and stage 2 (140)
 as a cost, not as a test. The definitions of stage 1 apply unchanged.
+
+## Stage 4, fixed 2026-11-03T18:53Z, before any stage 4 call
+
+E4 found, after the fact, that E7's runs with the #2134 contrast exemplar hold
+fewer grant-holder reads and more compromised-reader reads than the runs
+without it. The maintainer approved one arm to decide it ("$1 approved").
+
+**The arm:** the same 13 calls, cases and arms as stage 1, from a clean
+worktree of commit `bee48c8e` on the branch `exp/no-2134-exemplar`, which is
+`main` at `86c8416c` with the compromised-reader contrast section of the
+information-disclosure exemplars removed. The prepared material of all 13
+cases is identical at `d51830a1` (stage 1) and `86c8416c`, and no prompt or
+framework file differs between them except this removal, so stage 1 is the
+control arm. The runner stops before a call that could take the stage 4 total
+over $0.90.
+
+**The measures:** the store reads of each arm by the class rule of
+`displacement.py`, and the agreement of reached references under the rulings
+of `86c8416c` (`score_stage.py <prefix> rescore-2026-11-03`). Stage 1: 5
+grant-holder reads, 7 compromised-reader reads, and 2 of 6 reached `outside`
+references agree.
+
+**The falsifier:** "the #2134 exemplar displaces the grant-holder read" is
+refuted if either holds:
+
+1. Stage 4 holds 5 or fewer grant-holder reads.
+2. Stage 4 has 2 or fewer agreeing `outside` references.
+
+The cost of the removal is reported and is not a test: the agreement on the
+reached `in-component` references (stage 1: 2 of 2) and the number of
+compromised-reader reads. One pass in each arm gives a direction, not a rate.
