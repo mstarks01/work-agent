@@ -30,10 +30,10 @@ from analysis_service.jobs import (
     Resumption,
 )
 from analysis_service.links import LinkAnswer, with_link_answers
-from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.sources import Source
 from tests.factories import (
     DESCRIPTION_TEXT,
+    adk_runner,
     sample_report,
     sample_selection,
     scripted_pipeline,
@@ -105,7 +105,7 @@ class TestTheResumedRun:
             visited.append(node)
 
         async def scenario():
-            return await AdkPipelineRunner(pipeline).run(self.resumed_job(), on_node)
+            return await adk_runner(pipeline).run(self.resumed_job(), on_node)
 
         return asyncio.run(scenario()), visited
 

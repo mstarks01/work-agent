@@ -20,6 +20,7 @@ from evals.harness import critic_replay
 from evals.harness.bundle import case_file, reports_dir, write_failures
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
+from evals.harness.run_record import loaded
 from tests import test_evals_run_grounds as grounds
 from tests.eval_factories import write_emission_sweep
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixture)
@@ -178,7 +179,12 @@ def test_the_replayed_rulings_are_written_completed(
     held = json.loads(written.read_text(encoding="utf-8"))
     assert held["record"]["command"] == "critic-replay"
     assert [one["path"] for one in held["record"]["inputs"]] == sorted(
-        str(path) for path in (artifact.path, *archived.files)
+        str(path)
+        for path in (
+            artifact.path,
+            *archived.files,
+            *loaded((PACKAGE_LOADER, PROMPT_LOADER)),
+        )
     )
     claims = held["claims"]
     assert [claim["id"] for claim in claims] == [d.id for d in archived.drafts]

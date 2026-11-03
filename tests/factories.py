@@ -98,6 +98,7 @@ from analysis_service.model_tiers import (
     credentials_env_var_for,
     load_model_tiers,
 )
+from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.principals import Identity, Principal
 from analysis_service.provider import InProcessExecutor
 from analysis_service.report import (
@@ -216,6 +217,12 @@ TEST_CREDENTIAL_ENV: dict[str, str] = {
     "ANALYSIS_VERTEX_PROJECT": "test-project",
     "ANALYSIS_VERTEX_LOCATION": "us-central1",
 }
+
+
+def adk_runner(pipeline: Pipeline) -> AdkPipelineRunner:
+    """A runner for ``pipeline`` with no certification gate, for a test that
+    drives the graph and asks nothing of certification."""
+    return AdkPipelineRunner(pipeline, certification=None)
 
 
 def blessed_manifest(tiers: dict[TierName, set[str]]) -> BlessedManifest:
@@ -853,6 +860,8 @@ def sample_threat(
                 verb for verb, lanes in LANES_OF_VERB.items() if category in lanes
             )
         ),
+        # A stolen cookie replayed from the attacker's own machine.
+        "attacker_position": "outside",
         # One quote and one derived fact, so a default draft exercises two
         # branches rather than the cheapest one. The quote is a verbatim span of
         # the source ``sample_report`` submits, so it verifies through the

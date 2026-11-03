@@ -67,7 +67,7 @@ from typing import Literal, NamedTuple, Self, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from analysis_service.analysis import ABSENT_WORD, control_state
+from analysis_service.analysis import ABSENT_WORD, ControlAttribute, control_state
 from analysis_service.grounding import (
     IndexedSource,
     fragments,
@@ -78,7 +78,7 @@ from analysis_service.grounding import (
     placements,
     verify_quote,
 )
-from analysis_service.parsing import Sha256Hex
+from analysis_service.parsing import Sha256Hex, member
 from analysis_service.references import canonical
 from analysis_service.sources import (
     ANSWERS_LABEL,
@@ -96,9 +96,11 @@ from analysis_service.system_model import (
     DataClassification,
     DataFlow,
     Element,
+    ElementPrefix,
     SystemModel,
     TrustBoundary,
     ZonedElement,
+    element_prefix,
     make_element_id,
     normalize_name,
 )
@@ -138,6 +140,7 @@ __all__ = [
     "Contradiction",
     "Origin",
     "Predicate",
+    "ProjectedField",
     "Projection",
     "ProjectionReason",
     "Qualifier",
@@ -162,6 +165,7 @@ __all__ = [
     "contradictions",
     "disputed",
     "offered",
+    "parse_subject_type",
     "project",
     "projected_attribute",
     "projection_fields",
@@ -263,6 +267,18 @@ SubjectType = Literal[
     "artifact",
 ]
 
+#: Every subject type.
+_SUBJECT_TYPES: tuple[SubjectType, ...] = get_args(SubjectType)
+
+
+def parse_subject_type(value: str) -> SubjectType:
+    """``value`` as a subject type, or raise :class:`ValueError` naming it."""
+    found = member(value, _SUBJECT_TYPES)
+    if found is None:
+        raise ValueError(f"unknown subject type {value!r}")
+    return found
+
+
 #: What a **Scope** qualifier says. Closed, because a reader routes on it.
 QualifierKind = Literal[
     "principal", "operation", "resource", "environment", "condition"
@@ -298,12 +314,15 @@ ProposedReason = Literal["silent", "hedged"]
 #: How a predicate's value is read.
 ValueKind = Literal["text", "term", "reference"]
 
+#: A graph field a predicate projects into.
+ProjectedField = Literal[ControlAttribute, "trust_zone"]
+
 #: Whether two values of one predicate, at one subject and scope, can both hold.
 Multiplicity = Literal["one", "many"]
 
-#: Which element ID prefixes each graph-bound subject type accepts, read off the
-#: element classes so a renamed prefix moves this with it.
-SUBJECT_PREFIXES: Mapping[str, frozenset[str]] = MappingProxyType(
+#: Which ID prefixes each subject type accepts. A graph-bound type's prefixes
+#: are read off the element classes, so a renamed prefix moves this with it.
+SUBJECT_PREFIXES: Mapping[SubjectType, frozenset[str]] = MappingProxyType(
     {
         "component": frozenset(element.id_prefix for element in get_args(ZonedElement)),
         "interaction": frozenset({DataFlow.id_prefix}),
@@ -315,20 +334,17 @@ SUBJECT_PREFIXES: Mapping[str, frozenset[str]] = MappingProxyType(
 )
 
 #: Which element class each ID prefix names, read off the five element classes.
-_ELEMENT_TYPES: Mapping[str, type[BaseModel]] = MappingProxyType(
+_ELEMENT_TYPES: Mapping[ElementPrefix, type[BaseModel]] = MappingProxyType(
     {element_type.id_prefix: element_type for element_type in get_args(Element)}
 )
-
-#: Every prefix the element schema uses.
-_ELEMENT_PREFIXES: frozenset[str] = frozenset(_ELEMENT_TYPES)
 
 #: The subject types whose ID is an **Element ID**, and whose subject the model
 #: must therefore hold. Derived rather than listed again: a type is graph-bound
 #: exactly when its prefixes are the schema's.
-GRAPH_BOUND: frozenset[str] = frozenset(
+GRAPH_BOUND: frozenset[SubjectType] = frozenset(
     subject_type
     for subject_type, prefixes in SUBJECT_PREFIXES.items()
-    if prefixes <= _ELEMENT_PREFIXES
+    if prefixes <= frozenset(_ELEMENT_TYPES)
 )
 
 # --- Bounds ----------------------------------------------------------------
@@ -388,7 +404,7 @@ class Predicate:
     refers_to: frozenset[SubjectType] = frozenset()
     requires: tuple[str, ...] = ()
     multiplicity: Multiplicity = "one"
-    projects_into: str = ""
+    projects_into: ProjectedField | Literal[""] = ""
     #: Whether the sources must *state* this predicate's value, so an inference
     #: is refused rather than recorded.
     #:
@@ -727,9 +743,9 @@ class Assertion(BaseModel):
     origin: Origin
     #: Required when ``value`` is :data:`UNKNOWN`, refused otherwise.
     reason: UnknownReason | None = None
-    #: Bounded at :data:`MAX_SPANS` by the gate rather than here, so the rule
-    #: has one reader and a row over it is a reported refusal, not a schema
-    #: error the resolver would have to pre-empt with a copy of the rule.
+    #: Bounded at :data:`MAX_SPANS` by the gate rather than here, so a row over
+    #: it is a reported refusal, not a schema error the resolver would have to
+    #: pre-empt with a copy of the rule.
     support: list[SupportSpan] = Field(default_factory=list)
     #: The assertion IDs an ``inferred`` value rests on.
     premises: list[str] = Field(default_factory=list, max_length=MAX_PREMISES)
@@ -837,11 +853,12 @@ CatalogIssueCode = Literal[
 #: The issues a submitter's answer draws when it places nothing. None is a
 #: refusal, and each is a fact about the answers one run applies, so a run
 #: drops the ones its checkpoint carries and finds its own again.
-ANSWER_ISSUES: frozenset[str] = frozenset(
+ANSWER_ISSUES: frozenset[CatalogIssueCode] = frozenset(
     {"unmatched-link", "unknown-link-element", "unmatched-answer"}
 )
 
-#: Every code that refuses a row: every code but three and the answer issues.
+#: Every code that refuses a row or a whole catalog: every code but three and
+#: the answer issues.
 #:
 #: :data:`CatalogIssueCode` holds what a report's ``assertions.issues`` can say.
 #: ``graph-contradiction`` is not a refusal: the row stands, stays settled and
@@ -853,7 +870,7 @@ ANSWER_ISSUES: frozenset[str] = frozenset(
 #: rather than left to a reader to remember, because ``tests/test_assertions.py``
 #: holds the gate's fixture table to exactly these, and a new code that is a
 #: refusal must fail there rather than quietly join the exception.
-GATE_REFUSALS: frozenset[str] = (
+GATE_REFUSALS: frozenset[CatalogIssueCode] = (
     frozenset(get_args(CatalogIssueCode))
     - {"graph-contradiction", "support-truncated", "superseded-by-answer"}
     - ANSWER_ISSUES
@@ -862,7 +879,7 @@ GATE_REFUSALS: frozenset[str] = (
 #: The refusals of a whole catalog rather than of a row in it: a catalog keyed
 #: by another registry, or one over a count bound. Nothing in such a catalog
 #: can be read, so :func:`quarantine` keeps none of it.
-CATALOG_REFUSALS: frozenset[str] = frozenset(
+CATALOG_REFUSALS: frozenset[CatalogIssueCode] = frozenset(
     {"wrong-registry-version", "too-many-assertions", "too-many-subjects"}
 )
 
@@ -966,14 +983,10 @@ class AssertionRecord(BaseModel):
         model: SystemModel,
         sources: Mapping[str, str],
     ) -> AssertionRecord:
-        """Resolve one proposal and run the gate over what was built.
+        """The record that :meth:`resolved` builds and gates from one proposal.
 
-        **The one reader of "what did the node's proposal come to".** The
-        production ``prepare`` node, the assertion eval mode and the offline
-        replay all ask it, so a resolver change moves every caller at once.
-        The gate runs over the resolver's output rather than being assumed:
-        the resolver's contract is that its catalog raises nothing, and here
-        is where that contract meets real model output.
+        **What the node's proposal came to**, read through :meth:`resolved`,
+        the one reader of it.
         """
         record, _ = cls.resolved(proposal, model, sources)
         return record
@@ -985,8 +998,12 @@ class AssertionRecord(BaseModel):
         model: SystemModel,
         sources: Mapping[str, str],
     ) -> tuple[AssertionRecord, dict[int, tuple[str, ...]]]:
-        """:meth:`of`, and each proposed row the record lost, by index, with
-        its codes.
+        """The record of one proposal, resolved and gated, and each proposed
+        row the record lost, by index, with its codes.
+
+        The gate runs over the resolver's output rather than being assumed:
+        the resolver's contract is that its catalog raises nothing, and here
+        is where that contract meets real model output.
 
         **The one reader of "which proposed row did this record lose".** It
         reads :meth:`refusals`, so a refusal of the whole catalog loses every
@@ -1130,7 +1147,7 @@ class Conflict:
     values: tuple[str, ...]
 
 
-def subject_id(subject_type: str, name: str) -> str:
+def subject_id(subject_type: SubjectType, name: str) -> str:
     """The deterministic ID a non-graph subject's type and name imply.
 
     Graph-bound subjects have no call here: their ID is the **Element ID** the
@@ -1521,7 +1538,7 @@ def conflicts(catalog: AssertionCatalog) -> tuple[Conflict, ...]:
     return tuple(found)
 
 
-def projection_fields() -> Mapping[str, str]:
+def projection_fields() -> Mapping[str, ProjectedField]:
     """Which graph field each projecting predicate is authoritative for.
 
     Read off :data:`REGISTRY` rather than listed again. ``tests/test_assertions.py``
@@ -2499,8 +2516,8 @@ def _spans(
 #: which outranks a reader that inferred it. A table over :data:`Basis`, held
 #: to it by ``tests/test_assertions.py``, so a fourth basis fails there rather
 #: than raising in a merge.
-BASIS_RANK: Mapping[str, int] = MappingProxyType(
-    {basis: rank for rank, basis in enumerate(("stated", "derived", "inferred"))}
+BASIS_RANK: Mapping[Basis, int] = MappingProxyType(
+    {basis: rank for rank, basis in enumerate[Basis](("stated", "derived", "inferred"))}
 )
 
 
@@ -2570,12 +2587,12 @@ ProjectionReason = Literal[
 #: value (#961). Keyed by every assessment and held to the literal by
 #: ``tests/test_assertions.py``, so a fifth assessment fails there rather than
 #: projecting by default.
-PROJECTS_UNDER: Mapping[str, bool] = MappingProxyType(
+PROJECTS_UNDER: Mapping[Assessment, bool] = MappingProxyType(
     {"unchecked": True, "supported": True, "unsupported": False, "unresolved": False}
 )
 
 #: The assessments that set a row aside: every one :data:`PROJECTS_UNDER` refuses.
-REJECTING: frozenset[str] = frozenset(
+REJECTING: frozenset[Assessment] = frozenset(
     assessment for assessment, projects in PROJECTS_UNDER.items() if not projects
 )
 
@@ -2594,7 +2611,7 @@ class Projection:
     """
 
     element_id: str
-    attribute: str
+    attribute: ProjectedField
     value: str
     reason: ProjectionReason
     rows: tuple[str, ...]
@@ -2627,7 +2644,7 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
     order.
     """
     subjects = {subject.id: subject for subject in catalog.subjects}
-    grouped: dict[tuple[str, str], list[tuple[str, Assertion]]] = {}
+    grouped: dict[tuple[str, ProjectedField], list[tuple[str, Assertion]]] = {}
     for entry in catalog.entries:
         attribute = projected_attribute(entry.predicate, entry.subject)
         held = subjects.get(entry.subject)
@@ -2826,7 +2843,7 @@ def contradiction_issues(
 #:
 #: Keyed by every reason and held to the literal by ``tests/test_assertions.py``,
 #: so a reason added tomorrow fails there rather than defaulting to either.
-PROJECTION_EFFECT: Mapping[str, Literal["write", "qualify", "leave"]] = (
+PROJECTION_EFFECT: Mapping[ProjectionReason, Literal["write", "qualify", "leave"]] = (
     MappingProxyType(
         {
             "stated": "write",
@@ -2844,7 +2861,7 @@ PROJECTION_EFFECT: Mapping[str, Literal["write", "qualify", "leave"]] = (
 
 #: The projection reasons under which the catalog answers an attribute: its
 #: projected value is the attribute's value. Read off :data:`PROJECTION_EFFECT`.
-SETTLING_REASONS: frozenset[str] = frozenset(
+SETTLING_REASONS: frozenset[ProjectionReason] = frozenset(
     reason for reason, effect in PROJECTION_EFFECT.items() if effect == "write"
 )
 
@@ -2854,20 +2871,22 @@ SETTLING_REASONS: frozenset[str] = frozenset(
 #: an **Element ID**, and anything after the sentinel there is a value the
 #: schema or the validity gate refuses. Keyed by the graph field and held to
 #: :func:`projection_fields` by ``tests/test_assertions.py``.
-QUALIFIED_SPELLING: Mapping[str, Literal["prose", "bare"]] = MappingProxyType(
-    {
-        "authentication": "prose",
-        "encryption_in_transit": "prose",
-        "encryption_at_rest": "prose",
-        "data_classification": "prose",
-        "exposure": "bare",
-        "trust_zone": "bare",
-    }
+QUALIFIED_SPELLING: Mapping[ProjectedField, Literal["prose", "bare"]] = (
+    MappingProxyType(
+        {
+            "authentication": "prose",
+            "encryption_in_transit": "prose",
+            "encryption_at_rest": "prose",
+            "data_classification": "prose",
+            "exposure": "bare",
+            "trust_zone": "bare",
+        }
+    )
 )
 
 #: What a qualified ``unknown`` says happened, keyed by every reason that
 #: qualifies.
-_QUALIFIED_BECAUSE: Mapping[str, str] = MappingProxyType(
+_QUALIFIED_BECAUSE: Mapping[ProjectionReason, str] = MappingProxyType(
     {
         "hedged": "the sources voice uncertainty about this",
         "scoped": "stated only for part of what this carries",
@@ -3060,7 +3079,7 @@ def qualified(
     return text[: CONTROL_VALUE_MAX_CHARS - 1] + "…"
 
 
-def projected_attribute(predicate: str, subject: str) -> str:
+def projected_attribute(predicate: str, subject: str) -> ProjectedField | Literal[""]:
     """The graph attribute a row of ``predicate`` about ``subject`` reaches, or ``""``.
 
     **The one reader of "does this row reach a graph field".** A predicate
@@ -3071,7 +3090,7 @@ def projected_attribute(predicate: str, subject: str) -> str:
     predicate would leave a legal row on a Process with neither a projection
     nor an evidence entry (#926). :func:`project` and :func:`offered` both ask this.
     """
-    attribute = projection_fields().get(predicate, "")
+    attribute = projection_fields().get(predicate)
     return attribute if attribute and attribute in _attributes_of(subject) else ""
 
 
@@ -3119,13 +3138,13 @@ def _attributes_of(element_id: str) -> frozenset[str]:
     Read off the element classes by ID prefix, so a field moved between types
     moves this with it.
     """
-    element_type = _ELEMENT_TYPES.get(element_id.split(":", 1)[0])
-    return frozenset(element_type.model_fields) if element_type else frozenset()
+    prefix = element_prefix(element_id)
+    return frozenset(_ELEMENT_TYPES[prefix].model_fields) if prefix else frozenset()
 
 
 def _projected(
     element_id: str,
-    attribute: str,
+    attribute: ProjectedField,
     rows: list[tuple[str, Assertion]],
     subjects: Mapping[str, Subject],
 ) -> Projection:

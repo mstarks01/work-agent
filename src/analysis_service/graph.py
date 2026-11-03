@@ -115,7 +115,7 @@ import logging
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, get_args
 
 import anyio.to_thread
 from google.adk.agents import LlmAgent
@@ -244,6 +244,7 @@ from analysis_service.skills import (
 from analysis_service.sources import render_fenced, text_digest
 from analysis_service.system_model import (
     BoundaryCrossing,
+    ElementSourceField,
     EmittedSystemModel,
     SystemModel,
 )
@@ -330,6 +331,10 @@ ROLES: tuple[str, ...] = (
 )
 
 
+#: An artifact a lane agent is given, by the prompt placeholder it fills.
+LaneArtifact = Literal["candidates", "scope", "reference_notes", "prior_cases"]
+
+
 # The per-lane artifacts, as ``{placeholder}`` in ``analyze.md`` against the
 # state-key prefix it resolves to. **The only place that correspondence
 # lives**: :meth:`Lane.prompt_bindings` reads it to substitute, and
@@ -343,7 +348,7 @@ ROLES: tuple[str, ...] = (
 # other people's leads, and the material genuinely differs per lane — the candidate
 # rules that selected the corpus documents fired per lane, and the rule counts
 # behind the scope differ per category.
-LANE_ARTIFACTS: Mapping[str, str] = MappingProxyType(
+LANE_ARTIFACTS: Mapping[LaneArtifact, str] = MappingProxyType(
     {
         "candidates": "candidates",
         "scope": "scope",
@@ -393,7 +398,7 @@ class Lane:
         """Where this lane agent parks its proposals for its framework's merge."""
         return f"drafts_{self.slug}"
 
-    def key(self, artifact: str) -> str:
+    def key(self, artifact: LaneArtifact) -> str:
         """Where ``prepare`` parks one of this lane's inputs."""
         return f"{LANE_ARTIFACTS[artifact]}_{self.slug}"
 
@@ -411,7 +416,7 @@ class Lane:
             **{name: f"{{{self.key(name)}}}" for name in LANE_ARTIFACTS},
         }
 
-    def state(self, artifacts: Mapping[str, str]) -> dict[str, str]:
+    def state(self, artifacts: Mapping[LaneArtifact, str]) -> dict[str, str]:
         """This lane's state entries, given one rendered value per artifact.
 
         Keyed by placeholder on the way in and by state key on the way out,
@@ -441,9 +446,8 @@ class FrameworkNodes:
     subgraphs never touch: they fan out from the one prepared model and fan back
     in at ``assemble``, which is the only node that sees both.
 
-    Like :class:`Lane`, this is the one place its names are spelled. A node name
-    and the state key it writes are derived from the same ``name``, so a graph
-    carrying two frameworks cannot cross their wires.
+    A node name and the state key it writes are derived from the same
+    ``name``, so a graph carrying two frameworks cannot cross their wires.
     """
 
     name: FrameworkName
@@ -1045,8 +1049,8 @@ class Analysis:
     service over a job, the eval harness over a corpus case — and neither copies
     a field across itself. Two copies would have to agree with nothing checking
     that they did, and a field added here and missed in one driver would produce
-    a report with a block silently absent. :meth:`into_report` is the one place
-    that mapping lives; a driver hands over the four things the graph cannot
+    a report with a block silently absent. :meth:`into_report` holds that
+    mapping; a driver hands over the four things the graph cannot
     know and reads nothing out of this object itself.
 
     **One shared model, N finished blocks.** The blocks arrive whole — each
@@ -1452,7 +1456,7 @@ def reject_model(validation_issues: str, ctx, keys: GraphKeys) -> dict[str, Any]
 # Element fields stripped from the model rendered to every lane agent and every
 # critic. They survive on STATE_VALID_MODEL, so the report still
 # carries them.
-_ELEMENT_SOURCE_FIELDS = ("source_excerpt", "source_label", "source_speaker")
+_ELEMENT_SOURCE_FIELDS: tuple[ElementSourceField, ...] = get_args(ElementSourceField)
 
 
 def render_model(valid_model: dict) -> str:
@@ -2118,8 +2122,8 @@ def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) 
 
     The two keys are read from state for the reason :func:`route_review` gives,
     and it matters most of all here: this is the node a silent critic *reaches*,
-    so a binding failure would kill the run at the one place built to report why
-    it died.
+    so a binding failure would kill the run at the node whose job is to report
+    why it died.
     """
     state = keys.state(ctx)
     # The second look parked the merged set on ``reviewed`` and routed here, so
@@ -2288,7 +2292,7 @@ class LaneInputs:
     """What one framework's lanes are given, and what the prepare node records."""
 
     #: Lane name -> the four rendered artifacts, keyed by placeholder.
-    artifacts: Mapping[str, Mapping[str, str]]
+    artifacts: Mapping[str, Mapping[LaneArtifact, str]]
     candidates: Mapping[str, CandidateSet]
     ruled_out: Mapping[str, str]
     ruled_in: Mapping[str, str]
@@ -2322,7 +2326,7 @@ def framework_lane_inputs(
     ]
     notes_by_lane = select_per_lane(package.knowledge.notes, fired_by_lane, MAX_NOTES)
     cases_by_lane = select_per_lane(package.knowledge.cases, fired_by_lane, MAX_CASES)
-    artifacts: dict[str, dict[str, str]] = {}
+    artifacts: dict[str, dict[LaneArtifact, str]] = {}
     retrieved: list[str] = []
     ruled_out: dict[str, str] = {}
     ruled_in: dict[str, str] = {}
@@ -2497,7 +2501,7 @@ def _framework_block(
 # because the remedy differs: ``refuted`` says do not name this framework for
 # this system, and ``undecidable`` says the input never said, which the
 # submitter answers by submitting more.
-_REFUSALS: Mapping[str, Refusal] = MappingProxyType(
+_REFUSALS: Mapping[PreconditionResult, Refusal] = MappingProxyType(
     {
         "refuted": Refusal(
             "not-applicable",
@@ -2513,7 +2517,9 @@ _REFUSALS: Mapping[str, Refusal] = MappingProxyType(
 )
 
 
-def _refusal(package: FrameworkPackage, result: object) -> Refusal | None:
+def _refusal(
+    package: FrameworkPackage, result: PreconditionResult | None
+) -> Refusal | None:
     """Why this framework did not run, as a scope state and a reason, or ``None``.
 
     What the reason is *used for* is the block's own — the neutral base answers
@@ -2526,7 +2532,7 @@ def _refusal(package: FrameworkPackage, result: object) -> Refusal | None:
     model and runs no gate, and reporting a refusal there would describe one that
     never happened.
     """
-    refusal = _REFUSALS.get(str(result))
+    refusal = _REFUSALS.get(result or "satisfied")
     if refusal is None:
         return None
     return Refusal(refusal.state, refusal.reason.format(framework=package.name))
@@ -2814,8 +2820,9 @@ def _stated_node_func(keys: GraphKeys) -> Callable[..., Any]:
 
     It runs right behind the reader, ahead of every node that reads the valid
     model, so a pause, its early questions and ``prepare`` all read the
-    capabilities the sources state. The rows are checked here and nowhere
-    else (:func:`~analysis_service.capability_reader.with_stated_capabilities`).
+    capabilities the sources state. The rows are checked here, in ``stated``,
+    and nowhere else
+    (:func:`~analysis_service.capability_reader.with_stated_capabilities`).
     """
 
     def stated(valid_model: dict, ctx, source_texts: dict | None = None) -> dict:

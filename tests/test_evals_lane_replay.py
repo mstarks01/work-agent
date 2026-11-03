@@ -11,13 +11,17 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
 
 from analysis_service.frameworks import LANE_CLOSING_DOC, PACKAGES
-from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.frameworks.stride.record import (
+    ArchivedThreatProposals,
+    DraftThreat,
+)
 from analysis_service.graph import FrameworkNodes
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import lane_closing
@@ -30,6 +34,7 @@ from evals.harness.ledger import Ledger
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import DEFAULT_CORPUS
+from evals.harness.run_record import loaded
 from evals.harness.scorer import score_case
 from evals.reference_facts import load_facts
 from tests import test_evals_run_grounds as grounds
@@ -229,7 +234,8 @@ def test_the_out_file_starts_with_the_record_of_the_lane_material(
     tmp_path,
     monkeypatch,
 ):
-    """A replay's proposals name the sweep files they were rebuilt from (#2029)."""
+    """A replay's proposals name the sweep files they were rebuilt from (#2029),
+    and each prompt and package file the lane's request was built from."""
     out, _ = recorded
     finished(out, case.id)
 
@@ -260,10 +266,63 @@ def test_the_out_file_starts_with_the_record_of_the_lane_material(
     assert next(iter(held)) == "record"
     assert held["claims"] == []
     assert held["record"]["table"]["lane"] == "spoofing"
-    assert [one["path"] for one in held["record"]["inputs"]] == [
+    digests = {one["path"]: one["sha256"] for one in held["record"]["inputs"]}
+    files = [
+        loader.root / f"{name}.md"
+        for loader in (PACKAGE_LOADER, PROMPT_LOADER)
+        for name in loader.names()
+    ]
+    assert digests.keys() == {
         str(out),
         str(case_file(out, case.id, "lanes")),
-    ]
+        *map(str, files),
+    }
+    assert all(
+        digests[str(path)] == hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in files
+    )
+
+
+def test_a_replay_of_todays_prepare_names_each_file_it_loaded(
+    case,  # noqa: F811
+    tmp_path,
+    monkeypatch,
+):
+    """With no sweep, the record names each prompt, package and Domain Pack file
+    the lane's request was built from, with its digest."""
+
+    def scripted(*_):
+        async def call(instruction, turn):
+            return json.dumps({"claims": []})
+
+        return call
+
+    monkeypatch.setattr(lane_replay, "node_call", scripted)
+    monkeypatch.setattr(lane_replay.Deployment, "from_env", lambda: None)
+    written = tmp_path / "proposals.json"
+    args = argparse.Namespace(
+        artifact=None,
+        case=case.id,
+        lane="spoofing",
+        framework="stride",
+        accept_cost="unknown",
+        append=None,
+        fresh_leads=False,
+        prepare_today="none",
+        out=written,
+    )
+
+    assert lane_replay.command_lane_replay(args) == 0
+
+    held = json.loads(written.read_text(encoding="utf-8"))
+    digests = {one["path"]: one["sha256"] for one in held["record"]["inputs"]}
+    domains = MarkdownLoader(REPO_ROOT / "domains")
+    named = loaded((PACKAGE_LOADER, PROMPT_LOADER, domains))
+    assert digests.keys() == set(map(str, named))
+    assert all(
+        digests[str(path)] == hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in named
+    )
 
 
 def test_material_without_the_user_turn_is_refused(tmp_path):
@@ -444,7 +503,9 @@ def test_each_lane_scores_the_must_finds_the_run_drafts_match(recorded, case):  
     by_lane = {
         index
         for lane, batch in proposals["stride"].items()
-        for index in lane_must_finds(case, prepared.state, lane, batch)
+        for index in lane_must_finds(
+            case, prepared.state, lane, ArchivedThreatProposals.model_validate(batch)
+        )
     }
     whole = {
         pair.reference_index

@@ -63,8 +63,8 @@ Three properties make the expansion safe to put in front of the gate:
 - **A provisional ID is unmistakable.** The adapter does not derive element IDs.
   It writes ``ref_process:<ref>`` — a prefix no element class declares, so a
   provisional ID can never equal a derived one — and lets
-  :func:`~analysis_service.system_model.normalize_element_ids`, the one reader
-  of the ID rule, overwrite it and follow every reference. Deriving here would
+  :func:`~analysis_service.system_model.normalize_element_ids`, which applies
+  the ID rule, overwrite it and follow every reference. Deriving here would
   be a second reader of that rule, and it would re-impose the 300-character
   ``id`` bound on a value the full route never re-checks.
 - **An unresolved ref survives as itself.** A ref that names no element, and
@@ -116,6 +116,7 @@ from analysis_service.system_model import (
     DataFlow,
     DataStore,
     Element,
+    ElementGroup,
     EntityKind,
     Exposure,
     ExternalEntity,
@@ -168,7 +169,7 @@ EXTRACTION_FORMATS: tuple[ExtractionFormat, ...] = (FULL_FORMAT, COMPACT_FORMAT)
 #: type the full model would have spelled out, and a sixth element type brings
 #: its own. ``tests/test_compact.py`` holds the five to being distinct — two
 #: types sharing a letter would put the ambiguity straight back.
-REF_TAGS: Mapping[str, str] = MappingProxyType(
+REF_TAGS: Mapping[ElementGroup, str] = MappingProxyType(
     {
         group: get_args(SystemModel.model_fields[group].annotation)[0].id_prefix[0]
         for group in ELEMENT_GROUPS
@@ -374,7 +375,7 @@ class CompactSystemModel(BaseModel):
 #: than a branch, and ``tests/test_compact.py`` checks it against
 #: ``SystemModel``'s own fields, so a sixth element type joins both sides or
 #: fails the lint.
-COMPACT_ELEMENTS: Mapping[str, tuple[type[BaseModel], type[Element]]] = (
+COMPACT_ELEMENTS: Mapping[ElementGroup, tuple[type[BaseModel], type[Element]]] = (
     MappingProxyType(
         {
             "external_entities": (CompactExternalEntity, ExternalEntity),
@@ -388,7 +389,7 @@ COMPACT_ELEMENTS: Mapping[str, tuple[type[BaseModel], type[Element]]] = (
 
 #: The groups whose elements a flow endpoint may name, read off the element
 #: classes so the compact route and the full route share one set.
-_ENDPOINT_GROUPS: tuple[str, ...] = tuple(
+_ENDPOINT_GROUPS: tuple[ElementGroup, ...] = tuple(
     group
     for group, (_, element_type) in COMPACT_ELEMENTS.items()
     if element_type.id_prefix in ENDPOINT_PREFIXES
@@ -559,7 +560,7 @@ def _provisional_id(element_type: type[Element], ref: str) -> str:
 
 
 def _expand_element(
-    group: str,
+    group: ElementGroup,
     row: BaseModel,
     claims: Mapping[str, str],
     follow: Callable[[str], str],

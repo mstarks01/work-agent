@@ -57,7 +57,7 @@ from contextlib import asynccontextmanager, contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from alembic.migration import MigrationContext
 from alembic.util import CommandError
@@ -344,7 +344,8 @@ def _object_keys(row: Row[Any], *, include_unnamed: bool = False) -> list[str]:
 
 
 #: The fields of a record that are objects or event rows, not job columns.
-_OUTSIDE_THE_ROW = frozenset({"sources", "report", "events"})
+RecordObjectField = Literal["sources", "report", "events"]
+_OUTSIDE_THE_ROW: frozenset[RecordObjectField] = frozenset(get_args(RecordObjectField))
 #: The fields a job row holds as JSON text.
 _JSON_FIELDS = frozenset(
     column.name for column in jobs.columns if isinstance(column.type, _Json)

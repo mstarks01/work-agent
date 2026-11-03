@@ -1,0 +1,47 @@
+{
+ "route": "openrouter/openai/gpt-5.6-luna",
+ "results": [
+  {
+   "case": "01-one-time-code-only",
+   "rows": [
+    {
+     "capability": "browser-frontend",
+     "source_label": "System description",
+     "quote": "The rota app is a web app that the clinic's own team builds and runs."
+    },
+    {
+     "capability": "authentication",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address."
+    },
+    {
+     "capability": "one-time-codes",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address."
+    },
+    {
+     "capability": "out-of-band-authentication",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address."
+    },
+    {
+     "capability": "out-of-band-codes",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address."
+    },
+    {
+     "capability": "mail-sending",
+     "source_label": "System description",
+     "quote": "Staff sign in to the rota app with a one-time code that the app sends to their work email address."
+    }
+   ],
+   "mfa_kept": [],
+   "V6.4.4": "unknown",
+   "charge_usd": 0.001082425,
+   "usage": {
+    "prompt_tokens": 6044,
+    "completion_tokens": 545
+   }
+  }
+ ]
+}

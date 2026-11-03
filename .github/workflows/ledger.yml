@@ -26,8 +26,8 @@ jobs:
           persist-credentials: false
 
       # The base branch's copy of the script, so a pull request that edits the
-      # script is not checked by its own edit. Where the base branch has no
-      # copy, the pull request's copy runs. A rename lists both of its paths.
+      # script is not checked by its own edit. A base that holds no copy fails
+      # the step. A rename lists both of its paths.
       # The diff goes to a file and not through a pipe, so a failed git diff
       # fails the step and does not pass an empty list.
       - name: Ledger rows and code apart
@@ -38,10 +38,9 @@ jobs:
           set -euo pipefail
           script=evals/harness/ledger_isolation.py
           check="$RUNNER_TEMP/ledger_isolation.py"
-          if git cat-file -e "$BASE_SHA:$script" 2>/dev/null; then
-            git show "$BASE_SHA:$script" > "$check"
-          else
-            cp "$script" "$check"
+          if ! git show "$BASE_SHA:$script" > "$check"; then
+            echo "The base commit $BASE_SHA holds no $script, so the check cannot run it." >&2
+            exit 1
           fi
           paths="$RUNNER_TEMP/paths"
           git diff -z --name-only --no-renames "$BASE_SHA...$HEAD_SHA" > "$paths"

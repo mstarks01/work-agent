@@ -139,7 +139,7 @@ TOKEN_CAPS: dict[str, int] = {
     # 0016's reading that a cap here alarms rather than rations.
     "prompts/extract-compact": 750,
     # ``repair`` carries the `duplicate-id` step (#1040). The repair pass is
-    # the one reader that sees that code, and "change nothing the issues do not
+    # the pass that sees that code, and "change nothing the issues do not
     # cite" would otherwise forbid the flows a rename carries.
     #
     # It also states three contract points (#1082): `trust_zone` may be

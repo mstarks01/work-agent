@@ -16,6 +16,7 @@ it, so it admits only what the writer then accepts.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Literal, get_args
 
 from pydantic import ValidationError
 
@@ -66,7 +67,8 @@ __all__ = [
 
 #: The fields a flow's ID is built from. An answer cannot move one, because the
 #: flow would then carry an ID its endpoints no longer derive.
-_ENDPOINTS = frozenset({"source", "destination"})
+EndpointField = Literal["source", "destination"]
+_ENDPOINTS: frozenset[EndpointField] = frozenset(get_args(EndpointField))
 
 
 class LineageConflict(ValueError):

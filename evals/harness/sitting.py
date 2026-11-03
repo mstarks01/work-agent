@@ -166,13 +166,14 @@ DraftState = Literal["open", "finished"]
 #: What the store reports for a draft it cannot read. It is not a state the
 #: file can name: no file says this about itself, and a file that will not
 #: read cannot say anything about itself at all.
-UNREADABLE = "unreadable"
+Unreadable = Literal["unreadable"]
+UNREADABLE: Unreadable = "unreadable"
 
 #: What a live draft puts on its rail row, keyed by the state in the file so
 #: a state the shape gains arrives here rather than through an ``if``. A key
 #: it does not hold raises, which is the whole reason it is a table: a state
 #: nobody wrote a row for stops the rail rather than drawing a wrong one.
-DRAFT_ROW: Mapping[str, tuple[str, RowState]] = {
+DRAFT_ROW: Mapping[DraftState, tuple[str, RowState]] = {
     "open": ("draft in progress", "draft"),
     "finished": ("finished, not submitted", "finished"),
 }
@@ -228,8 +229,7 @@ class Draft(BaseModel):
 class DraftStatus:
     """What the store says about one case, for the rail that reads it."""
 
-    #: A :data:`DraftState`, or :data:`UNREADABLE`.
-    state: str
+    state: DraftState | Unreadable
     #: The file itself, because the refusal an unreadable draft gets names it.
     path: Path
 
@@ -496,7 +496,7 @@ def rail(
     """Every case in the corpus, in corpus order, with the status a reader reads.
 
     ``signatures`` says who cleared each case, from
-    :func:`evals.review_submission.rail_signatures` — the one reader of
+    :func:`evals.review_submission.rail_signatures`, which answers
     that question. It is passed in rather than read here because a submission
     is a merged file rather than a fact about a case directory, and this
     module is what a submission is validated against.

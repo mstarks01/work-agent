@@ -205,10 +205,10 @@ from analysis_service.job_answers import (
 from analysis_service.jobs import (
     DeleteRefusal,
     Envelope,
-    InMemoryJobStore,
     JobRecord,
     JobStore,
     PipelineRunner,
+    RefusalOutcome,
     StopSignal,
     ended,
     event_frames,
@@ -395,10 +395,8 @@ class Workspace:
     from the cell.
     """
 
-    def __init__(
-        self, *, store: JobStore | None = None, max_jobs: int = MAX_RUNS
-    ) -> None:
-        self.store: JobStore = InMemoryJobStore() if store is None else store
+    def __init__(self, *, store: JobStore, max_jobs: int = MAX_RUNS) -> None:
+        self.store = store
         self._max_jobs = max_jobs
         self._runs: dict[str, tuple[asyncio.Task[None], StopSignal]] = {}
 
@@ -479,8 +477,8 @@ class Workspace:
         """True while the job waits for answers.
 
         A paused job that no job locks waits. A paused job whose locking job
-        still runs also waits: that job can fail, and this one is then the
-        only place its answers resume. A paused job whose locking job has
+        still runs also waits: that job can fail, and this one is then
+        where its answers resume. A paused job whose locking job has
         :func:`~analysis_service.jobs.ended` waits no more. That job has a
         report or pauses itself, and a paused job never fails, so this one
         takes no answers again. A locking job that this owner no longer holds
@@ -665,7 +663,7 @@ class CellEmpty(Exception):
 
 @dataclass
 class Cell:
-    """The one place that holds the :class:`Current` (ADR 0093).
+    """Holds the :class:`Current` (ADR 0093).
 
     ``current`` is ``None`` where the Deployment did not build, and the
     diagnostic page then serves. A swap replaces ``current`` in one
@@ -1236,7 +1234,7 @@ _STALE_MESSAGE = (
 #: What the page is told for each admission refusal, keyed by outcome. An
 #: outcome missing here is this app's defect: ``duplicate`` cannot follow from
 #: a page, because ``JobRecord.create`` mints the ID.
-_ADMISSION_MESSAGES: dict[str, str] = {
+_ADMISSION_MESSAGES: dict[RefusalOutcome, str] = {
     "at_ceiling": "An analysis is already running. Wait for it to finish.",
     "over_rate": "This workspace started too many analyses in the current"
     " window. Wait for the window to roll past the earlier ones.",

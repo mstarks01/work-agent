@@ -1,4 +1,5 @@
-"""One reader of a job's framework selection, for every entry point.
+"""One reader of a job's framework selection, for every entry point,
+through :func:`resolve_names`.
 
 A job names the frameworks it wants and the options each one needs. Three
 entry points read that list — the HTTP route, the first-run web app and the

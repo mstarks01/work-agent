@@ -43,6 +43,7 @@ from tests.factories import (
     DEFAULT_FRAMEWORKS,
     DESCRIPTION_TEXT,
     SCRIPTED_FRAMEWORKS,
+    adk_runner,
     sample_selection,
     stand_in_engine,
 )
@@ -360,7 +361,7 @@ def test_an_engine_on_a_deployment_runs_in_the_carried_order(carried, asked):
 
 def test_engine_drives_the_real_graph_to_a_report():
     pipeline, _ = build(happy_replies())
-    engine = engine_for(AdkPipelineRunner(pipeline))
+    engine = engine_for(adk_runner(pipeline))
 
     outcome = analyze(engine, DESCRIPTION_TEXT)
 

@@ -239,7 +239,7 @@ def unprojected_predicates() -> frozenset[str]:
 
     A fact of one of these kinds reaches no graph reader. With the assertion
     pass on, the **Evidence Catalog** offers it to every lane as a row; a
-    candidate rule is the only reader that turns it into a lead.
+    candidate rule turns it into a lead.
     """
     return frozenset(REGISTRY) - frozenset(projection_fields())
 

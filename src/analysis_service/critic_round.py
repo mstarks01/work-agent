@@ -221,9 +221,8 @@ class CriticRound:
         """What the ``merge`` node outputs, and so the user turn its critic receives.
 
         ADK hands a node's output to the next node through ``to_user_content``,
-        so this dictionary is the critic's user turn. The one reader of that
-        shape: the node returns it, and :func:`critic_request` builds the turn
-        from it.
+        so this dictionary is the critic's user turn. The node returns it, and
+        :func:`critic_request` builds the turn from it.
         """
         return {
             "framework": self.framework,

@@ -343,8 +343,8 @@ def test_the_cli_resolves_its_critic_tier_through_the_one_reader():
 
     Two spellings name this node: the graph's ``critic_<framework>`` and the
     tiers file's ``critic/<framework>``.
-    :meth:`~analysis_service.deployment.Deployment.tier_of` is documented as the
-    one place that walk is written, and asking ``tiers.resolve_tier`` with the
+    :meth:`~analysis_service.deployment.Deployment.tier_of` walks the graph
+    spelling to a tier, and asking ``tiers.resolve_tier`` with the
     graph spelling raises ``unknown LLM node`` — so the run dies at its first
     line, after a reader has already paid for nothing.
 

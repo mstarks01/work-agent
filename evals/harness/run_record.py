@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.claims import FrameworkName
+from analysis_service.markdown_loader import MarkdownLoader
 from evals.harness.bundle import reports_dir
 from evals.harness.provenance import checkout_state
 
@@ -68,6 +69,14 @@ def run_record_for(
     if all(output is None for output in outputs):
         return None
     return run_record(command, table, inputs)
+
+
+def loaded(loaders: Iterable[MarkdownLoader]) -> dict[Path, Selections]:
+    """Each file the loaders hold, so a record from a changed tree still names
+    the prompt and package text a request was built from."""
+    return {
+        loader.root / f"{name}.md": {} for loader in loaders for name in loader.names()
+    }
 
 
 def sweep_inputs(artifacts: Iterable[Path]) -> dict[Path, Selections]:

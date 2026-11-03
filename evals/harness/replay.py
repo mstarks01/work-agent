@@ -129,6 +129,7 @@ from evals.harness.modes import (
     AssertionResult,
     AttributeCheck,
     ExtractionResult,
+    SweepMode,
     score_extraction,
 )
 from evals.harness.reference import GoldenCase
@@ -163,7 +164,7 @@ FATES: tuple[Fate, ...] = (
 #: reader ruled a producer need not draw, so nothing stood for it and nothing
 #: had to (:func:`~evals.harness.alignment.placeholder_zones`). A produced
 #: zone that pairs with one still reads ``found`` or ``renamed``.
-LOSSES: frozenset[str] = frozenset(FATES) - {"found", "renamed", "placeholder"}
+LOSSES: frozenset[Fate] = frozenset(FATES) - {"found", "renamed", "placeholder"}
 
 #: The fates a produced row can answer a reference row with, which is every
 #: fate that is not an absence. Named apart from :data:`RowFate` because one
@@ -197,7 +198,7 @@ ROW_FATES: tuple[RowFate, ...] = (
 #: raised, and the prompt tells the model to write no such row, so nobody
 #: produced it and nobody should have. A produced value against one still
 #: reads ``wrong_value``, which is the defect that matters.
-ROW_LOSSES: frozenset[str] = frozenset(
+ROW_LOSSES: frozenset[RowFate] = frozenset(
     {"wrong_certainty", "wrong_value", "rescoped", "omitted"}
 )
 
@@ -727,7 +728,7 @@ def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | No
 def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
     """The produced row in the reference's spellings, where a signed alias rules.
 
-    The one place an alias is applied, before any comparison: the subject, a
+    This applies an alias before any comparison: the subject, a
     value that points at another subject, and each scope qualifier are each
     rewritten to the reference's spelling where a signed ruling names the
     produced one. A value and a qualifier are rewritten only under the produced
@@ -969,7 +970,7 @@ BindFate = Literal[
 BIND_FATES: tuple[BindFate, ...] = get_args(BindFate)
 
 #: The binding losses, which the pooled table lists as targets.
-BIND_LOSSES: frozenset[str] = frozenset(
+BIND_LOSSES: frozenset[BindFate] = frozenset(
     {"renamed", "omitted", "referent_renamed", "referent_omitted"}
 )
 
@@ -1203,7 +1204,7 @@ def rendered_digest(rendered: Mapping[str, str]) -> str:
 #:
 #: A table keyed by mode, listing routes: a second route added to a mode is one
 #: entry here, and a sweep that ran it is placed rather than refused.
-ROUTES_OF: Mapping[str, tuple[tuple[str, ...], ...]] = {
+ROUTES_OF: Mapping[SweepMode, tuple[tuple[str, ...], ...]] = {
     "extraction": (("extract",),),
     "end-to-end": (("extract",),),
     "assertions": (("assert",),),
@@ -1216,7 +1217,7 @@ ROUTES_OF: Mapping[str, tuple[tuple[str, ...], ...]] = {
 #: question — which nodes' instructions place the sweep on an arm. The head-only
 #: mode reads through ``extract`` and keeps a catalog, so the two tables answer
 #: apart.
-KEEPS: Mapping[str, str] = {
+KEEPS: Mapping[SweepMode, str] = {
     "extraction": "extraction",
     "end-to-end": "extraction",
     "assertions": "catalog",

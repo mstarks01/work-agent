@@ -68,6 +68,7 @@ from analysis_service.system_model import (
     normalize_element_ids,
 )
 from analysis_service.validation import validate
+from tests.eval_factories import ruled_position
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     EVAL_MODEL,
@@ -144,6 +145,9 @@ def scripted_proposal(case, category) -> dict:
         # Taken from the reference the scripted draft is standing in for, so a
         # mode test grades the pipeline rather than this file's verb-picking.
         "verb": reference.verb,
+        # The position the case ruled on that reference, for the same reason;
+        # a lane must state one, so an unruled reference takes ``outside``.
+        "attacker_position": ruled_position(case, reference) or "outside",
         "evidence_refs": reaching_refs(case, reference.affected_element_ids),
         "severity": Severity(
             likelihood=reference.severity.likelihood,

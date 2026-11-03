@@ -27,9 +27,10 @@ is caller-controlled, so it must never sit on the marker line. What is left
 outside carries only this module's own bytes — an index, a count, and the
 register.
 
-The render is a pure function of the sources, called from the one place the
-graph is driven, so the service and the eval harness cannot show the same job to
-a model differently.
+The render is a pure function of the sources.
+:func:`~analysis_service.execution.seed_state` is its one reader for a graph
+run, so the service and the eval harness cannot show the same job to a model
+differently.
 """
 
 from __future__ import annotations
@@ -383,6 +384,10 @@ def total_bytes(sources: Sequence[Source]) -> int:
     return sum(source.size_bytes() for source in sources)
 
 
+#: What a breach of the source limits is.
+LimitRung = Literal["empty", "duplicate-label", "count", "total"]
+
+
 @dataclass(frozen=True)
 class LimitBreach:
     """Why a submission was refused before any model ran.
@@ -392,7 +397,7 @@ class LimitBreach:
     reason. ``message`` is caller-facing and names no internal detail.
     """
 
-    rung: Literal["empty", "duplicate-label", "count", "total"]
+    rung: LimitRung
     message: str
 
 

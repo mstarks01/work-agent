@@ -15,7 +15,7 @@ instruments must then say:
   the one reader of "does this catalog pass") refuses the row, by code, in
   any of its rounds; or
 * **the endpoint** (:attr:`~evals.harness.replay.AssertionReplay.recovered`,
-  the one reader of required-fact recall) stops counting the row, and the
+  which counts required-fact recall) stops counting the row, and the
   matcher's fate says why.
 
 A falsification probe that takes nothing away at either instrument is a hole in
@@ -35,6 +35,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
+from typing import Literal, get_args
 
 from analysis_service.assertions import (
     Assertion,
@@ -575,9 +576,30 @@ def _valid_inference(reference: SignedReference, case: GoldenCase) -> Corruption
     )
 
 
+#: A probe of :data:`PROBES`.
+ProbeName = Literal[
+    "perfect-reading",
+    "mfa-enforced",
+    "support-copied",
+    "empty-citation",
+    "stopword-mechanism",
+    "removed-assertion",
+    "renamed-flow",
+    "deleted-parallel-interaction",
+    "signature-is-not-authentication",
+    "destination-is-not-authentication",
+    "control-name-elsewhere",
+    "absence-inferred",
+    "scope-dropped",
+    "paraphrase",
+    "identity-and-provenance",
+    "changed-source",
+    "valid-inference",
+]
+
 #: Every probe, keyed by the criterion it answers. A key here is never an arm:
 #: ``tests/test_evals_falsification.py`` holds the two namespaces apart.
-PROBES: Mapping[str, Probe] = MappingProxyType(
+PROBES: Mapping[ProbeName, Probe] = MappingProxyType(
     {
         "perfect-reading": Probe("01-payments-checkout", _perfect),
         "mfa-enforced": Probe(
@@ -707,7 +729,7 @@ class Outcome:
         return not self.broke
 
 
-def run_probe(name: str, case: GoldenCase, reference: SignedReference) -> Outcome:
+def run_probe(name: ProbeName, case: GoldenCase, reference: SignedReference) -> Outcome:
     """Corrupt this case's perfect reading one way, and read both instruments."""
     probe = PROBES[name]
     corrupted = probe.corrupt(reference, case)
@@ -836,8 +858,8 @@ def render(found: Sequence[Outcome]) -> str:
     for name, probe in PROBES.items():
         if probe.note:
             lines.append(f"- `{name}` reaches part of its criterion: {probe.note}")
-    for name, why in sorted(UNPROBED.items()):
-        lines.append(f"- no probe for `{name}`: {why}")
+    for criterion, why in sorted(UNPROBED.items()):
+        lines.append(f"- no probe for `{criterion}`: {why}")
     return "\n".join(lines) + "\n"
 
 
@@ -860,19 +882,18 @@ def render(found: Sequence[Outcome]) -> str:
 #: under the basis ``inferred``, and reaching a lane labelled as an inference
 #: is what ADR 0036 asks of one. ``paraphrase`` and ``valid-inference`` are
 #: positive controls, and the rest corrupt the graph rather than a fact.
-CRITICAL: frozenset[str] = frozenset(
-    {
-        "mfa-enforced",
-        "support-copied",
-        "empty-citation",
-        "stopword-mechanism",
-        "control-name-elsewhere",
-        "signature-is-not-authentication",
-        "destination-is-not-authentication",
-        "scope-dropped",
-        "changed-source",
-    }
-)
+CriticalProbe = Literal[
+    "mfa-enforced",
+    "support-copied",
+    "empty-citation",
+    "stopword-mechanism",
+    "control-name-elsewhere",
+    "signature-is-not-authentication",
+    "destination-is-not-authentication",
+    "scope-dropped",
+    "changed-source",
+]
+CRITICAL: frozenset[CriticalProbe] = frozenset(get_args(CriticalProbe))
 
 #: Who assesses the corrupted rows in the reviewed reading. Not a model: the
 #: fixture itself knows which rows it corrupted.
@@ -959,7 +980,7 @@ class Reading:
 
 
 def reading(
-    name: str, case: GoldenCase, reference: SignedReference, *, reviewed: bool
+    name: ProbeName, case: GoldenCase, reference: SignedReference, *, reviewed: bool
 ) -> Reading:
     """One probe's corruption, ready for analysis preparation.
 
@@ -998,7 +1019,7 @@ def reading(
 
 
 def consume_probe(
-    name: str, case: GoldenCase, reference: SignedReference, *, reviewed: bool
+    name: ProbeName, case: GoldenCase, reference: SignedReference, *, reviewed: bool
 ) -> Consumed:
     """Drive one probe's corruption through the job, reviewed or not."""
     built = reading(name, case, reference, reviewed=reviewed)

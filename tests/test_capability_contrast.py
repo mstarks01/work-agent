@@ -27,7 +27,6 @@ from analysis_service.capability_reader import (
 from analysis_service.frameworks.asvs.applicability import applicability_for
 from analysis_service.jobs import JobRecord, PipelineAwaiting
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.prompts import compose_capabilities_prompt
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from analysis_service.system_model import SystemModel
@@ -35,6 +34,7 @@ from tests.factories import (
     DESCRIPTION_TEXT,
     PROJECT_ROOT,
     ScriptedLlm,
+    adk_runner,
     emitted,
     sample_selection,
     scripted_pipeline,
@@ -94,7 +94,7 @@ def _run(path: Path, reading: dict[str, Any]) -> tuple[SystemModel, SchemaLlm]:
     async def on_node(node: str) -> None:
         pass
 
-    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+    outcome = asyncio.run(adk_runner(pipeline).run(record, on_node))
     assert isinstance(outcome, PipelineAwaiting)
     reader = llms[graph.CAPABILITIES_NODE]
     assert isinstance(reader, SchemaLlm)

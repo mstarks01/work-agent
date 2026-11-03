@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from analysis_service.claims import (
     Claim,
@@ -43,13 +43,16 @@ from analysis_service.claims import (
     FrameworkName,
     RuledClaim,
     ScopeEntry,
+    VerdictStatus,
 )
 from analysis_service.frameworks.asvs.catalog import requirements_for
 from analysis_service.frameworks.asvs.record import requirement_of
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness import attribution, audit
+from evals.harness.attribution import ObservedKind
 from evals.harness.reference import (
     DISPOSITION_FOR_EVIDENCE,
+    AsvsDisposition,
     CaseFramework,
     GoldenCase,
     ReferenceRequirement,
@@ -62,7 +65,7 @@ if TYPE_CHECKING:
 #: The verdicts that assert a requirement applies to this system. ``rejected``
 #: is the critic ruling it does not, which is the negative answer rather than a
 #: missing one — so it is read, not ignored.
-APPLIES: frozenset[str] = frozenset({"confirmed", "needs-info"})
+APPLIES: frozenset[VerdictStatus] = frozenset({"confirmed", "needs-info"})
 
 #: This scorer's package, at the closed type the corpus is keyed by.
 FRAMEWORK: FrameworkName = "asvs"
@@ -392,9 +395,7 @@ class Observation:
     of evidence that would settle the requirement.
     """
 
-    kind: Literal[
-        "confirmed", "needs-info", "rejected", "not-applicable", "deferred", "silent"
-    ]
+    kind: ObservedKind
     needs: str = ""
 
 
@@ -402,7 +403,7 @@ class Observation:
 #: so the two cannot drift. ``not-applicable`` and ``gap-from-prose`` are absent:
 #: neither asks for evidence, and :func:`satisfies` answers them before it looks
 #: here.
-EVIDENCE_FOR_DISPOSITION: Mapping[str, str] = MappingProxyType(
+EVIDENCE_FOR_DISPOSITION: Mapping[AsvsDisposition, str] = MappingProxyType(
     {disposition: kind for kind, disposition in DISPOSITION_FOR_EVIDENCE.items()}
 )
 
@@ -449,10 +450,10 @@ def observe(
 
 
 def satisfies(
-    disposition: str,
+    disposition: AsvsDisposition,
     observation: Observation,
     carried: Collection[str],
-    also_acceptable: Collection[str],
+    also_acceptable: Collection[AsvsDisposition],
 ) -> bool:
     """Whether one run's answer is one this case accepts.
 
@@ -489,7 +490,7 @@ def satisfies(
 
 
 def _routed(
-    disposition: str, observation: Observation, carried: Collection[str]
+    disposition: AsvsDisposition, observation: Observation, carried: Collection[str]
 ) -> bool:
     """Whether the run reached the evidence one route asks for."""
     wanted = EVIDENCE_FOR_DISPOSITION[disposition]
@@ -503,13 +504,13 @@ class Judged:
     """One requirement a case judged, the run answered, and the scorer compared."""
 
     requirement: str
-    expected: str
+    expected: AsvsDisposition
     observed: Observation
     ok: bool
     #: The other routes this record accepts. Carried into the artifact so a
     #: reader can tell an answer that scored right on an alternate from one
     #: that matched the case's first choice.
-    also_acceptable: tuple[str, ...] = ()
+    also_acceptable: tuple[AsvsDisposition, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         entry = {

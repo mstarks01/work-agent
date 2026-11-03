@@ -7,8 +7,8 @@ picks which file the service reads. Every consumer assembles its configuration
 through this one object — the HTTP service, the in-process engine, the first-run
 web app, the eval harness's pipeline builder and the eval CLI. Each file is
 therefore read once per process, a deployment that redirects
-``ANALYSIS_SAMPLING`` has its sweeps grading the configuration it runs, and the
-node-to-tier walk is written in one place.
+``ANALYSIS_SAMPLING`` has its sweeps grading the configuration it runs, and
+:meth:`Deployment.tier_of` walks a node to its tier.
 
 A process holds one Deployment at a time. The first-run app holds it in one
 cell and replaces it when a save on its Settings page passes (ADR 0093). A job
@@ -162,8 +162,8 @@ ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
 #: default (ADR 0087); a non-empty value other than an affirmative turns it
 #: off, and an unset or empty variable keeps the default.
 CAPABILITY_READER_VAR = "ANALYSIS_CAPABILITY_READER"
-#: Each optional pass, by its variable, with its default. The one reader of the
-#: defaults: :meth:`Deployment.from_env`, the Settings page and the doc test of
+#: Each optional pass, by its variable, with its default.
+#: :meth:`Deployment.from_env`, the Settings page and the doc test of
 #: the "Optional passes" table in ``Configuration.md`` read it (ADR 0091).
 PASS_FLAGS: dict[str, bool] = {
     ASSERTIONS_VAR: True,

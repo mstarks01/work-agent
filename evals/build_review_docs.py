@@ -36,6 +36,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.asvs.catalog import ASVS_VERSION, requirement_text
 from evals.harness.reference import read_digest
@@ -384,7 +385,7 @@ def asvs_part(records: list[dict]) -> dict:
 #: is applicability. Each answers in blocks rather than in text, so the
 #: reading document and `webapp/sitting.py` lay out one description of the
 #: record and cannot drift into describing two.
-RENDERERS: dict[str, Callable[[list[dict]], dict]] = {
+RENDERERS: dict[FrameworkName, Callable[[list[dict]], dict]] = {
     "stride": stride_part,
     "asvs": asvs_part,
 }

@@ -45,9 +45,9 @@ from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.job_answers import OWNER_FILE_GONE
 from analysis_service.jobs import (
     JOB_ID_PATTERN,
-    AdmissionOutcome,
     InMemoryJobStore,
     JobRecord,
+    RefusalOutcome,
 )
 from analysis_service.owner_files import (
     CONTROL_CHARACTER,
@@ -289,7 +289,7 @@ def _reusing(tiers):
     from analysis_service.answer_sets import AnswerSet
 
     startup = startup_for(tiers)
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     reusing = TestClient(create_app(startup, workspace), base_url=LOOPBACK)
     earlier = run_to_completion(reusing)
     record = asyncio.run(workspace.store.get(earlier))
@@ -721,7 +721,7 @@ def test_an_option_that_is_not_a_closed_set_fails_loudly(client):
 
 def test_the_workspace_deletes_the_oldest_finished_job_and_stays_bounded(tiers):
     """Untrusted prose and its report never accumulate without bound."""
-    workspace = Workspace(max_jobs=3)
+    workspace = Workspace(store=InMemoryJobStore(), max_jobs=3)
     with TestClient(
         create_app(startup_for(tiers), workspace), base_url=LOOPBACK
     ) as client:
@@ -802,9 +802,7 @@ def test_the_admission_messages_and_the_literal_agree():
     a page cannot cause."""
     from webapp.main import _ADMISSION_MESSAGES
 
-    answered = set(_ADMISSION_MESSAGES) | {"admitted", "duplicate"}
-
-    assert answered == set(get_args(AdmissionOutcome))
+    assert set(_ADMISSION_MESSAGES) == set(get_args(RefusalOutcome))
 
 
 def test_a_refused_submission_deletes_no_finished_job(tiers):
@@ -815,7 +813,8 @@ def test_a_refused_submission_deletes_no_finished_job(tiers):
     )
     startup = replace(startup_for(tiers), settings=settings)
     with TestClient(
-        create_app(startup, Workspace(max_jobs=2)), base_url=LOOPBACK
+        create_app(startup, Workspace(store=InMemoryJobStore(), max_jobs=2)),
+        base_url=LOOPBACK,
     ) as client:
         runs = [run_to_completion(client) for _ in range(2)]
         refused = client.post("/analyze", json=posted("C"), headers=SAME_ORIGIN)
@@ -2403,7 +2402,7 @@ def test_the_operator_is_a_local_principal_that_the_first_run_creates(tiers):
     from webapp.main import OPERATOR
 
     startup = startup_for(tiers)
-    workspace = Workspace()
+    workspace = Workspace(store=InMemoryJobStore())
     client = TestClient(create_app(startup, workspace), base_url=LOOPBACK)
 
     assert client.get("/workspace/runs").json() == []

@@ -134,6 +134,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
+    ControlAttribute,
     control_state,
     matches_term,
 )
@@ -168,7 +169,7 @@ logger = logging.getLogger(__name__)
 #: is measured only once somebody declares it. ``tests/test_basis.py`` compares
 #: the two and names the attribute that is missing — here rather than at import,
 #: so the guard still runs on a half-added attribute.
-CONTROL_SCOPE: Mapping[str, str | None] = MappingProxyType(
+CONTROL_SCOPE: Mapping[ControlAttribute, str | None] = MappingProxyType(
     {
         "authentication": None,
         "encryption_in_transit": None,
@@ -186,7 +187,7 @@ CONTROL_SCOPE: Mapping[str, str | None] = MappingProxyType(
 _UNDECLARED = "undeclared"
 
 #: The attributes the diagnostic reads, in registry order.
-IN_SCOPE: tuple[str, ...] = tuple(
+IN_SCOPE: tuple[ControlAttribute, ...] = tuple(
     attribute
     for attribute in CONTROL_ATTRIBUTES
     if CONTROL_SCOPE.get(attribute, _UNDECLARED) is None
@@ -278,10 +279,10 @@ class StatedControl(NamedTuple):
     """One stated in-scope control, with the tokens to look for and where, as
     :func:`control_measurability` yields it.
 
-    That walk is the one reader of "which values does this diagnostic
-    measure". Both rungs of the published measurement and the shipped
-    :func:`unbased_controls` walk the model through it, so a denominator and a
-    rate can never be computed over two different sets.
+    :func:`control_measurability` is the one reader of "which values does
+    this diagnostic measure". Both rungs of the published measurement and the
+    shipped :func:`unbased_controls` walk the model through it, so a
+    denominator and a rate can never be computed over two different sets.
     """
 
     element_id: str

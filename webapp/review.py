@@ -74,6 +74,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from analysis_service.claim_identity import report_rows
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from evals import verify_corpus
 from evals.harness import baseline, bundle
@@ -116,7 +117,7 @@ PORT = 8010
 
 #: The verdicts the endpoint accepts, spelled from the type the ledger declares
 #: so the two cannot drift apart.
-VERDICTS: tuple[str, ...] = get_args(VoteChoice)
+VERDICTS: tuple[VoteChoice, ...] = get_args(VoteChoice)
 
 #: What each package's records rule on, in the words the reviewer reads. A
 #: table rather than one heading, because the two packages do not ask the same
@@ -128,7 +129,7 @@ VERDICTS: tuple[str, ...] = get_args(VoteChoice)
 #: holds — so only the prose is keyed here and the ledger stays one closed set.
 #: ``evals/build_review_docs.py`` asks the same question per package in the
 #: reading document; these are the browser's half of that pair.
-QUESTIONS: dict[str, dict[str, str]] = {
+QUESTIONS: dict[FrameworkName, dict[str, str]] = {
     "stride": {
         "heading": "Could this happen?",
         "ask": "Could this attack happen in this system?",
@@ -349,7 +350,7 @@ def create_app(session: Session) -> FastAPI:
                 status_code=422,
                 detail=f"verdict is not one of {', '.join(VERDICTS)}",
             )
-        verdict: VoteChoice = body.verdict  # type: ignore[assignment]
+        verdict: VoteChoice = body.verdict
         try:
             recorded = cast(
                 item.components,

@@ -1,0 +1,108 @@
+{
+  "case": "15-multitenant-invoicing",
+  "positions": [
+    {
+      "lane": "spoofing",
+      "reference": {
+        "verb": "guess-credential",
+        "affected_element_ids": [
+          "flow:entity:company-user>process:billing-app>manage-invoices",
+          "process:billing-app"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 108"
+    },
+    {
+      "lane": "tampering",
+      "reference": {
+        "verb": "alter",
+        "affected_element_ids": [
+          "flow:entity:company-user>process:billing-app>manage-invoices",
+          "process:billing-app",
+          "store:tenant-database"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 109"
+    },
+    {
+      "lane": "repudiation",
+      "reference": {
+        "verb": "unattributable",
+        "affected_element_ids": [
+          "flow:process:admin-console>process:billing-app>open-session-as-customer-user",
+          "process:admin-console",
+          "store:tenant-database"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 110"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "elicit",
+        "affected_element_ids": [
+          "flow:entity:payer>process:billing-app>open-payment-page",
+          "process:billing-app",
+          "entity:payer"
+        ]
+      },
+      "position": "outside",
+      "ruling": "The ballot proposed outside, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 111"
+    },
+    {
+      "lane": "information-disclosure",
+      "reference": {
+        "verb": "elicit",
+        "affected_element_ids": [
+          "flow:entity:company-user>process:billing-app>manage-invoices",
+          "process:billing-app",
+          "store:tenant-database"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 112"
+    },
+    {
+      "lane": "denial-of-service",
+      "reference": {
+        "verb": "flood",
+        "affected_element_ids": [
+          "flow:entity:company-user>process:billing-app>manage-invoices",
+          "process:pdf-renderer",
+          "store:render-queue"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 113"
+    },
+    {
+      "lane": "elevation-of-privilege",
+      "reference": {
+        "verb": "escalate",
+        "affected_element_ids": [
+          "flow:entity:company-user>process:billing-app>manage-invoices",
+          "process:billing-app"
+        ]
+      },
+      "position": "authorized-principal",
+      "ruling": "The ballot proposed authorized-principal, and the ruler accepted it.",
+      "reviewed_by": "mstarks01",
+      "source": "QA-2026-11-02-05 position ballot row 114"
+    }
+  ]
+}

@@ -279,7 +279,7 @@ def _batches(items: Sequence[_T], size: int) -> list[list[_T]]:
 
 async def _run_mode(
     cases: Sequence[GoldenCase],
-    mode: str,
+    mode: modes.SweepMode,
     deployment: Deployment,
     only: Sequence[FrameworkName],
     accepted: float | None,
@@ -494,8 +494,8 @@ async def _run_mode(
             )
         except Exception as error:  # noqa: BLE001 — every fault, so none is free
             # A refused model and a provider fault arrive the same way here and
-            # are told apart by :data:`MEASURED` in the fold, which is the one
-            # reader of that question.
+            # are told apart by :data:`MEASURED` in the fold, which answers that
+            # question.
             return _CaseOutcome(case=case, error=error)
         return _CaseOutcome(
             case=case,
@@ -747,7 +747,7 @@ def _scored_sweep(
     runs: dict[str, modes.AnalysisRun],
     votes: ledger.Ledger,
     table: roster.Roster,
-) -> dict[str, Sweep]:
+) -> dict[standings.Series, Sweep]:
     """Every reading that needs the vote ledger, folded onto ``sweep``.
 
     One spelling for the two commands that compute these numbers: ``run``,
@@ -790,7 +790,7 @@ def _scored_sweep(
     matcher = SubsetVerbIdentity(flow_maps)
     reports = {case: run.report for case, run in runs.items()}
 
-    by_series = {}
+    by_series: dict[standings.Series, Sweep] = {}
     for name, included in standings.SERIES.items():
         read = standings.narrow(votes, table, included)
         scores, yields, charged = _score_runs(cases, runs, matcher, read, flow_maps)
@@ -818,7 +818,7 @@ def _scored_keys(sweep: Sweep) -> dict[str, Any]:
     return keys
 
 
-def _series_record(by_series: dict[str, Sweep]) -> dict[str, Any]:
+def _series_record(by_series: dict[standings.Series, Sweep]) -> dict[str, Any]:
     """Which standings each series reads, and the non-primary series' numbers.
 
     The primary series' blocks are the artifact's top-level scored keys and
@@ -840,7 +840,7 @@ def _series_record(by_series: dict[str, Sweep]) -> dict[str, Any]:
     }
 
 
-def _print_series(by_series: dict[str, Sweep]) -> None:
+def _print_series(by_series: dict[standings.Series, Sweep]) -> None:
     """Say which standings the printed numbers read, and what the others say."""
     included = ", ".join(standings.SERIES[standings.PRIMARY])
     print(f"\nThe scored numbers above read {included} votes only.")
@@ -1170,7 +1170,7 @@ def command_run(args: argparse.Namespace) -> int:
     # A mode that produced no run has nothing to score, and ``Sweep`` already
     # defaults every scored field to empty — which is a sweep that measured
     # nothing rather than one whose numbers were all zero.
-    by_series: dict[str, Sweep] = {}
+    by_series: dict[standings.Series, Sweep] = {}
     if mode_run.runs:
         by_series = _scored_sweep(sweep, ran, mode_run.runs, votes, table)
         sweep = by_series[standings.PRIMARY]

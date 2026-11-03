@@ -45,6 +45,16 @@ FULL_SECTION = "\n".join(
 )
 
 
+BEFORE_SECTION = "\n".join(
+    [
+        check.BEFORE_HEADING,
+        *(f"- **{name}**: `grep -c x src`, none found." for name in check.RECURRING),
+    ]
+)
+
+FULL_BODY = f"{FULL_SECTION}\n\n{BEFORE_SECTION}"
+
+
 def _guide_classes() -> list[str]:
     """Each class the class table of ``docs/agents/code-review.md`` names, in order."""
     text = REVIEW_GUIDE.read_text(encoding="utf-8")
@@ -54,6 +64,20 @@ def _guide_classes() -> list[str]:
 
 def test_the_class_names_are_the_guides():
     assert list(check.CLASSES) == _guide_classes()
+
+
+def _guide_recurring() -> list[str]:
+    """Each class the table "The classes that come back in fixes" of
+    ``docs/agents/code-review.md`` names, in order."""
+    text = REVIEW_GUIDE.read_text(encoding="utf-8")
+    table = text.partition("**The classes that come back in fixes.**")[2]
+    rows = re.match(r"(?:.+\n)*?\n((?:\|.*\n)+)", table)
+    assert rows is not None
+    return re.findall(r"^\| ([^|]+?) \|", rows.group(1), re.MULTILINE)[1:]
+
+
+def test_the_recurring_class_names_are_the_guides():
+    assert list(check.RECURRING) == _guide_recurring()
 
 
 def _guide_code_paths() -> list[str]:
@@ -180,6 +204,38 @@ def test_the_names_on_one_line_are_not_a_read():
     assert check.missing(body) == [f"text after {name}" for name in check.CLASSES[:-1]]
 
 
+def test_a_before_the_code_section_with_every_class_passes():
+    assert check.missing(BEFORE_SECTION, check.BEFORE_HEADING, check.RECURRING) == []
+
+
+def test_a_body_with_no_before_the_code_section_names_the_heading():
+    assert check.missing(FULL_SECTION, check.BEFORE_HEADING, check.RECURRING) == [
+        check.BEFORE_HEADING
+    ]
+
+
+def test_a_before_the_code_section_that_leaves_out_a_class_names_it():
+    body = BEFORE_SECTION.replace("A default only a test omits", "A default")
+    assert check.missing(body, check.BEFORE_HEADING, check.RECURRING) == [
+        "A default only a test omits"
+    ]
+
+
+def test_an_empty_before_the_code_entry_is_named():
+    name = check.RECURRING[2]
+    body = BEFORE_SECTION.replace(
+        f"**{name}**: `grep -c x src`, none found.", f"**{name}**:"
+    )
+    assert check.missing(body, check.BEFORE_HEADING, check.RECURRING) == [
+        f"text after {name}"
+    ]
+
+
+def test_a_class_name_counts_with_or_without_its_backticks():
+    plain = BEFORE_SECTION.replace("`Literal`", "Literal")
+    assert check.missing(plain, check.BEFORE_HEADING, check.RECURRING) == []
+
+
 def _commit(repo: Path, path: str, text: str | None = None) -> str:
     file = repo / path
     file.parent.mkdir(parents=True, exist_ok=True)
@@ -203,12 +259,21 @@ def _commit(repo: Path, path: str, text: str | None = None) -> str:
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
+    """A repository whose first commit holds the tree's two tables, as the base
+    branch does."""
     run_command(["git", "init", "-b", "main", str(tmp_path)], tmp_path)
-    _commit(tmp_path, "README.md")
+    for table in (check.TABLE, check.HELD):
+        _commit(
+            tmp_path,
+            f".github/scripts/{table.name}",
+            table.read_text(encoding="utf-8"),
+        )
     return tmp_path
 
 
-def _run(repo: Path, base: str, head: str, body: str) -> int:
+def _ran(
+    repo: Path, base: str, head: str, body: str
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(SCRIPT), base, head],
         cwd=repo,
@@ -216,14 +281,20 @@ def _run(repo: Path, base: str, head: str, body: str) -> int:
         capture_output=True,
         text=True,
         check=False,
-    ).returncode
+    )
+
+
+def _run(repo: Path, base: str, head: str, body: str) -> int:
+    return _ran(repo, base, head, body).returncode
 
 
 def test_a_code_change_with_no_section_is_refused(repo):
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
     head = _commit(repo, "src/module.py")
     assert _run(repo, base, head, "A body with no section.") == 1
-    assert _run(repo, base, head, FULL_SECTION) == 0
+    assert _run(repo, base, head, FULL_SECTION) == 1
+    assert _run(repo, base, head, BEFORE_SECTION) == 1
+    assert _run(repo, base, head, FULL_BODY) == 0
 
 
 def test_a_code_file_moved_out_of_a_code_path_needs_the_read(repo):
@@ -417,17 +488,30 @@ reason = "test"
 
 def test_the_check_reads_the_base_branchs_table(repo):
     """The table a pull request carries cannot free the pull request: the check
-    reads the base commit's copy, and falls back to its own copy only where the
-    base holds none."""
+    reads the base commit's copy."""
     _commit(repo, ".github/scripts/prompt_outcomes.toml", TABLE_ROW)
     _commit(repo, "prompts/extract.md")
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
     _commit(repo, "src/module.py")
     head = _commit(repo, ".github/scripts/prompt_outcomes.toml", "")
-    read = f"{FULL_SECTION}\n\n{check.PROMPT_HEADING}\n\n- `prompts/extract.md`: true."
+    read = f"{FULL_BODY}\n\n{check.PROMPT_HEADING}\n\n- `prompts/extract.md`: true."
 
-    assert _run(repo, base, head, FULL_SECTION) == 1
+    assert _run(repo, base, head, FULL_BODY) == 1
     assert _run(repo, base, head, read) == 0
+
+
+@pytest.mark.parametrize("table", [check.TABLE, check.HELD], ids=lambda t: t.name)
+def test_a_base_with_no_table_stops_the_check(repo, table):
+    """The check reads each table from the base commit only, so a base that
+    holds none fails with an error that names the table."""
+    run_command(["git", "rm", "-q", f".github/scripts/{table.name}"], repo)
+    _commit(repo, "README.md")
+    base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
+    head = _commit(repo, "src/module.py")
+    ran = _ran(repo, base, head, FULL_BODY)
+
+    assert ran.returncode == 1
+    assert f"holds no .github/scripts/{table.name}" in ran.stderr
 
 
 def test_a_prompt_read_names_each_prompt_with_text_after_it():
@@ -446,14 +530,14 @@ def test_a_prompt_read_names_each_prompt_with_text_after_it():
 
 
 def test_a_module_change_with_no_prompt_read_is_refused(repo):
-    """The base holds no table, so the check reads the script's own copy, and
-    asks for the prompt the tree holds."""
+    """The base holds the tree's table, so the check asks for the prompt that
+    the table pairs with the module."""
     _commit(repo, "prompts/extract-compact.md")
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
     head = _commit(repo, "src/analysis_service/compact.py")
     read = f"{check.PROMPT_HEADING}\n\n- prompts/extract-compact.md: still true."
-    assert _run(repo, base, head, FULL_SECTION) == 1
-    assert _run(repo, base, head, f"{FULL_SECTION}\n\n{read}") == 0
+    assert _run(repo, base, head, FULL_BODY) == 1
+    assert _run(repo, base, head, f"{FULL_BODY}\n\n{read}") == 0
 
 
 #: The rows of held wording in model text, read once for every test here and
@@ -527,9 +611,9 @@ def test_a_change_to_held_wording_needs_a_prompt_read_from_the_base_table(repo):
     _commit(repo, "prompts/critic.md", "Here two elements talk.\n")
     head = _commit(repo, ".github/scripts/held_wording.toml", "")
     read = (
-        f"{FULL_SECTION}\n\n{check.PROMPT_HEADING}\n\n"
+        f"{FULL_BODY}\n\n{check.PROMPT_HEADING}\n\n"
         "- `two parts talk`: changed by a measured change, ledger row QA-01."
     )
 
-    assert _run(repo, base, head, FULL_SECTION) == 1
+    assert _run(repo, base, head, FULL_BODY) == 1
     assert _run(repo, base, head, read) == 0

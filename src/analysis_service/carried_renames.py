@@ -91,7 +91,7 @@ def _renamed_id(element_id: str, renames: Sequence[ElementRename]) -> str:
 def renamed(carried: AnswerSet, renames: Sequence[ElementRename]) -> AnswerSet:
     """The carried answers with each element under ``renames``.
 
-    **The one reader of a rename.** A fact answer about an element takes the
+    **How a rename moves a carried answer.** A fact answer about an element takes the
     element's new ID; every other answer is kept as it was carried. Where a
     renamed answer would land on a fact another carried answer names, the
     other answer is kept and the renamed one is not.

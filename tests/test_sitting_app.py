@@ -48,7 +48,11 @@ def unruled(tree: Path, case: str = CASE) -> int:
     moves one that ``rulings.json`` leaves alone, read through :func:`load_case`.
     """
     golden = load_case(tree / "evals" / "corpus" / case)
-    named = {*golden.ruled_readings, *golden.refused_readings}
+    named = {
+        *golden.ruled_readings,
+        *golden.refused_readings,
+        *golden.ruled_positions,
+    }
     return next(
         index for index in range(len(golden.stride_claims())) if index not in named
     )
@@ -1882,6 +1886,18 @@ class TestTheDraftStore:
         held = sittings.draft_states(root, "ada")
         assert held[CASE].state == "open"
         assert held[OTHER].state == sittings.UNREADABLE
+
+    def test_a_draft_that_names_the_unreadable_state_is_refused(self, tmp_path):
+        """``unreadable`` is what the store says, never a state a file names."""
+        root = self.store(tmp_path)
+        path = sittings.draft_path(root, "ada", CASE)
+        path.parent.mkdir(parents=True)
+        path.write_text(
+            json.dumps({"case": CASE, "state": sittings.UNREADABLE}), encoding="utf-8"
+        )
+        with pytest.raises(sittings.DraftError):
+            sittings.load_draft(root, "ada", CASE)
+        assert sittings.draft_states(root, "ada")[CASE].state == sittings.UNREADABLE
 
     def test_a_survey_of_a_reader_with_no_store_is_empty(self, tmp_path):
         assert sittings.draft_states(self.store(tmp_path), "ada") == {}

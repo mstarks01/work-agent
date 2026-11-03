@@ -16,7 +16,7 @@ from analysis_service.links import with_link_answers
 from analysis_service.sources import ANSWERS_LABEL, Source
 from analysis_service.system_model import CapabilityStatement, SystemModel
 from analysis_service.validation import validate
-from tests.factories import DESCRIPTION_TEXT, valid_model
+from tests.factories import DESCRIPTION_TEXT, adk_runner, valid_model
 
 ASVS_L1 = {"asvs": {"level": 1}}
 
@@ -231,7 +231,7 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
 
     from analysis_service import graph
     from analysis_service.jobs import Checkpoint, JobRecord, Resumption
-    from analysis_service.pipeline import AdkPipelineRunner, PipelineCompleted
+    from analysis_service.pipeline import PipelineCompleted
     from analysis_service.report import FrameworkSelection
     from tests.factories import scripted_pipeline
 
@@ -253,7 +253,7 @@ def test_a_resumed_asvs_run_reports_the_answered_absence():
     async def on_node(node: str) -> None:
         return None
 
-    outcome = asyncio.run(AdkPipelineRunner(pipeline).run(record, on_node))
+    outcome = asyncio.run(adk_runner(pipeline).run(record, on_node))
 
     assert isinstance(outcome, PipelineCompleted)
     (block,) = outcome.report.analyses

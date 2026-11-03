@@ -13,8 +13,8 @@ matched against bytes a caller submitted, and this module interprets neither as
 anything but text. It compiles no regular expression from either side, so the
 ladder proper cannot cost more than the quote's length times the source's.
 
-The repair rung is where cost has to be bounded on purpose, because it is the
-one place both lengths multiply into a search. :data:`MAX_REPAIR_WORK` is that
+The repair rung is where cost has to be bounded on purpose, because there both
+lengths multiply into a search. :data:`MAX_REPAIR_WORK` is that
 bound, and the constant carries the measurements behind it. It is a budget the
 scan spends, not a size it is refused for: what costs the time is how many
 windows survive pruning, and no function of the two lengths can see that.

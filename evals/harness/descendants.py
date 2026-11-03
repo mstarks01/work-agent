@@ -35,10 +35,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from analysis_service.claims import FrameworkName
+from analysis_service.claims import FrameworkName, ProposalBatch
 from analysis_service.fan_in import fan_in
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks.stride.record import (
+    ArchivedThreatProposals,
+    DraftThreat,
+)
 from analysis_service.graph import (
     STATE_SOURCE_TEXTS,
     STATE_VALID_MODEL,
@@ -97,12 +100,11 @@ def replay_case(
 ) -> Replayed:
     """The fan-in run again over ``proposals`` plus ``injected``, then scored."""
     block = next(block for block in report.analyses if block.framework == FRAMEWORK)
-    schema = schemas_for(FRAMEWORK).proposals
     batches = {}
     for lane in set(proposals) | set(injected):
         raw = dict(proposals.get(lane) or {"claims": []})
         raw["claims"] = [*raw.get("claims", []), *injected.get(lane, ())]
-        batches[lane] = schema.model_validate(raw)
+        batches[lane] = ArchivedThreatProposals.model_validate(raw)
     merged = fan_in(
         batches,
         PACKAGES[FRAMEWORK],
@@ -146,7 +148,7 @@ def replay_case(
 
 
 def lane_must_finds(
-    case: GoldenCase, state: Mapping[str, Any], lane: str, batch: Any
+    case: GoldenCase, state: Mapping[str, Any], lane: str, batch: ProposalBatch
 ) -> tuple[int, ...]:
     """The must-find references one lane's proposals match, before any critic.
 
@@ -159,7 +161,7 @@ def lane_must_finds(
     model = SystemModel.model_validate(state[STATE_VALID_MODEL])
     session = GraphKeys.of([FRAMEWORK]).state(SimpleNamespace(state=state))
     merged = fan_in(
-        {lane: schemas_for(FRAMEWORK).proposals.model_validate(batch)},
+        {lane: batch},
         nodes.package,
         model,
         state[STATE_SOURCE_TEXTS],

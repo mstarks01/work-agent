@@ -1,6 +1,6 @@
 # Repudiation Exemplars
 
-Three drafts against the exemplar system, showing the shape and the reasoning. Follow the reasoning, not the wording.
+Three drafts against the exemplar systems, showing the shape and the reasoning. Follow the reasoning, not the wording.
 
 ## Canonical: audit records that cannot name the customer
 
@@ -20,6 +20,7 @@ The lane test: the harm here is not that someone impersonated a customer (spoofi
     "flow:process:ledger-service>store:audit-log>append-transfer-record"
   ],
   "verb": "unattributable",
+  "attacker_position": "authorized-principal",
   "evidence_refs": [
     "crossing:flow:entity:customer>process:web-api>submit-payment",
     "absent:flow:process:web-api>process:ledger-service>post-transfer:authentication"
@@ -64,6 +65,7 @@ Written against exemplar system B. Repudiation does not require anyone to tamper
     "store:telemetry-store"
   ],
   "verb": "unattributable",
+  "attacker_position": "authorized-principal",
   "evidence_refs": [
     "crossing:flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry",
     "crossing:flow:process:mqtt-broker>process:stream-processor>consume-topic"
@@ -111,6 +113,7 @@ Written against exemplar system B. Repudiation does not require anyone to tamper
     "flow:entity:payments-provider>process:web-api>settlement-webhook"
   ],
   "verb": "unattributable",
+  "attacker_position": "authorized-principal",
   "evidence_refs": [
     "crossing:flow:entity:payments-provider>process:web-api>settlement-webhook",
     "unknown:flow:entity:payments-provider>process:web-api>settlement-webhook:authentication"

@@ -43,7 +43,7 @@ from evals.harness.artifact import ProvenanceError, corpus_digest
 from evals.harness.bundle import check_out
 from evals.harness.modes import EvalRunError
 from evals.harness.node_call import node_call
-from evals.harness.run_record import run_record_for
+from evals.harness.run_record import loaded, run_record_for
 
 
 def _one_framework(fixtures: list[CriticFixture]) -> FrameworkName:
@@ -70,11 +70,10 @@ def _critic_node(framework: FrameworkName) -> str:
     """This package's critic node, as the *graph* names it.
 
     :meth:`~analysis_service.deployment.Deployment.tier_of` takes this spelling
-    and is the one place the walk to a tier is written — graph node to
-    canonical tier node to tier. The tiers file spells the same node
-    ``critic/<framework>``, so a caller that asked
-    ``tiers.resolve_tier`` with this name is a second reader of that walk, and
-    a wrong one.
+    and walks it to a tier — graph node to canonical tier node to tier. The
+    tiers file spells the same node ``critic/<framework>``, so a caller that
+    asked ``tiers.resolve_tier`` with this name is a second reader of that
+    walk, and a wrong one.
     """
     return f"critic_{framework}"
 
@@ -113,12 +112,14 @@ def main(argv: list[str] | None = None) -> int:
     framework = _one_framework(fixtures)
     package = PACKAGES[framework]
     case_id = _one_case(fixtures)
+    package_loader = MarkdownLoader(REPO_ROOT / "frameworks" / framework)
+    prompt_loader = MarkdownLoader(REPO_ROOT / "prompts")
     try:
         record = run_record_for(
             [args.out],
             "critic-review",
             {"framework": framework, "case": case_id, "corpus_digest": corpus_digest()},
-            {CASES: {}},
+            {CASES: {}, **loaded((package_loader, prompt_loader))},
         )
     except ProvenanceError as error:
         print(error, file=sys.stderr)
@@ -139,8 +140,8 @@ def main(argv: list[str] | None = None) -> int:
                 model,
                 corpus_sources(case_id),
                 package,
-                MarkdownLoader(REPO_ROOT / "frameworks" / framework),
-                MarkdownLoader(REPO_ROOT / "prompts"),
+                package_loader,
+                prompt_loader,
                 node,
             )
         )

@@ -1,5 +1,5 @@
 """The shared base for every fail-closed configuration error, and the one
-reader of where a request's validation error sits.
+reader of where a request's validation error sits, :func:`error_place`.
 
 Four loaders refuse to build on bad config — the model tiers
 (:class:`~analysis_service.model_tiers.ModelConfigError`), vendor credentials

@@ -9,8 +9,8 @@ a scored sweep into the question and the answer back into a ruling.
 names the surviving draft at a ``verb`` loss's place and the displaced draft
 beside a ``place`` or ``unled`` loss, with the vote status on it. Those are
 the near misses; this module selects from them and computes nothing about
-places or verbs of its own, so there is one reader of "which draft sits next
-to this miss".
+places or verbs of its own, so it decides nothing about which draft sits
+next to a miss.
 
 **A row is asked only where a ruling can move the figure.** A draft that
 matched a reference of its own keeps it, because the scorer assigns every
@@ -30,7 +30,7 @@ import csv
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, get_args
+from typing import Any, Literal, get_args
 
 from analysis_service.frameworks.stride.record import DraftThreat
 from evals.harness.identity import CaseFlows, endpoint_subset
@@ -42,11 +42,12 @@ from evals.harness.reference import (
     RulingVerdict,
     load_case,
 )
-from evals.harness.scorer import CaseScore
+from evals.harness.scorer import CaseScore, VoteStatus
 from evals.harness.verbs import same_action
 
 #: What the reader fills in, and the answers the recorder accepts.
-VERDICTS = ("same", "different", "unsure")
+NearMissVerdict = Literal[RulingVerdict, "unsure"]
+VERDICTS: tuple[NearMissVerdict, ...] = get_args(NearMissVerdict)
 
 #: The verdicts that become a signed ruling. ``unsure`` records nothing, so the
 #: row is asked again on the next ballot.
@@ -55,7 +56,7 @@ RULED: tuple[RulingVerdict, ...] = get_args(RulingVerdict)
 #: The vote statuses a displaced draft may carry and still be asked about. A
 #: ``rejected`` draft is one a person refused; ``None`` means it matched a
 #: reference of its own and nobody was asked.
-ASKABLE = frozenset({"pooled", "open", "unvoted", "stale"})
+ASKABLE: frozenset[VoteStatus] = frozenset({"pooled", "open", "unvoted", "stale"})
 
 COLUMNS = (
     "n",
@@ -79,7 +80,8 @@ COLUMNS = (
 
 #: The columns the reader answers in. Every other column is carried, and a
 #: returned ballot that changes one is refused.
-ANSWERED = ("verdict", "note")
+AnsweredColumn = Literal["verdict", "note"]
+ANSWERED: tuple[AnsweredColumn, ...] = get_args(AnsweredColumn)
 
 PLACE_SEP = " ; "
 
@@ -199,7 +201,8 @@ def write(ballot: Sequence[Mapping[str, str]], path: Path) -> None:
         writer.writerows(ballot)
 
 
-def _read(path: Path) -> list[dict[str, str]]:
+def read_rows(path: Path) -> list[dict[str, str]]:
+    """The rows of a ballot CSV, each keyed by its column."""
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
 
@@ -211,8 +214,8 @@ def returned_rows(issued: Path, returned: Path) -> list[dict[str, str]]:
     carried column it does carry must read exactly as issued, so an answer is
     never recorded against a row the reader was not shown.
     """
-    issued_rows = {row["n"]: row for row in _read(issued)}
-    answers = _read(returned)
+    issued_rows = {row["n"]: row for row in read_rows(issued)}
+    answers = read_rows(returned)
     numbers = [row.get("n", "") for row in answers]
     if sorted(numbers) != sorted(issued_rows) or len(set(numbers)) != len(numbers):
         raise ValueError(

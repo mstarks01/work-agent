@@ -80,6 +80,84 @@ So the check does not guard a pull request that changes
 `.github/workflows/five-class.yml`. The reviewer of such a pull request reads
 the workflow diff.
 
+### The step before the code
+
+A defect that the standards read finds costs a new head and a new CI run. Stop
+the recurring classes before the code exists.
+
+Do this step before you add a function, a constant, a table, a type, a check
+or a comment claim. Read each row of the table "The classes that come back
+in fixes" in [the standards read](#the-standards-read-before-the-merge) as a
+question. For a second reader, search the tree for an existing reader of the
+same rule. Search by the name, by the literal values and by the data that the
+code reads.
+
+Record each answer in the pull request body, under the heading
+`## Before the code`, with one entry for each class by its name in that table.
+Each entry gives the class, the search you ran, and the result. Give one of
+these results: "existing reader: `path:symbol`", "none found" or "not touched
+by this change". CI requires the section on each pull request that changes a
+code path, and reads it the way it reads `## Five-class read`.
+`.github/scripts/five_class_read.py` holds the class names, and
+`tests/test_five_class_read.py` holds them to the table.
+
+Two rules keep a search small:
+
+- Count the matches first, with `grep -c` or `grep -l`. Narrow a wide search
+  before you read its lines.
+- Give a wide search to a read-only sub-task, so that only its conclusion
+  enters your context.
+
+### The standards read before the merge
+
+The author of a diff reads it against the five classes, but the author also
+believes the design is right, so the author misses the defects that come from
+that design. Before the merge of each pull request that changes a code path,
+a second reader reads the diff against the standards. That reader is a
+sub-task or a person who did not write the diff.
+
+Give the reader only these inputs:
+
+- the diff of the pull request head, and the files it touches;
+- `AGENTS.md`, `GLOSSARY.md` and each guide in `docs/agents/`;
+- the smell list and the classes that come back, below.
+
+Do not give the reader the author's reasons. Start the read when the head is
+pushed, so it runs while CI runs. The author fixes each finding, or answers it
+with evidence in the pull request body. A fix makes a new head, and a new head
+needs a new read.
+
+**The smell list.** Each smell is a judgement call, and a rule in these guides
+overrides it:
+
+| Smell | What the reader looks for |
+|---|---|
+| Mysterious Name | a name that does not say what the value holds or what the function does |
+| Duplicated Code | the same steps in two hunks or two files |
+| Feature Envy | a function that reads another object's fields more than its own |
+| Data Clumps | the same few parameters or fields that always go together |
+| Primitive Obsession | a bare string, number or bool that stands for a domain concept |
+| Repeated Switches | the same branch on the same value in more than one place |
+| Shotgun Surgery | one change that needs edits in many files |
+| Divergent Change | one module that changes for unrelated reasons |
+| Speculative Generality | a parameter, hook or layer that no caller needs |
+| Message Chains | a caller that walks a long chain of attributes |
+| Middle Man | a function or class that only passes a call on |
+| Refused Bequest | a subclass that does not fit what its base says |
+
+**The classes that come back in fixes.** The review of 2026-11-02 found these
+in the fix pull requests of the review before it. The author asks each
+question before the code, and the reader asks it again of the diff:
+
+| Class | The question |
+|---|---|
+| A second reader | each new helper or rule: is there one reader, and does a lint refuse a second? |
+| A claim with no guard | each claim that a rule has one reader (`CLAIM`): does it sit on a guard or name one in backticks? A guard is the reader of a `ONE_READERS` row or the one site of a one-site `==` assert. Only a ruling keeps a claim in `UNGUARDED_CLAIMS` |
+| A closed set with no `Literal` | each table or tuple of string keys that code reads as a set: does a `Literal` state the set? |
+| A default only a test omits | each new default: does a caller outside `tests/` omit it? |
+| A type that says the wrong thing | each new exception: does its base describe it? |
+| A name for the wrong thing | each new name or rename: does the name say what the value holds? |
+
 ## The five defect classes
 
 Every finding in this repository's record — ten audit rounds, the range review
@@ -130,9 +208,15 @@ in a ledger row.
 - Fix each instance that the sweep finds, in the same way as the finding.
 - When a mechanism comes back in a later round, add a lint that refuses it.
   Then it cannot come back again.
-- Count the findings in two groups: code older than the last `reviewed/*` tag,
-  and newer code. The count in older code must go down from round to round. A
-  count that does not go down shows a mechanism that needs a lint.
+- Count the findings in three groups:
+  - code newer than the last `reviewed/*` tag;
+  - older code, for a class whose definition did not change in this round;
+  - older code, for a class whose definition this round made wider, such as
+    new claim words or a wider scope.
+
+  The second count must go down from round to round. A count that does not go
+  down shows a mechanism that needs a lint. The third count shows old defects
+  that the narrower definition did not count, not new defects.
 
 ### Read the prompts against the code they describe
 
@@ -230,8 +314,8 @@ The message carries what a later reader cannot recover from the diff:
   knows which half of its own range nobody read before the merge
 - which axes ran, and what each read as its source of truth
 - how many findings each axis produced, and where each was fixed
-- how many findings were in code older than the last `reviewed/*` tag, and how
-  many were in newer code
+- how many findings were in each of the three count groups: newer code, older
+  code under an unchanged definition, and older code under a wider definition
 - **what was left open by decision**, with the reason — this is the part that
   stops the next review re-reporting a settled question as a new finding.
   Held wording in model text goes in `.github/scripts/held_wording.toml`, and

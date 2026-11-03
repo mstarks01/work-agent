@@ -103,6 +103,7 @@ from analysis_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
+    RefusalOutcome,
     event_frames,
     execute_job,
     is_follow_up,
@@ -116,7 +117,12 @@ from analysis_service.parsing import ascii_int
 from analysis_service.principals import Identity
 from analysis_service.report_changes import report_changes
 from analysis_service.selection import SelectionError
-from analysis_service.sources import Source, SourceLimits, clean_system_name
+from analysis_service.sources import (
+    LimitRung,
+    Source,
+    SourceLimits,
+    clean_system_name,
+)
 from analysis_service.store_backends import audited_delete, build_store, store_lifespan
 from analysis_service.validation import ValidationIssue
 
@@ -165,7 +171,12 @@ _CONTENT_LENGTH_DIGITS = 19
 # came near. A repeated label is the same kind of wrong — malformed at any size,
 # so 422 rather than a budget status. Per-source well-formedness never reaches
 # here: a bad source fails body validation, which FastAPI answers with 422 too.
-_STATUS_BY_RUNG = {"empty": 400, "duplicate-label": 422, "count": 413, "total": 413}
+_STATUS_BY_RUNG: dict[LimitRung, int] = {
+    "empty": 400,
+    "duplicate-label": 422,
+    "count": 413,
+    "total": 413,
+}
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -594,7 +605,7 @@ def _status_view(record: Envelope) -> JobStatusView:
 # status: a bound that clears with time is a 429, a job that already has its
 # resumed job is a 409, and a parent that a delete removed reads as a missing
 # job, with its 404.
-_REFUSALS: dict[str, tuple[int, Callable[[Admission, int], str]]] = {
+_REFUSALS: dict[RefusalOutcome, tuple[int, Callable[[Admission, int], str]]] = {
     "at_ceiling": (
         429,
         lambda admission, ceiling: (
@@ -743,7 +754,7 @@ def create_app(
     how long one may run, ``max_active_jobs`` bounds how many one caller may
     have in flight, ``carried_frameworks`` is what a submission may select
     from, and ``carries_catalog`` says whether a job here builds an assertion
-    catalog, which is the only reader of a link answer. All five come from the
+    catalog, which a link answer places a principal in. All five come from the
     deployment wherever there is one; a caller who injects a
     runner instead must state them, because reading a second configuration
     behind their back is how an app comes to enforce bounds its deployment never

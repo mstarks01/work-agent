@@ -102,6 +102,7 @@ def test_a_claim_refuses_a_verb_outside_the_vocabulary():
         "description": "d",
         "affected_element_ids": ["process:a"],
         "evidence_refs": ["e"],
+        "attacker_position": "outside",
         "severity": {"likelihood": "high", "impact": "high", "justification": "j"},
     }
     assert ThreatProposal(**common, verb="read").verb == "read"

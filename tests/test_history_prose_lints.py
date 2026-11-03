@@ -29,10 +29,8 @@ nobody reads.
 from __future__ import annotations
 
 import ast
-import io
 import re
 import sys
-import tokenize
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -47,8 +45,12 @@ from tests.source_tree import (
     TESTS,
     WHOLE_TREE,
     WORKFLOWS,
+    block_comments,
+    comment_runs,
     guide_files,
     held_files,
+    joined_runs,
+    line_comments,
     parse,
     source_files,
     without,
@@ -173,17 +175,6 @@ _DOCUMENTED = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 _FENCE = re.compile(r"^```.*?^```", re.DOTALL | re.MULTILINE)
 
 
-def _runs(lines: list[tuple[int, str]]) -> list[tuple[int, str]]:
-    """Consecutive numbered lines joined into one text, at its first line."""
-    runs: list[tuple[int, str]] = []
-    for lineno, text in lines:
-        if runs and lineno == runs[-1][0] + runs[-1][1].count("\n") + 1:
-            runs[-1] = (runs[-1][0], f"{runs[-1][1]}\n{text}")
-        else:
-            runs.append((lineno, text))
-    return runs
-
-
 def _prose(path: Path) -> list[tuple[int, str]]:
     """Every docstring and every run of comment lines in one file, at its line."""
     texts: list[tuple[int, str]] = []
@@ -193,77 +184,22 @@ def _prose(path: Path) -> list[tuple[int, str]]:
             docstring = first.value if isinstance(first, ast.Expr) else None
             if isinstance(docstring, ast.Constant) and isinstance(docstring.value, str):
                 texts.append((first.lineno, docstring.value))
-    source = path.read_text(encoding="utf-8")
-    comments = [
-        (token.start[0], token.string.lstrip("#").strip())
-        for token in tokenize.generate_tokens(io.StringIO(source).readline)
-        if token.type == tokenize.COMMENT
-    ]
-    return texts + _runs(comments)
-
-
-def _trailing(line: str, marker: str) -> str | None:
-    """The comment that ends a line of code, or None.
-
-    A comment starts at ``marker`` after a space, outside any quote: the text
-    before it holds an even count of each quote character. A quote that a
-    comment does not close, such as an apostrophe in a plain YAML value, hides
-    the comment, so the reader misses a comment rather than reads a string.
-    """
-    start = line.find(f" {marker}")
-    while start != -1:
-        before = line[:start]
-        if all(before.count(quote) % 2 == 0 for quote in "\"'`"):
-            return line[start + 1 + len(marker) :].strip()
-        start = line.find(f" {marker}", start + 1)
-    return None
-
-
-def _line_prose(path: Path, marker: str) -> list[tuple[int, str]]:
-    """Every run of full-line ``marker`` comments in one file, and every comment
-    that ends a line of code, at its line."""
-    full: list[tuple[int, str]] = []
-    trailing: list[tuple[int, str]] = []
-    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        if line.lstrip().startswith(marker):
-            full.append((lineno, line.strip().removeprefix(marker).strip()))
-        elif (comment := _trailing(line, marker)) is not None:
-            trailing.append((lineno, comment))
-    return _runs(full) + trailing
+    return texts + comment_runs(path)
 
 
 def _script_prose(path: Path) -> list[tuple[int, str]]:
     """Every ``//`` comment in one page script, at its line."""
-    return _line_prose(path, "//")
-
-
-_BLOCK = re.compile(r"/\*(.*?)\*/|<!--(.*?)-->", re.DOTALL)
-
-
-def _block_prose(path: Path) -> list[tuple[int, str]]:
-    """Every ``/* */`` and ``<!-- -->`` comment in one script, page or style
-    sheet, at its first line."""
-    source = path.read_text(encoding="utf-8")
-    return [
-        (
-            source.count("\n", 0, block.start()) + 1,
-            "\n".join(
-                line.strip().removeprefix("*").strip()
-                for line in block.group(block.lastindex or 0).splitlines()
-            ),
-        )
-        for block in _BLOCK.finditer(source)
-    ]
+    return line_comments(path, "//")
 
 
 def _hash_prose(path: Path) -> list[tuple[int, str]]:
     """Every ``#`` comment in one config file or shell script, at its line."""
-    return _line_prose(path, "#")
+    return line_comments(path, "#")
 
 
 def _diagram_prose(path: Path) -> list[tuple[int, str]]:
     """Every ``%%`` comment in one diagram source, at its line."""
-    return _line_prose(path, "%%")
+    return line_comments(path, "%%")
 
 
 def _guide_prose(path: Path) -> list[tuple[int, str]]:
@@ -277,7 +213,7 @@ def _guide_prose(path: Path) -> list[tuple[int, str]]:
         for lineno, line in enumerate(text.splitlines(), 1)
         if line.strip()
     ]
-    return _runs(lines)
+    return joined_runs(lines)
 
 
 def _hits(path: Path, texts: list[tuple[int, str]]) -> list[str]:
@@ -299,7 +235,7 @@ def history() -> list[str]:
         *(
             hit
             for path in (*SCRIPTS, *MARKUP)
-            for hit in _hits(path, _block_prose(path))
+            for hit in _hits(path, block_comments(path))
         ),
         *(
             hit
@@ -376,11 +312,11 @@ def test_the_scan_reads_every_kind_of_prose(tmp_path):
         "This went unnoticed.",
         "trailing",
     ]
-    assert [(n, " ".join(t.split())) for n, t in _block_prose(script)] == [
+    assert [(n, " ".join(t.split())) for n, t in block_comments(script)] == [
         (4, "A block comment."),
         (5, ""),
     ]
-    assert [(n, " ".join(t.split())) for n, t in _block_prose(page)] == [
+    assert [(n, " ".join(t.split())) for n, t in block_comments(page)] == [
         (2, "A page comment."),
         (5, "A style comment."),
     ]

@@ -25,8 +25,8 @@ Version 4 reads the action verb as written beside the place, because place
 alone has a measured drawback. ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
 agreement alone at 12 false splits of 169, 69 false merges of 92 candidate
 negatives, and the reference merges the frontier table in
-``docs/agents/claim-identity.md`` carries. That table is the one reader of the
-reference column, so this module states it nowhere.
+``docs/agents/claim-identity.md`` carries. That table holds the
+reference column, so this module does not state it.
 
 The verb takes the candidate merges from 69 to 2.
 It takes the false splits from 12 to 13 over 169 labelled pairs, which is the
@@ -359,9 +359,9 @@ def key_claim(
     The single spelling of "which version keys this package, and which
     component that version reads". Every site that keys a produced claim goes
     through here — the review queue, the scorer, the sitting page, the writing
-    instrument and the tests that stand in for them — so a finding counted under
-    one key and asked about under another cannot happen by one site being edited
-    and another missed.
+    instrument and the tests that stand in for them — so an edit to the rule
+    here reaches each of them, and none counts a finding under one key while
+    another asks about it under a second key.
 
     ``scope`` is positional and second, beside the framework, because it is the
     half of a place an **Element ID** does not carry and a caller that omitted

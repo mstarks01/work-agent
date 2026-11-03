@@ -233,7 +233,7 @@ _SCHEMA_PROBE: dict[str, Any] = {
 def model_info(vendor: Vendor, model: str) -> dict[str, Any] | None:
     """LiteLLM's map entry for this ``(vendor, model)``, or ``None`` if unmapped.
 
-    The one place the open-world residual is *observable* rather than merely
+    Here the open-world residual is *observable* rather than merely
     documented. Everything else in this module answers a supportedness question
     by asking LiteLLM and reading the answer, and for an unmapped model LiteLLM
     answers from the provider's base config instead of saying it does not know.

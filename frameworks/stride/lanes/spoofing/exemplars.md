@@ -1,6 +1,6 @@
 # Spoofing Exemplars
 
-Five drafts against the exemplar system, showing the shape and the reasoning. The last one also shows a near-duplicate that is not a draft. Follow the reasoning, not the wording.
+Five drafts against the exemplar systems, showing the shape and the reasoning. The last one also shows a near-duplicate that is not a draft. Follow the reasoning, not the wording.
 
 ## Canonical: password-only customer identity
 
@@ -19,6 +19,7 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
     "flow:entity:customer>process:web-api>submit-payment"
   ],
   "verb": "guess-credential",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:entity:customer>process:web-api>submit-payment"
   ],
@@ -61,6 +62,7 @@ Written against exemplar system B, to show the same reasoning on an event-driven
     "flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry"
   ],
   "verb": "use-credential",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry"
   ],
@@ -103,6 +105,7 @@ Written against exemplar system B, to show the same reasoning on an event-driven
     "flow:entity:payments-provider>process:web-api>settlement-webhook"
   ],
   "verb": "forge",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:entity:payments-provider>process:web-api>settlement-webhook",
     "unknown:flow:entity:payments-provider>process:web-api>settlement-webhook:authentication"
@@ -139,6 +142,7 @@ Lane contrast: altering an instruction the web API sent is tampering, and reachi
     "process:ledger-service"
   ],
   "verb": "impersonate",
+  "attacker_position": "outside",
   "evidence_refs": [
     "crossing:flow:process:web-api>process:ledger-service>post-transfer",
     "absent:flow:process:web-api>process:ledger-service>post-transfer:authentication"
@@ -173,6 +177,7 @@ This draft shares its verb and its elements with the one above, and it is still 
     "process:ledger-service"
   ],
   "verb": "impersonate",
+  "attacker_position": "on-path",
   "evidence_refs": [
     "crossing:flow:process:web-api>process:ledger-service>post-transfer",
     "absent:flow:process:web-api>process:ledger-service>post-transfer:encryption_in_transit"
