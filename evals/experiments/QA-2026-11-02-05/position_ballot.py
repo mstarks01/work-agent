@@ -216,11 +216,14 @@ def answered(
     issued: Sequence[Mapping[str, str]], returned: Sequence[Mapping[str, str]]
 ) -> list[Mapping[str, str]]:
     """The returned rows, each checked against the row it answers."""
+    for number, answer in enumerate(returned, start=1):
+        if list(answer) != list(COLUMNS) or None in answer.values():
+            raise ValueError(
+                f"line {number + 1}: the columns are not the issued columns"
+            )
     if [row["n"] for row in returned] != [row["n"] for row in issued]:
         raise ValueError("the returned ballot does not hold the issued rows in order")
     for row, answer in zip(issued, returned, strict=True):
-        if list(answer) != list(row) or None in answer.values():
-            raise ValueError(f"row {row['n']}: the columns are not the issued columns")
         changed = [
             column
             for column in row
@@ -237,6 +240,8 @@ def answered(
             raise ValueError(f"row {row['n']}: only a change verdict names a position")
         if position and position not in POSITIONS:
             raise ValueError(f"row {row['n']}: {position!r} is not a position")
+        if verdict == "change" and position == row["proposed"]:
+            raise ValueError(f"row {row['n']}: a change names the proposed position")
         if verdict != "accept" and not answer["note"].strip():
             raise ValueError(f"row {row['n']}: a {verdict!r} verdict states its reason")
     return list(returned)

@@ -159,6 +159,10 @@ DECLARED: dict[str, str] = {
         " that drafts by a verb and a place, and scores them against the"
         " must-finds of that package's references."
     ),
+    "evals/experiments/QA-2026-11-02-05/position_rescore.py": (
+        "This code is that framework's. It counts the matches on the must-finds"
+        " that carry an attacker position, and only that package's drafts state one."
+    ),
     "evals/experiments/QA-2026-11-02-05/position_ballot.py": (
         "This code is that framework's. It records the attacker position of a"
         " reference claim, and only that package's drafts state a position."
@@ -647,12 +651,15 @@ def test_every_open_decision_gives_a_reason():
 def test_the_declaration_does_not_rot(literals):
     """A file that stops reaching one framework has to leave the list.
 
-    Either way of reaching one keeps it here. A module can name a package or
-    import its record, and a declaration is stale only when it does neither —
-    otherwise removing a literal from a module that still imports the record
-    would drop the reason and the entry together.
+    Each way of reaching one keeps it here. A module can name a package, import
+    its record, or give a thing a framework's name, and a declaration is stale
+    only when it does none of the three — otherwise removing a literal from a
+    module that still imports the record would drop the reason and the entry
+    together.
     """
-    reaching = set(literals) | set(package_importers())
+    reaching = (
+        set(literals) | set(package_importers()) | set(framework_named_identifiers())
+    )
     stale = sorted(set(DECLARED) - reaching)
     assert not stale, (
         f"these files no longer name or import a framework and are still"

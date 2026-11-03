@@ -1,5 +1,5 @@
 {
-  "command": "python -m evals.harness.run score <the sweep JSON of evals/baselines/<name>/> --corpus <corpus> --out <file>",
+  "command": "position_rescore.py",
   "series": "all",
   "before_corpus": {
     "commit": "ac8a07b4922427fd8f1bf2e3545aab127b0d6db0",
