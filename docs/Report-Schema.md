@@ -158,13 +158,17 @@ require at least one.
 ```python
 class Threat(RuledClaim):
     category: StrideCategory  # spoofing | tampering | repudiation | ...
+    attacker_position: AttackerPosition | None  # outside | on-path | ...
     severity: Severity
     mitigations: list[Mitigation]  # {summary, detail}
     confidence: Rating | None  # low | medium | high (critic-calibrated)
     recommendation: RecommendationReading | None  # {sound, note}
 ```
 
-Five fields, and nothing else. `confidence` is `null` only on a threat that
+Six fields, and nothing else. `attacker_position` is where the attacker stands
+when it acts: `outside`, `on-path`, `storage-copy`, `in-component` or
+`authorized-principal`. It is `null` only on a threat that a run wrote before
+the field existed. `confidence` is `null` only on a threat that
 code rejected for its lane, because nobody rated it. `recommendation` is the
 critic's reading of the threat's `mitigations`. It is `null` where the critic
 made none, and on every rejected threat.

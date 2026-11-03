@@ -23,6 +23,7 @@ Two verbs, and the fix decides between them: narrow a grant and it is `abuse-gra
     "store:accounts-db"
   ],
   "verb": "abuse-grant",
+  "attacker_position": "outside",
   "evidence_refs": [],
   "quotes": [
     {
@@ -65,6 +66,7 @@ Written against exemplar system B. Elevation does not need a privilege bug when 
     "store:telemetry-store"
   ],
   "verb": "abuse-grant",
+  "attacker_position": "authorized-principal",
   "evidence_refs": [
     "crossing:flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry",
     "crossing:flow:process:mqtt-broker>process:stream-processor>consume-topic"
@@ -112,6 +114,7 @@ Written against exemplar system B. Elevation does not need a privilege bug when 
     "process:ledger-service"
   ],
   "verb": "escalate",
+  "attacker_position": "outside",
   "evidence_refs": [
     "unknown:process:ledger-service:exposure"
   ],

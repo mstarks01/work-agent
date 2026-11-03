@@ -648,6 +648,41 @@ def test_a_draft_at_a_ruled_reading_matches_and_says_so():
     assert ruling.rationale.startswith("a ruled reading")
 
 
+@pytest.mark.parametrize(
+    ("ruled", "stated", "matches"),
+    [
+        ("in-component", "in-component", True),
+        ("in-component", "storage-copy", False),
+        ("in-component", None, False),
+        (None, "storage-copy", True),
+        (None, None, True),
+    ],
+    ids=["same", "another", "unstated", "unruled", "unruled-unstated"],
+)
+def test_a_ruled_position_matches_only_a_draft_that_states_it(ruled, stated, matches):
+    """A verb and a place do not decide the attacker, so a ruled position does."""
+    case = load_case(CORPUS_DIR / "02-iot-fleet-telemetry")
+    reference = case.stride_claims()[5]
+    draft = draft_threat(
+        1,
+        reference.category,
+        "The claim, at its own verb and place",
+        element_ids=reference.affected_element_ids,
+        verb=reference.verb,
+    ).model_copy(update={"attacker_position": stated})
+    positions = {} if ruled is None else {5: ruled}
+    matcher = SubsetVerbIdentity(flows_by_case([case]))
+
+    score = score_case(
+        replace(case, ruled_positions=MappingProxyType(positions)),
+        [draft],
+        matcher,
+        Ledger(),
+    )
+
+    assert (5 in {pair.reference_index for pair in score.matched}) is matches
+
+
 def test_a_ruled_reading_never_takes_a_threat_a_claims_own_reading_matched():
     """Case 12: one threat fits ref 14 as written and ref 13 only as ruled.
 

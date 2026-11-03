@@ -19,6 +19,7 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
     "process:ledger-service"
   ],
   "verb": "intercept",
+  "attacker_position": "on-path",
   "evidence_refs": [
     "crossing:flow:process:web-api>process:ledger-service>post-transfer",
     "absent:flow:process:web-api>process:ledger-service>post-transfer:encryption_in_transit"
@@ -57,6 +58,7 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
     "process:ledger-service"
   ],
   "verb": "recover-credential",
+  "attacker_position": "outside",
   "evidence_refs": [],
   "quotes": [
     {
@@ -95,6 +97,7 @@ Written against exemplar system B, and worth comparing with the canonical draft 
     "store:telemetry-store"
   ],
   "verb": "read",
+  "attacker_position": "storage-copy",
   "evidence_refs": [
     "unknown:store:telemetry-store:encryption_at_rest"
   ],
@@ -137,6 +140,7 @@ Written against exemplar system B, and worth comparing with the canonical draft 
     "flow:process:ledger-service>store:accounts-db>read-write-balances"
   ],
   "verb": "read",
+  "attacker_position": "in-component",
   "evidence_refs": [
     "absent:flow:process:web-api>process:ledger-service>post-transfer:authentication",
     "crossing:flow:process:web-api>process:ledger-service>post-transfer"

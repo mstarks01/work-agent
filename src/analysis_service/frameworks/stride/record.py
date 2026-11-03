@@ -47,6 +47,9 @@ from analysis_service.system_model import is_zone
 __all__ = [
     "CATEGORY_LETTERS",
     "STRIDE_CATEGORIES",
+    "ArchivedThreatProposal",
+    "ArchivedThreatProposals",
+    "AttackerPosition",
     "DraftThreat",
     "RecommendationReading",
     "StrideAnalysis",
@@ -77,6 +80,25 @@ StrideCategory = Literal[
     "information-disclosure",
     "denial-of-service",
     "elevation-of-privilege",
+]
+
+#: Where the attacker of a STRIDE threat stands when it acts. A verb and a
+#: place do not decide a threat's mechanism: a storage copy of a config store
+#: and code that runs in the store's reader are two threats with one verb at one
+#: place, and encryption at rest stops only the first. The position tells them
+#: apart, so the scorer can hold a draft to the position a reference rests on.
+#:
+#: * ``outside`` reaches the system only through the interfaces it exposes.
+#: * ``on-path`` observes or alters the traffic of a flow.
+#: * ``storage-copy`` holds a copy of a store's media, backup or snapshot.
+#: * ``in-component`` runs code in, or holds the identity of, a modelled element.
+#: * ``authorized-principal`` is a legitimate account that acts beyond its purpose.
+AttackerPosition = Literal[
+    "outside",
+    "on-path",
+    "storage-copy",
+    "in-component",
+    "authorized-principal",
 ]
 
 # The six categories in canonical STRIDE order, derived from the type itself
@@ -195,6 +217,10 @@ class DraftThreat(Claim):
     #: finding when they name one action against one place — and a threat that
     #: names no action leaves the first half of that unanswerable.
     verb: ActionVerb
+    #: The agent's choice, required on :class:`ThreatProposal`. ``None`` only on
+    #: a draft that a run wrote before the field existed, which states no
+    #: position and so matches no reference that a person ruled a position on.
+    attacker_position: AttackerPosition | None = None
     severity: Severity
     mitigations: list[Mitigation] = Field(default_factory=list)
 
@@ -440,6 +466,7 @@ class ThreatProposal(Proposal):
     # agent picks from the closed vocabulary; an unrecognised verb is refused by
     # the response schema before the node returns, not by a check afterwards.
     verb: ActionVerb
+    attacker_position: AttackerPosition
     severity: Severity
     mitigations: list[Mitigation] = Field(default_factory=list)
 
@@ -469,6 +496,24 @@ class ThreatProposals(ProposalBatch):
     # No length bound, for the reason `ProposalBatch` gives: `fan_in` carries
     # MAX_CLAIMS_PER_BATCH, so a narrowing cannot drop it.
     claims: list[ThreatProposal]  # type: ignore[assignment]
+
+
+class ArchivedThreatProposal(ThreatProposal):
+    """A :class:`ThreatProposal` read back from a run's archive.
+
+    A run that a lane answered before ``attacker_position`` existed stored no
+    position, and the record says so with ``None``, as :class:`DraftThreat`
+    does. The agent's own schema stays :class:`ThreatProposal`, which requires
+    the field, so only a read of stored output takes this one.
+    """
+
+    attacker_position: AttackerPosition | None = None  # type: ignore[assignment]
+
+
+class ArchivedThreatProposals(ThreatProposals):
+    """A lane's stored batch, read with :class:`ArchivedThreatProposal`."""
+
+    claims: list[ArchivedThreatProposal]  # type: ignore[assignment]
 
 
 class ThreatRuling(Ruling):

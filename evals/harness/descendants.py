@@ -38,7 +38,10 @@ from typing import Any
 from analysis_service.claims import FrameworkName
 from analysis_service.fan_in import fan_in
 from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.frameworks.stride.record import (
+    ArchivedThreatProposals,
+    DraftThreat,
+)
 from analysis_service.graph import (
     STATE_SOURCE_TEXTS,
     STATE_VALID_MODEL,
@@ -97,12 +100,11 @@ def replay_case(
 ) -> Replayed:
     """The fan-in run again over ``proposals`` plus ``injected``, then scored."""
     block = next(block for block in report.analyses if block.framework == FRAMEWORK)
-    schema = schemas_for(FRAMEWORK).proposals
     batches = {}
     for lane in set(proposals) | set(injected):
         raw = dict(proposals.get(lane) or {"claims": []})
         raw["claims"] = [*raw.get("claims", []), *injected.get(lane, ())]
-        batches[lane] = schema.model_validate(raw)
+        batches[lane] = ArchivedThreatProposals.model_validate(raw)
     merged = fan_in(
         batches,
         PACKAGES[FRAMEWORK],

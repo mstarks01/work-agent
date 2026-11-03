@@ -144,6 +144,7 @@ def scripted_proposal(case, category) -> dict:
         # Taken from the reference the scripted draft is standing in for, so a
         # mode test grades the pipeline rather than this file's verb-picking.
         "verb": reference.verb,
+        "attacker_position": "outside",
         "evidence_refs": reaching_refs(case, reference.affected_element_ids),
         "severity": Severity(
             likelihood=reference.severity.likelihood,

@@ -573,8 +573,19 @@ def _rule(
     when no reading matches, so a miss reports the claim as it is written. A
     match on a ruled reading says so in the rationale, because a reader of the
     artifact would otherwise see a match the claim's own fields do not explain.
+
+    A reference a person ruled an attacker position on matches only a draft
+    that states that position, so no reading is asked of a draft that states
+    another one or none.
     """
     reference = case.stride_claims()[reference_index]
+    position = case.ruled_positions.get(reference_index)
+    if position is not None and threat.attacker_position != position:
+        return ClaimRuling(
+            match=False,
+            rationale=f"a person ruled the reference's attacker {position}, and"
+            f" the draft states {threat.attacker_position or 'no position'}",
+        ), False
     rulings = [
         matcher.equivalent(
             ClaimPair(

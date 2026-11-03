@@ -860,6 +860,8 @@ def sample_threat(
                 verb for verb, lanes in LANES_OF_VERB.items() if category in lanes
             )
         ),
+        # A stolen cookie replayed from the attacker's own machine.
+        "attacker_position": "outside",
         # One quote and one derived fact, so a default draft exercises two
         # branches rather than the cheapest one. The quote is a verbatim span of
         # the source ``sample_report`` submits, so it verifies through the
