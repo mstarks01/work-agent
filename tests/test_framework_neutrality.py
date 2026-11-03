@@ -658,8 +658,8 @@ def test_the_declaration_does_not_rot(literals):
     """A file that stops reaching one framework has to leave the list.
 
     Each way of reaching one keeps it here. A module can name a package, import
-    its record, or give a thing a framework's name, and a declaration is stale
-    only when it does none of the three — otherwise removing a literal from a
+    its record, or give a thing a framework's name that no open decision
+    excuses, and a declaration is stale only when it does none of the three — otherwise removing a literal from a
     module that still imports the record would drop the reason and the entry
     together.
     """
@@ -667,7 +667,8 @@ def test_the_declaration_does_not_rot(literals):
     stale = sorted(set(DECLARED) - reaching)
     assert not stale, (
         f"these files no longer name a framework, import its record or give a"
-        f" thing its name, and are still declared: {stale}. Remove them."
+        f" thing a framework's name that no open decision excuses, and are still"
+        f" declared: {stale}. Remove them."
     )
 
 

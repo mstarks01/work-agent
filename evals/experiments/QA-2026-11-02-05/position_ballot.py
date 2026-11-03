@@ -197,11 +197,16 @@ def issue(corpus_dir: Path = CORPUS_DIR) -> list[dict[str, str]]:
         if claim.must_find
     ]
     keys = {key for key, *_ in must_finds}
-    if keys != set(PROPOSED):
-        raise ValueError(
-            f"no proposal for {sorted(keys - set(PROPOSED))}; a proposal for no"
-            f" must-find at {sorted(set(PROPOSED) - keys)}"
+    faults = [
+        f"{label} {sorted(missing)}"
+        for label, missing in (
+            ("no proposal for", keys - set(PROPOSED)),
+            ("a proposal for no must-find at", set(PROPOSED) - keys),
         )
+        if missing
+    ]
+    if faults:
+        raise ValueError("; ".join(faults))
     rows: list[dict[str, str]] = []
     for key, case_dir, index, claim in must_finds:
         rows.append(
