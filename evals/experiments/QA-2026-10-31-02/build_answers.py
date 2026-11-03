@@ -9,7 +9,8 @@ from analysis_service.claims import UnknownRef
 from analysis_service.early_questions import QUESTION_PRIOR, element_type
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.links import with_link_answers
-from analysis_service.question_kinds import QUESTION_KINDS, question_kind
+from analysis_service.parsing import table_entry
+from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import Source, render_sources
 from analysis_service.system_model import SystemModel
 
@@ -24,11 +25,10 @@ def main(case: str, out: Path) -> None:
         facts = []
         for element in model.elements():
             for kind in rates.get(element_type(element), {}):
-                name = question_kind(kind)
-                if name is None:
+                if kind not in QUESTION_KINDS:
                     continue
-                key = UnknownRef(element_id=element.id, question=name).key
-                spec = QUESTION_KINDS[name]
+                key = UnknownRef(element_id=element.id, question=kind).key
+                spec = table_entry(QUESTION_KINDS, kind)
                 if spec.facets:
                     facts.append(
                         FactAnswer.model_validate(

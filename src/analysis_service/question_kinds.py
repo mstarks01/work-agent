@@ -37,7 +37,7 @@ __all__ = [
     "Facet",
     "QuestionKind",
     "QuestionKindName",
-    "question_kind",
+    "parse_question_kind",
 ]
 
 
@@ -300,12 +300,13 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
 )
 
 
-def question_kind(name: str) -> QuestionKindName | None:
+def parse_question_kind(name: str) -> QuestionKindName | None:
     """The kind of :data:`QUESTION_KINDS` that ``name`` names, or ``None``.
 
     **The per-row check of a question kind.** A reference holds the kind as a
     ``str``, so a report that names a kind this table does not hold still
-    loads, and the reader that calls this refuses that reference alone.
+    loads. The critic's review seam refuses that reference alone, and a label
+    shows the kind as it is written.
     """
     return member(name, QUESTION_KINDS)
 

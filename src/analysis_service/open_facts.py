@@ -25,14 +25,14 @@ from analysis_service.assertions import (
     AssertionCatalog,
     assertion_id,
     identity_parts,
+    parse_predicate,
     read_assertion_id,
-    registered_predicate,
 )
-from analysis_service.capabilities import CAPABILITIES, capability_key
+from analysis_service.capabilities import CAPABILITIES, parse_capability_key
 from analysis_service.claims import AttributeGround, UnknownRef
 from analysis_service.evidence import evidence_catalog, prepared_view
 from analysis_service.parsing import table_entry
-from analysis_service.question_kinds import QUESTION_KINDS, question_kind
+from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
 from analysis_service.system_model import (
     ZONE_ATTRIBUTE,
     DataFlow,
@@ -201,7 +201,7 @@ def assertion_label(
         return UNWORDED_ASSERTION
     subjects = {subject.id: subject.label for subject in catalog.subjects}
     for entry in catalog.entries:
-        name = registered_predicate(entry.predicate)
+        name = parse_predicate(entry.predicate)
         if name is None:
             continue
         if identity_parts(entry)[:3] != asked[:3]:
@@ -253,10 +253,10 @@ def label_of(
                     return f"What does {source} do when it connects to {destination}?"
     match ref.kind:
         case "capability":
-            key = capability_key(ref.capability)
-            return CAPABILITIES[key].question if key else ref.capability
+            key = parse_capability_key(ref.capability)
+            return ref.capability if key is None else CAPABILITIES[key].question
         case "question":
-            name = question_kind(ref.question)
+            name = parse_question_kind(ref.question)
             if name is None:
                 return ref.question
             return QUESTION_KINDS[name].template.format(element=where)
@@ -287,7 +287,7 @@ def group_of(ref: UnknownRef) -> tuple[str, str]:
             return "assertions", "What the description leaves open"
         case "subject":
             return "subjects", "Other questions"
-        case "question" if (name := question_kind(ref.question)) is not None:
+        case "question" if (name := parse_question_kind(ref.question)) is not None:
             template = QUESTION_KINDS[name].template
             heading = template.replace("{element}'s", "its").replace("{element}", "it")
             return ref.question, heading

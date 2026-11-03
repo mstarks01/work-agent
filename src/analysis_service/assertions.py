@@ -166,6 +166,7 @@ __all__ = [
     "contradictions",
     "disputed",
     "offered",
+    "parse_predicate",
     "parse_subject_type",
     "project",
     "projected_attribute",
@@ -173,7 +174,6 @@ __all__ = [
     "qualified",
     "quarantine",
     "referent_type",
-    "registered_predicate",
     "settled",
     "snap_subject",
     "span_source",
@@ -692,12 +692,13 @@ REGISTRY: Mapping[PredicateName, Predicate] = MappingProxyType(
 )
 
 
-def registered_predicate(name: str) -> PredicateName | None:
+def parse_predicate(name: str) -> PredicateName | None:
     """The predicate of :data:`REGISTRY` that ``name`` names, or ``None``.
 
     **The per-row check of a predicate.** A row holds its predicate as a
-    ``str``, so a row that names no registered predicate still loads, and the
-    reader that calls this refuses that row alone, as ``unknown-predicate``.
+    ``str``, so a row that names no registered predicate still loads. The
+    gate refuses that row alone, as ``unknown-predicate``, and every other
+    reader that calls this passes over it.
     """
     return member(name, REGISTRY)
 
@@ -1438,7 +1439,7 @@ def quarantine(
     kept = []
     removed = []
     for entry in catalog.entries:
-        if registered_predicate(entry.predicate) is None:
+        if parse_predicate(entry.predicate) is None:
             reasons: set[CatalogIssueCode] = {"unknown-predicate"}
         else:
             reasons = (
@@ -1465,7 +1466,7 @@ def quarantine(
 
 def _identity(entry: Assertion) -> str:
     """The row's identity, or ``""`` where its predicate is unregistered."""
-    return assertion_id(entry) if registered_predicate(entry.predicate) else ""
+    return "" if parse_predicate(entry.predicate) is None else assertion_id(entry)
 
 
 def without(catalog: AssertionCatalog, identities: Collection[str]) -> AssertionCatalog:
@@ -1513,7 +1514,7 @@ def subjects_of(
     named = set()
     for entry in entries:
         named.add(entry.subject)
-        name = registered_predicate(entry.predicate)
+        name = parse_predicate(entry.predicate)
         if name is not None and REGISTRY[name].value == "reference":
             named.add(entry.value)
     named -= UNIVERSAL_TERMS
@@ -1697,7 +1698,7 @@ def admissible(entry: Assertion) -> bool:
     one :data:`PROJECTS_UNDER` admits.
     """
     return (
-        registered_predicate(entry.predicate) is not None
+        parse_predicate(entry.predicate) is not None
         and PROJECTS_UNDER[entry.assessment]
     )
 
@@ -1795,7 +1796,7 @@ def catalog_issues(
     rows = tuple(
         (entry, assertion_id(entry))
         for entry in catalog.entries
-        if registered_predicate(entry.predicate)
+        if parse_predicate(entry.predicate) is not None
     )
     identities = frozenset(identity for _, identity in rows)
 
@@ -1806,7 +1807,7 @@ def catalog_issues(
             subject=entry.subject,
         )
         for entry in catalog.entries
-        if registered_predicate(entry.predicate) is None
+        if parse_predicate(entry.predicate) is None
     )
     for entry, identity in rows:
         issues.extend(_entry_issues(entry, identity, by_id, checked))
@@ -2392,7 +2393,7 @@ def _resolve_row(
             )
         )
 
-    name = registered_predicate(row.predicate)
+    name = parse_predicate(row.predicate)
     if name is None:
         drop("unknown-predicate", f"{row.predicate!r} is not a registered predicate")
         return None

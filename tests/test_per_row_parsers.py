@@ -19,14 +19,14 @@ from analysis_service.answer_forms import (
 from analysis_service.assertions import (
     REGISTRY,
     catalog_issues,
+    parse_predicate,
     quarantine,
-    registered_predicate,
 )
-from analysis_service.capabilities import CAPABILITIES, capability_key
+from analysis_service.capabilities import CAPABILITIES, parse_capability_key
 from analysis_service.claims import UnknownRef
 from analysis_service.fact_answers import FactAnswer, answer_facets
 from analysis_service.open_facts import group_of, label_of
-from analysis_service.question_kinds import QUESTION_KINDS, question_kind
+from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import CapabilityStatement, SystemModel
 from analysis_service.validation import validate
@@ -41,9 +41,9 @@ class TestEachParserGivesTheTableKey:
     @pytest.mark.parametrize(
         ("parse", "table"),
         [
-            (registered_predicate, REGISTRY),
-            (capability_key, CAPABILITIES),
-            (question_kind, QUESTION_KINDS),
+            (parse_predicate, REGISTRY),
+            (parse_capability_key, CAPABILITIES),
+            (parse_question_kind, QUESTION_KINDS),
         ],
     )
     def test_each_key_parses_and_no_other_does(self, parse, table):
@@ -118,7 +118,7 @@ class TestAnUnknownCapabilityIsRefusedOnItsStatement:
         assert label_of(UnknownRef(capability="telepathy"), names) == "telepathy"
 
 
-class TestAnUnknownQuestionKindIsRefusedOnItsReference:
+class TestAnUnknownQuestionKindReadsAsWritten:
     def test_a_label_and_a_group_read_the_kind_or_the_name(self):
         known = UnknownRef(element_id=ELEMENT, question="capacity-limits")
         unknown = UnknownRef(element_id=ELEMENT, question="vibes")
@@ -148,7 +148,7 @@ class TestAnUnknownQuestionKindIsRefusedOnItsReference:
         assert answer_facets(key) == QUESTION_KINDS["capacity-limits"].facets
 
 
-class TestAnAttributeOutsideATableTakesFreeText:
+class TestAnAttributeReadsItsAnswerTables:
     @pytest.mark.parametrize("attribute", sorted(CONTROL_SUGGESTIONS))
     def test_a_control_attribute_offers_its_suggestions(self, attribute):
         key = UnknownRef(element_id=ELEMENT, attribute=attribute).key

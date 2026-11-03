@@ -108,7 +108,7 @@ from analysis_service.open_facts import (
     prepared_model,
 )
 from analysis_service.parsing import non_negative, table_entry
-from analysis_service.question_kinds import QUESTION_KINDS, Facet, question_kind
+from analysis_service.question_kinds import QUESTION_KINDS, Facet, parse_question_kind
 from analysis_service.system_model import Element, SystemModel
 
 __all__ = [
@@ -343,7 +343,7 @@ class EarlyQuestion:
 
 def _open_key(model: SystemModel, element: Element, field: str) -> UnknownKey | None:
     """The fact this field asks about this element, or ``None`` where it is not open."""
-    if question_kind(field) is not None:
+    if parse_question_kind(field) is not None:
         return UnknownRef(element_id=element.id, question=field).key
     if open_attribute(model, element.id, field):
         return UnknownRef(element_id=element.id, attribute=field).key

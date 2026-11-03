@@ -19,7 +19,7 @@ from analysis_service.assertions import (
     REGISTRY,
     UNKNOWN,
     AssertionCatalog,
-    registered_predicate,
+    parse_predicate,
 )
 from analysis_service.claims import UnknownKey
 from analysis_service.fact_answers import (
@@ -32,7 +32,7 @@ from analysis_service.fact_answers import (
     key_ref,
 )
 from analysis_service.parsing import member
-from analysis_service.question_kinds import QUESTION_KINDS, Facet, question_kind
+from analysis_service.question_kinds import QUESTION_KINDS, Facet, parse_question_kind
 from analysis_service.system_model import EXCERPT_MAX_CHARS, SystemModel
 
 __all__ = [
@@ -87,7 +87,7 @@ def answer_choices(
     if ref.kind == "capability":
         return YES_NO
     if ref.kind == "question":
-        name = question_kind(ref.question)
+        name = parse_question_kind(ref.question)
         yes_no = name is not None and QUESTION_KINDS[name].answer == "yes-no"
         return YES_NO if yes_no else ()
     if ref.kind == "attribute":
@@ -99,7 +99,7 @@ def answer_choices(
         row = answered_row(catalog, ref.assertion)
         if row is None:
             return ()
-        registered = registered_predicate(row.predicate)
+        registered = parse_predicate(row.predicate)
         if registered is None:
             return ()
         predicate = REGISTRY[registered]
@@ -169,17 +169,17 @@ def answer_form(
         return "facets"
     if answer_choices(key, model, catalog):
         return "choice"
-    control = fact_kind(key) == "attribute" and _suggested(key) is not None
+    control = fact_kind(key) == "attribute" and _suggested_attribute(key) is not None
     return "control" if control else "text"
 
 
 def answer_suggestions(key: UnknownKey) -> tuple[str, ...]:
     """Common mechanisms for a control answered in free text, or empty."""
-    attribute = _suggested(key) if fact_kind(key) == "attribute" else None
+    attribute = _suggested_attribute(key) if fact_kind(key) == "attribute" else None
     return () if attribute is None else CONTROL_SUGGESTIONS[attribute]
 
 
-def _suggested(key: UnknownKey) -> ControlAttribute | None:
+def _suggested_attribute(key: UnknownKey) -> ControlAttribute | None:
     """The attribute of :data:`CONTROL_SUGGESTIONS` this key names, or ``None``."""
     return member(key_ref(key).attribute, CONTROL_SUGGESTIONS)
 

@@ -60,7 +60,7 @@ from analysis_service.claims import (
 )
 from analysis_service.evidence import ground_gloss
 from analysis_service.frameworks import FrameworkSchemas
-from analysis_service.question_kinds import question_kind
+from analysis_service.question_kinds import parse_question_kind
 from analysis_service.references import snap
 from analysis_service.sources import quotable
 from analysis_service.system_model import SystemModel, attribute_names
@@ -379,7 +379,7 @@ def _unresolved_unknown_ref_issues(
                 # A kind of question about an element: the kind is the
                 # table's, and the element is the model's, so both are checked
                 # and nothing else is.
-                unknown_kind = question_kind(ref.question) is None
+                unknown_kind = parse_question_kind(ref.question) is None
                 if unknown_kind or ref.element_id not in by_id:
                     issues.append(
                         UnreconciledRuling.of(

@@ -2538,7 +2538,10 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: (
             isinstance(node, ast.DictComp)
             and _calls(node.key, "assertion_id")
-            and _calls_each(node, "registered_predicate")
+            and (
+                _calls_each(node, "parse_predicate")
+                or any(_loads(part, "REGISTRY") for part in ast.walk(node))
+            )
         ),
         ("src/analysis_service/claim_identity.py", "row_controls"),
         {},

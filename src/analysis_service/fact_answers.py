@@ -71,7 +71,7 @@ from analysis_service.claims import (
 from analysis_service.grounding import normalize
 from analysis_service.open_facts import element_names, label_of
 from analysis_service.parsing import table_entry
-from analysis_service.question_kinds import QUESTION_KINDS, Facet, question_kind
+from analysis_service.question_kinds import QUESTION_KINDS, Facet, parse_question_kind
 from analysis_service.sources import FORMATTING_CATEGORIES, plain_name, quotable
 from analysis_service.system_model import SystemModel
 
@@ -184,7 +184,7 @@ class FactAnswer(BaseModel):
         question = ""
         if isinstance(key, list | tuple) and len(key) == len(UNKNOWN_KEY_FIELDS):
             question = dict(zip(UNKNOWN_KEY_FIELDS, key, strict=True))["question"]
-        name = question_kind(question)
+        name = parse_question_kind(question)
         kind = None if name is None else QUESTION_KINDS[name]
         if kind is None or kind.answer != "facets":
             raise ValueError("facets answer only a question kind that has facets")
@@ -385,7 +385,9 @@ def detail_note(detail: str) -> str:
 def answer_facets(key: UnknownKey) -> tuple[Facet, ...]:
     """The facets a question kind is answered in, or empty."""
     name = (
-        question_kind(key_ref(key).question) if fact_kind(key) == "question" else None
+        parse_question_kind(key_ref(key).question)
+        if fact_kind(key) == "question"
+        else None
     )
     return () if name is None else QUESTION_KINDS[name].facets
 

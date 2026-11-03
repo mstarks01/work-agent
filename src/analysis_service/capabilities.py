@@ -52,12 +52,12 @@ __all__ = [
     "Decision",
     "Expression",
     "Presence",
-    "capability_key",
     "evaluate",
     "expression_issues",
     "expression_keys",
     "lineage",
     "open_capability_needs",
+    "parse_capability_key",
     "resolve",
 ]
 
@@ -1473,12 +1473,13 @@ def lineage_issues(table: Mapping[_Key, Capability]) -> list[str]:
     return issues
 
 
-def capability_key(name: str) -> CapabilityKey | None:
+def parse_capability_key(name: str) -> CapabilityKey | None:
     """The key of :data:`CAPABILITIES` that ``name`` names, or ``None``.
 
     **The per-row check of a capability key.** A statement, a reader's row and
     an open fact hold the key as a ``str``, so one that names no capability
-    still loads, and the reader that calls this refuses that one alone.
+    still loads. The gate refuses that statement alone, as
+    ``invalid-reference``, and a label shows the key as it is written.
     """
     return member(name, CAPABILITIES)
 
@@ -1628,7 +1629,7 @@ def expression_keys(expression: Expression) -> tuple[str, ...]:
 def expression_issues(expression: object) -> list[str]:
     """Everything that makes ``expression`` illegal, as messages."""
     if isinstance(expression, str):
-        if expression == ALWAYS or capability_key(expression) is not None:
+        if expression == ALWAYS or parse_capability_key(expression) is not None:
             return []
         return [f"{expression!r} is not a capability"]
     if not isinstance(expression, Mapping) or len(expression) != 1:

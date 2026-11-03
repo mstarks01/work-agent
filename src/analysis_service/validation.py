@@ -30,7 +30,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state, leading_word
-from analysis_service.capabilities import CAPABILITIES, capability_key
+from analysis_service.capabilities import CAPABILITIES, parse_capability_key
 from analysis_service.diagrams import DiagramReading, DiagramStructure, node_names
 from analysis_service.grounding import (
     PreparedSource,
@@ -279,7 +279,7 @@ def validate(
         issues.extend(_assumption_issues(assumption, by_id))
 
     for statement in model.capabilities:
-        if capability_key(statement.capability) is None:
+        if parse_capability_key(statement.capability) is None:
             issues.append(
                 ValidationIssue(
                     code="invalid-reference",
