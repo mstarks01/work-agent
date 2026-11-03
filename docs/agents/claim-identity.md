@@ -298,7 +298,7 @@ ruled position only to a draft that states it, and the loss report calls it to
 charge a miss to `position`. A `ONE_READERS` row in
 `tests/test_one_reader_lints.py` refuses a comparison of a draft's position, a
 ruled position or a position reader in any other function; a local name that
-holds a position under another name is not seen.
+holds a position, or a position reader, under another name is not seen.
 
 ### A vote also records what it judged
 

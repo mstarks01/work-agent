@@ -1032,7 +1032,7 @@ def _compares_a_position(node: ast.AST) -> bool:
     """Whether ``node`` compares an attacker position: a draft's
     ``attacker_position``, a value read from ``ruled_positions``, a call to a
     position reader, or a parameter of ``holds_position``. A local name that
-    holds a position under another name is not seen."""
+    holds a position, or a position reader, under another name is not seen."""
     return isinstance(node, ast.Compare) and any(
         _names_a_position(side) for side in (node.left, *node.comparators)
     )
