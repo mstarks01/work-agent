@@ -13,7 +13,8 @@ attacker position, so each ``read`` of a store is given a class by its text:
 * ``other``: every other read of a store, such as a storage copy.
 
 A word rule raises a lead and rules out nothing, so ``runs/displacement.json``
-keeps each draft's title beside its class for a person to check. Writes that
+keeps each draft's title, its class and the words or evidence ref that decided
+the class, for a person to check. Writes that
 file and prints the counts.
 """
 
@@ -29,33 +30,31 @@ ARMS = {
     "treatment": ("item4-04-p*.json", "item4-05-p*.json", "item4-13-p*.json"),
     "control": ("item4-ctl-*.json",),
 }
-COMPROMISE = re.compile(r"compromis|code running|runs code|run code", re.IGNORECASE)
+COMPROMISE = re.compile(r"\w*compromis\w*|code running|runs? code", re.IGNORECASE)
 STORE_AUTH = re.compile(r"(?:unknown|absent):flow:\S*>store:\S*:authentication")
 
 
-def _class(claim: dict[str, Any]) -> str:
-    text = f"{claim['title']} {claim['description']}"
-    refs = " ".join(claim.get("evidence_refs") or [])
-    if COMPROMISE.search(text):
-        return "compromised-reader"
-    if STORE_AUTH.search(refs):
-        return "grant-holder"
-    return "other"
+def _class(claim: dict[str, Any]) -> tuple[str, str]:
+    """The draft's class, and the words or the evidence ref that decided it."""
+    compromise = COMPROMISE.search(f"{claim['title']} {claim['description']}")
+    if compromise:
+        return "compromised-reader", compromise.group(0)
+    auth = STORE_AUTH.search(" ".join(claim.get("evidence_refs") or []))
+    if auth:
+        return "grant-holder", auth.group(0)
+    return "other", ""
 
 
 def reads(arm: str) -> list[dict[str, str]]:
     """Each read of a store in one arm's runs, with its class."""
     return [
-        {
-            "run": path.stem,
-            "title": claim["title"],
-            "class": _class(claim),
-        }
+        {"run": path.stem, "title": claim["title"], "class": kind, "because": why}
         for pattern in ARMS[arm]
         for path in sorted(E7_RUNS.glob(pattern))
         for claim in json.loads(path.read_text(encoding="utf-8"))["claims"]
         if claim["verb"] == "read"
         and any(ref.startswith("store:") for ref in claim["affected_element_ids"])
+        for kind, why in [_class(claim)]
     ]
 
 

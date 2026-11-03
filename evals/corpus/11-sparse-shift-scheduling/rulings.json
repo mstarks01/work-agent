@@ -107,9 +107,9 @@
         ]
       },
       "verdict": "same",
-      "ruling": "Same: rule the collect flow in. A draft that reads the export through the reader's access matches: the attacker and the remedy are the same, and the flow does not change the finding.",
+      "ruling": "Same: rule the collect flow in.",
       "reviewed_by": "mstarks01",
-      "source": "QA-2026-11-03-01 ruling of 2026-11-03 on 11/10: the stage 2 and 3 draft read the file share on the payroll system's collect flow"
+      "source": "QA-2026-11-03-01, the maintainer's answer of 2026-11-03 on 11/10: the stage 2 and 3 draft read the file share on the payroll system's collect flow"
     }
   ],
   "positions": [
