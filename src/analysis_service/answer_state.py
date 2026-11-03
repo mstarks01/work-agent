@@ -1477,6 +1477,9 @@ class Answers:
     #: Every rename the job holds after this save (ADR 0116), or ``None`` to
     #: keep the ones it holds. Only a waiting job's save sends renames.
     renames: Sequence[ElementRename] | None = None
+    #: Whether this save states the resolution of the job's Controls
+    #: (ADR 0124), which is a change of its own, as a rename is.
+    resolves_controls: bool = False
 
 
 @dataclass(frozen=True)
@@ -1820,6 +1823,22 @@ class AnswerState:
                     renames=renaming.renames,
                 )
             return renaming.answer(replace(answers, renames=None), limits=limits)
+        if (
+            answers.resolves_controls
+            and self.waiting
+            and answers.save
+            and answers.given.empty
+            and not answers.skips
+        ):
+            # A Control's resolution alone is a change: the job keeps its own
+            # answers.
+            return SavedAnswers(
+                answers=self.answers,
+                shown=tuple(self.shown),
+                skipped=tuple(self.skipped),
+                revision=self.revision,
+                renames=self.renames,
+            )
         given = answers.given
         if not self.waiting:
             if answers.save and given.empty:

@@ -40,6 +40,7 @@ from analysis_service.api import JOB_REFUSAL_STATUS, max_body_bytes
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import UNKNOWN_KEY_FIELDS
 from analysis_service.compact import FULL_FORMAT
+from analysis_service.controls import ControlLimits
 from analysis_service.deployment import Deployment
 from analysis_service.fact_answers import FactAnswer, key_ref
 from analysis_service.job_answers import OWNER_FILE_GONE
@@ -139,6 +140,7 @@ def stub_settings(runner=None, catalog: bool = False) -> Settings:
         deadline_seconds=TEST_DEADLINE,
         carries_catalog=catalog,
         max_owner_files=WEBAPP_MAX_OWNER_FILES,
+        control_limits=WEBAPP_CONTROL_LIMITS,
     )
 
 
@@ -175,6 +177,10 @@ def broken_client(tiers):
 # label is the app's, not the user's: the form asks for text, not a citation key.
 WEBAPP_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
 WEBAPP_MAX_OWNER_FILES = 3
+#: The bounds on the operator's Controls in the webapp tests.
+WEBAPP_CONTROL_LIMITS = ControlLimits(
+    max_controls=50, max_evidence=10, max_evidence_bytes=10_000
+)
 
 # The local operator's own spend: no test here is about a window, and the
 # descriptions some tests send are a hundred kilobytes.
@@ -348,15 +354,15 @@ def test_every_write_route_refuses_a_request_that_is_not_same_origin(client):
     writes = [
         (
             method,
-            route.path.replace("{run_id}", "job-missing").replace(
-                "{file_id}", "file-" + "0" * 32
-            ),
+            route.path.replace("{run_id}", "job-missing")
+            .replace("{file_id}", "file-" + "0" * 32)
+            .replace("{control_id}", "control-" + "0" * 32),
         )
         for route in client.app.routes
         for method in sorted(getattr(route, "methods", None) or ())
         if method in {"POST", "PUT", "DELETE"}
     ]
-    assert len(writes) == 11, writes
+    assert len(writes) == 12, writes
     for method, path in writes:
         response = client.request(
             method, path, json={}, headers={"Sec-Fetch-Site": "cross-site"}
@@ -378,7 +384,9 @@ def _body_routes(client) -> list[tuple[str, str, int]]:
     return [
         (
             method,
-            route.path.replace("{run_id}", "job-missing"),
+            route.path.replace("{run_id}", "job-missing").replace(
+                "{control_id}", "control-" + "0" * 32
+            ),
             limits.get(route.path, max_body_bytes(WEBAPP_LIMITS)),
         )
         for route in client.app.routes
@@ -388,7 +396,7 @@ def _body_routes(client) -> list[tuple[str, str, int]]:
 
 
 def test_each_body_route_is_counted(client):
-    assert len(_body_routes(client)) == 8
+    assert len(_body_routes(client)) == 9
 
 
 def test_each_write_route_refuses_a_body_that_is_not_json(client):
@@ -767,7 +775,7 @@ def test_each_run_route_answers_a_malformed_id_as_a_missing_run_before_the_store
                 ("PUT", "/workspace/runs/{run_id}/title"): {"title": "Orders"},
             },
             headers=SAME_ORIGIN,
-            others=("file_id",),
+            others=("file_id", "control_id"),
         )
 
 

@@ -12,6 +12,7 @@ from analysis_service.controls import (
     MAX_CONTROL_ALIASES,
     MAX_CONTROL_FACTS,
     MAX_CONTROL_ROWS,
+    Control,
     ControlDocument,
     ControlLimits,
     EvidenceRefusal,
@@ -21,6 +22,7 @@ from analysis_service.controls import (
 )
 from analysis_service.fact_answers import STORED
 from analysis_service.frameworks import PACKAGES
+from analysis_service.job_controls import CopiedControl
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
 from analysis_service.sources import text_digest
 from analysis_service.system_model import ElementPrefix
@@ -58,6 +60,18 @@ def document(**changed: Any) -> dict:
         "evidence": [evidence()],
         **changed,
     }
+
+
+def copied_control() -> CopiedControl:
+    """The job's copy of :func:`document`, whose evidence text matches its
+    digest."""
+    text = "encrypted: true\n"
+    held = ControlDocument.model_validate(
+        document(evidence=[evidence(sha256=text_digest(text), size_bytes=len(text))])
+    )
+    return CopiedControl.of(
+        Control.create(owner_id="alice", document=held), {EVIDENCE_ID: text}
+    )
 
 
 def refusal(**changed: Any) -> str:

@@ -116,14 +116,16 @@ class ControlScope(BaseModel):
         application."""
         return "" if self.type == "application" else _scope_id(self.type, self.name)
 
+    def alias_ids(self) -> tuple[str, ...]:
+        """The element ID that each alias gives, in the owner's order."""
+        return tuple(_scope_id(self.type, alias) for alias in self.aliases)
+
     def element_ids(self) -> frozenset[str]:
         """The element ID that the name and each alias give, as a match reads
         them. Empty for the whole application."""
         if self.type == "application":
             return frozenset()
-        return frozenset(
-            _scope_id(self.type, name) for name in (self.name, *self.aliases)
-        )
+        return frozenset((self.name_id(), *self.alias_ids()))
 
 
 def _scope_id(scope_type: ScopeType, name: str) -> str:

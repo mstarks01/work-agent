@@ -112,7 +112,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from contextlib import asynccontextmanager, nullcontext
+from contextlib import asynccontextmanager, nullcontext, suppress
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
@@ -127,7 +127,7 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from analysis_service import (
@@ -172,6 +172,14 @@ from analysis_service.config_files import (
     SettingsFileError,
     settings_dir,
 )
+from analysis_service.controls import (
+    CONTROL_ID,
+    CONTROL_ID_PATTERN,
+    Control,
+    ControlLimits,
+    ControlScope,
+    EvidenceRefusal,
+)
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
 from analysis_service.diagrams import install_reader, reader_fault
@@ -202,6 +210,7 @@ from analysis_service.job_answers import (
     UnreadableSchema,
     Withheld,
 )
+from analysis_service.job_controls import ControlScopeEntry, controls_used
 from analysis_service.jobs import (
     DeleteRefusal,
     Envelope,
@@ -376,6 +385,8 @@ class Settings:
     carries_catalog: bool
     #: How many Owner Files the operator keeps in Files (ADR 0118).
     max_owner_files: int
+    #: The bounds on the operator's Controls (ADR 0127).
+    control_limits: ControlLimits
     gate: CertificationGate | None = None
 
 
@@ -652,6 +663,7 @@ class Current:
     answers: JobAnswers
     deadline_seconds: float
     max_owner_files: int
+    control_limits: ControlLimits
 
 
 class CellEmpty(Exception):
@@ -733,6 +745,37 @@ class _Submission(BaseModel):
     owner_files: list[Annotated[str, Field(pattern=OWNER_FILE_ID)]] = Field(
         default_factory=list
     )
+    #: The Controls the new job copies (ADR 0127). Only this route takes
+    #: them: ``POST /v1/jobs`` has no Controls.
+    controls: list[Annotated[str, Field(pattern=CONTROL_ID)]] = Field(
+        default_factory=list
+    )
+
+
+class _AliasBody(BaseModel):
+    """The body of ``POST /workspace/controls/{id}/aliases``: the element
+    name that "keep this name" appends to the Control's scope (ADR 0124)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    alias: str
+
+
+#: The ``control_scopes`` key of an ``/answer`` body (ADR 0124). Only this
+#: route takes it: the ``/v1`` answer body refuses the key.
+_CONTROL_SCOPES: TypeAdapter[list[ControlScopeEntry]] = TypeAdapter(
+    list[ControlScopeEntry]
+)
+
+
+def _control_scopes(raw: object) -> list[ControlScopeEntry] | None:
+    """Take ``control_scopes`` out of an ``/answer`` body, so the rest of the
+    body is the one :func:`read_answers` reads. ``None`` where the body does
+    not carry the key. Raises :class:`ValidationError` for a value of the
+    wrong shape."""
+    if not isinstance(raw, dict) or "control_scopes" not in raw:
+        return None
+    return _CONTROL_SCOPES.validate_python(raw.pop("control_scopes"))
 
 
 class _FileUpload(BaseModel):
@@ -764,6 +807,7 @@ def _file_view(file: OwnerFile) -> dict[str, object]:
 
 #: The answer to a delete of a file the operator does not hold.
 _NO_SUCH_FILE = "This file is no longer in Files."
+_NO_SUCH_CONTROL = "This Control is no longer in Controls."
 
 
 class _UnknownKey(Exception):
@@ -858,6 +902,7 @@ class Startup:
             ),
             deadline_seconds=settings.deadline_seconds,
             max_owner_files=settings.max_owner_files,
+            control_limits=settings.control_limits,
         )
 
 
@@ -899,6 +944,7 @@ def build_startup(env: Mapping[str, str]) -> Startup:
             limits=deployment.resilience.source_limits(),
             budget=deployment.resilience.budget_policy(),
             max_owner_files=deployment.resilience.max_owner_files,
+            control_limits=deployment.resilience.control_limits(),
             deadline_seconds=deployment.job_deadline_seconds(),
             carries_catalog=deployment.carries_catalog,
             gate=deployment.gate,
@@ -1696,6 +1742,63 @@ def create_app(
             return _message(404, _NO_SUCH_FILE)
         return Response(status_code=204)
 
+    @app.post("/workspace/controls/{control_id}/aliases")
+    async def keep_this_name(control_id: str, request: Request) -> Response:
+        """Append a name to the scope of the operator's Control as an alias:
+        "keep this name" (ADR 0124). Only the owner's click writes an alias;
+        the service never writes one of its own."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        current = cell.read(unavailable)
+        raw = await _job_body(request, current.answers)
+        try:
+            alias = _AliasBody.model_validate(_body_of(raw, _AliasBody)).alias
+        except _UnknownKey as exc:
+            return _message(400, str(exc))
+        except TypeError:
+            return _message(400, "Expected a JSON object with an alias.")
+        except ValueError as exc:
+            return _message(400, refusal_text(exc))
+        if not CONTROL_ID_PATTERN.fullmatch(control_id):
+            return _message(404, _NO_SUCH_CONTROL)
+        held = await workspace.store.principal(OPERATOR)
+        control = (
+            None
+            if held is None
+            else await workspace.store.get_control(control_id, held.owner_id)
+        )
+        if control is None:
+            return _message(404, _NO_SUCH_CONTROL)
+        document = control.document
+        scope = document.scope
+        try:
+            widened = ControlScope.model_validate(
+                scope.model_dump() | {"aliases": [*scope.aliases, alias]}
+            )
+        except ValueError as exc:
+            return _message(400, refusal_text(exc))
+        outcome = await workspace.store.replace_control(
+            Control.create(
+                owner_id=control.owner_id,
+                document=document.model_copy(update={"scope": widened}),
+            ),
+            {},
+            limits=current.control_limits,
+        )
+        match outcome:
+            case "replaced":
+                return JSONResponse({"aliases": widened.aliases})
+            case "absent":
+                return _message(404, _NO_SUCH_CONTROL)
+            case "alias_in_use":
+                return _message(
+                    409, f"Another Control's scope already holds “{alias}”."
+                )
+            case "name_in_use":
+                return _message(409, "Another Control took this name. Try again.")
+            case EvidenceRefusal(message=message):
+                return _message(409, message)
+
     @app.get("/workspace/runs")
     async def workspace_runs() -> Response:
         current = cell.read(lambda: JSONResponse([]))
@@ -1743,6 +1846,17 @@ def create_app(
             for source in sources
             if source.owner_file_id is not None
         ]
+        # Read from the job's copy, so a later edit or delete of a Control
+        # changes nothing here (ADR 0127).
+        copies = await store.controls(record.id, owner_id)
+        if copies is None:
+            await answers.missing(record, "controls")
+        model = None
+        if copies:
+            # A job that serves no model leaves its Controls pending.
+            with suppress(NotCompleted, Withheld):
+                model = (await answers.answerable(record.id, owner_id)).model
+        payload["controls_used"] = controls_used(copies, record.control_scopes, model)
         payload["error"] = record.error
         payload["issues"] = [
             {"code": issue.code, "message": issue.message}
@@ -1868,6 +1982,7 @@ def create_app(
                         questions=submission.questions,
                         answers_from=submission.answers_from,
                         owner_files=submission.owner_files,
+                        controls=submission.controls,
                     ),
                     start=workspace.start(current.deadline_seconds),
                 )
@@ -1884,14 +1999,20 @@ def create_app(
         at ``prepare`` from what that run reached, so nothing is extracted
         again. An empty answer list continues a paused run without answers; a
         finished run has nothing to continue. A save answers with the
-        new revision.
+        new revision. ``control_scopes`` states the resolution of each Control
+        a paused run copied (ADR 0124).
         """
         if (forbidden := _cross_origin(request)) is not None:
             return forbidden
         current = cell.read(unavailable)
         answers = current.answers
+        raw = await _job_body(request, answers)
         try:
-            submitted = read_answers(await _job_body(request, answers))
+            control_scopes = _control_scopes(raw)
+        except ValidationError as refused:
+            return _message(400, refusal_text(refused))
+        try:
+            submitted = read_answers(raw)
         except BodyRefused as refused:
             message = await _refusal_words(refused, workspace, answers, run_id)
             if refused.over_a_bound:
@@ -1910,6 +2031,7 @@ def create_app(
                 owner_id,
                 submitted,
                 start=workspace.start(current.deadline_seconds),
+                control_scopes=control_scopes,
             )
         if isinstance(outcome, Started):
             return JSONResponse({"run": outcome.job_id})

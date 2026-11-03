@@ -74,6 +74,7 @@ from analysis_service.controls import (
 )
 from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
+from analysis_service.job_controls import ControlResolution, CopiedControl
 from analysis_service.links import MAX_HELD_LINKS
 from analysis_service.owner_files import FileAdmission, OwnerFile
 from analysis_service.principals import Identity, Principal, PrincipalTable
@@ -199,6 +200,8 @@ RECORD_FIELDS: dict[str, EnvelopeHold] = {
     "parent_revision": "always",
     "carried": "same-schema",
     "carried_renames": "same-schema",
+    "controls": "never",
+    "control_scopes": "same-schema",
     "ask_questions": "always",
     "checkpoint": "never",
     "status": "always",
@@ -430,6 +433,13 @@ class JobRecord(BaseModel):
     carried_renames: list[ElementRename] = Field(
         default_factory=list, max_length=MAX_RENAMES
     )
+    # The job's copy of each Control its submission named (ADR 0127): the
+    # object ``<owner-id>/<job-id>/controls.json``, which the store writes
+    # once. A route reads it by name, with :meth:`JobStore.controls`.
+    controls: list[CopiedControl] = Field(default_factory=list)
+    # The resolution of each copy that a pause save stated (ADR 0124), or
+    # ``None`` where no save stated one and each copy takes its default.
+    control_scopes: list[ControlResolution] | None = None
     # Whether this job stops after its assertion pass to ask a person, and
     # waits for the answers. Off unless a submission asks for it, so an
     # autonomous run never waits.
@@ -480,6 +490,8 @@ class JobRecord(BaseModel):
         amends: str | None = None,
         parent_revision: int | None = None,
         carried: AnswerSet = NO_ANSWERS,
+        controls: Sequence[CopiedControl] = (),
+        control_scopes: Sequence[ControlResolution] | None = None,
         ask_questions: bool = False,
         reserved_tokens: int = 0,
     ) -> Self:
@@ -500,6 +512,8 @@ class JobRecord(BaseModel):
             amends=amends,
             parent_revision=parent_revision,
             carried=carried,
+            controls=list(controls),
+            control_scopes=None if control_scopes is None else list(control_scopes),
             ask_questions=ask_questions,
             created_at=now,
             updated_at=now,
@@ -842,6 +856,11 @@ class JobStore(Protocol):
 
     async def sources(self, job_id: str, owner_id: str) -> list[Source] | None: ...
 
+    async def controls(self, job_id: str, owner_id: str) -> list[CopiedControl] | None:
+        """The owned job's copy of its Controls, empty where it names none, or
+        ``None`` where the owner holds no such job."""
+        ...
+
     async def report_json(
         self, job_id: str, owner_id: str
     ) -> dict[str, Any] | None: ...
@@ -878,6 +897,7 @@ class JobStore(Protocol):
         revision: int,
         *,
         renames: Sequence[ElementRename],
+        control_scopes: Sequence[ControlResolution] | None,
     ) -> bool: ...
 
     async def save_corrections(
@@ -1375,6 +1395,12 @@ class InMemoryJobStore:
             return None
         return [source.model_copy(deep=True) for source in record.sources]
 
+    async def controls(self, job_id: str, owner_id: str) -> list[CopiedControl] | None:
+        record = self._records.get(job_id)
+        if record is None or record.owner_id != owner_id:
+            return None
+        return list(record.controls)
+
     async def report_json(self, job_id: str, owner_id: str) -> dict[str, Any] | None:
         """The owned job's report, already JSON, or ``None`` if it has none.
 
@@ -1470,12 +1496,14 @@ class InMemoryJobStore:
         revision: int,
         *,
         renames: Sequence[ElementRename],
+        control_scopes: Sequence[ControlResolution] | None,
     ) -> bool:
         """Keep the saved answers of a job that still waits for them.
 
         ``shown`` is every early question the pause has shown, ``skipped``
-        every one its submitter skipped for now, and ``renames`` every rename
-        of a carried answer's element (ADR 0116). ``revision`` is the
+        every one its submitter skipped for now, ``renames`` every rename
+        of a carried answer's element (ADR 0116), and ``control_scopes`` the
+        resolution of each copied Control (ADR 0124). ``revision`` is the
         revision the save read: the check and the next revision are one step,
         so of two saves that read one revision only the first lands. Only these
         change, so the checkpoint an envelope read leaves
@@ -1497,6 +1525,7 @@ class InMemoryJobStore:
         record.shown_early = list(shown)
         record.skipped_early = list(skipped)
         record.carried_renames = list(renames)
+        record.control_scopes = None if control_scopes is None else list(control_scopes)
         record.updated_at = datetime.now(UTC)
         return True
 

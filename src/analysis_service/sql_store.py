@@ -117,6 +117,7 @@ from analysis_service.controls import (
     names_another_scope,
 )
 from analysis_service.fact_answers import STORED, FactAnswer, SkipKey
+from analysis_service.job_controls import ControlResolution, CopiedControl
 from analysis_service.jobs import (
     RESTART_FAILURE_MESSAGE,
     TERMINAL_STATUSES,
@@ -261,12 +262,14 @@ jobs = Table(
     Column("resumption", _Json, nullable=False),
     Column("carried", _Json, nullable=False),
     Column("carried_renames", _Json, nullable=False),
+    Column("control_scopes", _Json, nullable=False),
     Column("checkpoint", _Json, nullable=False),
     Column("validation_issues", _Json, nullable=False),
     Column("certification", _Json, nullable=False),
     Column("unreported_nodes", _Json, nullable=False),
     Column("sources_sha256", String(64), nullable=False),
     Column("report_sha256", String(64)),
+    Column("controls_sha256", String(64)),
 )
 
 #: The ``job_events`` table: one row for each event, keyed by the job and the
@@ -348,6 +351,7 @@ controls = Table(
 DIGEST_COLUMNS: dict[ObjectName, str] = {
     "sources.json": "sources_sha256",
     "report.json": "report_sha256",
+    "controls.json": "controls_sha256",
 }
 
 
@@ -381,7 +385,7 @@ def _object_keys(row: Row[Any], *, include_unnamed: bool = False) -> list[str]:
 
 
 #: The fields of a record that are objects or event rows, not job columns.
-RecordObjectField = Literal["sources", "report", "events"]
+RecordObjectField = Literal["sources", "report", "controls", "events"]
 _OUTSIDE_THE_ROW: frozenset[RecordObjectField] = frozenset(get_args(RecordObjectField))
 #: The fields a job row holds as JSON text.
 _JSON_FIELDS = frozenset(
@@ -393,6 +397,7 @@ _ADAPTERS: dict[str, TypeAdapter[Any]] = {
     for name in _JSON_FIELDS
 }
 _SOURCES: TypeAdapter[list[Source]] = TypeAdapter(list[Source])
+_CONTROLS: TypeAdapter[list[CopiedControl]] = TypeAdapter(list[CopiedControl])
 _STATUS: TypeAdapter[JobStatus] = TypeAdapter(JobStatus)
 _EVENTS: TypeAdapter[list[JobEvent]] = TypeAdapter(list[JobEvent])
 
@@ -449,10 +454,12 @@ def _record(
     sources: bytes | None,
     report: bytes | None,
     events: Sequence[str],
+    controls: bytes | None = None,
 ) -> JobRecord:
     """The record a row and its objects hold. An envelope, where ``sources``
     is ``None``, leaves out each part that :func:`envelope_parts` names, and
-    never parses one."""
+    never parses one. ``controls`` is ``None`` where the row names no
+    Controls object."""
     left_out = envelope_parts(row.schema_version) if sources is None else {}
     data: dict[str, Any] = {}
     for name in JobRecord.model_fields.keys() - _OUTSIDE_THE_ROW:
@@ -465,6 +472,7 @@ def _record(
             data[name] = value
     data["sources"] = None if sources is None else _loads(sources, "sources")
     data["report"] = None if report is None else _loads(report, "report")
+    data["controls"] = [] if controls is None else _loads(controls, "controls")
     data["events"] = [
         _loads(text, "events", index) for index, text in enumerate(events)
     ]
@@ -1331,6 +1339,8 @@ class SqlJobStore:
         }
         if record.report is not None:
             objects["report.json"] = stored_report(record.report)
+        if record.controls:
+            objects["controls.json"] = _CONTROLS.dump_json(record.controls)
         keys = []
         try:
             for name, data in objects.items():
@@ -1423,6 +1433,7 @@ class SqlJobStore:
                         **_job_row(record),
                         "sources_sha256": digests["sources.json"],
                         "report_sha256": digests.get("report.json"),
+                        "controls_sha256": digests.get("controls.json"),
                     }
                 )
             )
@@ -1487,12 +1498,19 @@ class SqlJobStore:
         sources = await self._object(row, "sources.json")
         if sources is None:
             return None
-        report = None
-        if _names(row, "report.json"):
-            report = await self._object(row, "report.json")
-            if report is None:
-                return None
-        return _record(row, sources, report, texts)
+        named: dict[ObjectName, bytes | None] = {}
+        for name in ("report.json", "controls.json"):
+            if _names(row, name):
+                named[name] = await self._object(row, name)
+                if named[name] is None:
+                    return None
+        return _record(
+            row,
+            sources,
+            named.get("report.json"),
+            texts,
+            named.get("controls.json"),
+        )
 
     async def owned(self, job_id: str, owner_id: str) -> Envelope | None:
         """The record ``owner_id`` owns, as an envelope, or ``None``.
@@ -1522,6 +1540,28 @@ class SqlJobStore:
         if data is None:
             return None
         return _part_of(row, lambda: _SOURCES.validate_json(data))
+
+    async def controls(self, job_id: str, owner_id: str) -> list[CopiedControl] | None:
+        """The owned job's copy of its Controls. The owner is checked on the
+        row, before the object is read."""
+        async with self._transaction() as connection:
+            found = await connection.execute(
+                select(
+                    jobs.c.id,
+                    jobs.c.owner_id,
+                    jobs.c.schema_version,
+                    jobs.c.controls_sha256,
+                ).where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+            )
+            row = found.one_or_none()
+        if row is None:
+            return None
+        if not _names(row, "controls.json"):
+            return []
+        data = await self._object(row, "controls.json")
+        if data is None:
+            return None
+        return _part_of(row, lambda: _CONTROLS.validate_json(data, context=STORED))
 
     async def _report(
         self, job_id: str, owner_id: str
@@ -1687,6 +1727,7 @@ class SqlJobStore:
         revision: int,
         *,
         renames: Sequence[ElementRename],
+        control_scopes: Sequence[ControlResolution] | None,
     ) -> bool:
         """Keep a waiting job's saved answers, as one conditional ``UPDATE`` on
         the revision, under the lock on the job's row."""
@@ -1695,6 +1736,10 @@ class SqlJobStore:
             "shown_early": _json("shown_early", list(shown)),
             "skipped_early": _json("skipped_early", list(skipped)),
             "carried_renames": _json("carried_renames", list(renames)),
+            "control_scopes": _json(
+                "control_scopes",
+                None if control_scopes is None else list(control_scopes),
+            ),
         }
         async with self._transaction(writes=True) as connection:
             await self._lock(connection, job_id)
