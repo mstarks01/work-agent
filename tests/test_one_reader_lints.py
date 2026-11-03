@@ -1002,10 +1002,16 @@ def test_the_reason_a_claim_rests_on_has_one_writer():
 
 
 #: The names a comparison of an attacker position uses: the parameters of
-#: ``scorer.holds_position`` and of ``losses._holding``, and the loss report's
-#: two position readers.
+#: ``scorer.holds_position``, the reader ``losses._holding`` takes, and the loss
+#: report's two position readers.
 _POSITION_NAMES = frozenset(
-    {"ruled_position", "stated_position", "_draft_position", "_proposal_position"}
+    {
+        "ruled_position",
+        "stated_position",
+        "position_of",
+        "_draft_position",
+        "_proposal_position",
+    }
 )
 
 

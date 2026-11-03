@@ -45,7 +45,7 @@ import json
 import os
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import Annotated, Any, Literal, Self
@@ -707,11 +707,11 @@ class GoldenCase:
     model: SystemModel
     references: Mapping[FrameworkName, tuple[ReferenceClaim, ...]]
     #: STRIDE reference index -> the readings a person ruled it also accepts.
-    ruled_readings: Mapping[int, tuple[Reading, ...]] = MappingProxyType({})
+    ruled_readings: Mapping[int, tuple[Reading, ...]] = field(kw_only=True)
     #: STRIDE reference index -> the readings a person ruled a different finding.
-    refused_readings: Mapping[int, tuple[Reading, ...]] = MappingProxyType({})
+    refused_readings: Mapping[int, tuple[Reading, ...]] = field(kw_only=True)
     #: STRIDE reference index -> the attacker position a person ruled it holds.
-    ruled_positions: Mapping[int, AttackerPosition] = MappingProxyType({})
+    ruled_positions: Mapping[int, AttackerPosition] = field(kw_only=True)
 
     @property
     def id(self) -> str:
