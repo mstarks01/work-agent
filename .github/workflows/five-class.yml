@@ -2,7 +2,8 @@
 # a "## Five-class read" section in its body, with one entry for each defect
 # class of docs/agents/code-review.md, and a "## Before the code" section, with
 # one entry for each class that comes back in fixes. A pull request that changes
-# a module that decides what a prompt says also holds a "## Prompt read" section.
+# a module that decides what a prompt says, or a file with a row in
+# held_wording.toml, also holds a "## Prompt read" section.
 # .github/scripts/five_class_read.py holds the rules and the class names, and
 # .github/scripts/prompt_outcomes.toml beside it holds the map from modules to
 # prompts, and .github/scripts/held_wording.toml holds the held wording in model
