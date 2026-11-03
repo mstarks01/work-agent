@@ -1,0 +1,10 @@
+material from today's prepare, catalog signed; prompt files from d9931ded2a232649b6cccd48b184343e93cf6022
+- Shopper order details may be intercepted if the public checkout flow lacks transport encryption | ['flow:entity:shopper>process:storefront-api>place-order', 'entity:shopper', 'process:storefront-api']
+- Settlement callback contents may be intercepted if webhook transport protection is absent | ['flow:entity:card-processor>process:storefront-api>settlement-webhook', 'entity:card-processor', 'process:storefront-api']
+- Orders crossing from the storefront to the core may be readable if gRPC transport encryption is absent | ['flow:process:storefront-api>process:order-service>submit-order', 'process:storefront-api', 'process:order-service']
+- Order database traffic may expose shopper records if its internal connection is unencrypted | ['flow:process:order-service>store:orders-db>read-write-orders', 'process:order-service', 'store:orders-db']
+- A copied orders database may disclose all shopper records if at-rest encryption is absent | ['store:orders-db']
+- Database password stored in the order-service environment can unlock the orders corpus | ['process:order-service', 'flow:process:order-service>store:orders-db>read-write-orders', 'store:orders-db']
+- Code running in the order service inherits full read access to confidential orders | ['process:order-service', 'flow:process:order-service>store:orders-db>read-write-orders', 'store:orders-db']
+spent: $0.0494 reported
+must-finds matched: [10, 11]

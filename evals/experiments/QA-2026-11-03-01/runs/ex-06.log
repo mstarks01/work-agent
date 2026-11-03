@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from 615b1885bc6c0f16d3f42d7fda170ab4a647d0d7
+- Unverified local client channel may expose player data to malware on the player device | ['flow:entity:player>process:game-client>launch-and-play', 'process:game-client', 'entity:player']
+- Unverified matchmaking transport may reveal player match assignments | ['flow:process:game-client>process:lobby>matchmaking', 'process:game-client', 'process:lobby']
+- Unverified gameplay transport may expose match state to network observers | ['flow:process:game-client>process:game-server>gameplay-traffic', 'process:game-client', 'process:game-server']
+- Unverified lobby-to-game-server handoff may disclose player identifiers | ['flow:process:lobby>process:game-server>hand-over-match', 'process:lobby', 'process:game-server']
+- Unverified lobby database transport may expose player account records | ['flow:process:lobby>store:player-database>read-players', 'process:lobby', 'store:player-database']
+- Unverified game-server statistics transport may expose match statistics | ['flow:process:game-server>store:stats-database>read-write-stats', 'process:game-server', 'store:stats-database']
+- Unverified game-server player-record updates may disclose player data | ['flow:process:game-server>store:player-database>update-players', 'process:game-server', 'store:player-database']
+- Unverified support-to-moderation transport may expose player-account activity | ['flow:entity:customer-support-staff>process:moderation-website>moderate-accounts', 'entity:customer-support-staff', 'process:moderation-website']
+- Unverified moderation database transport may expose player records | ['flow:process:moderation-website>store:player-database>read-write-players', 'process:moderation-website', 'store:player-database']
+- A storage copy may expose all player records if player-database encryption at rest is absent | ['store:player-database']
+- A storage copy may expose match statistics if statistics-database encryption at rest is absent | ['store:stats-database']
+- Code in a player-database reader may disclose the player corpus through its existing access | ['store:player-database', 'process:lobby', 'process:moderation-website', 'flow:process:lobby>store:player-database>read-players']
+- Code in the game server may disclose match statistics through its existing database access | ['store:stats-database', 'process:game-server', 'flow:process:game-server>store:stats-database>read-write-stats']
+spent: $0.0690 reported
+must-finds matched: [8, 9]

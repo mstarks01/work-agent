@@ -1,0 +1,16 @@
+material from today's prepare, catalog signed; prompt files from d51830a1fa4ffbdb5348b1713bae9fa0b2b2a2f2
+- Player-local game traffic may expose player information if transport protection is absent | ['flow:entity:player>process:game-client>launch-and-play', 'entity:player', 'process:game-client']
+- Matchmaking traffic may be readable across the player-to-production boundary | ['flow:process:game-client>process:lobby>matchmaking', 'process:game-client', 'process:lobby']
+- Gameplay state may be readable across the player-to-game-server boundary | ['flow:process:game-client>process:game-server>gameplay-traffic', 'process:game-client', 'process:game-server']
+- Unverified lobby-to-game-server transport may expose match composition | ['flow:process:lobby>process:game-server>hand-over-match', 'process:lobby', 'process:game-server']
+- Player account records may be exposed on the lobby database read path | ['flow:process:lobby>store:player-database>read-players', 'process:lobby', 'store:player-database']
+- Match statistics may be exposed on the game-server database path | ['flow:process:game-server>store:stats-database>read-write-stats', 'process:game-server', 'store:stats-database']
+- Player progression data may be exposed on the game-server write path | ['flow:process:game-server>store:player-database>update-players', 'process:game-server', 'store:player-database']
+- Support-to-moderation traffic may expose player account information | ['flow:entity:customer-support-staff>process:moderation-website>moderate-accounts', 'entity:customer-support-staff', 'process:moderation-website']
+- Moderation website database traffic may expose player records | ['flow:process:moderation-website>store:player-database>read-write-players', 'process:moderation-website', 'store:player-database']
+- A storage copy may expose all player records if at-rest encryption is absent | ['store:player-database']
+- A storage copy may expose match statistics if at-rest encryption is absent | ['store:stats-database']
+- Compromise of a player-database reader may expose the player-account corpus | ['store:player-database', 'process:lobby', 'process:moderation-website', 'flow:process:lobby>store:player-database>read-players']
+- Compromise of the game-server reader may expose match statistics | ['store:stats-database', 'process:game-server', 'flow:process:game-server>store:stats-database>read-write-stats']
+spent: $0.0608 reported
+must-finds matched: [8, 9]
