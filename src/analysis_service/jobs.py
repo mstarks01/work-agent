@@ -1012,7 +1012,8 @@ class JobStore(Protocol):
         (:func:`~analysis_service.controls.names_another_scope`), and a name
         that the owner already uses gets ``name_in_use``. ``principal`` is as
         in :meth:`add_file`. A text that does not fit the evidence list raises
-        (:func:`~analysis_service.controls.check_texts`) and keeps nothing.
+        (:func:`~analysis_service.controls.check_texts`) and keeps nothing, and
+        so does a Control ID that the store holds, whoever its owner is.
         """
         ...
 
@@ -1713,6 +1714,8 @@ class InMemoryJobStore:
         if refused is not None:
             return refused
         check_texts(control.document, texts)
+        if control.document.id in self._controls:
+            raise ValueError(f"the store already holds control {control.document.id}")
         if principal is None:
             if not self._principals.holds(control.owner_id):
                 raise ValueError(f"owner {control.owner_id} holds no principal")

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 from pydantic import ValidationError
@@ -15,6 +15,7 @@ from analysis_service.controls import (
     ControlDocument,
     ControlLimits,
     EvidenceRefusal,
+    ScopeType,
     control_refusal,
     credential_hit,
 )
@@ -22,6 +23,7 @@ from analysis_service.fact_answers import STORED
 from analysis_service.frameworks import PACKAGES
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
 from analysis_service.sources import text_digest
+from analysis_service.system_model import ElementPrefix
 
 CONTROL_ID = "control-" + "c" * 32
 EVIDENCE_ID = "evidence-" + "e" * 32
@@ -316,9 +318,42 @@ class TestTheEvidenceRules:
         assert evidence_message(text).startswith("Line 2 of")
 
 
-def test_one_scan_of_a_hostile_line_stays_linear():
-    """Each start of an assignment reads at most 256 characters of its value,
-    so a line of 100 KiB of starts is read in time linear in its length."""
+def test_a_document_with_no_name_key_is_refused():
+    held = document()
+    del held["name"]
+    with pytest.raises(ValidationError, match="name\n  Field required"):
+        ControlDocument.model_validate(held)
+
+
+def test_the_scope_types_are_the_element_prefixes_but_a_flow():
+    assert set(get_args(ScopeType)) == {"application"} | (
+        set(get_args(ElementPrefix)) - {"flow"}
+    )
+
+
+@pytest.mark.parametrize(
+    ("line", "shape"),
+    [
+        ("-----BEGIN PGP PRIVATE KEY BLOCK-----", "a private key block"),
+        (
+            'password = "' + "x" * 400 + '"',
+            "a password, secret or token set to a value",
+        ),
+        ("token: eyJ" + "a" * 400, "a password, secret or token set to a value"),
+        ("secret: '" + "b" * 300, "a password, secret or token set to a value"),
+    ],
+)
+def test_a_long_or_unclosed_credential_is_refused(line, shape):
+    assert evidence_message(f"{line}\n") == (
+        f"Line 1 of “waf.yaml” holds {shape}. Remove it, then add the file again:"
+        " the service stores no credential."
+    )
+
+
+@pytest.mark.parametrize(
+    "line", ["token=" * 17_000, 'password="' * 10_000, "token: " + "a" * 100_000]
+)
+def test_a_hostile_line_is_read_in_linear_time(line):
     started = time.perf_counter()
-    assert credential_hit("token=" * 17_000) is None
+    credential_hit(line)
     assert time.perf_counter() - started < 1

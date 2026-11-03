@@ -2026,6 +2026,35 @@ class SqlJobStore:
             await self._remove([key])
         return outcome
 
+    async def _owner_holds(
+        self,
+        connection: AsyncConnection,
+        owner_id: str,
+        principal: Principal | None,
+    ) -> bool:
+        """Whether an upload or a save of ``owner_id`` may go on: the owner holds
+        a principal, or ``principal`` is new and its identity holds none.
+        Without ``principal``, an owner who holds none is a defect, and the
+        call raises."""
+        if principal is not None:
+            return await self._principal(connection, principal.identity) is None
+        holder = select(principals.c.owner_id).where(principals.c.owner_id == owner_id)
+        if await connection.scalar(holder) is None:
+            raise ValueError(f"owner {owner_id} holds no principal")
+        return True
+
+    async def _add_principal(
+        self, connection: AsyncConnection, principal: Principal
+    ) -> None:
+        await connection.execute(
+            insert(principals).values(
+                owner_id=principal.owner_id,
+                issuer=principal.issuer,
+                sub=principal.sub,
+                created_at=principal.created_at,
+            )
+        )
+
     async def _insert_file(
         self, file: OwnerFile, *, limit: int, principal: Principal | None
     ) -> FileAdmission:
@@ -2039,26 +2068,13 @@ class SqlJobStore:
         try:
             async with self._transaction(writes=True) as connection:
                 await self._owner_lock(connection, file.owner_id)
-                if principal is None:
-                    holder = select(principals.c.owner_id).where(
-                        principals.c.owner_id == file.owner_id
-                    )
-                    if await connection.scalar(holder) is None:
-                        raise ValueError(f"owner {file.owner_id} holds no principal")
-                elif await self._principal(connection, principal.identity) is not None:
+                if not await self._owner_holds(connection, file.owner_id, principal):
                     return "principal_exists"
                 count = select(func.count()).select_from(owner_files).where(owned)
                 if (await connection.scalar(count) or 0) >= limit:
                     return "over_limit"
                 if principal is not None:
-                    await connection.execute(
-                        insert(principals).values(
-                            owner_id=principal.owner_id,
-                            issuer=principal.issuer,
-                            sub=principal.sub,
-                            created_at=principal.created_at,
-                        )
-                    )
+                    await self._add_principal(connection, principal)
                 await connection.execute(insert(owner_files).values(file.model_dump()))
         except IntegrityError:
             named = select(owner_files.c.id).where(
@@ -2149,6 +2165,12 @@ class SqlJobStore:
         if refused is not None:
             return refused
         check_texts(control.document, texts)
+        async with self._transaction() as connection:
+            held = select(controls.c.id).where(controls.c.id == control.document.id)
+            if await connection.scalar(held) is not None:
+                raise ValueError(
+                    f"the store already holds control {control.document.id}"
+                )
         keys = await self._put_evidence(control, texts)
         try:
             outcome = await self._insert_control(
@@ -2215,13 +2237,7 @@ class SqlJobStore:
         try:
             async with self._transaction(writes=True) as connection:
                 await self._owner_lock(connection, control.owner_id)
-                if principal is None:
-                    holder = select(principals.c.owner_id).where(
-                        principals.c.owner_id == control.owner_id
-                    )
-                    if await connection.scalar(holder) is None:
-                        raise ValueError(f"owner {control.owner_id} holds no principal")
-                elif await self._principal(connection, principal.identity) is not None:
+                if not await self._owner_holds(connection, control.owner_id, principal):
                     return "principal_exists"
                 count = select(func.count()).select_from(controls).where(owned)
                 if (await connection.scalar(count) or 0) >= limit:
@@ -2230,14 +2246,7 @@ class SqlJobStore:
                 if refused is not None:
                     return refused
                 if principal is not None:
-                    await connection.execute(
-                        insert(principals).values(
-                            owner_id=principal.owner_id,
-                            issuer=principal.issuer,
-                            sub=principal.sub,
-                            created_at=principal.created_at,
-                        )
-                    )
+                    await self._add_principal(connection, principal)
                 await connection.execute(insert(controls).values(_control_row(control)))
         except IntegrityError:
             if not await self._name_in_use(control):
@@ -2348,6 +2357,12 @@ class SqlJobStore:
         )
         return True
 
+    async def _lists(self, control_id: str, evidence_id: str, owner_id: str) -> bool:
+        """Whether the owned Control's row lists the evidence file now."""
+        return _lists_evidence(
+            await self.get_control(control_id, owner_id), evidence_id
+        )
+
     async def read_evidence(
         self, control_id: str, evidence_id: str, owner_id: str
     ) -> str | None:
@@ -2362,8 +2377,8 @@ class SqlJobStore:
         if file is None:
             return None
         data = await self._objects.get(evidence_key(owner_id, control_id, evidence_id))
-        if data is None and await self.get_control(control_id, owner_id) is None:
-            # A delete removed the row after this read found it.
+        if data is None and not await self._lists(control_id, evidence_id, owner_id):
+            # A delete or a replace removed the file after this read found it.
             return None
         if data is None or not hmac.compare_digest(object_digest(data), file.sha256):
             logger.error(
@@ -2375,6 +2390,12 @@ class SqlJobStore:
             )
             raise CorruptObject(evidence_id)
         return data.decode("utf-8")
+
+
+def _lists_evidence(held: Control | None, evidence_id: str) -> bool:
+    return held is not None and any(
+        file.id == evidence_id for file in held.document.evidence
+    )
 
 
 def _document(document: str) -> ControlDocument:

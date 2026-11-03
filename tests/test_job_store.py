@@ -2595,6 +2595,24 @@ class TestControls:
             == "principal_exists"
         )
 
+    @pytest.mark.parametrize("owner", ["alice", "bob"])
+    def test_a_held_control_id_is_a_defect_and_changes_nothing(self, store, owner):
+        held, texts = save(store)
+        save(store, "bob", name="Other")
+        again, new_texts = control(owner, "Again", control_id=held.document.id)
+        with pytest.raises(ValueError, match="already holds"):
+            asyncio.run(
+                store.add_control(
+                    again, new_texts, limits=CONTROL_LIMITS, principal=None
+                )
+            )
+        assert asyncio.run(store.get_control(held.document.id, "alice")) == held
+        [(evidence_id, text)] = texts.items()
+        assert (
+            asyncio.run(store.read_evidence(held.document.id, evidence_id, "alice"))
+            == text
+        )
+
     def test_a_control_whose_owner_holds_no_principal_is_a_defect(self, store):
         held, texts = control("nobody")
         with pytest.raises(ValueError, match="holds no principal"):
@@ -2706,6 +2724,24 @@ class TestControlEvidenceObjects:
         for evidence_id in texts:
             key = evidence_key("alice", first.document.id, evidence_id)
             assert asyncio.run(objects.get(key)) is None
+
+    def test_a_file_that_a_replace_drops_during_a_read_reads_as_missing(self, held):
+        store, objects = held
+        first, texts = save(store)
+        [evidence_id] = texts
+        added, new_texts = control(files=[("new.tf", "kms = true\n")])
+        changed = edited(first, evidence=added.document.evidence)
+        read = objects.get
+
+        async def replaced_first(key: str) -> bytes | None:
+            await store.replace_control(changed, new_texts, limits=CONTROL_LIMITS)
+            return await read(key)
+
+        objects.get = replaced_first
+        assert (
+            asyncio.run(store.read_evidence(first.document.id, evidence_id, "alice"))
+            is None
+        )
 
     def test_a_text_that_fails_its_digest_raises(self, held):
         store, objects = held

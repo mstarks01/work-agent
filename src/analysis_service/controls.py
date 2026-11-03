@@ -28,12 +28,7 @@ from pydantic import (
 
 from analysis_service.fact_answers import FactAnswer, key_ref, read_back
 from analysis_service.frameworks import check_unit
-from analysis_service.owner_files import (
-    CONTROL_CHARACTER,
-    NO_TEXT,
-    NOT_PLAIN_TEXT,
-    NOT_UTF_8,
-)
+from analysis_service.owner_files import text_refusal
 from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import (
     MAX_LABEL_CHARS,
@@ -144,6 +139,9 @@ class ControlRow(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    #: A ``str`` and not a ``FrameworkName``: :func:`check_unit` names the
+    #: refusal of a submission, and a row read back keeps a framework that a
+    #: later build drops.
     framework: str = Field(max_length=32)
     unit: str = Field(max_length=32)
     version: str = Field(min_length=1, max_length=32)
@@ -183,7 +181,7 @@ class ControlDocument(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str = Field(pattern=CONTROL_ID)
-    name: str = _Name
+    name: str = Field(max_length=MAX_LABEL_CHARS)
     scope: ControlScope
     facts: list[FactAnswer] = Field(max_length=MAX_CONTROL_FACTS)
     rows: list[ControlRow] = Field(max_length=MAX_CONTROL_ROWS)
@@ -322,17 +320,21 @@ class EvidenceRefusal:
 #: The credential shapes the service knows, by the words a refusal names them
 #: with. An evidence file that holds one is refused by line, and the service
 #: redacts nothing (ADR 0127). An assignment counts only where it sets a
-#: literal value: a quoted string, or an unquoted value at the end of its line
-#: that holds a digit or a symbol, so a type name or a reference passes. A
-#: value is at most 256 characters, so one scan of a line stays linear.
+#: literal value: a quoted string, or an unquoted value that holds a digit or a
+#: symbol, or that runs 256 characters. So a type name or a reference passes.
+#: Each start reads at most 256 characters of a value, so one scan of a line
+#: stays linear.
 CredentialShape = Literal[
     "a private key block",
     "a cloud access key ID",
     "a vendor token",
     "a password, secret or token set to a value",
 ]
+_UNQUOTED = r"[^\s'\"#,;()\[\]{}<>]"
 CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
-    "a private key block": re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----"),
+    "a private key block": re.compile(
+        r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----"
+    ),
     "a cloud access key ID": re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
     "a vendor token": re.compile(
         r"(?<![\w-])(?:sk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{36}"
@@ -341,9 +343,9 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
     ),
     "a password, secret or token set to a value": re.compile(
         r"(?i)(?<![\w.-])[\w.-]*(?:password|passwd|secret|token)[\"']?\s*[:=]\s*"
-        r"(?:\"(?![$<{%])[^\"\n]{1,256}\"|'(?![$<{%])[^'\n]{1,256}'"
-        r"|(?![$<{%*])(?=[^\s'\"#,;()\[\]{}<>]{0,255}[\d!@^&*+~?/\\|])"
-        r"[^\s'\"#,;()\[\]{}<>]{1,256}\s*$)"
+        r"(?:([\"'])(?![$<{%\"'])[^\n]"
+        rf"|(?![$<{{%*])(?:(?={_UNQUOTED}{{0,255}}[\d!@^&*+~?/\\|]){_UNQUOTED}{{1,256}}\s*$"
+        rf"|{_UNQUOTED}{{256}}))"
     ),
 }
 
@@ -383,19 +385,16 @@ def control_refusal(
 
 
 def _text_refusal(name: str, text: str, limits: ControlLimits) -> str | None:
-    try:
-        data = text.encode("utf-8")
-    except UnicodeEncodeError:
-        return NOT_UTF_8
-    if len(data) > limits.max_evidence_bytes:
-        return (
+    refusal = text_refusal(
+        text,
+        max_bytes=limits.max_evidence_bytes,
+        too_large=(
             f"This file is larger than the {limits.max_evidence_bytes:,} bytes one"
             " evidence file can hold."
-        )
-    if CONTROL_CHARACTER.search(text):
-        return NOT_PLAIN_TEXT
-    if not text.strip():
-        return NO_TEXT
+        ),
+    )
+    if refusal is not None:
+        return refusal
     hit = credential_hit(text)
     if hit is None:
         return None
