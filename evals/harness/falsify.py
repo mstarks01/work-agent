@@ -35,6 +35,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
+from typing import Literal, get_args
 
 from analysis_service.assertions import (
     Assertion,
@@ -860,19 +861,18 @@ def render(found: Sequence[Outcome]) -> str:
 #: under the basis ``inferred``, and reaching a lane labelled as an inference
 #: is what ADR 0036 asks of one. ``paraphrase`` and ``valid-inference`` are
 #: positive controls, and the rest corrupt the graph rather than a fact.
-CRITICAL: frozenset[str] = frozenset(
-    {
-        "mfa-enforced",
-        "support-copied",
-        "empty-citation",
-        "stopword-mechanism",
-        "control-name-elsewhere",
-        "signature-is-not-authentication",
-        "destination-is-not-authentication",
-        "scope-dropped",
-        "changed-source",
-    }
-)
+CriticalProbe = Literal[
+    "mfa-enforced",
+    "support-copied",
+    "empty-citation",
+    "stopword-mechanism",
+    "control-name-elsewhere",
+    "signature-is-not-authentication",
+    "destination-is-not-authentication",
+    "scope-dropped",
+    "changed-source",
+]
+CRITICAL: frozenset[CriticalProbe] = frozenset(get_args(CriticalProbe))
 
 #: Who assesses the corrupted rows in the reviewed reading. Not a model: the
 #: fixture itself knows which rows it corrupted.

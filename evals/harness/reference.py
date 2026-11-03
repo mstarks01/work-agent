@@ -48,7 +48,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Literal, Self
+from typing import Annotated, Literal, Self, cast
 
 from pydantic import (
     BaseModel,
@@ -60,6 +60,7 @@ from pydantic import (
     model_validator,
 )
 
+from analysis_service.actions import ActionVerb
 from analysis_service.claim_identity import sibling_flows
 from analysis_service.claims import (
     FrameworkName,
@@ -954,7 +955,10 @@ def _load_rulings(
             raise CorpusError(f"{where} cites {', '.join(dangling)}, not in the model")
         # Only an accepted reading must be one the service could file: a
         # refused one accepts nothing, and records what a lane actually wrote.
-        if ruled.verdict == "same" and ruled.lane not in LANES_OF_VERB[alternate.verb]:
+        if (
+            ruled.verdict == "same"
+            and ruled.lane not in LANES_OF_VERB[cast(ActionVerb, alternate.verb)]
+        ):
             raise CorpusError(f"{where}: {alternate.verb!r} is not a {ruled.lane} verb")
         by_index = readings[ruled.verdict]
         by_index[named[0]] = (*by_index.get(named[0], ()), alternate)

@@ -57,7 +57,7 @@ import sys
 import time
 from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
-from typing import Any, get_args
+from typing import Any, Literal, get_args
 
 from google.adk.workflow import FunctionNode
 
@@ -705,9 +705,21 @@ def case_transport() -> None:
     print(f"{'TOTAL':34}{total_full:9}{total_compact:9}{saved:7.1f}%")
 
 
+#: The name of each bench case.
+BenchCase = Literal[
+    "repair",
+    "spent-deadline",
+    "prepare",
+    "retention",
+    "index",
+    "catalog",
+    "pipeline",
+    "transport",
+]
+
 #: Every case, by the name the command line takes. A table rather than a
 #: dispatch chain, so a case added here is runnable without a second edit.
-CASES: dict[str, Callable[[], None]] = {
+CASES: dict[BenchCase, Callable[[], None]] = {
     "repair": case_repair,
     "spent-deadline": case_spent_deadline,
     "prepare": case_prepare,

@@ -74,6 +74,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from analysis_service.claim_identity import report_rows
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
 from evals import verify_corpus
 from evals.harness import baseline, bundle
@@ -128,7 +129,7 @@ VERDICTS: tuple[str, ...] = get_args(VoteChoice)
 #: holds — so only the prose is keyed here and the ledger stays one closed set.
 #: ``evals/build_review_docs.py`` asks the same question per package in the
 #: reading document; these are the browser's half of that pair.
-QUESTIONS: dict[str, dict[str, str]] = {
+QUESTIONS: dict[FrameworkName, dict[str, str]] = {
     "stride": {
         "heading": "Could this happen?",
         "ask": "Could this attack happen in this system?",

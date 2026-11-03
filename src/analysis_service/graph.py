@@ -115,7 +115,7 @@ import logging
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, get_args
 
 import anyio.to_thread
 from google.adk.agents import LlmAgent
@@ -244,6 +244,7 @@ from analysis_service.skills import (
 from analysis_service.sources import render_fenced, text_digest
 from analysis_service.system_model import (
     BoundaryCrossing,
+    ElementSourceField,
     EmittedSystemModel,
     SystemModel,
 )
@@ -1451,7 +1452,7 @@ def reject_model(validation_issues: str, ctx, keys: GraphKeys) -> dict[str, Any]
 # Element fields stripped from the model rendered to every lane agent and every
 # critic. They survive on STATE_VALID_MODEL, so the report still
 # carries them.
-_ELEMENT_SOURCE_FIELDS = ("source_excerpt", "source_label", "source_speaker")
+_ELEMENT_SOURCE_FIELDS: tuple[ElementSourceField, ...] = get_args(ElementSourceField)
 
 
 def render_model(valid_model: dict) -> str:

@@ -176,6 +176,9 @@ class EarlyRule:
     limit: int | None
 
 
+#: The two kinds of question the early floor tells apart.
+EarlyKind = Literal["capability", "field"]
+
 #: The rule for each kind of early question: ``capability`` and ``field``,
 #: which is every other kind (``QA-2026-09-26-03-E20``). A field question's
 #: floor of 1 is where the ranking cuts: no measurement says how many findings
@@ -184,7 +187,7 @@ class EarlyRule:
 #: names, so the floor decides which field questions a pause asks. A
 #: capability question under 2 settles one unit, and at ASVS level 2 that
 #: leaves 28 of 51.
-EARLY_RULES: Mapping[str, EarlyRule] = {
+EARLY_RULES: Mapping[EarlyKind, EarlyRule] = {
     "capability": EarlyRule(floor=2.0, limit=30),
     "field": EarlyRule(floor=1.0, limit=None),
 }
@@ -240,7 +243,7 @@ ANSWER_LIMITS: Mapping[str, int] = MappingProxyType(
 )
 
 
-def _early_kind(question: EarlyQuestion) -> str:
+def _early_kind(question: EarlyQuestion) -> EarlyKind:
     return "capability" if question.kind == "capability" else "field"
 
 

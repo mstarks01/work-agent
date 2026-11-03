@@ -148,7 +148,7 @@ def _capability_effects(
     for question in questions:
         key = key_ref(question.key).capability
         others = before - {key}
-        by_answer = {}
+        by_answer: dict[str, AnswerEffect] = {}
         for value in YES_NO:
             answer = FactAnswer(key=question.key, value=value)
             view = prepared.model_copy(
