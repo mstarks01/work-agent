@@ -190,25 +190,32 @@ PROPOSED: Mapping[str, AttackerPosition] = {
 
 def issue(corpus_dir: Path = CORPUS_DIR) -> list[dict[str, str]]:
     """One ballot row for each STRIDE must-find, in case and reference order."""
+    must_finds = [
+        (f"{case_dir.name[:2]}/{index}", case_dir, index, claim)
+        for case_dir in sorted(path for path in corpus_dir.iterdir() if path.is_dir())
+        for index, claim in enumerate(load_case(case_dir).stride_claims())
+        if claim.must_find
+    ]
+    keys = {key for key, *_ in must_finds}
+    if keys != set(PROPOSED):
+        raise ValueError(
+            f"no proposal for {sorted(keys - set(PROPOSED))}; a proposal for no"
+            f" must-find at {sorted(set(PROPOSED) - keys)}"
+        )
     rows: list[dict[str, str]] = []
-    for case_dir in sorted(path for path in corpus_dir.iterdir() if path.is_dir()):
-        for index, claim in enumerate(load_case(case_dir).stride_claims()):
-            if not claim.must_find:
-                continue
-            rows.append(
-                {
-                    "n": str(len(rows) + 1),
-                    "case": case_dir.name,
-                    "ref": str(index),
-                    **_shown(claim),
-                    "notes": claim.notes,
-                    "proposed": PROPOSED[f"{case_dir.name[:2]}/{index}"],
-                    "verdicts": "/".join(VERDICTS),
-                    **dict.fromkeys(ANSWERED, ""),
-                }
-            )
-    if len(rows) != len(PROPOSED):
-        raise ValueError("a proposal names no must-find")
+    for key, case_dir, index, claim in must_finds:
+        rows.append(
+            {
+                "n": str(len(rows) + 1),
+                "case": case_dir.name,
+                "ref": str(index),
+                **_shown(claim),
+                "notes": claim.notes,
+                "proposed": PROPOSED[key],
+                "verdicts": "/".join(VERDICTS),
+                **dict.fromkeys(ANSWERED, ""),
+            }
+        )
     return rows
 
 
