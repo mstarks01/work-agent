@@ -169,7 +169,7 @@ logger = logging.getLogger(__name__)
 #: is measured only once somebody declares it. ``tests/test_basis.py`` compares
 #: the two and names the attribute that is missing — here rather than at import,
 #: so the guard still runs on a half-added attribute.
-CONTROL_SCOPE: Mapping[str, str | None] = MappingProxyType(
+CONTROL_SCOPE: Mapping[ControlAttribute, str | None] = MappingProxyType(
     {
         "authentication": None,
         "encryption_in_transit": None,

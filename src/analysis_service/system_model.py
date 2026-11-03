@@ -1251,7 +1251,7 @@ def _rewrite_id(
 
 
 #: The type prefixes a flow endpoint may carry: the zoned elements' own.
-ENDPOINT_PREFIXES: frozenset[str] = frozenset(
+ENDPOINT_PREFIXES: frozenset[ElementPrefix] = frozenset(
     element.id_prefix for element in get_args(ZonedElement)
 )
 

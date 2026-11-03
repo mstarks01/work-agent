@@ -2500,8 +2500,8 @@ def _spans(
 #: which outranks a reader that inferred it. A table over :data:`Basis`, held
 #: to it by ``tests/test_assertions.py``, so a fourth basis fails there rather
 #: than raising in a merge.
-BASIS_RANK: Mapping[str, int] = MappingProxyType(
-    {basis: rank for rank, basis in enumerate(("stated", "derived", "inferred"))}
+BASIS_RANK: Mapping[Basis, int] = MappingProxyType(
+    {basis: rank for rank, basis in enumerate[Basis](("stated", "derived", "inferred"))}
 )
 
 
@@ -2571,12 +2571,12 @@ ProjectionReason = Literal[
 #: value (#961). Keyed by every assessment and held to the literal by
 #: ``tests/test_assertions.py``, so a fifth assessment fails there rather than
 #: projecting by default.
-PROJECTS_UNDER: Mapping[str, bool] = MappingProxyType(
+PROJECTS_UNDER: Mapping[Assessment, bool] = MappingProxyType(
     {"unchecked": True, "supported": True, "unsupported": False, "unresolved": False}
 )
 
 #: The assessments that set a row aside: every one :data:`PROJECTS_UNDER` refuses.
-REJECTING: frozenset[str] = frozenset(
+REJECTING: frozenset[Assessment] = frozenset(
     assessment for assessment, projects in PROJECTS_UNDER.items() if not projects
 )
 
@@ -2827,7 +2827,7 @@ def contradiction_issues(
 #:
 #: Keyed by every reason and held to the literal by ``tests/test_assertions.py``,
 #: so a reason added tomorrow fails there rather than defaulting to either.
-PROJECTION_EFFECT: Mapping[str, Literal["write", "qualify", "leave"]] = (
+PROJECTION_EFFECT: Mapping[ProjectionReason, Literal["write", "qualify", "leave"]] = (
     MappingProxyType(
         {
             "stated": "write",
@@ -2845,7 +2845,7 @@ PROJECTION_EFFECT: Mapping[str, Literal["write", "qualify", "leave"]] = (
 
 #: The projection reasons under which the catalog answers an attribute: its
 #: projected value is the attribute's value. Read off :data:`PROJECTION_EFFECT`.
-SETTLING_REASONS: frozenset[str] = frozenset(
+SETTLING_REASONS: frozenset[ProjectionReason] = frozenset(
     reason for reason, effect in PROJECTION_EFFECT.items() if effect == "write"
 )
 
@@ -2868,7 +2868,7 @@ QUALIFIED_SPELLING: Mapping[str, Literal["prose", "bare"]] = MappingProxyType(
 
 #: What a qualified ``unknown`` says happened, keyed by every reason that
 #: qualifies.
-_QUALIFIED_BECAUSE: Mapping[str, str] = MappingProxyType(
+_QUALIFIED_BECAUSE: Mapping[ProjectionReason, str] = MappingProxyType(
     {
         "hedged": "the sources voice uncertainty about this",
         "scoped": "stated only for part of what this carries",

@@ -34,6 +34,7 @@ from analysis_service.claims import (
     FrameworkName,
     RuledClaim,
     ScopeEntry,
+    ScopeState,
 )
 from analysis_service.frameworks.asvs.record import requirement_of
 from evals.harness.critic_yield import UNSTATED
@@ -66,7 +67,7 @@ STAGES: tuple[Stage, ...] = (
 #: ``needs-other-evidence`` cannot be a miss — the matrix counts it applied —
 #: so a miss carrying it is a scorer disagreement, and it is charged to the
 #: deferral that produced it rather than dropped.
-STAGE_FOR_SCOPE: Mapping[str, Stage] = MappingProxyType(
+STAGE_FOR_SCOPE: Mapping[ScopeState, Stage] = MappingProxyType(
     {
         "undecidable": "precondition",
         "not-applicable": "precondition",

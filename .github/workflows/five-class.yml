@@ -36,20 +36,22 @@ jobs:
 
       # The base branch's copy of the script, so a pull request that edits
       # only the script does not pass its own check. A base that holds no copy
-      # runs the pull request's copy. LIMIT: GitHub runs the pull request's
-      # copy of this workflow file, so a pull request that edits this file can
-      # remove this step and pass. The check does not guard such a pull
-      # request; its reviewer reads the workflow diff. The body reaches the
-      # script through the environment, never through the command line,
-      # because a pull request author writes it.
+      # fails the step. LIMIT: GitHub runs the pull request's copy of this
+      # workflow file, so a pull request that edits this file can remove this
+      # step and pass. The check does not guard such a pull request; its
+      # reviewer reads the workflow diff. The body reaches the script through
+      # the environment, never through the command line, because a pull
+      # request author writes it.
       - name: Pull request body
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
+          script=.github/scripts/five_class_read.py
           check="$RUNNER_TEMP/five_class_read.py"
-          if ! git show "$BASE_SHA:.github/scripts/five_class_read.py" > "$check" 2>/dev/null; then
-            cp .github/scripts/five_class_read.py "$check"
+          if ! git show "$BASE_SHA:$script" > "$check"; then
+            echo "The base commit $BASE_SHA holds no $script, so the check cannot run it." >&2
+            exit 1
           fi
           python3 "$check" "$BASE_SHA" "$HEAD_SHA"
