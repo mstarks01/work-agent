@@ -514,23 +514,34 @@ class JobAnswers:
             raise UnreadableSchema(record.schema_version)
         return record
 
-    async def answerable(self, job_id: str, owner_id: str) -> Answerable:
+    async def answerable(
+        self,
+        job_id: str,
+        owner_id: str,
+        *,
+        sources: Sequence[Source] | None = None,
+        controls: Sequence[CopiedControl] | None = None,
+    ) -> Answerable:
         """What this caller may ask or answer about, read once.
 
         **The one reader of "what does this job ask about".** Each part that
         the envelope leaves out is read by name, once, after :meth:`parsable`.
+        ``sources`` and ``controls`` are the job's sources and its copy of its
+        Controls where the caller read them already, so neither is read twice.
         """
         record = await self.parsable(job_id, owner_id)
         store = self.store
         # The envelope leaves the sources out, and the answers compose with them.
-        sources = await store.sources(job_id, owner_id)
         if sources is None:
-            await self.missing(record, "sources")
-        record.sources = sources
-        controls = await store.controls(job_id, owner_id)
+            sources = await store.sources(job_id, owner_id)
+            if sources is None:
+                await self.missing(record, "sources")
+        record.sources = list(sources)
         if controls is None:
-            await self.missing(record, "controls")
-        record.controls = controls
+            controls = await store.controls(job_id, owner_id)
+            if controls is None:
+                await self.missing(record, "controls")
+        record.controls = list(controls)
         if record.status == "awaiting-answers":
             # The questions are read off what the head built, so they answer
             # to the head's verdict as a report answers to its run's.
@@ -563,11 +574,13 @@ class JobAnswers:
 
     async def questions(self, job_id: str, owner_id: str) -> dict[str, Any]:
         """Every question the job asks the submitter, derived at read time.
+        A read carries no admission bound."""
+        return await self.payload_of(await self.answerable(job_id, owner_id))
 
-        The derivation grows with the report, and a read carries no admission
-        bound, so it runs off the event loop.
-        """
-        answerable = await self.answerable(job_id, owner_id)
+    @staticmethod
+    async def payload_of(answerable: Answerable) -> dict[str, Any]:
+        """Every question that ``answerable`` asks. The derivation grows with
+        the report, so it runs off the event loop."""
         return await anyio.to_thread.run_sync(answerable.payload)
 
     async def submit(
