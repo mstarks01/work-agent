@@ -474,3 +474,30 @@ def test_every_key_file_export_uses_the_registry_suffix():
 
     assert exports, "no workflow exports a key file; the scan is vacuous"
     assert {suffix for _, suffix in exports} == {SECRET_FILE_SUFFIX}, exports
+
+
+#: The text of a step that reads a check script from the pull request's base
+#: commit.
+_BASE_COPY = 'git show "$BASE_SHA:'
+
+
+def _base_copy_workflows() -> list[Path]:
+    return [
+        workflow
+        for workflow in _workflows()
+        if any(_BASE_COPY in line for line in _code_lines(workflow))
+    ]
+
+
+def test_a_base_copy_check_never_copies_the_pull_request_s_script():
+    """A step that copied the pull request's script where the base held none
+    let a pull request run its own copy of the check."""
+    readers = _base_copy_workflows()
+
+    assert readers, "no workflow reads a script from the base; the scan is vacuous"
+    copying = [
+        workflow.name
+        for workflow in readers
+        if any(line.lstrip().startswith("cp ") for line in _code_lines(workflow))
+    ]
+    assert not copying, copying
