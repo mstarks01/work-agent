@@ -1,47 +1,68 @@
 {
-  "command": "python -m evals.harness.run score <first non-baseline JSON of evals/baselines/<name>/> --corpus <corpus> --out <file>",
-  "before_corpus": "evals/corpus at ac8a07b4922427fd8f1bf2e3545aab127b0d6db0",
-  "after_corpus": "evals/corpus with the 94 position rulings",
+  "command": "python -m evals.harness.run score <the sweep JSON of evals/baselines/<name>/> --corpus <corpus> --out <file>",
   "series": "all",
+  "before_corpus": {
+    "commit": "ac8a07b4922427fd8f1bf2e3545aab127b0d6db0",
+    "corpus_digest": "44a9bcd75769e1114dd7a4949297ecba00570a386b118de35417ec1be6ac9f97"
+  },
+  "after_corpus": {
+    "corpus_digest": "296b1e44aae80214dc1fe2e419cf581f5fe4e688786116c51e611b055fddac8e"
+  },
   "baselines": {
     "2198870-gpt-5.6-terra-6cd39a95": {
       "before": {
         "must_find_matched": 64,
-        "must_find_total": 103
+        "must_find_total": 103,
+        "matched_on_a_ruled_reference": 51,
+        "matched_on_an_any_reference": 13
       },
       "after": {
         "must_find_matched": 13,
-        "must_find_total": 103
+        "must_find_total": 103,
+        "matched_on_a_ruled_reference": 0,
+        "matched_on_an_any_reference": 13
       }
     },
     "6bff717-gpt-5.6-terra-24dda4db": {
       "before": {
         "must_find_matched": 70,
-        "must_find_total": 103
+        "must_find_total": 103,
+        "matched_on_a_ruled_reference": 55,
+        "matched_on_an_any_reference": 15
       },
       "after": {
         "must_find_matched": 15,
-        "must_find_total": 103
+        "must_find_total": 103,
+        "matched_on_a_ruled_reference": 0,
+        "matched_on_an_any_reference": 15
       }
     },
     "d3f1898-gpt-5.6-terra-29929443": {
       "before": {
         "must_find_matched": 55,
-        "must_find_total": 103
+        "must_find_total": 103,
+        "matched_on_a_ruled_reference": 43,
+        "matched_on_an_any_reference": 12
       },
       "after": {
         "must_find_matched": 12,
-        "must_find_total": 103
+        "must_find_total": 103,
+        "matched_on_a_ruled_reference": 0,
+        "matched_on_an_any_reference": 12
       }
     },
     "d4edd64-gpt-5.6-terra-fd1c49af": {
       "before": {
         "must_find_matched": 55,
-        "must_find_total": 103
+        "must_find_total": 103,
+        "matched_on_a_ruled_reference": 45,
+        "matched_on_an_any_reference": 10
       },
       "after": {
         "must_find_matched": 10,
-        "must_find_total": 103
+        "must_find_total": 103,
+        "matched_on_a_ruled_reference": 0,
+        "matched_on_an_any_reference": 10
       }
     }
   }

@@ -159,7 +159,7 @@ DECLARED: dict[str, str] = {
         " that drafts by a verb and a place, and scores them against the"
         " must-finds of that package's references."
     ),
-    "evals/experiments/QA-2026-11-02-05/record_positions.py": (
+    "evals/experiments/QA-2026-11-02-05/position_ballot.py": (
         "This code is that framework's. It records the attacker position of a"
         " reference claim, and only that package's drafts state a position."
     ),
