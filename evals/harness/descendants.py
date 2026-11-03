@@ -147,34 +147,43 @@ def replay_case(
     )
 
 
-def lane_must_finds(
-    case: GoldenCase, state: Mapping[str, Any], lane: str, batch: ProposalBatch
-) -> tuple[int, ...]:
-    """The must-find references one lane's proposals match, before any critic.
+def lane_drafts(
+    state: Mapping[str, Any], lane: str, batch: ProposalBatch
+) -> list[DraftThreat]:
+    """One lane's proposals as drafts, before any critic.
 
     ``state`` is what ``prepare`` wrote for the case, as ``lane-replay
     --prepare-today`` runs it. The fan-in runs as ``merge`` runs it, over this
-    lane alone and that state, so a proposal it would drop is not counted. The
-    critic does not run, so this is the most the lane's drafts could keep.
+    lane alone and that state, so a proposal it would drop is not a draft.
     """
     nodes = FrameworkNodes(FRAMEWORK)
-    model = SystemModel.model_validate(state[STATE_VALID_MODEL])
     session = GraphKeys.of([FRAMEWORK]).state(SimpleNamespace(state=state))
     merged = fan_in(
         {lane: batch},
         nodes.package,
-        model,
+        SystemModel.model_validate(state[STATE_VALID_MODEL]),
         state[STATE_SOURCE_TEXTS],
         state.get(nodes.key("ruled_out")) or {},
         held_assertions(session),
         state.get(nodes.key("ruled_in")) or {},
     )
-    drafts = [draft for draft in merged.drafts if isinstance(draft, DraftThreat)]
+    return [draft for draft in merged.drafts if isinstance(draft, DraftThreat)]
+
+
+def lane_must_finds(
+    case: GoldenCase, state: Mapping[str, Any], lane: str, batch: ProposalBatch
+) -> tuple[int, ...]:
+    """The must-find references one lane's drafts match, before any critic.
+
+    The drafts are :func:`lane_drafts`. The critic does not run, so this is
+    the most the lane's drafts could keep.
+    """
+    model = SystemModel.model_validate(state[STATE_VALID_MODEL])
     references = case.stride_claims()
     return tuple(
         sorted(
             index
-            for index in _matched(case, drafts, model)
+            for index in _matched(case, lane_drafts(state, lane, batch), model)
             if references[index].must_find
         )
     )
