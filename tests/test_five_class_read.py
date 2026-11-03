@@ -259,8 +259,15 @@ def _commit(repo: Path, path: str, text: str | None = None) -> str:
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
+    """A repository whose first commit holds the tree's two tables, as the base
+    branch does."""
     run_command(["git", "init", "-b", "main", str(tmp_path)], tmp_path)
-    _commit(tmp_path, "README.md")
+    for table in (check.TABLE, check.HELD):
+        _commit(
+            tmp_path,
+            f".github/scripts/{table.name}",
+            table.read_text(encoding="utf-8"),
+        )
     return tmp_path
 
 
@@ -475,8 +482,7 @@ reason = "test"
 
 def test_the_check_reads_the_base_branchs_table(repo):
     """The table a pull request carries cannot free the pull request: the check
-    reads the base commit's copy, and falls back to its own copy only where the
-    base holds none."""
+    reads the base commit's copy."""
     _commit(repo, ".github/scripts/prompt_outcomes.toml", TABLE_ROW)
     _commit(repo, "prompts/extract.md")
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
@@ -486,6 +492,27 @@ def test_the_check_reads_the_base_branchs_table(repo):
 
     assert _run(repo, base, head, FULL_BODY) == 1
     assert _run(repo, base, head, read) == 0
+
+
+@pytest.mark.parametrize("table", [check.TABLE, check.HELD], ids=lambda t: t.name)
+def test_a_base_with_no_table_stops_the_check(repo, table):
+    """The check reads each table from the base commit only, so a base that
+    holds none fails with an error that names the table."""
+    run_command(["git", "rm", "-q", f".github/scripts/{table.name}"], repo)
+    _commit(repo, "README.md")
+    base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
+    head = _commit(repo, "src/module.py")
+    ran = subprocess.run(
+        [sys.executable, str(SCRIPT), base, head],
+        cwd=repo,
+        env={**os.environ, "PR_BODY": FULL_BODY},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert ran.returncode == 1
+    assert f"holds no .github/scripts/{table.name}" in ran.stderr
 
 
 def test_a_prompt_read_names_each_prompt_with_text_after_it():
@@ -504,8 +531,8 @@ def test_a_prompt_read_names_each_prompt_with_text_after_it():
 
 
 def test_a_module_change_with_no_prompt_read_is_refused(repo):
-    """The base holds no table, so the check reads the script's own copy, and
-    asks for the prompt the tree holds."""
+    """The base holds the tree's table, so the check asks for the prompt that
+    the table pairs with the module."""
     _commit(repo, "prompts/extract-compact.md")
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
     head = _commit(repo, "src/analysis_service/compact.py")
