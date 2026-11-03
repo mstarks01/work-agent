@@ -2455,7 +2455,7 @@ def _framework_block(
     claims, rejected = outcome.claims, outcome.rejected
     marks = critic_round.marks
     retrieved = state.get(nodes.key("retrieved")) or {}
-    refusal = _refusal(package, state.get(nodes.key("precondition")) or "satisfied")
+    refusal = _refusal(package, state.get(nodes.key("precondition")))
     return schemas.block(
         framework=package.name,
         framework_version=package.version,
@@ -2513,7 +2513,9 @@ _REFUSALS: Mapping[PreconditionResult, Refusal] = MappingProxyType(
 )
 
 
-def _refusal(package: FrameworkPackage, result: PreconditionResult) -> Refusal | None:
+def _refusal(
+    package: FrameworkPackage, result: PreconditionResult | None
+) -> Refusal | None:
     """Why this framework did not run, as a scope state and a reason, or ``None``.
 
     What the reason is *used for* is the block's own — the neutral base answers
@@ -2521,12 +2523,12 @@ def _refusal(package: FrameworkPackage, result: PreconditionResult) -> Refusal |
     requirements. What the reason *says* is the graph's, because the gate is the
     graph's.
 
-    The caller passes ``satisfied`` when the state holds no result, which is a graph
+    ``result`` is read as ``satisfied`` when the key is absent, which is a graph
     entered past ``prepare``: the eval harness's analysis mode seeds a blessed
     model and runs no gate, and reporting a refusal there would describe one that
     never happened.
     """
-    refusal = _REFUSALS.get(result)
+    refusal = _REFUSALS.get(result or "satisfied")
     if refusal is None:
         return None
     return Refusal(refusal.state, refusal.reason.format(framework=package.name))

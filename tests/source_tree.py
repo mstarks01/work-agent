@@ -71,15 +71,15 @@ _SKIPPED_PATHS = ("evals/runs", ".claude/worktrees")
 #: and an audit report under ``evals/experiments/`` names the artifacts it read
 #: on the day. A lint that
 #: reads a kind of prose these trees do not hold adds its own trees to this one.
-FROZEN_PROSE = ("docs/research", "evals/experiments")
-
 #: The tree of audit scripts, each of which runs one experiment as it ran on
 #: its day.
 EXPERIMENTS = "evals/experiments"
 
+FROZEN_PROSE = ("docs/research", EXPERIMENTS)
+
 #: The part of :data:`PYTHON` that a lint of a live rule may leave out, with
 #: the reason, keyed for :func:`without`.
-EXPERIMENT_SCRIPTS: Mapping[str, str] = {
+EXPERIMENTS_LEFT_OUT: Mapping[str, str] = {
     EXPERIMENTS: (
         "an audit script there runs one experiment as it ran on its day, so it"
         " records the rule of that day and no live code calls it"

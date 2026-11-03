@@ -53,7 +53,7 @@ import pytest
 
 from tests.source_tree import (
     DEFINITIONS,
-    EXPERIMENT_SCRIPTS,
+    EXPERIMENTS_LEFT_OUT,
     PYTHON,
     REPO_ROOT,
     SHORTEST_REASON,
@@ -72,7 +72,7 @@ pytestmark = pytest.mark.lint
 
 #: The files the lint reads: the Python the project runs, and the page scripts
 #: beside it.
-FILES = without(source_files(*PYTHON, suffixes=(".py", ".js")), EXPERIMENT_SCRIPTS)
+FILES = without(source_files(*PYTHON, suffixes=(".py", ".js")), EXPERIMENTS_LEFT_OUT)
 
 
 #: The words that make a one-reader claim, with any whitespace between them.

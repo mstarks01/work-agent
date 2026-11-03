@@ -55,10 +55,12 @@ these shapes and no other.
 - ``union``, ``intersection``, ``difference`` or ``symmetric_difference`` on a
   counted receiver or with a counted argument, ``copy()`` of a counted value,
   and ``keys()`` of a counted table;
-- ``frozenset``, ``set``, ``tuple`` or ``sorted`` around a counted value, a
+- ``frozenset``, ``set``, ``tuple`` or ``sorted``, with one argument and no
+  keyword, around a counted value, a
   list comprehension, a generator expression or a list display of string
   literals;
-- ``dict`` or ``MappingProxyType`` around a counted value, a list
+- ``dict`` or ``MappingProxyType``, with one argument and no keyword, around
+  a counted value, a list
   comprehension or a generator expression.
 
 A counted operand, receiver, argument or value is one of these shapes, or a
@@ -73,10 +75,11 @@ not asked. Three tables hold the exceptions, each with a reason:
   or whose source the lint cannot decide, such as a fixed list that filters
   free text, file names, provider errors or corpus data;
 - :data:`PARTIAL`: a set that names part of its ``Literal``;
-- :data:`PENDING`: a closed set whose read keys are ``str`` at their source,
-  so it cannot carry its ``Literal`` until that source does.
+- :data:`PENDING`: a closed set whose read keys, or the keys it is built
+  from, are ``str`` at their source, so it cannot carry its ``Literal`` until
+  that source does.
 
-The sweep leaves out :data:`~tests.source_tree.EXPERIMENT_SCRIPTS`.
+The closed-set sweep leaves out :data:`~tests.source_tree.EXPERIMENTS_LEFT_OUT`.
 """
 
 from __future__ import annotations
@@ -93,7 +96,7 @@ from typing import Literal, get_args, get_origin
 import pytest
 
 from tests.source_tree import (
-    EXPERIMENT_SCRIPTS,
+    EXPERIMENTS_LEFT_OUT,
     PYTHON,
     REPO_ROOT,
     SHORTEST_REASON,
@@ -385,7 +388,7 @@ def _module(path: Path) -> ModuleType:
     return module
 
 
-def _pairs() -> list[tuple[str, str, str, frozenset[str], frozenset[str]]]:
+def _pairs() -> list[tuple[str, str, str, frozenset[object], frozenset[object]]]:
     """Each annotated constant beside the members its type declares.
 
     Resolved by importing, because the type may be declared in another module
@@ -611,7 +614,9 @@ OPEN: dict[tuple[str, str], str] = {
 
 #: The follow-up for an entry of :data:`PENDING` whose source is a ``str``.
 _PENDING_FOLLOW_UP = (
-    "; the follow-up types that source with the Literal after an archive replay"
+    "; the follow-up states a Literal of the keys where none exists, types that"
+    " source with it, and replays the archive first where the source is a"
+    " stored field"
 )
 
 #: The follow-up for an entry of :data:`PENDING` whose ``Literal`` sits in a
@@ -620,10 +625,10 @@ _MOVE_THE_LITERAL = (
     "; the follow-up names the Literal in a module that both modules import"
 )
 
-#: A closed set whose read keys are ``str`` at their source, by module and name,
-#: with that source. The set cannot carry its ``Literal`` while a ``str`` key
-#: reaches it, because mypy refuses a ``str`` where the ``Literal`` is the key
-#: type. :func:`test_no_pending_declaration_outlives_its_table` refuses an entry
+#: A closed set whose read keys, or the keys it is built from, are ``str`` at
+#: their source, by module and name, with that source. The set cannot carry its
+#: ``Literal`` while a ``str`` reaches it: mypy refuses a ``str`` key in a table
+#: lookup, and a ``str`` member where a set of the ``Literal`` is built. :func:`test_no_pending_declaration_outlives_its_table` refuses an entry
 #: whose set carries its ``Literal``.
 PENDING: dict[tuple[str, str], str] = {
     ("analysis_service.answer_forms", "CONTROL_SUGGESTIONS"): (
@@ -716,7 +721,7 @@ def _strings(nodes: Sequence[ast.expr | None]) -> bool:
     return bool(nodes) and all(_string(node) for node in nodes)
 
 
-def _members(
+def _is_counted_display(
     members: Sequence[ast.expr], known: Callable[[ast.expr], Shape | None]
 ) -> bool:
     """Whether ``members`` are the members of a counted display: each a string
@@ -733,7 +738,7 @@ def _shape(value: ast.expr, known: Callable[[ast.expr], Shape | None]) -> Shape 
     """The shape of ``value`` when it is one of the shapes the module docstring
     lists, or None. ``known`` gives the shape of a constant a name reads."""
     match value:
-        case ast.Dict(keys=keys, values=values) if _members(
+        case ast.Dict(keys=keys, values=values) if _is_counted_display(
             [
                 key if key else ast.Starred(one)
                 for key, one in zip(keys, values, strict=True)
@@ -741,7 +746,7 @@ def _shape(value: ast.expr, known: Callable[[ast.expr], Shape | None]) -> Shape 
             known,
         ):
             return "table"
-        case ast.Tuple(elts=members) | ast.Set(elts=members) if _members(
+        case ast.Tuple(elts=members) | ast.Set(elts=members) if _is_counted_display(
             members, known
         ):
             return "set"
@@ -880,7 +885,7 @@ def _set_reads(
 
 TREES = [
     (module_name(path), parse(path))
-    for path in without(source_files(*PYTHON), EXPERIMENT_SCRIPTS)
+    for path in without(source_files(*PYTHON), EXPERIMENTS_LEFT_OUT)
 ]
 CONSTANTS = _set_constants(TREES)
 READ_AS_SETS = _set_reads(TREES, CONSTANTS)
@@ -1028,6 +1033,16 @@ FROZEN_CALL = frozenset(load())
 UNPACKED_CALL = (*load(),)
 UNPACKED_TABLE_CALL = {**load()}
 LITERAL_AND_CALL = ("a", *load())
+UNPACKED_ONLY = (*BASE,)
+UNPACKED_TABLE_ONLY = {**TABLE}
+SET_CALL = set(BASE)
+DIFFERENCE_METHOD = BASE.difference(CHECKED)
+INTERSECTION_METHOD = BASE.intersection(CHECKED)
+SYMMETRIC_METHOD = BASE.symmetric_difference(CHECKED)
+SORTED_LIST = sorted(["b", "a"])
+TABLE_OF_A_LIST_COMPREHENSION = dict([(kind, 1) for kind in get_args(Kind)])
+TABLE_OF_A_GENERATOR = dict((kind, 1) for kind in get_args(Kind))
+SORTED_WITH_A_KEYWORD = sorted(BASE, reverse=True)
 TABLE_OF_A_LIST = dict(["a", "b"])
 """
 
@@ -1035,7 +1050,8 @@ TABLE_OF_A_LIST = dict(["a", "b"])
 def test_the_sweep_counts_every_listed_shape_and_no_other():
     """Each shape the module docstring lists is found, with its shape. An
     integer or type operator, a bare name, a call or a display around an
-    unknown value, and ``dict`` around a list display are not. ``shapes`` comes first, so a name it imports is found on the
+    unknown value, ``dict`` around a list display and a call with a keyword
+    are not. ``shapes`` comes first, so a name it imports is found on the
     second pass."""
     trees = [("shapes", ast.parse(_SHAPES)), ("control", ast.parse(_CONTROL))]
     found = {
@@ -1045,11 +1061,14 @@ def test_the_sweep_counts_every_listed_shape_and_no_other():
     }
 
     tables = {"TABLE", "DICT_COMPREHENSION", "PROXY", "PROXY_OF_A_COMPREHENSION"}
-    tables |= {"TABLE_COPY", "UNPACKED", "FROM_KEYS"}
+    tables |= {"TABLE_COPY", "UNPACKED", "FROM_KEYS", "UNPACKED_TABLE_ONLY"}
+    tables |= {"TABLE_OF_A_LIST_COMPREHENSION", "TABLE_OF_A_GENERATOR"}
     sets = {"BASE", "SET_COMPREHENSION", "FROM_A_LIST", "FROM_A_GENERATOR"}
     sets |= {"UNION", "DIFFERENCE", "INTERSECTION", "SYMMETRIC", "JOINED"}
     sets |= {"IMPORTED_COPY", "ARGS", "SET_OF_ARGS", "METHOD", "COPY", "KEYS"}
-    sets |= {"STARRED", "SORTED", "LITERAL_AND_CALL"}
+    sets |= {"STARRED", "SORTED", "LITERAL_AND_CALL", "UNPACKED_ONLY", "SET_CALL"}
+    sets |= {"DIFFERENCE_METHOD", "INTERSECTION_METHOD", "SYMMETRIC_METHOD"}
+    sets |= {"SORTED_LIST"}
     assert found == dict.fromkeys(tables, "table") | dict.fromkeys(sets, "set")
 
 

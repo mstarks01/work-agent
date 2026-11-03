@@ -27,7 +27,7 @@ from analysis_service.claims import UNKNOWN_KEY_FIELDS, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
 from evals.harness.prices import UnitPrices
 from tests.source_tree import (
-    EXPERIMENT_SCRIPTS,
+    EXPERIMENTS_LEFT_OUT,
     PYTHON,
     REPO_ROOT,
     TESTS,
@@ -49,7 +49,7 @@ MODULE_OWNER = "<module>"
 
 
 #: The files each lint walks.
-FILES = without(source_files(*PYTHON), EXPERIMENT_SCRIPTS)
+FILES = without(source_files(*PYTHON), EXPERIMENTS_LEFT_OUT)
 
 
 def _sites(
