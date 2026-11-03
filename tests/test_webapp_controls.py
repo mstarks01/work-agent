@@ -77,7 +77,7 @@ def zoned_model():
 class ZonedRunner(PausingRunner):
     """Pauses on :func:`zoned_model`."""
 
-    #: Whether the next run raises, so its job fails.
+    #: Whether each run raises, so its job fails.
     fails = False
 
     async def run(self, job, on_node):

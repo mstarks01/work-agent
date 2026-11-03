@@ -428,8 +428,9 @@ def control_offer(
 
 
 #: What the reopen payload says of a copied Control: its resolution, or
-#: ``pending`` where the read gets no model to resolve it against: the job
-#: has none yet, or the job does not serve it.
+#: ``pending`` where the job serves no model to resolve it against: the job
+#: is not complete yet, it ended with no report, or the certification gate
+#: withholds its report.
 UsedState = Literal["applied", "left-out", "pending"]
 
 

@@ -320,8 +320,9 @@ name" sends `POST /workspace/controls/{control_id}/aliases`, which appends the
 name to the Control's aliases. A job that does not pause takes the default
 resolution: each match as the pause first shows it. An analysis that you
 open again lists `controls_used` from its own copy, with the state
-`applied` or `left-out`, or `pending` where the job serves no model: it
-has none yet, or it does not serve one.
+`applied` or `left-out`, or `pending` where the job serves no model: it is
+not complete yet, it ended with no report (failed, stopped or rejected), or
+the certification gate withholds its report.
 
 ## The Settings page
 
