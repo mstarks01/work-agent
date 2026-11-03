@@ -85,18 +85,18 @@ the workflow diff.
 A defect that the standards read finds costs a new head and a new CI run. Stop
 the recurring classes before the code exists.
 
-Before you add a function, a constant, a table, a type, a check or a claim in
-a comment, go through each row of the table "The classes that come back in
-fixes" in [the standards read](#the-standards-read-before-the-merge) as a
+Do this step before you add a function, a constant, a table, a type, a check
+or a claim in a comment. Read each row of the table "The classes that come back
+in fixes" in [the standards read](#the-standards-read-before-the-merge) as a
 question. For a second reader, search the tree for an existing reader of the
 same rule. Search by the name, by the literal values and by the data that the
 code reads.
 
 Record each answer in the pull request body, under the heading
 `## Before the code`, with one entry for each class by its name in that table.
-Each entry gives the class, the search you ran, and the result. A result is
-"existing reader: `path:symbol`", "none found" or "not touched by this
-change". CI requires the section on each pull request that changes a code
+Each entry gives the class, the search you ran, and the result. Give one of
+these results: "existing reader: `path:symbol`", "none found" or "not touched
+by this change". CI requires the section on each pull request that changes a code
 path, and reads it the way it reads `## Five-class read`.
 `.github/scripts/five_class_read.py` holds the class names, and
 `tests/test_five_class_read.py` holds them to the table.
