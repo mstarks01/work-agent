@@ -185,8 +185,8 @@ PARTIAL: dict[tuple[str, str], str] = {
         "reserved or a forbidden param is absent by construction"
     ),
     ("analysis_service.validation", "CITATION_FIELDS"): (
-        "the source fields that locate the cited passage, its label and its"
-        " excerpt, so a field that records who spoke is absent by construction"
+        "the source fields the gate checks against the job's sources, so a"
+        " field that is never gated is absent by construction"
     ),
     ("analysis_service.validation", "RENAMING_CODES"): (
         "the codes whose repair may rename an element, so a code whose repair "
@@ -236,8 +236,9 @@ PARTIAL: dict[tuple[str, str], str] = {
         " not a binding is absent by construction"
     ),
     ("evals.harness.replay", "ROUTES_OF"): (
-        "the modes whose sweep keeps an emission or a catalog a replay reads, "
-        "so a mode that keeps only reports is absent by construction"
+        "the modes whose sweep runs a reading node, so the instructions it"
+        " carries place it on an arm; a mode that starts from the blessed model"
+        " runs no reading node and is absent by construction"
     ),
     ("evals.harness.replay", "KEEPS"): (
         "the modes whose sweep keeps an emission or a catalog a replay reads, "
