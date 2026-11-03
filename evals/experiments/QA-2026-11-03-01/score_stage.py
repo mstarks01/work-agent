@@ -1,10 +1,11 @@
 """Read a stage of QA-2026-11-03-01: do the drafts state the ruled position?
 
-Usage, from the repository root: ``score_stage.py <prefix>``, where the
-prefix ``id`` reads stage 1, ``fix`` stage 2 and ``ex`` stage 3. Each
-``runs/<prefix>-*.json`` holds one information-disclosure lane call. The case is prepared again as the
-call prepared it, and :func:`~evals.harness.descendants.lane_drafts` turns its
-proposals into drafts. A ruled reference of the lane is reached when a draft
+Usage, from the repository root: ``score_stage.py <prefix>``. The prefix
+``id`` reads stage 1, ``fix`` stage 2 and ``ex`` stage 3. Each file
+``runs/<prefix>-*.json`` holds one information-disclosure lane call. The case
+is prepared again as the call prepared it, and
+:func:`~evals.harness.descendants.lane_drafts` turns its proposals into
+drafts. A ruled reference of the lane is reached when a draft
 matches it by verb and place with no ruled position, and it agrees when a
 reaching draft states the ruled position. Writes ``runs/<prefix>-read.json``.
 """
