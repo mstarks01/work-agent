@@ -84,7 +84,6 @@ from analysis_service.system_model import SystemModel
 __all__ = [
     "ASVS_ID_FORMAT",
     "AsvsAnalysis",
-    "AsvsChapter",
     "AsvsOptions",
     "AsvsSummary",
     "DraftRequirementRuling",

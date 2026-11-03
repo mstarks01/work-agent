@@ -64,7 +64,7 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from analysis_service.assertions import AssertionRecord
-from analysis_service.parsing import member, non_negative
+from analysis_service.parsing import lookup, member, non_negative
 from analysis_service.sources import text_digest
 from evals.harness import falsify
 from evals.harness.artifact import load_artifact
@@ -608,22 +608,6 @@ class Reading:
     why: str = ""
 
 
-def _gate(row: Reading) -> Gate:
-    """The gate of :data:`GATES` that ``row`` reads, or raise ``KeyError``."""
-    name = member(row.gate, GATES)
-    if name is None:
-        raise KeyError(row.gate)
-    return GATES[name]
-
-
-def _pending(row: Reading) -> Pending:
-    """The gate of :data:`PENDING` that ``row`` reads, or raise ``KeyError``."""
-    name = member(row.gate, PENDING)
-    if name is None:
-        raise KeyError(row.gate)
-    return PENDING[name]
-
-
 def _ratio(measured: float, baseline: float) -> float | None:
     return None if not baseline else measured / baseline
 
@@ -839,7 +823,7 @@ def render(readings: Sequence[Reading]) -> str:
             gate = GATES[name]
             limit = f"{gate.direction} {gate.limit} ({gate.unit})"
         else:
-            limit = _pending(row).limit or "undeclared"
+            limit = lookup(PENDING, row.gate).limit or "undeclared"
         lines.append(
             f"| `{row.gate}` | {row.verdict} | {measured} | {baseline}"
             f" | {against} | {limit} |"
@@ -857,7 +841,7 @@ def render(readings: Sequence[Reading]) -> str:
     for row in unread:
         lines.append(f"- `{row.gate}` unread: {row.why}")
     for row in failed:
-        gate = _gate(row)
+        gate = lookup(GATES, row.gate)
         lines.append(f"- `{row.gate}`: {gate.question} {gate.why}")
     return "\n".join(lines) + "\n"
 

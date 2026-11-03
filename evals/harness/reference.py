@@ -69,7 +69,7 @@ from analysis_service.claims import (
     derive_severity_level,
 )
 from analysis_service.deployment import ConfigPaths
-from analysis_service.frameworks.asvs.record import AsvsChapter
+from analysis_service.frameworks.asvs.catalog import AsvsChapter
 from analysis_service.frameworks.stride.record import (
     LANES_OF_VERB,
     AttackerPosition,

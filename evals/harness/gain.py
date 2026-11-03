@@ -47,7 +47,7 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
-from analysis_service.parsing import member
+from analysis_service.parsing import lookup
 from evals.harness import audit
 from evals.harness.artifact import figures_corpus
 from evals.harness.comparison import flagged_cases, held_out_cases
@@ -285,14 +285,6 @@ GATES: Mapping[GainGateName, GainGate] = MappingProxyType(
 )
 
 
-def _gate(row: Reading) -> GainGate:
-    """The gate of :data:`GATES` that ``row`` reads, or raise ``KeyError``."""
-    name = member(row.gate, GATES)
-    if name is None:
-        raise KeyError(row.gate)
-    return GATES[name]
-
-
 def _reader(framework: FrameworkName, gate: GainGateName) -> Reader | None:
     readers = READERS[framework]
     return {
@@ -378,7 +370,7 @@ def render(
         "| --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in readings:
-        gate = _gate(row)
+        gate = lookup(GATES, row.gate)
         cells = [
             "—" if value is None else f"{value:.4g}"
             for value in (row.measured, row.baseline, row.against_limit)
@@ -390,7 +382,7 @@ def render(
     lines.append("")
     for row in readings:
         if row.verdict == "fail":
-            lines.append(f"- `{row.gate}` fails: {_gate(row).question}")
+            lines.append(f"- `{row.gate}` fails: {lookup(GATES, row.gate).question}")
         elif row.verdict == "inconclusive":
             lines.append(f"- `{row.gate}` unread: {row.why}")
     if all(row.verdict == "pass" for row in readings):

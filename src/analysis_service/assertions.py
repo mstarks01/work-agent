@@ -338,16 +338,13 @@ _ELEMENT_TYPES: Mapping[ElementPrefix, type[BaseModel]] = MappingProxyType(
     {element_type.id_prefix: element_type for element_type in get_args(Element)}
 )
 
-#: Every prefix the element schema uses.
-_ELEMENT_PREFIXES: frozenset[ElementPrefix] = frozenset(_ELEMENT_TYPES)
-
 #: The subject types whose ID is an **Element ID**, and whose subject the model
 #: must therefore hold. Derived rather than listed again: a type is graph-bound
 #: exactly when its prefixes are the schema's.
 GRAPH_BOUND: frozenset[SubjectType] = frozenset(
     subject_type
     for subject_type, prefixes in SUBJECT_PREFIXES.items()
-    if prefixes <= _ELEMENT_PREFIXES
+    if prefixes <= frozenset(_ELEMENT_TYPES)
 )
 
 # --- Bounds ----------------------------------------------------------------

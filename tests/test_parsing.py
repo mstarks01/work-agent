@@ -13,6 +13,8 @@ import pytest
 from analysis_service.parsing import (
     ascii_int,
     is_version,
+    lookup,
+    member,
     non_negative,
     signer,
     strings,
@@ -96,3 +98,14 @@ def test_money_and_non_negative_answer_one_rule(value):
     from evals.harness.baseline import money
 
     assert non_negative(value) == (money(value) is not None)
+
+
+def test_a_member_is_the_set_member_equal_to_the_value():
+    assert member("b", ("a", "b")) == "b"
+    assert member("c", ("a", "b")) is None
+
+
+def test_a_lookup_reads_the_table_or_raises_like_a_subscript():
+    assert lookup({"a": 1}, "a") == 1
+    with pytest.raises(KeyError, match="'c'"):
+        lookup({"a": 1}, "c")

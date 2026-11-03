@@ -30,14 +30,15 @@ file, because a value of spaces reads as a signature. :data:`Signer` is the
 model field that asks it as the file loads. :data:`Sha256Hex` is the one
 shape of a SHA-256 digest that a model field holds. :func:`member` asks
 which member of a closed set a string is, so a caller gets the set's
-``Literal`` back without a cast.
+``Literal`` back without a cast, and :func:`lookup` reads a closed table by
+that member.
 """
 
 from __future__ import annotations
 
 import math
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Annotated, TypeGuard, TypeVar
 
 from pydantic import BeforeValidator, Field
@@ -45,6 +46,7 @@ from pydantic import BeforeValidator, Field
 _ASCII_DIGITS = re.compile(r"[0-9]+")
 
 _Member = TypeVar("_Member")
+_Value = TypeVar("_Value")
 
 
 def ascii_int(value: str, *, max_digits: int) -> int | None:
@@ -86,6 +88,18 @@ def member(value: object, members: Iterable[_Member]) -> _Member | None:
     comes back as the ``Literal`` of the set it was checked against.
     """
     return next((one for one in members if one == value), None)
+
+
+def lookup(table: Mapping[_Member, _Value], key: object) -> _Value:
+    """What ``table`` holds under the key equal to ``key``.
+
+    Raises ``KeyError`` naming ``key`` where no key is equal, as a subscript
+    does, so a caller that reads a closed table by a ``str`` keeps its refusal.
+    """
+    found = member(key, table)
+    if found is None:
+        raise KeyError(key)
+    return table[found]
 
 
 def is_version(value: object, expected: int) -> bool:

@@ -33,7 +33,7 @@ from typing import Literal, get_args
 
 from analysis_service.bands import Band, band_of
 from analysis_service.frameworks import FrameworkPackageError
-from analysis_service.parsing import member
+from analysis_service.parsing import lookup
 
 __all__ = [
     "ASVS_LEVELS",
@@ -226,10 +226,7 @@ def requirement_id(lane: str, key: object) -> str:
     agent gives the rest. :func:`~analysis_service.frameworks.asvs.record.
     requirement_of` reads the same pair back off a composed claim ID.
     """
-    chapter = member(lane, LANES)
-    if chapter is None:
-        raise KeyError(lane)
-    return f"V{CHAPTER_NUMBERS[chapter]}.{key}"
+    return f"V{lookup(CHAPTER_NUMBERS, lane)}.{key}"
 
 
 _REQUIREMENT_IDS: frozenset[str] = frozenset(req.id for req in REQUIREMENTS)
