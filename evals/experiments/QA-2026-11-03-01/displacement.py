@@ -12,7 +12,7 @@ of :data:`STUDIES` names a run folder and the files of each arm:
 
 Each ``read`` of a store is given a class by its text:
 
-* ``compromised-reader``: the title or description says the attacker
+* ``compromised-reader``: the title says the attacker
   compromises the reader or runs code in it, in words such as "compromised",
   "code in", "code running in" or "code executing in";
 * ``grant-holder``: otherwise, the draft cites the authentication fact of a
@@ -61,7 +61,7 @@ STORE_AUTH = re.compile(r"(?:unknown|absent):flow:\S*>store:\S*:authentication")
 
 def _class(claim: dict[str, Any]) -> tuple[str, str]:
     """The draft's class, and the words or the evidence ref that decided it."""
-    compromise = COMPROMISE.search(f"{claim['title']} {claim['description']}")
+    compromise = COMPROMISE.search(claim["title"])
     if compromise:
         return "compromised-reader", compromise.group(0)
     auth = STORE_AUTH.search(" ".join(claim.get("evidence_refs") or []))

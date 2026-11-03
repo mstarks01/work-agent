@@ -1,8 +1,8 @@
 {
   "counts": {
     "with-exemplar": {
-      "compromised-reader": 17,
-      "other": 26
+      "other": 27,
+      "compromised-reader": 16
     },
     "without-exemplar": {
       "other": 27,
@@ -15,8 +15,8 @@
       {
         "run": "id-01",
         "title": "A storage copy could expose all confidential orders if encryption at rest is absent",
-        "class": "compromised-reader",
-        "because": "compromise"
+        "class": "other",
+        "because": ""
       },
       {
         "run": "id-02",
