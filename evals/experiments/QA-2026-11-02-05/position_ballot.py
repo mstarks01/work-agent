@@ -246,20 +246,22 @@ def answered(
         verdict, position = answer["verdict"], answer["position"]
         if verdict not in VERDICTS:
             raise ValueError(
-                f"row {row['n']}: verdict {verdict!r} is not one of {VERDICTS}"
+                f"row {row['n']}: the verdict {verdict!r} is not one of {VERDICTS}"
             )
         if verdict == "change" and not position:
-            raise ValueError(f"row {row['n']}: a change verdict names a position")
+            raise ValueError(f"row {row['n']}: the verdict 'change' names a position")
         if verdict != "change" and position:
             raise ValueError(
-                f"row {row['n']}: an {verdict!r} verdict names no position"
+                f"row {row['n']}: the verdict {verdict!r} names no position"
             )
         if position and position not in POSITIONS:
             raise ValueError(f"row {row['n']}: {position!r} is not a position")
         if verdict == "change" and position == row["proposed"]:
             raise ValueError(f"row {row['n']}: a change names the proposed position")
         if verdict != "accept" and not answer["note"].strip():
-            raise ValueError(f"row {row['n']}: a {verdict!r} verdict states its reason")
+            raise ValueError(
+                f"row {row['n']}: the verdict {verdict!r} states its reason"
+            )
     return list(returned)
 
 
@@ -303,7 +305,7 @@ def record(rows: Sequence[Mapping[str, str]], corpus_dir: Path = CORPUS_DIR) -> 
     """Write each ``accept`` and ``change`` row as a position ruling, and reload.
 
     Returns how many rulings were written. Any exception restores each rulings
-    file as it was, so a partly written ballot never stays in the tree.
+    file it wrote as it was, so a partly written ballot never stays in the tree.
     """
     written: dict[Path, bytes | None] = {}
     added = 0
