@@ -74,7 +74,7 @@ def vocabularies() -> dict[str, frozenset[str]]:
     Read off the classes rather than hand-listed, so a ``Literal`` added to any
     element type is covered without anyone remembering this module.
     """
-    found = {ASSET_VOCABULARY: CORE_ASSET_TAGS}
+    found: dict[str, frozenset[str]] = {ASSET_VOCABULARY: CORE_ASSET_TAGS}
     for element_class in get_args(Element):
         for field_name, field in element_class.model_fields.items():
             if get_origin(field.annotation) is Literal:

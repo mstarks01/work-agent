@@ -44,7 +44,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from analysis_service.actions import VerbError
 from analysis_service.assertions import CatalogProposal
@@ -279,7 +279,7 @@ def _batches(items: Sequence[_T], size: int) -> list[list[_T]]:
 
 async def _run_mode(
     cases: Sequence[GoldenCase],
-    mode: str,
+    mode: modes.SweepMode,
     deployment: Deployment,
     only: Sequence[FrameworkName],
     accepted: float | None,
@@ -747,7 +747,7 @@ def _scored_sweep(
     runs: dict[str, modes.AnalysisRun],
     votes: ledger.Ledger,
     table: roster.Roster,
-) -> dict[str, Sweep]:
+) -> dict[standings.Series, Sweep]:
     """Every reading that needs the vote ledger, folded onto ``sweep``.
 
     One spelling for the two commands that compute these numbers: ``run``,
@@ -790,7 +790,7 @@ def _scored_sweep(
     matcher = SubsetVerbIdentity(flow_maps)
     reports = {case: run.report for case, run in runs.items()}
 
-    by_series = {}
+    by_series: dict[standings.Series, Sweep] = {}
     for name, included in standings.SERIES.items():
         read = standings.narrow(votes, table, included)
         scores, yields, charged = _score_runs(cases, runs, matcher, read, flow_maps)
@@ -818,7 +818,7 @@ def _scored_keys(sweep: Sweep) -> dict[str, Any]:
     return keys
 
 
-def _series_record(by_series: dict[str, Sweep]) -> dict[str, Any]:
+def _series_record(by_series: dict[standings.Series, Sweep]) -> dict[str, Any]:
     """Which standings each series reads, and the non-primary series' numbers.
 
     The primary series' blocks are the artifact's top-level scored keys and
@@ -840,7 +840,7 @@ def _series_record(by_series: dict[str, Sweep]) -> dict[str, Any]:
     }
 
 
-def _print_series(by_series: dict[str, Sweep]) -> None:
+def _print_series(by_series: dict[standings.Series, Sweep]) -> None:
     """Say which standings the printed numbers read, and what the others say."""
     included = ", ".join(standings.SERIES[standings.PRIMARY])
     print(f"\nThe scored numbers above read {included} votes only.")
@@ -1170,7 +1170,7 @@ def command_run(args: argparse.Namespace) -> int:
     # A mode that produced no run has nothing to score, and ``Sweep`` already
     # defaults every scored field to empty — which is a sweep that measured
     # nothing rather than one whose numbers were all zero.
-    by_series: dict[str, Sweep] = {}
+    by_series: dict[standings.Series, Sweep] = {}
     if mode_run.runs:
         by_series = _scored_sweep(sweep, ran, mode_run.runs, votes, table)
         sweep = by_series[standings.PRIMARY]
@@ -1842,6 +1842,7 @@ def replay_artifact(
             f"{path}: a {loaded.mode} sweep keeps no emission this instrument reads;"
             f" it replays {sorted(replay.ROUTES_OF)}"
         )
+    mode = cast(modes.SweepMode, loaded.mode)
     present = [case for case in cases if case.id in loaded.cases]
     if not present:
         raise modes.EvalRunError(f"{path}: none of its cases are in {corpus_dir}")
@@ -1863,7 +1864,7 @@ def replay_artifact(
             **graded,
         )
 
-    if replay.KEEPS[loaded.mode] == "extraction":
+    if replay.KEEPS[mode] == "extraction":
         extracted = extractions_from_reports(loaded, held)
         return sweep(
             extractions=tuple(

@@ -133,7 +133,7 @@ def _threat_id(lane: StrideCategory, sequence: int) -> str:
 #: corpus files them so: forging a message is spoofing when the identity is the
 #: point and tampering when the content is, and deleting a record is tampering,
 #: repudiation or denial of service by what the record was for.
-LANES_OF_VERB: dict[str, tuple[StrideCategory, ...]] = {
+LANES_OF_VERB: dict[ActionVerb, tuple[StrideCategory, ...]] = {
     "read": ("information-disclosure",),
     "intercept": ("information-disclosure",),
     "elicit": ("information-disclosure",),

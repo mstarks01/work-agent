@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any, get_args
 
 from analysis_service.answer_state import recommended
-from analysis_service.capabilities import CAPABILITIES, Applicability
+from analysis_service.capabilities import CAPABILITIES, Applicability, Presence
 from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
 from analysis_service.early_questions import capability_questions
 from analysis_service.fact_answers import FactAnswer, key_ref
@@ -67,7 +67,11 @@ FIXTURES_DIR = Path(__file__).resolve().parents[1] / "applicability"
 _LABEL = "Fixture source"
 
 #: How a truth state answers a yes-or-no capability question.
-TRUTH_ANSWERS = {"present": "yes", "absent": "no", "unknown": "unknown"}
+TRUTH_ANSWERS: dict[Presence, str] = {
+    "present": "yes",
+    "absent": "no",
+    "unknown": "unknown",
+}
 
 
 @dataclass(frozen=True)
@@ -83,7 +87,7 @@ class Fixture:
     statements: tuple[CapabilityStatement, ...]
     answers: Mapping[str, str]
     expected: Mapping[str, str]
-    truth: Mapping[str, str]
+    truth: Mapping[str, Presence]
 
     @property
     def signed(self) -> bool:

@@ -384,6 +384,10 @@ def total_bytes(sources: Sequence[Source]) -> int:
     return sum(source.size_bytes() for source in sources)
 
 
+#: What a breach of the source limits is.
+LimitRung = Literal["empty", "duplicate-label", "count", "total"]
+
+
 @dataclass(frozen=True)
 class LimitBreach:
     """Why a submission was refused before any model ran.
@@ -393,7 +397,7 @@ class LimitBreach:
     reason. ``message`` is caller-facing and names no internal detail.
     """
 
-    rung: Literal["empty", "duplicate-label", "count", "total"]
+    rung: LimitRung
     message: str
 
 

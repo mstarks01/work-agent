@@ -49,7 +49,9 @@ def result(case_id: str = "01-payments-checkout", **overrides) -> modes.Assertio
 @pytest.mark.parametrize(
     "mode", sorted(mode for mode, kept in replay.KEEPS.items() if kept == "catalog")
 )
-def test_every_catalog_mode_archives_its_run(tmp_path: Path, mode: str) -> None:
+def test_every_catalog_mode_archives_its_run(
+    tmp_path: Path, mode: modes.SweepMode
+) -> None:
     """A mode whose replay reads a catalog is a mode whose sweep writes one."""
     out = str(tmp_path / "sweep.json")
     write_assertions(out, mode, {"01-payments-checkout": result()})
@@ -91,7 +93,7 @@ def test_a_head_that_wrote_no_stage_archives_none(tmp_path: Path) -> None:
     "mode", sorted(mode for mode, kept in replay.KEEPS.items() if kept != "catalog")
 )
 def test_a_mode_that_keeps_an_extraction_writes_no_catalog(
-    tmp_path: Path, mode: str
+    tmp_path: Path, mode: modes.SweepMode
 ) -> None:
     out = str(tmp_path / "sweep.json")
     write_assertions(out, mode, {"01-payments-checkout": result()})
@@ -118,7 +120,7 @@ def test_every_mode_says_which_files_a_finished_case_writes() -> None:
 
 
 @pytest.mark.parametrize("mode", sorted(modes.MODE_ENTRIES))
-def test_each_row_agrees_with_the_writers(mode: str) -> None:
+def test_each_row_agrees_with_the_writers(mode: modes.SweepMode) -> None:
     """Each row answers the gate of each writer that ``run._run_mode`` calls."""
     kinds = FINISHED_KINDS[mode]
     reporting = mode in modes.REPORTING_MODES

@@ -184,7 +184,10 @@ class EarlyRule:
 #: names, so the floor decides which field questions a pause asks. A
 #: capability question under 2 settles one unit, and at ASVS level 2 that
 #: leaves 28 of 51.
-EARLY_RULES: Mapping[str, EarlyRule] = {
+#: The two kinds of question the early floor tells apart.
+EarlyKind = Literal["capability", "field"]
+
+EARLY_RULES: Mapping[EarlyKind, EarlyRule] = {
     "capability": EarlyRule(floor=2.0, limit=30),
     "field": EarlyRule(floor=1.0, limit=None),
 }
@@ -240,7 +243,7 @@ ANSWER_LIMITS: Mapping[str, int] = MappingProxyType(
 )
 
 
-def _early_kind(question: EarlyQuestion) -> str:
+def _early_kind(question: EarlyQuestion) -> EarlyKind:
     return "capability" if question.kind == "capability" else "field"
 
 

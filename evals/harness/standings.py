@@ -39,7 +39,9 @@ from evals.harness.roster import Roster, Standing
 #:
 #: A table rather than a flag, so adding a series is an entry here and every
 #: sweep starts computing it. The first key is the primary one.
-SERIES: dict[str, tuple[Standing, ...]] = {
+Series = Literal["maintainer", "all"]
+
+SERIES: dict[Series, tuple[Standing, ...]] = {
     "maintainer": ("maintainer",),
     # Written out rather than derived from :data:`~evals.harness.roster.STANDINGS`,
     # because this order is published: the artifact's series block carries it

@@ -48,13 +48,13 @@ from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 from unittest import mock
 
 from analysis_service import answer_state
 from analysis_service.answer_sets import SentAnswers
 from analysis_service.answer_state import Answers, AnswerState, SavedAnswers
-from analysis_service.capabilities import lineage
+from analysis_service.capabilities import Presence, lineage
 from analysis_service.claims import FrameworkName, UnknownKey
 from analysis_service.early_questions import EarlyQuestion
 from analysis_service.fact_answers import FactAnswer, SkipKey, key_ref
@@ -101,7 +101,7 @@ def _skip(question: EarlyQuestion) -> None:
     del question
 
 
-def _truth(truth: Mapping[str, str]) -> Answerer:
+def _truth(truth: Mapping[str, Presence]) -> Answerer:
     """A signed fixture's truth for each capability it names, as
     ``rule-applicability`` answers it, and "I don't know" to the rest."""
 
@@ -286,7 +286,8 @@ def _decided(
 
 
 #: The other answer to a capability question.
-TURNED = {"yes": "no", "no": "yes"}
+YesNo = Literal["yes", "no"]
+TURNED: dict[YesNo, YesNo] = {"yes": "no", "no": "yes"}
 
 
 def _reversal(answers: Sequence[FactAnswer]) -> tuple[FactAnswer, ...]:
@@ -311,8 +312,9 @@ def _reversal(answers: Sequence[FactAnswer]) -> tuple[FactAnswer, ...]:
             and (name in lineage(other_name) or other_name in lineage(name))
         )
 
+    turned = TURNED[cast(YesNo, first.value)]
     return tuple(
-        FactAnswer(key=one.key, value=TURNED[one.value])
+        FactAnswer(key=one.key, value=turned)
         for one in (first, *filter(bound, answers))
     )
 

@@ -45,7 +45,7 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
 from evals.harness import audit, baseline, standings
@@ -77,7 +77,8 @@ UNSPREAD = "spread unmeasured"
 
 #: The two tables each framework block prints, keyed by the heading each
 #: carries, with whether it reads the held-out cases.
-PARTS: Mapping[str, bool] = {"development cases": False, "held-out cases": True}
+PartHeading = Literal["development cases", "held-out cases"]
+PARTS: Mapping[PartHeading, bool] = {"development cases": False, "held-out cases": True}
 
 
 @dataclass(frozen=True)
@@ -96,7 +97,7 @@ class Row:
     reported_usd: float | None
     #: ``{series: {framework: {part: {column label: cell}}}}``, already
     #: rendered, where a part is a key of :data:`PARTS`.
-    cells: dict[str, dict[str, dict[str, dict[str, str]]]]
+    cells: dict[str, dict[str, dict[PartHeading, dict[str, str]]]]
     #: (findings a person answered, findings offered) across every sweep, so
     #: a reader can weigh how much of the row rests on judgement.
     coverage: tuple[int, int]
@@ -227,7 +228,7 @@ def read_baseline(directory: Path, root: Path) -> Row | None:
     )
     held_out = audit.still_held_out(flagged, ledger)
     exhausted = audit.exhausted(ledger)
-    cells: dict[str, dict[str, dict[str, dict[str, str]]]] = {}
+    cells: dict[str, dict[str, dict[PartHeading, dict[str, str]]]] = {}
     for series, sweeps in per_series.items():
         for framework in identity.get("frameworks", []):
             for part, holdout in PARTS.items():

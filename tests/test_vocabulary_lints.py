@@ -34,6 +34,16 @@ declared in :data:`PARTIAL` with the reason, stated as a property of the subset
 rather than as its name. :func:`test_no_declaration_outlives_its_subset` refuses
 an entry whose constant has since grown to the whole vocabulary, so the table
 cannot rot into coverage it no longer provides.
+
+## A closed set states its Literal
+
+A module-level tuple, set, frozenset or dict of string literals that code reads
+as a set, by ``in`` or ``not in``, or a dict by a key that is not a literal, is
+a closed set. :func:`test_a_closed_set_states_its_literal` asks each one for the
+annotation that names its ``Literal``, and the pair check above then holds the
+members to the type. A table that is only iterated, or read by literal keys, is
+not asked. A fixed list that filters free text, file names, provider errors or
+corpus data is open by design and is declared in :data:`OPEN` with the reason.
 """
 
 from __future__ import annotations
@@ -42,13 +52,22 @@ import ast
 import importlib
 import importlib.util
 import re
+from collections.abc import Container, Iterable, Mapping, Sequence
 from pathlib import Path
 from types import ModuleType
-from typing import get_args
+from typing import Literal, get_args
 
 import pytest
 
-from tests.source_tree import PYTHON, REPO_ROOT, module_name, parse, source_files
+from tests.source_tree import (
+    PYTHON,
+    REPO_ROOT,
+    SHORTEST_REASON,
+    imports,
+    module_name,
+    parse,
+    source_files,
+)
 
 pytestmark = pytest.mark.lint
 
@@ -121,6 +140,112 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the packages holding a lane no case exercises, which a package whose"
         " every lane is exercised does not appear in"
     ),
+    ("analysis_service.api", "_REFUSALS"): (
+        "the outcomes that refuse a submission, so the outcome that admits one "
+        "is absent by construction, and so is the one a minted ID cannot reach"
+    ),
+    ("webapp.main", "_ADMISSION_MESSAGES"): (
+        "the outcomes that refuse a page's submission, so the outcome that "
+        "admits one is absent by construction, and so is the one a minted ID "
+        "cannot reach"
+    ),
+    ("analysis_service.assertions", "ANSWER_ISSUES"): (
+        "the codes a submitter's answer draws when it places nothing, which is "
+        "fewer than the codes a catalog can carry"
+    ),
+    ("analysis_service.assertions", "CATALOG_REFUSALS"): (
+        "the codes that refuse a whole catalog, so a code that refuses one row "
+        "of it is absent by construction"
+    ),
+    ("analysis_service.claims", "CONDITIONAL_GROUNDS"): (
+        "the ground kinds that say a fact is unstated, so a ground that states "
+        "a fact or its absence is absent by construction"
+    ),
+    ("analysis_service.claims", "ATTRIBUTE_GROUNDS"): (
+        "the ground kinds whose reference is an element and an attribute of it, "
+        "which is fewer than the ground kinds that exist"
+    ),
+    ("analysis_service.claims", "ASSERTION_GROUNDS"): (
+        "the ground kinds whose reference is a row of the assertion catalog, "
+        "which is fewer than the ground kinds that exist"
+    ),
+    ("analysis_service.open_facts", "_GROUND_STATE"): (
+        "the ground kinds that state an attribute's state, which a ground that "
+        "cites a quote, an element or a catalog row does not"
+    ),
+    ("analysis_service.open_facts", "_ATTRIBUTE_QUESTIONS"): (
+        "the control attributes whose plain question reads badly, so an "
+        "attribute whose plain question reads well is absent by construction"
+    ),
+    ("analysis_service.frameworks.stride.rules", "ENTERED_ZONE_KINDS"): (
+        "the boundary kinds that a crossing enters to transfer authority, which "
+        "a network hop or an unclassified zone does not"
+    ),
+    ("analysis_service.frameworks.stride.rules", "LEFT_ZONE_KINDS"): (
+        "the boundary kinds that a crossing leaves to transfer authority, which "
+        "is the tenant zone and no zone whose authority is inside it"
+    ),
+    ("analysis_service.sampling", "OFFERED_PARAMS"): (
+        "the sampling params an environment variable may override, so a "
+        "reserved or a forbidden param is absent by construction"
+    ),
+    ("analysis_service.validation", "CITATION_FIELDS"): (
+        "the source fields the citation rule checks, so a field the rule does "
+        "not check, such as the speaker, is absent by construction"
+    ),
+    ("analysis_service.validation", "RENAMING_CODES"): (
+        "the codes whose repair may rename an element, so a code whose repair "
+        "keeps the element's ID is absent by construction"
+    ),
+    ("evals.harness.applicability", "APPLIES"): (
+        "the verdicts that assert a requirement applies, so the verdict that "
+        "rules it out is absent by construction"
+    ),
+    ("evals.harness.certify", "_FLOAT_PARAMS"): (
+        "the sampling params a sweep re-pins as a float, so a param of another "
+        "type or outside promotion is absent by construction"
+    ),
+    ("evals.harness.certify", "_INT_PARAMS"): (
+        "the sampling params a sweep re-pins as an integer, so a param of "
+        "another type or outside promotion is absent by construction"
+    ),
+    ("evals.harness.certify", "_STR_PARAMS"): (
+        "the sampling params a sweep re-pins as a string, so a param of another "
+        "type or outside promotion is absent by construction"
+    ),
+    ("evals.harness.certify", "_NOT_PROMOTABLE"): (
+        "the sampling params that record a property of the deployment, so a "
+        "decoding value a sweep can tune is absent by construction"
+    ),
+    ("evals.harness.modes", "REPORTING_MODES"): (
+        "the modes whose graph ends in a report, so a mode that stops at "
+        "extraction or at the catalog is absent by construction"
+    ),
+    ("evals.harness.near_misses", "ASKABLE"): (
+        "the vote statuses a displaced draft may carry and still be asked "
+        "about, so the status of a draft a person refused is absent by "
+        "construction"
+    ),
+    ("evals.harness.population", "REACHES"): (
+        "the routes that put a row in front of a lane, so a route that leaves a "
+        "row open, set aside or refused is absent by construction"
+    ),
+    ("evals.harness.replay", "ROW_LOSSES"): (
+        "the fates of a reference row that lose its fact, so a fate that keeps "
+        "the fact is absent by construction"
+    ),
+    ("evals.harness.replay", "BIND_LOSSES"): (
+        "the fates of a binding that lose it, so a fate that keeps or refuses "
+        "the binding is absent by construction"
+    ),
+    ("evals.harness.replay", "ROUTES_OF"): (
+        "the modes whose sweep keeps an emission or a catalog a replay reads, "
+        "so a mode that keeps only reports is absent by construction"
+    ),
+    ("evals.harness.replay", "KEEPS"): (
+        "the modes whose sweep keeps an emission or a catalog a replay reads, "
+        "so a mode that keeps only reports is absent by construction"
+    ),
 }
 
 
@@ -148,9 +273,20 @@ def _annotated_vocabularies() -> list[tuple[Path, str, str]]:
                 continue
             inside = annotation.slice
             first = inside.elts[0] if isinstance(inside, ast.Tuple) else inside
-            name = getattr(first, "id", "")
-            if name and name[0].isupper():
+            if not isinstance(first, ast.Name | ast.Attribute):
+                continue
+            name = ast.unparse(first)
+            if name.rpartition(".")[2][0].isupper():
                 found.append((path, node.target.id, name))
+    return found
+
+
+def _resolved(module: ModuleType, dotted: str) -> object | None:
+    """The object that ``dotted``, such as ``sittings.RowState``, names in
+    ``module``, or None."""
+    found: object | None = module
+    for part in dotted.split("."):
+        found = getattr(found, part, None)
     return found
 
 
@@ -177,9 +313,10 @@ def _pairs() -> list[tuple[str, str, str, frozenset[str], frozenset[str]]]:
     for path, constant, type_name in _annotated_vocabularies():
         dotted = module_name(path)
         module = _module(path)
-        if not hasattr(module, constant) or not hasattr(module, type_name):
+        vocabulary = _resolved(module, type_name)
+        if not hasattr(module, constant) or vocabulary is None:
             continue
-        members = get_args(getattr(module, type_name))
+        members = get_args(vocabulary)
         if not members or not all(isinstance(one, str) for one in members):
             continue
         resolved.append(
@@ -253,6 +390,256 @@ def test_every_declaration_names_a_constant_that_exists():
         f"PARTIAL names {unknown}, which this sweep does not find. The constant"
         " was renamed, moved, or lost its annotation."
     )
+
+
+# A closed set states its Literal ("The classes that come back in fixes" in
+# docs/agents/code-review.md).
+
+#: The calls whose one argument lists the members of a set.
+_SET_CALLS = frozenset({"frozenset", "set", "tuple"})
+
+#: What a module-level constant of string literals is: a ``set`` of members (a
+#: tuple, a set or a frozenset), or a ``table`` keyed by them (a dict).
+Shape = Literal["set", "table"]
+
+#: A module's dotted name and its parsed tree.
+ModuleTree = tuple[str, ast.Module]
+
+#: A table that code reads as a set and that is open by design, and why. The
+#: reason is a property of the table: it is a fixed list that filters free text,
+#: file names, provider errors or corpus data, so no value in the code carries
+#: its members as a type. :func:`test_no_open_declaration_outlives_its_table`
+#: refuses an entry that names no such table.
+OPEN: dict[tuple[str, str], str] = {
+    ("analysis_service.grounding", "_NEGATIONS"): (
+        "a list of words that filters the tokens of a quoted span of free text"
+    ),
+    ("analysis_service.grounding", "_TYPOGRAPHIC_FOLDS"): (
+        "a list of characters that filters each character of a model's quote"
+    ),
+    ("analysis_service.retry", "_RATE_LIMIT_CLEARS_WITH_TIME"): (
+        "the limit dimensions a provider error names, which a provider can"
+        " extend with a word the table has not met"
+    ),
+    ("analysis_service.sampling", "_BOOL_LITERALS"): (
+        "the spellings that filter the free text of an environment variable"
+    ),
+    ("analysis_service.sources", "FORMATTING_CATEGORIES"): (
+        "the Unicode categories that filter each character of free text"
+    ),
+    ("analysis_service.token_caps", "JOB_VARYING_DIRS"): (
+        "directory names that filter the file names under a framework package"
+    ),
+    ("analysis_service.vendors", "_ENDPOINT_VARIANTS"): (
+        "words that filter the parts of a model identifier that a deployment writes"
+    ),
+    ("analysis_service.vendors", "_FLOATING_WORDS"): (
+        "words that filter the parts of a model identifier that a deployment writes"
+    ),
+    ("evals.build_review_docs", "HAND_WRITTEN"): (
+        "case directory names, which the corpus holds as data and not as a type"
+    ),
+    ("evals.harness.archive", "KIND_NAMES"): (
+        "whole file names that filter the files an archive directory holds"
+    ),
+    ("evals.harness.artifact", "UNGRADED"): (
+        "file names that filter the files a case directory holds"
+    ),
+    ("evals.harness.ledger_isolation", "LEDGER_DIRS"): (
+        "directory paths that filter the file paths a change touches"
+    ),
+    ("evals.harness.promotion", "RECALL_CASES"): (
+        "case directory names, which the corpus holds as data and not as a type"
+    ),
+    ("examples.sync_docs", "FENCE_LANGUAGES"): (
+        "file suffixes that filter the paths a document includes"
+    ),
+}
+
+
+def _strings(nodes: Sequence[ast.expr | None]) -> bool:
+    """Whether ``nodes`` is one string literal or more."""
+    return bool(nodes) and all(
+        isinstance(node, ast.Constant) and isinstance(node.value, str) for node in nodes
+    )
+
+
+def _shape(value: ast.expr) -> Shape | None:
+    """The shape of a constant whose members are string literals, or None."""
+    match value:
+        case ast.Dict(keys=keys) if _strings(keys):
+            return "table"
+        case ast.Tuple(elts=members) | ast.Set(elts=members) if _strings(members):
+            return "set"
+        case ast.Call(
+            func=ast.Name(id=call),
+            args=[
+                ast.Tuple(elts=members) | ast.Set(elts=members) | ast.List(elts=members)
+            ],
+        ) if call in _SET_CALLS and _strings(members):
+            return "set"
+    return None
+
+
+def _closed_sets(modules: Iterable[ModuleTree]) -> dict[tuple[str, str], Shape]:
+    """Every module-level constant of string literals, by module and name."""
+    found: dict[tuple[str, str], Shape] = {}
+    for module, tree in modules:
+        for node in tree.body:
+            match node:
+                case (
+                    ast.Assign(targets=[ast.Name(id=name)], value=value)
+                    | ast.AnnAssign(target=ast.Name(id=name), value=ast.expr() as value)
+                ):
+                    if shape := _shape(value):
+                        found[(module, name)] = shape
+    return found
+
+
+def _referent(
+    node: ast.expr,
+    module: str,
+    bound: Mapping[str, str],
+    closed: Container[tuple[str, str]],
+) -> tuple[str, str] | None:
+    """The module and the name of the constant ``node`` reads, or None."""
+    match node:
+        case ast.Name(id=name) if (module, name) in closed:
+            return (module, name)
+        case ast.Name(id=name) if name in bound:
+            source, _, constant = bound[name].rpartition(".")
+            return (source, constant)
+        case ast.Attribute(value=ast.Name(id=name), attr=constant) if name in bound:
+            return (bound[name], constant)
+    return None
+
+
+def _set_reads(
+    modules: Iterable[ModuleTree], closed: Mapping[tuple[str, str], Shape]
+) -> set[tuple[str, str]]:
+    """Each constant of ``closed`` that code reads as a set: by ``in`` or
+    ``not in``, or a table by a key that is not a literal."""
+    read: set[tuple[str, str]] = set()
+    for module, tree in modules:
+        bound = imports(tree)
+        for node in ast.walk(tree):
+            match node:
+                case ast.Compare(ops=ops, comparators=rights):
+                    asked = [
+                        right
+                        for op, right in zip(ops, rights, strict=True)
+                        if isinstance(op, ast.In | ast.NotIn)
+                    ]
+                    shapes: tuple[Shape, ...] = ("set", "table")
+                case ast.Subscript(value=table, slice=key) if not isinstance(
+                    key, ast.Constant
+                ):
+                    asked, shapes = [table], ("table",)
+                case ast.Call(
+                    func=ast.Attribute(value=table, attr="get"), args=[key, *_]
+                ) if not isinstance(key, ast.Constant):
+                    asked, shapes = [table], ("table",)
+                case _:
+                    continue
+            for one in asked:
+                found = _referent(one, module, bound, closed)
+                if found and closed.get(found) in shapes:
+                    read.add(found)
+    return read
+
+
+TREES = [(module_name(path), parse(path)) for path in source_files(*PYTHON)]
+CLOSED = _closed_sets(TREES)
+READ_AS_SETS = _set_reads(TREES, CLOSED)
+
+
+def test_the_closed_set_sweep_finds_something():
+    """Guards the guard: an empty discovery reads exactly like a clean tree."""
+    assert len(READ_AS_SETS) > 50, (
+        f"only {len(READ_AS_SETS)} constants read as sets found, so the check"
+        " below is close to vacuous. The shape it reads has probably moved."
+    )
+
+
+def test_a_closed_set_states_its_literal():
+    """Each constant that code reads as a set is annotated with its Literal.
+
+    A set that code reads by membership or by a key is a vocabulary, and the
+    ``Literal`` lets the type checker refuse a member it does not hold. The
+    annotation is the claim :func:`test_a_constant_enumerates_the_type_it_is_annotated_with`
+    holds to the members.
+    """
+    annotated = {(module, constant) for module, constant, *_ in PAIRS}
+    bare = sorted(READ_AS_SETS - annotated - set(OPEN))
+
+    assert not bare, (
+        f"{bare} are read as sets and carry no Literal. Annotate each with the"
+        " Literal of its members, such as tuple[Kind, ...] = get_args(Kind) or"
+        " dict[Kind, ...], or declare an open table in"
+        " tests/test_vocabulary_lints.py OPEN with the reason it is open."
+    )
+
+
+def test_no_open_declaration_outlives_its_table():
+    """An entry of :data:`OPEN` names a constant read as a set, with no Literal."""
+    annotated = {(module, constant) for module, constant, *_ in PAIRS}
+    stale = sorted(key for key in OPEN if key not in READ_AS_SETS or key in annotated)
+    thin = sorted(key for key, reason in OPEN.items() if len(reason) < SHORTEST_REASON)
+
+    assert not stale, f"{stale} are no open table read as a set; delete each entry"
+    assert not thin, f"state a reason for {thin}"
+
+
+_CONTROL = """
+from typing import Literal, get_args
+
+Kind = Literal["a", "b"]
+KINDS: tuple[Kind, ...] = get_args(Kind)
+CHECKED = frozenset({"a", "b"})
+KEYED = {"a": 1, "b": 2}
+ITERATED = ("a", "b")
+BY_LITERAL = {"a": 1}
+NUMBERS = frozenset({1, 2})
+
+
+def use(name, index):
+    for one in ITERATED:
+        pass
+    return name in CHECKED, KEYED[name], BY_LITERAL["a"], ITERATED[index], 1 in NUMBERS
+"""
+
+_IMPORTER = """
+import control
+from control import BY_LITERAL, ITERATED
+
+
+def use(name):
+    return name not in ITERATED, BY_LITERAL.get(name), control.KEYED.get(name)
+"""
+
+
+def test_the_sweep_reads_membership_and_variable_keys_only():
+    """A set read by ``in``, and a table read by a variable key, are found. A
+    set only iterated or indexed, a table read by a literal key, and a set of
+    numbers are not."""
+    trees = [("control", ast.parse(_CONTROL))]
+
+    assert _set_reads(trees, _closed_sets(trees)) == {
+        ("control", "CHECKED"),
+        ("control", "KEYED"),
+    }
+
+
+def test_the_sweep_follows_an_import():
+    """A read in another module, through either form of import, is found."""
+    trees = [("control", ast.parse(_CONTROL)), ("user", ast.parse(_IMPORTER))]
+
+    assert _set_reads(trees, _closed_sets(trees)) == {
+        ("control", "CHECKED"),
+        ("control", "KEYED"),
+        ("control", "ITERATED"),
+        ("control", "BY_LITERAL"),
+    }
 
 
 # A claim of review needs the field that records it (docs/agents/provenance.md).

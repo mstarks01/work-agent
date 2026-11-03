@@ -38,7 +38,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from analysis_service.analysis import control_state
 from analysis_service.answer_sets import AnswerSet, SentAnswers
@@ -142,7 +142,17 @@ def _in_part(rest: str | None) -> Answerer:
 
 
 #: The answerers, keyed by name.
-ANSWERERS: Mapping[str, Answerer] = {
+AnswererName = Literal[
+    "capability-yes",
+    "capability-no",
+    "controls-none",
+    "controls-stated",
+    "skip-all",
+    "facets-partial",
+    "facets-mixed-unknown",
+]
+
+ANSWERERS: Mapping[AnswererName, Answerer] = {
     "capability-yes": _capabilities("yes"),
     "capability-no": _capabilities("no"),
     "controls-none": _every_control(stated=False),
@@ -278,7 +288,7 @@ def replay(
     extracted: SystemModel,
     blessed: SystemModel,
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
-    name: str,
+    name: AnswererName,
 ) -> Replay:
     """Answer ``extracted``'s early list, as the service shows it, with one answerer."""
     answerer = ANSWERERS[name]

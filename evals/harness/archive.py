@@ -82,7 +82,7 @@ def _sorted_utf8(value: Any) -> str:
 
 #: One entry per producer, keyed by the kind of file it writes. A writer names
 #: its own kind, so nothing infers a spelling from a path.
-ARCHIVE_SPELLINGS: dict[str, Callable[[Any], str]] = {
+ARCHIVE_SPELLINGS: dict[ArchiveKind, Callable[[Any], str]] = {
     "report": _utf8,
     "drafts": _escaped,
     "proposals": _escaped,
@@ -105,6 +105,10 @@ KIND_NAMES: dict[str, str] = {"baseline.json": "manifest"}
 CaseKind = Literal[
     "report", "drafts", "proposals", "lanes", "extraction", "assertions", "failure"
 ]
+
+#: Each kind of file an archive holds: a case file, a sweep's artifact, or a
+#: Baseline's manifest.
+ArchiveKind = Literal[CaseKind, "artifact", "manifest"]
 
 
 def case_suffix(kind: CaseKind) -> str:

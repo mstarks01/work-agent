@@ -65,7 +65,7 @@ Route = Literal["projected", "offered", "open", "set-aside", "refused"]
 
 #: The routes that put a row in front of a lane. The population the support
 #: measurement is read over is these rows, frozen.
-REACHES: frozenset[str] = frozenset({"projected", "offered"})
+REACHES: frozenset[Route] = frozenset({"projected", "offered"})
 
 #: The format of a frozen population file. Bumped when a field changes
 #: meaning, so a population frozen under one rule is never read under another.

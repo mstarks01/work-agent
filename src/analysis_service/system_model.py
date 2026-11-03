@@ -55,16 +55,18 @@ ZONE_ATTRIBUTE = "trust_zone"
 # because an attacker acted, and whether a component being down matters is a
 # judgement about the business rather than a fact about the system. Those
 # belong to the person reading the report (#877).
-CORE_ASSET_TAGS = frozenset(
-    {
-        "credentials",
-        "pii",
-        "financial",
-        "health",
-        "secrets",
-        "business-critical-data",
-    }
-)
+AssetTag = Literal[
+    "credentials",
+    "pii",
+    "financial",
+    "health",
+    "secrets",
+    "business-critical-data",
+]
+CORE_ASSET_TAGS: frozenset[AssetTag] = frozenset(get_args(AssetTag))
+
+#: The element fields that record where a source states the element.
+ElementSourceField = Literal["source_excerpt", "source_label", "source_speaker"]
 
 
 #: The spellings of "no tag" that :func:`normalize_element_ids` drops from a
