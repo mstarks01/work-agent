@@ -107,6 +107,20 @@ def test_each_store_choice_has_one_reader():
     ]
 
 
+def test_a_case_s_requirement_records_have_one_filter():
+    """Only ``GoldenCase.requirement_records`` picks a case's catalog-keyed
+    records out of its reference set; every other reader calls it."""
+
+    def picks(node: ast.AST) -> bool:
+        return (
+            _calls(node, "isinstance")
+            and len(node.args) == 2
+            and _is_name(node.args[1], "ReferenceRequirement")
+        )
+
+    assert _sites(picks) == [("evals/harness/reference.py", "requirement_records")]
+
+
 #: Each entry point that prints a configuration refusal itself, beside
 #: ``refuse_entry``, with the reason: it loads no corpus.
 CONFIG_REFUSERS: dict[Site, str] = {
