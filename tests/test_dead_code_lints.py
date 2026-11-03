@@ -104,8 +104,7 @@ _PINNED = (
 #: tests instead when the reason is only that the tests exist.
 TEST_ONLY: dict[str, str] = {
     "check_unit": (
-        "the check of a Control row's framework and unit that ADR 0123 specifies;"
-        " no Control row model exists yet"
+        "the submit check of a Control row's framework and unit that ADR 0123 specifies"
     ),
     "measure_direction": (
         "the one aggregation ADR 0031 pins its direction numbers with, and the"
