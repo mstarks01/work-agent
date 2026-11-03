@@ -1,0 +1,69 @@
+diff --git a/evals/harness/exemplar_verbs.py b/evals/harness/exemplar_verbs.py
+index baa4b74f..e979a4b7 100644
+--- a/evals/harness/exemplar_verbs.py
++++ b/evals/harness/exemplar_verbs.py
+@@ -9,7 +9,7 @@ over-report at once.
+ 
+ ## The measurement
+ 
+-STRIDE ships 21 exemplars, and the corpus holds 285 reference claims. No
++STRIDE ships 22 exemplars, and the corpus holds 285 reference claims. No
+ exemplar is read from a holdout case (#744), and no case is still held out, so
+ this reads all 285.
+ 51 of those claims name a verb no exemplar in their lane demonstrates.
+diff --git a/frameworks/stride/lanes/information-disclosure/exemplars.md b/frameworks/stride/lanes/information-disclosure/exemplars.md
+index 7d4916ed..b1e4637b 100644
+--- a/frameworks/stride/lanes/information-disclosure/exemplars.md
++++ b/frameworks/stride/lanes/information-disclosure/exemplars.md
+@@ -1,6 +1,6 @@
+ # Information Disclosure Exemplars
+ 
+-Four drafts against the exemplar systems, showing the shape and the reasoning. Follow the reasoning, not the wording.
++Five drafts against the exemplar systems, showing the shape and the reasoning. Follow the reasoning, not the wording.
+ 
+ ## Canonical: plaintext transfer traffic between zones
+ 
+@@ -168,3 +168,43 @@ Written against exemplar system B, and worth comparing with the canonical draft
+   ]
+ }
+ ```
++
++## Contrast, in system A: a credential holder is not a storage copy
++
++A third attacker reaches the rows of `store:accounts-db`. It holds the database password, or another grant on the store, and queries the store through its own interface from outside the ledger service. Encryption at rest does nothing against this attacker, because the database serves each row to a session it authenticates, and a clean ledger service does not stop it either. Its precondition is a credential and its remedy is the grant, so it is a third draft beside the storage copy and the compromised reader, with `attacker_position` `outside`. Where an account or a grant can read a store, write this draft as well. One draft does not stand in for another.
++
++```json
++{
++  "sequence": 5,
++  "title": "Anyone holding the ledger's database password reads every account straight from the database",
++  "description": "`store:accounts-db` admits the ledger's shared static password on `flow:process:ledger-service>store:accounts-db>read-write-balances`, and that account has full read/write on every table. An attacker who holds the password, or any other grant on the store, connects to the database's own interface and reads the balances and account-holder PII of every customer. This attacker needs no copy of the storage and runs no code in the ledger service: the database serves each row to a session it authenticates, so encryption at rest does not stop the read, and nothing in the ledger service sees it. How the password leaks is the `recover-credential` draft; this draft is the read that holding it allows. Second-order: the session looks like the ledger's own, so `store:audit-log`, which records transfers only, holds no trace of it.",
++  "affected_element_ids": [
++    "store:accounts-db",
++    "flow:process:ledger-service>store:accounts-db>read-write-balances"
++  ],
++  "verb": "read",
++  "attacker_position": "outside",
++  "evidence_refs": [],
++  "quotes": [
++    {
++      "text": "that account has full read/write on every table",
++      "source_label": "Payments platform notes"
++    }
++  ],
++  "severity": {
++    "likelihood": "medium",
++    "impact": "high",
++    "justification": "Likelihood is medium: the attacker must first hold the password or a grant, but one static password shared through an environment variable has many ways to leak. Impact is high: `store:accounts-db` is classified confidential and tagged `pii` and `financial`, and the account reads every table."
++  },
++  "mitigations": [
++    {
++      "summary": "Give each reader its own short-lived credential",
++      "detail": "Replace the shared static password with per-service credentials that expire, so a leaked value stops working and each session names its holder."
++    },
++    {
++      "summary": "Admit sessions only from the ledger service",
++      "detail": "Restrict which hosts and identities may open a session on `store:accounts-db`, so a held password is useless from anywhere else."
++    }
++  ]
++}
++```

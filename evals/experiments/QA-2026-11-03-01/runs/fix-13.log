@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from d9931ded2a232649b6cccd48b184343e93cf6022
+- Engineer sign-in credentials may be intercepted on the unverified console connection | ['flow:entity:duty-engineer>process:dispatch-console>open-console', 'entity:duty-engineer', 'process:dispatch-console']
+- Dispatch requests may disclose operational and personal data across the corporate-to-control-plane boundary | ['flow:process:dispatch-console>process:dispatch-api>dispatch-requests', 'process:dispatch-console', 'process:dispatch-api']
+- Live crew status may be intercepted on an unverified cross-boundary WebSocket | ['flow:process:dispatch-console>process:dispatch-api>live-job-status', 'process:dispatch-console', 'process:dispatch-api']
+- An unrecorded credentialed CORS policy could let another origin read live dispatch status | ['process:dispatch-api', 'process:dispatch-console', 'flow:process:dispatch-console>process:dispatch-api>live-job-status']
+- Archived partner schedules may be intercepted before reaching the corporate file store | ['flow:process:schedule-importer>store:schedule-archive>store-schedule-documents', 'process:schedule-importer', 'store:schedule-archive']
+- The importer's unverified API-token channel may expose work orders and the static token | ['flow:process:schedule-importer>process:dispatch-api>post-work-orders', 'process:schedule-importer', 'process:dispatch-api']
+- Database traffic may expose crew names and mobile numbers on an unverified internal channel | ['flow:process:dispatch-api>store:dispatch-database>read-write-job-orders', 'process:dispatch-api', 'store:dispatch-database']
+- A copied dispatch-database volume could expose crew records if at-rest encryption is absent | ['store:dispatch-database']
+- A copied schedule archive could disclose all planned work if its storage is unencrypted | ['store:schedule-archive']
+- Code running in the dispatch API could read the dispatch database through an unverified read path | ['store:dispatch-database', 'process:dispatch-api', 'flow:process:dispatch-api>store:dispatch-database>read-write-job-orders']
+spent: $0.0655 reported
+must-finds matched: [10, 11]

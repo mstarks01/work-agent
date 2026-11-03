@@ -163,6 +163,10 @@ DECLARED: dict[str, str] = {
         "This code is that framework's. It counts the matches on the must-finds"
         " that carry an attacker position, and only that package's drafts state one."
     ),
+    "evals/experiments/QA-2026-11-03-01/score_stage.py": (
+        "This code is that framework's. It reads the attacker position that"
+        " only that package's drafts state, against its ruled references."
+    ),
     "evals/experiments/QA-2026-11-02-05/position_ballot.py": (
         "This code is that framework's. It records the attacker position of a"
         " reference claim, and only that package's drafts state a position."
