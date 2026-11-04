@@ -21,8 +21,13 @@ from analysis_service.controls import Control, ControlDocument
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.graph import STATE_CONTROL_LINES, STATE_FACT_ANSWERS
 from analysis_service.job_answers import JobAnswers
-from analysis_service.job_controls import NOT_COPIED
-from analysis_service.jobs import Checkpoint, InMemoryJobStore, PipelineAwaiting
+from analysis_service.job_controls import NOT_COPIED, resolutions
+from analysis_service.jobs import (
+    Admission,
+    Checkpoint,
+    InMemoryJobStore,
+    PipelineAwaiting,
+)
 from analysis_service.links import with_link_answers
 from analysis_service.pipeline import _seeded_state
 from analysis_service.principals import Identity, Principal
@@ -33,7 +38,14 @@ from tests.factories import valid_model
 from tests.test_api import auth, make_client, one_framework, one_source
 from tests.test_controls import fact, row
 from tests.test_webapp import LOOPBACK, SAME_ORIGIN, posted
-from tests.test_webapp_questions import FACT, HELD, PausingRunner, app_for, ran
+from tests.test_webapp_questions import (
+    FACT,
+    HELD,
+    PausingRunner,
+    _run_form_script,
+    app_for,
+    ran,
+)
 from webapp.main import OPERATOR, Workspace
 
 tiers = test_webapp.tiers
@@ -86,11 +98,14 @@ class ZonedRunner(PausingRunner):
 
     #: Whether each run raises, so its job fails.
     fails = False
+    #: How many runs extracted a description and paused.
+    heads = 0
 
     async def run(self, job, on_node):
         if self.fails:
             raise RuntimeError("the run failed")
         if job.pauses():
+            self.heads += 1
             checkpoint = Checkpoint(
                 system_model=zoned_model(), assertions=HELD.assertions
             )
@@ -465,14 +480,6 @@ class TestTheSubmission:
         assert [copy.document.name for copy in copies] == ["SSO"]
         assert copies[0].evidence[0].text == "SSO: on\n"
 
-    def test_a_submission_with_controls_and_no_questions_is_refused(self, owner):
-        sso = owner.keep("SSO", {"type": "application"})
-        refused = owner.submit(sso, questions=False)
-        assert refused.status_code == 400
-        assert refused.json()["message"] == (
-            "Controls apply at the pause; turn the questions on to apply them."
-        )
-
     def test_a_job_that_serves_no_model_lists_each_control_pending(self, owner):
         sso = owner.keep("SSO", {"type": "application"})
         owner.runner.fails = True
@@ -841,3 +848,136 @@ class TestTheFacts:
         rows = {tuple(row["key"]): row for row in json.loads(match.group(1))["answers"]}
         assert rows[tuple(DB_KEY)]["answer"]["value"] == "KMS"
         assert rows[tuple(DB_KEY)]["corrected"] is True
+
+
+def end_frames(stream: str) -> dict[str, dict]:
+    """Each frame after the store's events, by its event name."""
+    return {
+        name: json.loads(data)
+        for name, data in re.findall(r"event: (\S+)\ndata: (.*)\n", stream)
+        if name != "status" and name != "node"
+    }
+
+
+class TestTheAutomaticContinue:
+    """A submission with Controls and no questions pauses, and the service
+    continues it at once with no own answers (ADR 0125, #2170)."""
+
+    @pytest.fixture(autouse=True)
+    def one_loop(self, owner):
+        """Every request on one event loop, as the server runs them: the
+        continue runs in the job's task after the submission answered."""
+        with owner.client:
+            yield
+
+    def continued(self, owner, *controls: str) -> tuple[str, dict[str, dict]]:
+        """Submit ``controls`` with no questions, and read the run's stream
+        to its end. Returns the run and its end frames."""
+        started = owner.submit(*controls, questions=False)
+        assert started.status_code == 200, started.text
+        run_id = started.json()["run"]
+        stream = owner.client.get(f"/events/{run_id}").text
+        return run_id, end_frames(stream)
+
+    def test_the_job_completes_with_each_control_fact_written(self, owner):
+        _, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
+        assert list(frames) == ["continuing", "continued"]
+        child = frames["continued"]["run"]
+        assert ran(owner.client, child) == "completed"
+        assert owner.answers_source(child) == [DB_LINE]
+        assert states(asyncio.run(owner.store.get(child))) == [
+            ("Encrypted", DB_KEY, "AES-256", "written", "")
+        ]
+        assert owner.runner.heads == 1
+
+    def test_each_control_takes_its_default_resolution(self, owner):
+        db = owner.keep("Encrypted", ORDERS_DB)
+        billing = owner.keep("Billing", {"type": "process", "name": "Billing"})
+        _, frames = self.continued(owner, db, billing)
+        child = frames["continued"]["run"]
+        assert ran(owner.client, child) == "completed"
+        held = asyncio.run(owner.store.get(child))
+        copies = asyncio.run(owner.store.controls(child, owner.owner_id()))
+        resolved = {
+            entry.control: entry
+            for entry in resolutions(copies, held.control_scopes, zoned_model())
+        }
+        assert resolved[db].state == "applied"
+        assert (resolved[billing].state, resolved[billing].reason) == (
+            "left-out",
+            "missing-element",
+        )
+
+    def test_a_conflict_leaves_the_job_paused_until_an_untick(self, owner):
+        aes = owner.keep("Encrypted", ORDERS_DB)
+        kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
+        run_id, frames = self.continued(owner, aes, kms)
+        assert list(frames) == ["continuing", "questions"]
+        message = (
+            "Two Controls write “encryption_at_rest” on Orders DB with two values:"
+            " “AES-256” and “KMS”. Untick one, or edit one Control so that they"
+            " agree."
+        )
+        assert frames["questions"]["refusal"] == message
+        assert owner.questions(run_id)["refusal"] == message
+        assert asyncio.run(owner.store.get(run_id)).status == "awaiting-answers"
+        untick = [{"control": aes, "element": "store:orders-db"}]
+        child = owner.resumed(run_id, control_scopes=untick)
+        assert states(asyncio.run(owner.store.get(child)))[0][0] == "Encrypted"
+        assert owner.runner.heads == 1
+
+    def test_an_admission_refusal_leaves_the_job_paused(self, owner, monkeypatch):
+        reserve = owner.store.reserve
+        reserved = []
+
+        async def second_at_ceiling(record, **kwargs):
+            """Admit the submission, and refuse the continue once."""
+            reserved.append(record.id)
+            if len(reserved) == 2:
+                return Admission(outcome="at_ceiling", active=1)
+            return await reserve(record, **kwargs)
+
+        monkeypatch.setattr(owner.store, "reserve", second_at_ceiling)
+        run_id, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
+        assert frames["questions"]["refusal"] == (
+            "An analysis is already running. Wait for it to finish."
+        )
+        child = owner.resumed(run_id)
+        assert owner.answers_source(child) == [DB_LINE]
+        assert owner.runner.heads == 1
+
+    def test_a_job_whose_run_fails_does_not_continue(self, owner):
+        owner.runner.fails = True
+        run_id, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
+        assert list(frames) == ["failed"]
+        assert asyncio.run(owner.store.resumed_by(run_id, owner.owner_id())) is None
+
+    def test_a_submission_with_no_control_and_no_question_does_not_pause(self, owner):
+        started = owner.submit(questions=False)
+        assert started.status_code == 200, started.text
+        assert ran(owner.client, started.json()["run"]) == "completed"
+        assert owner.runner.heads == 0
+
+    def test_the_page_follows_the_continue_to_the_resumed_job(self):
+        steps = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.continuing({ data: "{}" });
+calls.push({ status: ids["status-text"].textContent });
+streams[0].listeners.continued({ data: JSON.stringify({ run: "r2" }) });
+"""
+        seen = _run_form_script(steps)
+        assert seen["calls"][-1] == {"status": "Continuing with your Controls…"}
+        assert seen["streams"] == ["/events/r1", "/events/r2"]
+
+    def test_the_page_shows_the_refusal_of_the_continue(self):
+        steps = """
+await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1",
+  link_questions: [], early_questions: [], revision: 0, refusal: "Untick one." }) });
+await settle();
+calls.push({ problem: ids["answer-problem"].textContent });
+"""
+        seen = _run_form_script(steps)
+        assert seen["calls"][-1] == {"problem": "Untick one."}
+        assert seen["asked"]
+        assert [call["url"] for call in seen["calls"][:-1]] == ["/analyze"]

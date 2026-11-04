@@ -404,7 +404,9 @@ sidebar, click **New Control**, and say what it protects, the facts it proves,
 the framework units it covers and the evidence files that show it. The form
 lists your Controls under "Controls for this analysis", each one ticked. At
 the questions, the page shows what each Control matched in your description,
-and you confirm the match there. Controls apply only with the questions on.
+and you confirm the match there. With the questions off, the service applies
+each Control's default match and continues at once. When it cannot apply them,
+the page shows the refusal at the questions.
 The report lists each Control with the facts it wrote and what became of each
 row. See [The Controls page](Web-App.md#the-controls-page).
 

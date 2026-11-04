@@ -50,7 +50,7 @@ const formControls = (() => {
   const drawChecklist = () => {
     const present = new Set(held.map((control) => control.id));
     const lines = held.map((control) => {
-      const box = h("input", { type: "checkbox", id: `control-${control.id}`, checked: ticked.has(control.id), disabled: !asking(),
+      const box = h("input", { type: "checkbox", id: `control-${control.id}`, checked: ticked.has(control.id),
         on: { change: (event) => { if (event.target.checked) ticked.add(control.id); else ticked.delete(control.id); drawChecklist(); } } });
       return h("li", {}, box, " ", h("label", { for: box.id }, h("b", {}, control.name)),
         h("span", { class: "hint" }, ` · ${scopeText(control.scope)}`,
@@ -62,9 +62,8 @@ const formControls = (() => {
     el("controls-rows").replaceChildren(...lines, ...missing);
     const count = [...ticked].filter((id) => present.has(id)).length;
     el("controls-summary").replaceChildren(
-      asking()
-        ? `${counted(count, "Control is", "Controls are")} ticked. The service matches each one to your system, and you confirm the match with the questions. `
-        : "Controls apply with the questions. Turn the questions on to apply them. ",
+      `${counted(count, "Control is", "Controls are")} ticked. The service matches each one to your system, `,
+      asking() ? "and you confirm the match with the questions. " : "and continues at once with no questions. ",
       manage());
     el("controls-offer").hidden = reopened || (!held.length && !missing.length);
   };
@@ -82,8 +81,8 @@ const formControls = (() => {
     drawChecklist();
   };
   el("ask")?.addEventListener("change", drawChecklist);
-  // The IDs a submission sends, or nothing where the questions are off.
-  const chosen = () => (asking() && ticked.size ? [...ticked] : undefined);
+  // The IDs a submission sends, or nothing where none is ticked.
+  const chosen = () => (ticked.size ? [...ticked] : undefined);
 
   // ---- The pause -----------------------------------------------------------
   // Each reason a Control is left out (LeftOutReason), and each reason a

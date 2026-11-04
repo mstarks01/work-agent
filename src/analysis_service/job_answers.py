@@ -212,12 +212,6 @@ OWNER_FILE_GONE = (
 )
 
 
-#: The refusal of a submission that names Controls and asks no questions. A
-#: Control's facts need the extracted model, which a job that does not pause
-#: never shows before its lanes run.
-CONTROLS_ASK = "Controls apply at the pause; turn the questions on to apply them."
-
-
 class RunnerUnavailable(Exception):
     """The deployment cannot build a runner now: its configuration is incomplete.
 
@@ -656,8 +650,6 @@ class JobAnswers:
         sources = list(submission.sources)
         self._refusing(refuse_owner_file_sources, sources)
         sources += await self.owner_file_sources(identity, submission.owner_files)
-        if submission.controls and not submission.questions:
-            raise Refused(CONTROLS_ASK)
         controls = await self.control_copies(identity, submission.controls)
         if sources:
             sources = self._refusing(with_link_answers, sources, submission.links)
@@ -677,6 +669,7 @@ class JobAnswers:
             carried=carried,
             controls=controls,
             ask_questions=submission.questions,
+            continues_at_pause=bool(controls) and not submission.questions,
             reserved_tokens=budgets.estimate(sources, selection),
         )
         return await self.admit(record, start=start, principal=submitter.new)
@@ -853,6 +846,23 @@ class JobAnswers:
             ),
         )
         return await self.admit(record, start=start)
+
+    async def continue_at_pause(
+        self, job_id: str, owner_id: str, *, start: Start
+    ) -> None:
+        """Continue a job that pauses for its Controls alone, with no own
+        answers, as a continue with an empty answer list does (ADR 0125).
+
+        Each copied Control takes the resolution the job holds and writes its
+        open facts. A job that does not wait at its pause, because its run
+        failed, stopped or was rejected, starts nothing. A refusal raises as
+        :meth:`answer` raises it, and the job stays paused.
+        """
+        record = await self.envelope(job_id, owner_id)
+        if record.continues_at_pause and record.status == "awaiting-answers":
+            await self.answer(
+                job_id, owner_id, Answers(revision=record.revision), start=start
+            )
 
     async def amend(
         self,

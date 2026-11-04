@@ -257,6 +257,7 @@ jobs = Table(
     Column("amends", String(64)),
     Column("error", Text),
     Column("ask_questions", Boolean, nullable=False),
+    Column("continues_at_pause", Boolean, nullable=False),
     Column("frameworks", _Json, nullable=False),
     Column("answers", _Json, nullable=False),
     Column("shown_early", _Json, nullable=False),

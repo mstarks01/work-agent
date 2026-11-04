@@ -432,22 +432,20 @@ class Workspace:
         self.store = store
         self._max_jobs = max_jobs
         self._runs: dict[str, tuple[asyncio.Task[None], StopSignal]] = {}
+        # Why the continue of each job that pauses for its Controls alone was
+        # refused (ADR 0125). A restart loses it, and the page then shows the
+        # job's pause with no reason.
+        self._refusals: dict[str, str] = {}
 
-    def start(self, deadline_seconds: float) -> Start:
+    def start(self, deadline_seconds: float, answers: JobAnswers) -> Start:
         """What runs an admitted job on this process's event loop, under
-        ``deadline_seconds``. A job keeps the runner and the deadline that it
-        got at admission, whatever the cell holds later."""
+        ``deadline_seconds``. A job keeps the runner, the deadline and the job
+        operations that it got at admission, whatever the cell holds later."""
 
         def run(record: JobRecord, runner: PipelineRunner) -> None:
             stop = StopSignal()
             task = asyncio.create_task(
-                execute_job(
-                    self.store,
-                    runner,
-                    record.id,
-                    deadline_seconds=deadline_seconds,
-                    stop=stop,
-                )
+                self._run(answers, record, runner, deadline_seconds, stop)
             )
             # Held so the task is not garbage-collected mid-flight, and so
             # :meth:`stop` can reach it.
@@ -455,6 +453,68 @@ class Workspace:
             task.add_done_callback(lambda _: self._runs.pop(record.id, None))
 
         return run
+
+    async def _run(
+        self,
+        answers: JobAnswers,
+        record: JobRecord,
+        runner: PipelineRunner,
+        deadline_seconds: float,
+        stop: StopSignal,
+    ) -> None:
+        """Run the job, then continue it where it pauses for its Controls
+        alone (ADR 0125). The continue runs in the job's own task, so a read
+        of the job can wait for it with :meth:`settled`."""
+        await execute_job(
+            self.store, runner, record.id, deadline_seconds=deadline_seconds, stop=stop
+        )
+        if record.continues_at_pause and not stop.requested:
+            await self._continue(answers, record, deadline_seconds)
+
+    async def _continue(
+        self, answers: JobAnswers, record: JobRecord, deadline_seconds: float
+    ) -> None:
+        """Continue the paused job ``record`` with no own answers, and keep
+        the page's words for a refusal, which leaves the job paused."""
+        try:
+            async with self.make_room(answers, answering=record.id):
+                await answers.continue_at_pause(
+                    record.id,
+                    record.owner_id,
+                    start=self.start(deadline_seconds, answers),
+                )
+        except Exception as refusal:
+            words = _refusal_message(refusal)
+            if words is None:
+                logger.exception("job %s did not continue at its pause", record.id)
+                words = _NOT_STARTED
+            held = {job.id for job in await self.jobs(answers)}
+            self._refusals = {
+                job_id: kept
+                for job_id, kept in self._refusals.items()
+                if job_id in held
+            }
+            self._refusals[record.id] = words
+        else:
+            self._refusals.pop(record.id, None)
+
+    async def settled(self, job_id: str) -> None:
+        """Wait for the task of ``job_id`` to end, where this process runs
+        one. The task of a job that pauses for its Controls alone ends after
+        the continue."""
+        if (held := self._runs.get(job_id)) is not None:
+            await asyncio.wait([held[0]])
+
+    def continuing(self, job_id: str) -> bool:
+        """Whether this process runs a task of the paused job ``job_id``: the
+        continue of a job that pauses for its Controls alone."""
+        return job_id in self._runs
+
+    def refusal(self, job_id: str) -> dict[str, str]:
+        """The ``refusal`` key of the questions of ``job_id``: why its
+        continue at its pause was refused. Empty where nothing refused it."""
+        words = self._refusals.get(job_id)
+        return {} if words is None else {"refusal": words}
 
     async def stop(self, job_ids: Iterable[str]) -> bool:
         """Stop each run of ``job_ids`` that this process runs, and wait up to
@@ -1415,24 +1475,44 @@ async def _refused(status: int, request: Request, exc: Exception) -> JSONRespons
     return JSONResponse({"message": str(exc), **fields}, status_code=status)
 
 
+#: What the page says where this app cannot start a job and the reason is in
+#: the server log only.
+_NOT_STARTED = "The analysis could not be started. Check the server log."
+
+
+def _refusal_message(refusal: Exception) -> str | None:
+    """What the page says for a typed refusal of the job operations, or
+    ``None`` for any other exception. Each handler of these refusals and the
+    continue at a pause (ADR 0125) take the words from here."""
+    if isinstance(refusal, NotAdmitted):
+        # An outcome missing from the table gets no words: it is this app's
+        # defect, and the server log names it.
+        outcome = refusal.admission.outcome
+        if outcome not in _ADMISSION_MESSAGES:
+            return None
+        return _ADMISSION_MESSAGES[outcome]
+    if isinstance(refusal, AlreadyResumed):
+        return _ADMISSION_MESSAGES["resumed_already"]
+    if isinstance(refusal, StaleRevision):
+        return _STALE_MESSAGE
+    if isinstance(refusal, SourcesOverLimit):
+        return refusal.breach.message
+    if isinstance(refusal, tuple(_REFUSAL_STATUS)):
+        return str(refusal)
+    return None
+
+
 async def _not_admitted(request: Request, exc: NotAdmitted) -> JSONResponse:
-    outcome = exc.admission.outcome
-    if outcome in _ADMISSION_MESSAGES:
-        return _message(409, _ADMISSION_MESSAGES[outcome])
-    logger.error("job was not admitted: %s", outcome)
-    return _message(500, "The analysis could not be started. Check the server log.")
+    words = _refusal_message(exc)
+    if words is not None:
+        return _message(409, words)
+    logger.error("job was not admitted: %s", exc.admission.outcome)
+    return _message(500, _NOT_STARTED)
 
 
-async def _already_resumed(request: Request, exc: AlreadyResumed) -> JSONResponse:
-    return _message(409, _ADMISSION_MESSAGES["resumed_already"])
-
-
-async def _stale(request: Request, exc: StaleRevision) -> JSONResponse:
-    return _message(409, _STALE_MESSAGE)
-
-
-async def _over_limit(request: Request, exc: SourcesOverLimit) -> JSONResponse:
-    return _message(400, exc.breach.message)
+async def _worded(status: int, request: Request, exc: Exception) -> JSONResponse:
+    """The page's words for ``exc``, under ``status``."""
+    return _message(status, _refusal_message(exc) or _NOT_STARTED)
 
 
 async def _cell_empty(request: Request, exc: CellEmpty) -> Response:
@@ -1562,9 +1642,9 @@ def create_app(
     for refusal, status in _REFUSAL_STATUS.items():
         app.add_exception_handler(refusal, partial(_refused, status))
     app.exception_handler(NotAdmitted)(_not_admitted)
-    app.exception_handler(AlreadyResumed)(_already_resumed)
-    app.exception_handler(StaleRevision)(_stale)
-    app.exception_handler(SourcesOverLimit)(_over_limit)
+    app.add_exception_handler(AlreadyResumed, partial(_worded, 409))
+    app.add_exception_handler(StaleRevision, partial(_worded, 409))
+    app.add_exception_handler(SourcesOverLimit, partial(_worded, 400))
     app.exception_handler(CellEmpty)(_cell_empty)
     app.exception_handler(_BodyUnread)(_body_unread)
 
@@ -2091,13 +2171,26 @@ def create_app(
         payload["controls_used"] = controls_used(
             copies, record.control_scopes, None if asked is None else asked.model
         )
+        # While the service continues a job at its pause, the page shows the
+        # continue rather than the questions (ADR 0125).
+        payload["continuing"] = (
+            record.continues_at_pause
+            and record.status == "awaiting-answers"
+            and workspace.continuing(record.id)
+        )
+        if payload["continuing"]:
+            asked = None
         payload["error"] = record.error
         payload["issues"] = [
             {"code": issue.code, "message": issue.message}
             for issue in record.validation_issues
         ]
         if asked is not None and record.status == "awaiting-answers":
-            payload["questions"] = {"run": record.id} | await answers.payload_of(asked)
+            payload["questions"] = (
+                {"run": record.id}
+                | await answers.payload_of(asked)
+                | workspace.refusal(record.id)
+            )
         return JSONResponse(payload)
 
     @app.delete("/workspace/runs/{run_id}")
@@ -2216,7 +2309,7 @@ def create_app(
                         owner_files=submission.owner_files,
                         controls=submission.controls,
                     ),
-                    start=workspace.start(current.deadline_seconds),
+                    start=workspace.start(current.deadline_seconds, answers),
                 )
         except SelectionError as exc:
             # The framework or option the refusal names, never a value sent.
@@ -2262,7 +2355,7 @@ def create_app(
                 run_id,
                 owner_id,
                 submitted,
-                start=workspace.start(current.deadline_seconds),
+                start=workspace.start(current.deadline_seconds, answers),
                 control_scopes=control_scopes,
             )
         if isinstance(outcome, Started):
@@ -2296,7 +2389,7 @@ def create_app(
                 owner_id,
                 amendment.text,
                 revision=amendment.revision,
-                start=workspace.start(current.deadline_seconds),
+                start=workspace.start(current.deadline_seconds, answers),
             )
         return JSONResponse({"run": started.job_id})
 
@@ -2515,7 +2608,9 @@ async def _refusal_words(
 
 #: How a run's stream ends: the event of its last frame. ``first_run.js``
 #: listens for each one.
-EndFrame = Literal["failed", "questions", "done", "rejected", "stopped"]
+EndFrame = Literal[
+    "failed", "questions", "done", "rejected", "stopped", "continuing", "continued"
+]
 
 
 def _frame(event: EndFrame, data: dict[str, object]) -> str:
@@ -2543,6 +2638,15 @@ async def _stream(
     if record is None:
         return
     status = record.status
+    if status == "awaiting-answers" and record.continues_at_pause:
+        # The service continues the job at once (ADR 0125). The page follows
+        # the Resumed Job, or shows the pause with the refusal.
+        yield _frame("continuing", {})
+        await workspace.settled(run_id)
+        child = await workspace.store.resumed_by(run_id, record.owner_id)
+        if child is not None:
+            yield _frame("continued", {"run": child})
+            return
     if status == "awaiting-answers":
         try:
             payload = await answers.questions(run_id, record.owner_id)
@@ -2550,7 +2654,7 @@ async def _stream(
             # The response has started, so a refusal is a frame, never a status.
             yield _frame("failed", {"message": str(refusal)})
             return
-        yield _frame("questions", {"run": run_id} | payload)
+        yield _frame("questions", {"run": run_id} | payload | workspace.refusal(run_id))
     elif status == "completed":
         # The envelope read above refuses an unreadable record. The frame
         # names why a report is withheld, which :func:`served` does not give.
