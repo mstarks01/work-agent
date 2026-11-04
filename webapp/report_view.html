@@ -331,6 +331,11 @@
   .preview-bar span { flex: 1 1 auto; font-weight: 600; }
   .exporting #report-tabs, .exporting #analysis-tabs, .exporting #invite,
   .exporting .export-bar, .exporting .finding-open, .exporting .mermaid-link { display: none; }
+  .export-bar .download-link { margin-right: 8px; }
+  .controls-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  .controls-table th, .controls-table td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--hairline); overflow-wrap: anywhere; }
+  .controls-table .tag { font-size: 0.78rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--hairline); }
+  .controls-table blockquote.excerpt { margin: 4px 0; padding: 4px 10px; border-left: 3px solid var(--hairline); white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 0.82rem; }
   .exporting #about-view, .exporting #export-questions { border-top: 1px solid var(--hairline);
     margin-top: 32px; padding-top: 8px; }
   .export-question { margin: 0 0 12px; break-inside: avoid; }
@@ -374,7 +379,7 @@
 
     <!-- One section per framework the job selected, built in JS: the count
          and the names are the report's, not this file's. -->
-    <div id="report-view"><div class="export-bar"><button type="button" class="toggle" id="export-preview">Preview complete export</button></div><div id="analyses"></div><div id="invite"></div></div>
+    <div id="report-view"><div class="export-bar"><a class="toggle download-link" id="export-md" download="report.md">Download as Markdown</a> <a class="toggle download-link" id="export-json" download="report.json">Download as JSON</a> <button type="button" class="toggle" id="export-preview">Preview complete export</button></div><div id="analyses"></div><div id="invite"></div></div>
 
     <!-- The questions the conditional findings rest on, in the question list
          the early questions use, or a final report's answers to correct. -->
@@ -440,6 +445,9 @@
 <!-- webapp/main.py replaces the contents of the block below with the run's
      report JSON, every `<` escaped, before serving this page. -->
 <script type="application/json" id="report" nonce="__CSP_NONCE__"><!--report--></script>
+<!-- The Controls section: each Control the job copied, from the job's copy
+     and the report's rulings (ADR 0127). -->
+<script type="application/json" id="controls" nonce="__CSP_NONCE__"><!--controls--></script>
 
 <!-- The units each framework answers for, with each one's own text, joined by
      webapp/main.py because the page knows no package. Escaped the same way. -->

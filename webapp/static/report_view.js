@@ -1306,6 +1306,80 @@
   // against `job.frameworks`.
   R.analyses.forEach(renderBlock);
 
+  // ---- Controls ---------------------------------------------------------------
+  // Each Control the job copied: what it matched, each fact it wrote with the
+  // state the job keeps, and each row with its outcome over the job's
+  // rulings (ADR 0127). The service builds every value and sentence here;
+  // each one lands as text.
+  const CONTROLS = JSON.parse(document.getElementById("controls").textContent);
+  const controlMatch = (entry) => {
+    const scope = entry.scope.type === "application"
+      ? "The whole application"
+      : `The ${entry.scope.type} “${entry.scope.name}”`;
+    if (entry.state === "left-out") return `${scope}: left out, ${entry.reason}`;
+    return entry.elements.length ? `${scope} → ${entry.elements.join(", ")} (${entry.outcome})` : `${scope} (${entry.outcome})`;
+  };
+  const controlRow = (row) => {
+    const open = el("details", "control-row");
+    const summary = el("summary", null, `${row.framework} ${row.unit}${row.label ? ` · ${row.label}` : ""} `);
+    summary.append(el("span", `tag ${row.outcome}`, row.outcome));
+    open.append(summary);
+    const ruledOut = row.rulings.filter((ruling) => ruling.ruling === "applied").map((ruling) => ruling.claim);
+    if (ruledOut.length) {
+      const line = el("p", "meta", "Ruled out: ");
+      ruledOut.forEach((claim, at) => line.append(at ? ", " : "", code(claim)));
+      open.append(line);
+    }
+    for (const ruling of row.rulings) {
+      const line = el("p", null);
+      line.append(el("span", "meta", `The critic's reason on ${ruling.claim}: `), ruling.reason);
+      open.append(line);
+    }
+    for (const quoted of row.quoted) {
+      open.append(el("p", "meta", `${quoted.file} · ${quoted.class} · line ${quoted.line}`), el("blockquote", "excerpt", quoted.text));
+    }
+    if (!row.ticked) open.append(el("p", "meta", `This row was left out: version ${row.version} is not the version the analysis ran.`));
+    open.append(el("p", "meta", row.meaning));
+    return open;
+  };
+  if (CONTROLS.length) {
+    const section = el("section", "controls-section");
+    section.id = "controls-section";
+    section.append(el("h2", null, "Controls"),
+      el("p", "meta", "The Controls this analysis applied, as they were when it ran. The critic judged each row against the findings. A Control settles nothing on its own, and the service verified nothing."));
+    const table = el("table", "controls-table");
+    const head = el("tr");
+    ["Control", "Match", "Facts", "Rows and outcomes"].forEach((text) => {
+      const th = el("th", null, text);
+      th.scope = "col";
+      head.append(th);
+    });
+    table.append(el("thead"), el("tbody"));
+    table.tHead.append(head);
+    for (const entry of CONTROLS) {
+      const tr = el("tr");
+      const facts = el("ul");
+      for (const fact of entry.facts) {
+        const item = el("li", null, `${fact.label}: ${fact.value} `);
+        item.append(el("span", `tag ${fact.state}`, fact.state));
+        if (fact.stated) item.append(el("span", "meta", ` The description states “${fact.stated}”.`));
+        facts.append(item);
+      }
+      const rows = el("td");
+      entry.rows.forEach((row) => rows.append(controlRow(row)));
+      tr.append(el("td", "name", entry.name), el("td", null, controlMatch(entry)), el("td"), rows);
+      tr.children[2].append(facts);
+      table.tBodies[0].append(tr);
+    }
+    section.append(table);
+    $("analyses").append(section);
+  }
+  // The two downloads: the report as Markdown and as JSON, each with the
+  // Controls section.
+  for (const format of ["md", "json"]) {
+    $(`export-${format}`).href = `/report/${encodeURIComponent(R.job.id)}/export.${format}`;
+  }
+
   // ---- About the analysis -----------------------------------------------------
   // How this report was made: its identifiers, its times and the versions
   // that ran, each by a readable label with its whole value. A value the

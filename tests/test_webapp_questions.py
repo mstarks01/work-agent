@@ -576,7 +576,8 @@ for (const id of ["analyze","description","problem","go","load","ask",
                   "diagram-name","diagram-remove","analysis-name",
                   "description-remaining","source_formats","file_refusals","page_labels",
                   "files-rows","chosen-files","files-dialog","files-cancel","files-select",
-                  "upload-menu","upload-computer","upload-files"])
+                  "upload-menu","upload-computer","upload-files","controls-offer",
+                  "controls-rows","controls-summary","controls-used","controls-used-list"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
 ids["upload-file"].dataset.maxBytes = "64";
@@ -601,6 +602,8 @@ globalThis.document = {
 globalThis.location = { href: "", search: SEARCH };
 globalThis.window = { scrollTo() {}, listeners: {}, addEventListener(name, fn) { this.listeners[name] = fn; } };
 globalThis.fetch = async (url, init) => {
+  // The form lists the operator's Controls as it loads; this page has none.
+  if (url === "/workspace/controls") return { ok: true, json: async () => [] };
   calls.push({ url, body: init && init.body ? JSON.parse(init.body) : null });
   const next = url === "/analyze" ? "r1" : "r2";
   return { ok: true, json: async () => ({ run: next }) };
@@ -633,6 +636,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
             "answer_editor.js",
             "question_list.js",
             "text_file.js",
+            "form_controls.js",
             "first_run.js",
         )
     )
@@ -1169,7 +1173,9 @@ def _report_payloads(payloads: dict) -> dict:
 
     sample = sample_report()
     served = test_report_page.payloads_of(
-        render_report(sample, report_state(sample), previous=None, parent=None).html
+        render_report(
+            sample, report_state(sample), previous=None, parent=None, controls=()
+        ).html
     )
     merged = {name: json.loads(text) for name, text in served.items()}
     for name, value in payloads.items():
@@ -1434,7 +1440,7 @@ def test_the_served_draft_keys_each_link_by_its_fold():
     link = LinkAnswer(principal="Customer Account", element="entity:customer")
     state = replace(report_state(report), draft=SentAnswers(links=(link,)))
     served = test_report_page.payloads_of(
-        render_report(report, state, previous=None, parent=None).html
+        render_report(report, state, previous=None, parent=None, controls=()).html
     )
 
     (drafted,) = json.loads(served["earlier"])["draft"]["links"]
@@ -4337,8 +4343,8 @@ calls.push({{ said: text(box), open: box.open, order }});
     seen = next(c for c in _run_form_script(steps)["calls"] if "said" in c)
     said = seen["said"]
     assert seen["open"] is True
-    assert seen["order"][:2] == ["detected-facts", "list-intro"], (
-        "the facts come before the list"
+    assert seen["order"][:3] == ["detected-facts", "control-offer", "list-intro"], (
+        "the facts and the Controls come before the list"
     )
     assert "What your description says (1 part)" in said
     assert (

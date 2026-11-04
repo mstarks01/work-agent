@@ -943,6 +943,7 @@ code {
   }
   .sidebar nav {
     display:flex;
+    flex-wrap:wrap;
     margin-left:auto;
     gap:6px
   }
@@ -1294,6 +1295,44 @@ a.analysis-row:hover {
 }
 .chosen-files li {
   overflow-wrap:anywhere
+}
+.controls-offer h2, .control-offer h2 {
+  font-size:16px;
+  margin:16px 0 4px
+}
+.control-offer {
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:4px 24px 12px;
+  margin:0 0 16px
+}
+.offer-lines, .fanout {
+  list-style:none;
+  padding:0;
+  margin:6px 0
+}
+.offer-line {
+  padding:8px 0;
+  border-top:1px solid var(--line);
+  overflow-wrap:anywhere
+}
+.offer-line:first-child {
+  border-top:0
+}
+.offer-line .tag {
+  font-size:12px;
+  padding:1px 7px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  color:var(--muted)
+}
+.offer-line .tag.applied {
+  border-color:var(--accent);
+  color:var(--accent)
+}
+.fanout {
+  margin-left:24px;
+  font-size:14px
 }
 .files-dialog {
   width:min(36rem, 94vw)

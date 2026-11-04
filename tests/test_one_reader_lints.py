@@ -1776,6 +1776,19 @@ def _keys_a_crossing(node: ast.AST) -> bool:
     )
 
 
+def _counts_spellings(node: ast.AST) -> bool:
+    """A count of a reference's spellings: ``len`` of them anywhere, or a
+    comparison of them with a literal tuple."""
+    if isinstance(node, ast.Call) and _calls(node, "len") and node.args:
+        return _loads_attribute(node.args[0], "spellings")
+    if not isinstance(node, ast.Compare):
+        return False
+    sides = (node.left, *node.comparators)
+    return any(_loads_attribute(side, "spellings") for side in sides) and any(
+        isinstance(side, ast.Tuple) for side in sides
+    )
+
+
 def _finds_an_assumed_zone(node: ast.AST) -> bool:
     if not isinstance(node, ast.Compare):
         return False
@@ -1811,7 +1824,12 @@ def _walks_the_scoped_controls(node: ast.AST) -> bool:
 
 
 def _reads_a_unit_text(node: ast.AST) -> bool:
-    return _calls(node, "requirement_text") or _loads(node, "_TEXT_BY_ID")
+    return (
+        _calls(node, "requirement_text")
+        or _calls(node, "published_text")
+        or _loads(node, "_TEXT_BY_ID")
+        or _loads(node, "_NAME_BY_ID")
+    )
 
 
 def _marks_a_read_back(node: ast.AST) -> bool:
@@ -2071,6 +2089,19 @@ ONE_READERS: dict[str, _OneReader] = {
     "a decided crossing's endpoint key": _OneReader(
         _keys_a_crossing, ("evals/harness/modes.py", "_crossing_keys"), {}, ""
     ),
+    "how many spellings a fact reference uses": _OneReader(
+        _counts_spellings,
+        ("src/analysis_service/claims.py", "sound"),
+        {
+            ("src/analysis_service/claims.py", "mixed"): (
+                "the other count of the same spellings: more than one"
+            ),
+            ("src/analysis_service/critic.py", "_unresolved_unknown_ref_issues"): (
+                "the refusal of a mixed entry says how many spellings it uses"
+            ),
+        },
+        "",
+    ),
     "an assumed trust zone": _OneReader(
         _finds_an_assumed_zone,
         ("src/analysis_service/system_model.py", "assumed_zone_elements"),
@@ -2147,6 +2178,9 @@ ONE_READERS: dict[str, _OneReader] = {
         {
             ("src/analysis_service/frameworks/asvs/catalog.py", "requirement_text"): (
                 "the package's catalog reader, which text_of_unit calls"
+            ),
+            ("src/analysis_service/frameworks/asvs/catalog.py", "published_text"): (
+                "the package's catalog reader of each grain, which text_of_unit calls"
             ),
             ("evals/build_review_docs.py", "_standard"): (
                 "the review documents of one package's corpus read that"

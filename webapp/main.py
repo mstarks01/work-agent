@@ -179,6 +179,7 @@ from analysis_service.controls import (
     ControlLimits,
     ControlScope,
     EvidenceRefusal,
+    evidence_too_large,
 )
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
@@ -197,6 +198,7 @@ from analysis_service.fact_answers import (
 from analysis_service.fixes import fixes_by_framework
 from analysis_service.frameworks import PACKAGES, package_for
 from analysis_service.job_answers import (
+    Answerable,
     DraftSaved,
     JobAnswers,
     NoSuchJob,
@@ -210,7 +212,12 @@ from analysis_service.job_answers import (
     UnreadableSchema,
     Withheld,
 )
-from analysis_service.job_controls import ControlScopeEntry, controls_used
+from analysis_service.job_controls import (
+    ControlScopeEntry,
+    SectionEntry,
+    controls_section,
+    controls_used,
+)
 from analysis_service.jobs import (
     DeleteRefusal,
     Envelope,
@@ -274,6 +281,15 @@ from analysis_service.vendors import (
     missing_sdk,
     vendor_for,
 )
+from webapp.controls_page import (
+    ControlEdit,
+    ControlSave,
+    control_view,
+    controls_full,
+    page_data,
+    save_refusal,
+    saved_control,
+)
 from webapp.page import (
     LOOPBACK_HOSTS,
     WORKSPACE_STYLE,
@@ -287,6 +303,7 @@ from webapp.page import (
     response,
     script_json,
 )
+from webapp.report_export import report_markdown
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
     Refusal,
@@ -348,6 +365,10 @@ _SETTINGS_GRANTS = Grants(script=True, style=True, connect=True)
 
 #: The Files page calls ``/workspace/files`` to list, add and delete files.
 _FILES_GRANTS = Grants(script=True, style=True, connect=True)
+
+#: The Controls page calls ``/workspace/controls`` to list, add, replace and
+#: delete Controls.
+_CONTROLS_GRANTS = Grants(script=True, style=True, connect=True)
 
 #: The label of each Source that a job of this app gets beside its Owner
 #: Files, by kind: the three that the form page makes, which it reads from
@@ -809,6 +830,18 @@ def _file_view(file: OwnerFile) -> dict[str, object]:
 _NO_SUCH_FILE = "This file is no longer in Files."
 _NO_SUCH_CONTROL = "This Control is no longer in Controls."
 
+_CONTROL_STALE = (
+    "This Control changed in another tab or window. Reload the page, then edit"
+    " it again."
+)
+
+_CONTROL_ALIAS_IN_USE = (
+    "Another Control protects a scope with one of these names. Remove the alias,"
+    " or change the name."
+)
+
+_CONTROL_BODY = "Expected a JSON object with a name, a scope, facts, rows and evidence."
+
 
 class _UnknownKey(Exception):
     """A body carries a key its route does not read."""
@@ -1017,6 +1050,7 @@ def render_report(
     state: AnswerState,
     previous: Report | None,
     parent: str | None,
+    controls: Sequence[SectionEntry],
 ) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
@@ -1064,6 +1098,7 @@ def render_report(
         sidebar=_SIDEBAR,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
+        controls=script_json([entry.model_dump(mode="json") for entry in controls]),
         units=script_json(unit_rows(report)),
         fixes=script_json(
             fixes_by_framework(
@@ -1322,6 +1357,39 @@ def file_refusals(max_bytes: int, max_files: int) -> dict[FileRefusal, str]:
     }
 
 
+def evidence_refusals(limits: ControlLimits) -> dict[FileRefusal, str]:
+    """Each :data:`FileRefusal` of the Controls page's read of an evidence
+    file, in the words of :func:`~analysis_service.controls.control_refusal`."""
+    return {
+        "too_large": evidence_too_large(limits.max_evidence_bytes),
+        "not_utf_8": NOT_UTF_8,
+        "not_plain_text": NOT_PLAIN_TEXT,
+        "no_text": NO_TEXT,
+        "full": controls_full(limits),
+    }
+
+
+def _section_of(record: JobRecord, report: Report) -> list[SectionEntry]:
+    """The report's Controls section, from the job's copy and the report's
+    rulings (ADR 0127). ``record`` holds the copy that
+    :meth:`~analysis_service.job_answers.JobAnswers.answerable` read."""
+    return controls_section(
+        record.controls,
+        record.control_scopes,
+        record.control_facts,
+        report.system_model,
+        report.analyses,
+    )
+
+
+def _name_taken(name: str) -> str:
+    """The refusal of a Control save whose name the owner already uses."""
+    return (
+        f"You already have a Control named “{name}”. Give this Control a"
+        " different name."
+    )
+
+
 def _message(status: int, message: str) -> JSONResponse:
     return JSONResponse({"message": message}, status_code=status)
 
@@ -1524,6 +1592,7 @@ def create_app(
                         "answer_editor.js",
                         "question_list.js",
                         "text_file.js",
+                        "form_controls.js",
                         "first_run.js",
                     )
                 ),
@@ -1742,6 +1811,157 @@ def create_app(
             return _message(404, _NO_SUCH_FILE)
         return Response(status_code=204)
 
+    @app.get("/controls", response_class=HTMLResponse)
+    async def controls_page() -> Response:
+        """The Controls page: the operator's Controls (ADR 0127)."""
+        current = cell.read(
+            lambda: response(diagnostic_page(state, env), status_code=503)
+        )
+        limits = current.control_limits
+        return response(
+            render(
+                _CONTROLS_PAGE,
+                _CONTROLS_GRANTS,
+                script="\n".join(
+                    client_script(name)
+                    for name in ("sidebar.js", "text_file.js", "controls.js")
+                ),
+                workspace_style=WORKSPACE_STYLE,
+                sidebar=_SIDEBAR,
+                source_formats=_SOURCE_FORMATS,
+                file_refusals=script_json(evidence_refusals(limits)),
+                controls_page=script_json(page_data(limits)),
+            )
+        )
+
+    @app.get("/workspace/controls")
+    async def workspace_controls() -> Response:
+        """The operator's Controls, the latest save first, with no evidence
+        text."""
+        held = await workspace.store.principal(OPERATOR)
+        controls = (
+            [] if held is None else await workspace.store.list_controls(held.owner_id)
+        )
+        return JSONResponse([control_view(control) for control in controls])
+
+    async def control_body(
+        request: Request, current: Current, model: type[ControlSave]
+    ) -> ControlSave | JSONResponse:
+        """The body of a Control save, or the ``400`` that refuses it."""
+        raw = await _job_body(request, current.answers)
+        try:
+            return model.model_validate(_body_of(raw, model))
+        except _UnknownKey as exc:
+            return _message(400, str(exc))
+        except TypeError:
+            return _message(400, _CONTROL_BODY)
+        except ValueError as exc:
+            return _message(400, save_refusal(exc))
+
+    @app.post("/workspace/controls")
+    async def add_control(request: Request) -> Response:
+        """Keep a new Control. The first save of an operator who holds no
+        principal creates it, as a first job does (ADR 0064)."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        current = cell.read(unavailable)
+        save = await control_body(request, current, ControlSave)
+        if isinstance(save, JSONResponse):
+            return save
+        held = await workspace.store.principal(OPERATOR)
+        principal = held or Principal.new(OPERATOR)
+        new = None if held is not None else principal
+        try:
+            control, texts = saved_control(save, owner_id=principal.owner_id)
+        except ValueError as exc:
+            return _message(400, save_refusal(exc))
+        limits = current.control_limits
+        outcome = await workspace.store.add_control(
+            control, texts, limits=limits, principal=new
+        )
+        match outcome:
+            case "added":
+                if new is not None:
+                    log_created(new)
+                return JSONResponse(control_view(control), status_code=201)
+            case EvidenceRefusal(message=message):
+                return _message(400, message)
+            case "name_in_use":
+                return _message(409, _name_taken(save.name))
+            case "alias_in_use":
+                return _message(409, _CONTROL_ALIAS_IN_USE)
+            case "over_limit":
+                return _message(409, controls_full(limits))
+            case "principal_exists":
+                return _message(
+                    409, "Another save started at the same time. Try again."
+                )
+
+    @app.put("/workspace/controls/{control_id}")
+    async def replace_control(control_id: str, request: Request) -> Response:
+        """Replace the operator's Control in place, and keep no earlier
+        version. The edit names the ``updated_at`` it read (ADR 0127)."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        current = cell.read(unavailable)
+        edit = await control_body(request, current, ControlEdit)
+        if isinstance(edit, JSONResponse):
+            return edit
+        assert isinstance(edit, ControlEdit)
+        if not CONTROL_ID_PATTERN.fullmatch(control_id):
+            return _message(404, _NO_SUCH_CONTROL)
+        held = await workspace.store.principal(OPERATOR)
+        stored = (
+            None
+            if held is None
+            else await workspace.store.get_control(control_id, held.owner_id)
+        )
+        if stored is None:
+            return _message(404, _NO_SUCH_CONTROL)
+        try:
+            control, texts = saved_control(
+                edit,
+                owner_id=stored.owner_id,
+                control_id=control_id,
+                held=stored.document.evidence,
+            )
+        except ValueError as exc:
+            return _message(400, save_refusal(exc))
+        outcome = await workspace.store.replace_control(
+            control,
+            texts,
+            limits=current.control_limits,
+            expected_updated_at=edit.updated_at,
+        )
+        match outcome:
+            case "replaced":
+                return JSONResponse(control_view(control))
+            case EvidenceRefusal(message=message):
+                return _message(400, message)
+            case "absent":
+                return _message(404, _NO_SUCH_CONTROL)
+            case "stale":
+                return _message(409, _CONTROL_STALE)
+            case "name_in_use":
+                return _message(409, _name_taken(edit.name))
+            case "alias_in_use":
+                return _message(409, _CONTROL_ALIAS_IN_USE)
+
+    @app.delete("/workspace/controls/{control_id}")
+    async def delete_control(control_id: str, request: Request) -> Response:
+        """Delete the operator's Control and its evidence, and keep nothing.
+        Each job that applied it keeps its own copy (ADR 0127)."""
+        if (forbidden := _cross_origin(request)) is not None:
+            return forbidden
+        if not CONTROL_ID_PATTERN.fullmatch(control_id):
+            return _message(404, _NO_SUCH_CONTROL)
+        held = await workspace.store.principal(OPERATOR)
+        if held is None or not await workspace.store.delete_control(
+            control_id, held.owner_id
+        ):
+            return _message(404, _NO_SUCH_CONTROL)
+        return Response(status_code=204)
+
     @app.post("/workspace/controls/{control_id}/aliases")
     async def keep_this_name(control_id: str, request: Request) -> Response:
         """Append a name to the scope of the operator's Control as an alias:
@@ -1758,7 +1978,7 @@ def create_app(
         except TypeError:
             return _message(400, "Expected a JSON object with an alias.")
         except ValueError as exc:
-            return _message(400, refusal_text(exc))
+            return _message(400, save_refusal(exc))
         if not CONTROL_ID_PATTERN.fullmatch(control_id):
             return _message(404, _NO_SUCH_CONTROL)
         held = await workspace.store.principal(OPERATOR)
@@ -1776,7 +1996,7 @@ def create_app(
                 scope.model_dump() | {"aliases": [*scope.aliases, alias]}
             )
         except ValueError as exc:
-            return _message(400, refusal_text(exc))
+            return _message(400, save_refusal(exc))
         outcome = await workspace.store.replace_control(
             Control.create(
                 owner_id=control.owner_id,
@@ -2097,8 +2317,9 @@ def create_app(
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
 
-    @app.get("/report/{run_id}", response_class=HTMLResponse)
-    async def report_page(run_id: str) -> Response:
+    async def report_of(run_id: str) -> tuple[Answerable, Report] | None:
+        """The run's answerable state and its report, or ``None`` where the
+        app serves no report of it."""
         current = cell.read(
             lambda: PlainTextResponse("no such report", status_code=404)
         )
@@ -2107,10 +2328,19 @@ def create_app(
             owner_id = await workspace.owner_id(answers, run_id)
             answerable = await answers.answerable(run_id, owner_id)
         except (NoSuchJob, NotCompleted, Withheld):
+            return None
+        if answerable.report is None:
+            return None
+        return answerable, answerable.report
+
+    @app.get("/report/{run_id}", response_class=HTMLResponse)
+    async def report_page(run_id: str) -> Response:
+        served_report = await report_of(run_id)
+        if served_report is None:
             return PlainTextResponse("no such report", status_code=404)
-        report = answerable.report
-        if report is None:
-            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        answers = cell.read(unavailable).answers
+        owner_id = answerable.record.owner_id
         # The page compares with the report before it where the store holds
         # that report under this service's schema version and
         # :meth:`JobAnswers.servable` lets it be served, and else shows none,
@@ -2130,7 +2360,42 @@ def create_app(
                 answerable.state(),
                 previous,
                 None if resumption is None else resumption.parent_id,
+                _section_of(answerable.record, report),
             )
+        )
+
+    @app.get("/report/{run_id}/export.md")
+    async def report_markdown_export(run_id: str) -> Response:
+        """The report as one Markdown file, with its Controls section."""
+        served_report = await report_of(run_id)
+        if served_report is None:
+            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        text = report_markdown(
+            _name_of(answerable.record),
+            report,
+            _section_of(answerable.record, report),
+        )
+        return PlainTextResponse(
+            text,
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="report.md"'},
+        )
+
+    @app.get("/report/{run_id}/export.json")
+    async def report_json_export(run_id: str) -> Response:
+        """The report and its Controls section as one JSON object."""
+        served_report = await report_of(run_id)
+        if served_report is None:
+            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        section = _section_of(answerable.record, report)
+        return JSONResponse(
+            {
+                "report": report.model_dump(mode="json"),
+                "controls": [entry.model_dump(mode="json") for entry in section],
+            },
+            headers={"Content-Disposition": 'attachment; filename="report.json"'},
         )
 
     @app.post("/correct/{run_id}")
@@ -2440,6 +2705,7 @@ _STYLE = """
 _FORM_PAGE = (Path(__file__).parent / "workspace.html").read_text(encoding="utf-8")
 _SETTINGS_PAGE = (Path(__file__).parent / "settings.html").read_text(encoding="utf-8")
 _FILES_PAGE = (Path(__file__).parent / "files.html").read_text(encoding="utf-8")
+_CONTROLS_PAGE = (Path(__file__).parent / "controls.html").read_text(encoding="utf-8")
 #: The format table as each page that uploads reads it, and the ``accept``
 #: attribute of its file field: both from :data:`FORMATS` (ADR 0120).
 _SOURCE_FORMATS = script_json({name: asdict(row) for name, row in FORMATS.items()})

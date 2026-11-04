@@ -202,6 +202,26 @@ page to the section and the open rows you had. A print from the browser prints
 the same export. A print leaves out the sidebar, the tabs and the buttons, and
 it always uses the light colours.
 
+**Controls**, under the findings of a job that copied a Control, is one table
+of each Control: what it matched, the facts it wrote with the state
+`written`, `changed` or `stated`, and its rows with the outcome `applied`,
+`refused` or `no-finding`. A row opens to the claim IDs it ruled out, the
+critic's reason, each line of the evidence that the quotation of an applied
+ruling quotes, by file, class and line, and one sentence that says what the
+outcome means. A
+Control that the job left out shows its reason. The section reads the job's
+copy and the report's rulings, so a later edit of a Control changes nothing
+here.
+
+**Download as Markdown** and **Download as JSON**, beside the export button,
+send `GET /report/{run}/export.md` and `GET /report/{run}/export.json`. The
+Markdown file holds the findings, the findings ruled out and the Controls
+section. It escapes each value, so a value forms no Markdown markup, no HTML,
+no Markdown link and no GFM autolink. A viewer that links any bare domain name
+can still link one. The JSON file holds the report and
+the Controls section as `report` and `controls`. A `/v1` report carries no
+Controls section.
+
 ## When the configuration is wrong
 
 If the engine cannot be built — bad tier config, missing credentials, an
@@ -254,7 +274,7 @@ files or its environment: after a hand edit of a config file or of
 
 ## The Files page
 
-**Files**, between **Analyses** and **Settings**, keeps **Owner File**s: call
+**Files**, between **Analyses** and **Controls**, keeps **Owner File**s: call
 transcripts and Mermaid diagrams that you add to any of your analyses
 (ADR 0118). Each file stays until you delete it. Retention does not remove it.
 
@@ -289,14 +309,61 @@ a chosen file is gone, the submission is refused and the form shows the file
 as "Missing". An analysis that you open again lists "Files used" from its own
 copies.
 
+## The Controls page
+
+**Controls**, between **Files** and **Settings**, keeps your **Control**s
+(ADR 0127). Each Control stays until you delete it. Retention does not remove
+it.
+
+- **The list.** The page has the Analyses page's shape: a "Find a Control"
+  search box, a "Protects" filter and a "Framework" filter, a select column
+  with "Delete selected", and a table of the name, what it protects, what it
+  covers, the evidence and the last update. The Name and Updated columns
+  sort. The facts a Control proves show on a line under its name. A line
+  above the table gives the count against `max_controls`, such as "4 of 50
+  Controls", and "New Control" is disabled at the limit.
+- **The editor.** "New Control", "Edit" or a click on a name opens the editor
+  above the table: the name, then four cards. "What it protects" takes the
+  kind, the name and the aliases. "What it proves" takes a fact and its
+  value from the facts of the scope's kind: an element's attributes and the
+  Question Kinds for an element or a zone, and the Capabilities for the whole
+  application. A closed fact takes one of its values. The service refuses a
+  `trust_zone` fact, because a Control places no element, and an attribute or
+  a question on the whole application. "What it covers" takes a row by
+  framework and unit, and the row keeps the package version. Each unit's
+  label comes from its package's catalog when the page loads. "Evidence" takes a
+  plain text file and its class: Configuration, Code or People. The page
+  reads the file with the checks of an Owner File and sends only its text.
+  Each line has a "Remove" button. "Save Control" sends the Control, and an
+  edit replaces it and keeps no earlier version.
+- **The routes.** `GET /workspace/controls` lists your Controls with no
+  evidence text. `POST /workspace/controls` adds one and answers `201`.
+  `PUT /workspace/controls/{control_id}` replaces one, and the body names the
+  `updated_at` the page read: a Control that changed since is refused with
+  `409`. Each save refuses a document that breaks a rule with `400` and the
+  rule's sentence, such as "Give the Control a name.", and refuses a name you
+  already use, an alias that another scope holds and a save over the count
+  limit with `409`. An evidence file over the byte limit, with a control
+  character, with no text or with a credential shape is refused with `400`.
+  The credential refusal names the line and the shape, and the service
+  redacts nothing.
+- **Delete.** A dialog says that each analysis that applied the Control keeps
+  its own copy. `DELETE /workspace/controls/{control_id}` removes the row and
+  each evidence file, and keeps nothing. "Delete selected" asks once for the
+  count it shows. Another owner's Control answers as a missing one.
+
 ## Controls in an analysis
 
 A **Control** records a protection that your systems already have, and it
 names what it protects: the whole application, one zone or one element
-(ADR 0124). The submission sends the IDs of the Controls you tick in
-`controls`, and the job copies each one, with the text of each evidence file
-(ADR 0127). A later edit or delete changes no job. When a ticked Control is
-gone, the submission is refused.
+(ADR 0124). "Controls for this analysis", under the Files list, lists each of
+your Controls with what it protects and its rows, each ticked. The
+submission sends the IDs of the Controls you tick in `controls`, and the job
+copies each one, with the text of each evidence file (ADR 0127). A later edit
+or delete changes no job. When a ticked Control is gone, the submission is
+refused and the list shows the Control as "Missing". Controls apply at the
+pause, so the list is disabled while the questions are off, and the service
+refuses `controls` with no questions.
 
 The model exists only after the extraction, so the pause shows the match. The
 questions of a paused analysis list each copied Control in `controls`: what
@@ -309,7 +376,9 @@ it matched, and why where it matched nothing.
   inference (`zone-inferred`), and an element that no source placed
   (`no-zone-stated`), are listed unticked.
 - **No match has a reason.** `missing-element` lists the elements of the
-  scope's type to choose from. `empty-zone` is a zone that holds no element.
+  scope's type to choose from, and a zone to choose lists its elements. The
+  choice applies to this analysis only. `empty-zone` is a zone that holds no
+  element.
 - **A row of another package version is unticked.** A unit can change its
   meaning between two versions of a catalog.
 
@@ -317,8 +386,11 @@ A save sends `control_scopes` to `/answer/{run}`: one entry for each Control
 that applies, with its element and, for a zone, the ticked elements. A
 Control with no entry is left out. A later save can tick it again. "Keep this
 name" sends `POST /workspace/controls/{control_id}/aliases`, which appends the
-name to the Control's aliases. A job that does not pause takes the default
-resolution: each match as the pause first shows it. An analysis that you
+name to the Control's aliases. Each line names the facts the Control
+answers, and says where the description already states one. A save that
+leaves two Controls writing one fact with two values is refused. With no
+save, the job takes the default resolution: each match as the pause first
+shows it. An analysis that you
 open again lists `controls_used` from its own copy, with the state
 `applied` or `left-out`, or `pending` where the job serves no model: it is
 not complete yet, it ended with no report (failed, stopped or rejected), or
@@ -567,10 +639,11 @@ Each policy grants only what its own page does:
 | Page | Grants beyond `default-src 'none'` |
 | --- | --- |
 | Report | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/answer/{run}` and `/correct/{run}`. It loads nothing. |
-| Form | the same, for `/example`, `/analyze`, `/answer/{run}`, `/amend/{run}`, `/events/{run}`, `/workspace/runs` and `/workspace/files`. |
+| Form | the same, for `/example`, `/analyze`, `/answer/{run}`, `/amend/{run}`, `/events/{run}`, `/workspace/runs`, `/workspace/files` and `/workspace/controls`. |
 | Diagnostic | `style-src` nonce only — it runs no script, so it is granted none. |
 | Settings | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/settings` and `/settings/rows`. It draws its table from the data in the page. |
 | Files | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/workspace/files`. |
+| Controls | `script-src`/`style-src` nonce, plus `connect-src 'self'` for `/workspace/controls`. |
 
 `base-uri` and `form-action` are `'none'` everywhere; the form posts through
 fetch, so a navigation away from it would be something going wrong. A page and

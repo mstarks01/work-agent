@@ -24,6 +24,7 @@ import re
 import socket
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -1827,7 +1828,9 @@ def _drawn(browser, report):
     page = browser.new_page()
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    html = render_report(report, report_state(report), previous=None, parent=None).html
+    html = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    ).html
     page.route(
         "http://report.test/report/r1",
         lambda route: route.fulfill(body=html, content_type="text/html"),
@@ -2142,3 +2145,392 @@ def test_a_file_deleted_before_the_submission_shows_as_missing(page):
     page.wait_for_selector("#problem:not([hidden])")
     assert "no longer in Files" in page.inner_text("#problem")
     page.wait_for_selector("#chosen-files li >> text=Missing")
+
+
+# ---- Controls (#2157) ------------------------------------------------------
+
+#: A Control name that spells markup and script. The page shows it as text.
+HOSTILE_CONTROL = '<img src=x onerror="window.ran=1">SSO <b>(Okta)</b>'
+
+
+def new_control(page, name: str, *, scope=("store", "Orders DB")) -> None:
+    """Open the editor and fill the name and what the Control protects."""
+    page.click("#new-control")
+    page.fill("#control-name", name)
+    kind, scope_name = scope
+    page.select_option("#scope-type", kind)
+    if scope_name:
+        page.fill("#scope-name", scope_name)
+
+
+def add_fact(page, label: str, value: str) -> None:
+    page.select_option("#fact-pick", label=label)
+    if page.locator("select#fact-value").count():
+        page.select_option("#fact-value", value)
+    else:
+        page.fill("#fact-value", value)
+    page.click("#add-fact")
+
+
+def add_row(page, framework: str, unit: str) -> None:
+    page.select_option("#row-framework", framework)
+    page.select_option("#row-unit", unit)
+    page.click("#add-row")
+
+
+def add_evidence(page, name: str, text: str, evidence_class: str = "config") -> None:
+    page.select_option("#evidence-class", evidence_class)
+    with page.expect_file_chooser() as chosen:
+        page.click("#evidence-file")
+    chosen.value.set_files(
+        {"name": name, "mimeType": "text/plain", "buffer": text.encode()}
+    )
+
+
+def save_control(page) -> None:
+    with page.expect_response("**/workspace/controls**") as answered:
+        page.click("#save-control")
+    assert answered.value.ok, answered.value.text()
+    page.wait_for_selector("#controls-notice:not([hidden])")
+
+
+def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
+    page.goto("/controls")
+    assert page.get_attribute("#controls-nav", "aria-current") == "page"
+    assert page.inner_text("#controls-empty") == "No Controls yet."
+    assert page.inner_text("#controls-count") == "0 of 50 Controls"
+    new_control(page, HOSTILE_CONTROL)
+    page.fill("#alias-input", "orders <i>database</i>")
+    page.press("#alias-input", "Enter")
+    add_fact(page, "encryption at rest", "AES-256 <script>window.ran=1</script>")
+    add_row(page, "asvs", "V11.2")
+    add_row(page, "stride", "information-disclosure")
+    add_evidence(page, "<b>rds</b>.tf", "storage_encrypted = true\n", "code")
+    page.wait_for_selector("#evidence-list li")
+    save_control(page)
+    assert page.inner_text("#controls-notice") == f"“{HOSTILE_CONTROL}” is saved."
+    assert page.inner_text("#controls-count") == "1 of 50 Controls"
+    cells = page.locator("#controls-list tr td")
+    assert page.inner_text("#controls-list td.name-cell a") == HOSTILE_CONTROL
+    assert "Proves encryption at rest" in cells.nth(1).inner_text()
+    assert cells.nth(2).inner_text() == "A data store: Orders DB"
+    assert cells.nth(3).inner_text().split("\n") == [
+        "asvs V11.2",
+        "stride information-disclosure",
+    ]
+    assert cells.nth(4).inner_text() == "<b>rds</b>.tf (Code)"
+    assert page.locator("#controls-list img, #controls-list b").count() == 0
+    assert page.evaluate("window.ran") is None
+    [control] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
+    assert control["scope"]["aliases"] == ["orders <i>database</i>"]
+    assert control["facts"][0]["value"] == "AES-256 <script>window.ran=1</script>"
+
+    # An edit opens the same editor with the Control's values, and replaces it.
+    page.click("#controls-list button:text('Edit')")
+    assert page.input_value("#control-name") == HOSTILE_CONTROL
+    assert page.input_value("#scope-name") == "Orders DB"
+    assert "orders <i>database</i>" in page.inner_text(".aliases")
+    page.fill("#control-name", "Orders DB encrypted")
+    page.click("#facts-list button")
+    add_fact(page, "data classification", "confidential")
+    save_control(page)
+    assert page.inner_text("#controls-list td.name-cell a") == "Orders DB encrypted"
+    [edited] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
+    assert edited["id"] == control["id"]
+    assert [fact["value"] for fact in edited["facts"]] == ["confidential"]
+    assert edited["evidence"] == control["evidence"]
+
+
+@pytest.mark.parametrize(
+    ("fill", "message"),
+    [
+        (lambda page: new_control(page, " "), "Give the Control a name."),
+        (
+            lambda page: new_control(page, "WAF", scope=("process", "")),
+            "Name what the Control protects, or choose the whole application.",
+        ),
+        (
+            lambda page: new_control(page, "WAF"),
+            "Add at least one fact or one row. A Control with neither changes nothing.",
+        ),
+    ],
+)
+def test_each_save_refusal_shows_its_message(page, fill, message):
+    page.goto("/controls")
+    fill(page)
+    if "fact or one row" not in message:
+        add_row(page, "stride", "spoofing")
+    page.click("#save-control")
+    page.wait_for_selector("#editor-problem:not([hidden])")
+    assert page.inner_text("#editor-problem") == message
+
+
+def test_a_repeated_row_and_name_and_a_large_file_are_refused(page):
+    page.goto("/controls")
+    new_control(page, "WAF")
+    add_row(page, "stride", "spoofing")
+    add_row(page, "stride", "spoofing")
+    page.click("#save-control")
+    page.wait_for_selector("#editor-problem:not([hidden])")
+    assert page.inner_text("#editor-problem") == "The row spoofing appears twice."
+    page.click("#rows-list button")
+    save_control(page)
+    new_control(page, "WAF")
+    add_row(page, "stride", "tampering")
+    page.click("#save-control")
+    page.wait_for_selector("#editor-problem:not([hidden])")
+    assert page.inner_text("#editor-problem") == (
+        "You already have a Control named “WAF”. Give this Control a different name."
+    )
+    add_evidence(page, "big.txt", "x" * 10_001)
+    page.wait_for_function(
+        "() => document.querySelector('#editor-problem').textContent.includes('larger')"
+    )
+    assert page.inner_text("#editor-problem") == (
+        "This file is larger than the 10,000 bytes one evidence file can hold."
+    )
+
+
+def test_a_delete_and_a_multi_delete_ask_first(page):
+    page.goto("/controls")
+    for name in ("One", "Two", "Three"):
+        new_control(page, name, scope=("application", ""))
+        add_row(page, "stride", "spoofing")
+        save_control(page)
+    page.click("#controls-list tr:has-text('Three') button:text('Delete')")
+    page.wait_for_selector("#delete-dialog[open]")
+    assert page.inner_text("#delete-question") == (
+        "Delete “Three”? Each analysis that already applied it keeps its own copy,"
+        " and its reports do not change. You cannot undo this."
+    )
+    page.click("#delete-go")
+    page.wait_for_selector("#controls-list tr:has-text('Three')", state="detached")
+    assert page.inner_text("#controls-notice") == (
+        "“Three” is deleted. The analyses that applied it keep their copy."
+    )
+    page.check("#select-shown")
+    assert page.inner_text("#delete-selected") == "Delete selected (2)"
+    page.click("#delete-selected")
+    page.wait_for_selector("#delete-dialog[open]")
+    assert page.inner_text("#delete-question").startswith("Delete 2 Controls?")
+    page.click("#delete-go")
+    page.wait_for_selector("#controls-empty:not([hidden])")
+    assert page.inner_text("#controls-notice") == (
+        "2 Controls are deleted. The analyses that applied them keep their copy."
+    )
+
+
+@pytest.fixture
+def zoned_page(browser, tiers):
+    """A page on the app over the zoned model of the Control tests."""
+    from tests.test_webapp_controls import ZonedRunner
+
+    app = web.app_for(tiers, ZonedRunner())
+    with contextmanager(serve)(app) as base:
+        context = browser.new_context(base_url=base)
+        opened = context.new_page()
+        errors: list[str] = []
+        opened.on("pageerror", lambda error: errors.append(str(error)))
+        opened.on("dialog", lambda dialog: errors.append(f"dialog: {dialog.message}"))
+        opened.goto("/controls")
+        yield opened
+        context.close()
+        assert errors == [], f"the page raised: {errors}"
+
+
+def keep_control(page, name: str, scope: dict, *, facts=(), rows=None) -> str:
+    """Keep a Control through the page's own route, and return its ID."""
+    body = {
+        "name": name,
+        "scope": {"name": "", "aliases": []} | scope,
+        "facts": list(facts),
+        "rows": rows
+        if rows is not None
+        else [{"framework": "stride", "unit": "spoofing", "version": "1.0"}],
+        "evidence": [],
+    }
+    saved = page.evaluate(
+        """(body) => fetch('/workspace/controls', {method: 'POST',
+             headers: {'Content-Type': 'application/json'},
+             body: JSON.stringify(body)}).then((r) => r.json())""",
+        body,
+    )
+    return saved["id"]
+
+
+def submit_with_controls(page) -> dict:
+    """Submit the form with its ticked Controls, and wait for the pause."""
+    page.goto("/")
+    page.wait_for_selector("#controls-offer:not([hidden])")
+    page.fill("#description", "A web app talks to a database.")
+    page.fill("#analysis-name", "Controls analysis")
+    page.locator('input[name="framework"]').first.check()
+    with page.expect_response("**/analyze") as answered:
+        page.click("#go")
+    assert answered.value.ok, answered.value.text()
+    page.wait_for_selector("#control-offer .offer-line")
+    return answered.value.request.post_data_json
+
+
+def save_offer(page, action) -> dict:
+    """Do ``action`` on the offer, and return the save it sends."""
+    with page.expect_response(_post_to_answer) as answered:
+        action()
+    assert answered.value.ok, answered.value.text()
+    page.wait_for_timeout(100)
+    return answered.value.request.post_data_json
+
+
+def test_a_zone_control_fans_out_and_the_owner_ticks_a_part(zoned_page):
+    page = zoned_page
+    zone = keep_control(
+        page, "Internal <b>WAF</b>", {"type": "boundary", "name": "Internal Network"}
+    )
+    sent = submit_with_controls(page)
+    assert sent["controls"] == [zone]
+    offer = page.locator("#control-offer")
+    assert "matches Internal Network" in offer.inner_text()
+    assert page.locator("#control-offer b").first.inner_text() == "Internal <b>WAF</b>"
+    fanout = page.locator("#control-offer .fanout li")
+    assert [text.strip() for text in fanout.all_inner_texts()] == [
+        "Web App — stated-zone: a source places this part in the zone",
+        "Orders DB — zone-inferred: the service inferred this placement",
+        "Audit Log — no-zone-stated: no source places this part",
+    ]
+    assert page.is_checked(f"#cover-{zone}-process\\:web-app")
+    assert not page.is_checked(f"#cover-{zone}-store\\:orders-db")
+    body = save_offer(page, lambda: page.check(f"#cover-{zone}-store\\:orders-db"))
+    assert body["control_scopes"] == [
+        {
+            "control": zone,
+            "element": "boundary:internal-network",
+            "ticked": ["process:web-app", "store:orders-db"],
+        }
+    ]
+    assert page.is_checked(f"#cover-{zone}-store\\:orders-db")
+    assert "1 Control of 1 will apply." in offer.inner_text()
+
+
+def test_an_unmatched_control_takes_a_choice_and_keeps_the_name(zoned_page):
+    page = zoned_page
+    waf = keep_control(page, "WAF", {"type": "process", "name": "Edge"})
+    submit_with_controls(page)
+    offer = page.locator("#control-offer")
+    assert "missing-element" in offer.inner_text()
+    assert page.is_disabled(f"#offer-{waf}")
+    choices = page.locator(f"#apply-{waf} option").all_inner_texts()
+    assert choices == ["Not this time", "Web App"]
+    body = save_offer(
+        page, lambda: page.select_option(f"#apply-{waf}", "process:web-app")
+    )
+    assert body["control_scopes"] == [{"control": waf, "element": "process:web-app"}]
+    page.wait_for_selector("#control-offer >> text=matches Web App")
+    assert page.is_checked(f"#offer-{waf}")
+    save_offer(page, lambda: page.click("#control-offer button:text('Keep this name')"))
+    assert "“Web App” is now an alias of “WAF”." in offer.inner_text()
+    [control] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
+    assert control["scope"]["aliases"] == ["Web App"]
+
+
+def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_page):
+    page = zoned_page
+    db = {"type": "store", "name": "Orders DB"}
+    key = ["", "encryption_at_rest", "", "", "", ""]
+    aes = keep_control(page, "AES", db, facts=[{"key": key, "value": "AES-256"}])
+    kms = keep_control(page, "KMS", db, facts=[{"key": key, "value": "KMS"}])
+    submit_with_controls(page)
+    assert "Is data stored in Orders DB encrypted?: AES-256" in page.inner_text(
+        "#control-offer"
+    )
+    message = (
+        "Two Controls write “encryption_at_rest” on Orders DB with two values:"
+        " “KMS” and “AES-256”. Untick one, or edit one Control so that they agree."
+    )
+    page.click("#continue")
+    page.wait_for_selector("#answer-problem:not([hidden])")
+    assert page.inner_text("#answer-problem") == message
+    body = save_offer(page, lambda: page.uncheck(f"#offer-{aes}"))
+    assert body["control_scopes"] == [{"control": kms, "element": "store:orders-db"}]
+    assert page.is_hidden("#answer-problem")
+    assert not page.is_checked(f"#offer-{aes}")
+    assert "unticked: you left it out" in page.inner_text("#control-offer")
+
+
+def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
+    zoned_page,
+):
+    page = zoned_page
+    gone = keep_control(page, "Gone", {"type": "application"})
+    page.goto("/")
+    page.wait_for_selector(f"#control-{gone}")
+    assert page.is_checked(f"#control-{gone}")
+    page.evaluate(f"fetch('/workspace/controls/{gone}', {{method: 'DELETE'}})")
+    page.fill("#description", "A web app talks to a database.")
+    page.fill("#analysis-name", "Gone control")
+    page.locator('input[name="framework"]').first.check()
+    page.click("#go")
+    page.wait_for_selector("#problem:not([hidden])")
+    assert "no longer in Controls" in page.inner_text("#problem")
+    page.wait_for_selector("#controls-rows li >> text=Missing")
+    page.click("#controls-rows button:text('Remove')")
+
+    kept = keep_control(page, "SSO", {"type": "application"})
+    page.reload()
+    page.wait_for_selector(f"#control-{kept}")
+    page.uncheck("#ask")
+    assert page.is_disabled(f"#control-{kept}")
+    assert "Turn the questions on" in page.inner_text("#controls-summary")
+    page.check("#ask")
+    sent = submit_with_controls(page)
+    assert sent["controls"] == [kept]
+    run = (
+        page.evaluate("new URLSearchParams(location.search).get('run')")
+        or page.evaluate("fetch('/workspace/runs').then((r) => r.json())")[0]["run"]
+    )
+    page.goto(f"/?run={run}")
+    page.wait_for_selector("#asked", state="visible")
+    page.click("#description-nav")
+    page.wait_for_selector("#controls-used", state="visible")
+    assert page.inner_text("#controls-used-list") == "SSO (applied)"
+    assert page.is_hidden("#controls-offer")
+
+
+def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers):
+    from tests.test_webapp_controls_page import RulingRunner
+
+    runner = RulingRunner()
+    with contextmanager(serve)(web.app_for(tiers, runner)) as base:
+        context = browser.new_context(base_url=base)
+        page = context.new_page()
+        errors: list[str] = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.on("dialog", lambda dialog: errors.append(f"dialog: {dialog.message}"))
+        page.goto("/controls")
+        rows = [
+            {"framework": "stride", "unit": unit, "version": "1.0"}
+            for unit in ("spoofing", "tampering")
+        ]
+        runner.control = keep_control(
+            page, HOSTILE_CONTROL, {"type": "application"}, rows=rows
+        )
+        submit_with_controls(page)
+        with page.expect_response("**/answer/**"):
+            page.click("#continue")
+        page.wait_for_url("**/report/**", timeout=20_000)
+        page.wait_for_selector("#controls-section")
+        section = page.locator("#controls-section")
+        assert page.locator("#controls-section td.name").inner_text() == HOSTILE_CONTROL
+        assert section.locator("img, b").count() == 0
+        page.click("#controls-section summary:has-text('tampering')")
+        assert "It shows no <b>signing</b> at https://evil.example." in (
+            section.inner_text()
+        )
+        assert "applied" in section.inner_text() and "refused" in section.inner_text()
+        assert page.get_attribute("a.download-link >> nth=0", "href").endswith(
+            "/export.md"
+        )
+        page.click("#export-preview")
+        assert page.is_visible("#controls-section")
+        assert page.evaluate("window.ran") is None
+        context.close()
+        assert errors == [], f"the page raised: {errors}"

@@ -408,8 +408,9 @@ class UnknownRef(BaseModel):
         **The one reader of "how is this fact named".** The review seam sends
         back an entry that uses more than one,
         :func:`~analysis_service.critic.snap_rulings` drops one
-        whose sound twin sits beside it, and the fallback count reads the
-        question and subject spellings here. A model whose provider treats the
+        whose sound twin sits beside it, and the fallback count reads
+        :attr:`sound` and :attr:`kind`, which read the spellings here. A model
+        whose provider treats the
         schema as a hint writes an attribute reference and then repeats it with
         a ``subject`` and schema punctuation in ``assertion``
         (``QA-2026-09-26-03-E10``).
@@ -423,6 +424,18 @@ class UnknownRef(BaseModel):
             "capability": bool(self.capability),
         }
         return tuple(name for name, on in used.items() if on)
+
+    @property
+    def sound(self) -> bool:
+        """Whether this reference uses one spelling, as a key that names one
+        fact must."""
+        return len(self.spellings) == 1
+
+    @property
+    def mixed(self) -> bool:
+        """Whether this reference uses more than one spelling. A reference
+        that uses none is neither sound nor mixed."""
+        return len(self.spellings) > 1
 
     @property
     def kind(self) -> Spelling:

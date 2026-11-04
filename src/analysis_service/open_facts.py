@@ -269,6 +269,12 @@ def label_of(
             return ref.subject
 
 
+def kind_words(template: str) -> str:
+    """A Question Kind's question about no one element: "it" for the
+    element."""
+    return template.replace("{element}'s", "its").replace("{element}", "it")
+
+
 def group_of(ref: UnknownRef) -> tuple[str, str]:
     """The group a page shows this fact in, and the group's heading.
 
@@ -289,9 +295,7 @@ def group_of(ref: UnknownRef) -> tuple[str, str]:
         case "subject":
             return "subjects", "Other questions"
         case "question" if (name := parse_question_kind(ref.question)) is not None:
-            template = QUESTION_KINDS[name].template
-            heading = template.replace("{element}'s", "its").replace("{element}", "it")
-            return ref.question, heading
+            return ref.question, kind_words(QUESTION_KINDS[name].template)
         case "attribute":
             return ref.attribute, _attribute_questions(ref.attribute)[1]
     label = label_of(ref, {})

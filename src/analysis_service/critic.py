@@ -180,13 +180,11 @@ def _one_per_fact(refs: Sequence[UnknownRef]) -> list[UnknownRef]:
     attribute or question, because that twin already asks the fact. A mixed
     entry with no twin stays, and the review seam sends it back.
     """
-    sound = {
-        _place(ref) for ref in refs if len(ref.spellings) == 1 and any(_place(ref))
-    }
+    sound = {_place(ref) for ref in refs if ref.sound and any(_place(ref))}
     kept: list[UnknownRef] = []
     seen: set[UnknownKey] = set()
     for ref in refs:
-        twinned = len(ref.spellings) > 1 and _place(ref) in sound
+        twinned = ref.mixed and _place(ref) in sound
         if not twinned and ref.key not in seen:
             seen.add(ref.key)
             kept.append(ref)
@@ -353,7 +351,7 @@ def _unresolved_unknown_ref_issues(
             # hold — the seam that does hold it is the one that built the
             # ground, and a reference it could not resolve never reached a
             # draft. Both are the whole reason the spellings exist.
-            if len(ref.spellings) > 1:
+            if ref.mixed:
                 issues.append(
                     UnreconciledRuling.of(
                         claim_id=ruling.id,
