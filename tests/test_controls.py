@@ -186,38 +186,38 @@ class TestTheDocument:
     def test_an_evidence_class_outside_the_set_is_refused(self):
         assert "evidence.0.class" in refusal(evidence=[evidence(**{"class": "prose"})])
 
+    def test_the_rows_take_a_fixed_bound(self):
+        rows = [row(unit.id) for unit in PACKAGES["asvs"].units][: MAX_CONTROL_ROWS + 1]
+        assert ControlDocument.model_validate(document(rows=rows[:-1]))
+        assert "rows\n  List should have at most" in refusal(rows=rows)
+
+    def test_the_facts_take_a_fixed_bound_before_their_kinds(self):
+        # A part takes fewer legal facts than the bound, so the bound refuses a
+        # long list before the kind rule reads a fact of it.
+        facts = [
+            {"key": ["", "", "", "", "", capability], "value": "yes"}
+            for capability in list(CAPABILITIES)[: MAX_CONTROL_FACTS + 1]
+        ]
+        assert "facts\n  List should have at most" in refusal(facts=facts)
+
     @pytest.mark.parametrize(
-        ("field", "items"),
+        ("scope_type", "key", "message"),
         [
-            (
-                "facts",
-                [
-                    {"key": ["", "", "", "", "", capability], "value": "yes"}
-                    for capability in list(CAPABILITIES)[: MAX_CONTROL_FACTS + 1]
-                ],
-            ),
-            (
-                "rows",
-                [row(unit.id) for unit in PACKAGES["asvs"].units][
-                    : MAX_CONTROL_ROWS + 1
-                ],
-            ),
+            ("application", "", "The whole application takes no fact."),
+            ("store", "", "A Control states a protection:"),
+            ("store", "technology", "A Control states a protection:"),
+            ("store", "data_classification", "A Control states a protection:"),
         ],
     )
-    def test_the_lists_take_fixed_bounds(self, field, items):
-        # The whole application takes a Capability fact, so it holds enough
-        # facts to pass the bound.
-        changed = (
-            {"scope": {"type": "application", "name": "", "aliases": []}}
-            if field == "facts"
-            else {}
-        )
-        assert ControlDocument.model_validate(
-            document(**changed, **{field: items[:-1]})
-        )
-        assert f"{field}\n  List should have at most" in refusal(
-            **changed, **{field: items}
-        )
+    def test_a_fact_that_describes_the_system_is_refused(
+        self, scope_type, key, message
+    ):
+        # A Capability or a descriptive attribute says what the application
+        # does, not what protects it.
+        name = "" if scope_type == "application" else "Orders DB"
+        scope = {"type": scope_type, "name": name, "aliases": []}
+        held = ["", key, "", "", "", "" if key else "websocket"]
+        assert message in refusal(scope=scope, facts=[{"key": held, "value": "yes"}])
 
     def test_the_aliases_take_a_fixed_bound(self):
         aliases = [f"alias {at}" for at in range(MAX_CONTROL_ALIASES + 1)]

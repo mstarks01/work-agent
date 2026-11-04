@@ -319,17 +319,17 @@ it.
   search box, a "Protects" filter and a "Framework" filter, a select column
   with "Delete selected", and a table of the name, what it protects, what it
   covers, the evidence and the last update. The Name and Updated columns
-  sort. The facts a Control proves show on a line under its name. A line
+  sort. The facts a Control states show on a line under its name. A line
   above the table gives the count against `max_controls`, such as "4 of 50
   Controls", and "New Control" is disabled at the limit.
 - **The editor.** "New Control", "Edit" or a click on a name opens the editor
   above the table: the name, then four cards. "What it protects" takes the
-  kind, the name and the aliases. "What it proves" takes a fact and its
-  value from the facts of the scope's kind: an element's attributes and the
-  Question Kinds for an element or a zone, and the Capabilities for the whole
-  application. A closed fact takes one of its values. The service refuses a
-  `trust_zone` fact, because a Control places no element, and an attribute or
-  a question on the whole application. "What it covers" takes a row by
+  kind, the name and the aliases. "What it does" takes a fact and its value
+  from the protective facts of an element or a zone: its encryption at rest,
+  its exposure and the Question Kinds. A closed fact takes one of its values.
+  A Control of the whole application states no fact. The service refuses
+  every other fact, because a fact that describes the system is the
+  description's to state. "What it covers" takes a row by
   framework and unit, and the row keeps the package version. Each unit's
   label comes from its package's catalog when the page loads. "Evidence" takes a
   plain text file and its class: Configuration, Code or People. The page

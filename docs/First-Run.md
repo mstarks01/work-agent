@@ -400,7 +400,7 @@ uses `unknown`; code turns a claim resting on such an attribute into
 
 A protection that you state on each analysis, such as a WAF at the edge or
 SSO on an API, can be a **Control** instead. Open **Controls** in the
-sidebar, click **New Control**, and say what it protects, the facts it proves,
+sidebar, click **New Control**, and say what it protects, the protections it states,
 the framework units it covers and the evidence files that show it. The form
 lists your Controls under "Controls for this analysis", each one ticked. At
 the questions, the page shows what each Control matched in your description,

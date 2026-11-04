@@ -96,6 +96,6 @@ the entry (ADR 0126). A Control the owner left out is listed with its reason
 
 ## Consequences
 
-The change review gains the count "answered by a Control". A capability fact an
-application-scoped Control writes takes the stated check and the lineage check
-in the same save.
+The change review gains the count "answered by a Control". A Control of the
+whole application writes no fact (ADR 0123), so a Control never writes a
+Capability.

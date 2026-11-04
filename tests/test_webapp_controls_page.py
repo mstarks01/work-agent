@@ -138,16 +138,16 @@ class TestCreate:
             (
                 {"scope": {"type": "application"}},
                 (
-                    "The whole application takes only a capability. Choose the"
-                    " part that an attribute or a question is about."
+                    "The whole application takes no fact. Name the units the"
+                    " Control covers, or choose the part that a fact is about."
                 ),
             ),
             (
                 {"facts": [{"key": ["", "", "", "", "", "database"], "value": "yes"}]},
                 (
-                    "A part takes its attributes and the questions about it. A"
-                    " capability is a fact of the whole application: protect the"
-                    " whole application for it."
+                    "A Control states a protection: the questions about the"
+                    " part, its encryption at rest or its exposure. The"
+                    " description states the rest."
                 ),
             ),
             (

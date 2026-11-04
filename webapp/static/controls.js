@@ -93,7 +93,6 @@
     h("h3", {}, title), hint ? h("p", { class: "hint" }, hint) : null, ...content);
 
   const SCOPE_HINTS = {
-    application: "The Control applies to every part of each analysis.",
     boundary: "The name must match the trust boundary after case and punctuation. The Control applies to each part the description places in it.",
     other: "The name must match the part after case and punctuation. A similar name matches nothing.",
   };
@@ -113,8 +112,8 @@
     });
     return card("What it protects", null,
       h("div", { class: "line" },
-        h("div", {}, h("label", { class: "field-label", for: "scope-type" }, "Kind"),
-          h("select", { id: "scope-type", on: { change: (event) => {
+        h("div", {},
+          h("select", { id: "scope-type", "aria-label": "What it protects", on: { change: (event) => {
             draft.scope = { type: event.target.value, name: "", aliases: [] };
             draft.facts = draft.facts.filter((fact) => factOf(draft.scope.type, fact.key));
             draw();
@@ -128,7 +127,7 @@
               h("button", { type: "button", class: "quiet", "aria-label": `Remove the alias ${alias}`,
                 on: { click: () => { draft.scope.aliases.splice(index, 1); draw(); } } }, "×"))),
             aliasInput)) : null),
-      h("p", { class: "hint", id: "scope-hint" }, SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other));
+      named ? h("p", { class: "hint", id: "scope-hint" }, SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other) : null);
   };
 
   // A fact's answer as one line: its value, or each facet's answer.
@@ -175,7 +174,10 @@
       refuse("");
       draw();
     };
-    return card("What it proves", "Each fact answers a question the analysis would otherwise ask. A fact the description states stands.",
+    if (!SCOPES[draft.scope.type].facts.length) {
+      return card("What it does", "A Control of the whole application states no fact. Name the units it covers below.");
+    }
+    return card("What it does", "Each fact states a protection on the part, and answers a question the analysis would otherwise ask. A fact the description states stands.",
       h("ul", { class: "lines", id: "facts-list" }, ...draft.facts.map((fact, index) => h("li", {},
         h("span", {}, h("b", {}, factLabel(draft.scope.type, fact)), ": ", answerText(fact)),
         remove(draft.facts, index, `the fact ${factLabel(draft.scope.type, fact)}`)))),
@@ -318,7 +320,7 @@
         on: { change: (event) => { if (event.target.checked) chosen.add(control.id); else chosen.delete(control.id); draw(); } } })),
       h("td", { class: "name-cell" },
         h("a", { href: "#", on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
-        facts.length ? h("div", { class: "sub" }, `Proves ${facts.join(", ")}`) : null),
+        facts.length ? h("div", { class: "sub" }, `Facts: ${facts.join(", ")}`) : null),
       h("td", {}, scopeText(control.scope)),
       h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
         `${one.framework} ${one.unit}`)))),

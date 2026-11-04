@@ -665,7 +665,7 @@ class TestV1:
 
 
 DB_KEY = ["store:orders-db", "encryption_at_rest", "", "", "", ""]
-CLASS_KEY = ["store:orders-db", "data_classification", "", "", "", ""]
+EDGE_KEY = ["process:web-app", "exposure", "", "", "", ""]
 DB_LINE = (
     'The encryption_at_rest of store:orders-db is "AES-256". From the Control'
     ' "Encrypted".'
@@ -689,16 +689,17 @@ class TestTheFacts:
     and a carried answer (ADR 0125, #2155)."""
 
     def test_an_open_fact_is_written_and_a_stated_fact_is_recorded(self, owner):
-        db = owner.keep(
-            "Encrypted",
-            ORDERS_DB,
-            facts=[fact(), fact("data_classification", "restricted")],
+        db = owner.keep("Encrypted", ORDERS_DB)
+        edge = owner.keep(
+            "Edge",
+            {"type": "process", "name": "Web App"},
+            facts=[fact("exposure", "internal")],
         )
-        child = owner.resumed(owner.paused(db))
+        child = owner.resumed(owner.paused(db, edge))
         held = asyncio.run(owner.store.get(child))
         assert states(held) == [
             ("Encrypted", DB_KEY, "AES-256", "written", ""),
-            ("Encrypted", CLASS_KEY, "restricted", "stated", "confidential"),
+            ("Edge", EDGE_KEY, "internal", "stated", "internet-facing"),
         ]
         assert owner.answers_source(child) == [DB_LINE]
         assert [list(fact.key) for fact in held.answers.facts] == [DB_KEY]
