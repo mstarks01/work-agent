@@ -39,6 +39,7 @@ def waiting(**changes) -> AnswerState:
         checkpoint=held(),
         frameworks={"stride": {}},
         analyses=(),
+        asks=True,
         waiting=True,
         final=False,
         sources=(Source(kind="description", label="overview", text="A web app."),),

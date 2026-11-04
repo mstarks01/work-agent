@@ -507,6 +507,17 @@ class Workspace:
         if (held := self._runs.get(job_id)) is not None:
             await asyncio.wait([held[0]])
 
+    def page_status(self, record: Envelope) -> PageStatus:
+        """A job's status as the pages read it. A job that this process
+        continues at its pause runs, because it asks nobody anything."""
+        if (
+            isinstance(record, JobRecord)
+            and record.waits_to_continue()
+            and self.continuing(record.id)
+        ):
+            return "running"
+        return _page_status(record)
+
     def continuing(self, job_id: str) -> bool:
         """Whether this process runs a task of the paused job ``job_id``: the
         continue of a job that pauses for its Controls alone."""
@@ -584,6 +595,10 @@ class Workspace:
         locker = await self.store.resumed_by(record.id, record.owner_id)
         if locker is None:
             return True
+        if isinstance(record, JobRecord) and not record.pauses_to_ask():
+            # The job paused for its Controls alone, so the job that continues
+            # it shows the analysis.
+            return False
         child = await self.store.owned(locker, record.owner_id)
         return child is not None and not ended(child)
 
@@ -702,10 +717,10 @@ class Workspace:
             "created_at": min(
                 (item.created_at for item in related), default=record.created_at
             ).isoformat(),
-            "status": _page_status(record),
-            # Whether the run stops for answers, so the page shows its
+            "status": self.page_status(record),
+            # Whether the run stops to ask a person, so the page shows its
             # progress under the Questions tab rather than Reports.
-            "pauses": isinstance(record, JobRecord) and record.pauses(),
+            "pauses": isinstance(record, JobRecord) and record.pauses_to_ask(),
             "frameworks": [selection.name for selection in _selection_of(record)],
             "reports": [
                 {
@@ -1173,6 +1188,7 @@ def render_report(
         question_fallback=script_json(question_fallback(report.analyses).to_json()),
         link_questions=script_json(asked["link_questions"]),
         final=script_json(asked["final"]),
+        asks=script_json(state.asks),
         resumed_by=script_json(asked["resumed_by"]),
         parent_run=script_json(parent),
         corrections=script_json(

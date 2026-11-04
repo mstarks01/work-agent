@@ -310,7 +310,7 @@
         formControls.load();
         return;
       }
-      follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean((ask && ask.checked) || controls));
+      follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean(ask && ask.checked));
     } catch {
       fail("The connection was interrupted. Check Analyses before starting again.");
     }
@@ -978,8 +978,10 @@
         "skipped": "You skipped every question that is left. ",
         "nothing-left": "No question is left to ask. ",
       };
-      ready.textContent = emptyListReasons[data.early_stop]
-        + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
+      ready.textContent = data.asks === false
+        ? "This analysis asks no questions. Untick or resolve a Control, then choose Start the analysis."
+        : emptyListReasons[data.early_stop]
+          + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
       intro.append(ready);
     }
     // What the pause leaves open (PauseSummary): never "everything is settled".
@@ -1306,7 +1308,7 @@
       follow(body.run, "Reading your description and identifying the parts of your system…", true);
     }), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
-    tail.append(fix);
+    if (data.asks) tail.append(fix);
   };
   // The boxes beside the list: every earlier answer, every skipped question,
   // and the questions the list leaves out. Each is redrawn from the payload

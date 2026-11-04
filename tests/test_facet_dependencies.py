@@ -121,6 +121,7 @@ class TestTheFollowUp:
             None,
             {},
             _analyses(),
+            asks=True,
             waiting=False,
             answered=AnswerSet(),
             final=False,

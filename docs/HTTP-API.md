@@ -260,13 +260,14 @@ The most rows come first.
 
 **Ask before the analysis runs.** Submit with `"questions": true` beside the
 sources. The value must be a JSON boolean: the service refuses `"yes"`, `1` or
-`"on"` with `422`. The job stops after extraction, and after the assertion pass where
-the deployment runs one. It ends in `awaiting-answers` and waits. Its
-questions come from what it has read so far. Answer them with the route below,
-or send `{"links": []}` to continue without answers; either starts the
+`"on"` with `422`. The job stops after extraction, and after the assertion
+pass where the deployment runs one. It ends in `awaiting-answers` and waits.
+Its questions come from what it has read so far. Answer them with the route
+below, or send `{"links": []}` to continue without answers; either starts the
 analysis as a new job. A job submitted without `questions`, such as an
-autonomous run, never stops. A deployment that builds no assertion catalog
-asks no link question, and asks its early questions.
+autonomous run, never stops, and its report asks no questions. A deployment
+that builds no assertion catalog asks no link question, and asks its early
+questions.
 
 A waiting job also lists `early_questions`: the open facts of its model, most
 likely needed first, before any finding exists. Each entry is
@@ -582,6 +583,8 @@ same principal. A link answer may name only a principal that the job asked
 about, or one that an earlier save answered. The finished job's report is unchanged.
 
 **A report offers one follow-up.** A report's questions are its follow-up.
+Only the report of a job submitted with `"questions": true` asks them. The
+report of any other job lists no question and refuses an answer with `400`.
 Answer them, and the analysis runs once more. The report that run writes is
 final: `final` is `true`, it asks no questions, and an answer to it is refused
 with `400`. The follow-up does not ask a fact that an earlier answer answered,

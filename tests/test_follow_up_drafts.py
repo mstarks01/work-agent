@@ -48,6 +48,7 @@ def _finished(store, count=MAX_FACT_ANSWERS + 1, earlier=()):
         for n in range(count)
     ]
     record = JobRecord.create(
+        ask_questions=True,
         owner_id="alice",
         sources=[DESCRIPTION],
         frameworks=sample_selection(),

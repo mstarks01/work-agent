@@ -800,6 +800,7 @@ def question_set(
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
     analyses: Sequence[FrameworkAnalysis],
     *,
+    asks: bool,
     waiting: bool,
     answered: AnswerSet,
     final: bool,
@@ -812,7 +813,9 @@ def question_set(
     ``frameworks`` maps each selected framework to its options, and ranks the
     early list; ``analyses`` ranks the report's list. So a waiting job passes
     no analyses, and a finished one's frameworks go unread. ``answered`` holds
-    the saved answers, whose questions are not asked again. ``final`` marks a report the follow-up wrote, and ``shown``
+    the saved answers, whose questions are not asked again. ``asks`` is
+    whether the analysis asks a person. The pause and the report of an
+    analysis that asks nobody ask nothing. ``final`` marks a report the follow-up wrote, and ``shown``
     is every early question the pause presented. ``skipped`` is every early
     question and link question the pause's submitter skipped for now; a
     report's list reads both to say what became of each question before the
@@ -840,15 +843,15 @@ def question_set(
             skipped_links=(),
             resumed_by=resumed_by,
         )
-    if final:
+    if final or not asks:
         return QuestionSet(
             model=model,
             catalog=catalog,
-            waiting=False,
+            waiting=waiting and not final,
             early=(),
             facts=(),
             links=(),
-            final=True,
+            final=final,
             shown=tuple(shown),
             answered_early=(),
             answered_links=(),
@@ -1674,6 +1677,9 @@ class AnswerState:
     checkpoint: Checkpoint
     frameworks: Mapping[FrameworkName, Mapping[str, Any]]
     analyses: Sequence[FrameworkAnalysis]
+    #: Whether the analysis asks a person. A job that pauses only so that its
+    #: Controls continue it at once does not, and neither does its report.
+    asks: bool
     waiting: bool
     final: bool
     sources: Sequence[Source]
@@ -1707,6 +1713,7 @@ class AnswerState:
             None if assertions is None else assertions.catalog,
             self.frameworks,
             self.analyses,
+            asks=self.asks,
             waiting=self.waiting,
             answered=answers,
             final=self.final,
@@ -1872,6 +1879,11 @@ class AnswerState:
         questions take each one they still ask (:attr:`carried`). The amendment
         names the revision it read, as a save does.
         """
+        if not self.asks:
+            # An amendment asks again, and this analysis asks nobody.
+            raise ValueError(
+                "this analysis asks no questions, so it takes no amendment"
+            )
         if self.resumed_by is not None:
             raise AlreadyResumed(
                 f"job {self.resumed_by} locks this job;"
@@ -1916,8 +1928,17 @@ class AnswerState:
         job with no catalog, :class:`SourcesOverLimit` where the composed
         sources break ``limits``, and a ``ValueError`` that names the
         submitter's own choices otherwise. ``limits`` is ``None`` only where
-        the job holds no sources to bound, as an eval replay of saves.
+        the job holds no sources to bound, as an eval replay of saves. An
+        analysis that asks no questions takes no answer and no skip: its pause
+        takes only a continue that unticks or resolves a Control (ADR 0125).
         """
+        own = (
+            not answers.given.empty
+            or bool(answers.skips)
+            or answers.renames is not None
+        )
+        if not self.asks and (own or not self.waiting):
+            raise ValueError("this analysis asks no questions, so it takes no answers")
         self._check_revision(answers.revision, required=self.waiting or answers.save)
         if self.waiting:
             assertions = self.checkpoint.assertions

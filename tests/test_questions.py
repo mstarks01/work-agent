@@ -461,8 +461,12 @@ class TestTheRoutes:
         from tests.factories import asking_threat, sample_report
         from tests.test_api import admit
 
+        # An analysis that asks: only its report offers follow-up questions.
         record = JobRecord.create(
-            owner_id="alice", sources=[DESCRIPTION], frameworks=sample_selection()
+            owner_id="alice",
+            sources=[DESCRIPTION],
+            frameworks=sample_selection(),
+            ask_questions=True,
         )
         record.transition("running")
         asked = UnknownRef(
@@ -861,6 +865,7 @@ class TestTheAdmissionCheck:
             catalog,
             {},
             [],
+            asks=True,
             waiting=True,
             answered=AnswerSet(),
             final=False,
@@ -1236,6 +1241,7 @@ def test_a_report_question_says_what_became_of_it_at_the_pause(report):
         catalog,
         {},
         report.analyses,
+        asks=True,
         waiting=False,
         answered=AnswerSet(),
         final=False,

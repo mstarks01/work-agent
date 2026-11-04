@@ -374,8 +374,9 @@ class JobSubmission(BaseModel):
     #: ``represented-by`` rows; see :mod:`analysis_service.links`.
     links: list[LinkAnswer] = Field(default_factory=list, max_length=MAX_LINK_ANSWERS)
     #: Stop after the assertion pass, publish the questions, and wait for a
-    #: person to answer them. Off by default, so an autonomous caller's job
-    #: never waits (#1252). Strict, as ``save`` is: ``"yes"`` asks nothing.
+    #: person to answer them; the report then offers its one follow-up. Off by
+    #: default, so an autonomous caller's job never waits and its report asks
+    #: nothing (#1252). Strict, as ``save`` is: ``"yes"`` asks nothing.
     questions: bool = Field(default=False, strict=True)
     #: An earlier job of the caller's whose answers this job carries, and
     #: whose questions take each one they still ask (ADR 0079). It needs

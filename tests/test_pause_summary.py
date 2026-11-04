@@ -24,6 +24,7 @@ def _paused(model, selection, answers=(), shown=(), skipped=()):
         None,
         selection,
         (),
+        asks=True,
         waiting=True,
         answered=AnswerSet(facts=tuple(answers)),
         final=False,

@@ -1191,6 +1191,7 @@ def report_state(
         ),
         frameworks={s.name: s.options for s in report.job.frameworks},
         analyses=report.analyses,
+        asks=True,
         waiting=False,
         final=final,
         sources=(),

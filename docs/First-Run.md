@@ -406,7 +406,8 @@ lists your Controls under "Controls for this analysis", each one ticked. At
 the questions, the page shows what each Control matched in your description,
 and you confirm the match there. With the questions off, the service applies
 each Control's default match and continues at once. When it cannot apply them,
-the page shows the refusal at the questions.
+the page shows the refusal at the questions. That pause asks no question: untick
+or resolve a Control there, then choose **Start the analysis**.
 The report lists each Control with the facts it wrote and what became of each
 row. See [The Controls page](Web-App.md#the-controls-page).
 
@@ -488,24 +489,27 @@ The app can ask you questions before the analysis, and after the report.
   so, and you can still change an answer. Only **Start the analysis** starts
   it. The analysis then starts from what was already read, so nothing is read
   again, and it reads your answers.
-- **After the report: one optional follow-up.** The report is complete
-  without it. Where the report asks something, a line under the findings
-  offers **Add information**, and the **Questions** tab shows how many
-  questions it asks. The questions use the same list as the questions before
-  the analysis: a group for each kind of question, an index of the groups on
-  the left, typed answers, and one shared answer for the parts you tick where a question
-  asks about several parts. Each question says what became of it before the analysis: new
-  from this analysis, left blank, skipped, answered in part, or answered "I
-  don't know". **Used by** names the findings that use it; click an ID to open
-  that finding. The help under **?** says what the answer informs and that a
-  finding can need other facts too. Where your install builds an assertion
-  catalog, the list also asks which part of your system each user, team or
-  account is, under **Match each user, team or account to a part of your
-  system**. Where a part of your system has the same name, the question lists
-  that part first, marked "(same name)", and shows an arrow button; nothing is
-  chosen until you click it. **Answers this report read** lists your earlier
-  answers; **Change** gives a new one. A known answer cannot change back to "I
-  don't know" there, and a known part of a question with parts cannot either.
+- **After the report: one optional follow-up.** Only an analysis with **Ask me
+  questions to make the report better.** ticked offers it. A report of an
+  analysis with the box unticked has no **Questions** tab. The report is
+  complete without the follow-up. Where the report asks something, a line
+  under the findings offers **Add information**, and the **Questions** tab
+  shows how many questions it asks. The questions use the same list as the
+  questions before the analysis: a group for each kind of question, an index
+  of the groups on the left, typed answers, and one shared answer for the
+  parts you tick where a question asks about several parts. Each question says
+  what became of it before the analysis: new from this analysis, left blank,
+  skipped, answered in part, or answered "I don't know". **Used by** names the
+  findings that use it; click an ID to open that finding. The help under **?**
+  says what the answer informs and that a finding can need other facts too.
+  Where your install builds an assertion catalog, the list also asks which
+  part of your system each user, team or account is, under **Match each user,
+  team or account to a part of your system**. Where a part of your system has
+  the same name, the question lists that part first, marked "(same name)", and
+  shows an arrow button; nothing is chosen until you click it. **Answers this
+  report read** lists your earlier answers; **Change** gives a new one. A
+  known answer cannot change back to "I don't know" there, and a known part of
+  a question with parts cannot either.
 
   For a control such as authentication or encryption, first choose "There is
   none", "I don't know" or "A mechanism". For a mechanism, the text box

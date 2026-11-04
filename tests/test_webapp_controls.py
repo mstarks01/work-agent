@@ -885,6 +885,52 @@ class TestTheAutomaticContinue:
         ]
         assert owner.runner.heads == 1
 
+    def test_the_analysis_shows_the_continued_job_and_asks_nothing(self, owner):
+        _, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
+        child = frames["continued"]["run"]
+        assert ran(owner.client, child) == "completed"
+        # The list shows the job that continues the pause, not the pause.
+        [shown] = owner.client.get("/workspace/runs").json()
+        assert (shown["run"], shown["status"], shown["pauses"]) == (
+            child,
+            "completed",
+            False,
+        )
+        # Its report has no questions, and takes no answers.
+        page = owner.client.get(f"/report/{child}").text
+        assert re.search(r'id="asks"[^>]*>false<', page)
+        assert re.search(r'id="fact_questions"[^>]*>\[\]<', page)
+        assert re.search(r'id="link_questions"[^>]*>\[\]<', page)
+        # No answer passes, not even a new value for a fact a Control wrote.
+        for sent in (dict(FACT), {"key": DB_KEY, "value": "KMS"}):
+            refused = owner.answer(child, revision=0, facts=[sent])
+            assert refused.status_code == 400
+            assert "asks no questions" in refused.json()["message"]
+        saved = owner.answer(child, revision=0, facts=[dict(FACT)], save=True)
+        assert saved.status_code == 400
+
+    def test_a_paused_analysis_that_asks_nobody_takes_no_answer_and_no_amendment(
+        self, owner
+    ):
+        aes = owner.keep("Encrypted", ORDERS_DB)
+        kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
+        run_id, frames = self.continued(owner, aes, kms)
+        assert "refusal" in frames["questions"]
+        asked = owner.questions(run_id)
+        assert asked["asks"] is False
+        assert asked["early_questions"] == []
+        # The pause takes an untick, but no answer of its own.
+        own = owner.answer(run_id, revision=0, facts=[dict(FACT)])
+        assert own.status_code == 400
+        assert "asks no questions" in own.json()["message"]
+        amended = owner.client.post(
+            f"/amend/{run_id}",
+            json={"text": "The API runs behind a gateway.", "revision": 0},
+            headers=SAME_ORIGIN,
+        )
+        assert amended.status_code == 400
+        assert "takes no amendment" in amended.json()["message"]
+
     def test_each_control_takes_its_default_resolution(self, owner):
         db = owner.keep("Encrypted", ORDERS_DB)
         billing = owner.keep("Billing", {"type": "process", "name": "Billing"})
