@@ -902,8 +902,8 @@ class SectionEntry(BaseModel):
 
 #: A quotation in a ruling's reason: the text inside a pair of double quotes,
 #: curly single quotes or backticks. A straight single quote is left out,
-#: because an apostrophe is one. A curly closing quote that a letter or a
-#: digit follows is an apostrophe, as in “owner’s”, and closes nothing.
+#: because an apostrophe is one. A curly closing quote that a word character
+#: follows is an apostrophe, as in “owner’s”, and closes nothing.
 _QUOTATION = re.compile(r"“([^”]+)”|\"([^\"]+)\"|‘(.+?)’(?!\w)|`([^`]+)`")
 
 

@@ -126,7 +126,7 @@ def check_fact_answers(
         ref = key_ref(answer.key)
         element_id, attribute, assertion = ref.element_id, ref.attribute, ref.assertion
         question, capability = ref.question, ref.capability
-        if len(ref.spellings) != 1:
+        if not ref.sound:
             raise ValueError(f"facts[{at}]: a key names one fact, in one spelling")
         kind = answer.kind
         if kind == "question":

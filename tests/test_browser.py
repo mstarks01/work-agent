@@ -2393,7 +2393,7 @@ def test_a_zone_control_fans_out_and_the_owner_ticks_a_part(zoned_page):
     assert page.locator("#control-offer b").first.inner_text() == "Internal <b>WAF</b>"
     fanout = page.locator("#control-offer .fanout li")
     assert [text.strip() for text in fanout.all_inner_texts()] == [
-        "Web App — stated-zone: the description places this part in the zone",
+        "Web App — stated-zone: a source places this part in the zone",
         "Orders DB — zone-inferred: the service inferred this placement",
         "Audit Log — no-zone-stated: no source places this part",
     ]

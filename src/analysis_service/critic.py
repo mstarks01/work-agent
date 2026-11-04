@@ -181,7 +181,7 @@ def _one_per_fact(refs: Sequence[UnknownRef]) -> list[UnknownRef]:
     entry with no twin stays, and the review seam sends it back.
     """
     sound = {
-        _place(ref) for ref in refs if len(ref.spellings) == 1 and any(_place(ref))
+        _place(ref) for ref in refs if ref.sound and any(_place(ref))
     }
     kept: list[UnknownRef] = []
     seen: set[UnknownKey] = set()

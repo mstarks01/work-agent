@@ -375,7 +375,7 @@ class TestThePage:
 
 class RulingRunner(ZonedRunner):
     """Rules on the rows of one Control in the report it completes: the
-    critic applies the ``spoofing`` row on the STRIDE claim, and refuses the
+    critic applies the ``spoofing`` row on two STRIDE drafts, and refuses the
     ``tampering`` row on a claim that went back to the deferred set."""
 
     control = ""
@@ -405,7 +405,7 @@ class RulingRunner(ZonedRunner):
                 )
             ],
         )
-        # Two drafts on one row, each ruled out by the same quoted line.
+        # Two drafts on one row, each ruled on by the same quoted line.
         ruled = sample_analysis(
             [],
             [

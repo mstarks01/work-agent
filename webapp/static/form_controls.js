@@ -94,7 +94,7 @@ const formControls = (() => {
     "unticked": "unticked: you left it out",
     "zone-inferred": "zone-inferred: the service inferred this placement",
     "no-zone-stated": "no-zone-stated: no source places this part",
-    "stated-zone": "stated-zone: the description places this part in the zone",
+    "stated-zone": "stated-zone: a source places this part in the zone",
   };
   // The candidates of a zone Control on `element`: the zone it matched, or a
   // zone the owner chose from its choices. Empty for any other element.

@@ -425,6 +425,12 @@ class UnknownRef(BaseModel):
         return tuple(name for name, on in used.items() if on)
 
     @property
+    def sound(self) -> bool:
+        """Whether this reference uses one spelling, as a key that names one
+        fact must."""
+        return len(self.spellings) == 1
+
+    @property
     def kind(self) -> Spelling:
         """Which of the five kinds of fact this reference names.
 
