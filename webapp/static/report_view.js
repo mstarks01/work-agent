@@ -1421,7 +1421,7 @@
         const item = el("li");
         item.append(code(m.claim_id), " — ", code(m.unit), ` needs ${m.needs}`);
         m.refused_controls.forEach(r => {
-          item.append("; row ", code(r.unit), " refused: ", prose(r.reason));
+          item.append("; row ", code(r.unit), " of ", code(r.control), " refused: ", prose(r.reason));
         });
         list.append(item);
       });

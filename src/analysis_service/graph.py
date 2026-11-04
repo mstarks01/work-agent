@@ -2494,7 +2494,8 @@ def _framework_block(
         package.record,
     )
     rejected = outcome.rejected
-    marks = critic_round.marks
+    # A returned claim leaves the block, so each mark on it leaves too.
+    marks = critic_round.marks.on_claims([claim.id for claim in (*claims, *rejected)])
     retrieved = state.get(nodes.key("retrieved")) or {}
     refusal = _refusal(package, state.get(nodes.key("precondition")))
     return schemas.block(

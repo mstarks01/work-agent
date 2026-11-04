@@ -3790,3 +3790,57 @@ class TestThePerFrameworkRoles:
         """A role that named the same node as another would silently merge two."""
         named = [NODES.node(role) for role in graph.ROLES]
         assert len(set(named)) == len(graph.ROLES)
+
+
+def test_a_mark_on_a_returned_claim_leaves_the_block_with_it(domain_loader):
+    """A claim the critic kept against every Control row goes back to the
+    deferred set, and each mark on it goes with it (ADR 0126). A mark left on
+    the block would name a claim the block does not hold."""
+    from analysis_service.claims import UnverifiedGround
+    from tests.test_critic_controls import DB_CONTROL, _applied, _asvs_draft, _db, _row
+
+    asvs = graph.FrameworkNodes("asvs")
+    keys = graph.GraphKeys.of(("asvs",))
+    model = valid_model().model_dump(mode="json")
+    ctx = FakeContext(**{graph.STATE_FRAMEWORK_OPTIONS: {"asvs": {"level": 3}}})
+    graph.prepare_analysis(
+        model,
+        ctx,
+        keys,
+        ("asvs",),
+        domain_loader,
+        repo_package_loaders(("asvs",)),
+        assertions=False,
+    )
+    draft = _asvs_draft("V11.2.1", "store:orders-db")
+    refused = {"control": DB_CONTROL, "unit": "V11.2.1", "reason": "names no key"}
+    ctx.state[graph.STATE_APPLIED_CONTROLS] = [
+        control.model_dump(mode="json") for control in _applied(_db(_row("V11.2.1")))
+    ]
+    ctx.state[asvs.key("drafts")] = [draft.model_dump(mode="json")]
+    ctx.state[asvs.key("reviewed")] = {
+        "claims": [
+            {"id": draft.id, "verdict": {"reason": "", "refused_controls": [refused]}}
+        ]
+    }
+    ctx.state[asvs.key("marks")] = AnalysisMarks(
+        unverified_grounds=[UnverifiedGround(claim_id=draft.id, index=0, reason="x")]
+    ).model_dump(mode="json")
+    ctx.state[asvs.key("undeferred")] = {"V11.2.1": "config"}
+    ctx.state[asvs.key("accepted")] = True
+
+    graph.assemble_report(
+        model,
+        ctx,
+        keys,
+        ("asvs",),
+        {"asvs": BOTH_DISCLAIMERS["asvs"]},
+        domain_packs=None,
+    )
+
+    [block] = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS]).analyses
+    assert block.claims == []
+    assert [entry.claim_id for entry in block.returned_claims] == [draft.id]
+    assert block.unverified_grounds == []
+    [entry] = [entry for entry in block.scope if entry.unit == "V11.2.1"]
+    assert (entry.state, entry.needs) == ("needs-other-evidence", "config")

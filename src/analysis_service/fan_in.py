@@ -330,8 +330,9 @@ def returned_to_deferred(
     undeferred: Mapping[str, str],
     record: type[Claim],
 ) -> Returned:
-    """Each unit a Control row alone kept from the deferred set and that no
-    ruling settled, back in the deferred set with its kind (ADR 0126).
+    """Each unit a Control row alone kept from the deferred set, back in the
+    deferred set with its kind, where a claim on it is kept or is rejected at
+    a step that does not rule on the unit (ADR 0126).
 
     The job carries no evidence of the kind such a unit needs. A claim the
     critic kept refused every row it was shown, so it leaves ``claims`` as a
