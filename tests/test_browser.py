@@ -2212,7 +2212,7 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     assert page.inner_text("#controls-count") == "1 of 50 Controls"
     cells = page.locator("#controls-list tr td")
     assert page.inner_text("#controls-list td.name-cell a") == HOSTILE_CONTROL
-    assert "Proves encryption at rest" in cells.nth(1).inner_text()
+    assert "Facts: encryption at rest" in cells.nth(1).inner_text()
     assert cells.nth(2).inner_text() == "A data store: Orders DB"
     assert cells.nth(3).inner_text().split("\n") == [
         "asvs V11.2",
@@ -2232,12 +2232,12 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     assert "orders <i>database</i>" in page.inner_text(".aliases")
     page.fill("#control-name", "Orders DB encrypted")
     page.click("#facts-list button")
-    add_fact(page, "data classification", "confidential")
+    add_fact(page, "encryption at rest", "KMS")
     save_control(page)
     assert page.inner_text("#controls-list td.name-cell a") == "Orders DB encrypted"
     [edited] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
     assert edited["id"] == control["id"]
-    assert [fact["value"] for fact in edited["facts"]] == ["confidential"]
+    assert [fact["value"] for fact in edited["facts"]] == ["KMS"]
     assert edited["evidence"] == control["evidence"]
 
 

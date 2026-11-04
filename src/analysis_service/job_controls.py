@@ -60,11 +60,7 @@ from analysis_service.fact_answers import (
 )
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
-from analysis_service.open_facts import (
-    open_attribute,
-    prepared_model,
-    stated_capability,
-)
+from analysis_service.open_facts import open_attribute, prepared_model
 from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import EvidenceClass
 from analysis_service.system_model import (
@@ -678,13 +674,9 @@ class ControlFacts(BaseModel):
 
 
 def _placed(facts: Sequence[FactAnswer], model: SystemModel, elements: Sequence[str]):
-    """Each fact of a Control on each element its scope covers. An attribute
-    or a question takes the element; an attribute the element does not have
-    is no fact of it. Every other kind names no element and is written once."""
+    """Each fact of a Control on each element its scope covers. A fact takes
+    the element; an attribute the element does not have is no fact of it."""
     for fact in facts:
-        if fact.kind not in ("attribute", "question"):
-            yield fact
-            continue
         for element_id in elements:
             element = model.get(element_id)
             attribute = key_ref(fact.key).attribute
@@ -702,8 +694,6 @@ def _stated_value(model: SystemModel, fact: FactAnswer) -> str | None:
         if open_attribute(model, ref.element_id, ref.attribute):
             return None
         return str(getattr(model.get(ref.element_id), ref.attribute))
-    if fact.kind == "capability":
-        return stated_capability(model, ref.capability)
     return None
 
 
@@ -798,8 +788,8 @@ def refuse_disagreement(
     with one value both stay writers.
 
     Each Control's written facts take the answer check of
-    :func:`~analysis_service.fact_writes.check_fact_answers`, the capability
-    lineage check included (ADR 0125), and the refusal names the Control.
+    :func:`~analysis_service.fact_writes.check_fact_answers` (ADR 0125), and
+    the refusal names the Control.
     """
     for entry in entries:
         written = [fact.answer for fact in entry.facts if fact.state == "written"]
@@ -815,8 +805,8 @@ def refuse_disagreement(
                 continue
             ref = key_ref(fact.key)
             element = model.get(ref.element_id)
-            place = "the application" if element is None else element.name
-            subject = ref.attribute or ref.question or ref.capability or ref.subject
+            place = ref.element_id if element is None else element.name
+            subject = ref.attribute or ref.question
             raise ValueError(
                 f"Two Controls write “{subject}” on {place} with two values:"
                 f" “{earlier.value}” and “{fact.value}”. Untick one, or edit one"

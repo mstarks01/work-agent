@@ -18,10 +18,10 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.answer_forms import YES_NO, attribute_choices, max_length_of
-from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import UnknownRef
 from analysis_service.controls import (
     EVIDENCE_ID,
+    PROTECTIVE_ATTRIBUTES,
     SCOPE_FACT_KINDS,
     Control,
     ControlDocument,
@@ -40,7 +40,6 @@ from analysis_service.owner_files import NOT_UTF_8
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import MAX_LABEL_CHARS, EvidenceClass, text_digest
 from analysis_service.system_model import (
-    ZONE_ATTRIBUTE,
     Element,
     ZonedElement,
     attribute_names,
@@ -72,9 +71,9 @@ def _element_types(scope_type: ScopeType) -> tuple[type[Element], ...]:
     return tuple(kind for kind in zoned if kind.id_prefix == scope_type)
 
 
-def _key(*, attribute: str = "", question: str = "", capability: str = "") -> list:
+def _key(*, attribute: str = "", question: str = "") -> list:
     """A fact's key with no element: the scope supplies it."""
-    ref = UnknownRef(attribute=attribute, question=question, capability=capability)
+    ref = UnknownRef(attribute=attribute, question=question)
     return list(ref.key)
 
 
@@ -83,8 +82,7 @@ def _attribute_facts(scope_type: ScopeType) -> list[dict[str, object]]:
     for element_type in _element_types(scope_type):
         fields = element_type.model_construct()
         for attribute in attribute_names(fields):
-            # A Control places no element (ControlDocument refuses a zone).
-            if attribute == ZONE_ATTRIBUTE or attribute in facts:
+            if attribute not in PROTECTIVE_ATTRIBUTES or attribute in facts:
                 continue
             facts[attribute] = {
                 "key": _key(attribute=attribute),
@@ -109,18 +107,6 @@ def _question_facts() -> list[dict[str, object]]:
     ]
 
 
-def _capability_facts() -> list[dict[str, object]]:
-    return [
-        {
-            "key": _key(capability=name),
-            "label": capability.question,
-            "choices": list(YES_NO),
-            "facets": [],
-        }
-        for name, capability in CAPABILITIES.items()
-    ]
-
-
 #: The facts the page offers of each kind that a scope writes
 #: (:data:`~analysis_service.controls.SCOPE_FACT_KINDS`).
 _FACT_OFFERS: Mapping[
@@ -129,7 +115,6 @@ _FACT_OFFERS: Mapping[
     {
         "attribute": _attribute_facts,
         "question": lambda scope_type: _question_facts(),
-        "capability": lambda scope_type: _capability_facts(),
     }
 )
 

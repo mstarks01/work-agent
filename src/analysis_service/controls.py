@@ -2,7 +2,7 @@
 systems already have (ADRs 0123, 0124 and 0127).
 
 A Control is one row and its evidence objects. The row holds the authored
-:class:`ControlDocument` as JSON: the scope, the facts it proves, the rows that
+:class:`ControlDocument` as JSON: the scope, the facts it states, the rows that
 name framework units and the list of evidence files. The text of each evidence
 file is an object under :func:`~analysis_service.objects.evidence_key`, and the
 document holds its digest.
@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Literal, Self, TypeVar
+from typing import Literal, Self, TypeVar, get_args
 
 from pydantic import (
     BaseModel,
@@ -56,16 +56,25 @@ MAX_CONTROL_ALIASES = 20
 ScopeType = Literal["application", "entity", "process", "store", "boundary"]
 
 #: The kinds of fact a Control writes: a subject or an assertion is a question
-#: of one job, so no Control writes one.
-ControlFactKind = Literal["attribute", "question", "capability"]
+#: of one job, and a Capability says what the application does rather than
+#: what protects it, so no Control writes one.
+ControlFactKind = Literal["attribute", "question"]
+
+#: The attributes a Control writes: each states a protection on a part. They
+#: are the :data:`~analysis_service.analysis.CONTROL_ATTRIBUTES` a scope holds,
+#: less ``data_classification``, which describes the data and protects nothing.
+#: ``authentication`` and ``encryption_in_transit`` sit on a flow, which is no
+#: scope.
+ProtectiveAttribute = Literal["encryption_at_rest", "exposure"]
+PROTECTIVE_ATTRIBUTES: tuple[ProtectiveAttribute, ...] = get_args(ProtectiveAttribute)
 
 #: The kinds of fact a Control of each scope writes (ADR 0125). A part takes
-#: its attributes and the Question Kinds about it; the whole application takes
-#: a Capability, which names no element. The document refuses another kind,
-#: and the Controls page offers these.
+#: its protective attributes and the Question Kinds about it; the whole
+#: application takes no fact. The document refuses another kind, and the
+#: Controls page offers these.
 SCOPE_FACT_KINDS: Mapping[ScopeType, frozenset[ControlFactKind]] = MappingProxyType(
     {
-        "application": frozenset({"capability"}),
+        "application": frozenset(),
         "entity": frozenset({"attribute", "question"}),
         "process": frozenset({"attribute", "question"}),
         "store": frozenset({"attribute", "question"}),
@@ -74,16 +83,17 @@ SCOPE_FACT_KINDS: Mapping[ScopeType, frozenset[ControlFactKind]] = MappingProxyT
 )
 
 _PART_REFUSAL = (
-    "A part takes its attributes and the questions about it. A capability is a"
-    " fact of the whole application: protect the whole application for it."
+    "A Control states a protection: the questions about the part, "
+    + " or ".join(f"its {name.replace('_', ' ')}" for name in PROTECTIVE_ATTRIBUTES)
+    + ". The description states the rest."
 )
 
-#: Why a document is refused for a fact of another kind, by scope.
+#: Why a document is refused for a fact it may not write, by scope.
 SCOPE_FACT_REFUSALS: Mapping[ScopeType, str] = MappingProxyType(
     {
         "application": (
-            "The whole application takes only a capability. Choose the part that"
-            " an attribute or a question is about."
+            "The whole application takes no fact. Name the units the Control"
+            " covers, or choose the part that a fact is about."
         ),
         "entity": _PART_REFUSAL,
         "process": _PART_REFUSAL,
@@ -252,13 +262,14 @@ class ControlDocument(BaseModel):
         for ref in refs:
             if not ref.sound:
                 raise ValueError("A fact names one fact, in one spelling.")
-            if ref.kind not in SCOPE_FACT_KINDS[self.scope.type]:
+            protective = ref.kind != "attribute" or ref.attribute in (
+                PROTECTIVE_ATTRIBUTES
+            )
+            if ref.kind not in SCOPE_FACT_KINDS[self.scope.type] or not protective:
                 raise ValueError(SCOPE_FACT_REFUSALS[self.scope.type])
         for key in _repeated(fact.key for fact in self.facts):
             ref = key_ref(key)
-            name = (
-                ref.attribute or ref.question or ref.capability or ref.assertion
-            ) or ref.subject
+            name = ref.attribute or ref.question
             raise ValueError(
                 f"The fact “{name}” appears twice. One Control writes one value for"
                 " one fact."
