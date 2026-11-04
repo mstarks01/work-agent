@@ -392,7 +392,9 @@ class JobRecord(BaseModel):
     # answer's row quotes; these are what ``prepare`` writes the rows from. See
     # :mod:`analysis_service.links` and :mod:`analysis_service.questions`. One
     # request carries at most MAX_FACT_ANSWERS; a job holds every save's
-    # (ADR 0070).
+    # (ADR 0070). A waiting job holds only its own answers, so a save that
+    # unticks a Control takes the Control's facts away. A Resumed Job holds
+    # what its run writes: its own answers over each Control fact (ADR 0125).
     answers: HeldAnswerSet = NO_ANSWERS
     # Every early question the pause presented, answered or not. The report
     # reads it to say what became of a follow-up question before the analysis.
@@ -579,8 +581,9 @@ class JobRecord(BaseModel):
         )
 
     def written_answers(self) -> AnswerSet:
-        """The answers this job's run writes: its own answers over each fact
-        its Controls write (ADR 0125)."""
+        """The answers this job's run writes: its answers over each fact its
+        Controls write (ADR 0125). A Resumed Job's answers hold each Control
+        fact already, and the result is its answers."""
         return self.answers.over(control_answers(self.control_facts or []))
 
     def selection(self) -> tuple[FrameworkName, ...]:

@@ -34,6 +34,7 @@ from analysis_service.evidence import evidence_catalog, prepared_view
 from analysis_service.parsing import table_entry
 from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
 from analysis_service.system_model import (
+    UNKNOWN,
     ZONE_ATTRIBUTE,
     DataFlow,
     SystemModel,
@@ -363,7 +364,7 @@ def stated_capability(model: SystemModel, capability: str) -> str | None:
     capability exactly where an answer may.
     """
     known = model.capability_facts().get(capability)
-    if known is None or known.state == "unknown":
+    if known is None or known.state == UNKNOWN:
         return None
     return known.state
 

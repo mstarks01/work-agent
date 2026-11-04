@@ -1978,7 +1978,7 @@ class AnswerState:
         controls = self._controls_of(held)
         # The answers Source holds each Control fact on a line that names the
         # Control, as the run composes it again (ADR 0125).
-        written = held.over(control_answers(controls))
+        written = within_held_limits(held.over(control_answers(controls)))
         sources = with_link_answers(
             [source for source in admitted.sources if source.kind != "answers"],
             written.links,
