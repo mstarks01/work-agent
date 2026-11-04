@@ -297,12 +297,14 @@
           questions: Boolean(ask && ask.checked),
           answers_from: document.getElementById("answers-from")?.value || undefined,
           owner_files: chosen.size ? [...chosen] : undefined,
+          controls: formControls.chosen(),
         }),
       });
       if (!started.ok) {
         fail((await started.json()).message);
-        // A chosen file can be gone: the list shows it as missing.
+        // A chosen file or Control can be gone: the list shows it as missing.
         if (chosen.size) loadFiles();
+        formControls.load();
         return;
       }
       follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean(ask && ask.checked));
@@ -372,6 +374,10 @@
   // What the description says, drawn once for each run (drawDetected).
   const detectedBox = document.createElement("div");
   detectedBox.className = "detected-facts";
+  // The copied Controls and their match, redrawn from each payload.
+  const controlsBox = document.createElement("div");
+  controlsBox.className = "control-offer";
+  controlsBox.id = "control-offer";
   // The answers this run carried from an earlier one and could not take,
   // redrawn from each payload (drawCarried).
   const carried = document.createElement("div");
@@ -379,7 +385,7 @@
   let framed = false;
   const frame = () => {
     if (framed) return;
-    questions.replaceChildren(detectedBox, intro, list, carried, tail);
+    questions.replaceChildren(detectedBox, controlsBox, intro, list, carried, tail);
     framed = true;
   };
 
@@ -904,6 +910,7 @@
     drawIntro(data);
     drawCarried(data);
     drawDetected(data);
+    drawOffer(data);
     drawTail(data);
     drawBoxes(data);
     announce(before, data);
@@ -1086,6 +1093,32 @@
     answerProblem.hidden = true;
     if (data.early_questions) reconcile(data);
   });
+  // Save the resolution of each copied Control after a change at the pause
+  // (ADR 0124). A refused save draws the offer again from the last answer.
+  const saveScopes = (scopes) => answerAction(async () => {
+    await flush();
+    if (edits.size) {
+      refuse("Some answers are not saved yet. Save them, then try again.");
+      drawOffer(view);
+      return;
+    }
+    const response = await fetch("/answer/" + pausedRun, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        links: [], facts: [], save: true, skip: [], presented: presented(), revision, control_scopes: scopes,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      refuse(data.message || "The service did not keep this change.");
+      drawOffer(view);
+      return;
+    }
+    answerProblem.hidden = true;
+    if (data.early_questions) reconcile(data);
+  });
+  const drawOffer = (data) => formControls.drawOffer(controlsBox, data, { save: saveScopes, refuse });
   // Whether a dropped answer waits for the submitter to choose an element, by its
   // reason (CarriedReason).
   const waitsForElement = {
@@ -1599,6 +1632,8 @@
       fail(JSON.parse(event.data).message);
     });
   };
+
+  formControls.load();
 
   // A report page that started a resumed run sends the browser here to watch
   // it, because the report page shows one finished report and nothing else.

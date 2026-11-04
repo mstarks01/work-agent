@@ -422,8 +422,16 @@ def control_offer(
 ) -> list[dict[str, object]]:
     """What the pause shows of each copied Control: its scope as authored,
     its match against ``model`` with the choices and the candidates, its
-    resolution, and its rows with their version check."""
+    resolution, and its rows with their version check. A choice of a zone
+    lists the candidates of that zone, so the owner can tick them."""
     names = {element.id: element.name for element in model.elements()}
+
+    def covers(found: Sequence[CoveredElement]) -> list[dict[str, object]]:
+        return [
+            cover.model_dump(mode="json") | {"name": names[cover.element]}
+            for cover in found
+        ]
+
     offer: list[dict[str, object]] = []
     for copy, resolution in zip(
         copies, resolutions(copies, scopes, model), strict=True
@@ -441,12 +449,18 @@ def control_offer(
                     else None
                 ),
                 "choices": [
-                    {"id": choice, "name": names[choice]} for choice in found.choices
+                    {
+                        "id": choice,
+                        "name": names[choice],
+                        "covers": (
+                            covers(zone_covers(model, choice))
+                            if is_zone(choice)
+                            else []
+                        ),
+                    }
+                    for choice in found.choices
                 ],
-                "covers": [
-                    cover.model_dump(mode="json") | {"name": names[cover.element]}
-                    for cover in found.covers
-                ],
+                "covers": covers(found.covers),
                 "resolution": resolution.model_dump(mode="json"),
                 "rows": [row.model_dump(mode="json") for row in copy.rows],
             }

@@ -2316,3 +2316,173 @@ def test_a_delete_and_a_multi_delete_ask_first(page):
     assert page.inner_text("#controls-notice") == (
         "2 Controls are deleted. The analyses that applied them keep their copy."
     )
+
+
+@pytest.fixture
+def zoned_page(browser, tiers):
+    """A page on the app over the zoned model of the Control tests."""
+    from tests.test_webapp_controls import ZonedRunner
+
+    app = web.app_for(tiers, ZonedRunner())
+    for base in serve(app):
+        context = browser.new_context(base_url=base)
+        opened = context.new_page()
+        errors: list[str] = []
+        opened.on("pageerror", lambda error: errors.append(str(error)))
+        opened.on("dialog", lambda dialog: errors.append(f"dialog: {dialog.message}"))
+        opened.goto("/controls")
+        yield opened
+        context.close()
+        assert errors == [], f"the page raised: {errors}"
+
+
+def keep_control(page, name: str, scope: dict, *, facts=(), rows=None) -> str:
+    """Keep a Control through the page's own route, and return its ID."""
+    body = {
+        "name": name,
+        "scope": {"name": "", "aliases": []} | scope,
+        "facts": list(facts),
+        "rows": rows if rows is not None else [
+            {"framework": "stride", "unit": "spoofing", "version": "1.0"}
+        ],
+        "evidence": [],
+    }
+    saved = page.evaluate(
+        """(body) => fetch('/workspace/controls', {method: 'POST',
+             headers: {'Content-Type': 'application/json'},
+             body: JSON.stringify(body)}).then((r) => r.json())""",
+        body,
+    )
+    return saved["id"]
+
+
+def submit_with_controls(page) -> dict:
+    """Submit the form with its ticked Controls, and wait for the pause."""
+    page.goto("/")
+    page.wait_for_selector("#controls-offer:not([hidden])")
+    page.fill("#description", "A web app talks to a database.")
+    page.fill("#analysis-name", "Controls analysis")
+    page.locator('input[name="framework"]').first.check()
+    with page.expect_response("**/analyze") as answered:
+        page.click("#go")
+    assert answered.value.ok, answered.value.text()
+    page.wait_for_selector("#control-offer .offer-line")
+    return answered.value.request.post_data_json
+
+
+def save_offer(page, action) -> dict:
+    """Do ``action`` on the offer, and return the save it sends."""
+    with page.expect_response(_post_to_answer) as answered:
+        action()
+    assert answered.value.ok, answered.value.text()
+    page.wait_for_timeout(100)
+    return answered.value.request.post_data_json
+
+
+def test_a_zone_control_fans_out_and_the_owner_ticks_a_part(zoned_page):
+    page = zoned_page
+    zone = keep_control(page, "Internal <b>WAF</b>", {"type": "boundary", "name": "Internal Network"})
+    sent = submit_with_controls(page)
+    assert sent["controls"] == [zone]
+    offer = page.locator("#control-offer")
+    assert "matches Internal Network" in offer.inner_text()
+    assert page.locator("#control-offer b").first.inner_text() == "Internal <b>WAF</b>"
+    fanout = page.locator("#control-offer .fanout li")
+    assert [text.strip() for text in fanout.all_inner_texts()] == [
+        "Web App",
+        "Orders DB — zone-inferred: the service inferred this placement",
+        "Audit Log — no-zone-stated: no source places this part",
+    ]
+    assert page.is_checked(f"#cover-{zone}-process\\:web-app")
+    assert not page.is_checked(f"#cover-{zone}-store\\:orders-db")
+    body = save_offer(page, lambda: page.check(f"#cover-{zone}-store\\:orders-db"))
+    assert body["control_scopes"] == [
+        {
+            "control": zone,
+            "element": "boundary:internal-network",
+            "ticked": ["process:web-app", "store:orders-db"],
+        }
+    ]
+    assert page.is_checked(f"#cover-{zone}-store\\:orders-db")
+    assert "1 Control of 1 will apply." in offer.inner_text()
+
+
+def test_an_unmatched_control_takes_a_choice_and_keeps_the_name(zoned_page):
+    page = zoned_page
+    waf = keep_control(page, "WAF", {"type": "process", "name": "Edge"})
+    submit_with_controls(page)
+    offer = page.locator("#control-offer")
+    assert "missing-element" in offer.inner_text()
+    assert page.is_disabled(f"#offer-{waf}")
+    choices = page.locator(f"#apply-{waf} option").all_inner_texts()
+    assert choices == ["Not this time", "Web App"]
+    body = save_offer(page, lambda: page.select_option(f"#apply-{waf}", "process:web-app"))
+    assert body["control_scopes"] == [{"control": waf, "element": "process:web-app"}]
+    page.wait_for_selector("#control-offer >> text=matches Web App")
+    assert page.is_checked(f"#offer-{waf}")
+    save_offer(page, lambda: page.click("#control-offer button:text('Keep this name')"))
+    assert "“Web App” is now an alias of “WAF”." in offer.inner_text()
+    [control] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
+    assert control["scope"]["aliases"] == ["Web App"]
+
+
+def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_page):
+    page = zoned_page
+    db = {"type": "store", "name": "Orders DB"}
+    key = ["", "encryption_at_rest", "", "", "", ""]
+    aes = keep_control(page, "AES", db, facts=[{"key": key, "value": "AES-256"}])
+    kms = keep_control(page, "KMS", db, facts=[{"key": key, "value": "KMS"}])
+    submit_with_controls(page)
+    assert "Is data stored in Orders DB encrypted?: AES-256" in page.inner_text(
+        "#control-offer"
+    )
+    message = (
+        "Two Controls write “encryption_at_rest” on Orders DB with two values:"
+        " “KMS” and “AES-256”. Untick one, or edit one Control so that they agree."
+    )
+    page.click("#continue")
+    page.wait_for_selector("#answer-problem:not([hidden])")
+    assert page.inner_text("#answer-problem") == message
+    body = save_offer(page, lambda: page.uncheck(f"#offer-{aes}"))
+    assert body["control_scopes"] == [{"control": kms, "element": "store:orders-db"}]
+    assert page.is_hidden("#answer-problem")
+    assert not page.is_checked(f"#offer-{aes}")
+    assert "unticked: you left it out" in page.inner_text("#control-offer")
+
+
+def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
+    zoned_page,
+):
+    page = zoned_page
+    gone = keep_control(page, "Gone", {"type": "application"})
+    page.goto("/")
+    page.wait_for_selector(f"#control-{gone}")
+    assert page.is_checked(f"#control-{gone}")
+    page.evaluate(f"fetch('/workspace/controls/{gone}', {{method: 'DELETE'}})")
+    page.fill("#description", "A web app talks to a database.")
+    page.fill("#analysis-name", "Gone control")
+    page.locator('input[name="framework"]').first.check()
+    page.click("#go")
+    page.wait_for_selector("#problem:not([hidden])")
+    assert "no longer in Controls" in page.inner_text("#problem")
+    page.wait_for_selector("#controls-rows li >> text=Missing")
+    page.click("#controls-rows button:text('Remove')")
+
+    kept = keep_control(page, "SSO", {"type": "application"})
+    page.reload()
+    page.wait_for_selector(f"#control-{kept}")
+    page.uncheck("#ask")
+    assert page.is_disabled(f"#control-{kept}")
+    assert "Turn the questions on" in page.inner_text("#controls-summary")
+    page.check("#ask")
+    sent = submit_with_controls(page)
+    assert sent["controls"] == [kept]
+    run = page.evaluate("new URLSearchParams(location.search).get('run')") or page.evaluate(
+        "fetch('/workspace/runs').then((r) => r.json())"
+    )[0]["run"]
+    page.goto(f"/?run={run}")
+    page.wait_for_selector("#asked", state="visible")
+    page.click("#description-nav")
+    page.wait_for_selector("#controls-used", state="visible")
+    assert page.inner_text("#controls-used-list") == "SSO (applied)"
+    assert page.is_hidden("#controls-offer")

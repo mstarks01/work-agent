@@ -362,7 +362,7 @@ def test_every_write_route_refuses_a_request_that_is_not_same_origin(client):
         for method in sorted(getattr(route, "methods", None) or ())
         if method in {"POST", "PUT", "DELETE"}
     ]
-    assert len(writes) == 12, writes
+    assert len(writes) == 15, writes
     for method, path in writes:
         response = client.request(
             method, path, json={}, headers={"Sec-Fetch-Site": "cross-site"}
@@ -396,7 +396,7 @@ def _body_routes(client) -> list[tuple[str, str, int]]:
 
 
 def test_each_body_route_is_counted(client):
-    assert len(_body_routes(client)) == 9
+    assert len(_body_routes(client)) == 11
 
 
 def test_each_write_route_refuses_a_body_that_is_not_json(client):
@@ -1873,9 +1873,11 @@ PAGE_SCRIPTS = {
         "answer_editor.js",
         "question_list.js",
         "text_file.js",
+        "form_controls.js",
         "first_run.js",
         "settings.js",
         "files.js",
+        "controls.js",
     ),
     "webapp/offline_sitting.py": "offline_sitting.js",
     "webapp/report_view.html": ("sidebar.js", "answer_editor.js", "report_view.js"),

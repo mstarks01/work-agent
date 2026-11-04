@@ -1570,6 +1570,7 @@ def create_app(
                         "answer_editor.js",
                         "question_list.js",
                         "text_file.js",
+                        "form_controls.js",
                         "first_run.js",
                     )
                 ),

@@ -45,6 +45,7 @@ const workspace = (() => {
     el("chosen-files").hidden = true;
     el("files-used-list").replaceChildren(...(data.owner_files || []).map((file) => node("li", `${file.label} (${file.kind})`)));
     el("files-used").hidden = !(data.owner_files || []).length;
+    formControls.drawUsed(data.controls_used);
     el("upload-file").disabled = true;
     el("ask").disabled = true;
     current = data;

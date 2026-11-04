@@ -238,7 +238,7 @@ class TestTheOffer:
         }
         assert offer["WAF"]["element"] == {"id": "process:web-app", "name": "Web App"}
         assert offer["Billing"]["choices"] == [
-            {"id": "process:web-app", "name": "Web App"}
+            {"id": "process:web-app", "name": "Web App", "covers": []}
         ]
         # A similar name proposes nothing: no element, and nothing applies.
         assert offer["Near"]["element"] is None
@@ -266,6 +266,39 @@ class TestTheOffer:
             {"element": "store:orders-db", "reason": "zone-inferred", "ticked": False},
             {"element": "store:audit-log", "reason": "no-zone-stated", "ticked": False},
         ]
+
+    def test_a_zone_choice_lists_the_parts_of_that_zone(self, owner):
+        moved = owner.keep("Moved", {"type": "boundary", "name": "Office"})
+        run_id = owner.paused(moved)
+        choices = {
+            choice["id"]: choice for choice in owner.offer(run_id)["Moved"]["choices"]
+        }
+        assert list(choices) == [
+            "boundary:internet",
+            "boundary:internal-network",
+            "boundary:dmz",
+        ]
+        assert [
+            (cover["element"], cover["name"], cover["ticked"])
+            for cover in choices["boundary:internal-network"]["covers"]
+        ] == [
+            ("process:web-app", "Web App", True),
+            ("store:orders-db", "Orders DB", False),
+            ("store:audit-log", "Audit Log", False),
+        ]
+        mapped = [
+            {
+                "control": moved,
+                "element": "boundary:internal-network",
+                "ticked": ["process:web-app"],
+            }
+        ]
+        assert owner.save(run_id, mapped).status_code == 200
+        resolution = owner.offer(run_id)["Moved"]["resolution"]
+        assert (resolution["state"], resolution["outcome"]) == (
+            "applied",
+            "owner-mapped",
+        )
 
     def test_a_row_of_another_package_version_is_offered_unticked(self, owner):
         rows = [row("V11.2"), row("V11", version="4.0.3")]
