@@ -123,7 +123,11 @@ class Owner:
                 "id": f"control-{uuid4().hex}",
                 "name": name,
                 "scope": {"name": "", "aliases": []} | scope,
-                "facts": [fact()] if facts is None else facts,
+                "facts": (
+                    ([] if scope["type"] == "application" else [fact()])
+                    if facts is None
+                    else facts
+                ),
                 "rows": [row()] if rows is None else rows,
                 "evidence": [
                     {

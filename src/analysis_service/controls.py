@@ -36,7 +36,7 @@ from analysis_service.sources import (
     plain_name,
     text_digest,
 )
-from analysis_service.system_model import make_element_id
+from analysis_service.system_model import ZONE_ATTRIBUTE, make_element_id
 
 CONTROL_ID = r"^control-[0-9a-f]{32}$"
 EVIDENCE_ID = r"^evidence-[0-9a-f]{32}$"
@@ -205,6 +205,19 @@ class ControlDocument(BaseModel):
             )
         if any(key_ref(fact.key).element_id for fact in self.facts):
             raise ValueError("A fact of a Control names no element: the scope does.")
+        refs = [key_ref(fact.key) for fact in self.facts]
+        if any(ref.attribute == ZONE_ATTRIBUTE for ref in refs):
+            raise ValueError(
+                "A Control places no element, so it writes no trust_zone. Protect"
+                " the zone instead."
+            )
+        if self.scope.type == "application" and any(
+            ref.attribute or ref.question for ref in refs
+        ):
+            raise ValueError(
+                "The whole application has no attribute and no question of a part."
+                " Choose the part that the fact is about."
+            )
         for key in _repeated(fact.key for fact in self.facts):
             ref = key_ref(key)
             name = (

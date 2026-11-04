@@ -26,6 +26,7 @@ became of a row, from the rulings the report's verdicts hold.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -187,6 +188,10 @@ class CoveredElement(BaseModel):
     element: _ElementId
     reason: CoverReason
     ticked: bool
+
+
+#: Whether a copied Control applies to the job, or the job leaves it out.
+ResolutionState = Literal["applied", "left-out"]
 
 
 class AppliedScope(BaseModel):
@@ -620,7 +625,7 @@ def row_outcome(rulings: Sequence[RowRuling]) -> RowOutcome:
 #: ``pending`` where the job serves no model to resolve it against: the job
 #: is not complete yet, it ended with no report, or the certification gate
 #: withholds its report.
-UsedState = Literal["applied", "left-out", "pending"]
+UsedState = Literal[ResolutionState, "pending"]
 
 
 def controls_used(
@@ -887,7 +892,7 @@ class SectionEntry(BaseModel):
     id: str
     name: str
     scope: ControlScope
-    state: Literal["applied", "left-out"]
+    state: ResolutionState
     outcome: MatchOutcome | None
     reason: LeftOutReason | None
     elements: list[str]
@@ -895,19 +900,40 @@ class SectionEntry(BaseModel):
     rows: list[SectionRow]
 
 
+#: A quotation in a ruling's reason: the text inside a pair of curly or
+#: straight double quotes.
+_QUOTATION = re.compile(r"“([^”]+)”|\"([^\"]+)\"")
+
+
+def _quotes(line: str, quotation: str) -> bool:
+    """Whether ``quotation`` quotes ``line``: the quotation stands in the
+    line, or the line stands in the quotation and is at least half of it."""
+    return quotation in line or (line in quotation and 2 * len(line) >= len(quotation))
+
+
 def _quoted(reason: str, evidence: Sequence[CopiedEvidence]) -> list[EvidenceLine]:
-    """Each line of ``evidence`` that ``reason`` quotes, by file and line. A
-    line counts where its text, stripped, holds a letter or a digit and
-    stands in the reason whole."""
-    return [
-        EvidenceLine.model_validate(
-            {"file": file.name, "class": file.evidence_class, "line": number}
-            | {"text": line.strip()}
-        )
-        for file in evidence
-        for number, line in enumerate(file.text.split("\n"), start=1)
-        if any(char.isalnum() for char in line) and line.strip() in reason
+    """Each line of ``evidence`` that a quotation of ``reason`` quotes, by file
+    and line. A line counts where its text, stripped, holds a letter or a
+    digit."""
+    quotations = [
+        (curly or straight).strip()
+        for curly, straight in _QUOTATION.findall(reason)
+        if (curly or straight).strip()
     ]
+    lines = []
+    for file in evidence:
+        for number, line in enumerate(file.text.split("\n"), start=1):
+            text = line.strip()
+            if any(char.isalnum() for char in text) and any(
+                _quotes(text, quotation) for quotation in quotations
+            ):
+                lines.append(
+                    EvidenceLine.model_validate(
+                        {"file": file.name, "class": file.evidence_class}
+                        | {"line": number, "text": text}
+                    )
+                )
+    return lines
 
 
 def controls_section(

@@ -2215,8 +2215,8 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     assert "Proves encryption at rest" in cells.nth(1).inner_text()
     assert cells.nth(2).inner_text() == "A data store: Orders DB"
     assert cells.nth(3).inner_text().split("\n") == [
-        "ASVS V11.2",
-        "STRIDE information-disclosure",
+        "asvs V11.2",
+        "stride information-disclosure",
     ]
     assert cells.nth(4).inner_text() == "<b>rds</b>.tf (Code)"
     assert page.locator("#controls-list img, #controls-list b").count() == 0
@@ -2522,7 +2522,9 @@ def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers)
         assert page.locator("#controls-section td.name").inner_text() == HOSTILE_CONTROL
         assert section.locator("img, b").count() == 0
         page.click("#controls-section summary:has-text('tampering')")
-        assert "It shows no <b>signing</b>." in section.inner_text()
+        assert "It shows no <b>signing</b> at https://evil.example." in (
+            section.inner_text()
+        )
         assert "applied" in section.inner_text() and "refused" in section.inner_text()
         assert page.get_attribute("a.download-link >> nth=0", "href").endswith(
             "/export.md"

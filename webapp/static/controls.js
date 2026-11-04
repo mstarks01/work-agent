@@ -45,7 +45,7 @@
   const unitOf = (row) => units[row.framework]?.units.find((unit) => unit.id === row.unit);
   const unitText = (row) => {
     const label = unitOf(row)?.label;
-    return label ? `${row.framework.toUpperCase()} ${row.unit} · ${label}` : `${row.framework.toUpperCase()} ${row.unit}`;
+    return label ? `${row.framework} ${row.unit} · ${label}` : `${row.framework} ${row.unit}`;
   };
 
   let controls = [];
@@ -155,7 +155,7 @@
         return answerBox.replaceChildren(h("select", { id: "fact-value", "aria-label": "Value" },
           ...one.choices.map((choice) => h("option", { value: choice }, choice))));
       }
-      return answerBox.replaceChildren(h("input", { type: "text", id: "fact-value", maxlength: 1000, "aria-label": "Value" }));
+      return answerBox.replaceChildren(h("input", { type: "text", id: "fact-value", maxlength: limits.value_chars, "aria-label": "Value" }));
     };
     drawAnswer();
     const add = () => {
@@ -201,7 +201,7 @@
           h("select", { id: "row-framework", on: { change: (event) => {
             framework = event.target.value;
             holder.replaceChildren(holder.firstChild, unitPick());
-          } } }, ...FRAMEWORKS.map((name) => h("option", { value: name }, `${name.toUpperCase()} ${units[name].version}`)))),
+          } } }, ...FRAMEWORKS.map((name) => h("option", { value: name }, `${name} ${units[name].version}`)))),
         holder,
         h("button", { type: "button", id: "add-row", on: { click: () => {
           draft.rows.push({ framework, unit: el("row-unit").value, version: units[framework].version });
@@ -288,7 +288,7 @@
 
   // ---- The table ----------------------------------------------------------
   el("controls-kind").append(...PAGE.scope_types.map((row) => h("option", { value: row.type }, row.label)));
-  el("controls-framework").append(...FRAMEWORKS.map((name) => h("option", { value: name }, name.toUpperCase())));
+  el("controls-framework").append(...FRAMEWORKS.map((name) => h("option", { value: name }, name)));
 
   const shownControls = () => {
     const text = el("controls-search").value.toLocaleLowerCase();
@@ -321,7 +321,7 @@
         facts.length ? h("div", { class: "sub" }, `Proves ${facts.join(", ")}`) : null),
       h("td", {}, scopeText(control.scope)),
       h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
-        `${one.framework.toUpperCase()} ${one.unit}`)))),
+        `${one.framework} ${one.unit}`)))),
       h("td", {}, control.evidence.length
         ? control.evidence.map((file) => `${file.name} (${CLASS_LABEL[file.class]})`).join(", ")
         : "None"),
@@ -334,7 +334,7 @@
   const draw = () => {
     el("controls-count").textContent = `${controls.length} of ${counted(limits.max_controls, "Control", "Controls")}`;
     el("new-control").disabled = atLimit() || editing === "new";
-    show("controls-problem", atLimit() ? textFile.refusals.full : "");
+    show("controls-full", atLimit() ? textFile.refusals.full : "");
     el("editor").replaceChildren(...(draft ? [editor()] : []));
     const shown = shownControls();
     const picked = controls.filter((control) => chosen.has(control.id));

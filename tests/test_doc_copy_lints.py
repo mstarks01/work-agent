@@ -27,7 +27,7 @@ from pydantic import TypeAdapter
 
 from analysis_service import deployment, resilience
 from analysis_service.analysis import CONTROL_ATTRIBUTES
-from analysis_service.answer_forms import _max_length
+from analysis_service.answer_forms import max_length_of
 from analysis_service.answer_state import EARLY_RULES, POLICY_VERSION
 from analysis_service.api import MAX_EVENT_STREAMS_PER_OWNER, max_body_bytes
 from analysis_service.assertions import Basis
@@ -975,7 +975,7 @@ def test_the_attribute_bound_is_each_attribute_field():
         HTTP_API, r"An attribute other than `data_description` takes at most (\d+)"
     )
     bounds = {
-        _max_length(element, attribute)
+        max_length_of(element, attribute)
         for element in _Element.__subclasses__()
         for attribute in (*CONTROL_ATTRIBUTES, "technology", "protocol")
         if attribute in element.model_fields

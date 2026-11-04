@@ -206,8 +206,9 @@ it always uses the light colours.
 of each Control: what it matched, the facts it wrote with the state
 `written`, `changed` or `stated`, and its rows with the outcome `applied`,
 `refused` or `no-finding`. A row opens to the claim IDs it ruled out, the
-critic's reason, each line of the evidence that the reason quotes by file,
-class and line, and one sentence that says what the outcome means. A
+critic's reason, each line of the evidence that the quotation of an applied
+ruling quotes, by file, class and line, and one sentence that says what the
+outcome means. A
 Control that the job left out shows its reason. The section reads the job's
 copy and the report's rulings, so a later edit of a Control changes nothing
 here.
@@ -215,7 +216,8 @@ here.
 **Download as Markdown** and **Download as JSON**, beside the export button,
 send `GET /report/{run}/export.md` and `GET /report/{run}/export.json`. The
 Markdown file holds the findings, the findings ruled out and the Controls
-section, with each value escaped as text. The JSON file holds the report and
+section. It escapes each value, so a value forms no markup, no link and no
+autolink. The JSON file holds the report and
 the Controls section as `report` and `controls`. A `/v1` report carries no
 Controls section.
 
@@ -324,12 +326,14 @@ it.
   kind, the name and the aliases. "What it proves" takes a fact and its
   value from the facts of the scope's kind: an element's attributes and the
   Question Kinds for an element or a zone, and the Capabilities for the whole
-  application. A closed fact takes one of its values. "What it covers" takes
-  a row by framework and unit, and the row keeps the package version. The
-  ASVS labels come from the catalog when the page loads. "Evidence" takes a
+  application. A closed fact takes one of its values. The service refuses a
+  `trust_zone` fact, because a Control places no element, and an attribute or
+  a question on the whole application. "What it covers" takes a row by
+  framework and unit, and the row keeps the package version. Each unit's
+  label comes from its package's catalog when the page loads. "Evidence" takes a
   plain text file and its class: Configuration, Code or People. The page
   reads the file with the checks of an Owner File and sends only its text.
-  Each line has a "Remove" link. "Save Control" sends the Control, and an
+  Each line has a quiet "Remove" button. "Save Control" sends the Control, and an
   edit replaces it and keeps no earlier version.
 - **The routes.** `GET /workspace/controls` lists your Controls with no
   evidence text. `POST /workspace/controls` adds one and answers `201`.

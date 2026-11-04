@@ -46,6 +46,7 @@ __all__ = [
     "answer_suggestions",
     "attribute_choices",
     "facets_json",
+    "max_length_of",
 ]
 
 
@@ -210,17 +211,17 @@ def answer_limit(key: UnknownKey, model: SystemModel) -> int:
     """
     widest = FactAnswer(key=key, value="x", detail="x" * MAX_DETAIL_CHARS)
     bounds = [
-        _max_length(FactAnswer, "value"),
+        max_length_of(FactAnswer, "value"),
         EXCERPT_MAX_CHARS - (len(fact_line(widest)) - 1),
     ]
     ref = key_ref(key)
     element = model.get(ref.element_id) if fact_kind(key) == "attribute" else None
     if element is not None and ref.attribute in type(element).model_fields:
-        bounds.append(_max_length(type(element), ref.attribute))
+        bounds.append(max_length_of(type(element), ref.attribute))
     return min(bound for bound in bounds if bound is not None)
 
 
-def _max_length(model_class: type[BaseModel], field: str) -> int | None:
+def max_length_of(model_class: type[BaseModel], field: str) -> int | None:
     """The field's ``max_length``, which pydantic keeps in its metadata."""
     metadata = model_class.model_fields[field].metadata
     return next(

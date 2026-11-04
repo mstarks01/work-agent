@@ -89,7 +89,7 @@ class TestTheDocument:
 
     def test_an_application_scope_needs_no_name(self):
         scope = {"type": "application", "name": "", "aliases": []}
-        held = ControlDocument.model_validate(document(scope=scope))
+        held = ControlDocument.model_validate(document(scope=scope, facts=[]))
         assert held.scope.model_dump() == scope
 
     @pytest.mark.parametrize("name", ["", "   "])

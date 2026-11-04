@@ -17,8 +17,9 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from analysis_service.answer_forms import YES_NO, attribute_choices
+from analysis_service.answer_forms import YES_NO, attribute_choices, max_length_of
 from analysis_service.capabilities import CAPABILITIES
+from analysis_service.claims import UnknownRef
 from analysis_service.controls import (
     EVIDENCE_ID,
     Control,
@@ -32,10 +33,12 @@ from analysis_service.controls import (
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import FACET_ANSWERS, FactAnswer
 from analysis_service.frameworks import PACKAGES
+from analysis_service.open_facts import kind_words
 from analysis_service.owner_files import NOT_UTF_8
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import MAX_LABEL_CHARS, EvidenceClass, text_digest
 from analysis_service.system_model import (
+    ZONE_ATTRIBUTE,
     Element,
     ZonedElement,
     attribute_names,
@@ -57,10 +60,6 @@ EVIDENCE_LABELS: Mapping[EvidenceClass, str] = MappingProxyType(
     {"config": "Configuration", "code": "Code", "people": "People"}
 )
 
-#: The attribute a Control does not write: a zone scope is how a Control
-#: reaches a zone, and a Control places no element.
-_PLACEMENT = "trust_zone"
-
 
 def _element_types(scope_type: ScopeType) -> tuple[type[Element], ...]:
     """The element classes whose facts a scope of ``scope_type`` writes: its
@@ -73,7 +72,8 @@ def _element_types(scope_type: ScopeType) -> tuple[type[Element], ...]:
 
 def _key(*, attribute: str = "", question: str = "", capability: str = "") -> list:
     """A fact's key with no element: the scope supplies it."""
-    return ["", attribute, "", "", question, capability]
+    ref = UnknownRef(attribute=attribute, question=question, capability=capability)
+    return list(ref.key)
 
 
 def _attribute_facts(scope_type: ScopeType) -> list[dict[str, object]]:
@@ -81,11 +81,11 @@ def _attribute_facts(scope_type: ScopeType) -> list[dict[str, object]]:
     for element_type in _element_types(scope_type):
         fields = element_type.model_construct()
         for attribute in attribute_names(fields):
-            if attribute == _PLACEMENT or attribute in facts:
+            # A Control places no element (ControlDocument refuses a zone).
+            if attribute == ZONE_ATTRIBUTE or attribute in facts:
                 continue
             facts[attribute] = {
                 "key": _key(attribute=attribute),
-                "kind": "attribute",
                 "label": attribute.replace("_", " "),
                 "choices": list(attribute_choices(element_type, attribute, None)),
                 "facets": [],
@@ -97,8 +97,7 @@ def _question_facts() -> list[dict[str, object]]:
     return [
         {
             "key": _key(question=name),
-            "kind": "question",
-            "label": kind.template.replace("{element}", "it"),
+            "label": kind_words(kind.template),
             "choices": list(YES_NO) if kind.answer == "yes-no" else [],
             "facets": [
                 {"id": facet.id, "question": facet.question} for facet in kind.facets
@@ -112,7 +111,6 @@ def _capability_facts() -> list[dict[str, object]]:
     return [
         {
             "key": _key(capability=name),
-            "kind": "capability",
             "label": capability.question,
             "choices": list(YES_NO),
             "facets": [],
@@ -185,6 +183,7 @@ def page_data(limits: ControlLimits) -> dict[str, object]:
             "max_evidence": limits.max_evidence,
             "max_evidence_bytes": limits.max_evidence_bytes,
             "name_chars": MAX_LABEL_CHARS,
+            "value_chars": max_length_of(FactAnswer, "value"),
         },
         "facet_answers": list(FACET_ANSWERS),
     }

@@ -118,6 +118,20 @@ class TestCreate:
             ),
             ({"rows": [row(), row()]}, "The row V11.2 appears twice."),
             (
+                {"facts": [fact("trust_zone", "boundary:dmz")]},
+                (
+                    "A Control places no element, so it writes no trust_zone."
+                    " Protect the zone instead."
+                ),
+            ),
+            (
+                {"scope": {"type": "application"}},
+                (
+                    "The whole application has no attribute and no question of a"
+                    " part. Choose the part that the fact is about."
+                ),
+            ),
+            (
                 {"rows": [row(unit="V99.9")]},
                 "unit 'V99.9' is not a unit of framework 'asvs'",
             ),
@@ -138,7 +152,7 @@ class TestCreate:
 
     def test_a_repeated_name_is_refused(self, owner):
         assert create(owner).status_code == 201
-        again = create(owner, scope={"type": "application"})
+        again = create(owner, scope={"type": "application"}, facts=[])
         assert again.status_code == 409
         assert again.json()["message"] == (
             "You already have a Control named “Orders DB encrypted at rest”. Give"
@@ -368,7 +382,7 @@ class RulingRunner(ZonedRunner):
                 RefusedControl(
                     control=self.control,
                     unit="tampering",
-                    reason="It shows no <b>signing</b>.",
+                    reason="It shows no <b>signing</b> at https://evil.example.",
                 )
             ],
         )
@@ -434,7 +448,7 @@ class TestTheReportSection:
             {
                 "claim": "stride-returned",
                 "ruling": "refused",
-                "reason": "It shows no <b>signing</b>.",
+                "reason": "It shows no <b>signing</b> at https://evil.example.",
             }
         ]
         assert rows["repudiation"]["meaning"].startswith("No finding")
@@ -456,10 +470,10 @@ class TestTheReportSection:
         text = exported.text
         assert "## Controls" in text
         assert "### WAF" in text
-        assert "- Row: STRIDE spoofing — applied." in text
-        assert "- Row: STRIDE tampering — refused." in text
-        assert "- Row: STRIDE repudiation — no-finding." in text
-        assert "It shows no \\<b\\>signing\\</b\\>." in text
+        assert "- Row: stride spoofing — applied." in text
+        assert "- Row: stride tampering — refused." in text
+        assert "- Row: stride repudiation — no-finding." in text
+        assert "It shows no \\<b\\>signing\\</b\\> at https\\://evil.example." in text
         assert "Evidence: WAF.yaml (config), line 1: WAF: on" in text
         assert "AES-256 — written" in text
         assert "Protects the process “Billing”: left out, missing-element." in text
@@ -483,3 +497,34 @@ class TestTheReportSection:
         owner, _, _ = ruled
         for path in ("export.md", "export.json"):
             assert owner.client.get(f"/report/job-missing/{path}").status_code == 404
+
+
+class TestTheTables:
+    """Each table of the pages names each member of its set, so no value
+    shows as ``undefined``."""
+
+    def test_the_form_words_each_type_reason_and_state(self):
+        from typing import get_args
+
+        from analysis_service.controls import ScopeType
+        from analysis_service.job_controls import CoverReason, LeftOutReason, UsedState
+        from tests.test_webapp import _table_keys
+
+        assert _table_keys("form_controls.js", "TYPES") == set(get_args(ScopeType))
+        assert _table_keys("form_controls.js", "REASONS") == {
+            *get_args(LeftOutReason),
+            *(reason for reason in get_args(CoverReason) if reason != "stated-zone"),
+        }
+        assert _table_keys("form_controls.js", "STATES") == set(get_args(UsedState))
+
+    def test_the_page_tables_name_each_member(self):
+        from typing import get_args
+
+        from analysis_service.controls import ScopeType
+        from analysis_service.job_controls import ROW_MEANINGS, RowOutcome
+        from analysis_service.sources import EvidenceClass
+        from webapp.controls_page import EVIDENCE_LABELS, SCOPE_LABELS
+
+        assert set(SCOPE_LABELS) == set(get_args(ScopeType))
+        assert set(EVIDENCE_LABELS) == set(get_args(EvidenceClass))
+        assert set(ROW_MEANINGS) == set(get_args(RowOutcome))

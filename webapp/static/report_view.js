@@ -1321,7 +1321,7 @@
   };
   const controlRow = (row) => {
     const open = el("details", "control-row");
-    const summary = el("summary", null, `${row.framework.toUpperCase()} ${row.unit}${row.label ? ` · ${row.label}` : ""} `);
+    const summary = el("summary", null, `${row.framework} ${row.unit}${row.label ? ` · ${row.label}` : ""} `);
     summary.append(el("span", `tag ${row.outcome}`, row.outcome));
     open.append(summary);
     const ruledOut = row.rulings.filter((ruling) => ruling.ruling === "applied").map((ruling) => ruling.claim);

@@ -25,17 +25,18 @@ const formControls = (() => {
     return node;
   };
   const counted = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  // Each scope type (ScopeType), as a line names it.
   const TYPES = {
-    application: "The whole application",
-    boundary: "trust boundary",
-    process: "process",
-    store: "data store",
-    entity: "external entity",
+    "application": "The whole application",
+    "boundary": "trust boundary",
+    "process": "process",
+    "store": "data store",
+    "entity": "external entity",
   };
   const scopeText = (scope) => (scope.type === "application"
     ? TYPES.application
     : `The ${TYPES[scope.type]} “${scope.name}”`);
-  const rowText = (row) => `${row.framework.toUpperCase()} ${row.unit}`;
+  const rowText = (row) => `${row.framework} ${row.unit}`;
   const manage = () => h("a", { href: "/controls" }, "Manage Controls");
 
   // ---- The submission ------------------------------------------------------
@@ -85,6 +86,8 @@ const formControls = (() => {
   const chosen = () => (asking() && ticked.size ? [...ticked] : undefined);
 
   // ---- The pause -----------------------------------------------------------
+  // Each reason a Control is left out (LeftOutReason), and each reason a
+  // zone lists a part unticked (CoverReason).
   const REASONS = {
     "missing-element": "missing-element: no part of this description has the name or an alias",
     "empty-zone": "empty-zone: the zone holds no part of this description",
@@ -223,7 +226,12 @@ const formControls = (() => {
   };
 
   // ---- A reopened analysis -------------------------------------------------
-  const STATES = { applied: "applied", "left-out": "left out", pending: "not matched yet" };
+  // Each state of a Control a reopened analysis lists (UsedState).
+  const STATES = {
+    "applied": "applied",
+    "left-out": "left out",
+    "pending": "not matched yet",
+  };
   const drawUsed = (used) => {
     reopened = true;
     el("controls-offer").hidden = true;
