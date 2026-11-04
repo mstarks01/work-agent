@@ -206,12 +206,12 @@ it always uses the light colours.
 of each Control: what it matched, the facts it wrote with the state
 `written`, `changed` or `stated`, and its rows with the outcome `applied`,
 `refused`, `not-reached` or `no-finding`. A row is `not-reached` when no
-finding on its unit reached the critic with the row, and a finding on its unit
-names no part that the Control's scope holds. A row opens to the claim IDs it ruled out, the
-critic's reason, each line of the evidence that the quotation of an applied
-ruling quotes, by file, class and line, and one sentence that says what the
-outcome means. A
-Control that the job left out shows its reason. The section reads the job's
+finding on its unit reached the critic with the row, and a finding on its
+unit names no part that the Control's scope holds. A row opens to the claim
+IDs it ruled out, the critic's reason, each line of the evidence that the
+quotation of an applied ruling quotes, by file, class and line, and one
+sentence that says what the outcome means. A Control that the job left out
+shows its reason. The section reads the job's
 copy and the report's rulings, so a later edit of a Control changes nothing
 here.
 
@@ -329,7 +329,7 @@ it.
   behind a "?" beside its title. "What it covers" comes first and takes a row
   by framework and unit, and the row keeps the package version. Each unit's
   label comes from its package's catalog when the page loads. A note shows
-  under the rows when the Control is not of the whole application and a row
+  under the rows when the Control does not cover the whole application and a row
   names a framework whose findings can name no part, because such a finding
   never reaches the Control. "What it protects" takes the
   kind, the name and the aliases. "What it does" takes a fact and its value

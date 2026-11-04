@@ -218,7 +218,7 @@
         h("span", {}, unitText(row), " ", h("span", { class: "sub" }, `version ${row.version}`)),
         remove(draft.rows, index, `the row ${row.unit}`)))),
       unreachable ? h("p", { class: "notice", id: "rows-reach", role: "note" },
-        "A row here names a unit whose findings can name no part of the model. Such a finding does not reach a Control that does not cover the whole application, and the report shows the row as “Not reached”. To cover each such finding, make a Control of the whole application.") : null,
+        "A row here names a unit whose findings can name no part of the model. Only a Control of the whole application reaches such a finding, and the report shows the row as “Not reached”. To cover each such finding, make a Control of the whole application.") : null,
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "row-framework" }, "Framework"),
           h("select", { id: "row-framework", on: { change: (event) => {
