@@ -50,7 +50,9 @@ class TestTheTable:
 
 class TestTheSeam:
     def issues(self, ref):
-        problems = review_issues([sample_draft("S-01")], rulings_of(ref), valid_model())
+        problems = review_issues(
+            [sample_draft("S-01")], rulings_of(ref), valid_model(), {}
+        )
         return [m for m in problems.messages if "question" in m]
 
     def test_a_kind_about_an_element_of_the_model_passes(self):
@@ -158,7 +160,7 @@ class TestOneSpellingPerFact:
         (ruling,) = snap_rulings(rulings_of(ECHO), {STORE})
         assert ruling.verdict.related_unknowns == [ECHO]
         problems = review_issues(
-            [sample_draft("S-01")], rulings_of(ECHO), valid_model()
+            [sample_draft("S-01")], rulings_of(ECHO), valid_model(), {}
         )
         assert any("3 ways at once" in m for m in problems.messages)
 

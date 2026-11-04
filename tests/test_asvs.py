@@ -977,7 +977,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
     def test_a_kind_the_job_carries_is_kept(self):
         """`prose` survives: the description was thin, which is answerable."""
         kept, deferred = PACKAGES["asvs"].record.partition_proposals(
-            [self._proposal("2.5", "prose")], "encoding-and-sanitization", ["prose"]
+            [self._proposal("2.5", "prose")], "encoding-and-sanitization", ["prose"], ()
         )
 
         assert len(kept) == 1
@@ -985,7 +985,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
 
     def test_a_kind_the_job_does_not_carry_is_deferred(self):
         kept, deferred = PACKAGES["asvs"].record.partition_proposals(
-            [self._proposal("2.4", "code")], "encoding-and-sanitization", ["prose"]
+            [self._proposal("2.4", "code")], "encoding-and-sanitization", ["prose"], ()
         )
 
         assert kept == []
@@ -996,7 +996,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
     def test_a_ruled_proposal_is_kept(self):
         """Empty means the agent ruled, and the critic judges it."""
         kept, deferred = PACKAGES["asvs"].record.partition_proposals(
-            [self._proposal("2.6", "")], "encoding-and-sanitization", ["prose"]
+            [self._proposal("2.6", "")], "encoding-and-sanitization", ["prose"], ()
         )
 
         assert len(kept) == 1
@@ -1008,15 +1008,28 @@ class TestAJobDefersWhatItsInputCannotSettle:
         proposals = [self._proposal("2.4", "code")]
 
         _, prose_only = PACKAGES["asvs"].record.partition_proposals(
-            proposals, "encoding-and-sanitization", ["prose"]
+            proposals, "encoding-and-sanitization", ["prose"], ()
         )
         kept, with_code = PACKAGES["asvs"].record.partition_proposals(
-            proposals, "encoding-and-sanitization", ["prose", "code"]
+            proposals, "encoding-and-sanitization", ["prose", "code"], ()
         )
 
         assert prose_only
         assert with_code == {}
         assert len(kept) == 1
+
+    def test_a_unit_a_control_row_covers_is_kept_whatever_its_kind(self):
+        """A Control row un-defers its unit, and the critic judges the draft
+        against the row (ADR 0126)."""
+        kept, deferred = PACKAGES["asvs"].record.partition_proposals(
+            [self._proposal("2.4", "config")],
+            "encoding-and-sanitization",
+            ["prose"],
+            {"V1.2.4"},
+        )
+
+        assert len(kept) == 1
+        assert deferred == {}
 
     def test_a_deferred_requirement_reaches_scope_with_its_reason(self):
         entries = AsvsAnalysis.scope_entries(
@@ -1050,7 +1063,7 @@ def test_a_package_that_defers_nothing_inherits_the_neutral_default():
     """STRIDE's claims rest on the system's own shape, so it defers none."""
     from analysis_service.frameworks.stride.record import DraftThreat
 
-    assert DraftThreat.partition_proposals(["a", "b"], "spoofing", ["prose"]) == (
+    assert DraftThreat.partition_proposals(["a", "b"], "spoofing", ["prose"], ()) == (
         ["a", "b"],
         {},
     )
@@ -1601,7 +1614,9 @@ def test_an_invented_key_is_marked_even_when_its_evidence_kind_would_defer_it():
     ]
 
     known, marks = known_proposals(proposals, ASVS, "authentication")
-    kept, deferred = ASVS.record.partition_proposals(known, "authentication", ["prose"])
+    kept, deferred = ASVS.record.partition_proposals(
+        known, "authentication", ["prose"], ()
+    )
 
     assert known == [] and kept == [] and deferred == {}
     assert [mark.claim_id for mark in marks.unknown_claim_identities] == [
@@ -1716,7 +1731,13 @@ class TestADraftStatesItsDirection:
         (draft,) = resolution.drafts
         assert draft.direction == "excluded"
         (view,) = critic_view(
-            [draft], only=None, repaired=(), unverified=(), assertions=None
+            [draft],
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
         assert view["direction"] == "excluded"
 

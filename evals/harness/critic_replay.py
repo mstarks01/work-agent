@@ -178,6 +178,7 @@ async def compose(
         archived.drafts,
         archived.marks,
         None if record is None else record.catalog,
+        (),
     )
     shared = {
         key: archived.shared[key]
@@ -334,7 +335,7 @@ def command_critic_replay(args: argparse.Namespace) -> int:
             f"  {mark} {row.draft_id:10} archived {row.archived:12} replayed {row.replayed}"
         )
     print(f"{same} of {len(rows)} verdicts agree")
-    problems = review_issues(archived.drafts, rulings, archived.model).problems
+    problems = review_issues(archived.drafts, rulings, archived.model, {}).problems
     kinds = Counter(problem.kind for problem in problems)
     print(
         f"{len(problems)} problems the re-ask would be sent"

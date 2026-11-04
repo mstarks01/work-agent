@@ -303,7 +303,11 @@ class DraftRequirementRuling(Claim):
 
     @classmethod
     def partition_proposals(
-        cls, proposals: Sequence[Any], lane: str, carried: Collection[str]
+        cls,
+        proposals: Sequence[Any],
+        lane: str,
+        carried: Collection[str],
+        covered: Collection[str],
     ) -> tuple[list[Any], dict[str, str]]:
         """Every requirement whose lane agent said this job cannot settle it.
 
@@ -315,11 +319,16 @@ class DraftRequirementRuling(Claim):
 
         The reason names the kind, so the **Scope Entry** tells a reader what
         would answer the requirement instead of only that nothing did.
+
+        A requirement in ``covered`` is kept whatever kind it names: a row of
+        an applied Control covers it, and the critic judges the row.
         """
         defer = [
             proposal
             for proposal in proposals
-            if proposal.needs_evidence and proposal.needs_evidence not in carried
+            if proposal.needs_evidence
+            and proposal.needs_evidence not in carried
+            and requirement_id(lane, proposal.requirement) not in covered
         ]
         kept = [proposal for proposal in proposals if proposal not in defer]
         return kept, {

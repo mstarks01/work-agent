@@ -20,7 +20,7 @@ from analysis_service.claims import (
     Mitigation,
 )
 from analysis_service.fan_in import DraftJoinError, join_drafts, snap_drafts
-from analysis_service.frameworks import schemas_for
+from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import MAX_SEQUENCE, DraftThreat
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
@@ -241,7 +241,13 @@ class TestJoinDrafts:
         view = {
             row["id"]: row
             for row in critic.critic_view(
-                joined.drafts, only=None, repaired=(), unverified=(), assertions=None
+                joined.drafts,
+                only=None,
+                repaired=(),
+                unverified=(),
+                assertions=None,
+                package=PACKAGES["stride"],
+                controls=(),
             )
         }
         assert set(view) == {"D-01", "D-02"}
@@ -754,6 +760,8 @@ class TestQuoteVerification:
             only=None,
             unverified=(),
             assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert view["repaired_quotes"] == [
@@ -764,7 +772,13 @@ class TestQuoteVerification:
             }
         ]
         (plain,) = critic.critic_view(
-            joined.drafts, only=None, repaired=(), unverified=(), assertions=None
+            joined.drafts,
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
         assert "repaired_quotes" not in plain
 
@@ -790,11 +804,19 @@ class TestQuoteVerification:
             only=None,
             repaired=(),
             assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
         assert [entry["index"] for entry in view["unverified_quotes"]] == [0]
         assert LABEL in view["unverified_quotes"][0]["reason"]
         (plain,) = critic.critic_view(
-            joined.drafts, only=None, repaired=(), unverified=(), assertions=None
+            joined.drafts,
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
         assert "unverified_quotes" not in plain
 

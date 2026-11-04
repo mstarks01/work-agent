@@ -169,7 +169,9 @@ def replay_case(
         return replace(held, refused=str(error))
     # The block carries no fan-in marks and no catalog a replay of assembly
     # reads: the view is not built here, only the rulings are checked and merged.
-    critic_round = CriticRound.of(framework, model, accounted, AnalysisMarks(), None)
+    critic_round = CriticRound.of(
+        framework, model, accounted, AnalysisMarks(), None, ()
+    )
     outcome = critic_round.outcome(
         [ruling.model_dump(mode="json") for ruling in rulings]
     )

@@ -199,3 +199,19 @@ def test_the_replay_fails_where_control_unit_of_leaves_the_set(
     assert {claim_id for claim_id, _ in strays} <= {
         claim.id for claim in replayed_claims if claim.framework == "stride"
     }
+
+
+def test_a_requirement_sits_in_itself_its_section_and_its_chapter():
+    requirement = next(req for req in REQUIREMENTS if req.id == "V2.1.1")
+
+    holding = PACKAGES["asvs"].units_holding("V2.1.1")
+
+    assert holding == {"V2.1.1", requirement.section, "V2"}
+
+
+def test_a_stride_lane_sits_in_itself_alone():
+    assert PACKAGES["stride"].units_holding("spoofing") == {"spoofing"}
+
+
+def test_a_unit_the_package_does_not_carry_sits_in_nothing():
+    assert PACKAGES["asvs"].units_holding("V99.1.1") == frozenset()

@@ -46,6 +46,7 @@ from analysis_service.evidence import (
     resolve_proposals,
     unknown_evidence_ref,
 )
+from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import (
     DraftThreat,
@@ -664,7 +665,13 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         draft = sample_draft("S-01", grounds=[ground])
 
         (view,) = critic_view(
-            [draft], assertions=held, only=None, repaired=(), unverified=()
+            [draft],
+            assertions=held,
+            only=None,
+            repaired=(),
+            unverified=(),
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         (fact,) = view["assertion_facts"]
@@ -679,7 +686,13 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
         draft = sample_draft("S-01", grounds=[ground])
 
         (view,) = critic_view(
-            [draft], assertions=held, only=None, repaired=(), unverified=()
+            [draft],
+            assertions=held,
+            only=None,
+            repaired=(),
+            unverified=(),
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert view["assertion_facts"][0]["says"] in render_catalog(
@@ -694,6 +707,8 @@ class TestTheCriticReadsTheRowItIsAskedToRuleOn:
             repaired=(),
             unverified=(),
             assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
         assert "assertion_facts" not in view

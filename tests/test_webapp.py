@@ -2313,13 +2313,20 @@ def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
     from webapp.main import client_script
 
     script = client_script("report_view.js")
-    assert '(c.verdict.rejected_because ?? "evidence") === "evidence"' in script
+    assert (
+        '["evidence", "control"].includes(c.verdict.rejected_because ?? "evidence")'
+        in script
+    )
     assert "answersInUnits(block) &&" in script, "gated on the block answering in units"
     assert (
         "REVIEW_EXCLUDED"
         in script.split("function unitTable")[1].split("function renderBlock")[0]
     ), "the requirement row reads the ruling as Excluded by review"
-    assert "block.rejected_claims.filter(c => !rulesOut(block, c))" in script, (
+    assert (
+        "CONTROL_COVERED"
+        in script.split("function unitTable")[1].split("function renderBlock")[0]
+    ), "the requirement row reads a control ruling as Covered by a Control"
+    assert "block.rejected_claims.filter(c => !rulesOnUnit(block, c))" in script, (
         "the dismissed list is the rest"
     )
     assert "ruled out by review" in script.split("function frameworkNotes")[1], (

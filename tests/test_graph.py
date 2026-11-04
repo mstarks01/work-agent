@@ -47,6 +47,7 @@ from analysis_service.critic import CriticOutputError
 from analysis_service.critic_round import CriticRound
 from analysis_service.deployment import DEFAULT_PROMPTS_DIR
 from analysis_service.frameworks import (
+    PACKAGES,
     PRECONDITION_RESULTS,
     PreconditionError,
     package_for,
@@ -1670,7 +1671,7 @@ def test_merge_joins_drafts_in_canonical_order():
     marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
     assert (
         event.output
-        == CriticRound.of("stride", valid_model(), drafts, marks, None).summary()
+        == CriticRound.of("stride", valid_model(), drafts, marks, None, ()).summary()
     )
     # Two drafts on quotes and derived facts are the critic's to rule.
     assert event.actions.route == graph.ROUTE_REVIEW
@@ -2095,7 +2096,12 @@ def test_the_re_ask_reads_one_view_of_a_draft_and_not_a_second():
     assert (
         dropped
         == critic._ruling_view(
-            [drafts[1]], repaired=(), unverified=(), assertions=None
+            [drafts[1]],
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )[0]
     )
 
@@ -3029,6 +3035,8 @@ FRAMEWORK_KEY_WRITERS: tuple[tuple[str, dict[str, Any]], ...] = (
             # Unit -> why this job could not settle it. Empty for a package
             # that defers nothing, which is every package but ASVS.
             "deferred": {},
+            # Unit -> the kind a Control row kept it from ``deferred`` for.
+            "undeferred": {},
         },
     ),
     (

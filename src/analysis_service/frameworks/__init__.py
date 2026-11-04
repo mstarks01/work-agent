@@ -456,6 +456,18 @@ class FrameworkPackage:
         """
         return "severity" in self.record.model_fields
 
+    def units_holding(self, unit_id: str) -> frozenset[str]:
+        """``unit_id`` and each unit it sits inside, or nothing for a unit
+        this package does not carry. A Control row on any of them covers the
+        unit (ADR 0126)."""
+        inside = {unit.id: unit.inside for unit in self.units}
+        holding: set[str] = set()
+        current: str | None = unit_id
+        while current in inside and current not in holding:
+            holding.add(current)
+            current = inside[current]
+        return frozenset(holding)
+
 
 def _unit_issues(package: FrameworkPackage) -> list[str]:
     """Each unit sits in a declared lane and inside a unit of the same table."""

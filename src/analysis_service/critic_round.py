@@ -41,6 +41,7 @@ from analysis_service.assertions import AssertionCatalog
 from analysis_service.claims import (
     AnalysisMarks,
     Claim,
+    ControlRowRef,
     FrameworkName,
     RuledClaim,
     Ruling,
@@ -54,11 +55,14 @@ from analysis_service.critic import (
     merge_retry,
     problem_messages,
     review_issues,
+    shown_rows,
 )
 from analysis_service.frameworks import (
     FrameworkSchemas,
+    package_for,
     schemas_for,
 )
+from analysis_service.job_controls import AppliedControl
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.node_requests import node_instruction, node_request
 from analysis_service.prompts import compose_critic_prompt, compose_recritic_prompt
@@ -177,11 +181,12 @@ class Failed(Unreconciled):
 class CriticRound:
     """One framework's Critic round over what its Fan-In produced.
 
-    The three evidence fields travel together and none has a default. A view
-    built from fewer marks than the first pass read is a second reader of one
-    draft (#1082): a critic told once that a quote was invented must not read
-    the same quote clean on the second look, and a replay must send what the
-    graph sent.
+    The marks, the catalog and the Controls travel together and none has a
+    default. A view built from fewer marks than the first pass read is a
+    second reader of one draft (#1082): a critic told once that a quote was
+    invented must not read the same quote clean on the second look, and a
+    replay must send what the graph sent. ``controls`` is each Control that
+    applies to the job (ADR 0126).
     """
 
     framework: FrameworkName
@@ -190,6 +195,7 @@ class CriticRound:
     drafts: Sequence[Claim]
     marks: AnalysisMarks
     assertions: AssertionCatalog | None
+    controls: Sequence[AppliedControl]
 
     @classmethod
     def of(
@@ -199,9 +205,18 @@ class CriticRound:
         drafts: Sequence[Claim],
         marks: AnalysisMarks,
         assertions: AssertionCatalog | None,
+        controls: Sequence[AppliedControl],
     ) -> CriticRound:
         """The round for one framework, with that framework's own schemas."""
-        return cls(framework, schemas_for(framework), model, drafts, marks, assertions)
+        return cls(
+            framework,
+            schemas_for(framework),
+            model,
+            drafts,
+            marks,
+            assertions,
+            controls,
+        )
 
     def view(self, only: Collection[str] | None = None) -> list[dict]:
         """The drafts the Critic reads, every computed fact already on them.
@@ -215,6 +230,8 @@ class CriticRound:
             repaired=self.marks.repaired_quotes,
             unverified=self.marks.unverified_grounds,
             assertions=self.assertions,
+            package=package_for(self.framework),
+            controls=self.controls,
         )
 
     def summary(self) -> dict[str, Any]:
@@ -289,13 +306,17 @@ class CriticRound:
             return Failed(problems=list(problems.problems))
         return self._assembled(rulings)
 
+    def shown(self) -> dict[str, frozenset[ControlRowRef]]:
+        """The Control rows each draft is shown, which its ruling answers."""
+        return shown_rows(self.drafts, package_for(self.framework), self.controls)
+
     def _checked(self, emitted: Sequence[Any]) -> tuple[list[Ruling], ReviewProblems]:
         rulings = self.rulings(emitted)
-        return rulings, review_issues(self.drafts, rulings, self.model)
+        return rulings, review_issues(self.drafts, rulings, self.model, self.shown())
 
     def _assembled(self, rulings: Sequence[Ruling]) -> Accepted:
         claims, rejected = assemble_claims(
-            self.drafts, rulings, self.model, self.schemas
+            self.drafts, rulings, self.model, self.schemas, self.shown()
         )
         return Accepted(claims=claims, rejected=rejected)
 

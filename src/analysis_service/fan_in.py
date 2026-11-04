@@ -58,6 +58,7 @@ from analysis_service.claims import (
     LaneCoverage,
     ProposalBatch,
     RepairedQuote,
+    RuledClaim,
     UnresolvedEvidence,
     UnresolvedMention,
     UnresolvedReference,
@@ -103,13 +104,15 @@ class FanIn(NamedTuple):
     from the critic against the reason. ``coverage`` is computed over the
     resolved drafts before the join, because the question it answers — did
     this lane look at the system — is about what the agents did rather than
-    about what survived review.
+    about what survived review. ``undeferred`` is each unit a Control row kept
+    from ``deferred``, against the kind it would have been deferred for.
     """
 
     drafts: list[Claim]
     marks: AnalysisMarks
     deferred: dict[str, str]
     coverage: list[LaneCoverage]
+    undeferred: dict[str, str]
 
 
 def fan_in(
@@ -120,6 +123,7 @@ def fan_in(
     ruled_out: Mapping[str, str] = _NO_TEXTS,
     assertions: AssertionCatalog | None = None,
     ruled_in: Mapping[str, str] = _NO_TEXTS,
+    covered: Collection[str] = frozenset(),
 ) -> FanIn:
     """Merge one framework's lane batches into the drafts its critic sees.
 
@@ -150,7 +154,9 @@ def fan_in(
     node's proposal, and a second resolution here would be a second reader.
     ``ruled_in`` is each unit the package's rules say applies, against the
     reason; a draft that rules one of them out is refused, because the rule is
-    the one answer to whether a unit applies (#1291).
+    the one answer to whether a unit applies (#1291). ``covered`` is each
+    unit a row of an applied Control covers, which the package keeps from the
+    deferred set (ADR 0126).
 
     Raises :class:`DraftJoinError` when a lane emitted more than
     :data:`~analysis_service.claims.MAX_CLAIMS_PER_BATCH` proposals. This is
@@ -196,13 +202,24 @@ def fan_in(
     # decides which, since the unit and the reason are both its own.
     partitions = {
         lane: package.record.partition_proposals(
-            known[lane], lane, CARRIED_EVIDENCE_KINDS
+            known[lane], lane, CARRIED_EVIDENCE_KINDS, covered
         )
         for lane in batches
     }
     deferred: dict[str, str] = {}
     for _, reasons in partitions.values():
         deferred.update(reasons)
+    # The package says which units a row kept by its answer with no row, so
+    # a draft the critic keeps against every row can go back (ADR 0126).
+    undeferred: dict[str, str] = {}
+    if covered:
+        for lane in batches:
+            _, unheld = package.record.partition_proposals(
+                known[lane], lane, CARRIED_EVIDENCE_KINDS, ()
+            )
+            undeferred.update(
+                (unit, kind) for unit, kind in unheld.items() if unit not in deferred
+            )
     # Logged because the answer a proposal carries to make this decision does
     # not survive into a draft: without this line a run that defers nothing
     # leaves no trace of whether the agents ruled or the seam never ran.
@@ -295,7 +312,26 @@ def fan_in(
         model,
         package,
     )
-    return FanIn(merged, marks, deferred, coverage)
+    return FanIn(merged, marks, deferred, coverage, undeferred)
+
+
+def returned_to_deferred(
+    claims: Sequence[RuledClaim], undeferred: Mapping[str, str], record: type[Claim]
+) -> tuple[list[RuledClaim], dict[str, str]]:
+    """``claims`` without each claim a Control row alone kept from the
+    deferred set, and each such claim's unit against its kind.
+
+    ``claims`` are the claims the critic kept, so it refused every row they
+    were shown. The job carries no evidence of the kind the unit needs, so
+    the unit goes back to the deferred set (ADR 0126).
+    """
+    kept = [claim for claim in claims if record.unit_of(claim) not in undeferred]
+    back = {
+        unit: undeferred[unit]
+        for claim in claims
+        if (unit := record.unit_of(claim)) in undeferred
+    }
+    return kept, back
 
 
 class DraftJoinError(ValueError):

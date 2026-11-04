@@ -28,7 +28,7 @@ from analysis_service.critic_round import (
     critic_request,
     rulings_of,
 )
-from analysis_service.frameworks import schemas_for
+from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.graph import (
     STATE_BOUNDARY_CROSSINGS,
     STATE_INPUT_TEXT,
@@ -48,7 +48,7 @@ def emitted(*rulings) -> list[dict]:
 
 
 def round_over(*drafts, marks: AnalysisMarks = NO_MARKS) -> CriticRound:
-    return CriticRound.of("stride", valid_model(), list(drafts), marks, None)
+    return CriticRound.of("stride", valid_model(), list(drafts), marks, None, ())
 
 
 def two_drafts():
@@ -134,7 +134,13 @@ class TestTheFirstLook:
         drafts = two_drafts()
 
         assert round_over(*drafts).view() == critic.critic_view(
-            drafts, only=None, repaired=(), unverified=(), assertions=None
+            drafts,
+            only=None,
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )
 
 
