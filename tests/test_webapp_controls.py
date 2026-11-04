@@ -460,6 +460,17 @@ class TestTheSubmission:
         assert missing.json() == theirs.json()
         assert foreign not in theirs.text
 
+    def test_a_control_that_changes_nothing_in_the_analysis_is_refused(self, owner):
+        # An ASVS row and no fact change nothing in a STRIDE-only analysis.
+        asvs_only = owner.keep("TLS", {"type": "application"})
+        stride = posted("x", ("stride",))["frameworks"]
+        refused = owner.submit(asvs_only, frameworks=stride)
+        assert refused.status_code == 400
+        assert refused.json()["message"].startswith("The Control “TLS” states no fact")
+        # A fact applies in any framework, so the same rows with a fact pass.
+        with_fact = owner.keep("Encrypted", ORDERS_DB)
+        assert owner.submit(with_fact, frameworks=stride).status_code == 200
+
     def test_a_repeated_id_is_refused(self, owner):
         sso = owner.keep("SSO", {"type": "application"})
         refused = owner.submit(sso, sso)

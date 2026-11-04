@@ -420,6 +420,14 @@ class TestTheUnreachedRows:
         assert outcomes["spoofing"][1].startswith("Not reached")
         assert outcomes["tampering"][0] == "no-finding"
 
+    def test_the_report_leaves_out_a_row_of_a_framework_not_run(self):
+        db = _db(_row("spoofing", "stride"), _row("V11.2.1"))
+        block = sample_analysis([sample_threat("spoofing")])
+
+        [entry] = controls_section([db], None, None, valid_model(), [block])
+
+        assert [row.unit for row in entry.rows] == ["spoofing"]
+
     def test_a_finding_on_another_unit_misses_no_row(self):
         [control] = _applied(_db(_row("V11.2.1")))
 

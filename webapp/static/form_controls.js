@@ -37,6 +37,15 @@ const formControls = (() => {
     ? TYPES.application
     : `The ${TYPES[scope.type]} “${scope.name}”`);
   const rowText = (row) => `${row.framework} ${row.unit}`;
+  // The frameworks the form selects now.
+  const selected = () => new Set([...document.querySelectorAll('#frameworks input[name="framework"]:checked')]
+    .map((box) => box.value));
+  // A Control with no fact and no row of a selected framework changes nothing
+  // in this analysis (job_controls.changes_nothing), so the list offers no tick.
+  // Before any framework is chosen, the list judges no Control.
+  const fits = (control, frameworks) => !frameworks.size || control.facts.length > 0
+    || control.rows.some((row) => frameworks.has(row.framework));
+  const coveredBy = (control) => [...new Set(control.rows.map((row) => row.framework))].join(" and ");
   const manage = () => h("a", { href: "/controls" }, "Manage Controls");
 
   // ---- The submission ------------------------------------------------------
@@ -49,18 +58,26 @@ const formControls = (() => {
 
   const drawChecklist = () => {
     const present = new Set(held.map((control) => control.id));
+    const frameworks = selected();
     const lines = held.map((control) => {
-      const box = h("input", { type: "checkbox", id: `control-${control.id}`, checked: ticked.has(control.id),
+      const fit = fits(control, frameworks);
+      const ownRows = control.rows.some((row) => frameworks.has(row.framework));
+      const box = h("input", { type: "checkbox", id: `control-${control.id}`, checked: fit && ticked.has(control.id),
+        disabled: !fit,
         on: { change: (event) => { if (event.target.checked) ticked.add(control.id); else ticked.delete(control.id); drawChecklist(); } } });
+      const note = !fit
+        ? `Not for this analysis: it states no fact and covers only ${coveredBy(control)}.`
+        : control.rows.length && !ownRows ? `Only its facts apply here: its rows cover ${coveredBy(control)}.` : "";
       return h("li", {}, box, " ", h("label", { for: box.id }, h("b", {}, control.name)),
         h("span", { class: "hint" }, ` · ${scopeText(control.scope)}`,
-          control.rows.length ? ` · ${control.rows.map(rowText).join(", ")}` : ""));
+          control.rows.length ? ` · ${control.rows.map(rowText).join(", ")}` : ""),
+        note ? h("span", { class: "hint control-fit" }, ` · ${note}`) : null);
     });
     const missing = [...ticked].filter((id) => !present.has(id)).map((id) => h("li", { class: "hint" },
       "Missing: a Control you ticked is no longer in Controls. ",
       h("button", { type: "button", class: "quiet", on: { click: () => { ticked.delete(id); drawChecklist(); } } }, "Remove")));
     el("controls-rows").replaceChildren(...lines, ...missing);
-    const count = [...ticked].filter((id) => present.has(id)).length;
+    const count = chosenIds().filter((id) => present.has(id)).length;
     el("controls-summary").replaceChildren(
       `${counted(count, "Control is", "Controls are")} ticked. The service matches each one to your system, `,
       asking() ? "and you confirm the match with the questions. " : "and continues at once with no questions. ",
@@ -81,8 +98,20 @@ const formControls = (() => {
     drawChecklist();
   };
   el("ask")?.addEventListener("change", drawChecklist);
-  // The IDs a submission sends, or nothing where none is ticked.
-  const chosen = () => (ticked.size ? [...ticked] : undefined);
+  el("frameworks")?.addEventListener("change", drawChecklist);
+  // The IDs a submission sends, or nothing where none is ticked. A Control
+  // that does not fit the selected frameworks stays ticked for later, but
+  // goes with no submission.
+  const chosenIds = () => {
+    const frameworks = selected();
+    const byId = new Map(held.map((control) => [control.id, control]));
+    // A ticked ID the list no longer holds still goes, so the service names it.
+    return [...ticked].filter((id) => !byId.has(id) || fits(byId.get(id), frameworks));
+  };
+  const chosen = () => {
+    const ids = chosenIds();
+    return ids.length ? ids : undefined;
+  };
 
   // ---- The pause -----------------------------------------------------------
   // Each reason a Control is left out (LeftOutReason), and each reason a

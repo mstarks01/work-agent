@@ -210,7 +210,8 @@ it always uses the light colours.
 
 **Controls**, under the findings of a job that copied a Control, is one table
 of each Control: what it matched, the facts it wrote with the state
-`written`, `changed` or `stated`, and its rows with the outcome `applied`,
+`written`, `changed` or `stated`, and its rows of the frameworks the job ran,
+each with the outcome `applied`,
 `refused`, `not-reached` or `no-finding`. A row is `not-reached` when no
 finding on its unit reached the critic with the row, and a finding on its
 unit names no part that the Control's scope holds. A row opens to the claim
@@ -376,8 +377,12 @@ your Controls with what it protects and its rows, each ticked. The
 submission sends the IDs of the Controls you tick in `controls`, and the job
 copies each one, with the text of each evidence file (ADR 0127). A later edit
 or delete changes no job. When a ticked Control is gone, the submission is
-refused and the list shows the Control as "Missing". Controls apply at the
-pause. With the questions off, a job with Controls also pauses, and the
+refused and the list shows the Control as "Missing". A Control that states
+no fact and has no row of a selected framework changes nothing in the
+analysis, so the list shows it unticked and disabled, with the note "Not for
+this analysis". The service refuses a submission that names one. A Control
+with facts and rows only of other frameworks stays ticked, with the note
+"Only its facts apply here". Controls apply at the pause. With the questions off, a job with Controls also pauses, and the
 service continues it at once with no answers (ADR 0125). The page shows
 "Continuing with your Controls…" until the next run starts. Each Control takes
 its default match. A refusal, such as two Controls that write one fact with

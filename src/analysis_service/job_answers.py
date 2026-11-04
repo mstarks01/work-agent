@@ -63,7 +63,9 @@ from analysis_service.job_controls import (
     CONTROL_GONE,
     ControlScopeEntry,
     CopiedControl,
+    changes_nothing,
     control_offer,
+    not_for_this_analysis,
     resolve_scopes,
 )
 from analysis_service.jobs import (
@@ -654,6 +656,10 @@ class JobAnswers:
         self._refusing(refuse_owner_file_sources, sources)
         sources += await self.owner_file_sources(identity, submission.owner_files)
         controls = await self.control_copies(identity, submission.controls)
+        names = [framework.name for framework in selection]
+        for copy in controls:
+            if changes_nothing(copy, names):
+                raise Refused(not_for_this_analysis(copy.document.name))
         if sources:
             sources = self._refusing(with_link_answers, sources, submission.links)
         breach = self.limits.breach(sources)

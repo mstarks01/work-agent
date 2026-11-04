@@ -2504,6 +2504,24 @@ def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_pa
     assert "unticked: you left it out" in page.inner_text("#control-offer")
 
 
+def test_a_control_that_fits_no_selected_framework_takes_no_tick(zoned_page):
+    page = zoned_page
+    spoofing = keep_control(page, "Spoof guard", {"type": "application"})
+    page.goto("/")
+    page.wait_for_selector(f"#control-{spoofing}")
+    stride = page.locator('#frameworks input[name="framework"][value="stride"]')
+    asvs = page.locator('#frameworks input[name="framework"][value="asvs"]')
+    asvs.check()
+    stride.uncheck()
+    # Its one row is STRIDE's and it states no fact, so ASVS alone takes none.
+    assert page.is_disabled(f"#control-{spoofing}")
+    assert not page.is_checked(f"#control-{spoofing}")
+    assert "Not for this analysis" in page.inner_text("#controls-rows")
+    stride.check()
+    assert page.is_enabled(f"#control-{spoofing}")
+    assert page.is_checked(f"#control-{spoofing}")
+
+
 def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
     zoned_page,
 ):
