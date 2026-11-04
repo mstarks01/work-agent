@@ -211,14 +211,14 @@
       ...units[framework].units.map((unit) => h("option", { value: unit.id },
         unit.label ? `${unit.id} · ${unit.label}`.slice(0, 120) : unit.id)));
     const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitPick());
-    // A finding that names no part never reaches a Control on one part.
+    // A finding that names no part reaches only a Control of the whole application.
     const unreachable = draft.scope.type !== "application" && draft.rows.some((row) => !units[row.framework]?.names_a_part);
     return card("What it covers", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
       h("ul", { class: "lines", id: "rows-list" }, ...draft.rows.map((row, index) => h("li", {},
         h("span", {}, unitText(row), " ", h("span", { class: "sub" }, `version ${row.version}`)),
         remove(draft.rows, index, `the row ${row.unit}`)))),
       unreachable ? h("p", { class: "notice", id: "rows-reach", role: "note" },
-        "A row here names a unit whose findings can name no part of the model. Such a finding does not reach a Control on one part, and the report shows the row as “Not reached”. To cover each such finding, make a Control of the whole application.") : null,
+        "A row here names a unit whose findings can name no part of the model. Such a finding does not reach a Control that does not cover the whole application, and the report shows the row as “Not reached”. To cover each such finding, make a Control of the whole application.") : null,
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "row-framework" }, "Framework"),
           h("select", { id: "row-framework", on: { change: (event) => {

@@ -553,8 +553,8 @@ def unreached_rows(
     claims: Iterable[Claim], package: FrameworkPackage, control: AppliedControl
 ) -> frozenset[str]:
     """The unit of each row of ``control`` that a claim sits on, where the
-    scope does not reach the claim's elements, so the critic was not shown
-    the row on it."""
+    scope does not reach the claim's elements, so the critic did not see the
+    row on it."""
     return frozenset(
         row.unit
         for claim in claims

@@ -61,8 +61,9 @@ report's claims and rejected claims, and the job keeps no second record of it.
 One reader computes the row's outcome: `applied` when any ruling
 applied it, `refused` when every ruling refused it. A row with an empty list is
 `not-reached` when a finding sits on its unit and the scope does not reach the
-finding's elements, and `no-finding` otherwise. An ASVS finding can name no
-element, so a Control on one part never reaches it, and the row says so.
+finding's elements, and `no-finding` otherwise. A framework whose record lets
+`affected_element_ids` be empty gives findings that name no element. Only a
+Control of the whole application reaches such a finding, and the row says so.
 
 **The lane never sees the document, and a row un-defers its unit.**
 `partition_proposals` gains one argument beside `carried`: the set of unit IDs

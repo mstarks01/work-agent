@@ -205,9 +205,9 @@ it always uses the light colours.
 **Controls**, under the findings of a job that copied a Control, is one table
 of each Control: what it matched, the facts it wrote with the state
 `written`, `changed` or `stated`, and its rows with the outcome `applied`,
-`refused`, `not-reached` or `no-finding`. A row is `not-reached` when a
-finding sits on its unit but names no part that the Control's scope holds, so
-the critic never saw the row. A row opens to the claim IDs it ruled out, the
+`refused`, `not-reached` or `no-finding`. A row is `not-reached` when no
+finding on its unit reached the critic with the row, and a finding on its unit
+names no part that the Control's scope holds. A row opens to the claim IDs it ruled out, the
 critic's reason, each line of the evidence that the quotation of an applied
 ruling quotes, by file, class and line, and one sentence that says what the
 outcome means. A
@@ -329,9 +329,9 @@ it.
   behind a "?" beside its title. "What it covers" comes first and takes a row
   by framework and unit, and the row keeps the package version. Each unit's
   label comes from its package's catalog when the page loads. A note shows
-  under the rows when the Control protects one part and a row names a
-  framework whose findings can name no part, because such a finding never
-  reaches the Control. "What it protects" takes the
+  under the rows when the Control is not of the whole application and a row
+  names a framework whose findings can name no part, because such a finding
+  never reaches the Control. "What it protects" takes the
   kind, the name and the aliases. "What it does" takes a fact and its value
   from the protective facts of an element or a zone: its encryption at rest,
   its exposure and the Question Kinds. A closed fact takes one of its values.
