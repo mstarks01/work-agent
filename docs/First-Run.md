@@ -402,7 +402,9 @@ A protection that you state on each analysis, such as a WAF at the edge or
 SSO on an API, can be a **Control** instead. Open **Controls** in the
 sidebar, click **New Control**, and say what it protects, the protections it states,
 the framework units it covers and the evidence files that show it. The form
-lists your Controls under "Controls for this analysis", each one ticked. At
+lists your Controls under "Controls for this analysis", each one ticked. A
+Control that states no fact and covers none of the frameworks you choose
+changes nothing, so the form shows it unticked and says why. At
 the questions, the page shows what each Control matched in your description,
 and you confirm the match there. With the questions off, the service applies
 each Control's default match and continues at once. When it cannot apply them,

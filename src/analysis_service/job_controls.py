@@ -107,6 +107,27 @@ NOT_COPIED = "The save names a Control that this analysis did not copy."
 _ElementId = Annotated[str, Field(max_length=ELEMENT_ID_MAX_CHARS, pattern=ELEMENT_ID)]
 
 
+def changes_nothing(copy: CopiedControl, frameworks: Iterable[str]) -> bool:
+    """Whether ``copy`` would change nothing in an analysis of ``frameworks``:
+    it states no fact, and no row of it names one of them. The form page
+    states the same rule in ``form_controls.js``. A route test and a browser
+    test each check it on their side: a Control with no fact and rows of one
+    framework does not fit an analysis of only the other."""
+    names = set(frameworks)
+    return not copy.document.facts and not any(
+        row.framework in names for row in copy.rows
+    )
+
+
+def not_for_this_analysis(name: str) -> str:
+    """The refusal of a submission that names a Control that changes nothing."""
+    return (
+        f"The Control “{name}” states no fact and covers no framework of this"
+        " analysis, so it changes nothing here. Untick it, or choose a"
+        " framework it covers."
+    )
+
+
 class CopiedEvidence(BaseModel):
     """One evidence file as the job copied it, with its text."""
 
@@ -972,6 +993,7 @@ def controls_section(
         [entry for block in blocks for entry in block.returned_claims],
     )
     written = {entry.control: entry for entry in facts or ()}
+    ran = {block.framework for block in blocks}
     unreached = {
         (control.id, unit)
         for control in applied_controls(copies, scopes, model)
@@ -996,7 +1018,8 @@ def controls_section(
             if (element := model.get(element_id)) is not None
         ]
         rows = []
-        for row in copy.rows:
+        # A row of a framework the analysis did not run has no outcome here.
+        for row in (row for row in copy.rows if row.framework in ran):
             ruled = rulings.get(ControlRowRef(control=copy.id, unit=row.unit), [])
             row_result = row_outcome(ruled, unreached=(copy.id, row.unit) in unreached)
             package = PACKAGES.get(cast(FrameworkName, row.framework))

@@ -2186,10 +2186,18 @@ def add_evidence(page, name: str, text: str, evidence_class: str = "config") -> 
 
 
 def save_control(page) -> None:
+    """Save the editor, and wait until the list shows the saved name. A
+    notice from an earlier save is already shown, so the notice alone does
+    not say that the list has reloaded."""
     with page.expect_response("**/workspace/controls**") as answered:
         page.click("#save-control")
     assert answered.value.ok, answered.value.text()
-    page.wait_for_selector("#controls-notice:not([hidden])")
+    name = answered.value.json()["name"]
+    page.wait_for_function(
+        """name => [...document.querySelectorAll('#controls-list td.name-cell a')]
+          .some((link) => link.textContent === name)""",
+        arg=name,
+    )
 
 
 def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
@@ -2502,6 +2510,24 @@ def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_pa
     assert page.is_hidden("#answer-problem")
     assert not page.is_checked(f"#offer-{aes}")
     assert "unticked: you left it out" in page.inner_text("#control-offer")
+
+
+def test_a_control_that_fits_no_selected_framework_takes_no_tick(zoned_page):
+    page = zoned_page
+    spoofing = keep_control(page, "Spoof guard", {"type": "application"})
+    page.goto("/")
+    page.wait_for_selector(f"#control-{spoofing}")
+    stride = page.locator('#frameworks input[name="framework"][value="stride"]')
+    asvs = page.locator('#frameworks input[name="framework"][value="asvs"]')
+    asvs.check()
+    stride.uncheck()
+    # Its one row is STRIDE's and it states no fact, so ASVS alone takes none.
+    assert page.is_disabled(f"#control-{spoofing}")
+    assert not page.is_checked(f"#control-{spoofing}")
+    assert "Not for this analysis" in page.inner_text("#controls-rows")
+    stride.check()
+    assert page.is_enabled(f"#control-{spoofing}")
+    assert page.is_checked(f"#control-{spoofing}")
 
 
 def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
