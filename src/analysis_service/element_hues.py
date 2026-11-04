@@ -2,7 +2,8 @@
 its Mermaid download colour an element alike.
 
 The hues of a model's elements are spread evenly round the colour wheel, one
-for each element, so no two elements of one model take the same hue. The
+for each element, so no two elements of a model of up to 360 elements take
+the same hue. The
 elements take them in an order that steps far round the wheel each time, so
 two elements next to each other in the list take hues far apart. The hues stay
 the same for one model on every view.
@@ -17,8 +18,8 @@ from analysis_service.system_model import SystemModel
 
 __all__ = ["FILL", "LINE", "element_hues", "hsl_hex"]
 
-#: The part of the wheel one step goes round: the golden ratio's, so the
-#: steps never fall back near an earlier hue.
+#: The part of the wheel one step goes round, near the golden ratio's. The
+#: step is prime to the count, so it reaches every slot once.
 GOLDEN_FRACTION = 0.382
 #: The hue of the first element, a blue.
 FIRST_HUE = 210
