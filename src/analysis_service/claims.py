@@ -408,8 +408,9 @@ class UnknownRef(BaseModel):
         **The one reader of "how is this fact named".** The review seam sends
         back an entry that uses more than one,
         :func:`~analysis_service.critic.snap_rulings` drops one
-        whose sound twin sits beside it, and the fallback count reads the
-        question and subject spellings here. A model whose provider treats the
+        whose sound twin sits beside it, and the fallback count reads
+        :attr:`sound` and :attr:`kind`, which read the spellings here. A model
+        whose provider treats the
         schema as a hint writes an attribute reference and then repeats it with
         a ``subject`` and schema punctuation in ``assertion``
         (``QA-2026-09-26-03-E10``).

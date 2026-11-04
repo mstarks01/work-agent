@@ -1687,6 +1687,7 @@ class TestAnUnruledMisfiledDraft:
     ],
 )
 def test_a_reference_is_sound_mixed_or_neither(ref, sound, mixed):
-    """``sound`` and ``mixed`` read one count of the spellings: one, more
-    than one, or none."""
+    """A reference is sound with one spelling, mixed with more than one, and
+    neither with none. The one-reader row of the count holds the two
+    properties to one count."""
     assert (ref.sound, ref.mixed) == (sound, mixed)
