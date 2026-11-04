@@ -4148,7 +4148,7 @@ await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
   early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
   answered_early: [], answered_links: [], revision: 0,
-  carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES",
+  carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES", reason: "not-taken",
     key: ["store:old", "encryption_at_rest", "", "", "", ""] }],
   carried_dropped_links: [{ principal: "batch loader", element: "none" }] }) });
 const text = (n) => typeof n === "string" ? n
@@ -4285,7 +4285,7 @@ calls.push({{ said: text(ids.questions), earlier: text(ids.earlier) }});
 """
     seen = next(c for c in _run_form_script(steps)["calls"] if "said" in c)
     assert (
-        "2 questions are answered by a Control and marked under Your answers."
+        "2 facts are answered by a Control and marked under Your answers."
         in (seen["said"])
     )
     assert "because a Control states the fact" in seen["said"]

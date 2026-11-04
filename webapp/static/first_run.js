@@ -1112,11 +1112,13 @@
       carried.append(review);
     }
     // The change review counts what the Controls answered (ADR 0125).
-    const byControl = (data.control_facts || []).filter((f) => f.state === "written").length;
+    const byControl = new Set((data.control_facts || [])
+      .filter((f) => f.state === "written")
+      .map((f) => questionKey(f.answer.key))).size;
     if (byControl) {
       const review = document.createElement("p");
       review.className = "carried-review";
-      review.textContent = `${counted(byControl, "question is", "questions are")} answered by a Control`
+      review.textContent = `${counted(byControl, "fact is", "facts are")} answered by a Control`
         + " and marked under Your answers.";
       carried.append(review);
     }
@@ -1172,7 +1174,7 @@
       );
     }
     const others = [
-      ...dropped.filter((a) => !waitsForElement[a.reason] && a.reason !== "control-states")
+      ...dropped.filter((a) => a.reason === "not-taken")
         .map((a) => `${a.label} — ${answerText(a)}`),
       ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${linkAnswerText(a)}`),
     ];

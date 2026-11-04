@@ -46,7 +46,11 @@ from analysis_service.fact_answers import (
     key_ref,
     merged_facts,
 )
-from analysis_service.open_facts import open_attribute, prepared_model
+from analysis_service.open_facts import (
+    open_attribute,
+    prepared_model,
+    stated_capability,
+)
 from analysis_service.question_kinds import parse_question_kind
 from analysis_service.sources import ANSWERS_LABEL
 from analysis_service.system_model import (
@@ -118,7 +122,6 @@ def check_fact_answers(
     prepared = prepared_model(model, catalog)
     answered_before = {answer.key for answer in earlier}
     settled_before = {answer.key: answer for answer in earlier if answer.known}
-    stated = prepared.capability_facts()
     for at, answer in enumerate(answers):
         ref = key_ref(answer.key)
         element_id, attribute, assertion = ref.element_id, ref.attribute, ref.assertion
@@ -153,11 +156,8 @@ def check_fact_answers(
         elif kind == "capability":
             if parse_capability_key(capability) is None:
                 raise ValueError(f"facts[{at}]: no capability by that name")
-            known = stated.get(capability)
-            if (
-                answer.key not in answered_before
-                and known is not None
-                and known.state != UNKNOWN
+            if answer.key not in answered_before and stated_capability(
+                prepared, capability
             ):
                 raise ValueError(
                     f"the sources state {capability!r}, so it takes no answer"

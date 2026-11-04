@@ -355,6 +355,19 @@ def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
     return element is not None and (unverified or assumed)
 
 
+def stated_capability(model: SystemModel, capability: str) -> str | None:
+    """The state ``model`` gives the capability, or ``None`` where the
+    capability is open: no statement names it, or the statements disagree.
+
+    The answer check and a Control's fact both ask it, so a Control writes a
+    capability exactly where an answer may.
+    """
+    known = model.capability_facts().get(capability)
+    if known is None or known.state == "unknown":
+        return None
+    return known.state
+
+
 def prepared_model(model: SystemModel, catalog: AssertionCatalog | None) -> SystemModel:
     """The model with the catalog's projection applied, as the lanes read it.
 

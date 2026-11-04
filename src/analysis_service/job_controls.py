@@ -44,7 +44,11 @@ from analysis_service.fact_answers import (
 )
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES, FrameworkName
-from analysis_service.open_facts import open_attribute, prepared_model
+from analysis_service.open_facts import (
+    open_attribute,
+    prepared_model,
+    stated_capability,
+)
 from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import EvidenceClass
 from analysis_service.system_model import (
@@ -525,9 +529,7 @@ def _stated_value(model: SystemModel, fact: FactAnswer) -> str | None:
             return None
         return str(getattr(model.get(ref.element_id), ref.attribute))
     if fact.kind == "capability":
-        known = model.capability_facts().get(ref.capability)
-        if known is not None and known.state != UNKNOWN:
-            return known.state
+        return stated_capability(model, ref.capability)
     return None
 
 

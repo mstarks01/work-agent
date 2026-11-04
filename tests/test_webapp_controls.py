@@ -10,6 +10,8 @@ the first-run app, with a runner that pauses a job that asks.
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 from uuid import uuid4
 
 import pytest
@@ -31,7 +33,7 @@ from tests.factories import valid_model
 from tests.test_api import auth, make_client, one_framework, one_source
 from tests.test_controls import fact, row
 from tests.test_webapp import LOOPBACK, SAME_ORIGIN, posted
-from tests.test_webapp_questions import HELD, PausingRunner, app_for, ran
+from tests.test_webapp_questions import FACT, HELD, PausingRunner, app_for, ran
 from webapp.main import OPERATOR, Workspace
 
 tiers = test_webapp.tiers
@@ -655,8 +657,7 @@ class TestTheFacts:
             ("Encrypted", CLASS_KEY, "restricted", "stated", "confidential"),
         ]
         assert owner.answers_source(child) == [DB_LINE]
-        assert held.answers.facts == ()
-        assert [list(fact.key) for fact in held.written_answers().facts] == [DB_KEY]
+        assert [list(fact.key) for fact in held.answers.facts] == [DB_KEY]
 
     def test_a_control_fact_is_not_asked_and_is_marked(self, owner):
         run_id = owner.paused(owner.keep("Encrypted", ORDERS_DB))
@@ -788,3 +789,18 @@ class TestTheFacts:
         refused = owner.answer(owner.paused(weak), revision=0)
         assert refused.status_code == 400
         assert refused.json()["message"].startswith("The Control “Weak” cannot apply:")
+
+    def test_a_final_report_takes_a_correction_of_a_control_fact(self, owner):
+        child = owner.resumed(owner.paused(owner.keep("Encrypted", ORDERS_DB)))
+        final = owner.resumed(child, facts=[dict(FACT)])
+        corrected = owner.client.post(
+            f"/correct/{final}",
+            json={"facts": [{"key": DB_KEY, "value": "KMS"}], "revision": 0},
+            headers=SAME_ORIGIN,
+        )
+        assert corrected.status_code == 200, corrected.text
+        page = owner.client.get(f"/report/{final}").text
+        match = re.search(r'id="corrections"[^>]*>(.*?)</script>', page, re.DOTALL)
+        rows = {tuple(row["key"]): row for row in json.loads(match.group(1))["answers"]}
+        assert rows[tuple(DB_KEY)]["answer"]["value"] == "KMS"
+        assert rows[tuple(DB_KEY)]["corrected"] is True

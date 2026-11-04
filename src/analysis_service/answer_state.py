@@ -1520,9 +1520,9 @@ class SavedAnswers:
     shown: tuple[UnknownKey, ...]
     skipped: tuple[SkipKey, ...]
     revision: int
-    renames: tuple[ElementRename, ...] = ()
     #: What each applied Control writes, with each fact's state (ADR 0125).
-    control_facts: tuple[ControlFacts, ...] = ()
+    control_facts: tuple[ControlFacts, ...]
+    renames: tuple[ElementRename, ...] = ()
 
 
 #: The label an amendment's description carries, with the lowest number after
@@ -1547,7 +1547,7 @@ class Carried:
     #: the elements a rename can map it to.
     choices: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     #: Each fact the job's Controls write (ADR 0125).
-    controlled: frozenset[UnknownKey] = frozenset()
+    controlled_keys: frozenset[UnknownKey] = frozenset()
 
     def reason(self, fact: FactAnswer) -> CarriedReason:
         """Why a dropped fact is not taken: ``control-states`` where a
@@ -1555,7 +1555,7 @@ class Carried:
         model does not have, and ``not-taken`` where the job's questions
         refuse it, because the sources state the fact or no question asks
         it."""
-        if fact.key in self.controlled:
+        if fact.key in self.controlled_keys:
             return "control-states"
         if key_ref(fact.key).element_id in self.choices:
             return "missing-element"
@@ -1646,7 +1646,7 @@ class ResumedJob:
     checkpoint: Checkpoint
     follow_up: bool
     #: What each applied Control writes, with each fact's state (ADR 0125).
-    control_facts: tuple[ControlFacts, ...] = ()
+    control_facts: tuple[ControlFacts, ...]
 
 
 @dataclass(frozen=True)
@@ -1716,9 +1716,9 @@ class AnswerState:
         )
 
     @cached_property
-    def control_facts(self) -> tuple[ControlFacts, ...]:
-        """What each applied Control writes, with its state against the
-        job's own answers (ADR 0125)."""
+    def _written_by_controls(self) -> tuple[ControlFacts, ...]:
+        """What each applied Control writes: a waiting job's Controls read
+        against its model, or what a report's job row holds."""
         if self.waiting:
             base = control_facts(
                 self.controls,
@@ -1730,16 +1730,24 @@ class AnswerState:
             )
         else:
             base = list(self.stored_facts or ())
-        return tuple(with_own_answers(base, self.answers.facts))
+        return tuple(base)
+
+    @cached_property
+    def control_facts(self) -> tuple[ControlFacts, ...]:
+        """What each applied Control writes, with its state against the
+        job's own answers (ADR 0125)."""
+        return self._controls_of(self.own(self.answers))
 
     @cached_property
     def controlled(self) -> AnswerSet:
         """The Control rung: every fact the Controls write."""
-        return control_answers(self.control_facts)
+        return control_answers(self._written_by_controls)
 
     def own(self, answers: AnswerSet) -> AnswerSet:
-        """``answers`` without each fact as a Control wrote it, so a later
-        save that unticks the Control takes the fact away (ADR 0125).
+        """``answers`` without each fact as a Control wrote it (ADR 0125). A
+        waiting job saves only these, so a later save that unticks the
+        Control takes the fact away. A report's job holds the answers its run
+        wrote, Control facts included, and its own answers are these.
 
         An answer that differs from the Control's stays, and
         :func:`~analysis_service.job_controls.with_own_answers` marks it
@@ -1749,7 +1757,7 @@ class AnswerState:
         return answers.model_copy(update={"facts": own})
 
     def _controls_of(self, own: AnswerSet) -> tuple[ControlFacts, ...]:
-        return tuple(with_own_answers(self.control_facts, own.facts))
+        return tuple(with_own_answers(self._written_by_controls, own.facts))
 
     def fact_origin(self, key: UnknownKey) -> FactOrigin | None:
         """The rung the held answer to ``key`` comes from, or ``None`` where
@@ -1761,7 +1769,7 @@ class AnswerState:
         rungs: tuple[tuple[Rung, Sequence[FactAnswer]], ...] = (
             ("correction", self.corrections),
             ("draft", self.draft.written().facts),
-            ("answer", self.answers.facts),
+            ("answer", self.own(self.answers).facts),
         )
         for rung, facts in rungs:
             if any(fact.key == key for fact in facts):
@@ -1814,7 +1822,7 @@ class AnswerState:
             choices=rename_choices(
                 self.carried_in, self.checkpoint.system_model, self.renames
             ),
-            controlled=controlled,
+            controlled_keys=controlled,
         )
 
     def _admits(self, base: QuestionSet, given: SentAnswers) -> bool:
@@ -1970,10 +1978,11 @@ class AnswerState:
         controls = self._controls_of(held)
         # The answers Source holds each Control fact on a line that names the
         # Control, as the run composes it again (ADR 0125).
+        written = held.over(control_answers(controls))
         sources = with_link_answers(
             [source for source in admitted.sources if source.kind != "answers"],
-            held.links,
-            held.over(control_answers(controls)).facts,
+            written.links,
+            written.facts,
             control_lines(controls),
         )
         # Checked for a save too: saved answers or a draft that no start could
@@ -1992,9 +2001,11 @@ class AnswerState:
                 renames=self.renames,
                 control_facts=controls,
             )
+        # The Resumed Job holds what its run writes, so each reader of a
+        # report's answers reads each Control fact too.
         return ResumedJob(
             sources=sources,
-            answers=held,
+            answers=written,
             shown=admitted.shown,
             skipped=admitted.skipped,
             checkpoint=self.checkpoint,
