@@ -16,6 +16,10 @@
     --muted:        #898781;
     --border:       rgba(11,11,11,0.10);
     --hairline:     #e1e0d9;
+    /* An element's tag: its hue (element_hues) at these saturations and
+       lightnesses. analysis_service.element_hues states the light ones too. */
+    --tag-fill-s: 70%; --tag-fill-l: 93%;
+    --tag-line-s: 50%; --tag-line-l: 40%;
     /* severity = status palette: critical / high(serious) / medium(warning) / low(good) */
     --sev-critical: #d03b3b;
     --sev-high:     #ec835a;
@@ -42,6 +46,8 @@
       --muted:    #898781;
       --border:   rgba(255,255,255,0.10);
       --hairline: #2c2c2a;
+      --tag-fill-s: 30%; --tag-fill-l: 22%;
+      --tag-line-s: 55%; --tag-line-l: 65%;
       --g-quote:  #7ea6ee;
       --g-unknown:#ac8ce8;
       --g-absent: #d47fc6;
@@ -54,6 +60,7 @@
       --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
       --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781; --border:rgba(255,255,255,0.10); --hairline:#2c2c2a;
       --g-quote:#7ea6ee; --g-unknown:#ac8ce8; --g-absent:#d47fc6; --g-derived:#49b6b1;
+      --tag-fill-s:30%; --tag-fill-l:22%; --tag-line-s:55%; --tag-line-l:65%;
     }
   }
 
@@ -89,12 +96,13 @@
   .model-diagram .unplaced .zone-box { fill: none; stroke-dasharray: 2 4; }
   .model-diagram .zone-label { fill: var(--ink-2); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
   .model-diagram .element { filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.12)); }
-  .model-diagram .element-box, .model-diagram .element-fill { fill: var(--surface); }
-  .model-diagram .process .element-box { fill: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
-  .model-diagram .external-entity .element-box { fill: color-mix(in srgb, var(--ink-2) 16%, var(--surface)); }
-  .model-diagram .data-store .element-fill { fill: color-mix(in srgb, var(--g-quote) 22%, var(--surface)); }
-  .model-diagram .element-box, .model-diagram .element-line { stroke: var(--ink-2); stroke-width: 1.2; }
-  .model-diagram .process .element-box { stroke: var(--accent); stroke-width: 1.6; }
+  /* Each element in the colour of its tag; its shape still says its kind. */
+  .model-diagram .element { --h: 0; }
+  .model-diagram .element-box, .model-diagram .element-fill {
+    fill: hsl(var(--h) var(--tag-fill-s) var(--tag-fill-l)); }
+  .model-diagram .element-box, .model-diagram .element-line {
+    stroke: hsl(var(--h) var(--tag-line-s) var(--tag-line-l)); stroke-width: 1.2; }
+  .model-diagram .process .element-box { stroke-width: 1.6; }
   .model-diagram .external-entity .element-box { stroke-width: 1.6; }
   .model-diagram .element-line { fill: none; stroke-width: 1.6; }
   .model-diagram .element-fill { stroke: none; }
@@ -115,7 +123,16 @@
   #about-view th, #about-view td { overflow-wrap: anywhere; }
   .meta { color: var(--ink-2); font-size: 0.85rem; }
   .meta code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .ref { text-decoration: underline dotted; cursor: help; }
+  /* An element as a tag in its own colour, as the diagram draws it. A zone or
+     a reference with no hue takes a grey tag. */
+  .ref { --h: 0; display: inline-block; padding: 0 6px; margin: 1px 0; border-radius: 4px;
+    border: 1px solid hsl(var(--h) var(--tag-line-s) var(--tag-line-l));
+    background: hsl(var(--h) var(--tag-fill-s) var(--tag-fill-l));
+    line-height: 1.5; cursor: help; overflow-wrap: anywhere; }
+  .ref.neutral { --tag-fill-s: 0%; --tag-line-s: 0%; }
+  /* A flow as its two endpoints, with an arrow in the weight of the tags. */
+  .ref-flow { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .flow-arrow { font-weight: 700; font-size: 1.1em; line-height: 1; color: var(--ink-2); }
   .prov { margin-top: 10px; font-size: 0.85rem; }
   .prov > summary { cursor: pointer; color: var(--muted); }
 
@@ -240,7 +257,7 @@
   .field .lbl { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; }
   .refs code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem;
     background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
-  .refs .ref { margin-right: 10px; }
+  .refs > .ref, .refs > .ref-flow { margin-right: 10px; }
   ul.mits { margin: 6px 0 0; padding-left: 18px; font-size: 0.88rem; color: var(--ink-2); }
 
   /* grounds rail — why the finding was raised, under the analysis */
@@ -489,6 +506,7 @@
 <!-- A display label for each element ID and evidence reference, from
      analysis_service.open_facts.reference_labels. Escaped the same way. -->
 <script type="application/json" id="names" nonce="__CSP_NONCE__"><!--names--></script>
+<script type="application/json" id="element_hues" nonce="__CSP_NONCE__"><!--element_hues--></script>
 <!-- How each finding moved since the report a follow-up's answers came from,
      from analysis_service.report_changes. Escaped the same way. -->
 <script type="application/json" id="changes" nonce="__CSP_NONCE__"><!--changes--></script>

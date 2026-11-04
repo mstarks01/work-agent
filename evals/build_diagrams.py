@@ -3,8 +3,8 @@
 A ``diagram`` Source holds Mermaid text. To measure how extraction reads one,
 a case needs a diagram of the same system its description states. This writes
 ``diagrams/<case>.mmd`` from each case's blessed ``model.json`` through
-:func:`~analysis_service.mermaid.model_mermaid`, the writer the report's
-**Download as Mermaid** link uses. So the diagram states what the reference
+:func:`~analysis_service.mermaid.model_mermaid`, the plain text that the
+report's **Download as Mermaid** link adds its colours to. So the diagram states what the reference
 model states and nothing more, and an extraction of it is scored against that
 same model.
 

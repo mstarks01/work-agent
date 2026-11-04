@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 
-from analysis_service.mermaid import model_mermaid
+from analysis_service.mermaid import model_mermaid, styled_mermaid
 from analysis_service.system_model import UNKNOWN, SystemModel
 from tests.factories import report_state, sample_report, sample_threat, valid_model
 from tests.test_report_page import run_report_page, two_findings
@@ -78,7 +78,7 @@ def test_the_report_page_carries_the_mermaid_text():
             report, report_state(report), previous=None, parent=None, controls=()
         ).html,
     )
-    assert json.loads(carried) == model_mermaid(report.system_model)
+    assert json.loads(carried) == styled_mermaid(report.system_model)
 
 
 def test_the_diagram_links_to_its_mermaid_text():

@@ -1340,7 +1340,10 @@ class Node {
   }
 }
 globalThis.document = {
-  getElementById: () => Object.assign(new Node("script"), { children: ["{}"] }),
+  // Each data block is empty, but a report holds a model with its flows.
+  getElementById: (id) => Object.assign(new Node("script"), {
+    children: [id === "report" ? '{"system_model": {"data_flows": []}}' : "{}"],
+  }),
   createElement: (tag) => new Node(tag),
   createDocumentFragment: () => new Node("#fragment"),
   createTextNode: (t) => Object.assign(new Node("#text"), { children: [t] }),

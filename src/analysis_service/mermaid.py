@@ -8,7 +8,8 @@ protocol where the model states one. A flow that crosses a boundary, or may
 cross one, takes a link style, read from
 :func:`~analysis_service.analysis.crossings_by_flow`.
 
-**The text reads back as a ``diagram`` Source.** That register takes a
+**The text reads back as a ``diagram`` Source**, with or without the
+``style`` lines of :func:`styled_mermaid`, which add no node. That register takes a
 subgraph as a trust zone only where its label says so, so the label says so.
 It takes a node's shape as its type only where a comment states the shape
 convention, so the text opens with :data:`SHAPE_CONVENTION`.
@@ -24,6 +25,7 @@ identifier or keyword.
 from __future__ import annotations
 
 from analysis_service.analysis import crossings_by_flow
+from analysis_service.element_hues import FILL, LINE, element_hues, hsl_hex
 from analysis_service.system_model import (
     UNKNOWN,
     DataFlow,
@@ -33,7 +35,7 @@ from analysis_service.system_model import (
     ZonedElement,
 )
 
-__all__ = ["model_mermaid"]
+__all__ = ["model_mermaid", "styled_mermaid"]
 
 #: The characters a label writes as an entity code: the quote that closes the
 #: label, the start of an entity code, the edge label delimiter, the backtick
@@ -82,13 +84,18 @@ def _edge_text(flow: DataFlow) -> str:
     return f"{flow.name} ({flow.protocol})"
 
 
+def _node_ids(model: SystemModel) -> dict[str, str]:
+    """The Mermaid node ID of each element: its position, never its name."""
+    return {element.id: f"n{at}" for at, element in enumerate(model.zoned_elements())}
+
+
 def model_mermaid(model: SystemModel) -> str:
     """``model`` as Mermaid ``flowchart`` text, or ``""`` for a model with no
     element to draw."""
     elements = model.zoned_elements()
     if not elements:
         return ""
-    ids = {element.id: f"n{at}" for at, element in enumerate(elements)}
+    ids = _node_ids(model)
     lines = ["flowchart LR", f"    {SHAPE_CONVENTION}"]
     zoned: set[str] = set()
     for at, zone in enumerate(model.trust_boundaries):
@@ -112,3 +119,19 @@ def model_mermaid(model: SystemModel) -> str:
             style = _CROSSING_STYLE[crossings[flow.id].decided]
             lines.append(f"    linkStyle {at} {style}")
     return "\n".join(lines) + "\n"
+
+
+def styled_mermaid(model: SystemModel) -> str:
+    """:func:`model_mermaid` with a ``style`` line for each element in the
+    colours the report gives it, for the report's download. The corpus
+    diagrams take the plain text, because they are extraction input."""
+    text = model_mermaid(model)
+    if not text:
+        return ""
+    hues = element_hues(model)
+    styles = [
+        f"    style {node} fill:{hsl_hex(hues[element], *FILL)},"
+        f"stroke:{hsl_hex(hues[element], *LINE)}"
+        for element, node in _node_ids(model).items()
+    ]
+    return text + "\n".join(styles) + "\n"
