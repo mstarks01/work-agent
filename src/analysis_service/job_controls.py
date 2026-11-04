@@ -110,7 +110,9 @@ _ElementId = Annotated[str, Field(max_length=ELEMENT_ID_MAX_CHARS, pattern=ELEME
 def changes_nothing(copy: CopiedControl, frameworks: Iterable[str]) -> bool:
     """Whether ``copy`` would change nothing in an analysis of ``frameworks``:
     it states no fact, and no row of it names one of them. The form page
-    states the same rule, and a browser test checks the two agree."""
+    states the same rule in ``form_controls.js``. A route test and a browser
+    test each check one case on their side: an ASVS-only Control with no fact
+    in a STRIDE-only analysis."""
     names = set(frameworks)
     return not copy.document.facts and not any(
         row.framework in names for row in copy.rows
@@ -991,6 +993,7 @@ def controls_section(
         [entry for block in blocks for entry in block.returned_claims],
     )
     written = {entry.control: entry for entry in facts or ()}
+    ran = {block.framework for block in blocks}
     unreached = {
         (control.id, unit)
         for control in applied_controls(copies, scopes, model)
@@ -1015,7 +1018,6 @@ def controls_section(
             if (element := model.get(element_id)) is not None
         ]
         rows = []
-        ran = {block.framework for block in blocks}
         # A row of a framework the analysis did not run has no outcome here.
         for row in (row for row in copy.rows if row.framework in ran):
             ruled = rulings.get(ControlRowRef(control=copy.id, unit=row.unit), [])
