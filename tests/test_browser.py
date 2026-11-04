@@ -1827,7 +1827,9 @@ def _drawn(browser, report):
     page = browser.new_page()
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    html = render_report(report, report_state(report), previous=None, parent=None).html
+    html = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    ).html
     page.route(
         "http://report.test/report/r1",
         lambda route: route.fulfill(body=html, content_type="text/html"),
@@ -2248,8 +2250,7 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
         ),
         (
             lambda page: new_control(page, "WAF"),
-            "Add at least one fact or one row. A Control with neither changes"
-            " nothing.",
+            "Add at least one fact or one row. A Control with neither changes nothing.",
         ),
     ],
 )
@@ -2342,9 +2343,9 @@ def keep_control(page, name: str, scope: dict, *, facts=(), rows=None) -> str:
         "name": name,
         "scope": {"name": "", "aliases": []} | scope,
         "facts": list(facts),
-        "rows": rows if rows is not None else [
-            {"framework": "stride", "unit": "spoofing", "version": "1.0"}
-        ],
+        "rows": rows
+        if rows is not None
+        else [{"framework": "stride", "unit": "spoofing", "version": "1.0"}],
         "evidence": [],
     }
     saved = page.evaluate(
@@ -2381,7 +2382,9 @@ def save_offer(page, action) -> dict:
 
 def test_a_zone_control_fans_out_and_the_owner_ticks_a_part(zoned_page):
     page = zoned_page
-    zone = keep_control(page, "Internal <b>WAF</b>", {"type": "boundary", "name": "Internal Network"})
+    zone = keep_control(
+        page, "Internal <b>WAF</b>", {"type": "boundary", "name": "Internal Network"}
+    )
     sent = submit_with_controls(page)
     assert sent["controls"] == [zone]
     offer = page.locator("#control-offer")
@@ -2416,7 +2419,9 @@ def test_an_unmatched_control_takes_a_choice_and_keeps_the_name(zoned_page):
     assert page.is_disabled(f"#offer-{waf}")
     choices = page.locator(f"#apply-{waf} option").all_inner_texts()
     assert choices == ["Not this time", "Web App"]
-    body = save_offer(page, lambda: page.select_option(f"#apply-{waf}", "process:web-app"))
+    body = save_offer(
+        page, lambda: page.select_option(f"#apply-{waf}", "process:web-app")
+    )
     assert body["control_scopes"] == [{"control": waf, "element": "process:web-app"}]
     page.wait_for_selector("#control-offer >> text=matches Web App")
     assert page.is_checked(f"#offer-{waf}")
@@ -2477,12 +2482,52 @@ def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
     page.check("#ask")
     sent = submit_with_controls(page)
     assert sent["controls"] == [kept]
-    run = page.evaluate("new URLSearchParams(location.search).get('run')") or page.evaluate(
-        "fetch('/workspace/runs').then((r) => r.json())"
-    )[0]["run"]
+    run = (
+        page.evaluate("new URLSearchParams(location.search).get('run')")
+        or page.evaluate("fetch('/workspace/runs').then((r) => r.json())")[0]["run"]
+    )
     page.goto(f"/?run={run}")
     page.wait_for_selector("#asked", state="visible")
     page.click("#description-nav")
     page.wait_for_selector("#controls-used", state="visible")
     assert page.inner_text("#controls-used-list") == "SSO (applied)"
     assert page.is_hidden("#controls-offer")
+
+
+def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers):
+    from tests.test_webapp_controls_page import RulingRunner
+
+    runner = RulingRunner()
+    for base in serve(web.app_for(tiers, runner)):
+        context = browser.new_context(base_url=base)
+        page = context.new_page()
+        errors: list[str] = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.on("dialog", lambda dialog: errors.append(f"dialog: {dialog.message}"))
+        page.goto("/controls")
+        rows = [
+            {"framework": "stride", "unit": unit, "version": "1.0"}
+            for unit in ("spoofing", "tampering")
+        ]
+        runner.control = keep_control(
+            page, HOSTILE_CONTROL, {"type": "application"}, rows=rows
+        )
+        submit_with_controls(page)
+        with page.expect_response("**/answer/**"):
+            page.click("#continue")
+        page.wait_for_url("**/report/**", timeout=20_000)
+        page.wait_for_selector("#controls-section")
+        section = page.locator("#controls-section")
+        assert page.locator("#controls-section td.name").inner_text() == HOSTILE_CONTROL
+        assert section.locator("img, b").count() == 0
+        page.click("#controls-section summary:has-text('tampering')")
+        assert "It shows no <b>signing</b>." in section.inner_text()
+        assert "applied" in section.inner_text() and "refused" in section.inner_text()
+        assert page.get_attribute("a.download-link >> nth=0", "href").endswith(
+            "/export.md"
+        )
+        page.click("#export-preview")
+        assert page.is_visible("#controls-section")
+        assert page.evaluate("window.ran") is None
+        context.close()
+        assert errors == [], f"the page raised: {errors}"

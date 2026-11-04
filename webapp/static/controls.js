@@ -320,7 +320,7 @@
         h("a", { href: "#", on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
         facts.length ? h("div", { class: "sub" }, `Proves ${facts.join(", ")}`) : null),
       h("td", {}, scopeText(control.scope)),
-      h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip fw-${one.framework}`, title: unitText(one) },
+      h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
         `${one.framework.toUpperCase()} ${one.unit}`)))),
       h("td", {}, control.evidence.length
         ? control.evidence.map((file) => `${file.name} (${CLASS_LABEL[file.class]})`).join(", ")

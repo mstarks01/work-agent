@@ -55,8 +55,9 @@ Control covers the element, and it states no zone.
 **No match is a listed reason from a closed set.** `missing-element` when no
 element of the type carries the name or an alias, and `empty-zone` when the
 zone matched and no element holds it. Beside `missing-element`, the page
-offers the elements of the scope's type, as `rename_choices` does. An
-application-scoped Control always matches.
+offers the elements of the scope's type, as `rename_choices` does. A zone in
+that list carries its candidates with their reasons and default ticks, so the
+owner can tick its elements. An application-scoped Control always matches.
 
 **A pause save carries `control_scopes`, one entry per applied Control**: the
 Control's ID, the element it resolves to, and for a zone the element IDs the

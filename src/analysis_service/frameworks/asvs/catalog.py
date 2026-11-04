@@ -282,7 +282,7 @@ _NAME_BY_ID: Mapping[str, str] = MappingProxyType(
 )
 
 
-def unit_text(unit_id: str) -> str:
+def published_text(unit_id: str) -> str:
     """The standard's own words for one unit: a chapter's or a section's name,
     a requirement's text, or ``""`` for an ID it lacks."""
     return _NAME_BY_ID.get(unit_id) or requirement_text(unit_id)

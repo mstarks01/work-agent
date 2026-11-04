@@ -1173,7 +1173,9 @@ def _report_payloads(payloads: dict) -> dict:
 
     sample = sample_report()
     served = test_report_page.payloads_of(
-        render_report(sample, report_state(sample), previous=None, parent=None).html
+        render_report(
+            sample, report_state(sample), previous=None, parent=None, controls=()
+        ).html
     )
     merged = {name: json.loads(text) for name, text in served.items()}
     for name, value in payloads.items():
@@ -1438,7 +1440,7 @@ def test_the_served_draft_keys_each_link_by_its_fold():
     link = LinkAnswer(principal="Customer Account", element="entity:customer")
     state = replace(report_state(report), draft=SentAnswers(links=(link,)))
     served = test_report_page.payloads_of(
-        render_report(report, state, previous=None, parent=None).html
+        render_report(report, state, previous=None, parent=None, controls=()).html
     )
 
     (drafted,) = json.loads(served["earlier"])["draft"]["links"]

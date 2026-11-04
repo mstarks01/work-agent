@@ -74,7 +74,9 @@ def test_the_report_page_carries_the_mermaid_text():
     report = sample_report([sample_threat()])
     (carried,) = re.findall(
         r'id="mermaid"[^>]*>(.*?)</script>',
-        render_report(report, report_state(report), previous=None, parent=None).html,
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html,
     )
     assert json.loads(carried) == model_mermaid(report.system_model)
 

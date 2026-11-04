@@ -398,6 +398,16 @@ that are actually known. When the input does not state an attribute, extraction
 uses `unknown`; code turns a claim resting on such an attribute into
 `needs-info` rather than treating the control as missing.
 
+A protection that you state on each analysis, such as a WAF at the edge or
+SSO on an API, can be a **Control** instead. Open **Controls** in the
+sidebar, click **New Control**, and say what it protects, the facts it proves,
+the framework units it covers and the evidence files that show it. The form
+lists your Controls under "Controls for this analysis", each one ticked. At
+the questions, the page shows what each Control matched in your description,
+and you confirm the match there. Controls apply only with the questions on.
+The report lists each Control with the facts it wrote and what became of each
+row. See [The Controls page](Web-App.md#the-controls-page).
+
 ### Answer the questions the analysis asks
 
 The app can ask you questions before the analysis, and after the report.

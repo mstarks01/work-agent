@@ -198,6 +198,7 @@ from analysis_service.fact_answers import (
 from analysis_service.fixes import fixes_by_framework
 from analysis_service.frameworks import PACKAGES, package_for
 from analysis_service.job_answers import (
+    Answerable,
     DraftSaved,
     JobAnswers,
     NoSuchJob,
@@ -211,7 +212,12 @@ from analysis_service.job_answers import (
     UnreadableSchema,
     Withheld,
 )
-from analysis_service.job_controls import ControlScopeEntry, controls_used
+from analysis_service.job_controls import (
+    ControlScopeEntry,
+    SectionEntry,
+    controls_section,
+    controls_used,
+)
 from analysis_service.jobs import (
     DeleteRefusal,
     Envelope,
@@ -297,6 +303,7 @@ from webapp.page import (
     response,
     script_json,
 )
+from webapp.report_export import report_markdown
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
     Refusal,
@@ -1043,6 +1050,7 @@ def render_report(
     state: AnswerState,
     previous: Report | None,
     parent: str | None,
+    controls: Sequence[SectionEntry],
 ) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
@@ -1090,6 +1098,7 @@ def render_report(
         sidebar=_SIDEBAR,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
+        controls=script_json([entry.model_dump(mode="json") for entry in controls]),
         units=script_json(unit_rows(report)),
         fixes=script_json(
             fixes_by_framework(
@@ -1358,6 +1367,19 @@ def evidence_refusals(limits: ControlLimits) -> dict[FileRefusal, str]:
         "no_text": NO_TEXT,
         "full": controls_full(limits),
     }
+
+
+def _section_of(record: JobRecord, report: Report) -> list[SectionEntry]:
+    """The report's Controls section, from the job's copy and the report's
+    rulings (ADR 0127). ``record`` holds the copy that
+    :meth:`~analysis_service.job_answers.JobAnswers.answerable` read."""
+    return controls_section(
+        record.controls,
+        record.control_scopes,
+        record.control_facts,
+        report.system_model,
+        report.analyses,
+    )
 
 
 def _name_taken(name: str) -> str:
@@ -2295,8 +2317,9 @@ def create_app(
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
 
-    @app.get("/report/{run_id}", response_class=HTMLResponse)
-    async def report_page(run_id: str) -> Response:
+    async def report_of(run_id: str) -> tuple[Answerable, Report] | None:
+        """The run's answerable state and its report, or ``None`` where the
+        app serves no report of it."""
         current = cell.read(
             lambda: PlainTextResponse("no such report", status_code=404)
         )
@@ -2305,10 +2328,19 @@ def create_app(
             owner_id = await workspace.owner_id(answers, run_id)
             answerable = await answers.answerable(run_id, owner_id)
         except (NoSuchJob, NotCompleted, Withheld):
+            return None
+        if answerable.report is None:
+            return None
+        return answerable, answerable.report
+
+    @app.get("/report/{run_id}", response_class=HTMLResponse)
+    async def report_page(run_id: str) -> Response:
+        served_report = await report_of(run_id)
+        if served_report is None:
             return PlainTextResponse("no such report", status_code=404)
-        report = answerable.report
-        if report is None:
-            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        answers = cell.read(unavailable).answers
+        owner_id = answerable.record.owner_id
         # The page compares with the report before it where the store holds
         # that report under this service's schema version and
         # :meth:`JobAnswers.servable` lets it be served, and else shows none,
@@ -2328,7 +2360,42 @@ def create_app(
                 answerable.state(),
                 previous,
                 None if resumption is None else resumption.parent_id,
+                _section_of(answerable.record, report),
             )
+        )
+
+    @app.get("/report/{run_id}/export.md")
+    async def report_markdown_export(run_id: str) -> Response:
+        """The report as one Markdown file, with its Controls section."""
+        served_report = await report_of(run_id)
+        if served_report is None:
+            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        text = report_markdown(
+            _name_of(answerable.record),
+            report,
+            _section_of(answerable.record, report),
+        )
+        return PlainTextResponse(
+            text,
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="report.md"'},
+        )
+
+    @app.get("/report/{run_id}/export.json")
+    async def report_json_export(run_id: str) -> Response:
+        """The report and its Controls section as one JSON object."""
+        served_report = await report_of(run_id)
+        if served_report is None:
+            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        section = _section_of(answerable.record, report)
+        return JSONResponse(
+            {
+                "report": report.model_dump(mode="json"),
+                "controls": [entry.model_dump(mode="json") for entry in section],
+            },
+            headers={"Content-Disposition": 'attachment; filename="report.json"'},
         )
 
     @app.post("/correct/{run_id}")

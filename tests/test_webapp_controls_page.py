@@ -11,13 +11,24 @@ import json
 import re
 
 import pytest
+from fastapi.testclient import TestClient
 
+from analysis_service.claims import (
+    ControlRowRef,
+    RefusedControl,
+    ReturnedClaim,
+    Verdict,
+)
 from analysis_service.frameworks.asvs.catalog import requirement_text
+from analysis_service.jobs import PipelineCompleted
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT
 from tests import test_webapp
+from tests.factories import sample_analysis
 from tests.test_controls import fact, row
-from tests.test_webapp import SAME_ORIGIN
-from tests.test_webapp_controls import BOB, Owner
+from tests.test_webapp import LOOPBACK, SAME_ORIGIN
+from tests.test_webapp_controls import BOB, ORDERS_DB, Owner, ZonedRunner
+from tests.test_webapp_questions import app_for, ran
+from webapp.main import Workspace
 
 tiers = test_webapp.tiers
 
@@ -71,7 +82,11 @@ class TestCreate:
         assert re.fullmatch(r"control-[0-9a-f]{32}", control["id"])
         [file] = control["evidence"]
         assert re.fullmatch(r"evidence-[0-9a-f]{32}", file["id"])
-        assert (file["name"], file["class"], file["size_bytes"]) == ("rds.tf", "code", 15)
+        assert (file["name"], file["class"], file["size_bytes"]) == (
+            "rds.tf",
+            "code",
+            15,
+        )
         assert "text" not in file
         assert listed(owner) == [control]
         text = asyncio.run(
@@ -89,13 +104,17 @@ class TestCreate:
             ),
             (
                 {"facts": [], "rows": []},
-                "Add at least one fact or one row. A Control with neither changes"
-                " nothing.",
+                (
+                    "Add at least one fact or one row. A Control with neither"
+                    " changes nothing."
+                ),
             ),
             (
                 {"facts": [fact(), fact(value="AES-128")]},
-                "The fact “encryption_at_rest” appears twice. One Control writes"
-                " one value for one fact.",
+                (
+                    "The fact “encryption_at_rest” appears twice. One Control"
+                    " writes one value for one fact."
+                ),
             ),
             ({"rows": [row(), row()]}, "The row V11.2 appears twice."),
             (
@@ -104,8 +123,10 @@ class TestCreate:
             ),
             (
                 {"scope": {"type": "flow", "name": "Orders", "aliases": []}},
-                "Input should be 'application', 'entity', 'process', 'store' or"
-                " 'boundary'",
+                (
+                    "Input should be 'application', 'entity', 'process', 'store'"
+                    " or 'boundary'"
+                ),
             ),
         ],
     )
@@ -148,16 +169,20 @@ class TestCreate:
         [
             (
                 "x" * (LIMITS.max_evidence_bytes + 1),
-                f"This file is larger than the {LIMITS.max_evidence_bytes:,} bytes"
-                " one evidence file can hold.",
+                (
+                    f"This file is larger than the {LIMITS.max_evidence_bytes:,}"
+                    " bytes one evidence file can hold."
+                ),
             ),
             ("a\x00b", NOT_PLAIN_TEXT),
             ("  \n", NO_TEXT),
             (
                 "region = eu\npassword = hunter2!\n",
-                "Line 2 of “rds.tf” holds a password, secret or token set to a"
-                " value. Remove it, then add the file again: the service stores no"
-                " credential.",
+                (
+                    "Line 2 of “rds.tf” holds a password, secret or token set to a"
+                    " value. Remove it, then add the file again: the service stores"
+                    " no credential."
+                ),
             ),
         ],
     )
@@ -293,7 +318,7 @@ class TestThePage:
         data = re.search(
             r'<script type="application/json" id="controls_page"[^>]*>(.*?)</script>',
             page,
-            re.S,
+            re.DOTALL,
         ).group(1)
         payload = json.loads(data)
         asvs = {unit["id"]: unit for unit in payload["units"]["asvs"]["units"]}
@@ -313,3 +338,148 @@ class TestThePage:
         controls = page.index('href="/controls"')
         settings = page.index('href="/settings"')
         assert files < controls < settings
+
+
+class RulingRunner(ZonedRunner):
+    """Rules on the rows of one Control in the report it completes: the
+    critic applies the ``spoofing`` row on the STRIDE claim, and refuses the
+    ``tampering`` row on a claim that went back to the deferred set."""
+
+    control = ""
+
+    async def run(self, job, on_node):
+        outcome = await super().run(job, on_node)
+        if job.pauses() or not self.control:
+            return outcome
+        report = outcome.report
+        [block] = [one for one in report.analyses if one.framework == "stride"]
+        [claim] = block.claims
+        verdict = Verdict(
+            status="rejected",
+            reason="The owner's file says “WAF: on” (WAF.yaml).",
+            rejected_because="control",
+            control_row=ControlRowRef(control=self.control, unit="spoofing"),
+        )
+        returned = ReturnedClaim(
+            claim_id="stride-returned",
+            unit="tampering",
+            needs="code",
+            refused_controls=[
+                RefusedControl(
+                    control=self.control,
+                    unit="tampering",
+                    reason="It shows no <b>signing</b>.",
+                )
+            ],
+        )
+        ruled = sample_analysis(
+            [],
+            [claim.model_copy(update={"verdict": verdict})],
+            returned_claims=[returned],
+        )
+        analyses = [ruled if one is block else one for one in report.analyses]
+        return PipelineCompleted(
+            report=report.model_copy(update={"analyses": analyses})
+        )
+
+
+@pytest.fixture
+def ruled(tiers):
+    owner = Owner(tiers)
+    owner.runner = RulingRunner()
+    owner.client = TestClient(
+        app_for(tiers, owner.runner, workspace=Workspace(store=owner.store)),
+        base_url=LOOPBACK,
+    )
+    stride = [
+        row(unit, framework="stride", version="1.0")
+        for unit in ("spoofing", "tampering", "repudiation")
+    ]
+    waf = owner.keep("WAF", {"type": "application"}, rows=stride, facts=[])
+    db = owner.keep("Encrypted", ORDERS_DB)
+    gone = owner.keep("Billing", {"type": "process", "name": "Billing"})
+    owner.runner.control = waf
+    run_id = owner.paused(waf, db, gone)
+    started = owner.answer(run_id, revision=0)
+    assert started.status_code == 200, started.text
+    child = started.json()["run"]
+    ran(owner.client, child)
+    held = asyncio.run(owner.store.get(child))
+    assert held.status == "completed", held.error
+    return owner, child, (waf, db, gone)
+
+
+class TestTheReportSection:
+    def test_the_json_export_carries_each_fact_state_and_row_outcome(self, ruled):
+        owner, child, _ = ruled
+        exported = owner.client.get(f"/report/{child}/export.json")
+        assert exported.status_code == 200, exported.text
+        assert "attachment" in exported.headers["content-disposition"]
+        body = exported.json()
+        assert body["report"]["job"]["id"] == child
+        section = {entry["name"]: entry for entry in body["controls"]}
+        assert list(section) == ["WAF", "Encrypted", "Billing"]
+        rows = {one["unit"]: one for one in section["WAF"]["rows"]}
+        assert {unit: one["outcome"] for unit, one in rows.items()} == {
+            "spoofing": "applied",
+            "tampering": "refused",
+            "repudiation": "no-finding",
+        }
+        [applied] = rows["spoofing"]["rulings"]
+        assert applied["ruling"] == "applied"
+        assert rows["spoofing"]["quoted"] == [
+            {"file": "WAF.yaml", "class": "config", "line": 1, "text": "WAF: on"}
+        ]
+        assert rows["tampering"]["rulings"] == [
+            {
+                "claim": "stride-returned",
+                "ruling": "refused",
+                "reason": "It shows no <b>signing</b>.",
+            }
+        ]
+        assert rows["repudiation"]["meaning"].startswith("No finding")
+        assert section["WAF"]["outcome"] == "application"
+        assert [
+            (fact["value"], fact["state"]) for fact in section["Encrypted"]["facts"]
+        ] == [("AES-256", "written")]
+        assert section["Encrypted"]["elements"] == ["Orders DB"]
+        assert (section["Billing"]["state"], section["Billing"]["reason"]) == (
+            "left-out",
+            "missing-element",
+        )
+
+    def test_the_markdown_export_carries_the_section_as_text(self, ruled):
+        owner, child, _ = ruled
+        exported = owner.client.get(f"/report/{child}/export.md")
+        assert exported.status_code == 200
+        assert exported.headers["content-type"].startswith("text/markdown")
+        text = exported.text
+        assert "## Controls" in text
+        assert "### WAF" in text
+        assert "- Row: STRIDE spoofing — applied." in text
+        assert "- Row: STRIDE tampering — refused." in text
+        assert "- Row: STRIDE repudiation — no-finding." in text
+        assert "It shows no \\<b\\>signing\\</b\\>." in text
+        assert "Evidence: WAF.yaml (config), line 1: WAF: on" in text
+        assert "AES-256 — written" in text
+        assert "Protects the process “Billing”: left out, missing-element." in text
+
+    def test_the_report_page_carries_the_section(self, ruled):
+        owner, child, _ = ruled
+        page = owner.client.get(f"/report/{child}").text
+        data = re.search(
+            r'<script type="application/json" id="controls"[^>]*>(.*?)</script>',
+            page,
+            re.DOTALL,
+        ).group(1)
+        assert [entry["name"] for entry in json.loads(data)] == [
+            "WAF",
+            "Encrypted",
+            "Billing",
+        ]
+        assert "\\u003cb>signing" in data
+
+    def test_an_unknown_report_is_missing(self, ruled):
+        owner, _, _ = ruled
+        for path in ("export.md", "export.json"):
+            assert owner.client.get(f"/report/job-missing/{path}").status_code == 404

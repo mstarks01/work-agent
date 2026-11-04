@@ -1811,7 +1811,12 @@ def _walks_the_scoped_controls(node: ast.AST) -> bool:
 
 
 def _reads_a_unit_text(node: ast.AST) -> bool:
-    return _calls(node, "requirement_text") or _loads(node, "_TEXT_BY_ID")
+    return (
+        _calls(node, "requirement_text")
+        or _calls(node, "published_text")
+        or _loads(node, "_TEXT_BY_ID")
+        or _loads(node, "_NAME_BY_ID")
+    )
 
 
 def _marks_a_read_back(node: ast.AST) -> bool:
@@ -2147,6 +2152,9 @@ ONE_READERS: dict[str, _OneReader] = {
         {
             ("src/analysis_service/frameworks/asvs/catalog.py", "requirement_text"): (
                 "the package's catalog reader, which text_of_unit calls"
+            ),
+            ("src/analysis_service/frameworks/asvs/catalog.py", "published_text"): (
+                "the package's catalog reader of each grain, which text_of_unit calls"
             ),
             ("evals/build_review_docs.py", "_standard"): (
                 "the review documents of one package's corpus read that"

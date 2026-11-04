@@ -74,10 +74,10 @@ from analysis_service.frameworks.asvs.catalog import (
     CHAPTER_NUMBERS,
     AsvsChapter,
     AsvsLevel,
+    published_text,
     requirement_band,
     requirement_id,
     requirements_for,
-    unit_text,
 )
 from analysis_service.parsing import table_entry
 from analysis_service.sources import EvidenceClass
@@ -299,7 +299,7 @@ class DraftRequirementRuling(Claim):
     @classmethod
     def text_of_unit(cls, unit: str) -> str:
         """The catalog's words for one unit, or ``""`` for an unknown ID."""
-        return unit_text(unit)
+        return published_text(unit)
 
     @classmethod
     def partition_proposals(

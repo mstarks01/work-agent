@@ -9,9 +9,11 @@
   .notice { border-left:3px solid var(--accent); background:var(--soft); padding:10px 14px; margin:12px 0; border-radius:4px; }
   .controls-table-wrap { overflow-x:auto; margin-top:16px; }
   table.controls { display:table; width:100%; min-width:640px; border-collapse:collapse; font-size:14px; }
-  table.controls th, table.controls td { text-align:left; padding:12px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-  table.controls th:first-child, table.controls td:first-child { width:1%; }
-  table.controls .name-cell { width:32%; overflow-wrap:anywhere; }
+  table.controls th, table.controls td { min-width:0; text-align:left; padding:12px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.controls th:first-child, table.controls td:first-child { width:32px; padding-left:0; }
+  table.controls th:last-child, table.controls td:last-child { width:1%; white-space:nowrap; padding-right:0; }
+  table.controls .row-actions { display:flex; gap:6px; }
+  table.controls .name-cell { width:26%; overflow-wrap:anywhere; }
   table.controls .name-cell a { font-weight:600; text-decoration:none; }
   table.controls th button { min-height:0; padding:0; border:0; background:transparent; font-weight:600; }
   table.controls th[aria-sort=ascending] button::after { content:" ↑"; }
@@ -20,8 +22,10 @@
   .sub { font-size:12px; color:var(--muted); }
   .chips { display:flex; gap:6px; flex-wrap:wrap; }
   .chip { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
-  .chip.fw-asvs { background:light-dark(#eaf0e5,#303f29); border-color:light-dark(#b9cbb0,#4f6b45); color:light-dark(#2f4f33,#cfe5c6); }
-  .chip.fw-stride { background:light-dark(#e9eef6,#2a3340); border-color:light-dark(#b7c6dd,#4b5f7a); color:light-dark(#2f4668,#c8d8f0); }
+  /* One tint for each framework, by its place in the page's list. */
+  .chip.tint-0 { background:light-dark(#eaf0e5,#303f29); border-color:light-dark(#b9cbb0,#4f6b45); color:light-dark(#2f4f33,#cfe5c6); }
+  .chip.tint-1 { background:light-dark(#e9eef6,#2a3340); border-color:light-dark(#b7c6dd,#4b5f7a); color:light-dark(#2f4668,#c8d8f0); }
+  .chip.tint-2 { background:light-dark(#f6efe4,#3f3426); border-color:light-dark(#dcc9a8,#6b5a40); color:light-dark(#5a4524,#ecdcc0); }
   .tag { display:inline-flex; align-items:center; gap:2px; font-size:13px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); }
   .editor { display:grid; gap:16px; margin:16px 0 28px; }
   .editor h2 { margin:0; font-size:20px; overflow-wrap:anywhere; }

@@ -878,7 +878,11 @@ def test_the_injection_point_escapes_every_angle_bracket():
     outcome = asyncio.run(StubPipelineRunner().run(record, ignore))
     assert isinstance(outcome, PipelineCompleted)
     page = render_report(
-        outcome.report, report_state(outcome.report), previous=None, parent=None
+        outcome.report,
+        report_state(outcome.report),
+        previous=None,
+        parent=None,
+        controls=(),
     ).html
 
     payload = re.search(
@@ -1518,7 +1522,9 @@ def test_no_free_text_field_reaches_the_page_as_markup():
     lint above, since no offline test here can run the DOM.
     """
     report = report_with_markup_everywhere()
-    page = render_report(report, report_state(report), previous=None, parent=None).html
+    page = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    ).html
 
     assert MARKUP_PAYLOAD not in page
     assert "<img" not in page
@@ -1602,7 +1608,9 @@ def test_a_submitted_nonce_placeholder_is_not_substituted():
     from tests.factories import sample_report, sample_threat
 
     report = sample_report(threats=[sample_threat(title="__CSP_NONCE__")])
-    rendered = render_report(report, report_state(report), previous=None, parent=None)
+    rendered = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    )
 
     nonce = re.search(r"script-src 'nonce-([^']+)'", rendered.csp).group(1)
     payload = re.search(
@@ -1623,7 +1631,9 @@ def test_the_page_carries_the_link_questions_its_catalog_raises():
     from tests.factories import sample_report
 
     report = sample_report()
-    rendered = render_report(report, report_state(report), previous=None, parent=None)
+    rendered = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    )
     payload = re.search(
         r'<script type="application/json" id="link_questions"[^>]*>(.*?)</script>',
         rendered.html,
@@ -2282,7 +2292,7 @@ class TestTheReportPageGetsARowPerUnit:
 
         report = sample_report(threats=[sample_threat(title="</script>")])
         html = render_report(
-            report, report_state(report), previous=None, parent=None
+            report, report_state(report), previous=None, parent=None, controls=()
         ).html
 
         payload = re.search(

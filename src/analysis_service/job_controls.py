@@ -28,13 +28,20 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Annotated, Literal, Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.assertions import AssertionCatalog
-from analysis_service.claims import Claim, ControlRowRef, ReturnedClaim, RuledClaim
+from analysis_service.claims import (
+    Claim,
+    ControlRowRef,
+    FrameworkAnalysis,
+    ReturnedClaim,
+    RuledClaim,
+)
 from analysis_service.controls import (
     CONTROL_ID,
     EVIDENCE_ID,
@@ -45,6 +52,7 @@ from analysis_service.controls import (
 )
 from analysis_service.fact_answers import (
     FactAnswer,
+    fact_label,
     key_ref,
     merged_facts,
     with_element,
@@ -809,3 +817,168 @@ def refuse_disagreement(
                 f" “{earlier.value}” and “{fact.value}”. Untick one, or edit one"
                 " Control so that they agree."
             )
+
+
+#: What each outcome of a row means, as the report's Controls section says it.
+ROW_MEANINGS: Mapping[RowOutcome, str] = MappingProxyType(
+    {
+        "applied": (
+            "Applied: the critic ruled out each finding listed here, because you"
+            " state that this Control covers the unit. The service verified"
+            " nothing."
+        ),
+        "refused": (
+            "Refused: the critic judged that this Control does not show what each"
+            " finding on the unit calls missing, so the findings stand."
+        ),
+        "no-finding": (
+            "No finding: no draft on this unit reached the critic with this row,"
+            " so nothing was ruled."
+        ),
+    }
+)
+
+
+class EvidenceLine(BaseModel):
+    """One line of an evidence file that a ruling's reason quotes, with the
+    file, its class and the line's number."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, serialize_by_alias=True)
+
+    file: str
+    evidence_class: EvidenceClass = Field(alias="class")
+    line: int
+    text: str
+
+
+class SectionRow(BaseModel):
+    """One row of a Control in the report: its unit, its outcome over the
+    job, each ruling and each evidence line a ruling quotes."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    framework: str
+    unit: str
+    label: str
+    version: str
+    ticked: bool
+    outcome: RowOutcome
+    meaning: str
+    rulings: list[RowRuling]
+    quoted: list[EvidenceLine]
+
+
+class SectionFact(BaseModel):
+    """One fact a Control wrote, as the job row keeps it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    label: str
+    value: str
+    state: FactState
+    stated: str
+
+
+class SectionEntry(BaseModel):
+    """One copied Control in the report's Controls section."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    name: str
+    scope: ControlScope
+    state: Literal["applied", "left-out"]
+    outcome: MatchOutcome | None
+    reason: LeftOutReason | None
+    elements: list[str]
+    facts: list[SectionFact]
+    rows: list[SectionRow]
+
+
+def _quoted(reason: str, evidence: Sequence[CopiedEvidence]) -> list[EvidenceLine]:
+    """Each line of ``evidence`` that ``reason`` quotes, by file and line. A
+    line counts where its text, stripped, holds a letter or a digit and
+    stands in the reason whole."""
+    return [
+        EvidenceLine.model_validate(
+            {"file": file.name, "class": file.evidence_class, "line": number}
+            | {"text": line.strip()}
+        )
+        for file in evidence
+        for number, line in enumerate(file.text.split("\n"), start=1)
+        if any(char.isalnum() for char in line) and line.strip() in reason
+    ]
+
+
+def controls_section(
+    copies: Sequence[CopiedControl],
+    scopes: Sequence[ControlResolution] | None,
+    facts: Sequence[ControlFacts] | None,
+    model: SystemModel,
+    blocks: Sequence[FrameworkAnalysis],
+) -> list[SectionEntry]:
+    """The report's Controls section: each copy of the job, what it resolved
+    to, each fact it wrote with the state the job row keeps, and each row
+    with its outcome from the rulings ``blocks`` hold (ADRs 0125 and 0126).
+    Nothing here recomputes a fact's state from the model."""
+    rulings = row_rulings(
+        [claim for block in blocks for claim in block.all_claims()],
+        [entry for block in blocks for entry in block.returned_claims],
+    )
+    written = {entry.control: entry for entry in facts or ()}
+    entries = []
+    for copy, resolution in zip(
+        copies, resolutions(copies, scopes, model), strict=True
+    ):
+        applied = isinstance(resolution, AppliedScope)
+        elements = [
+            element.name
+            for element_id in (resolution.element_ids() if applied else ())
+            if (element := model.get(element_id)) is not None
+        ]
+        rows = []
+        for row in copy.rows:
+            ruled = rulings.get(ControlRowRef(control=copy.id, unit=row.unit), [])
+            outcome = row_outcome(ruled)
+            package = PACKAGES.get(cast(FrameworkName, row.framework))
+            rows.append(
+                SectionRow(
+                    framework=row.framework,
+                    unit=row.unit,
+                    label=package.record.text_of_unit(row.unit) if package else "",
+                    version=row.version,
+                    ticked=row.ticked,
+                    outcome=outcome,
+                    meaning=ROW_MEANINGS[outcome],
+                    rulings=ruled,
+                    quoted=[
+                        line
+                        for ruling in ruled
+                        if ruling.ruling == "applied"
+                        for line in _quoted(ruling.reason, copy.evidence)
+                    ],
+                )
+            )
+        entry = written.get(copy.id)
+        entries.append(
+            SectionEntry(
+                id=copy.id,
+                name=copy.document.name,
+                scope=copy.document.scope,
+                state=resolution.state,
+                outcome=resolution.outcome if applied else None,
+                reason=None if applied else resolution.reason,
+                elements=elements,
+                facts=[
+                    SectionFact(
+                        label=fact_label(fact.answer.key, model),
+                        value=fact.answer.value,
+                        state=fact.state,
+                        stated=fact.stated,
+                    )
+                    for fact in (entry.facts if entry else ())
+                ],
+                rows=rows,
+            )
+        )
+    return entries

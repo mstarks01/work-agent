@@ -556,6 +556,10 @@ OPEN: dict[tuple[str, str], str] = {
         _CATALOG_ROW_IDS
     ),
     ("analysis_service.frameworks.asvs.catalog", "_TEXT_BY_ID"): _CATALOG_ROW_IDS,
+    ("analysis_service.frameworks.asvs.catalog", "_NAME_BY_ID"): (
+        "chapter and section IDs read from the rows of a catalog file, which"
+        " holds them as data and not as a type"
+    ),
     ("analysis_service.model_tiers", "LLM_NODES"): (
         "node names that hold one entry for each role of each framework in the"
         " registry, so a new framework adds a member"

@@ -87,7 +87,9 @@ def payloads_of(html: str) -> dict[str, str]:
 def page_script() -> str:
     """The report page's whole client script, as a rendered page carries it."""
     report = sample_report()
-    html = render_report(report, report_state(report), previous=None, parent=None).html
+    html = render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    ).html
     (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
     return script
 
@@ -138,6 +140,7 @@ def page(answered=(), shown=(), final=False, skipped=()):
         ),
         previous=None,
         parent=None,
+        controls=(),
     ).html
 
 
@@ -191,7 +194,9 @@ def two_findings():
         update={"id": "S-02", "title": "Cookies cross the network in clear"}
     )
     report = sample_report([sample_threat(), waiting])
-    return render_report(report, report_state(report), previous=None, parent=None).html
+    return render_report(
+        report, report_state(report), previous=None, parent=None, controls=()
+    ).html
 
 
 def test_the_summary_counts_the_confirmed_and_the_waiting_findings():
@@ -243,7 +248,9 @@ def test_findings_that_rest_on_one_missing_control_share_a_group(monkeypatch):
     ]
     report = sample_report(threats)
     text = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["analyses"]
     assert (
         "One shared action addresses 2 findings: Add encryption in transit to"
@@ -264,7 +271,9 @@ def test_conditional_and_dismissed_findings_each_keep_their_own_row():
     )
     report = sample_report([asking_threat(ASKED)], [rejected])
     text = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["analyses"]
     assert "Conditional findings · 1" in text
     assert "Dismissed findings · 1HighAdmin traffic is readableDismissedI-01" in text
@@ -316,6 +325,7 @@ def test_a_corrected_finding_is_marked_on_its_card():
         ),
         previous=None,
         parent=None,
+        controls=(),
     ).html
     assert "Corrected after this report" in run_report_page(html)["analyses"]
 
@@ -332,7 +342,11 @@ def test_an_owner_s_answer_is_marked_as_unchecked():
     derived = sample_threat().grounds[1]
     report = sample_report([sample_threat(grounds=[quote, derived])])
     html = render_report(
-        report, report_state(report, answered=[answer]), previous=None, parent=None
+        report,
+        report_state(report, answered=[answer]),
+        previous=None,
+        parent=None,
+        controls=(),
     ).html
     text = run_report_page(html)["analyses"]
     assert "your answer; the service did not check it" in text
@@ -432,7 +446,9 @@ def test_a_description_names_an_element_by_its_name():
     )
     report = sample_report([described])
     text = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["analyses"]
 
     endpoints = f"{by_id[flow.source]} → {by_id[flow.destination]}"
@@ -474,7 +490,9 @@ def test_a_description_names_an_evidence_reference_by_its_label():
     described = sample_threat(description=f"It rests on `{unstated}` and `{crosses}`.")
     report = sample_report([described])
     text = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["analyses"]
 
     def endpoints(f):
@@ -557,7 +575,7 @@ def test_a_follow_up_says_how_each_finding_moved():
     )
     after = sample_report([sample_threat()])
     html = render_report(
-        after, report_state(after, final=True), before, parent=None
+        after, report_state(after, final=True), before, parent=None, controls=()
     ).html
     text = run_report_page(html)["analyses"]
 
@@ -627,7 +645,9 @@ def test_every_ground_kind_renders_its_label_and_its_reference():
         )
     )
     text = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["analyses"]
 
     assert "undefined" not in text
@@ -742,7 +762,9 @@ def test_a_count_of_one_reads_in_the_singular():
         ],
     )
     parts = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )
     assert "1 confirmed finding: 1 high." in parts["analyses"]
     assert "1 was dismissed." in parts["analyses"]
@@ -777,6 +799,7 @@ def test_the_export_lists_the_link_answers_and_the_corrections_the_page_shows():
         ),
         previous=None,
         parent=None,
+        controls=(),
     ).html
     printed = run_report_page(follow_up)["export-questions"]
     assert "Answers this report readbatch loaderAnswer: none of these" in printed
@@ -791,6 +814,7 @@ def test_the_export_lists_the_link_answers_and_the_corrections_the_page_shows():
         ),
         previous=None,
         parent=None,
+        controls=(),
     ).html
     printed = run_report_page(final)["export-questions"]
     assert "Answer: I don't know" in printed
@@ -802,7 +826,9 @@ def test_the_page_carries_the_zones_the_service_assumed():
     report = sample_report([sample_threat()])
     (assumed,) = re.findall(
         r'id="assumed_zones"[^>]*>(.*?)</script>',
-        render_report(report, report_state(report), previous=None, parent=None).html,
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html,
     )
     assert json.loads(assumed) == sorted(report.system_model.assumed_zone_elements())
 
@@ -862,7 +888,9 @@ def test_the_pipeline_shows_each_fingerprint_once_with_its_steps():
         }
     )
     nodes = run_report_page(
-        render_report(report, report_state(report), previous=None, parent=None).html
+        render_report(
+            report, report_state(report), previous=None, parent=None, controls=()
+        ).html
     )["nodes"]
     assert "StepModelTime" in nodes
     assert "analyze_agemini-2.5-pro14.5 s" in nodes

@@ -57,9 +57,9 @@ EVIDENCE_LABELS: Mapping[EvidenceClass, str] = MappingProxyType(
     {"config": "Configuration", "code": "Code", "people": "People"}
 )
 
-#: The attributes a Control does not write: a zone scope is how a Control
+#: The attribute a Control does not write: a zone scope is how a Control
 #: reaches a zone, and a Control places no element.
-_UNWRITTEN = frozenset({"trust_zone"})
+_PLACEMENT = "trust_zone"
 
 
 def _element_types(scope_type: ScopeType) -> tuple[type[Element], ...]:
@@ -81,7 +81,7 @@ def _attribute_facts(scope_type: ScopeType) -> list[dict[str, object]]:
     for element_type in _element_types(scope_type):
         fields = element_type.model_construct()
         for attribute in attribute_names(fields):
-            if attribute in _UNWRITTEN or attribute in facts:
+            if attribute == _PLACEMENT or attribute in facts:
                 continue
             facts[attribute] = {
                 "key": _key(attribute=attribute),
