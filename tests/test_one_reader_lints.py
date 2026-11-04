@@ -1777,14 +1777,15 @@ def _keys_a_crossing(node: ast.AST) -> bool:
 
 
 def _counts_spellings(node: ast.AST) -> bool:
+    """A count of a reference's spellings: ``len`` of them anywhere, or a
+    comparison of them with a literal tuple."""
+    if isinstance(node, ast.Call) and _calls(node, "len") and node.args:
+        return _loads_attribute(node.args[0], "spellings")
     if not isinstance(node, ast.Compare):
         return False
-    return any(
-        isinstance(side, ast.Call)
-        and _calls(side, "len")
-        and side.args
-        and _loads_attribute(side.args[0], "spellings")
-        for side in (node.left, *node.comparators)
+    sides = (node.left, *node.comparators)
+    return any(_loads_attribute(side, "spellings") for side in sides) and any(
+        isinstance(side, ast.Tuple) for side in sides
     )
 
 
@@ -2094,6 +2095,9 @@ ONE_READERS: dict[str, _OneReader] = {
         {
             ("src/analysis_service/claims.py", "mixed"): (
                 "the other count of the same spellings: more than one"
+            ),
+            ("src/analysis_service/critic.py", "_unresolved_unknown_ref_issues"): (
+                "the refusal of a mixed entry says how many spellings it uses"
             ),
         },
         "",

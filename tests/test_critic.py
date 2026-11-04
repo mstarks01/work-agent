@@ -1667,3 +1667,26 @@ class TestAnUnruledMisfiledDraft:
         problems = review_issues([sample_draft("S-01")], [], valid_model(), {})
 
         assert "dropped draft 'S-01'" in "; ".join(problems.messages)
+
+
+@pytest.mark.parametrize(
+    ("ref", "sound", "mixed"),
+    [
+        (UnknownRef(), False, False),
+        (
+            UnknownRef(attribute="encryption_at_rest", element_id="store:db"),
+            True,
+            False,
+        ),
+        (UnknownRef(question="capacity-limits", element_id="process:api"), True, False),
+        (
+            UnknownRef(attribute="encryption_at_rest", capability="database"),
+            False,
+            True,
+        ),
+    ],
+)
+def test_a_reference_is_sound_mixed_or_neither(ref, sound, mixed):
+    """``sound`` and ``mixed`` read one count of the spellings: one, more
+    than one, or none."""
+    assert (ref.sound, ref.mixed) == (sound, mixed)
