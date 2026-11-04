@@ -595,7 +595,7 @@ class Workspace:
         locker = await self.store.resumed_by(record.id, record.owner_id)
         if locker is None:
             return True
-        if not record.ask_questions:
+        if not record.pauses_to_ask():
             # The job paused for its Controls alone, so the job that continues
             # it shows the analysis.
             return False
@@ -720,9 +720,7 @@ class Workspace:
             "status": self.page_status(record),
             # Whether the run stops to ask a person, so the page shows its
             # progress under the Questions tab rather than Reports.
-            "pauses": isinstance(record, JobRecord)
-            and record.pauses()
-            and record.ask_questions,
+            "pauses": isinstance(record, JobRecord) and record.pauses_to_ask(),
             "frameworks": [selection.name for selection in _selection_of(record)],
             "reports": [
                 {

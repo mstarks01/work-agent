@@ -310,7 +310,7 @@
         formControls.load();
         return;
       }
-      follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean((ask && ask.checked) || controls));
+      follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean(ask && ask.checked));
     } catch {
       fail("The connection was interrupted. Check Analyses before starting again.");
     }
@@ -1306,7 +1306,7 @@
       follow(body.run, "Reading your description and identifying the parts of your system…", true);
     }), "");
     fix.append(fixTitle, fixHint, fixText, fixButton);
-    tail.append(fix);
+    if (data.asks) tail.append(fix);
   };
   // The boxes beside the list: every earlier answer, every skipped question,
   // and the questions the list leaves out. Each is redrawn from the payload

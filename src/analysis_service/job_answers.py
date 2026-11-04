@@ -305,6 +305,8 @@ class Answerable:
             | {
                 "fallback": question_fallback(self.analyses).to_json(),
                 "revision": record.revision,
+                # A job that asks nobody offers no amendment.
+                "asks": record.ask_questions,
                 "draft_links": [
                     link.model_dump(mode="json") for link in record.draft.links
                 ],
@@ -829,7 +831,7 @@ class JobAnswers:
             frameworks=parent.whole_frameworks(),
             system_name=parent.system_name,
             title=parent.title,
-            # The resumed job never pauses, and its report asks what the
+            # The Resumed Job never pauses, and its report asks what the
             # analysis asks.
             ask_questions=parent.ask_questions,
             answers=outcome.answers,

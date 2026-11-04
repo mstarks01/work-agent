@@ -907,9 +907,27 @@ class TestTheAutomaticContinue:
         assert re.search(r'id="asks"[^>]*>false<', page)
         assert re.search(r'id="fact_questions"[^>]*>\[\]<', page)
         assert re.search(r'id="link_questions"[^>]*>\[\]<', page)
-        refused = owner.answer(child, revision=0, facts=[dict(FACT)])
-        assert refused.status_code == 400
-        assert "asked no question" in refused.json()["message"]
+        # No answer passes, not even a new value for a fact a Control wrote.
+        for sent in (dict(FACT), {"key": DB_KEY, "value": "KMS"}):
+            refused = owner.answer(child, revision=0, facts=[sent])
+            assert refused.status_code == 400
+            assert "asks no questions" in refused.json()["message"]
+        saved = owner.answer(child, revision=0, facts=[dict(FACT)], save=True)
+        assert saved.status_code == 400
+
+    def test_a_paused_analysis_that_asks_nobody_takes_no_amendment(self, owner):
+        aes = owner.keep("Encrypted", ORDERS_DB)
+        kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
+        run_id, frames = self.continued(owner, aes, kms)
+        assert "refusal" in frames["questions"]
+        assert owner.questions(run_id)["asks"] is False
+        amended = owner.client.post(
+            f"/amend/{run_id}",
+            json={"text": "The API runs behind a gateway.", "revision": 0},
+            headers=SAME_ORIGIN,
+        )
+        assert amended.status_code == 400
+        assert "takes no amendment" in amended.json()["message"]
 
     def test_each_control_takes_its_default_resolution(self, owner):
         db = owner.keep("Encrypted", ORDERS_DB)

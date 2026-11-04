@@ -149,7 +149,9 @@ closed section. A name that an agent writes, such as an element ID, an
 attribute or an asset tag, shows as words. The name itself shows when you hover
 over the words.
 
-**Questions** asks the facts that the conditional findings need, in the same
+**Questions** shows only for an analysis with **Ask me questions to make the
+report better.** ticked. It asks the facts that the conditional findings
+need, in the same
 list as the questions before the analysis: a group for each kind of question,
 an index of the groups, typed answers, and one shared answer for the parts you tick where a
 question asks about several parts. The service keeps which parts that

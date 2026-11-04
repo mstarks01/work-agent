@@ -567,6 +567,11 @@ class JobRecord(BaseModel):
         stops = self.ask_questions or self.continues_at_pause
         return stops and self.resumption is None
 
+    def pauses_to_ask(self) -> bool:
+        """Whether this job's run stops to ask a person: a job that pauses
+        only so that the service continues it at once asks nobody."""
+        return self.ask_questions and self.pauses()
+
     def waits_to_continue(self) -> bool:
         """Whether this job waits at its pause for the continue the service
         makes at once (ADR 0125)."""

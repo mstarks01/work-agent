@@ -1890,6 +1890,11 @@ class AnswerState:
                 " corrected description as a new job"
             )
         self._check_revision(revision, required=True)
+        if not self.asks:
+            # An amendment asks again, and this analysis asks nobody.
+            raise ValueError(
+                "this analysis asks no questions, so it takes no amendment"
+            )
         kept = [source for source in self.sources if source.kind != "answers"]
         taken = {source.label for source in kept}
         number = 1
@@ -1923,8 +1928,13 @@ class AnswerState:
         job with no catalog, :class:`SourcesOverLimit` where the composed
         sources break ``limits``, and a ``ValueError`` that names the
         submitter's own choices otherwise. ``limits`` is ``None`` only where
-        the job holds no sources to bound, as an eval replay of saves.
+        the job holds no sources to bound, as an eval replay of saves. A
+        report of an analysis that asks no questions takes no answer.
         """
+        if not (self.asks or self.waiting):
+            raise ValueError(
+                "this analysis asks no questions, so its report takes no answers"
+            )
         self._check_revision(answers.revision, required=self.waiting or answers.save)
         if self.waiting:
             assertions = self.checkpoint.assertions
