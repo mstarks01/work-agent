@@ -28,7 +28,7 @@ from webapp.main import render_report
 _SHIM = r"""
 class Node {
   constructor(tag) { this.tag = tag; this.children = []; this.dataset = {};
-    this.style = {}; this.listeners = {}; this.attributes = {}; this.value = "";
+    this.style = { setProperty(name, value) { this[name] = value; } }; this.listeners = {}; this.attributes = {}; this.value = "";
     this.classList = { add() {}, remove() {}, toggle() { return true; }, contains() { return false; } }; }
   append(...kids) { this.children.push(...kids); }
   prepend(...kids) { this.children.unshift(...kids); }
@@ -451,7 +451,8 @@ def test_a_description_names_an_element_by_its_name():
         ).html
     )["analyses"]
 
-    endpoints = f"{by_id[flow.source]} → {by_id[flow.destination]}"
+    # A flow is its two endpoint tags and an arrow between them.
+    endpoints = f"{by_id[flow.source]}→{by_id[flow.destination]}"
     assert (
         f"{by_id[flow.source]} sends {endpoints} with encryption in transit unknown."
         in text

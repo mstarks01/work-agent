@@ -1854,7 +1854,7 @@ _PLACED = """() => [...document.querySelectorAll('#model-diagram g.element')].ma
 
 def test_the_diagram_link_downloads_the_model_as_mermaid(browser):
     """The link under the diagram saves the service's Mermaid text unchanged."""
-    from analysis_service.mermaid import model_mermaid
+    from analysis_service.mermaid import styled_mermaid
     from tests.factories import sample_report
 
     report = sample_report()
@@ -1867,7 +1867,7 @@ def test_the_diagram_link_downloads_the_model_as_mermaid(browser):
 
     assert errors == []
     assert saved.suggested_filename == "system-model.mmd"
-    assert text == model_mermaid(report.system_model)
+    assert text == styled_mermaid(report.system_model)
 
 
 def test_the_diagram_draws_each_element_in_its_zone_and_each_flow_once(browser):

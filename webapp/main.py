@@ -184,6 +184,7 @@ from analysis_service.controls import (
 from analysis_service.critic import SEVERITY_ORDER
 from analysis_service.deployment import Deployment
 from analysis_service.diagrams import install_reader, reader_fault
+from analysis_service.element_hues import element_hues
 from analysis_service.engine import DEFAULT_CALLER
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import (
@@ -237,7 +238,7 @@ from analysis_service.links import (
     components,
     fold_principal,
 )
-from analysis_service.mermaid import model_mermaid
+from analysis_service.mermaid import styled_mermaid
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.open_facts import (
     gaps,
@@ -1224,7 +1225,8 @@ def render_report(
         ),
         severity_order=script_json(list(SEVERITY_ORDER)),
         assumed_zones=script_json(sorted(report.system_model.assumed_zone_elements())),
-        mermaid=script_json(model_mermaid(report.system_model)),
+        mermaid=script_json(styled_mermaid(report.system_model)),
+        element_hues=script_json(element_hues(report.system_model)),
         lanes=script_json(
             {name: package.id_rule.lane_field for name, package in PACKAGES.items()}
         ),

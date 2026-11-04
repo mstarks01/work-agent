@@ -76,6 +76,11 @@
   // analysis_service.open_facts.reference_labels, so the page parses no
   // reference.
   const NAMES = JSON.parse(document.getElementById("names").textContent);
+  // The hue of each element, from analysis_service.element_hues: its tags,
+  // its box in the diagram and the Mermaid download share it.
+  const HUES = JSON.parse(document.getElementById("element_hues").textContent);
+  // Each data flow by its ID, so a reference to one draws its two endpoints.
+  const FLOWS = new Map(R.system_model.data_flows.map(flow => [flow.id, flow]));
   // The field each framework stamps a finding's lane into, or null where it
   // stamps none: the service's own table, so a framework added later needs
   // no edit here.
@@ -123,10 +128,34 @@
   // elements, appended. A quote never comes through here. Its text is the
   // submitter's own words, and a backtick among them is one of those words.
   const CODE_SPAN = /`([^`\n]+)`/g;
-  // A labelled identifier as its label, the identifier on hover; any other as code.
-  const ref = (id) => Object.hasOwn(NAMES, id)
-    ? Object.assign(el("span", "ref", NAMES[id]), { title: id })
-    : code(id);
+  // An element's colour on a node: its hue as the --h custom property, which
+  // the CSS reads. A property set through the style object passes the CSP.
+  const paint = (node, id) => {
+    if (Object.hasOwn(HUES, id)) node.style.setProperty("--h", String(HUES[id]));
+    return node;
+  };
+  // A labelled identifier as a tag in its element's colour, the identifier on
+  // hover; a zone or another reference takes a grey tag.
+  const tag = (id) => paint(Object.assign(
+    el("span", Object.hasOwn(HUES, id) ? "ref" : "ref neutral", NAMES[id]), { title: id }), id);
+  const arrow = () => {
+    const glyph = el("span", "flow-arrow", "\u2192");
+    glyph.setAttribute("aria-hidden", "true");
+    return glyph;
+  };
+  // A flow as its two endpoint tags with an arrow, its name and ID on hover;
+  // any other labelled identifier as its tag; anything else as code.
+  const ref = (id) => {
+    const flow = FLOWS.get(id);
+    if (flow && Object.hasOwn(NAMES, flow.source) && Object.hasOwn(NAMES, flow.destination)) {
+      const chip = el("span", "ref-flow");
+      chip.title = `${flow.name} (${id})`;
+      chip.setAttribute("aria-label", `${NAMES[flow.source]} to ${NAMES[flow.destination]}`);
+      chip.append(tag(flow.source), arrow(), tag(flow.destination));
+      return chip;
+    }
+    return Object.hasOwn(NAMES, id) ? tag(id) : code(id);
+  };
   const prose = (text) => {
     const line = String(text);
     const frag = document.createDocumentFragment();
@@ -1905,8 +1934,8 @@
     columns.forEach(column => column.members.forEach(i => {
       const { kind, e } = nodes[i];
       const { x, y } = place.get(i);
-      const group = svg("g", { class: `element ${kind}`, "data-element": e.id,
-        "data-zone": column.id === null ? "" : column.id });
+      const group = paint(svg("g", { class: `element ${kind}`, "data-element": e.id,
+        "data-zone": column.id === null ? "" : column.id }), e.id);
       const assumed = ASSUMED_ZONES.has(e.id);
       group.append(svg("title", {}, `${e.name} (${KIND_WORDS[kind]})${assumed ? ", zone assumed" : ""}`));
       if (kind === "data-store") {
@@ -1958,7 +1987,9 @@
   // `protocol`, `authentication` and `data_classification` are free text
   // copied out of submitted prose.
   const mark = (v) => (v === "unknown" ? el("span", "unk", "unknown") : String(v));
-  const named = (e) => cell(Object.assign(el("span", "ref", e.name), { title: e.id }));
+  const named = (e) => cell(Object.hasOwn(HUES, e.id)
+    ? paint(Object.assign(el("span", "ref", e.name), { title: e.id }), e.id)
+    : Object.assign(el("span", null, e.name), { title: e.id }));
   const zoneCell = (zone) => cell(zone === "unknown" ? mark(zone) : ref(zone));
   const ELEMENT_TABLES = [
     { title: "External entities", rows: R.system_model.external_entities,
@@ -1975,7 +2006,7 @@
         cell(mark(e.data_classification)), cell(mark(e.encryption_at_rest))] },
     { title: "Data flows", rows: R.system_model.data_flows,
       head: ["Name", "From → to", "Protocol", "Authentication", "Encrypted in transit"],
-      cells: e => [named(e), cell(ref(e.source), " → ", ref(e.destination)), cell(mark(e.protocol)),
+      cells: e => [named(e), cell(ref(e.id)), cell(mark(e.protocol)),
         cell(mark(e.authentication)), cell(mark(e.encryption_in_transit))] },
   ];
   ELEMENT_TABLES.filter(t => t.rows.length).forEach(t => {
@@ -2005,7 +2036,7 @@
     $(`${id}-title`).hidden = $(id).hidden = !items.length;
   };
   listed("crossings", "Boundary crossings", R.boundary_crossings, c => [
-    ref(c.flow_id), ": ", ref(c.source_zone), " → ", ref(c.destination_zone),
+    ref(c.flow_id), ": ", ref(c.source_zone), " ", arrow(), " ", ref(c.destination_zone),
     ...(c.decided ? [] : [" — may cross, because a zone is not stated"]),
     ...c.assumed_endpoints.flatMap(id => [" — assumed zone for ", ref(id)]),
   ]);
