@@ -554,7 +554,8 @@
 
     const refs = el("div", "field refs");
     refs.append(el("div", "lbl", "Affected components and flows"));
-    // A pipe between two references; a flow is one, so its arrow takes none.
+    // Put a pipe between two references. A flow is one reference, so its
+    // arrow gets no pipe.
     t.affected_element_ids.forEach((r, i) => refs.append(...(i ? [" | "] : []), ref(r)));
     body.append(refs);
 
@@ -1437,7 +1438,8 @@
   });
   downloadItems.forEach((item) => item.addEventListener("click", () => showDownloads(false)));
   document.addEventListener("click", (event) => {
-    if (!downloadMenu.hidden && !$("report-tools").contains(event.target)) showDownloads(false);
+    const inside = downloadButton.contains(event.target) || downloadMenu.contains(event.target);
+    if (!downloadMenu.hidden && !inside) showDownloads(false);
   });
 
   // ---- About the analysis -----------------------------------------------------
