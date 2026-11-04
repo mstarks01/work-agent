@@ -24,6 +24,7 @@ import re
 import socket
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -2325,7 +2326,7 @@ def zoned_page(browser, tiers):
     from tests.test_webapp_controls import ZonedRunner
 
     app = web.app_for(tiers, ZonedRunner())
-    for base in serve(app):
+    with contextmanager(serve)(app) as base:
         context = browser.new_context(base_url=base)
         opened = context.new_page()
         errors: list[str] = []
@@ -2498,7 +2499,7 @@ def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers)
     from tests.test_webapp_controls_page import RulingRunner
 
     runner = RulingRunner()
-    for base in serve(web.app_for(tiers, runner)):
+    with contextmanager(serve)(web.app_for(tiers, runner)) as base:
         context = browser.new_context(base_url=base)
         page = context.new_page()
         errors: list[str] = []
