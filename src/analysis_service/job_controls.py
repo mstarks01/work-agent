@@ -930,16 +930,23 @@ def controls_section(
     for copy, resolution in zip(
         copies, resolutions(copies, scopes, model), strict=True
     ):
-        applied = isinstance(resolution, AppliedScope)
+        if isinstance(resolution, AppliedScope):
+            reached, outcome, reason = (
+                resolution.element_ids(),
+                resolution.outcome,
+                None,
+            )
+        else:
+            reached, outcome, reason = (), None, resolution.reason
         elements = [
             element.name
-            for element_id in (resolution.element_ids() if applied else ())
+            for element_id in reached
             if (element := model.get(element_id)) is not None
         ]
         rows = []
         for row in copy.rows:
             ruled = rulings.get(ControlRowRef(control=copy.id, unit=row.unit), [])
-            outcome = row_outcome(ruled)
+            row_result = row_outcome(ruled)
             package = PACKAGES.get(cast(FrameworkName, row.framework))
             rows.append(
                 SectionRow(
@@ -948,8 +955,8 @@ def controls_section(
                     label=package.record.text_of_unit(row.unit) if package else "",
                     version=row.version,
                     ticked=row.ticked,
-                    outcome=outcome,
-                    meaning=ROW_MEANINGS[outcome],
+                    outcome=row_result,
+                    meaning=ROW_MEANINGS[row_result],
                     rulings=ruled,
                     quoted=[
                         line
@@ -966,8 +973,8 @@ def controls_section(
                 name=copy.document.name,
                 scope=copy.document.scope,
                 state=resolution.state,
-                outcome=resolution.outcome if applied else None,
-                reason=None if applied else resolution.reason,
+                outcome=outcome,
+                reason=reason,
                 elements=elements,
                 facts=[
                     SectionFact(
