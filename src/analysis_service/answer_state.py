@@ -814,8 +814,8 @@ def question_set(
     early list; ``analyses`` ranks the report's list. So a waiting job passes
     no analyses, and a finished one's frameworks go unread. ``answered`` holds
     the saved answers, whose questions are not asked again. ``asks`` is
-    whether the analysis asks a person: the report of one that does not asks
-    nothing. ``final`` marks a report the follow-up wrote, and ``shown``
+    whether the analysis asks a person: neither the pause nor the report of
+    one that does not asks anything. ``final`` marks a report the follow-up wrote, and ``shown``
     is every early question the pause presented. ``skipped`` is every early
     question and link question the pause's submitter skipped for now; a
     report's list reads both to say what became of each question before the
@@ -843,11 +843,11 @@ def question_set(
             skipped_links=(),
             resumed_by=resumed_by,
         )
-    if final or not (asks or waiting):
+    if final or not asks:
         return QuestionSet(
             model=model,
             catalog=catalog,
-            waiting=False,
+            waiting=waiting and not final,
             early=(),
             facts=(),
             links=(),
@@ -1879,6 +1879,11 @@ class AnswerState:
         questions take each one they still ask (:attr:`carried`). The amendment
         names the revision it read, as a save does.
         """
+        if not self.asks:
+            # An amendment asks again, and this analysis asks nobody.
+            raise ValueError(
+                "this analysis asks no questions, so it takes no amendment"
+            )
         if self.resumed_by is not None:
             raise AlreadyResumed(
                 f"job {self.resumed_by} locks this job;"
@@ -1890,11 +1895,6 @@ class AnswerState:
                 " corrected description as a new job"
             )
         self._check_revision(revision, required=True)
-        if not self.asks:
-            # An amendment asks again, and this analysis asks nobody.
-            raise ValueError(
-                "this analysis asks no questions, so it takes no amendment"
-            )
         kept = [source for source in self.sources if source.kind != "answers"]
         taken = {source.label for source in kept}
         number = 1
@@ -1928,13 +1928,13 @@ class AnswerState:
         job with no catalog, :class:`SourcesOverLimit` where the composed
         sources break ``limits``, and a ``ValueError`` that names the
         submitter's own choices otherwise. ``limits`` is ``None`` only where
-        the job holds no sources to bound, as an eval replay of saves. A
-        report of an analysis that asks no questions takes no answer.
+        the job holds no sources to bound, as an eval replay of saves. An
+        analysis that asks no questions takes no answer and no skip: its pause
+        takes only a continue that unticks or resolves a Control (ADR 0125).
         """
-        if not (self.asks or self.waiting):
-            raise ValueError(
-                "this analysis asks no questions, so its report takes no answers"
-            )
+        own = not answers.given.empty or bool(answers.skips)
+        if not self.asks and (own or not self.waiting):
+            raise ValueError("this analysis asks no questions, so it takes no answers")
         self._check_revision(answers.revision, required=self.waiting or answers.save)
         if self.waiting:
             assertions = self.checkpoint.assertions

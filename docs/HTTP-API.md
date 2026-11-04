@@ -260,14 +260,14 @@ The most rows come first.
 
 **Ask before the analysis runs.** Submit with `"questions": true` beside the
 sources. The value must be a JSON boolean: the service refuses `"yes"`, `1` or
-`"on"` with `422`. The job stops after extraction, and after the assertion pass where
-the deployment runs one. It ends in `awaiting-answers` and waits. Its
-questions come from what it has read so far. Answer them with the route below,
-or send `{"links": []}` to continue without answers; either starts the
+`"on"` with `422`. The job stops after extraction, and after the assertion
+pass where the deployment runs one. It ends in `awaiting-answers` and waits.
+Its questions come from what it has read so far. Answer them with the route
+below, or send `{"links": []}` to continue without answers; either starts the
 analysis as a new job. A job submitted without `questions`, such as an
 autonomous run, never stops, and its report asks no questions. A deployment
-that builds no assertion catalog
-asks no link question, and asks its early questions.
+that builds no assertion catalog asks no link question, and asks its early
+questions.
 
 A waiting job also lists `early_questions`: the open facts of its model, most
 likely needed first, before any finding exists. Each entry is

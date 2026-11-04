@@ -920,7 +920,13 @@ class TestTheAutomaticContinue:
         kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
         run_id, frames = self.continued(owner, aes, kms)
         assert "refusal" in frames["questions"]
-        assert owner.questions(run_id)["asks"] is False
+        asked = owner.questions(run_id)
+        assert asked["asks"] is False
+        assert asked["early_questions"] == []
+        # The pause takes an untick, but no answer of its own.
+        own = owner.answer(run_id, revision=0, facts=[dict(FACT)])
+        assert own.status_code == 400
+        assert "asks no questions" in own.json()["message"]
         amended = owner.client.post(
             f"/amend/{run_id}",
             json={"text": "The API runs behind a gateway.", "revision": 0},
