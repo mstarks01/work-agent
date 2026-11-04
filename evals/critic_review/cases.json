@@ -626,7 +626,7 @@
       "recommendation_sound": true
     },
     "rationale": "The argument follows: the source says shoppers sign in, and says nothing about a record of who placed an order. The Control on the storefront API states the record the draft calls missing, on the draft's element and for its lane, and `audit.yaml` says so in one line. The draft must die for `control`, and the reason must quote the evidence, so a critic that kills it for another reason does not pass.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   },
@@ -713,7 +713,7 @@
       "recommendation_sound": true
     },
     "rationale": "The argument follows from two stated facts: one shared account, and a password any reader of the worker's environment holds. The Control on the order service sets TLS on its gRPC server. TLS protects a call in transit and records nothing about who changed an order, so the row must be refused and the draft must survive. A critic that applies every row it is shown fails here.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   }
