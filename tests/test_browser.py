@@ -1454,7 +1454,7 @@ def test_a_printed_report_is_the_complete_export(page):
         "#report-tabs",
         "#invite",
         "#preview-bar",
-        ".export-bar",
+        "#report-tools",
     ):
         assert not page.locator(hidden).is_visible(), hidden
     assert (
@@ -2574,9 +2574,16 @@ def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers)
             section.inner_text()
         )
         assert "applied" in section.inner_text() and "refused" in section.inner_text()
-        assert page.get_attribute("a.download-link >> nth=0", "href").endswith(
-            "/export.md"
-        )
+        assert page.get_attribute("#export-md", "href").endswith("/export.md")
+        # The download icon opens its two formats, and Escape closes them.
+        assert page.is_hidden("#export-menu")
+        page.click("#export-download")
+        assert page.is_visible("#export-menu")
+        assert page.evaluate("document.activeElement.id") == "export-md"
+        page.keyboard.press("ArrowDown")
+        assert page.evaluate("document.activeElement.id") == "export-json"
+        page.keyboard.press("Escape")
+        assert page.is_hidden("#export-menu")
         page.click("#export-preview")
         assert page.is_visible("#controls-section")
         assert page.evaluate("window.ran") is None

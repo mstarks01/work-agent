@@ -554,7 +554,8 @@
 
     const refs = el("div", "field refs");
     refs.append(el("div", "lbl", "Affected components and flows"));
-    t.affected_element_ids.forEach(r => refs.append(ref(r)));
+    // A pipe between two references; a flow is one, so its arrow takes none.
+    t.affected_element_ids.forEach((r, i) => refs.append(...(i ? [" | "] : []), ref(r)));
     body.append(refs);
 
     const next = el("div", "field");
@@ -1412,6 +1413,32 @@
   for (const format of ["md", "json"]) {
     $(`export-${format}`).href = `/report/${encodeURIComponent(R.job.id)}/export.${format}`;
   }
+  // The download icon opens a menu of the two formats, as the + of the
+  // analysis form opens its menu: arrows move, Escape and a click outside close.
+  const downloadButton = $("export-download");
+  const downloadMenu = $("export-menu");
+  const downloadItems = [...downloadMenu.querySelectorAll("[role=menuitem]")];
+  const showDownloads = (open) => {
+    downloadMenu.hidden = !open;
+    downloadButton.setAttribute("aria-expanded", String(open));
+    if (open) downloadItems[0].focus();
+  };
+  downloadButton.addEventListener("click", () => showDownloads(downloadMenu.hidden));
+  downloadMenu.addEventListener("keydown", (event) => {
+    const at = downloadItems.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+      showDownloads(false);
+      downloadButton.focus();
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      downloadItems[(at + step + downloadItems.length) % downloadItems.length].focus();
+    }
+  });
+  downloadItems.forEach((item) => item.addEventListener("click", () => showDownloads(false)));
+  document.addEventListener("click", (event) => {
+    if (!downloadMenu.hidden && !$("report-tools").contains(event.target)) showDownloads(false);
+  });
 
   // ---- About the analysis -----------------------------------------------------
   // How this report was made: its identifiers, its times and the versions
@@ -2036,12 +2063,12 @@
     $(`${id}-title`).hidden = $(id).hidden = !items.length;
   };
   listed("crossings", "Boundary crossings", R.boundary_crossings, c => [
-    ref(c.flow_id), ": ", ref(c.source_zone), " ", arrow(), " ", ref(c.destination_zone),
+    ref(c.flow_id), " | ", ref(c.source_zone), " ", arrow(), " ", ref(c.destination_zone),
     ...(c.decided ? [] : [" — may cross, because a zone is not stated"]),
     ...c.assumed_endpoints.flatMap(id => [" — assumed zone for ", ref(id)]),
   ]);
   listed("assumptions", "Assumptions", R.system_model.assumptions, a => [
-    ref(a.element_id), `: ${a.assumption} — ${a.basis}`,
+    ref(a.element_id), ` | ${a.assumption} — ${a.basis}`,
   ]);
 
   // What the model leaves unstated, on the most elements first. An element
@@ -2056,7 +2083,7 @@
       const words = NAMES[g.attribute] || g.attribute;
       const where = el("td");
       g.elements.forEach((e, i) => {
-        if (i) where.append(", ");
+        if (i) where.append(" | ");
         where.append(ref(e.id));
         if (QUESTION_ROWS.has(questionKey(e.key)) && ASKS) {
           const answer = el("a", null, "Answer");
