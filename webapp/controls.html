@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controls · Work Agent</title>
+<style nonce="__CSP_NONCE__"><!--workspace_style-->
+  .controls-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .notice { border-left:3px solid var(--accent); background:var(--soft); padding:10px 14px; margin:12px 0; border-radius:4px; }
+  .controls-table-wrap { overflow-x:auto; margin-top:16px; }
+  table.controls { display:table; width:100%; min-width:640px; border-collapse:collapse; font-size:14px; }
+  table.controls th, table.controls td { text-align:left; padding:12px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.controls th:first-child, table.controls td:first-child { width:1%; }
+  table.controls .name-cell { width:32%; overflow-wrap:anywhere; }
+  table.controls .name-cell a { font-weight:600; text-decoration:none; }
+  table.controls th button { min-height:0; padding:0; border:0; background:transparent; font-weight:600; }
+  table.controls th[aria-sort=ascending] button::after { content:" ↑"; }
+  table.controls th[aria-sort=descending] button::after { content:" ↓"; }
+  table.controls td time { white-space:nowrap; }
+  .sub { font-size:12px; color:var(--muted); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
+  .chip.fw-asvs { background:light-dark(#eaf0e5,#303f29); border-color:light-dark(#b9cbb0,#4f6b45); color:light-dark(#2f4f33,#cfe5c6); }
+  .chip.fw-stride { background:light-dark(#e9eef6,#2a3340); border-color:light-dark(#b7c6dd,#4b5f7a); color:light-dark(#2f4668,#c8d8f0); }
+  .tag { display:inline-flex; align-items:center; gap:2px; font-size:13px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); }
+  .editor { display:grid; gap:16px; margin:16px 0 28px; }
+  .editor h2 { margin:0; font-size:20px; overflow-wrap:anywhere; }
+  .editor input[type=text], .editor select { width:100%; }
+  .editor .line { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1.4fr); gap:12px; align-items:start; }
+  @media (max-width:900px) { .editor .line { grid-template-columns:minmax(0,1fr); } }
+  .editor .q-card { border:1px solid var(--line); border-radius:10px; padding:0; margin:0; }
+  .editor .q-card > h3 { font-size:17px; line-height:1.35; font-weight:600; margin:0; padding:16px 24px 13px; letter-spacing:-.015em; }
+  .editor .q-card > h3::after { content:""; display:block; height:1px; background:var(--line); margin-top:12px; }
+  .editor .q-card > :not(h3) { margin-left:24px; margin-right:24px; }
+  .editor .q-card > :last-child { margin-bottom:18px; }
+  .editor .hint { margin:0 0 4px; max-width:75ch; }
+  .aliases { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .aliases .tag button { min-height:0; padding:0 4px; }
+  .lines { list-style:none; padding:0; margin:6px 0 0; display:grid; }
+  .lines li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; padding:8px 0; border-top:1px solid var(--line); font-size:14px; overflow-wrap:anywhere; }
+  .lines li:first-child { border-top:0; }
+  .lines li button { min-height:0; padding:2px 6px; font-size:13px; }
+  .add-line { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto; gap:10px; align-items:end; margin-top:8px; padding-top:12px; border-top:1px solid var(--line); }
+  .add-line .facets { display:grid; gap:6px; }
+  @media (max-width:900px) { .add-line { grid-template-columns:minmax(0,1fr); } }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="workspace">
+  <aside class="sidebar">
+    <!--sidebar-->
+  </aside>
+  <div class="workspace-body">
+    <main id="main">
+      <div class="controls-head">
+        <h1>Controls</h1>
+        <span><button type="button" id="new-control" class="primary">New Control</button></span>
+      </div>
+      <p class="muted">A Control records a protection your systems already have. An analysis that applies a Control keeps its own copy, so a later edit or delete changes no report.</p>
+      <p id="controls-count" class="hint"></p>
+      <div id="controls-notice" class="notice" role="status" hidden></div>
+      <div id="controls-problem" class="problem" role="alert" hidden></div>
+      <div id="editor"></div>
+      <div class="analysis-filters"><div><label class="field-label" for="controls-search">Find a Control</label><input type="search" id="controls-search" placeholder="Search by name, what it protects or a unit"></div><div><label class="field-label" for="controls-kind">Protects</label><select id="controls-kind"><option value="">All kinds</option></select></div><div><label class="field-label" for="controls-framework">Framework</label><select id="controls-framework"><option value="">All frameworks</option></select></div></div>
+      <div class="analysis-actions"><button type="button" id="delete-selected" disabled>Delete selected</button></div>
+      <div class="controls-table-wrap">
+        <table class="controls" id="controls-table" hidden>
+          <thead><tr><th scope="col"><input type="checkbox" id="select-shown" aria-label="Select all shown Controls"></th><th scope="col" class="name-cell" data-sort="name" aria-sort="none"><button type="button">Name</button></th><th scope="col">Protects</th><th scope="col">Covers</th><th scope="col">Evidence</th><th scope="col" data-sort="updated" aria-sort="descending"><button type="button">Updated</button></th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody id="controls-list"></tbody>
+        </table>
+      </div>
+      <p id="controls-empty" class="muted" hidden></p>
+      <dialog id="delete-dialog" aria-labelledby="delete-question">
+        <p id="delete-question"></p>
+        <div class="dialog-actions"><button type="button" id="delete-cancel">Cancel</button><button type="button" id="delete-go" class="danger">Delete</button></div>
+      </dialog>
+    </main>
+  </div>
+</div>
+<script type="application/json" id="source_formats" nonce="__CSP_NONCE__"><!--source_formats--></script>
+<script type="application/json" id="file_refusals" nonce="__CSP_NONCE__"><!--file_refusals--></script>
+<script type="application/json" id="controls_page" nonce="__CSP_NONCE__"><!--controls_page--></script>
+<script nonce="__CSP_NONCE__"><!--script--></script>
+</body>
+</html>

@@ -76,8 +76,8 @@ from analysis_service.frameworks.asvs.catalog import (
     AsvsLevel,
     requirement_band,
     requirement_id,
-    requirement_text,
     requirements_for,
+    unit_text,
 )
 from analysis_service.parsing import table_entry
 from analysis_service.sources import EvidenceClass
@@ -298,8 +298,8 @@ class DraftRequirementRuling(Claim):
 
     @classmethod
     def text_of_unit(cls, unit: str) -> str:
-        """The catalog's words for one requirement, or ``""`` for an unknown ID."""
-        return requirement_text(unit)
+        """The catalog's words for one unit, or ``""`` for an unknown ID."""
+        return unit_text(unit)
 
     @classmethod
     def partition_proposals(

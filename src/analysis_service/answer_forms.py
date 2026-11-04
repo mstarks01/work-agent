@@ -44,16 +44,14 @@ __all__ = [
     "answer_form",
     "answer_limit",
     "answer_suggestions",
+    "attribute_choices",
     "facets_json",
 ]
 
 
-def _closed(model: SystemModel, element_id: str, attribute: str) -> tuple[str, ...]:
+def _closed(element_type: type[BaseModel], attribute: str) -> tuple[str, ...]:
     """A literal-typed attribute's legal values, except ``unknown``."""
-    element = model.get(element_id)
-    if element is None:
-        return ()
-    annotation = type(element).model_fields[attribute].annotation
+    annotation = element_type.model_fields[attribute].annotation
     if get_origin(annotation) is not Literal:
         return ()
     return tuple(value for value in get_args(annotation) if value != UNKNOWN)
@@ -66,18 +64,33 @@ ChoiceAttribute = Literal["data_classification", "trust_zone"]
 #: The answers an attribute takes, where they are not free text. Keyed by
 #: attribute, so an attribute with a closed set it does not name here falls
 #: back to its own annotation rather than to free text.
+#: A model of ``None`` is no model yet, and a zone then takes no choice.
 _ATTRIBUTE_CHOICES: Mapping[
-    ChoiceAttribute, Callable[[SystemModel, str], tuple[str, ...]]
+    ChoiceAttribute, Callable[[SystemModel | None], tuple[str, ...]]
 ] = MappingProxyType(
     {
-        "data_classification": lambda model, element_id: tuple(
+        "data_classification": lambda model: tuple(
             sorted(REGISTRY["data-classification"].terms)
         ),
-        "trust_zone": lambda model, element_id: tuple(
-            boundary.id for boundary in model.trust_boundaries
+        "trust_zone": lambda model: (
+            ()
+            if model is None
+            else tuple(boundary.id for boundary in model.trust_boundaries)
         ),
     }
 )
+
+
+def attribute_choices(
+    element_type: type[BaseModel], attribute: str, model: SystemModel | None
+) -> tuple[str, ...]:
+    """The values an answer to ``attribute`` of an element of ``element_type``
+    may take, or empty for free text. ``model`` is ``None`` where the page
+    has no model yet, as the Controls page has none."""
+    special = member(attribute, _ATTRIBUTE_CHOICES)
+    if special is None:
+        return _closed(element_type, attribute)
+    return _ATTRIBUTE_CHOICES[special](model)
 
 
 def answer_choices(
@@ -92,10 +105,10 @@ def answer_choices(
         yes_no = name is not None and QUESTION_KINDS[name].answer == "yes-no"
         return YES_NO if yes_no else ()
     if ref.kind == "attribute":
-        special = member(ref.attribute, _ATTRIBUTE_CHOICES)
-        if special is None:
-            return _closed(model, ref.element_id, ref.attribute)
-        return _ATTRIBUTE_CHOICES[special](model, ref.element_id)
+        element = model.get(ref.element_id)
+        if element is None:
+            return ()
+        return attribute_choices(type(element), ref.attribute, model)
     if ref.kind == "assertion" and catalog is not None:
         row = answered_row(catalog, ref.assertion)
         if row is None:

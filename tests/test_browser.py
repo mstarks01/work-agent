@@ -2142,3 +2142,177 @@ def test_a_file_deleted_before_the_submission_shows_as_missing(page):
     page.wait_for_selector("#problem:not([hidden])")
     assert "no longer in Files" in page.inner_text("#problem")
     page.wait_for_selector("#chosen-files li >> text=Missing")
+
+
+# ---- Controls (#2157) ------------------------------------------------------
+
+#: A Control name that spells markup and script. The page shows it as text.
+HOSTILE_CONTROL = '<img src=x onerror="window.ran=1">SSO <b>(Okta)</b>'
+
+
+def new_control(page, name: str, *, scope=("store", "Orders DB")) -> None:
+    """Open the editor and fill the name and what the Control protects."""
+    page.click("#new-control")
+    page.fill("#control-name", name)
+    kind, scope_name = scope
+    page.select_option("#scope-type", kind)
+    if scope_name:
+        page.fill("#scope-name", scope_name)
+
+
+def add_fact(page, label: str, value: str) -> None:
+    page.select_option("#fact-pick", label=label)
+    if page.locator("select#fact-value").count():
+        page.select_option("#fact-value", value)
+    else:
+        page.fill("#fact-value", value)
+    page.click("#add-fact")
+
+
+def add_row(page, framework: str, unit: str) -> None:
+    page.select_option("#row-framework", framework)
+    page.select_option("#row-unit", unit)
+    page.click("#add-row")
+
+
+def add_evidence(page, name: str, text: str, evidence_class: str = "config") -> None:
+    page.select_option("#evidence-class", evidence_class)
+    with page.expect_file_chooser() as chosen:
+        page.click("#evidence-file")
+    chosen.value.set_files(
+        {"name": name, "mimeType": "text/plain", "buffer": text.encode()}
+    )
+
+
+def save_control(page) -> None:
+    with page.expect_response("**/workspace/controls**") as answered:
+        page.click("#save-control")
+    assert answered.value.ok, answered.value.text()
+    page.wait_for_selector("#controls-notice:not([hidden])")
+
+
+def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
+    page.goto("/controls")
+    assert page.get_attribute("#controls-nav", "aria-current") == "page"
+    assert page.inner_text("#controls-empty") == "No Controls yet."
+    assert page.inner_text("#controls-count") == "0 of 50 Controls"
+    new_control(page, HOSTILE_CONTROL)
+    page.fill("#alias-input", "orders <i>database</i>")
+    page.press("#alias-input", "Enter")
+    add_fact(page, "encryption at rest", "AES-256 <script>window.ran=1</script>")
+    add_row(page, "asvs", "V11.2")
+    add_row(page, "stride", "information-disclosure")
+    add_evidence(page, "<b>rds</b>.tf", "storage_encrypted = true\n", "code")
+    page.wait_for_selector("#evidence-list li")
+    save_control(page)
+    assert page.inner_text("#controls-notice") == f"“{HOSTILE_CONTROL}” is saved."
+    assert page.inner_text("#controls-count") == "1 of 50 Controls"
+    cells = page.locator("#controls-list tr td")
+    assert page.inner_text("#controls-list td.name-cell a") == HOSTILE_CONTROL
+    assert "Proves encryption at rest" in cells.nth(1).inner_text()
+    assert cells.nth(2).inner_text() == "A data store: Orders DB"
+    assert cells.nth(3).inner_text().split("\n") == [
+        "ASVS V11.2",
+        "STRIDE information-disclosure",
+    ]
+    assert cells.nth(4).inner_text() == "<b>rds</b>.tf (Code)"
+    assert page.locator("#controls-list img, #controls-list b").count() == 0
+    assert page.evaluate("window.ran") is None
+    [control] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
+    assert control["scope"]["aliases"] == ["orders <i>database</i>"]
+    assert control["facts"][0]["value"] == "AES-256 <script>window.ran=1</script>"
+
+    # An edit opens the same editor with the Control's values, and replaces it.
+    page.click("#controls-list button:text('Edit')")
+    assert page.input_value("#control-name") == HOSTILE_CONTROL
+    assert page.input_value("#scope-name") == "Orders DB"
+    assert "orders <i>database</i>" in page.inner_text(".aliases")
+    page.fill("#control-name", "Orders DB encrypted")
+    page.click("#facts-list button")
+    add_fact(page, "data classification", "confidential")
+    save_control(page)
+    assert page.inner_text("#controls-list td.name-cell a") == "Orders DB encrypted"
+    [edited] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
+    assert edited["id"] == control["id"]
+    assert [fact["value"] for fact in edited["facts"]] == ["confidential"]
+    assert edited["evidence"] == control["evidence"]
+
+
+@pytest.mark.parametrize(
+    ("fill", "message"),
+    [
+        (lambda page: new_control(page, " "), "Give the Control a name."),
+        (
+            lambda page: new_control(page, "WAF", scope=("process", "")),
+            "Name what the Control protects, or choose the whole application.",
+        ),
+        (
+            lambda page: new_control(page, "WAF"),
+            "Add at least one fact or one row. A Control with neither changes"
+            " nothing.",
+        ),
+    ],
+)
+def test_each_save_refusal_shows_its_message(page, fill, message):
+    page.goto("/controls")
+    fill(page)
+    if "fact or one row" not in message:
+        add_row(page, "stride", "spoofing")
+    page.click("#save-control")
+    page.wait_for_selector("#editor-problem:not([hidden])")
+    assert page.inner_text("#editor-problem") == message
+
+
+def test_a_repeated_row_and_name_and_a_large_file_are_refused(page):
+    page.goto("/controls")
+    new_control(page, "WAF")
+    add_row(page, "stride", "spoofing")
+    add_row(page, "stride", "spoofing")
+    page.click("#save-control")
+    page.wait_for_selector("#editor-problem:not([hidden])")
+    assert page.inner_text("#editor-problem") == "The row spoofing appears twice."
+    page.click("#rows-list button")
+    save_control(page)
+    new_control(page, "WAF")
+    add_row(page, "stride", "tampering")
+    page.click("#save-control")
+    page.wait_for_selector("#editor-problem:not([hidden])")
+    assert page.inner_text("#editor-problem") == (
+        "You already have a Control named “WAF”. Give this Control a different name."
+    )
+    add_evidence(page, "big.txt", "x" * 10_001)
+    page.wait_for_function(
+        "() => document.querySelector('#editor-problem').textContent.includes('larger')"
+    )
+    assert page.inner_text("#editor-problem") == (
+        "This file is larger than the 10,000 bytes one evidence file can hold."
+    )
+
+
+def test_a_delete_and_a_multi_delete_ask_first(page):
+    page.goto("/controls")
+    for name in ("One", "Two", "Three"):
+        new_control(page, name, scope=("application", ""))
+        add_row(page, "stride", "spoofing")
+        save_control(page)
+    page.click("#controls-list tr:has-text('Three') button:text('Delete')")
+    page.wait_for_selector("#delete-dialog[open]")
+    assert page.inner_text("#delete-question") == (
+        "Delete “Three”? Each analysis that already applied it keeps its own copy,"
+        " and its reports do not change. You cannot undo this."
+    )
+    page.click("#delete-go")
+    page.wait_for_selector("#controls-list tr:has-text('Three')", state="detached")
+    assert page.inner_text("#controls-notice") == (
+        "“Three” is deleted. The analyses that applied it keep their copy."
+    )
+    page.check("#select-shown")
+    assert page.inner_text("#delete-selected") == "Delete selected (2)"
+    page.click("#delete-selected")
+    page.wait_for_selector("#delete-dialog[open]")
+    assert page.inner_text("#delete-question").startswith("Delete 2 Controls?")
+    page.click("#delete-go")
+    page.wait_for_selector("#controls-empty:not([hidden])")
+    assert page.inner_text("#controls-notice") == (
+        "2 Controls are deleted. The analyses that applied them keep their copy."
+    )

@@ -396,14 +396,18 @@ def control_refusal(
     return None
 
 
+def evidence_too_large(max_bytes: int) -> str:
+    """The refusal of an evidence file over ``max_bytes``."""
+    return (
+        f"This file is larger than the {max_bytes:,} bytes one evidence file can hold."
+    )
+
+
 def _text_refusal(name: str, text: str, limits: ControlLimits) -> str | None:
     refusal = text_refusal(
         text,
         max_bytes=limits.max_evidence_bytes,
-        too_large=(
-            f"This file is larger than the {limits.max_evidence_bytes:,} bytes one"
-            " evidence file can hold."
-        ),
+        too_large=evidence_too_large(limits.max_evidence_bytes),
     )
     if refusal is not None:
         return refusal

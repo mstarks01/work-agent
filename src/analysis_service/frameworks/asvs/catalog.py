@@ -276,6 +276,18 @@ def requirement_text(requirement_id: str) -> str:
     return _TEXT_BY_ID.get(requirement_id, "")
 
 
+_NAME_BY_ID: Mapping[str, str] = MappingProxyType(
+    {chapter.id: chapter.name for chapter in CHAPTERS}
+    | {req.section: req.section_name for req in REQUIREMENTS}
+)
+
+
+def unit_text(unit_id: str) -> str:
+    """The standard's own words for one unit: a chapter's or a section's name,
+    a requirement's text, or ``""`` for an ID it lacks."""
+    return _NAME_BY_ID.get(unit_id) or requirement_text(unit_id)
+
+
 def is_published_requirement(lane: str, key: object) -> bool:
     """Whether this lane and key name one of the 345 requirements 5.0.0 publishes.
 
