@@ -89,8 +89,25 @@
     type: "button", class: "quiet", "aria-label": `Remove ${label}`,
     on: { click: () => { list.splice(index, 1); draw(); } },
   }, "Remove");
-  const card = (title, hint, ...content) => h("section", { class: "q-card" },
-    h("h3", {}, title), hint ? h("p", { class: "hint" }, hint) : null, ...content);
+  // The "?" beside a card's title, as the analysis page has beside its
+  // question toggle: it opens the card's description.
+  const SVG = "http://www.w3.org/2000/svg";
+  const svg = (tag, attrs, ...children) => {
+    const node = document.createElementNS(SVG, tag);
+    for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+    node.append(...children);
+    return node;
+  };
+  const helpIcon = () => svg("svg", { "aria-hidden": "true", viewBox: "0 0 24 24", width: "18", height: "18", fill: "none",
+    stroke: "currentColor", "stroke-width": "1.8", "stroke-linecap": "round", "stroke-linejoin": "round" },
+  svg("circle", { cx: "12", cy: "12", r: "9" }),
+  svg("path", { d: "M9.7 9a2.5 2.5 0 0 1 4.6 1.3c0 1.7-2.3 2.1-2.3 3.7" }),
+  svg("path", { d: "M12 17h.01" }));
+  const help = (title, text) => h("details", { class: "question-help" },
+    h("summary", {}, h("span", { class: "sr-only" }, `About ${title}`), helpIcon()),
+    h("div", { class: "question-help-content" }, h("strong", {}, title), h("p", {}, text)));
+  const card = (title, about, ...content) => h("section", { class: "q-card" },
+    h("div", { class: "card-head" }, h("h3", {}, title), about ? help(title, about) : null), ...content);
 
   const SCOPE_HINTS = {
     boundary: "The name must match the trust boundary after case and punctuation. The Control applies to each part the description places in it.",
@@ -110,7 +127,7 @@
         el("alias-input").focus();
       } },
     });
-    return card("What it protects", null,
+    return card("What it protects", named ? (SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other) : null,
       h("div", { class: "line" },
         h("div", {},
           h("select", { id: "scope-type", "aria-label": "What it protects", on: { change: (event) => {
@@ -126,8 +143,7 @@
             ...draft.scope.aliases.map((alias, index) => h("span", { class: "tag" }, alias,
               h("button", { type: "button", class: "quiet", "aria-label": `Remove the alias ${alias}`,
                 on: { click: () => { draft.scope.aliases.splice(index, 1); draw(); } } }, "×"))),
-            aliasInput)) : null),
-      named ? h("p", { class: "hint", id: "scope-hint" }, SCOPE_HINTS[draft.scope.type] ?? SCOPE_HINTS.other) : null);
+            aliasInput)) : null));
   };
 
   // A fact's answer as one line: its value, or each facet's answer.
@@ -175,7 +191,8 @@
       draw();
     };
     if (!SCOPES[draft.scope.type].facts.length) {
-      return card("What it does", "A Control of the whole application states no fact. Name the units it covers below.");
+      return card("What it does", null,
+        h("p", { class: "hint" }, "A Control of the whole application states no fact. Name the units it covers above."));
     }
     return card("What it does", "Each fact states a protection on the part, and answers a question the analysis would otherwise ask. A fact the description states stands.",
       h("ul", { class: "lines", id: "facts-list" }, ...draft.facts.map((fact, index) => h("li", {},
@@ -194,10 +211,14 @@
       ...units[framework].units.map((unit) => h("option", { value: unit.id },
         unit.label ? `${unit.id} · ${unit.label}`.slice(0, 120) : unit.id)));
     const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitPick());
+    // A finding that names no part never reaches a Control on one part.
+    const unreachable = draft.scope.type !== "application" && draft.rows.some((row) => !units[row.framework]?.names_a_part);
     return card("What it covers", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
       h("ul", { class: "lines", id: "rows-list" }, ...draft.rows.map((row, index) => h("li", {},
         h("span", {}, unitText(row), " ", h("span", { class: "sub" }, `version ${row.version}`)),
         remove(draft.rows, index, `the row ${row.unit}`)))),
+      unreachable ? h("p", { class: "notice", id: "rows-reach", role: "note" },
+        "A row here names a unit whose findings can name no part of the model. Such a finding does not reach a Control on one part, and the report shows the row as “Not reached”. To cover each such finding, make a Control of the whole application.") : null,
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "row-framework" }, "Framework"),
           h("select", { id: "row-framework", on: { change: (event) => {
@@ -282,7 +303,7 @@
     h("div", {}, h("label", { class: "field-label", for: "control-name" }, "Name"),
       h("input", { type: "text", id: "control-name", maxlength: limits.name_chars, value: draft.name,
         on: { input: (event) => { draft.name = event.target.value; } } })),
-    scopeCard(), factCard(), rowCard(), evidenceCard(),
+    rowCard(), scopeCard(), factCard(), evidenceCard(),
     editorProblem,
     h("div", { class: "dialog-actions" },
       h("button", { type: "button", id: "cancel-control", on: { click: () => { refuse(""); stopEdit(); } } }, "Cancel"),

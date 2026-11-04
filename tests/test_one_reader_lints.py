@@ -2135,8 +2135,10 @@ ONE_READERS: dict[str, _OneReader] = {
     "the outcome of a Control row": _OneReader(
         lambda node: (
             isinstance(node, ast.Return)
-            and isinstance(node.value, ast.Constant)
-            and node.value.value == "no-finding"
+            and any(
+                isinstance(part, ast.Constant) and part.value == "no-finding"
+                for part in ast.walk(node)
+            )
         ),
         ("src/analysis_service/job_controls.py", "row_outcome"),
         {},

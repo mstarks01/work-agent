@@ -205,7 +205,9 @@ it always uses the light colours.
 **Controls**, under the findings of a job that copied a Control, is one table
 of each Control: what it matched, the facts it wrote with the state
 `written`, `changed` or `stated`, and its rows with the outcome `applied`,
-`refused` or `no-finding`. A row opens to the claim IDs it ruled out, the
+`refused`, `not-reached` or `no-finding`. A row is `not-reached` when a
+finding sits on its unit but names no part that the Control's scope holds, so
+the critic never saw the row. A row opens to the claim IDs it ruled out, the
 critic's reason, each line of the evidence that the quotation of an applied
 ruling quotes, by file, class and line, and one sentence that says what the
 outcome means. A
@@ -323,15 +325,19 @@ it.
   above the table gives the count against `max_controls`, such as "4 of 50
   Controls", and "New Control" is disabled at the limit.
 - **The editor.** "New Control", "Edit" or a click on a name opens the editor
-  above the table: the name, then four cards. "What it protects" takes the
+  above the table: the name, then four cards. Each card keeps its description
+  behind a "?" beside its title. "What it covers" comes first and takes a row
+  by framework and unit, and the row keeps the package version. Each unit's
+  label comes from its package's catalog when the page loads. A note shows
+  under the rows when the Control protects one part and a row names a
+  framework whose findings can name no part, because such a finding never
+  reaches the Control. "What it protects" takes the
   kind, the name and the aliases. "What it does" takes a fact and its value
   from the protective facts of an element or a zone: its encryption at rest,
   its exposure and the Question Kinds. A closed fact takes one of its values.
   A Control of the whole application states no fact. The service refuses
   every other fact, because a fact that describes the system is the
-  description's to state. "What it covers" takes a row by
-  framework and unit, and the row keeps the package version. Each unit's
-  label comes from its package's catalog when the page loads. "Evidence" takes a
+  description's to state. "Evidence" takes a
   plain text file and its class: Configuration, Code or People. The page
   reads the file with the checks of an Owner File and sends only its text.
   Each line has a "Remove" button. "Save Control" sends the Control, and an

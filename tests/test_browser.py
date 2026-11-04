@@ -2241,6 +2241,31 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     assert edited["evidence"] == control["evidence"]
 
 
+def test_the_editor_warns_of_a_row_that_a_part_cannot_reach(page):
+    page.goto("/controls")
+    new_control(page, "TLS at the edge")
+    cards = page.locator(".editor .q-card h3")
+    assert cards.all_inner_texts() == [
+        "What it covers",
+        "What it protects",
+        "What it does",
+        "Evidence",
+    ]
+    add_row(page, "stride", "spoofing")
+    assert page.locator("#rows-reach").count() == 0
+    add_row(page, "asvs", "V2.4.1")
+    assert "“Not reached”" in page.inner_text("#rows-reach")
+
+    # The description of a card opens from its "?".
+    about = page.locator(".q-card:has(h3:text-is('What it does')) .question-help")
+    assert not about.locator(".question-help-content").is_visible()
+    about.locator("summary").click()
+    assert "Each fact states a protection" in about.inner_text()
+
+    page.select_option("#scope-type", "application")
+    assert page.locator("#rows-reach").count() == 0
+
+
 @pytest.mark.parametrize(
     ("fill", "message"),
     [

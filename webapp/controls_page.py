@@ -34,7 +34,7 @@ from analysis_service.controls import (
 )
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import FACET_ANSWERS, FactAnswer
-from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks import PACKAGES, FrameworkPackage
 from analysis_service.open_facts import kind_words
 from analysis_service.owner_files import NOT_UTF_8
 from analysis_service.question_kinds import QUESTION_KINDS
@@ -138,12 +138,20 @@ def scope_types() -> list[dict[str, object]]:
     ]
 
 
+def _names_a_part(package: FrameworkPackage) -> bool:
+    """Whether each finding of ``package`` names a part of the model, as its
+    record's bound on ``affected_element_ids`` says."""
+    metadata = package.record.model_fields["affected_element_ids"].metadata
+    return any(getattr(bound, "min_length", 0) > 0 for bound in metadata)
+
+
 def units() -> dict[str, dict[str, object]]:
     """Each package's version and units, with the label its catalog gives
-    each unit at run time."""
+    each unit at run time, and whether each finding names a part."""
     return {
         name: {
             "version": package.version,
+            "names_a_part": _names_a_part(package),
             "units": [
                 {
                     "id": unit.id,
