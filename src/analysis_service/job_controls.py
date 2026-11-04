@@ -111,8 +111,8 @@ def changes_nothing(copy: CopiedControl, frameworks: Iterable[str]) -> bool:
     """Whether ``copy`` would change nothing in an analysis of ``frameworks``:
     it states no fact, and no row of it names one of them. The form page
     states the same rule in ``form_controls.js``. A route test and a browser
-    test each check one case on their side: an ASVS-only Control with no fact
-    in a STRIDE-only analysis."""
+    test each check it on their side: a Control with no fact and rows of one
+    framework does not fit an analysis of only the other."""
     names = set(frameworks)
     return not copy.document.facts and not any(
         row.framework in names for row in copy.rows
