@@ -8,7 +8,8 @@ protocol where the model states one. A flow that crosses a boundary, or may
 cross one, takes a link style, read from
 :func:`~analysis_service.analysis.crossings_by_flow`.
 
-**The text reads back as a ``diagram`` Source.** That register takes a
+**The text reads back as a ``diagram`` Source**, with or without the
+``style`` lines of :func:`styled_mermaid`, which add no node. That register takes a
 subgraph as a trust zone only where its label says so, so the label says so.
 It takes a node's shape as its type only where a comment states the shape
 convention, so the text opens with :data:`SHAPE_CONVENTION`.

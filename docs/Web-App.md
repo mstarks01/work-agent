@@ -147,7 +147,10 @@ a quote the service could not find in its source marked as such. The confirmed
 findings show open; the conditional and the dismissed findings each sit in a
 closed section. A name that an agent writes, such as an element ID, an
 attribute or an asset tag, shows as words. The name itself shows when you hover
-over the words.
+over the words. An element shows as a tag in its own colour, with an outline
+in a darker shade of it; each element of the model has a colour of its own,
+the same in every view. A trust zone shows as a grey tag, and a flow as its
+two endpoint tags with an arrow between them.
 
 **Questions** shows only for an analysis with **Ask me questions to make the
 report better.** ticked. It asks the facts that the conditional findings need,
@@ -177,14 +180,16 @@ zones runs across. A coloured arrow crosses a trust boundary. A dotted arrow
 may cross one, because a zone is not stated. Each flow's name sits on its
 arrow. An element whose zone the model does not state is drawn outside every
 zone, in a column named **Zone not stated**, and an element whose zone the
-service inferred says "zone assumed". Hover over an element or a flow to see
+service inferred says "zone assumed". Each element's box takes the colour of
+its tag. Hover over an element or a flow to see
 its whole name. **Download as Mermaid**, in the caption, saves the same model
 as a Mermaid flowchart (`system-model.mmd`) to paste into a document that
 renders Mermaid. A comment on its first line states which shape names which
 element type. Each trust zone is a subgraph labelled "Trust zone", each arrow
 names its flow and the protocol where the model states one, and a flow that
-crosses a boundary, or may cross one, takes a link style. The file reads back
-as a `diagram` source. Under the diagram, a table for each element kind (external entities, processes, data stores and data flows)
+crosses a boundary, or may cross one, takes a link style. A `style` line gives
+each element the light colours of its tag. The file reads back as a `diagram`
+source. Under the diagram, a table for each element kind (external entities, processes, data stores and data flows)
 lists the same elements in words, with a column for each attribute. Hover over
 a name to see its ID.
 

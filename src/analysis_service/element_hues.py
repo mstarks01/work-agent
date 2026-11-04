@@ -1,21 +1,25 @@
 """One hue for each element of a model, so the report's tags, its diagram and
 its Mermaid download colour an element alike.
 
-Each element, in the model's order, takes the next step of the golden angle
-round the colour wheel. So two elements next to each other in the list take
-hues far apart, and the hues stay the same for one model on every view.
+The hues of a model's elements are spread evenly round the colour wheel, one
+for each element, so no two elements of one model take the same hue. The
+elements take them in an order that steps far round the wheel each time, so
+two elements next to each other in the list take hues far apart. The hues stay
+the same for one model on every view.
 """
 
 from __future__ import annotations
 
 import colorsys
+from math import gcd
 
 from analysis_service.system_model import SystemModel
 
 __all__ = ["FILL", "LINE", "element_hues", "hsl_hex"]
 
-#: The step between the hues of two elements, in degrees.
-GOLDEN_ANGLE = 137.508
+#: The part of the wheel one step goes round: the golden ratio's, so the
+#: steps never fall back near an earlier hue.
+GOLDEN_FRACTION = 0.382
 #: The hue of the first element, a blue.
 FIRST_HUE = 210
 #: The saturation and the lightness, in percent, of an element's fill and of
@@ -28,12 +32,19 @@ LINE = (50, 40)
 def element_hues(model: SystemModel) -> dict[str, int]:
     """The hue of each element of ``model``, in degrees, by element ID.
 
-    **The one reader of an element's colour.** A trust zone and a flow take
-    none: a zone is drawn as a frame, and a flow as its two endpoints.
+    The report's tags, its diagram and its Mermaid download read this map. A
+    trust zone and a flow take none: a zone is drawn as a frame, and a flow as
+    its two endpoints. The step is prime to the number of elements, so each
+    element takes a slot of its own.
     """
+    elements = model.zoned_elements()
+    count = len(elements)
+    step = max(1, round(count * GOLDEN_FRACTION))
+    while gcd(step, count) != 1:
+        step += 1
     return {
-        element.id: round(FIRST_HUE + at * GOLDEN_ANGLE) % 360
-        for at, element in enumerate(model.zoned_elements())
+        element.id: round(FIRST_HUE + 360 * (at * step % count) / count) % 360
+        for at, element in enumerate(elements)
     }
 
 

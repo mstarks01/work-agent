@@ -27,6 +27,20 @@ def test_two_elements_next_in_the_list_take_far_hues():
         assert min(abs(first - second), 360 - abs(first - second)) >= 90
 
 
+def test_no_two_elements_of_a_large_model_share_a_hue():
+    model = valid_model()
+    stores = [
+        model.data_stores[0].model_copy(update={"id": f"store:s{n}", "name": f"S{n}"})
+        for n in range(40)
+    ]
+    hues = sorted(
+        element_hues(model.model_copy(update={"data_stores": stores})).values()
+    )
+    gaps = [later - earlier for earlier, later in pairwise([*hues, hues[0] + 360])]
+    assert len(set(hues)) == len(hues)
+    assert min(gaps) >= 360 // len(hues) - 1
+
+
 def test_a_colour_is_written_as_hex():
     assert hsl_hex(0, 100, 50) == "#ff0000"
     assert hsl_hex(120, 100, 25) == "#008000"
