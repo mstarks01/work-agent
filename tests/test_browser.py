@@ -2478,8 +2478,8 @@ def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
     page.reload()
     page.wait_for_selector(f"#control-{kept}")
     page.uncheck("#ask")
-    assert page.is_disabled(f"#control-{kept}")
-    assert "Turn the questions on" in page.inner_text("#controls-summary")
+    assert page.is_enabled(f"#control-{kept}")
+    assert "continues at once" in page.inner_text("#controls-summary")
     page.check("#ask")
     sent = submit_with_controls(page)
     assert sent["controls"] == [kept]

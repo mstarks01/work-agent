@@ -286,6 +286,9 @@
       return;
     }
 
+    // A job with Controls pauses even with the questions off: the service
+    // continues it at once (ADR 0125).
+    const controls = formControls.chosen();
     try {
       const started = await fetch("/analyze", {
         method: "POST",
@@ -297,7 +300,7 @@
           questions: Boolean(ask && ask.checked),
           answers_from: document.getElementById("answers-from")?.value || undefined,
           owner_files: chosen.size ? [...chosen] : undefined,
-          controls: formControls.chosen(),
+          controls,
         }),
       });
       if (!started.ok) {
@@ -307,7 +310,7 @@
         formControls.load();
         return;
       }
-      follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean(ask && ask.checked));
+      follow((await started.json()).run, "Reading your description and identifying the parts of your system…", Boolean((ask && ask.checked) || controls));
     } catch {
       fail("The connection was interrupted. Check Analyses before starting again.");
     }
@@ -1427,8 +1430,9 @@
     const optional = (data.early_held_back || []).length + (data.early_below_floor || []).length;
     // A pause with nothing to ask, nothing answered or skipped, no optional
     // question and no analysis to explain starts the analysis, with no page
-    // between. After a save, only the start button starts it.
-    if (!left && !saved && !gates.length && !optional) {
+    // between. After a save, or after a refused continue, only the start
+    // button starts it.
+    if (!left && !saved && !gates.length && !optional && !data.refusal) {
       pausedRun = data.run;
       revision = data.revision;
       startAnalysis();
@@ -1452,6 +1456,8 @@
     reconcile(data);
     setStatus(edits.size ? "unsaved" : "saved");
     asked.hidden = false;
+    // Why the service did not continue the job at its pause (ADR 0125).
+    if (data.refusal) refuse(data.refusal);
   };
   // The capability rows that "no" to the rest answers: listed, open, blank
   // and offering "no". A "no" rules out every unit that needs the capability,
@@ -1599,6 +1605,12 @@
       stream.close();
       idle();
       showQuestions(JSON.parse(event.data));
+    });
+    // A job with Controls and no questions continues at its pause at once.
+    stream.addEventListener("continuing", () => working("Continuing with your Controls…"));
+    stream.addEventListener("continued", (event) => {
+      stream.close();
+      follow(JSON.parse(event.data).run, "Continuing with your Controls…", false);
     });
     stream.addEventListener("node", (event) => {
       if (typeof workspace !== "undefined") {

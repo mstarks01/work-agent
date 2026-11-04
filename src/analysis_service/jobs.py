@@ -209,6 +209,7 @@ RECORD_FIELDS: dict[str, EnvelopeHold] = {
     "control_scopes": "same-schema",
     "control_facts": "same-schema",
     "ask_questions": "always",
+    "continues_at_pause": "always",
     "checkpoint": "never",
     "status": "always",
     "created_at": "always",
@@ -456,6 +457,10 @@ class JobRecord(BaseModel):
     # waits for the answers. Off unless a submission asks for it, so an
     # autonomous run never waits.
     ask_questions: bool = False
+    # Whether the service continues this job at its pause at once, with no
+    # own answers (ADR 0125): its submission named Controls and asked no
+    # questions, and the pause is where the Controls write their facts.
+    continues_at_pause: bool = False
     # What a paused job holds while it waits: the answers resume from it.
     checkpoint: Checkpoint | None = None
     status: JobStatus = "queued"
@@ -506,6 +511,7 @@ class JobRecord(BaseModel):
         control_scopes: Sequence[ControlResolution] | None = None,
         control_facts: Sequence[ControlFacts] | None = None,
         ask_questions: bool = False,
+        continues_at_pause: bool = False,
         reserved_tokens: int = 0,
     ) -> Self:
         """A fresh queued job with its initial status event recorded."""
@@ -529,6 +535,7 @@ class JobRecord(BaseModel):
             control_scopes=None if control_scopes is None else list(control_scopes),
             control_facts=None if control_facts is None else list(control_facts),
             ask_questions=ask_questions,
+            continues_at_pause=continues_at_pause,
             created_at=now,
             updated_at=now,
             reserved_tokens=reserved_tokens,
@@ -552,11 +559,18 @@ class JobRecord(BaseModel):
         return self.sources
 
     def pauses(self) -> bool:
-        """Whether this job's run stops after the assertion pass to ask a person.
+        """Whether this job's run stops after the assertion pass, to ask a
+        person or to continue at once.
 
         A resumed job never pauses: it is the run that answers came back to.
         """
-        return self.ask_questions and self.resumption is None
+        stops = self.ask_questions or self.continues_at_pause
+        return stops and self.resumption is None
+
+    def waits_to_continue(self) -> bool:
+        """Whether this job waits at its pause for the continue the service
+        makes at once (ADR 0125)."""
+        return self.continues_at_pause and self.status == "awaiting-answers"
 
     def final(self) -> bool:
         """Whether this job's report is final: the one follow-up wrote it (ADR 0054)."""

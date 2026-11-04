@@ -362,8 +362,12 @@ submission sends the IDs of the Controls you tick in `controls`, and the job
 copies each one, with the text of each evidence file (ADR 0127). A later edit
 or delete changes no job. When a ticked Control is gone, the submission is
 refused and the list shows the Control as "Missing". Controls apply at the
-pause, so the list is disabled while the questions are off, and the service
-refuses `controls` with no questions.
+pause. With the questions off, a job with Controls also pauses, and the
+service continues it at once with no answers (ADR 0125). The page shows
+"Continuing with your Controls…" until the next run starts. Each Control takes
+its default match. A refusal, such as two Controls that write one fact with
+two values, leaves the job at the pause, and the page shows the refusal above
+the questions. Untick or edit a Control there, then continue.
 
 The model exists only after the extraction, so the pause shows the match. The
 questions of a paused analysis list each copied Control in `controls`: what

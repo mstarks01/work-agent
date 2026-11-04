@@ -531,6 +531,7 @@ def every_field(owner_id: str = "alice") -> JobRecord:
         parent_revision=3,
         carried=AnswerSet(facts=(FactAnswer(key=KEY, value="mTLS"),)),
         ask_questions=True,
+        continues_at_pause=True,
         reserved_tokens=500,
     )
     record.transition("running")

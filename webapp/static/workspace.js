@@ -281,10 +281,12 @@ const workspace = (() => {
       // The snapshot lists only the reports the app serves.
       const served = data.reports.some((report) => report.run === data.run);
       if (data.questions) showQuestions(data.questions);
-      else if (data.status === "running") {
+      else if (data.status === "running" || data.continuing) {
         show("progress-panel");
         el("status").hidden = false;
         processing(data.completed_steps, data.pauses, undefined, data.run);
+        // The service continues a job with Controls and no questions at its pause.
+        if (data.continuing) el("status-text").textContent = "Continuing with your Controls…";
         setTimeout(() => { if (ticket === generation) open(data.run); }, 1500);
       } else if (view === "description") {
         show("description-panel");

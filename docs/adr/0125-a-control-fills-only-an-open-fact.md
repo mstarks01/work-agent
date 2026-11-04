@@ -34,11 +34,19 @@ Control wrote. An `unknown` answer at the pause can take a Control's fact back
 for this job, and the follow-up cannot. A carried answer to a fact a Control
 writes is dropped and listed with the reason `control-states`.
 
-**A submission with Controls asks questions.** A job that does not pause
-shows no model before its lanes run, so it has no point where a Control's
-facts and their lines of the answers Source can be written. The submission
-refuses `controls` without `questions`, as it refuses `answers_from` without
-them.
+**A submission with Controls and no questions continues at once.** A job that
+does not pause shows no model before its lanes run, so it has no point where a
+Control's facts and their lines of the answers Source can be written. So a job
+with Controls pauses after its assertion pass, also with the questions off,
+and the record keeps that choice in `continues_at_pause`. The service then
+continues the job at once with no own answers, as a continue with an empty
+answer list does. Each copy takes its default resolution, and each applied
+Control writes its open facts and their lines of the answers Source. A refusal
+leaves the job paused and the page shows it: a two-value conflict, a value the
+fact cannot hold, or an admission refusal. The owner unticks or edits a Control
+and continues, and the extraction does not run again. A submission with no
+Controls and no questions does not pause. The submission refuses
+`answers_from` without `questions`.
 
 **Two Controls that write one fact with two values refuse the save.** The
 refusal names the two Controls, the fact and the two values. The check runs at
