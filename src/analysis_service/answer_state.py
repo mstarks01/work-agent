@@ -800,6 +800,7 @@ def question_set(
     frameworks: Mapping[FrameworkName, Mapping[str, Any]],
     analyses: Sequence[FrameworkAnalysis],
     *,
+    asks: bool,
     waiting: bool,
     answered: AnswerSet,
     final: bool,
@@ -812,7 +813,9 @@ def question_set(
     ``frameworks`` maps each selected framework to its options, and ranks the
     early list; ``analyses`` ranks the report's list. So a waiting job passes
     no analyses, and a finished one's frameworks go unread. ``answered`` holds
-    the saved answers, whose questions are not asked again. ``final`` marks a report the follow-up wrote, and ``shown``
+    the saved answers, whose questions are not asked again. ``asks`` is
+    whether the analysis asks a person: the report of one that does not asks
+    nothing. ``final`` marks a report the follow-up wrote, and ``shown``
     is every early question the pause presented. ``skipped`` is every early
     question and link question the pause's submitter skipped for now; a
     report's list reads both to say what became of each question before the
@@ -840,7 +843,7 @@ def question_set(
             skipped_links=(),
             resumed_by=resumed_by,
         )
-    if final:
+    if final or not (asks or waiting):
         return QuestionSet(
             model=model,
             catalog=catalog,
@@ -848,7 +851,7 @@ def question_set(
             early=(),
             facts=(),
             links=(),
-            final=True,
+            final=final,
             shown=tuple(shown),
             answered_early=(),
             answered_links=(),
@@ -1674,6 +1677,9 @@ class AnswerState:
     checkpoint: Checkpoint
     frameworks: Mapping[FrameworkName, Mapping[str, Any]]
     analyses: Sequence[FrameworkAnalysis]
+    #: Whether the analysis asks a person. A job that pauses only so that its
+    #: Controls continue it at once does not, and neither does its report.
+    asks: bool
     waiting: bool
     final: bool
     sources: Sequence[Source]
@@ -1707,6 +1713,7 @@ class AnswerState:
             None if assertions is None else assertions.catalog,
             self.frameworks,
             self.analyses,
+            asks=self.asks,
             waiting=self.waiting,
             answered=answers,
             final=self.final,

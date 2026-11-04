@@ -268,6 +268,7 @@ class Answerable:
                 for selection in record.whole_frameworks()
             },
             analyses=self.analyses,
+            asks=record.ask_questions,
             waiting=record.status == "awaiting-answers",
             final=record.final(),
             sources=record.whole_sources(),
@@ -828,6 +829,9 @@ class JobAnswers:
             frameworks=parent.whole_frameworks(),
             system_name=parent.system_name,
             title=parent.title,
+            # The resumed job never pauses, and its report asks what the
+            # analysis asks.
+            ask_questions=parent.ask_questions,
             answers=outcome.answers,
             shown_early=outcome.shown,
             skipped_early=list(outcome.skipped),

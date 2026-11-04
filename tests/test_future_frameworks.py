@@ -129,6 +129,7 @@ def _paused(selection, answers=(), model=None):
             None,
             selection,
             (),
+            asks=True,
             waiting=True,
             answered=AnswerSet(facts=tuple(answers)),
             final=False,

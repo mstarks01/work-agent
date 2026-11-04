@@ -30,6 +30,9 @@
   const FALLBACK = JSON.parse(document.getElementById("question_fallback").textContent);
   // True for a report the follow-up wrote: it asks nothing more (ADR 0054).
   const FINAL = JSON.parse(document.getElementById("final").textContent);
+  // False for an analysis submitted with no questions: its report has no
+  // Questions section.
+  const ANALYSIS_ASKS = JSON.parse(document.getElementById("asks").textContent);
   // The run this report's follow-up started, where one locks it: the report
   // then asks nothing, and its follow-up's report is the next one to read.
   const RESUMED_BY = JSON.parse(document.getElementById("resumed_by").textContent);
@@ -316,7 +319,8 @@
   // The page has three sections: the report, its questions, and how it was
   // made. The report is the one a reader lands on, and ?view= names another,
   // so a reload stays where the reader was.
-  const SECTIONS = ["report", "questions", "about"];
+  const SECTIONS = ANALYSIS_ASKS ? ["report", "questions", "about"] : ["report", "about"];
+  $("questions-tab").hidden = !ANALYSIS_ASKS;
   const showSection = (name) => {
     SECTIONS.forEach(each => {
       $(`${each}-view`).hidden = each !== name;
@@ -2148,7 +2152,7 @@
     beforeExport.closed.forEach(d => { d.open = true; });
     $("report-view").hidden = false;
     $("questions-view").hidden = true;
-    exportQuestions.hidden = false;
+    exportQuestions.hidden = !ANALYSIS_ASKS;
     $("about-view").hidden = false;
     $("preview-bar").hidden = false;
   };

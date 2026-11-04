@@ -57,6 +57,7 @@ def _state(*, carried=(), facts=(), waiting=True, model=None):
         checkpoint=Checkpoint(system_model=model or valid_model(), assertions=None),
         frameworks={"stride": {}},
         analyses=(),
+        asks=True,
         waiting=waiting,
         final=False,
         sources=(Source.description(DESCRIPTION_TEXT),),

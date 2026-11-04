@@ -34,6 +34,7 @@ def test_the_shipped_order_starts_with_the_pause_s_first_list():
         None,
         BOTH,
         [],
+        asks=True,
         waiting=True,
         answered=AnswerSet(),
         final=False,

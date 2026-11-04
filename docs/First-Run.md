@@ -488,8 +488,10 @@ The app can ask you questions before the analysis, and after the report.
   so, and you can still change an answer. Only **Start the analysis** starts
   it. The analysis then starts from what was already read, so nothing is read
   again, and it reads your answers.
-- **After the report: one optional follow-up.** The report is complete
-  without it. Where the report asks something, a line under the findings
+- **After the report: one optional follow-up.** Only an analysis with
+  **Ask me questions to make the report better.** ticked offers it. A report of
+  an analysis with the box unticked has no **Questions** tab. The report is
+  complete without the follow-up. Where the report asks something, a line under the findings
   offers **Add information**, and the **Questions** tab shows how many
   questions it asks. The questions use the same list as the questions before
   the analysis: a group for each kind of question, an index of the groups on

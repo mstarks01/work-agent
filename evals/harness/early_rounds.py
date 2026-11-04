@@ -222,6 +222,7 @@ def paused_state(
         checkpoint=Checkpoint(system_model=model, assertions=None),
         frameworks=frameworks,
         analyses=(),
+        asks=True,
         waiting=True,
         final=False,
         sources=(),

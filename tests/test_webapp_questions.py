@@ -144,6 +144,20 @@ def start(client, questions: bool) -> str:
     return started.json()["run"]
 
 
+def asking_report(client) -> str:
+    """The report of an analysis that asks: its pause, continued with no
+    answers. Only such a report offers its follow-up questions."""
+    paused = start(client, questions=True)
+    client.get(f"/events/{paused}")
+    continued = client.post(
+        f"/answer/{paused}", json={"revision": 0}, headers=SAME_ORIGIN
+    )
+    assert continued.status_code == 200, continued.text
+    child = continued.json()["run"]
+    assert ran(client, child) == "completed"
+    return child
+
+
 def statuses(stream: str) -> list[str]:
     """Each status the stream carried, in order."""
     return [
@@ -411,8 +425,7 @@ class TestTheWholeFlow:
 
     def test_a_finished_report_s_questions_run_it_again(self, tiers, runner):
         client = client_for(tiers, runner)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
+        finished = asking_report(client)
         resumed = answer(client, finished, LINK)
         assert resumed.status_code == 200
         assert ran(client, resumed.json()["run"]) == "completed"
@@ -420,8 +433,7 @@ class TestTheWholeFlow:
     def test_a_follow_up_s_page_compares_it_with_the_report_before(self, tiers, runner):
         """The follow-up keeps the report its answers came from (#561)."""
         client = client_for(tiers, runner)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
+        finished = asking_report(client)
         resumed = answer(client, finished, LINK).json()["run"]
         client.get(f"/events/{resumed}")
 
@@ -441,8 +453,7 @@ class TestTheWholeFlow:
         from analysis_service.job_answers import JobAnswers
 
         client = client_for(tiers, runner)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
+        finished = asking_report(client)
         resumed = answer(client, finished, LINK).json()["run"]
         client.get(f"/events/{resumed}")
         monkeypatch.setattr(
@@ -1100,8 +1111,7 @@ class TestFactAnswers:
     def test_a_fact_answer_reruns_a_report_that_built_no_catalog(self, tiers):
         runner = PausingRunner(catalog=False)
         client = client_for(tiers, runner, catalog=False)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
+        finished = asking_report(client)
         response = client.post(
             f"/answer/{finished}",
             json={"links": [], "facts": [dict(FACT)]},
@@ -1109,7 +1119,8 @@ class TestFactAnswers:
         )
         assert response.status_code == 200, response.text
         assert ran(client, response.json()["run"]) == "completed"
-        assert [fact.value for fact in runner.resumed_facts[0]] == ["TLS 1.3"]
+        # The first resume is the pause's continue; the follow-up is the last.
+        assert [fact.value for fact in runner.resumed_facts[-1]] == ["TLS 1.3"]
 
     def test_a_link_answer_is_refused_where_the_report_built_no_catalog(self, tiers):
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
@@ -3160,8 +3171,7 @@ class TestCorrections:
     def runs(self, tiers):
         """A client, a finished run, and the final run its follow-up wrote."""
         client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
-        finished = start(client, questions=False)
-        client.get(f"/events/{finished}")
+        finished = asking_report(client)
         final = client.post(
             f"/answer/{finished}",
             json={"links": [], "facts": [dict(FACT)]},
@@ -3351,8 +3361,7 @@ def test_a_report_whose_follow_up_started_asks_nothing_and_says_where_it_went(ti
     """The first-run app offers no follow-up for a report whose answers
     started one, and says where that follow-up is (#1369)."""
     client = client_for(tiers, PausingRunner(catalog=False), catalog=False)
-    finished = start(client, questions=False)
-    client.get(f"/events/{finished}")
+    finished = asking_report(client)
     page = client.get(f"/report/{finished}").text
     (question,) = json.loads(
         re.search(r'id="fact_questions"[^>]*>(.*?)</script>', page).group(1)
@@ -3390,6 +3399,7 @@ def test_the_page_opens_the_list_with_the_questions_the_service_counts(case):
         None,
         {"asvs": {"level": 2}},
         [],
+        asks=True,
         waiting=True,
         answered=AnswerSet(),
         final=False,

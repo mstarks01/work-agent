@@ -157,6 +157,7 @@ def _lists(model: SystemModel, frameworks: Selection) -> list[list[EarlyQuestion
             None,
             frameworks,
             [],
+            asks=True,
             waiting=True,
             answered=AnswerSet(facts=tuple(answered)),
             final=False,

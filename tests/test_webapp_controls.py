@@ -891,6 +891,26 @@ class TestTheAutomaticContinue:
         ]
         assert owner.runner.heads == 1
 
+    def test_the_analysis_shows_the_continued_job_and_asks_nothing(self, owner):
+        _, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
+        child = frames["continued"]["run"]
+        assert ran(owner.client, child) == "completed"
+        # The list shows the job that continues the pause, not the pause.
+        [shown] = owner.client.get("/workspace/runs").json()
+        assert (shown["run"], shown["status"], shown["pauses"]) == (
+            child,
+            "completed",
+            False,
+        )
+        # Its report has no questions, and takes no answers.
+        page = owner.client.get(f"/report/{child}").text
+        assert re.search(r'id="asks"[^>]*>false<', page)
+        assert re.search(r'id="fact_questions"[^>]*>\[\]<', page)
+        assert re.search(r'id="link_questions"[^>]*>\[\]<', page)
+        refused = owner.answer(child, revision=0, facts=[dict(FACT)])
+        assert refused.status_code == 400
+        assert "asked no question" in refused.json()["message"]
+
     def test_each_control_takes_its_default_resolution(self, owner):
         db = owner.keep("Encrypted", ORDERS_DB)
         billing = owner.keep("Billing", {"type": "process", "name": "Billing"})
