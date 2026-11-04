@@ -2,7 +2,7 @@
 systems already have (ADRs 0123, 0124 and 0127).
 
 A Control is one row and its evidence objects. The row holds the authored
-:class:`ControlDocument` as JSON: the scope, the facts it proves, the rows that
+:class:`ControlDocument` as JSON: the scope, the facts it states, the rows that
 name framework units and the list of evidence files. The text of each evidence
 file is an object under :func:`~analysis_service.objects.evidence_key`, and the
 document holds its digest.
@@ -83,8 +83,9 @@ SCOPE_FACT_KINDS: Mapping[ScopeType, frozenset[ControlFactKind]] = MappingProxyT
 )
 
 _PART_REFUSAL = (
-    "A Control states a protection: the questions about the part, its"
-    " encryption at rest or its exposure. The description states the rest."
+    "A Control states a protection: the questions about the part, "
+    + " or ".join(f"its {name.replace('_', ' ')}" for name in PROTECTIVE_ATTRIBUTES)
+    + ". The description states the rest."
 )
 
 #: Why a document is refused for a fact it may not write, by scope.

@@ -674,13 +674,9 @@ class ControlFacts(BaseModel):
 
 
 def _placed(facts: Sequence[FactAnswer], model: SystemModel, elements: Sequence[str]):
-    """Each fact of a Control on each element its scope covers. An attribute
-    or a question takes the element; an attribute the element does not have
-    is no fact of it. Every other kind names no element and is written once."""
+    """Each fact of a Control on each element its scope covers. A fact takes
+    the element; an attribute the element does not have is no fact of it."""
     for fact in facts:
-        if fact.kind not in ("attribute", "question"):
-            yield fact
-            continue
         for element_id in elements:
             element = model.get(element_id)
             attribute = key_ref(fact.key).attribute
@@ -809,7 +805,7 @@ def refuse_disagreement(
                 continue
             ref = key_ref(fact.key)
             element = model.get(ref.element_id)
-            place = "the application" if element is None else element.name
+            place = ref.element_id if element is None else element.name
             subject = ref.attribute or ref.question
             raise ValueError(
                 f"Two Controls write “{subject}” on {place} with two values:"

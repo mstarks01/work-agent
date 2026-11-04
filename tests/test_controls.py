@@ -8,11 +8,13 @@ from typing import Any, get_args
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.analysis import CONTROL_ATTRIBUTES
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.controls import (
     MAX_CONTROL_ALIASES,
     MAX_CONTROL_FACTS,
     MAX_CONTROL_ROWS,
+    PROTECTIVE_ATTRIBUTES,
     Control,
     ControlDocument,
     ControlLimits,
@@ -26,7 +28,11 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.job_controls import CopiedControl
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
 from analysis_service.sources import text_digest
-from analysis_service.system_model import ElementPrefix
+from analysis_service.system_model import (
+    ElementPrefix,
+    ZonedElement,
+    attribute_names,
+)
 
 CONTROL_ID = "control-" + "c" * 32
 EVIDENCE_ID = "evidence-" + "e" * 32
@@ -190,6 +196,18 @@ class TestTheDocument:
         rows = [row(unit.id) for unit in PACKAGES["asvs"].units][: MAX_CONTROL_ROWS + 1]
         assert ControlDocument.model_validate(document(rows=rows[:-1]))
         assert "rows\n  List should have at most" in refusal(rows=rows)
+
+    def test_the_protective_attributes_are_the_control_attributes_of_a_scope(self):
+        # Each control attribute that a scope's element holds is protective,
+        # but data_classification, which describes the data.
+        held = {
+            attribute
+            for kind in get_args(ZonedElement)
+            for attribute in attribute_names(kind.model_construct())
+        }
+        assert set(PROTECTIVE_ATTRIBUTES) == (set(CONTROL_ATTRIBUTES) & held) - {
+            "data_classification"
+        }
 
     def test_the_facts_take_a_fixed_bound_before_their_kinds(self):
         # A part takes fewer legal facts than the bound, so the bound refuses a
