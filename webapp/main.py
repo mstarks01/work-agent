@@ -595,7 +595,7 @@ class Workspace:
         locker = await self.store.resumed_by(record.id, record.owner_id)
         if locker is None:
             return True
-        if not record.pauses_to_ask():
+        if isinstance(record, JobRecord) and not record.pauses_to_ask():
             # The job paused for its Controls alone, so the job that continues
             # it shows the analysis.
             return False
