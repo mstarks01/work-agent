@@ -2232,12 +2232,12 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     assert "orders <i>database</i>" in page.inner_text(".aliases")
     page.fill("#control-name", "Orders DB encrypted")
     page.click("#facts-list button")
-    add_fact(page, "data classification", "confidential")
+    add_fact(page, "encryption at rest", "KMS")
     save_control(page)
     assert page.inner_text("#controls-list td.name-cell a") == "Orders DB encrypted"
     [edited] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
     assert edited["id"] == control["id"]
-    assert [fact["value"] for fact in edited["facts"]] == ["confidential"]
+    assert [fact["value"] for fact in edited["facts"]] == ["KMS"]
     assert edited["evidence"] == control["evidence"]
 
 

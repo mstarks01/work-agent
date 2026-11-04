@@ -588,6 +588,19 @@ class TestTheTables:
         assert set(_FACT_OFFERS) == set(get_args(ControlFactKind))
         assert set().union(*SCOPE_FACT_KINDS.values()) == set(get_args(ControlFactKind))
 
+    def test_the_page_offers_only_protective_facts(self):
+        from webapp.controls_page import scope_types
+
+        offered = {
+            row["type"]: {fact["label"] for fact in row["facts"]}
+            for row in scope_types()
+        }
+        assert offered["application"] == set()
+        assert "encryption at rest" in offered["store"]
+        assert "exposure" in offered["process"]
+        described = {"technology", "kind", "interface kind", "data classification"}
+        assert not described & set().union(*offered.values())
+
 
 EVIDENCE = (
     "rate_limit:\n"
