@@ -1091,6 +1091,7 @@
   const waitsForElement = {
     "missing-element": true,
     "not-taken": false,
+    "control-states": false,
   };
   const drawCarried = (data) => {
     const dropped = data.carried_dropped || [];
@@ -1108,6 +1109,17 @@
       const review = document.createElement("p");
       review.className = "carried-review";
       review.textContent = `From the earlier analysis: ${parts.join(", ")}.`;
+      carried.append(review);
+    }
+    // The change review counts what the Controls answered (ADR 0125).
+    const byControl = new Set((data.control_facts || [])
+      .filter((f) => f.state === "written")
+      .map((f) => questionKey(f.answer.key))).size;
+    if (byControl) {
+      const review = document.createElement("p");
+      review.className = "carried-review";
+      review.textContent = `${counted(byControl, "fact is", "facts are")} answered by a Control`
+        + " and marked under Your answers.";
       carried.append(review);
     }
     for (const [index, rename] of (data.carried_renames || []).entries()) {
@@ -1153,8 +1165,17 @@
       }
       carried.append(box);
     }
+    const controlled = dropped.filter((a) => a.reason === "control-states");
+    if (controlled.length) {
+      carried.append(
+        hint(`${counted(controlled.length, "earlier answer is", "earlier answers are")} not kept,`
+          + " because a Control states the fact:"),
+        plainList(controlled.map((a) => `${a.label} — ${answerText(a)}`)),
+      );
+    }
     const others = [
-      ...dropped.filter((a) => !waitsForElement[a.reason]).map((a) => `${a.label} — ${answerText(a)}`),
+      ...dropped.filter((a) => a.reason === "not-taken")
+        .map((a) => `${a.label} — ${answerText(a)}`),
       ...(data.carried_dropped_links || []).map((a) => `${a.principal} — ${linkAnswerText(a)}`),
     ];
     if (others.length) {
@@ -1263,6 +1284,10 @@
       ...(data.carried_kept || []).map(questionKey),
       ...(data.carried_kept_links || []).map(questionKey),
     ]);
+    // Each fact a Control writes, by its key, with its state (ADR 0125).
+    const controlFacts = new Map((data.control_facts || [])
+      .filter((f) => f.state !== "stated")
+      .map((f) => [questionKey(f.answer.key), f]));
     // A question the list holds, compact or open, is not drawn in a box too.
     const inList = (key) => {
       const row = rows.get(key);
@@ -1281,8 +1306,21 @@
         if (covered.has(key)) kept.textContent += " (shared answer)";
         // Changing it here makes it this run's own answer.
         if (carriedKeys.has(key)) kept.textContent += " (from the earlier analysis)";
+        // The rung of the answer (fact_origin): a Control's value, or an own
+        // answer over it, which shows the Control's value as "was".
+        const control = controlFacts.get(key);
+        if (q.origin && q.origin.rung === "control") {
+          kept.textContent += ` (from Control ${q.origin.name})`;
+        } else if (control && control.state === "changed") {
+          kept.textContent += ` (was “${answerText(control.answer)}” from Control ${control.name})`;
+        }
       }
       row.append(kept);
+      // A fact no question asks is listed, and no editor can change it.
+      if (kind === "control") {
+        box.append(row);
+        return;
+      }
       const open = button(before ? "Change" : "Answer it", () => {
         open.hidden = true;
         kept.hidden = true;
@@ -1316,6 +1354,14 @@
       ...(data.answered_links || []).map((a) => ({ q: a, kind: "link", before: { principal: a.principal, element: a.answer.element } })),
       ...(data.answered_early || []).map((a) => ({ q: a, kind: "fact", before: a.answer })),
     ]).filter((entry) => !setAside.has(rowKey(entry)));
+    // A fact a Control writes that no question asks is still listed (ADR 0125).
+    const listed = new Set(answered.map(rowKey));
+    for (const f of controlFacts.values()) {
+      const q = { key: f.answer.key, label: f.label, origin: { rung: "control", name: f.name } };
+      if (f.state === "written" && !listed.has(questionKey(q.key)) && !inList(questionKey(q.key))) {
+        answered.push({ q, kind: "control", before: f.answer });
+      }
+    }
     redraw(earlierBox, (n) => `Your answers (${n})`, answered);
     const skipped = outside([
       ...(data.skipped_links || []).map((q) => ({ q, kind: "link", before: null })),

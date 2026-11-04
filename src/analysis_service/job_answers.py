@@ -27,9 +27,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from functools import partial
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 import anyio.to_thread
 
@@ -56,7 +56,7 @@ from analysis_service.claims import (
 from analysis_service.deployment import FrameworkNotCarried
 from analysis_service.detected_facts import detected_facts
 from analysis_service.errors import ConfigError, refusal_text
-from analysis_service.fact_answers import FactAnswer
+from analysis_service.fact_answers import FactAnswer, fact_label
 from analysis_service.fact_writes import LineageConflict
 from analysis_service.graph import Entry
 from analysis_service.job_controls import (
@@ -212,6 +212,12 @@ OWNER_FILE_GONE = (
 )
 
 
+#: The refusal of a submission that names Controls and asks no questions. A
+#: Control's facts need the extracted model, which a job that does not pause
+#: never shows before its lanes run.
+CONTROLS_ASK = "Controls apply at the pause; turn the questions on to apply them."
+
+
 class RunnerUnavailable(Exception):
     """The deployment cannot build a runner now: its configuration is incomplete.
 
@@ -280,14 +286,26 @@ class Answerable:
             draft=record.draft,
             carried_in=record.carried,
             renames=tuple(record.carried_renames),
+            controls=tuple(record.controls),
+            scopes=None
+            if record.control_scopes is None
+            else tuple(record.control_scopes),
+            stored_facts=None
+            if record.control_facts is None
+            else tuple(record.control_facts),
         )
 
     def payload(self) -> dict[str, Any]:
         """Every question the job asks, with its drafts, corrections and limits."""
         record = self.record
         state = self.state()
+        asked = state.questions.to_json()
+        # "Your answers" marks each answer with its rung (ADR 0125).
+        for row in cast(list[dict[str, Any]], asked["answered_early"]):
+            origin = state.fact_origin(tuple(row["key"]))
+            row["origin"] = None if origin is None else asdict(origin)
         return (
-            state.questions.to_json()
+            asked
             | state.carried.to_json(self.model)
             | {
                 "fallback": question_fallback(self.analyses).to_json(),
@@ -317,19 +335,32 @@ class Answerable:
                 # pause; a finished report shows its model itself.
                 "detected_facts": detected_facts(self.model) if state.waiting else [],
             }
-            | self._controls()
+            | self._controls(state)
         )
 
-    def _controls(self) -> dict[str, Any]:
-        """The offer of each copied Control at the pause (ADR 0124). A job
-        with no copy, which each ``/v1`` job is, gets no key."""
+    def _controls(self, state: AnswerState) -> dict[str, Any]:
+        """The offer of each copied Control at the pause (ADR 0124), and each
+        fact an applied Control writes with its state (ADR 0125). A job with
+        no copy, which each ``/v1`` job is, gets no key."""
         record = self.record
         if not record.controls or record.status != "awaiting-answers":
             return {}
         return {
             "controls": control_offer(
                 record.controls, record.control_scopes, self.model
-            )
+            ),
+            "control_facts": [
+                {
+                    "control": entry.control,
+                    "name": entry.name,
+                    "label": fact_label(fact.answer.key, self.model),
+                    "state": fact.state,
+                    "stated": fact.stated,
+                    "answer": fact.answer.model_dump(mode="json"),
+                }
+                for entry in state.control_facts
+                for fact in entry.facts
+            ],
         }
 
 
@@ -625,6 +656,8 @@ class JobAnswers:
         sources = list(submission.sources)
         self._refusing(refuse_owner_file_sources, sources)
         sources += await self.owner_file_sources(identity, submission.owner_files)
+        if submission.controls and not submission.questions:
+            raise Refused(CONTROLS_ASK)
         controls = await self.control_copies(identity, submission.controls)
         if sources:
             sources = self._refusing(with_link_answers, sources, submission.links)
@@ -763,6 +796,7 @@ class JobAnswers:
             scopes = self._refusing(
                 resolve_scopes, control_scopes, parent.controls, answerable.model
             )
+            state = replace(state, scopes=tuple(scopes))
         sent = replace(answers, resolves_controls=control_scopes is not None)
         outcome = await anyio.to_thread.run_sync(
             partial(self._refusing, state.answer, sent, limits=self.limits)
@@ -787,6 +821,7 @@ class JobAnswers:
                 outcome.revision,
                 renames=outcome.renames,
                 control_scopes=scopes,
+                control_facts=outcome.control_facts,
             ):
                 raise SaveConflict(
                     "the job no longer waits on answers, or another save landed"
@@ -812,6 +847,7 @@ class JobAnswers:
             parent_revision=parent.revision,
             controls=parent.controls,
             control_scopes=scopes,
+            control_facts=outcome.control_facts,
             reserved_tokens=budgets.estimate(
                 outcome.sources, parent.whole_frameworks()
             ),

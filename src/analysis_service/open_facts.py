@@ -34,6 +34,7 @@ from analysis_service.evidence import evidence_catalog, prepared_view
 from analysis_service.parsing import table_entry
 from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
 from analysis_service.system_model import (
+    UNKNOWN,
     ZONE_ATTRIBUTE,
     DataFlow,
     SystemModel,
@@ -353,6 +354,19 @@ def open_attribute(model: SystemModel, element_id: str, attribute: str) -> bool:
         attribute == ZONE_ATTRIBUTE and element_id in model.assumed_zone_elements()
     )
     return element is not None and (unverified or assumed)
+
+
+def stated_capability(model: SystemModel, capability: str) -> str | None:
+    """The state ``model`` gives the capability, or ``None`` where the
+    capability is open: no statement names it, or the statements disagree.
+
+    The answer check and a Control's fact both ask it, so a Control writes a
+    capability exactly where an answer may.
+    """
+    known = model.capability_facts().get(capability)
+    if known is None or known.state == UNKNOWN:
+        return None
+    return known.state
 
 
 def prepared_model(model: SystemModel, catalog: AssertionCatalog | None) -> SystemModel:

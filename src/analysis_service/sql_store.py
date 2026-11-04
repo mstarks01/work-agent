@@ -117,7 +117,11 @@ from analysis_service.controls import (
     names_another_scope,
 )
 from analysis_service.fact_answers import STORED, FactAnswer, SkipKey
-from analysis_service.job_controls import ControlResolution, CopiedControl
+from analysis_service.job_controls import (
+    ControlFacts,
+    ControlResolution,
+    CopiedControl,
+)
 from analysis_service.jobs import (
     RESTART_FAILURE_MESSAGE,
     TERMINAL_STATUSES,
@@ -263,6 +267,7 @@ jobs = Table(
     Column("carried", _Json, nullable=False),
     Column("carried_renames", _Json, nullable=False),
     Column("control_scopes", _Json, nullable=False),
+    Column("control_facts", _Json, nullable=False),
     Column("checkpoint", _Json, nullable=False),
     Column("validation_issues", _Json, nullable=False),
     Column("certification", _Json, nullable=False),
@@ -1728,6 +1733,7 @@ class SqlJobStore:
         *,
         renames: Sequence[ElementRename],
         control_scopes: Sequence[ControlResolution] | None,
+        control_facts: Sequence[ControlFacts] | None,
     ) -> bool:
         """Keep a waiting job's saved answers, as one conditional ``UPDATE`` on
         the revision, under the lock on the job's row."""
@@ -1739,6 +1745,10 @@ class SqlJobStore:
             "control_scopes": _json(
                 "control_scopes",
                 None if control_scopes is None else list(control_scopes),
+            ),
+            "control_facts": _json(
+                "control_facts",
+                None if control_facts is None else list(control_facts),
             ),
         }
         async with self._transaction(writes=True) as connection:

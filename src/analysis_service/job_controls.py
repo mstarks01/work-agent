@@ -11,6 +11,11 @@ Control with its :class:`ScopeMatch`, and a pause save states one
 :data:`ControlResolution` for each copy, which the job row keeps in
 ``control_scopes``. A job with no stated resolution takes the default that
 the match gives. :func:`resolutions` is the one reader of both.
+
+Each applied Control then writes its facts onto the elements it resolves to,
+where the fact is open (ADR 0125). :func:`control_facts` is the one reader of
+what each Control writes, and the job row keeps the result with each fact's
+state in ``control_facts``.
 """
 
 from __future__ import annotations
@@ -21,6 +26,8 @@ from typing import Annotated, Literal, Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from analysis_service.answer_sets import AnswerSet
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.controls import (
     CONTROL_ID,
     EVIDENCE_ID,
@@ -29,7 +36,19 @@ from analysis_service.controls import (
     ControlRow,
     ControlScope,
 )
+from analysis_service.fact_answers import (
+    FactAnswer,
+    key_ref,
+    merged_facts,
+    with_element,
+)
+from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES, FrameworkName
+from analysis_service.open_facts import (
+    open_attribute,
+    prepared_model,
+    stated_capability,
+)
 from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import EvidenceClass
 from analysis_service.system_model import (
@@ -37,6 +56,7 @@ from analysis_service.system_model import (
     ELEMENT_ID_MAX_CHARS,
     UNKNOWN,
     SystemModel,
+    attribute_names,
     element_prefix,
     is_zone,
 )
@@ -450,3 +470,181 @@ def controls_used(
         {"id": copy.id, "name": copy.document.name, "state": state}
         for copy, state in zip(copies, states, strict=True)
     ]
+
+
+#: What became of one fact a Control writes: ``written`` onto an open fact,
+#: ``changed`` where an own answer lies over it, or ``stated`` where the
+#: model states the fact and the Control writes nothing.
+FactState = Literal["written", "changed", "stated"]
+
+
+class ControlFact(BaseModel):
+    """One fact a Control writes, with its element, and its state.
+    ``stated`` is the value the model states, for a ``stated`` fact."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    answer: FactAnswer
+    state: FactState
+    stated: str = ""
+
+
+class ControlFacts(BaseModel):
+    """The facts one applied Control writes after its scope resolution."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    control: str = Field(pattern=CONTROL_ID)
+    name: str
+    facts: list[ControlFact]
+
+    def writes(self) -> list[FactAnswer]:
+        """Each fact this Control writes: every fact but a ``stated`` one."""
+        return [fact.answer for fact in self.facts if fact.state != "stated"]
+
+
+def _placed(facts: Sequence[FactAnswer], model: SystemModel, elements: Sequence[str]):
+    """Each fact of a Control on each element its scope covers. An attribute
+    or a question takes the element; an attribute the element does not have
+    is no fact of it. Every other kind names no element and is written once."""
+    for fact in facts:
+        if fact.kind not in ("attribute", "question"):
+            yield fact
+            continue
+        for element_id in elements:
+            element = model.get(element_id)
+            attribute = key_ref(fact.key).attribute
+            if element is None or (
+                fact.kind == "attribute" and attribute not in attribute_names(element)
+            ):
+                continue
+            yield fact.model_copy(update={"key": with_element(fact.key, element_id)})
+
+
+def _stated_value(model: SystemModel, fact: FactAnswer) -> str | None:
+    """The value ``model`` states for the fact, or ``None`` where it is open."""
+    ref = key_ref(fact.key)
+    if fact.kind == "attribute":
+        if open_attribute(model, ref.element_id, ref.attribute):
+            return None
+        return str(getattr(model.get(ref.element_id), ref.attribute))
+    if fact.kind == "capability":
+        return stated_capability(model, ref.capability)
+    return None
+
+
+def control_facts(
+    copies: Sequence[CopiedControl],
+    scopes: Sequence[ControlResolution] | None,
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+) -> list[ControlFacts]:
+    """The facts each applied copy writes onto ``model``, in the copies'
+    order (ADR 0125).
+
+    **The one reader of what a job's Controls write.** A Control fills only
+    a fact that the model the questions read leaves open. A fact the model
+    states is ``stated``, with the stated value, and blocks nothing.
+    """
+    prepared = prepared_model(model, catalog)
+    written = []
+    for copy, resolution in zip(
+        copies, resolutions(copies, scopes, model), strict=True
+    ):
+        if not isinstance(resolution, AppliedScope):
+            continue
+        facts = []
+        for fact in _placed(copy.document.facts, model, resolution.element_ids()):
+            stated = _stated_value(prepared, fact)
+            facts.append(
+                ControlFact(answer=fact, state="written")
+                if stated is None
+                else ControlFact(answer=fact, state="stated", stated=stated)
+            )
+        written.append(
+            ControlFacts(control=copy.id, name=copy.document.name, facts=facts)
+        )
+    return written
+
+
+def with_own_answers(
+    entries: Sequence[ControlFacts], own: Sequence[FactAnswer]
+) -> list[ControlFacts]:
+    """``entries`` with each fact an own answer of ``own`` lies over marked
+    ``changed``, and each other fact it writes marked ``written``. ``own``
+    holds no fact as a Control wrote it
+    (:meth:`~analysis_service.answer_state.AnswerState.own`)."""
+    said = {answer.key for answer in own}
+
+    def state(fact: ControlFact) -> ControlFact:
+        if fact.state == "stated":
+            return fact
+        changed = fact.answer.key in said
+        return fact.model_copy(update={"state": "changed" if changed else "written"})
+
+    return [
+        entry.model_copy(update={"facts": [state(fact) for fact in entry.facts]})
+        for entry in entries
+    ]
+
+
+def control_answers(entries: Sequence[ControlFacts]) -> AnswerSet:
+    """Every fact the Controls write, merged as :func:`merged_facts` merges
+    a facet answer. :func:`refuse_disagreement` refuses two values first."""
+    facts: list[FactAnswer] = []
+    for entry in entries:
+        facts = merged_facts(facts, entry.writes())
+    return AnswerSet(facts=tuple(facts))
+
+
+def control_lines(entries: Sequence[ControlFacts]) -> list[tuple[str, FactAnswer]]:
+    """Each fact a Control writes with the Control's name: one line of the
+    answers Source each (:func:`~analysis_service.fact_answers.control_line`)."""
+    return [(entry.name, fact) for entry in entries for fact in entry.writes()]
+
+
+def _disagree(one: FactAnswer, other: FactAnswer) -> bool:
+    """Whether two answers to one fact hold two values. Facets disagree
+    only where one facet holds two answers."""
+    if one.facets is not None and other.facets is not None:
+        return any(
+            other.facets.get(facet, answer) != answer
+            for facet, answer in one.facets.items()
+        )
+    return one.value != other.value
+
+
+def refuse_disagreement(
+    entries: Sequence[ControlFacts],
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+) -> None:
+    """Raise a :class:`ValueError` where a Control writes a value its fact
+    cannot hold, or two Controls write one fact with two values. Two Controls
+    with one value both stay writers.
+
+    Each Control's written facts take the answer check of
+    :func:`~analysis_service.fact_writes.check_fact_answers`, the capability
+    lineage check included (ADR 0125), and the refusal names the Control.
+    """
+    for entry in entries:
+        written = [fact.answer for fact in entry.facts if fact.state == "written"]
+        try:
+            check_fact_answers(written, model, catalog, reopen=True)
+        except ValueError as exc:
+            raise ValueError(f"The Control “{entry.name}” cannot apply: {exc}") from exc
+    first: dict[tuple[str, ...], tuple[str, FactAnswer]] = {}
+    for entry in entries:
+        for fact in entry.writes():
+            control, earlier = first.setdefault(fact.key, (entry.control, fact))
+            if control == entry.control or not _disagree(earlier, fact):
+                continue
+            ref = key_ref(fact.key)
+            element = model.get(ref.element_id)
+            place = "the application" if element is None else element.name
+            subject = ref.attribute or ref.question or ref.capability or ref.subject
+            raise ValueError(
+                f"Two Controls write “{subject}” on {place} with two values:"
+                f" “{earlier.value}” and “{fact.value}”. Untick one, or edit one"
+                " Control so that they agree."
+            )

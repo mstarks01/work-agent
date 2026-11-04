@@ -89,6 +89,7 @@ __all__ = [
     "answered_row",
     "asked_facets",
     "attribute_place",
+    "control_line",
     "covers",
     "detail_note",
     "fact_kind",
@@ -352,6 +353,12 @@ def fact_line(fact: FactAnswer) -> str:
     else:
         line = f'Asked "{_phrase(ref.subject)}", the answer is "{fact.value}".'
     return line + detail_note(fact.detail)
+
+
+def control_line(name: str, fact: FactAnswer) -> str:
+    """A fact a Control writes as its line of the answers Source, which names
+    the Control (ADR 0125)."""
+    return f'{fact_line(fact)} From the Control "{_phrase(name)}".'
 
 
 def _phrase(value: str) -> str:

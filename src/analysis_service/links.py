@@ -51,6 +51,7 @@ from analysis_service.assertions import (
 from analysis_service.claims import UnknownKey
 from analysis_service.fact_answers import (
     FactAnswer,
+    control_line,
     fact_line,
     merged_facts,
     refuse_repeated_facts,
@@ -151,17 +152,42 @@ def _line(link: LinkAnswer) -> str:
 
 Spans = tuple[tuple[int, int], ...]
 
+#: Each fact a Control writes, with the Control's name (ADR 0125).
+ControlLines = Sequence[tuple[str, FactAnswer]]
+
 
 def _composed(
-    links: Sequence[LinkAnswer], facts: Sequence[FactAnswer]
+    links: Sequence[LinkAnswer],
+    facts: Sequence[FactAnswer],
+    controls: ControlLines,
 ) -> tuple[str, Spans, Spans]:
-    """The answers Source's text, and where each answer's line sits in it."""
-    lines = [*map(_line, links), *map(fact_line, facts)]
+    """The answers Source's text, and where each answer's line sits in it.
+
+    Each Control line follows the link lines. A fact of ``facts`` that a
+    Control line writes quotes that line and has no line of its own, so a
+    fact an own answer changed keeps the Control's line beside its own.
+    """
+    lines = [_line(link) for link in links]
+    named: defaultdict[UnknownKey, list[tuple[FactAnswer, int]]] = defaultdict(list)
+    for name, fact in controls:
+        named[fact.key].append((fact, len(lines)))
+        lines.append(control_line(name, fact))
+    quoted = []
+    for fact in facts:
+        line = next((at for written, at in named[fact.key] if written == fact), None)
+        if line is None:
+            line = len(lines)
+            lines.append(fact_line(fact))
+        quoted.append(line)
     spans, at = [], 0
-    for line in lines:
-        spans.append((at, at + len(line)))
-        at += len(line) + 1
-    return "\n".join(lines), tuple(spans[: len(links)]), tuple(spans[len(links) :])
+    for text in lines:
+        spans.append((at, at + len(text)))
+        at += len(text) + 1
+    return (
+        "\n".join(lines),
+        tuple(spans[: len(links)]),
+        tuple(spans[line] for line in quoted),
+    )
 
 
 def _refuse_repeats(links: Sequence[LinkAnswer]) -> None:
@@ -225,10 +251,12 @@ def with_link_answers(
     sources: Sequence[Source],
     links: Sequence[LinkAnswer],
     facts: Sequence[FactAnswer] = (),
+    controls: ControlLines = (),
 ) -> list[Source]:
-    """A job's sources, with its link answers composed into one more.
+    """A job's sources, with its answers composed into one more.
 
-    A caller may not submit an ``answers`` Source of its own
+    ``facts`` is every fact the run writes, and ``controls`` each fact a
+    Control writes with the Control's name (:func:`_composed`). A caller may not submit an ``answers`` Source of its own
     (:func:`refuse_answers_source`), and an entry point that takes no answers
     still refuses one.
     """
@@ -237,7 +265,7 @@ def with_link_answers(
         return list(sources)
     _refuse_repeats(links)
     refuse_repeated_facts(facts)
-    text, _, _ = _composed(links, facts)
+    text, _, _ = _composed(links, facts, controls)
     return [*sources, Source(kind="answers", label=ANSWERS_LABEL, text=text)]
 
 
@@ -341,14 +369,18 @@ def apply_answers(
     model: SystemModel,
     links: Sequence[LinkAnswer],
     facts: Sequence[FactAnswer] = (),
+    controls: ControlLines = (),
 ) -> tuple[AssertionCatalog, list[CatalogIssue]]:
     """The catalog with every answer written in: links, then answered open rows.
+
+    ``controls`` are the Control lines the answers Source holds
+    (:func:`with_link_answers`), so each quote reads the composed text.
 
     A fact answer about an attribute is written onto the model instead, by
     :func:`~analysis_service.fact_writes.answered_model`, and one about a subject
     has no row; both still quote their lines of the answers Source.
     """
-    text, link_spans, fact_spans = _composed(links, facts)
+    text, link_spans, fact_spans = _composed(links, facts, controls)
     digest = text_digest(text)
     linked, issues = _link_rows(catalog, model, links, text, digest, link_spans)
     spans = [

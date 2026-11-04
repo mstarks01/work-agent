@@ -34,6 +34,12 @@ Control wrote. An `unknown` answer at the pause can take a Control's fact back
 for this job, and the follow-up cannot. A carried answer to a fact a Control
 writes is dropped and listed with the reason `control-states`.
 
+**A submission with Controls asks questions.** A job that does not pause
+shows no model before its lanes run, so it has no point where a Control's
+facts and their lines of the answers Source can be written. The submission
+refuses `controls` without `questions`, as it refuses `answers_from` without
+them.
+
 **Two Controls that write one fact with two values refuse the save.** The
 refusal names the two Controls, the fact and the two values. The check runs at
 submission on the resolved elements, after the zone fan-out and the ticks. Two
@@ -59,7 +65,8 @@ written and listed.
 **The report has a Controls section, and the job's copy is its one reader.**
 One entry per applied Control holds its name, its resolved scope, its documents
 with their class, and each fact with a state from the closed set `written`,
-`changed`, `stated`, stored on the copy at submission and at each save.
+`changed`, `stated`, stored in the job row's `control_facts` at each pause
+save and on the Resumed Job, because the copy is written once (ADR 0127).
 Nothing recomputes a state from the model. The rows and their outcomes join
 the entry (ADR 0126). A Control the owner left out is listed with its reason
 (ADR 0124). The Markdown and the JSON export carry the section.

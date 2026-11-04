@@ -4148,7 +4148,7 @@ await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
   early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
   answered_early: [], answered_links: [], revision: 0,
-  carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES",
+  carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES", reason: "not-taken",
     key: ["store:old", "encryption_at_rest", "", "", "", ""] }],
   carried_dropped_links: [{ principal: "batch loader", element: "none" }] }) });
 const text = (n) => typeof n === "string" ? n
@@ -4212,6 +4212,87 @@ calls.push({{ said: text(ids.questions), earlier: text(ids.earlier) }});
         " 1 answer is not kept." in seen["said"]
     )
     assert "TLS 1.3 (from the earlier analysis)" in seen["earlier"]
+
+
+def test_the_page_marks_each_fact_a_control_writes():
+    """A Control's fact is marked with the Control's name, an own answer over
+    one shows the Control's value as "was", a fact no question asks is
+    listed, and the change review counts what the Controls answered (ADR
+    0125, #2155)."""
+
+    def row(element: str, attribute: str, value: str, origin: dict) -> dict:
+        key = [element, attribute, "", "", "", ""]
+        return {
+            "key": key,
+            "kind": "attribute",
+            "label": f"{element}: {attribute}",
+            "reasons": [],
+            "choices": [],
+            "form": "control",
+            "suggestions": [],
+            "max_length": 200,
+            "group": attribute,
+            "group_heading": f"{attribute}?",
+            "element": element,
+            "answer": {"key": key, "value": value},
+            "origin": origin,
+        }
+
+    def written(element: str, attribute: str, value: str, state: str) -> dict:
+        key = [element, attribute, "", "", "", ""]
+        return {
+            "control": "control-" + "a" * 32,
+            "name": "Encrypted",
+            "label": f"{element}: {attribute}",
+            "state": state,
+            "stated": "",
+            "answer": {"key": key, "value": value},
+        }
+
+    control = {"rung": "control", "control": "control-" + "a" * 32, "name": "Encrypted"}
+    payload = {
+        "run": "r1",
+        "link_questions": [],
+        "early_questions": [],
+        "early_stop": "nothing-left",
+        "framework_gates": {"asvs": "refuted"},
+        "answered_early": [
+            row("store:db", "encryption_at_rest", "AES-256", control),
+            row("store:log", "encryption_at_rest", "KMS", {"rung": "answer"}),
+        ],
+        "answered_links": [],
+        "revision": 0,
+        "control_facts": [
+            written("store:db", "encryption_at_rest", "AES-256", "written"),
+            written("store:log", "encryption_at_rest", "AES-256", "changed"),
+            written("store:db", "technology", "Postgres 16", "written"),
+        ],
+        "carried_dropped": [
+            {
+                "label": "DB: encryption at rest",
+                "value": "AES",
+                "reason": "control-states",
+                "key": ["store:db", "encryption_at_rest", "", "", "", ""],
+            }
+        ],
+    }
+    steps = f"""
+await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
+streams[0].listeners.questions({{ data: JSON.stringify({json.dumps(payload)}) }});
+const text = (n) => typeof n === "string" ? n
+  : [n.textContent || "", ...(n.children || []).map(text)].join("");
+calls.push({{ said: text(ids.questions), earlier: text(ids.earlier) }});
+"""
+    seen = next(c for c in _run_form_script(steps)["calls"] if "said" in c)
+    assert (
+        "2 facts are answered by a Control and marked under Your answers."
+        in (seen["said"])
+    )
+    assert "because a Control states the fact" in seen["said"]
+    assert "DB: encryption at rest \u2014 AES" in seen["said"]
+    assert "AES-256 (from Control Encrypted)" in seen["earlier"]
+    assert "KMS (was \u201cAES-256\u201d from Control Encrypted)" in seen["earlier"]
+    assert "Postgres 16 (from Control Encrypted)" in seen["earlier"]
 
 
 def test_the_pause_lists_what_the_description_says():
