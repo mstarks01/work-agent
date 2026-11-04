@@ -80,7 +80,7 @@ def count(samples: Iterable[Sample]) -> dict[str, dict[str, float]]:
         for refs in findings:
             for ref in refs:
                 named = ref.attribute or ref.question
-                if len(ref.spellings) == 1 and named and ref.element_id in types:
+                if ref.sound and named and ref.element_id in types:
                     cited[(types[ref.element_id], named)] += 1
     rates: dict[str, dict[str, float]] = {}
     for (kind, named), times in sorted(cited.items()):

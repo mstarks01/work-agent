@@ -431,6 +431,12 @@ class UnknownRef(BaseModel):
         return len(self.spellings) == 1
 
     @property
+    def mixed(self) -> bool:
+        """Whether this reference uses more than one spelling. A reference
+        that uses none is neither sound nor mixed."""
+        return len(self.spellings) > 1
+
+    @property
     def kind(self) -> Spelling:
         """Which of the five kinds of fact this reference names.
 

@@ -1776,6 +1776,18 @@ def _keys_a_crossing(node: ast.AST) -> bool:
     )
 
 
+def _counts_spellings(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Compare):
+        return False
+    return any(
+        isinstance(side, ast.Call)
+        and _calls(side, "len")
+        and side.args
+        and _loads_attribute(side.args[0], "spellings")
+        for side in (node.left, *node.comparators)
+    )
+
+
 def _finds_an_assumed_zone(node: ast.AST) -> bool:
     if not isinstance(node, ast.Compare):
         return False
@@ -2075,6 +2087,16 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "a decided crossing's endpoint key": _OneReader(
         _keys_a_crossing, ("evals/harness/modes.py", "_crossing_keys"), {}, ""
+    ),
+    "how many spellings a fact reference uses": _OneReader(
+        _counts_spellings,
+        ("src/analysis_service/claims.py", "sound"),
+        {
+            ("src/analysis_service/claims.py", "mixed"): (
+                "the other count of the same spellings: more than one"
+            ),
+        },
+        "",
     ),
     "an assumed trust zone": _OneReader(
         _finds_an_assumed_zone,
