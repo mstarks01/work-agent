@@ -199,8 +199,8 @@ elements it is unstated on. The
 attribute on the most elements comes first. Where the report asks about an
 element, an **Answer** link opens that question.
 
-**The complete export** — **Preview complete export**, above the findings,
-shows the whole report as one document: every finding open, each question with
+**The complete export** — the eye icon at the end of the tab row
+(**Preview complete export**) shows the whole report as one document: every finding open, each question with
 its history and the findings it informs, and About the analysis as an appendix.
 The export has no editor; it gives the report's address to answer the questions
 online. **Print or save as PDF** prints it, and **Close preview** returns the
@@ -221,8 +221,8 @@ shows its reason. The section reads the job's
 copy and the report's rulings, so a later edit of a Control changes nothing
 here.
 
-**Download as Markdown** and **Download as JSON**, beside the export button,
-send `GET /report/{run}/export.md` and `GET /report/{run}/export.json`. The
+The download icon at the end of the tab row opens a menu of **Download as
+Markdown** and **Download as JSON**. They send `GET /report/{run}/export.md` and `GET /report/{run}/export.json`. The
 Markdown file holds the findings, the findings ruled out and the Controls
 section. It escapes each value, so a value forms no Markdown markup, no HTML,
 no Markdown link and no GFM autolink. A viewer that links any bare domain name

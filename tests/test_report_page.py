@@ -64,6 +64,7 @@ globalThis.document = {
   createDocumentFragment: () => new Node("#fragment"),
   querySelector: () => new Node("query"),
   querySelectorAll: () => [],
+  addEventListener: () => {},
   body: new Node("body"),
 };
 globalThis.window = globalThis;
