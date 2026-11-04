@@ -978,8 +978,10 @@
         "skipped": "You skipped every question that is left. ",
         "nothing-left": "No question is left to ask. ",
       };
-      ready.textContent = emptyListReasons[data.early_stop]
-        + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
+      ready.textContent = data.asks === false
+        ? "This analysis asks no questions. Untick or resolve a Control, then choose Start the analysis."
+        : emptyListReasons[data.early_stop]
+          + "You can still change an answer below. Nothing runs until you choose Start the analysis.";
       intro.append(ready);
     }
     // What the pause leaves open (PauseSummary): never "everything is settled".

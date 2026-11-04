@@ -814,8 +814,8 @@ def question_set(
     early list; ``analyses`` ranks the report's list. So a waiting job passes
     no analyses, and a finished one's frameworks go unread. ``answered`` holds
     the saved answers, whose questions are not asked again. ``asks`` is
-    whether the analysis asks a person: neither the pause nor the report of
-    one that does not asks anything. ``final`` marks a report the follow-up wrote, and ``shown``
+    whether the analysis asks a person. The pause and the report of an
+    analysis that asks nobody ask nothing. ``final`` marks a report the follow-up wrote, and ``shown``
     is every early question the pause presented. ``skipped`` is every early
     question and link question the pause's submitter skipped for now; a
     report's list reads both to say what became of each question before the
@@ -1932,7 +1932,11 @@ class AnswerState:
         analysis that asks no questions takes no answer and no skip: its pause
         takes only a continue that unticks or resolves a Control (ADR 0125).
         """
-        own = not answers.given.empty or bool(answers.skips)
+        own = (
+            not answers.given.empty
+            or bool(answers.skips)
+            or answers.renames is not None
+        )
         if not self.asks and (own or not self.waiting):
             raise ValueError("this analysis asks no questions, so it takes no answers")
         self._check_revision(answers.revision, required=self.waiting or answers.save)

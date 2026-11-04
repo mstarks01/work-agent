@@ -406,7 +406,8 @@ lists your Controls under "Controls for this analysis", each one ticked. At
 the questions, the page shows what each Control matched in your description,
 and you confirm the match there. With the questions off, the service applies
 each Control's default match and continues at once. When it cannot apply them,
-the page shows the refusal at the questions.
+the page shows the refusal at the questions. That pause asks no question: untick
+or resolve a Control there, then choose **Start the analysis**.
 The report lists each Control with the facts it wrote and what became of each
 row. See [The Controls page](Web-App.md#the-controls-page).
 

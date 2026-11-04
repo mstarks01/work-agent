@@ -915,7 +915,9 @@ class TestTheAutomaticContinue:
         saved = owner.answer(child, revision=0, facts=[dict(FACT)], save=True)
         assert saved.status_code == 400
 
-    def test_a_paused_analysis_that_asks_nobody_takes_no_amendment(self, owner):
+    def test_a_paused_analysis_that_asks_nobody_takes_no_answer_and_no_amendment(
+        self, owner
+    ):
         aes = owner.keep("Encrypted", ORDERS_DB)
         kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
         run_id, frames = self.continued(owner, aes, kms)
