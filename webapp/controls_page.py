@@ -9,7 +9,7 @@ Control the store keeps.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from types import MappingProxyType
 from typing import get_args
@@ -22,8 +22,10 @@ from analysis_service.capabilities import CAPABILITIES
 from analysis_service.claims import UnknownRef
 from analysis_service.controls import (
     EVIDENCE_ID,
+    SCOPE_FACT_KINDS,
     Control,
     ControlDocument,
+    ControlFactKind,
     ControlLimits,
     ControlRow,
     ControlScope,
@@ -119,22 +121,33 @@ def _capability_facts() -> list[dict[str, object]]:
     ]
 
 
+#: The facts the page offers of each kind that a scope writes
+#: (:data:`~analysis_service.controls.SCOPE_FACT_KINDS`).
+_FACT_OFFERS: Mapping[
+    ControlFactKind, Callable[[ScopeType], list[dict[str, object]]]
+] = MappingProxyType(
+    {
+        "attribute": _attribute_facts,
+        "question": lambda scope_type: _question_facts(),
+        "capability": lambda scope_type: _capability_facts(),
+    }
+)
+
+
 def scope_types() -> list[dict[str, object]]:
     """Each scope type, with the facts a Control of that scope may write.
 
-    An element scope writes its type's attributes and a Question Kind about
-    the element; the whole application writes a Capability, which names no
-    element.
+    The kinds come from :data:`~analysis_service.controls.SCOPE_FACT_KINDS`.
     """
     return [
         {
             "type": scope_type,
             "label": label,
-            "facts": (
-                _capability_facts()
-                if scope_type == "application"
-                else [*_attribute_facts(scope_type), *_question_facts()]
-            ),
+            "facts": [
+                fact
+                for kind in sorted(SCOPE_FACT_KINDS[scope_type])
+                for fact in _FACT_OFFERS[kind](scope_type)
+            ],
         }
         for scope_type, label in SCOPE_LABELS.items()
     ]

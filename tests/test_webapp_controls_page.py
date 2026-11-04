@@ -127,8 +127,16 @@ class TestCreate:
             (
                 {"scope": {"type": "application"}},
                 (
-                    "The whole application has no attribute and no question of a"
-                    " part. Choose the part that the fact is about."
+                    "The whole application takes only a capability. Choose the"
+                    " part that an attribute or a question is about."
+                ),
+            ),
+            (
+                {"facts": [{"key": ["", "", "", "", "", "database"], "value": "yes"}]},
+                (
+                    "A part takes its attributes and the questions about it. A"
+                    " capability is a fact of the whole application: protect the"
+                    " whole application for it."
                 ),
             ),
             (
@@ -499,6 +507,24 @@ class TestTheReportSection:
             assert owner.client.get(f"/report/job-missing/{path}").status_code == 404
 
 
+@pytest.mark.parametrize(
+    ("value", "escaped"),
+    [
+        ("see https://evil.example/x", "see https\\://evil.example/x"),
+        ("www.evil.example", "www\\.evil.example"),
+        ("_www.evil.example", "\\_www\\.evil.example"),
+        ("*WWW.evil.example", "\\*WWW\\.evil.example"),
+        ("mail a@b.example", "mail a\\@b.example"),
+        ("[x](javascript:y) <b>", "\\[x\\](javascript:y) \\<b\\>"),
+        ("AES-256. Done.", "AES-256. Done."),
+    ],
+)
+def test_the_markdown_export_escapes_markup_and_autolinks(value, escaped):
+    from webapp.report_export import _text
+
+    assert _text(value) == escaped
+
+
 class TestTheTables:
     """Each table of the pages names each member of its set, so no value
     shows as ``undefined``."""
@@ -513,7 +539,7 @@ class TestTheTables:
         assert _table_keys("form_controls.js", "TYPES") == set(get_args(ScopeType))
         assert _table_keys("form_controls.js", "REASONS") == {
             *get_args(LeftOutReason),
-            *(reason for reason in get_args(CoverReason) if reason != "stated-zone"),
+            *get_args(CoverReason),
         }
         assert _table_keys("form_controls.js", "STATES") == set(get_args(UsedState))
 
@@ -528,3 +554,38 @@ class TestTheTables:
         assert set(SCOPE_LABELS) == set(get_args(ScopeType))
         assert set(EVIDENCE_LABELS) == set(get_args(EvidenceClass))
         assert set(ROW_MEANINGS) == set(get_args(RowOutcome))
+
+
+EVIDENCE = (
+    "rate_limit:\n"
+    "  enabled: true\n"
+    "  requests: 100 a minute for each client\n"
+    "waf: enabled\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("reason", "lines"),
+    [
+        ("The file says “requests: 100 a minute for each client”.", [3]),
+        ('The file says "waf: enabled" (waf.yaml).', [4]),
+        ("The file says `requests: 100 a minute for each client`.", [3]),
+        ("The file says ‘enabled: true’.", [2]),
+        ("It quotes “enabled”, a word of many lines.", []),
+        ("The file says waf: enabled, with no quotation.", []),
+        ("“waf: enabled” and again “waf: enabled”.", [4]),
+    ],
+)
+def test_an_evidence_line_counts_only_where_a_quotation_quotes_it(reason, lines):
+    from analysis_service.job_controls import CopiedEvidence, _quoted
+
+    file = CopiedEvidence.model_validate(
+        {
+            "id": f"evidence-{'0' * 32}",
+            "name": "waf.yaml",
+            "class": "config",
+            "sha256": "0" * 64,
+            "text": EVIDENCE,
+        }
+    )
+    assert sorted({line.line for line in _quoted(reason, [file])}) == lines

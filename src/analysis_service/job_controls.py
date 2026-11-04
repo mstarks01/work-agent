@@ -900,25 +900,28 @@ class SectionEntry(BaseModel):
     rows: list[SectionRow]
 
 
-#: A quotation in a ruling's reason: the text inside a pair of curly or
-#: straight double quotes.
-_QUOTATION = re.compile(r"“([^”]+)”|\"([^\"]+)\"")
+#: A quotation in a ruling's reason: the text inside a pair of double quotes,
+#: curly single quotes or backticks. A straight single quote is left out,
+#: because an apostrophe is one.
+_QUOTATION = re.compile(r"“([^”]+)”|\"([^\"]+)\"|‘([^’]+)’|`([^`]+)`")
 
 
 def _quotes(line: str, quotation: str) -> bool:
-    """Whether ``quotation`` quotes ``line``: the quotation stands in the
-    line, or the line stands in the quotation and is at least half of it."""
-    return quotation in line or (line in quotation and 2 * len(line) >= len(quotation))
+    """Whether ``quotation`` quotes ``line``: the shorter of the two stands in
+    the longer, and is at least three quarters as long."""
+    short, long = sorted((line, quotation), key=len)
+    return short in long and 4 * len(short) >= 3 * len(long)
 
 
 def _quoted(reason: str, evidence: Sequence[CopiedEvidence]) -> list[EvidenceLine]:
-    """Each line of ``evidence`` that a quotation of ``reason`` quotes, by file
-    and line. A line counts where its text, stripped, holds a letter or a
-    digit."""
+    """Each line of ``evidence`` that a quotation of ``reason`` quotes, once,
+    by file and line. A line counts where its text, stripped, holds a letter
+    or a digit. A reason that quotes nothing quotes no line."""
     quotations = [
-        (curly or straight).strip()
-        for curly, straight in _QUOTATION.findall(reason)
-        if (curly or straight).strip()
+        found.strip()
+        for groups in _QUOTATION.findall(reason)
+        for found in groups
+        if found.strip()
     ]
     lines = []
     for file in evidence:
@@ -984,12 +987,14 @@ def controls_section(
                     outcome=row_result,
                     meaning=ROW_MEANINGS[row_result],
                     rulings=ruled,
-                    quoted=[
-                        line
-                        for ruling in ruled
-                        if ruling.ruling == "applied"
-                        for line in _quoted(ruling.reason, copy.evidence)
-                    ],
+                    quoted=list(
+                        dict.fromkeys(
+                            line
+                            for ruling in ruled
+                            if ruling.ruling == "applied"
+                            for line in _quoted(ruling.reason, copy.evidence)
+                        )
+                    ),
                 )
             )
         entry = written.get(copy.id)

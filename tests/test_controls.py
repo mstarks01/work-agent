@@ -8,6 +8,7 @@ from typing import Any, get_args
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.capabilities import CAPABILITIES
 from analysis_service.controls import (
     MAX_CONTROL_ALIASES,
     MAX_CONTROL_FACTS,
@@ -191,8 +192,8 @@ class TestTheDocument:
             (
                 "facts",
                 [
-                    {"key": ["", "", "", f"subject {at}", "", ""], "value": "yes"}
-                    for at in range(MAX_CONTROL_FACTS + 1)
+                    {"key": ["", "", "", "", "", capability], "value": "yes"}
+                    for capability in list(CAPABILITIES)[: MAX_CONTROL_FACTS + 1]
                 ],
             ),
             (
@@ -204,8 +205,19 @@ class TestTheDocument:
         ],
     )
     def test_the_lists_take_fixed_bounds(self, field, items):
-        assert ControlDocument.model_validate(document(**{field: items[:-1]}))
-        assert f"{field}\n  List should have at most" in refusal(**{field: items})
+        # The whole application takes a Capability fact, so it holds enough
+        # facts to pass the bound.
+        changed = (
+            {"scope": {"type": "application", "name": "", "aliases": []}}
+            if field == "facts"
+            else {}
+        )
+        assert ControlDocument.model_validate(
+            document(**changed, **{field: items[:-1]})
+        )
+        assert f"{field}\n  List should have at most" in refusal(
+            **changed, **{field: items}
+        )
 
     def test_the_aliases_take_a_fixed_bound(self):
         aliases = [f"alias {at}" for at in range(MAX_CONTROL_ALIASES + 1)]

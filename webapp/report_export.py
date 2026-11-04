@@ -2,8 +2,8 @@
 
 The file holds each framework's findings, the findings it ruled out, and the
 report's Controls section. Each value a submitter, an owner or a model wrote
-is escaped, so it reads as text in any Markdown viewer and forms no markup,
-no link and no autolink.
+is escaped, so it forms no Markdown markup, no HTML, no Markdown link and no
+GFM autolink. A viewer that links any bare domain name can still link one.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ _MARKUP = re.compile(r"([\\`*_\[\]<>#|!~&])")
 #: The character that lets a viewer make an autolink of a URL, a ``www.``
 #: name or an email address: the colon before ``//``, the dot after ``www``
 #: and the ``@``.
-_AUTOLINK = re.compile(r"(?i):(?=//)|(?<=\bwww)\.|@")
+_AUTOLINK = re.compile(r"(?i):(?=//)|(?<=www)\.|@")
 
 
 def _text(value: str) -> str:

@@ -15,6 +15,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from types import MappingProxyType
 from typing import Literal, Self, TypeVar
 
 from pydantic import (
@@ -53,6 +54,43 @@ MAX_CONTROL_ALIASES = 20
 #: or one Element of these types by name (ADR 0124). A flow is not a scope: its
 #: identity is two endpoints and a label, so a name alone is not its ID.
 ScopeType = Literal["application", "entity", "process", "store", "boundary"]
+
+#: The kinds of fact a Control writes: a subject or an assertion is a question
+#: of one job, so no Control writes one.
+ControlFactKind = Literal["attribute", "question", "capability"]
+
+#: The kinds of fact a Control of each scope writes (ADR 0125). A part takes
+#: its attributes and the Question Kinds about it; the whole application takes
+#: a Capability, which names no element. The document refuses another kind,
+#: and the Controls page offers these.
+SCOPE_FACT_KINDS: Mapping[ScopeType, frozenset[ControlFactKind]] = MappingProxyType(
+    {
+        "application": frozenset({"capability"}),
+        "entity": frozenset({"attribute", "question"}),
+        "process": frozenset({"attribute", "question"}),
+        "store": frozenset({"attribute", "question"}),
+        "boundary": frozenset({"attribute", "question"}),
+    }
+)
+
+_PART_REFUSAL = (
+    "A part takes its attributes and the questions about it. A capability is a"
+    " fact of the whole application: protect the whole application for it."
+)
+
+#: Why a document is refused for a fact of another kind, by scope.
+SCOPE_FACT_REFUSALS: Mapping[ScopeType, str] = MappingProxyType(
+    {
+        "application": (
+            "The whole application takes only a capability. Choose the part that"
+            " an attribute or a question is about."
+        ),
+        "entity": _PART_REFUSAL,
+        "process": _PART_REFUSAL,
+        "store": _PART_REFUSAL,
+        "boundary": _PART_REFUSAL,
+    }
+)
 
 _Name = Field(default="", max_length=MAX_LABEL_CHARS)
 
@@ -206,18 +244,14 @@ class ControlDocument(BaseModel):
         if any(key_ref(fact.key).element_id for fact in self.facts):
             raise ValueError("A fact of a Control names no element: the scope does.")
         refs = [key_ref(fact.key) for fact in self.facts]
-        if any(ref.attribute == ZONE_ATTRIBUTE for ref in refs):
+        if ZONE_ATTRIBUTE in {ref.attribute for ref in refs}:
             raise ValueError(
                 "A Control places no element, so it writes no trust_zone. Protect"
                 " the zone instead."
             )
-        if self.scope.type == "application" and any(
-            ref.attribute or ref.question for ref in refs
-        ):
-            raise ValueError(
-                "The whole application has no attribute and no question of a part."
-                " Choose the part that the fact is about."
-            )
+        for ref in refs:
+            if ref.kind not in SCOPE_FACT_KINDS[self.scope.type]:
+                raise ValueError(SCOPE_FACT_REFUSALS[self.scope.type])
         for key in _repeated(fact.key for fact in self.facts):
             ref = key_ref(key)
             name = (
