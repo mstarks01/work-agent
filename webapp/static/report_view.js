@@ -1376,11 +1376,8 @@
   }
   // The two downloads: the report as Markdown and as JSON, each with the
   // Controls section.
-  for (const [format, text] of [["md", "Download as Markdown"], ["json", "Download as JSON"]]) {
-    const link = el("a", "toggle download-link", text);
-    link.href = `/report/${encodeURIComponent(R.job.id)}/export.${format}`;
-    link.download = `report.${format}`;
-    $("export-preview").before(link, " ");
+  for (const format of ["md", "json"]) {
+    $(`export-${format}`).href = `/report/${encodeURIComponent(R.job.id)}/export.${format}`;
   }
 
   // ---- About the analysis -----------------------------------------------------
