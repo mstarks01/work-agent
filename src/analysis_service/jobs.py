@@ -567,6 +567,11 @@ class JobRecord(BaseModel):
         stops = self.ask_questions or self.continues_at_pause
         return stops and self.resumption is None
 
+    def waits_to_continue(self) -> bool:
+        """Whether this job waits at its pause for the continue the service
+        makes at once (ADR 0125)."""
+        return self.continues_at_pause and self.status == "awaiting-answers"
+
     def final(self) -> bool:
         """Whether this job's report is final: the one follow-up wrote it (ADR 0054)."""
         return is_follow_up(self.resumption)

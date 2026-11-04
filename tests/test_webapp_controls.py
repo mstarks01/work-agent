@@ -926,6 +926,18 @@ class TestTheAutomaticContinue:
         assert states(asyncio.run(owner.store.get(child)))[0][0] == "Encrypted"
         assert owner.runner.heads == 1
 
+    def test_a_manual_continue_takes_the_refusal_away(self, owner):
+        aes = owner.keep("Encrypted", ORDERS_DB)
+        kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
+        run_id, frames = self.continued(owner, aes, kms)
+        assert "refusal" in frames["questions"]
+        owner.runner.fails = True
+        untick = [{"control": aes, "element": "store:orders-db"}]
+        started = owner.answer(run_id, revision=0, control_scopes=untick)
+        assert started.status_code == 200, started.text
+        assert ran(owner.client, started.json()["run"]) == "failed"
+        assert "refusal" not in owner.questions(run_id)
+
     def test_an_admission_refusal_leaves_the_job_paused(self, owner, monkeypatch):
         reserve = owner.store.reserve
         reserved = []

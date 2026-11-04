@@ -859,7 +859,7 @@ class JobAnswers:
         :meth:`answer` raises it, and the job stays paused.
         """
         record = await self.envelope(job_id, owner_id)
-        if record.continues_at_pause and record.status == "awaiting-answers":
+        if record.waits_to_continue():
             await self.answer(
                 job_id, owner_id, Answers(revision=record.revision), start=start
             )

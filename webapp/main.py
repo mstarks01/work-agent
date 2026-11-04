@@ -447,6 +447,10 @@ class Workspace:
             task = asyncio.create_task(
                 self._run(answers, record, runner, deadline_seconds, stop)
             )
+            # A Resumed Job answers its parent, so a refusal of an earlier
+            # continue of that parent no longer holds.
+            if record.resumption is not None:
+                self._refusals.pop(record.resumption.parent_id, None)
             # Held so the task is not garbage-collected mid-flight, and so
             # :meth:`stop` can reach it.
             self._runs[record.id] = (task, stop)
@@ -495,8 +499,6 @@ class Workspace:
                 if job_id in held
             }
             self._refusals[record.id] = words
-        else:
-            self._refusals.pop(record.id, None)
 
     async def settled(self, job_id: str) -> None:
         """Wait for the task of ``job_id`` to end, where this process runs
@@ -1472,7 +1474,8 @@ def _cross_origin(request: Request) -> JSONResponse | None:
 
 async def _refused(status: int, request: Request, exc: Exception) -> JSONResponse:
     fields = exc.fields() if isinstance(exc, Refused) else {}
-    return JSONResponse({"message": str(exc), **fields}, status_code=status)
+    words = _refusal_message(exc) or _NOT_STARTED
+    return JSONResponse({"message": words, **fields}, status_code=status)
 
 
 #: What the page says where this app cannot start a job and the reason is in
@@ -2173,10 +2176,8 @@ def create_app(
         )
         # While the service continues a job at its pause, the page shows the
         # continue rather than the questions (ADR 0125).
-        payload["continuing"] = (
-            record.continues_at_pause
-            and record.status == "awaiting-answers"
-            and workspace.continuing(record.id)
+        payload["continuing"] = record.waits_to_continue() and workspace.continuing(
+            record.id
         )
         if payload["continuing"]:
             asked = None
@@ -2638,7 +2639,7 @@ async def _stream(
     if record is None:
         return
     status = record.status
-    if status == "awaiting-answers" and record.continues_at_pause:
+    if record.waits_to_continue():
         # The service continues the job at once (ADR 0125). The page follows
         # the Resumed Job, or shows the pause with the refusal.
         yield _frame("continuing", {})
