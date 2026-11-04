@@ -95,7 +95,15 @@ def submit(client, *, questions: bool) -> str:
 
 
 def completed(client) -> str:
-    run = submit(client, questions=False)
+    """The report of an analysis that asks: its pause, continued with no
+    answers, so the report offers its follow-up."""
+    paused = submit(client, questions=True)
+    assert ran(client, paused) == "awaiting-answers"
+    continued = client.post(
+        f"/answer/{paused}", json={"revision": 0}, headers=SAME_ORIGIN
+    )
+    assert continued.status_code == 200, continued.text
+    run = continued.json()["run"]
     assert ran(client, run) == "completed"
     return run
 

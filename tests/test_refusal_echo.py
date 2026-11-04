@@ -35,6 +35,7 @@ from tests.test_webapp import SAME_ORIGIN, posted
 from tests.test_webapp_questions import (
     FACT,
     PausingRunner,
+    asking_report,
     client_for,
     ran,
     start,
@@ -159,7 +160,10 @@ V1_CASES = {
 def _finished(store) -> str:
     """A finished report that asks a free-text fact and a closed one, in ``store``."""
     record = JobRecord.create(
-        owner_id="alice", sources=[DESCRIPTION], frameworks=sample_selection()
+        ask_questions=True,
+        owner_id="alice",
+        sources=[DESCRIPTION],
+        frameworks=sample_selection(),
     )
     record.transition("running")
     transport = UnknownRef(
@@ -275,8 +279,7 @@ def _run(client, state: str | None) -> str:
         run = start(client, questions=True)
         assert ran(client, run) == "awaiting-answers"
         return run
-    finished = start(client, questions=False)
-    assert ran(client, finished) == "completed"
+    finished = asking_report(client)
     if state == "finished":
         return finished
     final = client.post(

@@ -81,6 +81,7 @@ class TestTheResumedRun:
     def resumed_job(self) -> JobRecord:
         links = [LINK]
         record = JobRecord.create(
+            ask_questions=True,
             owner_id="idp|user-1",
             sources=with_link_answers([Source.description(DESCRIPTION_TEXT)], links),
             frameworks=sample_selection(),
@@ -137,6 +138,7 @@ def test_the_builder_refuses_an_assertion_pass_on_a_resumed_graph():
 class TestTheAnswersRoute:
     def completed(self, store, subject="alice", assertions=True, links=()):
         record = JobRecord.create(
+            ask_questions=True,
             owner_id=subject,
             sources=with_link_answers(
                 [Source.description(DESCRIPTION_TEXT)], list(links)
@@ -233,6 +235,7 @@ class TestTheAnswersRoute:
 def test_a_resumption_is_absent_on_an_ordinary_job():
     """The field is optional, so every record written before it still loads."""
     record = JobRecord.create(
+        ask_questions=True,
         owner_id="a",
         sources=[Source.description("an app")],
         frameworks=sample_selection(),
