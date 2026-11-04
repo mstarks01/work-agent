@@ -767,6 +767,10 @@ STATE_LINK_ANSWERS = "link_answers"
 # attribute answer is already written onto the seeded model; ``prepare``
 # writes the assertion answers over the open rows they answer.
 STATE_FACT_ANSWERS = "fact_answers"
+# Each fact a Control writes, with the Control's name (ADR 0125), seeded the
+# same way. Each is one line of the answers Source, which ``prepare`` composes
+# again so that each quote reads that text.
+STATE_CONTROL_LINES = "control_lines"
 
 #: The job-wide state keys ``analyze.md`` templates, which every lane of every
 #: framework reads as one value. With :data:`LANE_ARTIFACTS` and ``{lane}`` they
@@ -868,6 +872,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_FRAMEWORK_OPTIONS,
         STATE_LINK_ANSWERS,
         STATE_FACT_ANSWERS,
+        STATE_CONTROL_LINES,
         STATE_REPAIR_BASELINE,
         STATE_MODEL_REPAIR,
     }
@@ -1776,13 +1781,17 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
         FactAnswer.model_validate(fact, context=STORED)
         for fact in state.get(STATE_FACT_ANSWERS) or []
     ]
+    controls = [
+        (name, FactAnswer.model_validate(fact, context=STORED))
+        for name, fact in state.get(STATE_CONTROL_LINES) or []
+    ]
     if held is not None or links or facts:
         # The submitter's answers settle what they answer, so they are written
         # over whatever the node proposed and gated with the rest. A held
         # record is gated only after that: a resumed job's catalog holds its
         # parent's answered rows, and their quotes read the answers Source the
         # parent composed until this run writes them again.
-        linked, unplaced = apply_answers(record.catalog, model, links, facts)
+        linked, unplaced = apply_answers(record.catalog, model, links, facts, controls)
         record = AssertionRecord.over(
             linked,
             model,

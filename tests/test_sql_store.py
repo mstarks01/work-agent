@@ -34,7 +34,7 @@ from analysis_service.api import create_app
 from analysis_service.carried_renames import ElementRename
 from analysis_service.certification import CertifyResult
 from analysis_service.fact_answers import FactAnswer
-from analysis_service.job_controls import AppliedScope
+from analysis_service.job_controls import AppliedScope, ControlFact, ControlFacts
 from analysis_service.jobs import (
     GENERIC_FAILURE_MESSAGE,
     RESTART_FAILURE_MESSAGE,
@@ -545,6 +545,17 @@ def every_field(owner_id: str = "alice") -> JobRecord:
     record.control_scopes = [
         AppliedScope(
             control=CONTROL_ID, outcome="matched-by-name", element="store:orders-db"
+        )
+    ]
+    record.control_facts = [
+        ControlFacts(
+            control=CONTROL_ID,
+            name="Encrypted",
+            facts=[
+                ControlFact(
+                    answer=FactAnswer(key=KEY, value="TLS 1.3"), state="written"
+                )
+            ],
         )
     ]
     record.checkpoint = held

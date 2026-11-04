@@ -98,6 +98,16 @@ from analysis_service.fact_answers import (
 )
 from analysis_service.fact_writes import answered_model, check_fact_answers
 from analysis_service.frameworks import PACKAGES, PreconditionResult
+from analysis_service.job_controls import (
+    ControlFacts,
+    ControlResolution,
+    CopiedControl,
+    control_answers,
+    control_facts,
+    control_lines,
+    refuse_disagreement,
+    with_own_answers,
+)
 from analysis_service.links import (
     MAX_HELD_LINKS,
     MAX_LINK_ANSWERS,
@@ -108,6 +118,7 @@ from analysis_service.links import (
     fold_principal,
     link_questions,
     resumed_sources,
+    with_link_answers,
 )
 from analysis_service.open_facts import (
     CAPABILITY_GROUP,
@@ -197,7 +208,21 @@ EARLY_RULES: Mapping[EarlyKind, EarlyRule] = {
 EmptyListReason = Literal["budget-exhausted", "below-floor", "skipped", "nothing-left"]
 
 #: Why a carried fact answer is not taken (:meth:`Carried.reason`, ADR 0116).
-CarriedReason = Literal["missing-element", "not-taken"]
+CarriedReason = Literal["missing-element", "not-taken", "control-states"]
+
+#: Where an answer a job holds comes from, the highest rung first (ADR 0125).
+Rung = Literal["correction", "draft", "answer", "control", "carried"]
+
+
+@dataclass(frozen=True)
+class FactOrigin:
+    """The rung of one held answer. A Control's rung names the Control by its
+    ID and its name."""
+
+    rung: Rung
+    control: str = ""
+    name: str = ""
+
 
 #: Why a question is not in the recommended list (ADR 0078). A client maps
 #: each one to its own words. ``parent-undecided`` and ``gate-undecided``
@@ -1496,6 +1521,8 @@ class SavedAnswers:
     skipped: tuple[SkipKey, ...]
     revision: int
     renames: tuple[ElementRename, ...] = ()
+    #: What each applied Control writes, with each fact's state (ADR 0125).
+    control_facts: tuple[ControlFacts, ...] = ()
 
 
 #: The label an amendment's description carries, with the lowest number after
@@ -1519,12 +1546,17 @@ class Carried:
     #: For each element a dropped answer names and the model does not have,
     #: the elements a rename can map it to.
     choices: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    #: Each fact the job's Controls write (ADR 0125).
+    controlled: frozenset[UnknownKey] = frozenset()
 
     def reason(self, fact: FactAnswer) -> CarriedReason:
-        """Why a dropped fact is not taken: ``missing-element`` where it names
-        an element the model does not have, and ``not-taken`` where the job's
-        questions refuse it, because the sources state the fact or no
-        question asks it."""
+        """Why a dropped fact is not taken: ``control-states`` where a
+        Control writes it, ``missing-element`` where it names an element the
+        model does not have, and ``not-taken`` where the job's questions
+        refuse it, because the sources state the fact or no question asks
+        it."""
+        if fact.key in self.controlled:
+            return "control-states"
         if key_ref(fact.key).element_id in self.choices:
             return "missing-element"
         return "not-taken"
@@ -1613,6 +1645,8 @@ class ResumedJob:
     skipped: tuple[SkipKey, ...]
     checkpoint: Checkpoint
     follow_up: bool
+    #: What each applied Control writes, with each fact's state (ADR 0125).
+    control_facts: tuple[ControlFacts, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1657,6 +1691,14 @@ class AnswerState:
     carried_in: AnswerSet = NO_ANSWERS
     #: The owner's renames of the elements the carried answers name (ADR 0116).
     renames: tuple[ElementRename, ...] = ()
+    #: The job's copy of its Controls, and the resolution a save stated for
+    #: each, or ``None`` where each copy takes its default (ADR 0124).
+    controls: tuple[CopiedControl, ...] = ()
+    scopes: tuple[ControlResolution, ...] | None = None
+    #: What the job row holds of what each Control writes. A report reads
+    #: it, because its model holds each Control fact written already; a
+    #: waiting job reads its Controls against its model.
+    stored_facts: tuple[ControlFacts, ...] | None = None
 
     def _question_set(self, answers: AnswerSet) -> QuestionSet:
         assertions = self.checkpoint.assertions
@@ -1674,6 +1716,64 @@ class AnswerState:
         )
 
     @cached_property
+    def control_facts(self) -> tuple[ControlFacts, ...]:
+        """What each applied Control writes, with its state against the
+        job's own answers (ADR 0125)."""
+        if self.waiting:
+            base = control_facts(
+                self.controls,
+                self.scopes,
+                self.checkpoint.system_model,
+                None
+                if self.checkpoint.assertions is None
+                else self.checkpoint.assertions.catalog,
+            )
+        else:
+            base = list(self.stored_facts or ())
+        return tuple(with_own_answers(base, self.answers.facts))
+
+    @cached_property
+    def controlled(self) -> AnswerSet:
+        """The Control rung: every fact the Controls write."""
+        return control_answers(self.control_facts)
+
+    def own(self, answers: AnswerSet) -> AnswerSet:
+        """``answers`` without each fact as a Control wrote it, so a later
+        save that unticks the Control takes the fact away (ADR 0125).
+
+        An answer that differs from the Control's stays, and
+        :func:`~analysis_service.job_controls.with_own_answers` marks it
+        ``changed`` by its key alone."""
+        written = {fact.key: fact for fact in self.controlled.facts}
+        own = tuple(fact for fact in answers.facts if written.get(fact.key) != fact)
+        return answers.model_copy(update={"facts": own})
+
+    def _controls_of(self, own: AnswerSet) -> tuple[ControlFacts, ...]:
+        return tuple(with_own_answers(self.control_facts, own.facts))
+
+    def fact_origin(self, key: UnknownKey) -> FactOrigin | None:
+        """The rung the held answer to ``key`` comes from, or ``None`` where
+        the job holds none.
+
+        **The one reader of a fact's rung** (ADR 0125): a correction, a
+        draft, an own answer, a Control with its ID, or a carried answer.
+        """
+        rungs: tuple[tuple[Rung, Sequence[FactAnswer]], ...] = (
+            ("correction", self.corrections),
+            ("draft", self.draft.written().facts),
+            ("answer", self.answers.facts),
+        )
+        for rung, facts in rungs:
+            if any(fact.key == key for fact in facts):
+                return FactOrigin(rung)
+        for entry in self.control_facts:
+            if any(fact.key == key for fact in entry.writes()):
+                return FactOrigin("control", entry.control, entry.name)
+        if any(fact.key == key for fact in self.carried.taken.facts):
+            return FactOrigin("carried")
+        return None
+
+    @cached_property
     def carried(self) -> Carried:
         """The carried answers this job's questions take, and those they do not.
 
@@ -1689,6 +1789,7 @@ class AnswerState:
         base = self._question_set(self.answers)
         saved = {answer.key for answer in self.answers.facts}
         placed = {fold_principal(link.principal) for link in self.answers.links}
+        controlled = frozenset(fact.key for fact in self.controlled.facts)
         facts = [a for a in carried.facts if a.key not in saved]
         links = [
             link
@@ -1696,7 +1797,9 @@ class AnswerState:
             if fold_principal(link.principal) not in placed
         ]
         taken_facts = tuple(
-            a for a in facts if self._admits(base, SentAnswers(facts=(a,)))
+            a
+            for a in facts
+            if a.key not in controlled and self._admits(base, SentAnswers(facts=(a,)))
         )
         taken_links = tuple(
             link for link in links if self._admits(base, SentAnswers(links=(link,)))
@@ -1711,6 +1814,7 @@ class AnswerState:
             choices=rename_choices(
                 self.carried_in, self.checkpoint.system_model, self.renames
             ),
+            controlled=controlled,
         )
 
     def _admits(self, base: QuestionSet, given: SentAnswers) -> bool:
@@ -1724,14 +1828,15 @@ class AnswerState:
 
     @property
     def held(self) -> AnswerSet:
-        """Every answer this job holds: the carried ones its questions take,
-        under the ones its own saves gave."""
-        return self.answers.over(self.carried.taken)
+        """Every answer this job holds: the ones its own saves gave, over each
+        fact its Controls write, over the carried ones its questions take."""
+        return self.answers.over(self.controlled.over(self.carried.taken))
 
     @cached_property
     def questions(self) -> QuestionSet:
-        """Every question this job asks."""
-        if self.carried.taken.empty:
+        """Every question this job asks. A fact a Control writes is answered,
+        so it is not asked."""
+        if self.carried.taken.empty and self.controlled.empty:
             return self._question_set(self.answers)
         return self._question_set(self.held)
 
@@ -1806,6 +1911,13 @@ class AnswerState:
         the job holds no sources to bound, as an eval replay of saves.
         """
         self._check_revision(answers.revision, required=self.waiting or answers.save)
+        if self.waiting:
+            assertions = self.checkpoint.assertions
+            refuse_disagreement(
+                self.control_facts,
+                self.checkpoint.system_model,
+                None if assertions is None else assertions.catalog,
+            )
         if answers.renames is not None:
             if not (self.waiting and answers.save):
                 raise ValueError("only a save to a waiting job sends renames")
@@ -1821,6 +1933,7 @@ class AnswerState:
                     skipped=tuple(self.skipped),
                     revision=self.revision,
                     renames=renaming.renames,
+                    control_facts=self.control_facts,
                 )
             return renaming.answer(replace(answers, renames=None), limits=limits)
         if (
@@ -1838,6 +1951,7 @@ class AnswerState:
                 skipped=tuple(self.skipped),
                 revision=self.revision,
                 renames=self.renames,
+                control_facts=self.control_facts,
             )
         given = answers.given
         if not self.waiting:
@@ -1852,10 +1966,19 @@ class AnswerState:
             skips=answers.skips,
             presented=answers.presented,
         )
-        held = within_held_limits(admitted.answers)
+        held = within_held_limits(self.own(admitted.answers))
+        controls = self._controls_of(held)
+        # The answers Source holds each Control fact on a line that names the
+        # Control, as the run composes it again (ADR 0125).
+        sources = with_link_answers(
+            [source for source in admitted.sources if source.kind != "answers"],
+            held.links,
+            held.over(control_answers(controls)).facts,
+            control_lines(controls),
+        )
         # Checked for a save too: saved answers or a draft that no start could
         # run would hold the job until the submitter shortens an answer.
-        breach = None if limits is None else limits.breach(admitted.sources)
+        breach = None if limits is None else limits.breach(sources)
         if breach is not None:
             raise SourcesOverLimit(breach)
         if answers.save and not self.waiting:
@@ -1867,14 +1990,16 @@ class AnswerState:
                 skipped=admitted.skipped,
                 revision=self.revision,
                 renames=self.renames,
+                control_facts=controls,
             )
         return ResumedJob(
-            sources=admitted.sources,
+            sources=sources,
             answers=held,
             shown=admitted.shown,
             skipped=admitted.skipped,
             checkpoint=self.checkpoint,
             follow_up=not self.waiting,
+            control_facts=controls,
         )
 
     def correct(

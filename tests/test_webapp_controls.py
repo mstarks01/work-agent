@@ -16,9 +16,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.controls import Control, ControlDocument
+from analysis_service.fact_answers import FactAnswer
+from analysis_service.graph import STATE_CONTROL_LINES, STATE_FACT_ANSWERS
 from analysis_service.job_answers import JobAnswers
 from analysis_service.job_controls import NOT_COPIED
 from analysis_service.jobs import Checkpoint, InMemoryJobStore, PipelineAwaiting
+from analysis_service.links import with_link_answers
+from analysis_service.pipeline import _seeded_state
 from analysis_service.principals import Identity, Principal
 from analysis_service.sources import text_digest
 from analysis_service.system_model import Assumption, DataStore, TrustBoundary
@@ -106,7 +110,9 @@ class Owner:
         assert held is not None
         return held.owner_id
 
-    def keep(self, name: str, scope: dict, *, rows=None, identity=OPERATOR) -> str:
+    def keep(
+        self, name: str, scope: dict, *, rows=None, facts=None, identity=OPERATOR
+    ) -> str:
         """Keep a Control of ``scope`` with one evidence file, and return its ID."""
         text = f"{name}: on\n"
         evidence_id = f"evidence-{uuid4().hex}"
@@ -115,7 +121,7 @@ class Owner:
                 "id": f"control-{uuid4().hex}",
                 "name": name,
                 "scope": {"name": "", "aliases": []} | scope,
-                "facts": [fact()],
+                "facts": [fact()] if facts is None else facts,
                 "rows": [row()] if rows is None else rows,
                 "evidence": [
                     {
@@ -166,6 +172,23 @@ class Owner:
 
     def offer(self, run_id: str) -> dict[str, dict]:
         return {entry["name"]: entry for entry in self.questions(run_id)["controls"]}
+
+    def answer(self, run_id: str, **body):
+        return self.client.post(f"/answer/{run_id}", json=body, headers=SAME_ORIGIN)
+
+    def resumed(self, run_id: str, revision: int = 0, **body) -> str:
+        """Continue ``run_id``, and return the Resumed Job once it ran."""
+        started = self.answer(run_id, revision=revision, **body)
+        assert started.status_code == 200, started.text
+        child = started.json()["run"]
+        assert ran(self.client, child) == "completed"
+        return child
+
+    def answers_source(self, run_id: str) -> list[str]:
+        held = asyncio.run(self.store.get(run_id))
+        assert held is not None
+        [source] = [one for one in held.whole_sources() if one.kind == "answers"]
+        return source.text.splitlines()
 
     def save(self, run_id: str, scopes: list[dict], revision: int = 0):
         return self.client.post(
@@ -403,23 +426,18 @@ class TestTheSubmission:
         assert [copy.document.name for copy in copies] == ["SSO"]
         assert copies[0].evidence[0].text == "SSO: on\n"
 
-    def test_a_job_that_does_not_pause_lists_the_default(self, owner):
+    def test_a_submission_with_controls_and_no_questions_is_refused(self, owner):
         sso = owner.keep("SSO", {"type": "application"})
-        billing = owner.keep("Billing", {"type": "process", "name": "Billing"})
-        started = owner.submit(sso, billing, questions=False)
-        assert started.status_code == 200, started.text
-        run_id = started.json()["run"]
-        assert ran(owner.client, run_id) == "completed"
-        used = owner.client.get(f"/workspace/runs/{run_id}").json()["controls_used"]
-        assert [(entry["name"], entry["state"]) for entry in used] == [
-            ("SSO", "applied"),
-            ("Billing", "left-out"),
-        ]
+        refused = owner.submit(sso, questions=False)
+        assert refused.status_code == 400
+        assert refused.json()["message"] == (
+            "Controls apply at the pause; turn the questions on to apply them."
+        )
 
     def test_a_job_that_serves_no_model_lists_each_control_pending(self, owner):
         sso = owner.keep("SSO", {"type": "application"})
         owner.runner.fails = True
-        started = owner.submit(sso, questions=False)
+        started = owner.submit(sso)
         assert started.status_code == 200, started.text
         run_id = started.json()["run"]
         assert ran(owner.client, run_id) == "failed"
@@ -428,9 +446,11 @@ class TestTheSubmission:
 
     def test_a_withheld_report_lists_each_control_pending(self, owner, monkeypatch):
         sso = owner.keep("SSO", {"type": "application"})
-        started = owner.submit(sso, questions=False)
-        assert started.status_code == 200, started.text
-        run_id = started.json()["run"]
+        resumed = owner.client.post(
+            f"/answer/{owner.paused(sso)}", json={"revision": 0}, headers=SAME_ORIGIN
+        )
+        assert resumed.status_code == 200, resumed.text
+        run_id = resumed.json()["run"]
         assert ran(owner.client, run_id) == "completed"
         monkeypatch.setattr(JobAnswers, "withheld", lambda self, record: object())
         used = owner.client.get(f"/workspace/runs/{run_id}").json()["controls_used"]
@@ -596,3 +616,175 @@ class TestV1:
         held = asyncio.run(store.get(job_id))
         assert held.controls == []
         assert held.control_scopes is None
+
+
+DB_KEY = ["store:orders-db", "encryption_at_rest", "", "", "", ""]
+CLASS_KEY = ["store:orders-db", "data_classification", "", "", "", ""]
+DB_LINE = (
+    'The encryption_at_rest of store:orders-db is "AES-256". From the Control'
+    ' "Encrypted".'
+)
+
+
+def states(record) -> list[tuple]:
+    return [
+        (entry.name, list(fact.answer.key), fact.answer.value, fact.state, fact.stated)
+        for entry in record.control_facts
+        for fact in entry.facts
+    ]
+
+
+def answered(questions: dict) -> dict[str, dict]:
+    return {row["label"]: row for row in questions["answered_early"]}
+
+
+class TestTheFacts:
+    """A Control fills only an open fact, on the rung between an own answer
+    and a carried answer (ADR 0125, #2155)."""
+
+    def test_an_open_fact_is_written_and_a_stated_fact_is_recorded(self, owner):
+        db = owner.keep(
+            "Encrypted",
+            ORDERS_DB,
+            facts=[fact(), fact("data_classification", "restricted")],
+        )
+        child = owner.resumed(owner.paused(db))
+        held = asyncio.run(owner.store.get(child))
+        assert states(held) == [
+            ("Encrypted", DB_KEY, "AES-256", "written", ""),
+            ("Encrypted", CLASS_KEY, "restricted", "stated", "confidential"),
+        ]
+        assert owner.answers_source(child) == [DB_LINE]
+        assert held.answers.facts == ()
+        assert [list(fact.key) for fact in held.written_answers().facts] == [DB_KEY]
+
+    def test_a_control_fact_is_not_asked_and_is_marked(self, owner):
+        run_id = owner.paused(owner.keep("Encrypted", ORDERS_DB))
+        questions = owner.questions(run_id)
+        assert DB_KEY not in [row["key"] for row in questions["early_questions"]]
+        row = answered(questions)["Is data stored in Orders DB encrypted?"]
+        assert row["answer"]["value"] == "AES-256"
+        assert row["origin"]["rung"] == "control"
+        assert row["origin"]["name"] == "Encrypted"
+
+    def test_an_own_answer_lies_over_the_control_fact(self, owner):
+        run_id = owner.paused(owner.keep("Encrypted", ORDERS_DB))
+        saved = owner.answer(
+            run_id, save=True, revision=0, facts=[{"key": DB_KEY, "value": "KMS"}]
+        )
+        assert saved.status_code == 200, saved.text
+        row = answered(owner.questions(run_id))[
+            "Is data stored in Orders DB encrypted?"
+        ]
+        assert (row["answer"]["value"], row["origin"]["rung"]) == ("KMS", "answer")
+        assert states(asyncio.run(owner.store.get(run_id))) == [
+            ("Encrypted", DB_KEY, "AES-256", "changed", "")
+        ]
+        child = owner.resumed(run_id, revision=1)
+        held = asyncio.run(owner.store.get(child))
+        assert states(held)[0][3] == "changed"
+        assert owner.answers_source(child) == [
+            DB_LINE,
+            'The encryption_at_rest of store:orders-db is "KMS".',
+        ]
+        assert [fact.value for fact in held.written_answers().facts] == ["KMS"]
+
+    def test_an_unknown_answer_takes_the_fact_back_for_the_job(self, owner):
+        run_id = owner.paused(owner.keep("Encrypted", ORDERS_DB))
+        child = owner.resumed(run_id, facts=[{"key": DB_KEY, "value": "unknown"}])
+        held = asyncio.run(owner.store.get(child))
+        assert states(held)[0][3] == "changed"
+        assert [fact.value for fact in held.written_answers().facts] == ["unknown"]
+
+    def test_the_follow_up_cannot_take_a_control_fact_back(self, owner):
+        child = owner.resumed(owner.paused(owner.keep("Encrypted", ORDERS_DB)))
+        refused = owner.answer(
+            child, revision=0, facts=[{"key": DB_KEY, "value": "unknown"}]
+        )
+        assert refused.status_code == 400
+        assert "an earlier answer settled this fact" in refused.json()["message"]
+
+    def test_two_controls_with_two_values_are_refused(self, owner):
+        aes = owner.keep("Encrypted", ORDERS_DB)
+        kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
+        run_id = owner.paused(aes, kms)
+        message = (
+            "Two Controls write “encryption_at_rest” on Orders DB with two values:"
+            " “AES-256” and “KMS”. Untick one, or edit one Control so that they"
+            " agree."
+        )
+        both = [
+            {"control": control, "element": "store:orders-db"} for control in (aes, kms)
+        ]
+        for body in ({"save": True, "control_scopes": both}, {}):
+            refused = owner.answer(run_id, revision=0, **body)
+            assert refused.status_code == 400
+            assert refused.json()["message"] == message
+        untick = [{"control": aes, "element": "store:orders-db"}]
+        saved = owner.answer(run_id, revision=0, save=True, control_scopes=untick)
+        assert saved.status_code == 200, saved.text
+
+    def test_two_controls_with_one_value_are_both_writers(self, owner):
+        aes = owner.keep("Encrypted", ORDERS_DB)
+        again = owner.keep("Encrypted again", ORDERS_DB)
+        child = owner.resumed(owner.paused(aes, again))
+        held = asyncio.run(owner.store.get(child))
+        assert [(state[0], state[3]) for state in states(held)] == [
+            ("Encrypted", "written"),
+            ("Encrypted again", "written"),
+        ]
+        assert owner.answers_source(child) == [
+            DB_LINE,
+            DB_LINE.replace('"Encrypted"', '"Encrypted again"'),
+        ]
+
+    def test_an_untick_takes_the_control_fact_away(self, owner):
+        run_id = owner.paused(owner.keep("Encrypted", ORDERS_DB))
+        saved = owner.answer(run_id, save=True, revision=0, control_scopes=[])
+        assert saved.status_code == 200, saved.text
+        questions = owner.questions(run_id)
+        assert DB_KEY in [row["key"] for row in questions["early_questions"]]
+        assert questions["control_facts"] == []
+
+    def test_a_carried_answer_to_a_control_fact_is_dropped(self, owner):
+        first = owner.paused()
+        saved = owner.answer(
+            first, save=True, revision=0, facts=[{"key": DB_KEY, "value": "KMS"}]
+        )
+        assert saved.status_code == 200, saved.text
+        db = owner.keep("Encrypted", ORDERS_DB)
+        started = owner.submit(db, answers_from=first)
+        assert started.status_code == 200, started.text
+        child = started.json()["run"]
+        assert ran(owner.client, child) == "awaiting-answers"
+        questions = owner.questions(child)
+        assert [
+            (row["key"], row["reason"]) for row in questions["carried_dropped"]
+        ] == [(DB_KEY, "control-states")]
+        row = answered(questions)["Is data stored in Orders DB encrypted?"]
+        assert (row["answer"]["value"], row["origin"]["rung"]) == ("AES-256", "control")
+
+    def test_the_run_composes_the_answers_source_of_the_resumed_job(self, owner):
+        run_id = owner.paused(owner.keep("Encrypted", ORDERS_DB))
+        flow = ["flow:process:web-app>store:orders-db>store-order"]
+        own = {"key": [*flow, "encryption_in_transit", "", "", "", ""], "value": "TLS"}
+        job = asyncio.run(owner.store.get(owner.resumed(run_id, facts=[own])))
+        [source] = [one for one in job.sources if one.kind == "answers"]
+        seeded = _seeded_state(job)
+        [composed] = with_link_answers(
+            [],
+            [],
+            [FactAnswer.model_validate(one) for one in seeded[STATE_FACT_ANSWERS]],
+            [
+                (name, FactAnswer.model_validate(one))
+                for name, one in seeded[STATE_CONTROL_LINES]
+            ],
+        )
+        assert composed.text == source.text
+        assert source.text.splitlines()[0] == DB_LINE
+
+    def test_a_value_the_fact_cannot_hold_is_refused_with_the_control(self, owner):
+        weak = owner.keep("Weak", ORDERS_DB, facts=[fact(value="not encrypted")])
+        refused = owner.answer(owner.paused(weak), revision=0)
+        assert refused.status_code == 400
+        assert refused.json()["message"].startswith("The Control “Weak” cannot apply:")

@@ -46,6 +46,7 @@ from analysis_service.graph import (
     ENTRY_HEAD_ONLY,
     ENTRY_RESUME,
     STATE_ASSERTION_CATALOG,
+    STATE_CONTROL_LINES,
     STATE_FACT_ANSWERS,
     STATE_FRAMEWORK_OPTIONS,
     STATE_LINK_ANSWERS,
@@ -56,6 +57,7 @@ from analysis_service.graph import (
     Rejected,
     paused_at,
 )
+from analysis_service.job_controls import control_lines
 from analysis_service.jobs import (
     Checkpoint,
     JobRecord,
@@ -65,7 +67,7 @@ from analysis_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
-from analysis_service.links import LinkAnswer
+from analysis_service.links import ControlLines, LinkAnswer
 from analysis_service.report import (
     InputRef,
     Job,
@@ -237,6 +239,7 @@ def answered_state(
     model: SystemModel | None,
     links: Sequence[LinkAnswer],
     facts: Sequence[FactAnswer],
+    controls: ControlLines = (),
 ) -> dict[str, Any]:
     """The state a run starts from with a submitter's answers.
 
@@ -245,11 +248,13 @@ def answered_state(
     each attribute answer written in, or ``None`` for a run that extracts its
     own. The catalog pass reads the link and fact answers: it writes each
     assertion answer over its open row, and removes every unscoped row that
-    reaches an answered attribute.
+    reaches an answered attribute. ``controls`` are the Control lines of the
+    answers Source (:func:`~analysis_service.links.with_link_answers`).
     """
     state: dict[str, Any] = {
         STATE_LINK_ANSWERS: [link.model_dump() for link in links],
         STATE_FACT_ANSWERS: [fact.model_dump() for fact in facts],
+        STATE_CONTROL_LINES: [[name, fact.model_dump()] for name, fact in controls],
     }
     if model is not None:
         state[STATE_VALID_MODEL] = answered_model(model, facts).model_dump(mode="json")
@@ -264,10 +269,12 @@ def _seeded_state(job: JobRecord) -> dict[str, Any]:
     reads its own. A job that starts from its sources carries only its answers.
     """
     held = None if job.resumption is None else job.resumption.checkpoint
+    controls = job.control_facts or []
     seeded = answered_state(
         None if held is None else held.system_model,
         job.answers.links,
-        job.answers.facts,
+        job.written_answers().facts,
+        control_lines(controls),
     )
     if held is not None and held.assertions is not None:
         seeded[STATE_ASSERTION_CATALOG] = held.assertions.model_dump(mode="json")

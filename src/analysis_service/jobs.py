@@ -74,7 +74,12 @@ from analysis_service.controls import (
 )
 from analysis_service.execution import GraphFailed
 from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer, SkipKey
-from analysis_service.job_controls import ControlResolution, CopiedControl
+from analysis_service.job_controls import (
+    ControlFacts,
+    ControlResolution,
+    CopiedControl,
+    control_answers,
+)
 from analysis_service.links import MAX_HELD_LINKS
 from analysis_service.owner_files import FileAdmission, OwnerFile
 from analysis_service.principals import Identity, Principal, PrincipalTable
@@ -202,6 +207,7 @@ RECORD_FIELDS: dict[str, EnvelopeHold] = {
     "carried_renames": "same-schema",
     "controls": "never",
     "control_scopes": "same-schema",
+    "control_facts": "same-schema",
     "ask_questions": "always",
     "checkpoint": "never",
     "status": "always",
@@ -440,6 +446,10 @@ class JobRecord(BaseModel):
     # The resolution of each copy that a pause save stated (ADR 0124), or
     # ``None`` where no save stated one and each copy takes its default.
     control_scopes: list[ControlResolution] | None = None
+    # The facts each applied Control writes, with each fact's state (ADR
+    # 0125), as a pause save or the Resumed Job stated them, or ``None``
+    # where no save stated them yet.
+    control_facts: list[ControlFacts] | None = None
     # Whether this job stops after its assertion pass to ask a person, and
     # waits for the answers. Off unless a submission asks for it, so an
     # autonomous run never waits.
@@ -492,6 +502,7 @@ class JobRecord(BaseModel):
         carried: AnswerSet = NO_ANSWERS,
         controls: Sequence[CopiedControl] = (),
         control_scopes: Sequence[ControlResolution] | None = None,
+        control_facts: Sequence[ControlFacts] | None = None,
         ask_questions: bool = False,
         reserved_tokens: int = 0,
     ) -> Self:
@@ -514,6 +525,7 @@ class JobRecord(BaseModel):
             carried=carried,
             controls=list(controls),
             control_scopes=None if control_scopes is None else list(control_scopes),
+            control_facts=None if control_facts is None else list(control_facts),
             ask_questions=ask_questions,
             created_at=now,
             updated_at=now,
@@ -555,13 +567,21 @@ class JobRecord(BaseModel):
         submission names this job (ADR 0079) or an amendment starts from it
         (ADR 0072). A final report's corrections lie over a report's draft,
         the draft over the answers the job's run read or its pause saved, and
-        those over every answer the job carried under its renames, a dropped
-        one included. Nothing is checked here: the job that carries them
-        checks each one against its own questions.
+        those over each fact the job's Controls write, and those over every
+        answer the job carried under its renames, a dropped one included.
+        Nothing is checked here: the job that carries them checks each one
+        against its own questions.
         """
         corrected = AnswerSet(facts=tuple(self.corrections))
         carried = renamed(self.carried, self.carried_renames)
-        return corrected.over(self.draft.written().over(self.answers.over(carried)))
+        return corrected.over(
+            self.draft.written().over(self.written_answers().over(carried))
+        )
+
+    def written_answers(self) -> AnswerSet:
+        """The answers this job's run writes: its own answers over each fact
+        its Controls write (ADR 0125)."""
+        return self.answers.over(control_answers(self.control_facts or []))
 
     def selection(self) -> tuple[FrameworkName, ...]:
         """This job's frameworks by name, in selection order.
@@ -901,6 +921,7 @@ class JobStore(Protocol):
         *,
         renames: Sequence[ElementRename],
         control_scopes: Sequence[ControlResolution] | None,
+        control_facts: Sequence[ControlFacts] | None,
     ) -> bool: ...
 
     async def save_corrections(
@@ -1509,13 +1530,15 @@ class InMemoryJobStore:
         *,
         renames: Sequence[ElementRename],
         control_scopes: Sequence[ControlResolution] | None,
+        control_facts: Sequence[ControlFacts] | None,
     ) -> bool:
         """Keep the saved answers of a job that still waits for them.
 
         ``shown`` is every early question the pause has shown, ``skipped``
         every one its submitter skipped for now, ``renames`` every rename
         of a carried answer's element (ADR 0116), and ``control_scopes`` the
-        resolution of each copied Control (ADR 0124). ``revision`` is the
+        resolution of each copied Control (ADR 0124), and ``control_facts``
+        what each applied Control writes (ADR 0125). ``revision`` is the
         revision the save read: the check and the next revision are one step,
         so of two saves that read one revision only the first lands. Only these
         change, so the checkpoint an envelope read leaves
@@ -1538,6 +1561,7 @@ class InMemoryJobStore:
         record.skipped_early = list(skipped)
         record.carried_renames = list(renames)
         record.control_scopes = None if control_scopes is None else list(control_scopes)
+        record.control_facts = None if control_facts is None else list(control_facts)
         record.updated_at = datetime.now(UTC)
         return True
 

@@ -24,6 +24,7 @@ _JSON_COLUMNS = (
     "carried",
     "carried_renames",
     "control_scopes",
+    "control_facts",
     "checkpoint",
     "validation_issues",
     "certification",

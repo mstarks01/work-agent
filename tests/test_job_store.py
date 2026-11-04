@@ -37,7 +37,12 @@ from analysis_service.controls import (
     EvidenceRefusal,
 )
 from analysis_service.fact_answers import FactAnswer
-from analysis_service.job_controls import CopiedControl, LeftOutScope
+from analysis_service.job_controls import (
+    ControlFact,
+    ControlFacts,
+    CopiedControl,
+    LeftOutScope,
+)
 from analysis_service.jobs import (
     NON_LOCKING_STATUSES,
     RECORD_FIELDS,
@@ -836,7 +841,15 @@ class TestTheParentLock:
         parent = waiting(store)
         assert asyncio.run(
             store.save_answers(
-                parent, "alice", NO_ANSWERS, [], [], 0, renames=(), control_scopes=None
+                parent,
+                "alice",
+                NO_ANSWERS,
+                [],
+                [],
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
             )
         )
         stale = reserve(store, amendment(parent, revision=0))
@@ -895,6 +908,7 @@ class TestTheParentLock:
                     0,
                     renames=(),
                     control_scopes=None,
+                    control_facts=None,
                 ),
                 reserving(store, amendment(parent, revision=0)),
             )
@@ -919,6 +933,7 @@ class TestTheSaves:
                     revision,
                     renames=(),
                     control_scopes=None,
+                    control_facts=None,
                 )
             )
 
@@ -931,7 +946,15 @@ class TestTheSaves:
         given = AnswerSet(facts=(FactAnswer(key=KEY, value="unknown"),))
         assert asyncio.run(
             store.save_answers(
-                job, "alice", given, [KEY], [], 0, renames=(), control_scopes=None
+                job,
+                "alice",
+                given,
+                [KEY],
+                [],
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
             )
         )
         saved = asyncio.run(store.get(job))
@@ -944,19 +967,43 @@ class TestTheSaves:
         job = waiting(store)
         assert not asyncio.run(
             store.save_answers(
-                job, "mallory", NO_ANSWERS, [], [], 0, renames=(), control_scopes=None
+                job,
+                "mallory",
+                NO_ANSWERS,
+                [],
+                [],
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
             )
         )
         done = completed(store)
         assert not asyncio.run(
             store.save_answers(
-                done, "alice", NO_ANSWERS, [], [], 0, renames=(), control_scopes=None
+                done,
+                "alice",
+                NO_ANSWERS,
+                [],
+                [],
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
             )
         )
         asyncio.run(admit(store, amendment(job)))
         assert not asyncio.run(
             store.save_answers(
-                job, "alice", NO_ANSWERS, [], [], 0, renames=(), control_scopes=None
+                job,
+                "alice",
+                NO_ANSWERS,
+                [],
+                [],
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
             )
         )
         assert asyncio.run(store.get(job)).revision == 0
@@ -1079,16 +1126,41 @@ class TestTheControlsCopy:
         key = object_key("alice", record.id, "controls.json")
         assert asyncio.run(objects.get(key)) is None
 
-    def test_a_save_keeps_the_resolution(self, store):
+    def test_a_save_keeps_the_resolution_and_the_fact_states(self, store):
         job = waiting(store)
         stated = [LeftOutScope(control=CONTROL_ID, reason="unticked")]
+        facts = [
+            ControlFacts(
+                control=CONTROL_ID,
+                name="Encrypted",
+                facts=[
+                    ControlFact(
+                        answer=FactAnswer(
+                            key=("store:db", "encryption_at_rest", "", "", "", ""),
+                            value="AES-256",
+                        ),
+                        state="stated",
+                        stated="KMS",
+                    )
+                ],
+            )
+        ]
         assert asyncio.run(
             store.save_answers(
-                job, "alice", NO_ANSWERS, [], [], 0, renames=(), control_scopes=stated
+                job,
+                "alice",
+                NO_ANSWERS,
+                [],
+                [],
+                0,
+                renames=(),
+                control_scopes=stated,
+                control_facts=facts,
             )
         )
-        assert asyncio.run(store.get(job)).control_scopes == stated
-        assert asyncio.run(store.owned(job, "alice")).control_scopes == stated
+        for read in (store.get(job), store.owned(job, "alice")):
+            record = asyncio.run(read)
+            assert (record.control_scopes, record.control_facts) == (stated, facts)
 
 
 class TestTheSaveContract:
@@ -1904,7 +1976,15 @@ class TestTheSchemaVersion:
         asyncio.run(store.save(record))
         assert asyncio.run(
             store.save_answers(
-                job, "alice", NO_ANSWERS, (), (), 0, renames=(), control_scopes=None
+                job,
+                "alice",
+                NO_ANSWERS,
+                (),
+                (),
+                0,
+                renames=(),
+                control_scopes=None,
+                control_facts=None,
             )
         )
         reads = [
