@@ -38,7 +38,11 @@ pentest, on shape alone.
 **The neutral part is a list of answers in the `FactAnswer` shape.** The scope
 supplies the element, so an answer in a Control carries no element ID. A
 Control can write a protective control attribute or a Question Kind row about
-its part: each states a protection. It writes no Capability and no attribute
+its part, and only in the answer that makes it a protection: the exposure
+`internal`, a known encryption at rest, or the answer that each Question Kind
+or facet names in `protects`. The service refuses an answer that states a
+weakness, such as "the internet can reach it", or that states nothing, such as
+"unknown" or "none". It writes no Capability and no attribute
 that describes the system, because those say what the application does, not
 what protects it, and the description states them. The
 neutral part names no framework, so every Framework Package reads it through

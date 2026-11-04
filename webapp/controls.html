@@ -30,7 +30,7 @@
   .editor { display:grid; gap:16px; margin:16px 0 28px; }
   .editor h2 { margin:0; font-size:20px; overflow-wrap:anywhere; }
   .editor input[type=text], .editor select { width:100%; }
-  .editor .line { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1.4fr); gap:12px; align-items:start; }
+  .editor .line { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1.4fr); gap:12px; align-items:end; }
   @media (max-width:900px) { .editor .line { grid-template-columns:minmax(0,1fr); } }
   .editor .q-card { border:1px solid var(--line); border-radius:10px; padding:0; margin:0; }
   .editor .q-card > .card-head { position:relative; display:flex; align-items:center; gap:4px; min-height:52px; box-sizing:border-box; margin:0 0 12px; padding:6px 16px 6px 24px; border-bottom:1px solid var(--line); }
@@ -43,6 +43,15 @@
   .lines { list-style:none; padding:0; margin:6px 0 0; display:grid; }
   .lines li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; padding:8px 0; border-top:1px solid var(--line); font-size:14px; overflow-wrap:anywhere; }
   .lines li:first-child { border-top:0; }
+  .editor .lines:empty { display:none; }
+  .editor .lines:empty + .add-line { margin-top:0; padding-top:0; border-top:0; }
+  .statements { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr)); gap:16px 28px; }
+  .statements fieldset { border:0; padding:0; margin:0; min-width:0; }
+  .statements legend { padding:0; margin-bottom:6px; font-size:13px; font-weight:600; color:var(--muted); }
+  .statements ul { list-style:none; padding:0; margin:0; display:grid; gap:6px; }
+  .statements label { display:flex; gap:8px; align-items:flex-start; font-size:14px; line-height:1.4; font-weight:400; }
+  .statements label input { flex:none; margin-top:2px; }
+  .statements .how { margin:6px 0 0 24px; width:calc(100% - 24px); }
   .lines li button { min-height:0; padding:2px 6px; font-size:13px; }
   .add-line { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto; gap:10px; align-items:end; margin-top:8px; padding-top:12px; border-top:1px solid var(--line); }
   .add-line .facets { display:grid; gap:6px; }

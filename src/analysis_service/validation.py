@@ -475,6 +475,14 @@ UNCERTAIN_CONTROL_LEADS: frozenset[str] = frozenset(
 )
 
 
+def ambiguous_lead(value: str) -> str | None:
+    """The word a control value opens with where it is an ambiguous or an
+    uncertain lead, or ``None``. **The one reader of which leads a control
+    value may not open with**: the gate sends such a value to repair, and a
+    Control refuses it."""
+    return leading_word(value, AMBIGUOUS_CONTROL_LEADS | UNCERTAIN_CONTROL_LEADS)
+
+
 def _ambiguous_control_issues(element: Element) -> list[ValidationIssue]:
     """Every control whose leading word is a negation other than ``none``, or a doubt.
 
@@ -494,10 +502,7 @@ def _ambiguous_control_issues(element: Element) -> list[ValidationIssue]:
         # sentinels, so "where a word ends" has one answer: ``no-mfa`` and
         # ``no/unknown`` open with ``no`` here exactly as ``none;`` opens with
         # ``none`` there.
-        lead = leading_word(
-            str(getattr(element, attribute)),
-            AMBIGUOUS_CONTROL_LEADS | UNCERTAIN_CONTROL_LEADS,
-        )
+        lead = ambiguous_lead(str(getattr(element, attribute)))
         if lead is not None:
             issues.append(
                 ValidationIssue(

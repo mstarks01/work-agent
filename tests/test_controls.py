@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from analysis_service.analysis import CONTROL_ATTRIBUTES
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.controls import (
+    ATTRIBUTE_STATEMENTS,
     MAX_CONTROL_ALIASES,
     MAX_CONTROL_FACTS,
     MAX_CONTROL_ROWS,
@@ -29,6 +30,7 @@ from analysis_service.job_controls import CopiedControl
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
 from analysis_service.sources import text_digest
 from analysis_service.system_model import (
+    CONTROL_VALUE_MAX_CHARS,
     ElementPrefix,
     ZonedElement,
     attribute_names,
@@ -236,6 +238,58 @@ class TestTheDocument:
         scope = {"type": scope_type, "name": name, "aliases": []}
         held = ["", key, "", "", "", "" if key else "websocket"]
         assert message in refusal(scope=scope, facts=[{"key": held, "value": "yes"}])
+
+    @pytest.mark.parametrize(
+        ("attribute", "question", "answer"),
+        [
+            ("exposure", "", {"value": "internet-facing"}),
+            ("encryption_at_rest", "", {"value": "unknown"}),
+            ("encryption_at_rest", "", {"value": "none"}),
+            ("encryption_at_rest", "", {"value": "not encrypted"}),
+            ("encryption_at_rest", "", {"value": "TBD"}),
+            ("", "physical-access", {"value": "yes"}),
+            ("", "destination", {"value": "no"}),
+            ("", "stored-copy-access", {"facets": {"encrypted": "no"}}),
+            ("", "reachability", {"facets": {"internet": "yes"}}),
+            ("", "update-process", {"facets": {"scheduled": "unknown"}}),
+            ("", "update-process", {"facets": {"tested": "not applicable"}}),
+        ],
+    )
+    def test_an_answer_that_states_no_protection_is_refused(
+        self, attribute, question, answer
+    ):
+        # A Control states what protects the part. A harmful or an empty
+        # answer states a weakness or nothing.
+        fact = {"key": ["", attribute, "", "", question, ""], **answer}
+        assert "A Control states only a protection." in refusal(facts=[fact])
+
+    @pytest.mark.parametrize(
+        ("attribute", "question", "answer"),
+        [
+            ("exposure", "", {"value": "internal"}),
+            ("encryption_at_rest", "", {"value": "AES-256 by the KMS"}),
+            ("", "physical-access", {"value": "no"}),
+            ("", "destination", {"value": "yes"}),
+            ("", "reachability", {"facets": {"internet": "no"}}),
+            ("", "update-process", {"facets": {"scheduled": "yes", "tested": "yes"}}),
+        ],
+    )
+    def test_a_protective_answer_is_kept(self, attribute, question, answer):
+        fact = {"key": ["", attribute, "", "", question, ""], **answer}
+        assert ControlDocument.model_validate(document(facts=[fact]))
+
+    def test_a_value_longer_than_the_part_holds_is_refused(self):
+        # The model's attribute holds CONTROL_VALUE_MAX_CHARS, so a longer
+        # value would fail when the job writes it.
+        fact = {"key": ["", "encryption_at_rest", "", "", "", ""]}
+        held = "AES-256 " + "k" * (CONTROL_VALUE_MAX_CHARS - 8)
+        assert ControlDocument.model_validate(document(facts=[fact | {"value": held}]))
+        assert "the most the part holds" in refusal(
+            facts=[fact | {"value": held + "k"}]
+        )
+
+    def test_each_protective_attribute_has_a_statement(self):
+        assert set(ATTRIBUTE_STATEMENTS) == set(PROTECTIVE_ATTRIBUTES)
 
     def test_the_aliases_take_a_fixed_bound(self):
         aliases = [f"alias {at}" for at in range(MAX_CONTROL_ALIASES + 1)]

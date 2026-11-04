@@ -208,6 +208,11 @@ def answer_limit(key: UnknownKey, model: SystemModel) -> int:
     own, the line the answer writes into the answers Source, and an
     attribute's field on its element. The line keeps room for the longest
     detail, so an answer at the limit takes any detail beside it.
+
+    A Control's fact names no element, so it cannot ask this. The Control
+    document and the Controls page bound an attribute value at
+    :data:`~analysis_service.system_model.CONTROL_VALUE_MAX_CHARS`, the bound
+    of the attribute's own field.
     """
     widest = FactAnswer(key=key, value="x", detail="x" * MAX_DETAIL_CHARS)
     bounds = [
