@@ -529,19 +529,38 @@ def shown_controls(
     **The one reader of what a draft is shown** (ADR 0126): the critic view
     renders it, and the review seam checks the rulings against it.
     """
-    if not controls:
-        return []
-    holding = package.units_holding(package.control_unit_of(draft))
     shown = []
     for control in controls:
-        rows = [
-            row
-            for row in control.rows
-            if row.framework == package.name and row.unit in holding
-        ]
+        rows = _rows_on(draft, package, control)
         if rows and control.reaches(draft.affected_element_ids):
             shown.append(control.model_copy(update={"rows": rows}))
     return shown
+
+
+def _rows_on(
+    draft: Claim, package: FrameworkPackage, control: AppliedControl
+) -> list[CopiedRow]:
+    """Each row of ``control`` on the draft's unit or on a unit that holds it."""
+    holding = package.units_holding(package.control_unit_of(draft))
+    return [
+        row
+        for row in control.rows
+        if row.framework == package.name and row.unit in holding
+    ]
+
+
+def unreached_rows(
+    claims: Iterable[Claim], package: FrameworkPackage, control: AppliedControl
+) -> frozenset[str]:
+    """The unit of each row of ``control`` that a claim sits on, where the
+    scope does not reach the claim's elements, so the critic did not see the
+    row on it."""
+    return frozenset(
+        row.unit
+        for claim in claims
+        if not shown_controls(claim, package, [control])
+        for row in _rows_on(claim, package, control)
+    )
 
 
 def covered_units(
@@ -565,8 +584,9 @@ def covered_units(
 RowVerdict = Literal["applied", "refused"]
 
 #: What became of one row over a job: it covered a draft, the critic refused
-#: it on every draft it was shown, or no draft was shown it.
-RowOutcome = Literal["applied", "refused", "no-finding"]
+#: it on every draft it was shown, a finding on its unit lay outside the
+#: scope, or no draft was shown it.
+RowOutcome = Literal["applied", "refused", "not-reached", "no-finding"]
 
 
 class RowRuling(BaseModel):
@@ -606,12 +626,13 @@ def row_rulings(
     return rulings
 
 
-def row_outcome(rulings: Sequence[RowRuling]) -> RowOutcome:
+def row_outcome(rulings: Sequence[RowRuling], *, unreached: bool) -> RowOutcome:
     """**The one reader of a row's outcome** (ADR 0126): ``applied`` where a
-    ruling applied it, ``refused`` where every ruling refused it, and
-    ``no-finding`` where it has none."""
+    ruling applied it, ``refused`` where every ruling refused it. A row with
+    no ruling is ``not-reached`` where ``unreached`` says a finding on its
+    unit lay outside the scope, and ``no-finding`` where none did."""
     if not rulings:
-        return "no-finding"
+        return "not-reached" if unreached else "no-finding"
     if any(ruling.ruling == "applied" for ruling in rulings):
         return "applied"
     return "refused"
@@ -826,6 +847,11 @@ ROW_MEANINGS: Mapping[RowOutcome, str] = MappingProxyType(
             "Refused: the critic judged that this Control does not show what each"
             " finding on the unit calls missing, so the findings stand."
         ),
+        "not-reached": (
+            "Not reached: each finding on this unit names no part that this"
+            " Control protects, so the critic did not judge this row and the"
+            " findings stand."
+        ),
         "no-finding": (
             "No finding: no draft on this unit reached the critic with this row,"
             " so nothing was ruled."
@@ -946,6 +972,12 @@ def controls_section(
         [entry for block in blocks for entry in block.returned_claims],
     )
     written = {entry.control: entry for entry in facts or ()}
+    unreached = {
+        (control.id, unit)
+        for control in applied_controls(copies, scopes, model)
+        for block in blocks
+        for unit in unreached_rows(block.claims, PACKAGES[block.framework], control)
+    }
     entries = []
     for copy, resolution in zip(
         copies, resolutions(copies, scopes, model), strict=True
@@ -966,7 +998,7 @@ def controls_section(
         rows = []
         for row in copy.rows:
             ruled = rulings.get(ControlRowRef(control=copy.id, unit=row.unit), [])
-            row_result = row_outcome(ruled)
+            row_result = row_outcome(ruled, unreached=(copy.id, row.unit) in unreached)
             package = PACKAGES.get(cast(FrameworkName, row.framework))
             rows.append(
                 SectionRow(

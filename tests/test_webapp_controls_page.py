@@ -364,6 +364,9 @@ class TestThePage:
             "tampering",
         }
         assert payload["limits"]["max_controls"] == LIMITS.max_controls
+        # A STRIDE finding always names a part; an ASVS finding may name none.
+        assert payload["units"]["stride"]["names_a_part"] is True
+        assert payload["units"]["asvs"]["names_a_part"] is False
 
     def test_the_sidebar_lists_controls_between_files_and_settings(self, owner):
         page = owner.client.get("/controls").text

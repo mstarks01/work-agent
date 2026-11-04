@@ -33,9 +33,9 @@
   .editor .line { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1.4fr); gap:12px; align-items:start; }
   @media (max-width:900px) { .editor .line { grid-template-columns:minmax(0,1fr); } }
   .editor .q-card { border:1px solid var(--line); border-radius:10px; padding:0; margin:0; }
-  .editor .q-card > h3 { font-size:17px; line-height:1.35; font-weight:600; margin:0; padding:16px 24px 13px; letter-spacing:-.015em; }
-  .editor .q-card > h3::after { content:""; display:block; height:1px; background:var(--line); margin-top:12px; }
-  .editor .q-card > :not(h3) { margin-left:24px; margin-right:24px; }
+  .editor .q-card > .card-head { position:relative; display:flex; align-items:center; gap:4px; min-height:52px; box-sizing:border-box; margin:0 0 12px; padding:6px 16px 6px 24px; border-bottom:1px solid var(--line); }
+  .editor .q-card > .card-head h3 { font-size:17px; line-height:1.35; font-weight:600; margin:0; letter-spacing:-.015em; }
+  .editor .q-card > :not(.card-head) { margin-left:24px; margin-right:24px; }
   .editor .q-card > :last-child { margin-bottom:18px; }
   .editor .hint { margin:0 0 4px; max-width:75ch; }
   .aliases { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }

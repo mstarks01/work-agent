@@ -34,12 +34,14 @@ from analysis_service.job_controls import (
     CopiedControl,
     RowRuling,
     applied_controls,
+    controls_section,
     row_outcome,
     row_rulings,
+    unreached_rows,
 )
 from analysis_service.sources import text_digest
 from analysis_service.system_model import SystemModel
-from tests.factories import sample_draft, valid_model
+from tests.factories import sample_analysis, sample_draft, sample_threat, valid_model
 
 DB_CONTROL = "control-" + "d" * 32
 APP_CONTROL = "control-" + "a" * 32
@@ -349,7 +351,7 @@ class TestTheRowOutcome:
             RowRuling(claim="b", ruling="applied", reason="yes"),
         ]
 
-        assert row_outcome(rulings) == "applied"
+        assert row_outcome(rulings, unreached=False) == "applied"
 
     def test_a_row_refused_on_every_ruling_is_refused(self):
         rulings = [
@@ -357,10 +359,69 @@ class TestTheRowOutcome:
             RowRuling(claim="b", ruling="refused", reason="no"),
         ]
 
-        assert row_outcome(rulings) == "refused"
+        assert row_outcome(rulings, unreached=False) == "refused"
 
     def test_a_row_with_no_ruling_found_nothing(self):
-        assert row_outcome([]) == "no-finding"
+        assert row_outcome([], unreached=False) == "no-finding"
+
+    def test_a_row_with_no_ruling_and_a_finding_it_missed_is_not_reached(self):
+        assert row_outcome([], unreached=True) == "not-reached"
+
+    def test_a_ruling_outweighs_a_finding_the_row_missed(self):
+        rulings = [RowRuling(claim="a", ruling="applied", reason="yes")]
+
+        assert row_outcome(rulings, unreached=True) == "applied"
+
+
+class TestTheUnreachedRows:
+    """A row misses a finding on its unit that the Control's scope does not
+    reach, and the report says so in place of "no finding"."""
+
+    def test_a_finding_on_no_element_misses_a_part_scope(self):
+        [control] = _applied(_db(_row("V11.2.1")))
+
+        unreached = unreached_rows([_asvs_draft("V11.2.1")], PACKAGES["asvs"], control)
+
+        assert unreached == {"V11.2.1"}
+
+    def test_a_finding_on_another_element_misses_a_part_scope(self):
+        [control] = _applied(_db(_row("V11.2")))
+
+        drafts = [_asvs_draft("V11.2.1", "process:web-app")]
+
+        assert unreached_rows(drafts, PACKAGES["asvs"], control) == {"V11.2"}
+
+    def test_a_finding_the_scope_reaches_is_not_missed(self):
+        [control] = _applied(_db(_row("V11.2.1")))
+
+        drafts = [_asvs_draft("V11.2.1", "store:orders-db")]
+
+        assert unreached_rows(drafts, PACKAGES["asvs"], control) == frozenset()
+
+    def test_the_application_reaches_a_finding_on_no_element(self):
+        [control] = _applied(_app(_row("V11.2.1")))
+
+        drafts = [_asvs_draft("V11.2.1")]
+
+        assert unreached_rows(drafts, PACKAGES["asvs"], control) == frozenset()
+
+    def test_the_report_says_a_row_that_missed_a_finding_is_not_reached(self):
+        db = _db(_row("spoofing", "stride"), _row("tampering", "stride"))
+        block = sample_analysis([sample_threat("spoofing")])
+
+        [entry] = controls_section([db], None, None, valid_model(), [block])
+
+        outcomes = {row.unit: (row.outcome, row.meaning) for row in entry.rows}
+        assert outcomes["spoofing"][0] == "not-reached"
+        assert outcomes["spoofing"][1].startswith("Not reached")
+        assert outcomes["tampering"][0] == "no-finding"
+
+    def test_a_finding_on_another_unit_misses_no_row(self):
+        [control] = _applied(_db(_row("V11.2.1")))
+
+        drafts = [_asvs_draft("V6.2.1")]
+
+        assert unreached_rows(drafts, PACKAGES["asvs"], control) == frozenset()
 
 
 def _config_proposal() -> RequirementProposals:
@@ -435,7 +496,10 @@ class TestTheUnDefer:
             "V11.2.1",
             "config",
         )
-        assert row_outcome(row_rulings(claims, returned)[ROW]) == "refused"
+        assert (
+            row_outcome(row_rulings(claims, returned)[ROW], unreached=False)
+            == "refused"
+        )
         entries = AsvsAnalysis.scope_entries(
             lanes=["cryptography"],
             claims=[*claims, *outcome.rejected],
@@ -455,7 +519,10 @@ class TestTheUnDefer:
         )
 
         assert (claims, returned, deferred) == ([], [], {})
-        assert row_outcome(row_rulings(outcome.rejected, returned)[ROW]) == "applied"
+        assert (
+            row_outcome(row_rulings(outcome.rejected, returned)[ROW], unreached=False)
+            == "applied"
+        )
         entries = AsvsAnalysis.scope_entries(
             lanes=["cryptography"],
             claims=outcome.rejected,
