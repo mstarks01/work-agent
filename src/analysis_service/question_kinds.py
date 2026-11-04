@@ -231,7 +231,7 @@ QUESTION_KINDS: Mapping[QuestionKindName, QuestionKind] = MappingProxyType(
                 Facet(
                     "restricted",
                     "Can only named operators get its disks, backups or snapshots?",
-                    statement="Gives its disks, backups and snapshots only to named operators.",
+                    statement="Only named operators can get its disks, backups or snapshots.",
                     protects="yes",
                 ),
             ),

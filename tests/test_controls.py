@@ -30,6 +30,7 @@ from analysis_service.job_controls import CopiedControl
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
 from analysis_service.sources import text_digest
 from analysis_service.system_model import (
+    CONTROL_VALUE_MAX_CHARS,
     ElementPrefix,
     ZonedElement,
     attribute_names,
@@ -243,6 +244,9 @@ class TestTheDocument:
         [
             ("exposure", "", {"value": "internet-facing"}),
             ("encryption_at_rest", "", {"value": "unknown"}),
+            ("encryption_at_rest", "", {"value": "none"}),
+            ("encryption_at_rest", "", {"value": "not encrypted"}),
+            ("encryption_at_rest", "", {"value": "TBD"}),
             ("", "physical-access", {"value": "yes"}),
             ("", "destination", {"value": "no"}),
             ("", "stored-copy-access", {"facets": {"encrypted": "no"}}),
@@ -273,6 +277,16 @@ class TestTheDocument:
     def test_a_protective_answer_is_kept(self, attribute, question, answer):
         fact = {"key": ["", attribute, "", "", question, ""], **answer}
         assert ControlDocument.model_validate(document(facts=[fact]))
+
+    def test_a_value_longer_than_the_part_holds_is_refused(self):
+        # The model's attribute holds CONTROL_VALUE_MAX_CHARS, so a longer
+        # value would fail when the job writes it.
+        fact = {"key": ["", "encryption_at_rest", "", "", "", ""]}
+        held = "AES-256 " + "k" * (CONTROL_VALUE_MAX_CHARS - 8)
+        assert ControlDocument.model_validate(document(facts=[fact | {"value": held}]))
+        assert "the most the part holds" in refusal(
+            facts=[fact | {"value": held + "k"}]
+        )
 
     def test_each_protective_attribute_has_a_statement(self):
         assert set(ATTRIBUTE_STATEMENTS) == set(PROTECTIVE_ATTRIBUTES)

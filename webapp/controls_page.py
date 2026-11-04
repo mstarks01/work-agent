@@ -17,7 +17,6 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from analysis_service.answer_forms import max_length_of
 from analysis_service.claims import UnknownRef
 from analysis_service.controls import (
     ATTRIBUTE_STATEMENTS,
@@ -39,6 +38,7 @@ from analysis_service.owner_files import NOT_UTF_8
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import MAX_LABEL_CHARS, EvidenceClass, text_digest
 from analysis_service.system_model import (
+    CONTROL_VALUE_MAX_CHARS,
     Element,
     ZonedElement,
     attribute_names,
@@ -207,7 +207,7 @@ def page_data(limits: ControlLimits) -> dict[str, object]:
             "max_evidence": limits.max_evidence,
             "max_evidence_bytes": limits.max_evidence_bytes,
             "name_chars": MAX_LABEL_CHARS,
-            "value_chars": max_length_of(FactAnswer, "value"),
+            "value_chars": CONTROL_VALUE_MAX_CHARS,
         },
     }
 

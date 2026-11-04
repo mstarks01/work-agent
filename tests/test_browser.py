@@ -2267,7 +2267,7 @@ def test_the_editor_warns_of_a_row_that_a_part_cannot_reach(page):
     add_row(page, "stride", "spoofing")
     assert page.locator("#rows-reach").count() == 0
     add_row(page, "asvs", "V2.4.1")
-    assert page.inner_text("#rows-reach").startswith("Many ASVS findings")
+    assert page.inner_text("#rows-reach").startswith("Many findings of asvs")
 
     # The description of a card opens from its "?".
     about = page.locator(".q-card:has(h3:text-is('What it does')) .question-help")

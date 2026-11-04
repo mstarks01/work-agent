@@ -829,12 +829,6 @@ class TestTheFacts:
         assert composed.text == source.text
         assert source.text.splitlines()[0] == DB_LINE
 
-    def test_a_value_the_fact_cannot_hold_is_refused_with_the_control(self, owner):
-        weak = owner.keep("Weak", ORDERS_DB, facts=[fact(value="not encrypted")])
-        refused = owner.answer(owner.paused(weak), revision=0)
-        assert refused.status_code == 400
-        assert refused.json()["message"].startswith("The Control “Weak” cannot apply:")
-
     def test_a_final_report_takes_a_correction_of_a_control_fact(self, owner):
         child = owner.resumed(owner.paused(owner.keep("Encrypted", ORDERS_DB)))
         final = owner.resumed(child, facts=[dict(FACT)])

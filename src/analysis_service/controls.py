@@ -27,6 +27,7 @@ from pydantic import (
     model_validator,
 )
 
+from analysis_service.analysis import control_state
 from analysis_service.fact_answers import FactAnswer, key_ref, read_back
 from analysis_service.frameworks import check_unit
 from analysis_service.owner_files import text_refusal
@@ -38,7 +39,12 @@ from analysis_service.sources import (
     plain_name,
     text_digest,
 )
-from analysis_service.system_model import UNKNOWN, ZONE_ATTRIBUTE, make_element_id
+from analysis_service.system_model import (
+    CONTROL_VALUE_MAX_CHARS,
+    ZONE_ATTRIBUTE,
+    make_element_id,
+)
+from analysis_service.validation import ambiguous_lead
 
 CONTROL_ID = r"^control-[0-9a-f]{32}$"
 EVIDENCE_ID = r"^evidence-[0-9a-f]{32}$"
@@ -121,7 +127,9 @@ def states_a_protection(fact: FactAnswer) -> bool:
     """Whether ``fact`` gives the answer that makes it a protection.
 
     **The one rule of a protective answer.** An attribute takes its
-    statement's value, or any known value where the owner writes how. A
+    statement's value, or, where the owner writes how, a value that
+    :func:`~analysis_service.analysis.control_state` reads as stated and
+    that opens with no ambiguous lead. A
     ``yes-no`` kind takes the answer it protects on, and a ``facets`` kind
     takes, for each facet it names, the answer that facet protects on. A
     ``text`` kind states no protection.
@@ -129,10 +137,12 @@ def states_a_protection(fact: FactAnswer) -> bool:
     ref = key_ref(fact.key)
     if ref.kind == "attribute":
         statement = ATTRIBUTE_STATEMENTS.get(cast(ProtectiveAttribute, ref.attribute))
+        if statement is None:
+            return False
+        if statement.value is not None:
+            return fact.value == statement.value
         return (
-            statement is not None
-            and fact.value != UNKNOWN
-            and statement.value in (None, fact.value)
+            control_state(fact.value) == "stated" and ambiguous_lead(fact.value) is None
         )
     name = parse_question_kind(ref.question)
     if name is None:
@@ -332,11 +342,16 @@ class ControlDocument(BaseModel):
             if ref.kind not in SCOPE_FACT_KINDS[self.scope.type] or not protective:
                 raise ValueError(SCOPE_FACT_REFUSALS[self.scope.type])
         for fact, ref in zip(self.facts, refs, strict=True):
+            if ref.kind == "attribute" and len(fact.value) > CONTROL_VALUE_MAX_CHARS:
+                raise ValueError(
+                    f"The value of “{ref.attribute}” is longer than"
+                    f" {CONTROL_VALUE_MAX_CHARS} characters, the most the part holds."
+                )
             if not states_a_protection(fact):
                 name = ref.attribute or ref.question
                 raise ValueError(
                     f"A Control states only a protection. The answer to “{name}”"
-                    " states none. Tick a statement of what protects the part."
+                    " states none. Give the answer that states a protection."
                 )
         for key in _repeated(fact.key for fact in self.facts):
             ref = key_ref(key)

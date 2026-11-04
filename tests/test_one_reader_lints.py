@@ -2132,6 +2132,16 @@ ONE_READERS: dict[str, _OneReader] = {
         {},
         "",
     ),
+    "which leads a control value may not open with": _OneReader(
+        lambda node: (
+            isinstance(node, ast.Name)
+            and isinstance(node.ctx, ast.Load)
+            and node.id in {"AMBIGUOUS_CONTROL_LEADS", "UNCERTAIN_CONTROL_LEADS"}
+        ),
+        ("src/analysis_service/validation.py", "ambiguous_lead"),
+        {},
+        "",
+    ),
     "the outcome of a Control row": _OneReader(
         lambda node: (
             isinstance(node, ast.Return)
