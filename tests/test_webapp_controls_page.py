@@ -591,18 +591,45 @@ class TestTheTables:
         assert set(_FACT_OFFERS) == set(get_args(ControlFactKind))
         assert set().union(*SCOPE_FACT_KINDS.values()) == set(get_args(ControlFactKind))
 
-    def test_the_page_offers_only_protective_facts(self):
+    def test_the_page_offers_only_statements_of_a_protection(self):
         from webapp.controls_page import scope_types
 
         offered = {
-            row["type"]: {fact["label"] for fact in row["facts"]}
+            row["type"]: {one["label"] for one in row["statements"]}
             for row in scope_types()
         }
         assert offered["application"] == set()
-        assert "encryption at rest" in offered["store"]
-        assert "exposure" in offered["process"]
-        described = {"technology", "kind", "interface kind", "data classification"}
-        assert not described & set().union(*offered.values())
+        assert "Encrypts its data at rest." in offered["store"]
+        assert "Only the internal network can reach it." in offered["process"]
+        assert "The internet cannot reach it." in offered["process"]
+        assert not any("?" in label for label in set().union(*offered.values()))
+
+    def test_each_statement_the_page_offers_is_one_the_document_keeps(self):
+        # The page and the document read the protective answer from two
+        # places, so each tick must save.
+        from analysis_service.controls import ControlDocument
+        from webapp.controls_page import scope_types
+
+        for scope_row in scope_types():
+            for one in scope_row["statements"]:
+                value = one["answer"] or "AES-256 by the KMS"
+                fact = (
+                    {"key": one["key"], "facets": {one["facet"]: value}}
+                    if one["facet"]
+                    else {"key": one["key"], "value": value}
+                )
+                scope = {"type": scope_row["type"], "name": "Orders DB", "aliases": []}
+                held = ControlDocument.model_validate(
+                    {
+                        "id": "control-" + "a" * 32,
+                        "name": "Tick",
+                        "scope": scope,
+                        "facts": [fact],
+                        "rows": [],
+                        "evidence": [],
+                    }
+                )
+                assert held.facts, one["label"]
 
 
 EVIDENCE = (

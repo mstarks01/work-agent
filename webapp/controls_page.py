@@ -17,11 +17,11 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from analysis_service.answer_forms import YES_NO, attribute_choices, max_length_of
+from analysis_service.answer_forms import max_length_of
 from analysis_service.claims import UnknownRef
 from analysis_service.controls import (
+    ATTRIBUTE_STATEMENTS,
     EVIDENCE_ID,
-    PROTECTIVE_ATTRIBUTES,
     SCOPE_FACT_KINDS,
     Control,
     ControlDocument,
@@ -33,9 +33,8 @@ from analysis_service.controls import (
     ScopeType,
 )
 from analysis_service.errors import refusal_text
-from analysis_service.fact_answers import FACET_ANSWERS, FactAnswer
+from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks import PACKAGES, FrameworkPackage
-from analysis_service.open_facts import kind_words
 from analysis_service.owner_files import NOT_UTF_8
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import MAX_LABEL_CHARS, EvidenceClass, text_digest
@@ -77,50 +76,69 @@ def _key(*, attribute: str = "", question: str = "") -> list:
     return list(ref.key)
 
 
-def _attribute_facts(scope_type: ScopeType) -> list[dict[str, object]]:
-    facts: dict[str, dict[str, object]] = {}
-    for element_type in _element_types(scope_type):
-        fields = element_type.model_construct()
-        for attribute in attribute_names(fields):
-            if attribute not in PROTECTIVE_ATTRIBUTES or attribute in facts:
-                continue
-            facts[attribute] = {
-                "key": _key(attribute=attribute),
-                "label": attribute.replace("_", " "),
-                "choices": list(attribute_choices(element_type, attribute, None)),
-                "facets": [],
-            }
-    return list(facts.values())
+def _statement(
+    key: list, label: str, topic: str, *, answer: str | None, facet: str = ""
+) -> dict[str, object]:
+    """One protection the page offers as a tick: the fact's key, the facet it
+    answers, and the answer it writes, or ``None`` where the owner writes how."""
+    return {
+        "key": key,
+        "facet": facet,
+        "answer": answer,
+        "label": label,
+        "topic": topic,
+    }
 
 
-def _question_facts() -> list[dict[str, object]]:
+def _attribute_statements(scope_type: ScopeType) -> list[dict[str, object]]:
+    held = {
+        attribute
+        for element_type in _element_types(scope_type)
+        for attribute in attribute_names(element_type.model_construct())
+    }
     return [
-        {
-            "key": _key(question=name),
-            "label": kind_words(kind.template),
-            "choices": list(YES_NO) if kind.answer == "yes-no" else [],
-            "facets": [
-                {"id": facet.id, "question": facet.question} for facet in kind.facets
-            ],
-        }
-        for name, kind in QUESTION_KINDS.items()
+        _statement(
+            _key(attribute=attribute),
+            statement.statement,
+            statement.topic,
+            answer=statement.value,
+        )
+        for attribute, statement in ATTRIBUTE_STATEMENTS.items()
+        if attribute in held
     ]
 
 
-#: The facts the page offers of each kind that a scope writes
+def _question_statements() -> list[dict[str, object]]:
+    statements = []
+    for name, kind in QUESTION_KINDS.items():
+        key = _key(question=name)
+        if kind.statement is not None:
+            statements.append(
+                _statement(key, kind.statement, kind.topic, answer=kind.protects)
+            )
+        statements.extend(
+            _statement(
+                key, facet.statement, kind.topic, answer=facet.protects, facet=facet.id
+            )
+            for facet in kind.facets
+        )
+    return statements
+
+
+#: The statements the page offers of each kind of fact that a scope writes
 #: (:data:`~analysis_service.controls.SCOPE_FACT_KINDS`).
 _FACT_OFFERS: Mapping[
     ControlFactKind, Callable[[ScopeType], list[dict[str, object]]]
 ] = MappingProxyType(
     {
-        "attribute": _attribute_facts,
-        "question": lambda scope_type: _question_facts(),
+        "attribute": _attribute_statements,
+        "question": lambda scope_type: _question_statements(),
     }
 )
 
 
 def scope_types() -> list[dict[str, object]]:
-    """Each scope type, with the facts a Control of that scope may write.
+    """Each scope type, with the protections a Control of that scope may state.
 
     The kinds come from :data:`~analysis_service.controls.SCOPE_FACT_KINDS`.
     """
@@ -128,10 +146,10 @@ def scope_types() -> list[dict[str, object]]:
         {
             "type": scope_type,
             "label": label,
-            "facts": [
-                fact
+            "statements": [
+                statement
                 for kind in sorted(SCOPE_FACT_KINDS[scope_type])
-                for fact in _FACT_OFFERS[kind](scope_type)
+                for statement in _FACT_OFFERS[kind](scope_type)
             ],
         }
         for scope_type, label in SCOPE_LABELS.items()
@@ -191,7 +209,6 @@ def page_data(limits: ControlLimits) -> dict[str, object]:
             "name_chars": MAX_LABEL_CHARS,
             "value_chars": max_length_of(FactAnswer, "value"),
         },
-        "facet_answers": list(FACET_ANSWERS),
     }
 
 

@@ -332,12 +332,15 @@ it.
   under the rows when the Control does not cover the whole application and a row
   names a framework whose findings can name no part, because such a finding
   never reaches the Control. "What it protects" takes the
-  kind, the name and the aliases. "What it does" takes a fact and its value
-  from the protective facts of an element or a zone: its encryption at rest,
-  its exposure and the Question Kinds. A closed fact takes one of its values.
-  A Control of the whole application states no fact. The service refuses
-  every other fact, because a fact that describes the system is the
-  description's to state. "Evidence" takes a
+  kind, the name and the aliases. "What it does" is a checklist of
+  protections, grouped by topic, such as "Encrypts its backups and
+  snapshots." or "The internet cannot reach it.". Each tick writes the
+  answer that makes its fact a protection: a Question Kind or one of its
+  facets, the exposure `internal`, or the encryption at rest. "Encrypts its
+  data at rest." also takes how the part does it. A Control of the whole
+  application states no fact. The service refuses every other fact and every
+  answer that states a weakness or nothing, because a Control states only a
+  protection. "Evidence" takes a
   plain text file and its class: Configuration, Code or People. The page
   reads the file with the checks of an Owner File and sends only its text.
   Each line has a "Remove" button. "Save Control" sends the Control, and an

@@ -38,10 +38,17 @@
   const scopeText = (scope) => (scope.type === "application"
     ? SCOPES.application.label
     : `${SCOPES[scope.type].label}: ${scope.name}`);
-  // A fact of a scope type, by its key.
+  // Each statement of a scope type that a fact ticks: the fact's own, or
+  // each facet's that the fact answers.
   const keyText = (key) => JSON.stringify(key);
-  const factOf = (scopeType, key) => SCOPES[scopeType].facts.find((one) => keyText(one.key) === keyText(key));
-  const factLabel = (scopeType, fact) => factOf(scopeType, fact.key)?.label ?? fact.key.filter(Boolean).join(" ");
+  const ticks = (scopeType, fact) => SCOPES[scopeType].statements.filter((one) => keyText(one.key) === keyText(fact.key)
+    && (!one.facet || fact.facets?.[one.facet] === one.answer));
+  // A statement as a list item, with how the part does it where the owner
+  // wrote that.
+  const statementText = (fact, one) => {
+    const text = one.label.replace(/\.$/, "");
+    return one.answer === null ? `${text}: ${fact.value}` : text;
+  };
   const unitOf = (row) => units[row.framework]?.units.find((unit) => unit.id === row.unit);
   const unitText = (row) => {
     const label = unitOf(row)?.label;
@@ -132,7 +139,7 @@
         h("div", {},
           h("select", { id: "scope-type", "aria-label": "What it protects", on: { change: (event) => {
             draft.scope = { type: event.target.value, name: "", aliases: [] };
-            draft.facts = draft.facts.filter((fact) => factOf(draft.scope.type, fact.key));
+            draft.facts = draft.facts.filter((fact) => ticks(draft.scope.type, fact).length);
             draw();
           } } }, ...PAGE.scope_types.map((row) => h("option", { value: row.type, selected: row.type === draft.scope.type }, row.label)))),
         named ? h("div", {}, h("label", { class: "field-label", for: "scope-name" }, "Its name in your descriptions"),
@@ -146,63 +153,46 @@
             aliasInput)) : null));
   };
 
-  // A fact's answer as one line: its value, or each facet's answer.
-  const answerText = (fact) => (fact.facets
-    ? Object.entries(fact.facets).map(([facet, answer]) => `${facet}: ${answer}`).join("; ")
-    : fact.value);
+  // Each statement is a tick. A tick writes the answer that makes it a
+  // protection, and a statement that asks how takes the owner's words.
   const factCard = () => {
-    const offered = SCOPES[draft.scope.type].facts.filter((one) => !draft.facts.some((fact) => keyText(fact.key) === keyText(one.key)));
-    const answerBox = h("div", { class: "facets" });
-    const pick = h("select", { id: "fact-pick", on: { change: () => drawAnswer() } },
-      ...offered.map((one, index) => h("option", { value: String(index) }, one.label)));
-    // The answer input follows the chosen fact: a select for each facet, a
-    // select of the closed answers, or a text field.
-    const drawAnswer = () => {
-      const one = offered[Number(pick.value)];
-      if (!one) return answerBox.replaceChildren();
-      if (one.facets.length) {
-        return answerBox.replaceChildren(...one.facets.map((facet) => h("label", {},
-          `${facet.question} `,
-          h("select", { "data-facet": facet.id }, h("option", { value: "unknown" }, "I don't know"),
-            ...PAGE.facet_answers.map((answer) => h("option", { value: answer }, answer))))));
-      }
-      if (one.choices.length) {
-        return answerBox.replaceChildren(h("select", { id: "fact-value", "aria-label": "Value" },
-          ...one.choices.map((choice) => h("option", { value: choice }, choice))));
-      }
-      return answerBox.replaceChildren(h("input", { type: "text", id: "fact-value", maxlength: limits.value_chars, "aria-label": "Value" }));
-    };
-    drawAnswer();
-    const add = () => {
-      const one = offered[Number(pick.value)];
-      if (!one) return;
-      if (one.facets.length) {
-        const facets = Object.fromEntries([...answerBox.querySelectorAll("select")].map((select) => [select.dataset.facet, select.value]));
-        draft.facts.push({ key: one.key, facets });
-      } else {
-        const value = el("fact-value").value.trim();
-        if (!value) {
-          refuse("Give the fact a value.");
-          return;
-        }
-        draft.facts.push({ key: one.key, value });
-      }
-      refuse("");
-      draw();
-    };
-    if (!SCOPES[draft.scope.type].facts.length) {
+    const offered = SCOPES[draft.scope.type].statements;
+    if (!offered.length) {
       return card("What it does", null,
         h("p", { class: "hint" }, "A Control of the whole application states no fact. Name the units it covers above."));
     }
-    return card("What it does", "Each fact states a protection on the part, and answers a question the analysis would otherwise ask. A fact the description states stands.",
-      h("ul", { class: "lines", id: "facts-list" }, ...draft.facts.map((fact, index) => h("li", {},
-        h("span", {}, h("b", {}, factLabel(draft.scope.type, fact)), ": ", answerText(fact)),
-        remove(draft.facts, index, `the fact ${factLabel(draft.scope.type, fact)}`)))),
-      offered.length ? h("div", { class: "add-line" },
-        h("div", {}, h("label", { class: "field-label", for: "fact-pick" }, "Fact"), pick),
-        h("div", {}, h("span", { class: "field-label" }, "Value"), answerBox),
-        h("button", { type: "button", id: "add-fact", on: { click: add } }, "Add fact"))
-        : h("p", { class: "hint" }, "Every fact of this kind has a value."));
+    const factOfKey = (key) => draft.facts.find((fact) => keyText(fact.key) === keyText(key));
+    const tick = (one, index, on) => {
+      const fact = factOfKey(one.key);
+      if (one.facet && on && fact) {
+        fact.facets = { ...fact.facets, [one.facet]: one.answer };
+      } else if (one.facet && on) {
+        draft.facts.push({ key: one.key, facets: { [one.facet]: one.answer } });
+      } else if (one.facet && fact) {
+        const { [one.facet]: _, ...rest } = fact.facets;
+        fact.facets = rest;
+        if (!Object.keys(rest).length) draft.facts.splice(draft.facts.indexOf(fact), 1);
+      } else if (on) {
+        draft.facts.push({ key: one.key, value: one.answer ?? "" });
+      } else if (fact) {
+        draft.facts.splice(draft.facts.indexOf(fact), 1);
+      }
+      draw();
+      if (on && one.answer === null) el(`how-${index}`)?.focus();
+    };
+    const item = (one, index) => {
+      const fact = factOfKey(one.key);
+      const on = Boolean(fact) && (!one.facet || fact.facets?.[one.facet] === one.answer);
+      return h("li", {},
+        h("label", {}, h("input", { type: "checkbox", checked: on, on: { change: (event) => tick(one, index, event.target.checked) } }), one.label),
+        one.answer === null && on ? h("input", { type: "text", id: `how-${index}`, class: "how", maxlength: limits.value_chars, value: fact.value,
+          "aria-label": `How: ${one.label}`, placeholder: "How, such as AES-256 with keys in a KMS",
+          on: { input: (event) => { fact.value = event.target.value; } } }) : null);
+    };
+    const topics = [...new Set(offered.map((one) => one.topic))];
+    return card("What it does", "Tick each protection the part has. The analysis takes each one as a fact about the part. A fact that the description states stands.",
+      h("div", { class: "statements", id: "statements" }, ...topics.map((topic) => h("fieldset", {}, h("legend", {}, topic),
+        h("ul", {}, ...offered.map((one, index) => (one.topic === topic ? item(one, index) : null)))))));
   };
 
   const rowCard = () => {
@@ -211,14 +201,17 @@
       ...units[framework].units.map((unit) => h("option", { value: unit.id },
         unit.label ? `${unit.id} · ${unit.label}`.slice(0, 120) : unit.id)));
     const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitPick());
-    // A finding that names no part reaches only a Control of the whole application.
-    const unreachable = draft.scope.type !== "application" && draft.rows.some((row) => !units[row.framework]?.names_a_part);
+    // A finding that names no part reaches only a Control of the whole
+    // application. A package name is an acronym, so the note writes it in
+    // capitals.
+    const unplaced = draft.scope.type === "application" ? []
+      : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_a_part).map((row) => row.framework.toUpperCase()))];
     return card("What it covers", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
       h("ul", { class: "lines", id: "rows-list" }, ...draft.rows.map((row, index) => h("li", {},
         h("span", {}, unitText(row), " ", h("span", { class: "sub" }, `version ${row.version}`)),
         remove(draft.rows, index, `the row ${row.unit}`)))),
-      unreachable ? h("p", { class: "notice", id: "rows-reach", role: "note" },
-        "A row here names a unit whose findings can name no part of the model. Only a Control of the whole application reaches such a finding, and the report shows the row as “Not reached”. To cover each such finding, make a Control of the whole application.") : null,
+      unplaced.length ? h("p", { class: "notice", id: "rows-reach", role: "note" },
+        `Many ${unplaced.join(" and ")} findings are about the whole application, not one part of it. This Control protects only part of the application, so the analysis cannot apply it to those findings. To apply it to them, choose “The whole application” in “What it protects”.`) : null,
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "row-framework" }, "Framework"),
           h("select", { id: "row-framework", on: { change: (event) => {
@@ -269,12 +262,17 @@
   const saveBody = () => ({
     name: draft.name,
     scope: draft.scope.type === "application" ? { type: "application" } : draft.scope,
-    facts: draft.facts,
+    facts: draft.facts.map((fact) => (fact.facets ? { key: fact.key, facets: fact.facets } : { key: fact.key, value: fact.value.trim() })),
     rows: draft.rows,
     evidence: draft.evidence.map((file) => (file.id ? { id: file.id } : { name: file.name, class: file.class, text: file.text })),
     ...(editing === "new" ? {} : { updated_at: draft.updated_at }),
   });
   const save = async (button) => {
+    const missing = draft.facts.find((fact) => !fact.facets && !fact.value.trim());
+    if (missing) {
+      refuse(`Write how the part does this: “${ticks(draft.scope.type, missing)[0]?.label}”`);
+      return;
+    }
     button.disabled = true;
     try {
       const sent = await fetch(editing === "new" ? "/workspace/controls" : `/workspace/controls/${encodeURIComponent(editing)}`, {
@@ -335,13 +333,13 @@
     el("delete-dialog").showModal();
   };
   const row = (control) => {
-    const facts = control.facts.map((fact) => factLabel(control.scope.type, fact));
+    const facts = control.facts.flatMap((fact) => ticks(control.scope.type, fact).map((one) => statementText(fact, one)));
     return h("tr", {},
       h("td", {}, h("input", { type: "checkbox", checked: chosen.has(control.id), "aria-label": `Select ${control.name}`,
         on: { change: (event) => { if (event.target.checked) chosen.add(control.id); else chosen.delete(control.id); draw(); } } })),
       h("td", { class: "name-cell" },
         h("a", { href: "#", on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
-        facts.length ? h("div", { class: "sub" }, `Facts: ${facts.join(", ")}`) : null),
+        facts.length ? h("div", { class: "sub" }, facts.join("; ")) : null),
       h("td", {}, scopeText(control.scope)),
       h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
         `${one.framework} ${one.unit}`)))),

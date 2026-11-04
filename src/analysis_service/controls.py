@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Literal, Self, TypeVar, get_args
+from typing import Literal, Self, TypeVar, cast, get_args
 
 from pydantic import (
     BaseModel,
@@ -31,13 +31,14 @@ from analysis_service.fact_answers import FactAnswer, key_ref, read_back
 from analysis_service.frameworks import check_unit
 from analysis_service.owner_files import text_refusal
 from analysis_service.parsing import Sha256Hex
+from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
 from analysis_service.sources import (
     MAX_LABEL_CHARS,
     EvidenceClass,
     plain_name,
     text_digest,
 )
-from analysis_service.system_model import ZONE_ATTRIBUTE, make_element_id
+from analysis_service.system_model import UNKNOWN, ZONE_ATTRIBUTE, make_element_id
 
 CONTROL_ID = r"^control-[0-9a-f]{32}$"
 EVIDENCE_ID = r"^evidence-[0-9a-f]{32}$"
@@ -81,6 +82,69 @@ SCOPE_FACT_KINDS: Mapping[ScopeType, frozenset[ControlFactKind]] = MappingProxyT
         "boundary": frozenset({"attribute", "question"}),
     }
 )
+
+
+@dataclass(frozen=True)
+class AttributeStatement:
+    """The protection a Control states with one protective attribute."""
+
+    #: A short name of what the attribute covers, as the Controls page groups it.
+    topic: str
+    #: The protection, with no subject.
+    statement: str
+    #: The one value that states the protection, or ``None`` where the owner
+    #: writes how the part does it.
+    value: str | None
+
+
+#: The statement of each protective attribute. An attribute that a part can
+#: hold in a harmful value takes only its protective value.
+ATTRIBUTE_STATEMENTS: Mapping[ProtectiveAttribute, AttributeStatement] = (
+    MappingProxyType(
+        {
+            "encryption_at_rest": AttributeStatement(
+                topic="Encryption at rest",
+                statement="Encrypts its data at rest.",
+                value=None,
+            ),
+            "exposure": AttributeStatement(
+                topic="Reachability",
+                statement="Only the internal network can reach it.",
+                value="internal",
+            ),
+        }
+    )
+)
+
+
+def states_a_protection(fact: FactAnswer) -> bool:
+    """Whether ``fact`` gives the answer that makes it a protection.
+
+    **The one rule of a protective answer.** An attribute takes its
+    statement's value, or any known value where the owner writes how. A
+    ``yes-no`` kind takes the answer it protects on, and a ``facets`` kind
+    takes, for each facet it names, the answer that facet protects on. A
+    ``text`` kind states no protection.
+    """
+    ref = key_ref(fact.key)
+    if ref.kind == "attribute":
+        statement = ATTRIBUTE_STATEMENTS.get(cast(ProtectiveAttribute, ref.attribute))
+        return (
+            statement is not None
+            and fact.value != UNKNOWN
+            and statement.value in (None, fact.value)
+        )
+    name = parse_question_kind(ref.question)
+    if name is None:
+        return False
+    kind = QUESTION_KINDS[name]
+    if kind.answer == "yes-no":
+        return fact.value == kind.protects
+    if kind.answer == "facets" and fact.facets:
+        protects = {facet.id: facet.protects for facet in kind.facets}
+        return all(protects.get(id_) == answer for id_, answer in fact.facets.items())
+    return False
+
 
 _PART_REFUSAL = (
     "A Control states a protection: the questions about the part, "
@@ -267,6 +331,13 @@ class ControlDocument(BaseModel):
             )
             if ref.kind not in SCOPE_FACT_KINDS[self.scope.type] or not protective:
                 raise ValueError(SCOPE_FACT_REFUSALS[self.scope.type])
+        for fact, ref in zip(self.facts, refs, strict=True):
+            if not states_a_protection(fact):
+                name = ref.attribute or ref.question
+                raise ValueError(
+                    f"A Control states only a protection. The answer to “{name}”"
+                    " states none. Tick a statement of what protects the part."
+                )
         for key in _repeated(fact.key for fact in self.facts):
             ref = key_ref(key)
             name = ref.attribute or ref.question

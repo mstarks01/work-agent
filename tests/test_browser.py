@@ -2163,13 +2163,11 @@ def new_control(page, name: str, *, scope=("store", "Orders DB")) -> None:
         page.fill("#scope-name", scope_name)
 
 
-def add_fact(page, label: str, value: str) -> None:
-    page.select_option("#fact-pick", label=label)
-    if page.locator("select#fact-value").count():
-        page.select_option("#fact-value", value)
-    else:
-        page.fill("#fact-value", value)
-    page.click("#add-fact")
+def tick(page, statement: str, how: str = "") -> None:
+    """Tick a statement of "What it does", and write how where it asks."""
+    page.get_by_label(statement, exact=True).check()
+    if how:
+        page.fill(f"#statements input[aria-label='How: {statement}']", how)
 
 
 def add_row(page, framework: str, unit: str) -> None:
@@ -2202,7 +2200,9 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     new_control(page, HOSTILE_CONTROL)
     page.fill("#alias-input", "orders <i>database</i>")
     page.press("#alias-input", "Enter")
-    add_fact(page, "encryption at rest", "AES-256 <script>window.ran=1</script>")
+    tick(page, "Encrypts its data at rest.", "AES-256 <script>window.ran=1</script>")
+    tick(page, "Encrypts its backups and snapshots.")
+    tick(page, "The internet cannot reach it.")
     add_row(page, "asvs", "V11.2")
     add_row(page, "stride", "information-disclosure")
     add_evidence(page, "<b>rds</b>.tf", "storage_encrypted = true\n", "code")
@@ -2212,7 +2212,10 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     assert page.inner_text("#controls-count") == "1 of 50 Controls"
     cells = page.locator("#controls-list tr td")
     assert page.inner_text("#controls-list td.name-cell a") == HOSTILE_CONTROL
-    assert "Facts: encryption at rest" in cells.nth(1).inner_text()
+    assert (
+        "Encrypts its data at rest: AES-256 <script>window.ran=1</script>;"
+        " Encrypts its backups and snapshots" in cells.nth(1).inner_text()
+    )
     assert cells.nth(2).inner_text() == "A data store: Orders DB"
     assert cells.nth(3).inner_text().split("\n") == [
         "asvs V11.2",
@@ -2224,6 +2227,10 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     [control] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
     assert control["scope"]["aliases"] == ["orders <i>database</i>"]
     assert control["facts"][0]["value"] == "AES-256 <script>window.ran=1</script>"
+    assert [fact.get("facets") for fact in control["facts"][1:]] == [
+        {"encrypted": "yes"},
+        {"internet": "no"},
+    ]
 
     # An edit opens the same editor with the Control's values, and replaces it.
     page.click("#controls-list button:text('Edit')")
@@ -2231,13 +2238,17 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     assert page.input_value("#scope-name") == "Orders DB"
     assert "orders <i>database</i>" in page.inner_text(".aliases")
     page.fill("#control-name", "Orders DB encrypted")
-    page.click("#facts-list button")
-    add_fact(page, "encryption at rest", "KMS")
+    assert page.get_by_label("The internet cannot reach it.", exact=True).is_checked()
+    page.get_by_label("The internet cannot reach it.", exact=True).uncheck()
+    page.fill("#statements input[aria-label='How: Encrypts its data at rest.']", "KMS")
     save_control(page)
     assert page.inner_text("#controls-list td.name-cell a") == "Orders DB encrypted"
     [edited] = page.evaluate("fetch('/workspace/controls').then((r) => r.json())")
     assert edited["id"] == control["id"]
-    assert [fact["value"] for fact in edited["facts"]] == ["KMS"]
+    assert [fact["value"] for fact in edited["facts"]] == [
+        "KMS",
+        "Are its backups and snapshots encrypted? yes",
+    ]
     assert edited["evidence"] == control["evidence"]
 
 
@@ -2251,19 +2262,31 @@ def test_the_editor_warns_of_a_row_that_a_part_cannot_reach(page):
         "What it does",
         "Evidence",
     ]
+    # An empty list takes no space, so no second line shows under the title.
+    assert not page.locator("#rows-list").is_visible()
     add_row(page, "stride", "spoofing")
     assert page.locator("#rows-reach").count() == 0
     add_row(page, "asvs", "V2.4.1")
-    assert "“Not reached”" in page.inner_text("#rows-reach")
+    assert page.inner_text("#rows-reach").startswith("Many ASVS findings")
 
     # The description of a card opens from its "?".
     about = page.locator(".q-card:has(h3:text-is('What it does')) .question-help")
     assert not about.locator(".question-help-content").is_visible()
     about.locator("summary").click()
-    assert "Each fact states a protection" in about.inner_text()
+    assert "Tick each protection the part has." in about.inner_text()
 
     page.select_option("#scope-type", "application")
     assert page.locator("#rows-reach").count() == 0
+
+
+def test_a_statement_that_asks_how_needs_the_how(page):
+    page.goto("/controls")
+    new_control(page, "Orders DB encrypted")
+    tick(page, "Encrypts its data at rest.")
+    page.click("#save-control")
+    assert page.inner_text("#editor-problem") == (
+        "Write how the part does this: “Encrypts its data at rest.”"
+    )
 
 
 @pytest.mark.parametrize(
