@@ -180,7 +180,7 @@ from analysis_service.evidence import (
     render_element_roster,
 )
 from analysis_service.fact_answers import STORED, FactAnswer
-from analysis_service.fan_in import fan_in
+from analysis_service.fan_in import fan_in, returned_to_deferred
 from analysis_service.field_capabilities import with_field_capabilities
 from analysis_service.frameworks import (
     DISCLAIMER_DOC,
@@ -195,6 +195,7 @@ from analysis_service.frameworks import (
     schemas_for,
 )
 from analysis_service.identity import IDENTITY_VERSION, build_identity
+from analysis_service.job_controls import AppliedControl, covered_units
 from analysis_service.knowledge import (
     MAX_CASES,
     MAX_NOTES,
@@ -771,6 +772,10 @@ STATE_FACT_ANSWERS = "fact_answers"
 # same way. Each is one line of the answers Source, which ``prepare`` composes
 # again so that each quote reads that text.
 STATE_CONTROL_LINES = "control_lines"
+# Each Control that applies to the job, with its resolved scope, its ticked
+# rows and the text of its evidence (ADR 0126), seeded the same way. The
+# fan-in keeps each unit a row covers, and the critic is shown each row.
+STATE_APPLIED_CONTROLS = "applied_controls"
 
 #: The job-wide state keys ``analyze.md`` templates, which every lane of every
 #: framework reads as one value. With :data:`LANE_ARTIFACTS` and ``{lane}`` they
@@ -814,6 +819,10 @@ FRAMEWORK_STRUCTURED_ARTIFACTS: tuple[str, ...] = (
     # Unit -> why this job could not settle it. Written by the fan-in, read by
     # ``assemble``, and empty for a package that defers nothing.
     "deferred",
+    # Unit -> the kind a Control row kept it from ``deferred`` for. Written by
+    # the fan-in, read by ``assemble``, which returns a unit whose draft the
+    # critic kept against every row.
+    "undeferred",
     # Unit -> why the package's own rules ruled it out of this model, before
     # any lane ran. Written by ``prepare``, read by ``assemble``, and empty
     # for a package whose rules rule nothing out.
@@ -873,6 +882,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_LINK_ANSWERS,
         STATE_FACT_ANSWERS,
         STATE_CONTROL_LINES,
+        STATE_APPLIED_CONTROLS,
         STATE_REPAIR_BASELINE,
         STATE_MODEL_REPAIR,
     }
@@ -1809,6 +1819,14 @@ def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRec
     return record
 
 
+def held_controls(state: SessionState) -> list[AppliedControl]:
+    """The Controls that apply to the job, as the driver seeded them."""
+    return [
+        AppliedControl.model_validate(control)
+        for control in state.get(STATE_APPLIED_CONTROLS) or []
+    ]
+
+
 def held_assertions(state: SessionState) -> AssertionCatalog | None:
     """The catalog ``prepare`` parked, or ``None`` on a graph that ran no pass."""
     record = state.get(STATE_ASSERTION_CATALOG)
@@ -1958,6 +1976,7 @@ def merge_drafts(
         )
     proposal_batch = nodes.schemas.proposals
     model = SystemModel.model_validate(valid_model)
+    controls = held_controls(state)
     merged = fan_in(
         {
             lane.lane: proposal_batch.model_validate(
@@ -1971,8 +1990,10 @@ def merge_drafts(
         state.get(nodes.key("ruled_out")) or {},
         held_assertions(state),
         state.get(nodes.key("ruled_in")) or {},
+        covered=covered_units(nodes.package, controls),
     )
     state.put(nodes.key("deferred"), merged.deferred)
+    state.put(nodes.key("undeferred"), merged.undeferred)
     state.put(
         nodes.key("drafts"), [draft.model_dump(mode="json") for draft in merged.drafts]
     )
@@ -1981,7 +2002,7 @@ def merge_drafts(
         nodes.key("coverage"), [row.model_dump(mode="json") for row in merged.coverage]
     )
     critic_round = CriticRound.of(
-        nodes.name, model, merged.drafts, merged.marks, held_assertions(state)
+        nodes.name, model, merged.drafts, merged.marks, held_assertions(state), controls
     )
     state.prompt(nodes.key("draft_view"), render_fenced(critic_round.view()))
     return _routed(
@@ -2112,6 +2133,7 @@ def _parked_round(
         _drafts_of(state.get(nodes.key("drafts")) if accepted else None, nodes.package),
         AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
         held_assertions(state),
+        held_controls(state),
     )
 
 
@@ -2465,8 +2487,15 @@ def _framework_block(
     )
     if isinstance(outcome, Failed):
         raise outcome.error
-    claims, rejected = outcome.claims, outcome.rejected
-    marks = critic_round.marks
+    claims, returned, back = returned_to_deferred(
+        outcome.claims,
+        outcome.rejected,
+        state.get(nodes.key("undeferred")) or {},
+        package.record,
+    )
+    rejected = outcome.rejected
+    # A returned claim leaves the block, so each mark on it leaves too.
+    marks = critic_round.marks.on_claims([claim.id for claim in (*claims, *rejected)])
     retrieved = state.get(nodes.key("retrieved")) or {}
     refusal = _refusal(package, state.get(nodes.key("precondition")))
     return schemas.block(
@@ -2480,7 +2509,7 @@ def _framework_block(
             claims=(*claims, *rejected),
             options=options,
             refusal=refusal,
-            deferred=state.get(nodes.key("deferred")) or {},
+            deferred={**(state.get(nodes.key("deferred")) or {}), **back},
             ruled_out=state.get(nodes.key("ruled_out")) or {},
             ruled_in=state.get(nodes.key("ruled_in")) or {},
         ),
@@ -2492,6 +2521,7 @@ def _framework_block(
             LaneCoverage.model_validate(row)
             for row in state.get(nodes.key("coverage")) or []
         ],
+        returned_claims=returned,
         fired_rules=list(retrieved.get("fired_rules", [])),
         knowledge_docs=list(retrieved.get("knowledge_docs", [])),
         catalog_leads=retrieved.get("catalog_leads"),

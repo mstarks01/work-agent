@@ -47,6 +47,7 @@ from analysis_service.critic import CriticOutputError
 from analysis_service.critic_round import CriticRound
 from analysis_service.deployment import DEFAULT_PROMPTS_DIR
 from analysis_service.frameworks import (
+    PACKAGES,
     PRECONDITION_RESULTS,
     PreconditionError,
     package_for,
@@ -1670,7 +1671,7 @@ def test_merge_joins_drafts_in_canonical_order():
     marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
     assert (
         event.output
-        == CriticRound.of("stride", valid_model(), drafts, marks, None).summary()
+        == CriticRound.of("stride", valid_model(), drafts, marks, None, ()).summary()
     )
     # Two drafts on quotes and derived facts are the critic's to rule.
     assert event.actions.route == graph.ROUTE_REVIEW
@@ -2095,7 +2096,12 @@ def test_the_re_ask_reads_one_view_of_a_draft_and_not_a_second():
     assert (
         dropped
         == critic._ruling_view(
-            [drafts[1]], repaired=(), unverified=(), assertions=None
+            [drafts[1]],
+            repaired=(),
+            unverified=(),
+            assertions=None,
+            package=PACKAGES["stride"],
+            controls=(),
         )[0]
     )
 
@@ -3029,6 +3035,8 @@ FRAMEWORK_KEY_WRITERS: tuple[tuple[str, dict[str, Any]], ...] = (
             # Unit -> why this job could not settle it. Empty for a package
             # that defers nothing, which is every package but ASVS.
             "deferred": {},
+            # Unit -> the kind a Control row kept it from ``deferred`` for.
+            "undeferred": {},
         },
     ),
     (
@@ -3782,3 +3790,57 @@ class TestThePerFrameworkRoles:
         """A role that named the same node as another would silently merge two."""
         named = [NODES.node(role) for role in graph.ROLES]
         assert len(set(named)) == len(graph.ROLES)
+
+
+def test_a_mark_on_a_returned_claim_leaves_the_block_with_it(domain_loader):
+    """A claim the critic kept against every Control row goes back to the
+    deferred set, and each mark on it goes with it (ADR 0126). A mark left on
+    the block would name a claim the block does not hold."""
+    from analysis_service.claims import UnverifiedGround
+    from tests.test_critic_controls import DB_CONTROL, _applied, _asvs_draft, _db, _row
+
+    asvs = graph.FrameworkNodes("asvs")
+    keys = graph.GraphKeys.of(("asvs",))
+    model = valid_model().model_dump(mode="json")
+    ctx = FakeContext(**{graph.STATE_FRAMEWORK_OPTIONS: {"asvs": {"level": 3}}})
+    graph.prepare_analysis(
+        model,
+        ctx,
+        keys,
+        ("asvs",),
+        domain_loader,
+        repo_package_loaders(("asvs",)),
+        assertions=False,
+    )
+    draft = _asvs_draft("V11.2.1", "store:orders-db")
+    refused = {"control": DB_CONTROL, "unit": "V11.2.1", "reason": "names no key"}
+    ctx.state[graph.STATE_APPLIED_CONTROLS] = [
+        control.model_dump(mode="json") for control in _applied(_db(_row("V11.2.1")))
+    ]
+    ctx.state[asvs.key("drafts")] = [draft.model_dump(mode="json")]
+    ctx.state[asvs.key("reviewed")] = {
+        "claims": [
+            {"id": draft.id, "verdict": {"reason": "", "refused_controls": [refused]}}
+        ]
+    }
+    ctx.state[asvs.key("marks")] = AnalysisMarks(
+        unverified_grounds=[UnverifiedGround(claim_id=draft.id, index=0, reason="x")]
+    ).model_dump(mode="json")
+    ctx.state[asvs.key("undeferred")] = {"V11.2.1": "config"}
+    ctx.state[asvs.key("accepted")] = True
+
+    graph.assemble_report(
+        model,
+        ctx,
+        keys,
+        ("asvs",),
+        {"asvs": BOTH_DISCLAIMERS["asvs"]},
+        domain_packs=None,
+    )
+
+    [block] = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS]).analyses
+    assert block.claims == []
+    assert [entry.claim_id for entry in block.returned_claims] == [draft.id]
+    assert block.unverified_grounds == []
+    [entry] = [entry for entry in block.scope if entry.unit == "V11.2.1"]
+    assert (entry.state, entry.needs) == ("needs-other-evidence", "config")

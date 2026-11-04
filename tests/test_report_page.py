@@ -353,9 +353,11 @@ def test_every_reason_a_fact_is_open_has_a_line_on_the_page():
     assert keys == set(get_args(FactStatus))
 
 
-@pytest.mark.parametrize("step", [None, "evidence", "reasoning", "lane", "duplicate"])
+@pytest.mark.parametrize(
+    "step", [None, "evidence", "reasoning", "lane", "duplicate", "control"]
+)
 def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
-    """The page's ``rulesOut`` and ``RuledClaim.rules_on_unit`` are two readers of
+    """The page's ``rulesOnUnit`` and ``RuledClaim.rules_on_unit`` are two readers of
     one rule, so each rejection cause is put to both."""
     from types import SimpleNamespace
     from typing import get_args
@@ -368,6 +370,7 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
         "reasoning",
         "lane",
         "duplicate",
+        "control",
     }
     node = shutil.which("node")
     if node is None:
@@ -375,12 +378,12 @@ def test_the_page_rules_out_a_unit_where_the_claim_rules_on_it(step):
     javascript = viewer_javascript()
     rule = "\n".join(
         re.search(rf"const {name} = .*?;\n", javascript, re.DOTALL)[0]
-        for name in ("answersInUnits", "rulesOut")
+        for name in ("answersInUnits", "rulesOnUnit")
     )
     verdict = {"status": "rejected", "rejected_because": step}
     program = (
         f"const UNITS = {{asvs: ['1.1.1']}};\n{rule}\n"
-        f"console.log(JSON.stringify(rulesOut("
+        f"console.log(JSON.stringify(rulesOnUnit("
         f"{{framework: 'asvs'}}, {{verdict: {json.dumps(verdict)}}})));"
     )
     done = subprocess.run(

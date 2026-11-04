@@ -67,9 +67,19 @@ def critic_round(
     a time would also change what the model is asked, which is the thing under
     test. The fixtures carry no fan-in marks and no catalog, so the marks are
     empty and the catalog is absent, stated here rather than defaulted.
+
+    The round applies each Control a fixture carries, once by ID, as a job
+    applies its Controls to every draft. Each draft is then shown the Controls
+    that reach its element and its unit, so a fixture's Control reaches
+    another fixture's draft only where the two share an element and a unit.
     """
     drafts = [_draft_of(fixture, package) for fixture in fixtures]
-    return CriticRound.of(package.name, model, drafts, AnalysisMarks(), None)
+    controls = {
+        control.id: control for fixture in fixtures for control in fixture.controls
+    }
+    return CriticRound.of(
+        package.name, model, drafts, AnalysisMarks(), None, list(controls.values())
+    )
 
 
 async def compose(
@@ -535,10 +545,10 @@ async def replay(
     drops a fixture or invents an ID fails the same mechanical check here as in
     a job, and the replay reports it rather than scoring around it.
     """
-    drafts = [_draft_of(fixture, package) for fixture in fixtures]
+    round_ = critic_round(fixtures, model, package)
     instruction, turn = await compose(
         fixtures, model, sources, package, package_loader, prompt_loader
     )
     rulings = parse_rulings(await call(instruction, turn), package)
-    problems = review_issues(drafts, rulings, model)
+    problems = review_issues(round_.drafts, rulings, model, round_.shown())
     return score(fixtures, rulings, package), list(problems.messages)

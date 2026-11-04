@@ -16,11 +16,17 @@ Each applied Control then writes its facts onto the elements it resolves to,
 where the fact is open (ADR 0125). :func:`control_facts` is the one reader of
 what each Control writes, and the job row keeps the result with each fact's
 state in ``control_facts``.
+
+The run reads each applied Control as an :class:`AppliedControl`. The
+fan-in keeps each unit a row covers, and the critic judges each row it is
+shown on a draft (ADR 0126). :func:`shown_controls` is the one reader of
+what a draft is shown, and :func:`row_outcome` the one reader of what
+became of a row, from the rulings the report's verdicts hold.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Annotated, Literal, Self, cast
 
@@ -28,6 +34,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.assertions import AssertionCatalog
+from analysis_service.claims import Claim, ControlRowRef, ReturnedClaim, RuledClaim
 from analysis_service.controls import (
     CONTROL_ID,
     EVIDENCE_ID,
@@ -43,7 +50,7 @@ from analysis_service.fact_answers import (
     with_element,
 )
 from analysis_service.fact_writes import check_fact_answers
-from analysis_service.frameworks import PACKAGES, FrameworkName
+from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from analysis_service.open_facts import (
     open_attribute,
     prepared_model,
@@ -445,6 +452,146 @@ def control_offer(
             }
         )
     return offer
+
+
+class AppliedControl(BaseModel):
+    """One applied Control as the run reads it: its resolved scope, each
+    ticked row and the text of each evidence file (ADR 0126)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str
+    scope: AppliedScope
+    rows: list[CopiedRow]
+    evidence: list[CopiedEvidence]
+
+    @property
+    def id(self) -> str:
+        return self.scope.control
+
+    def reaches(self, elements: Sequence[str]) -> bool:
+        """Whether the scope is the application or holds one of ``elements``."""
+        return self.scope.outcome == "application" or bool(
+            set(elements) & set(self.scope.element_ids())
+        )
+
+
+def applied_controls(
+    copies: Sequence[CopiedControl],
+    scopes: Sequence[ControlResolution] | None,
+    model: SystemModel,
+) -> list[AppliedControl]:
+    """Each copy that applies to ``model``, with its ticked rows, in the
+    copies' order."""
+    return [
+        AppliedControl(
+            name=copy.document.name,
+            scope=resolution,
+            rows=[row for row in copy.rows if row.ticked],
+            evidence=copy.evidence,
+        )
+        for copy, resolution in zip(
+            copies, resolutions(copies, scopes, model), strict=True
+        )
+        if isinstance(resolution, AppliedScope)
+    ]
+
+
+def shown_controls(
+    draft: Claim, package: FrameworkPackage, controls: Sequence[AppliedControl]
+) -> list[AppliedControl]:
+    """The Controls the critic is shown on ``draft``, each with only the rows
+    on the draft's unit or on a unit that holds it.
+
+    **The one reader of what a draft is shown** (ADR 0126): the critic view
+    renders it, and the review seam checks the rulings against it.
+    """
+    if not controls:
+        return []
+    holding = package.units_holding(package.control_unit_of(draft))
+    shown = []
+    for control in controls:
+        rows = [
+            row
+            for row in control.rows
+            if row.framework == package.name and row.unit in holding
+        ]
+        if rows and control.reaches(draft.affected_element_ids):
+            shown.append(control.model_copy(update={"rows": rows}))
+    return shown
+
+
+def covered_units(
+    package: FrameworkPackage, controls: Sequence[AppliedControl]
+) -> frozenset[str]:
+    """Each unit of ``package`` that a row of ``controls`` covers: the row's
+    unit and each unit inside it."""
+    rows = {
+        row.unit
+        for control in controls
+        for row in control.rows
+        if row.framework == package.name
+    }
+    return frozenset(
+        unit.id for unit in package.units if package.units_holding(unit.id) & rows
+    )
+
+
+#: What the critic said of one row on one draft: the row covers the draft, or
+#: it does not.
+RowVerdict = Literal["applied", "refused"]
+
+#: What became of one row over a job: it covered a draft, the critic refused
+#: it on every draft it was shown, or no draft was shown it.
+RowOutcome = Literal["applied", "refused", "no-finding"]
+
+
+class RowRuling(BaseModel):
+    """One ruling on one row: the claim, the critic's verdict and its reason."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    claim: str
+    ruling: RowVerdict
+    reason: str
+
+
+def row_rulings(
+    claims: Iterable[RuledClaim], returned: Iterable[ReturnedClaim]
+) -> dict[ControlRowRef, list[RowRuling]]:
+    """Each row a verdict of ``claims`` or an entry of ``returned`` names,
+    against its rulings in that order. The report holds each ruling once, so
+    the job keeps no second record of it."""
+    rulings: dict[ControlRowRef, list[RowRuling]] = {}
+    for claim in claims:
+        verdict = claim.verdict
+        if verdict.control_row is not None:
+            rulings.setdefault(verdict.control_row, []).append(
+                RowRuling(claim=claim.id, ruling="applied", reason=verdict.reason)
+            )
+        for refused in verdict.refused_controls:
+            row = ControlRowRef(control=refused.control, unit=refused.unit)
+            rulings.setdefault(row, []).append(
+                RowRuling(claim=claim.id, ruling="refused", reason=refused.reason)
+            )
+    for entry in returned:
+        for refused in entry.refused_controls:
+            row = ControlRowRef(control=refused.control, unit=refused.unit)
+            rulings.setdefault(row, []).append(
+                RowRuling(claim=entry.claim_id, ruling="refused", reason=refused.reason)
+            )
+    return rulings
+
+
+def row_outcome(rulings: Sequence[RowRuling]) -> RowOutcome:
+    """**The one reader of a row's outcome** (ADR 0126): ``applied`` where a
+    ruling applied it, ``refused`` where every ruling refused it, and
+    ``no-finding`` where it has none."""
+    if not rulings:
+        return "no-finding"
+    if any(ruling.ruling == "applied" for ruling in rulings):
+        return "applied"
+    return "refused"
 
 
 #: What the reopen payload says of a copied Control: its resolution, or

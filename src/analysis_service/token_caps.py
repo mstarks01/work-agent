@@ -173,8 +173,10 @@ TOKEN_CAPS: dict[str, int] = {
     # ``critic`` must not say the service "already matched every quote against
     # the source it names" (#1082): `_verify_quotes` marks a quote it could not
     # find and keeps the draft, so the sentence would be false of exactly the
-    # draft that needs the critic most.
-    f"package/{CRITIC_DOC}": 1400,
+    # draft that needs the critic most. Each package's ``critic`` says what a
+    # ``control`` rejection means in its terms, with two worked cases (ADR
+    # 0126); ASVS's measures 1722.
+    f"package/{CRITIC_DOC}": 1800,
     # ASVS's disclaimer says what a `gap` means (#1082). A claim can take any
     # of the three directions ADR 0028 gives a draft, including the one the
     # report calls a gap, so "does not settle" alone does not describe every

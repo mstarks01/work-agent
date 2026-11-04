@@ -2095,6 +2095,22 @@ ONE_READERS: dict[str, _OneReader] = {
         {},
         "",
     ),
+    "what a draft is shown of the Controls": _OneReader(
+        lambda node: _calls(node, "reaches"),
+        ("src/analysis_service/job_controls.py", "shown_controls"),
+        {},
+        "",
+    ),
+    "the outcome of a Control row": _OneReader(
+        lambda node: (
+            isinstance(node, ast.Return)
+            and isinstance(node.value, ast.Constant)
+            and node.value.value == "no-finding"
+        ),
+        ("src/analysis_service/job_controls.py", "row_outcome"),
+        {},
+        "",
+    ),
     "what a job's Controls write": _OneReader(
         lambda node: _calls(node, "_stated_value"),
         ("src/analysis_service/job_controls.py", "control_facts"),

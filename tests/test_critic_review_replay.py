@@ -18,8 +18,17 @@ from typing import get_args
 
 import pytest
 
+from analysis_service import graph
+from analysis_service.critic_round import CriticRound
 from analysis_service.frameworks import PACKAGES, schemas_for
+from analysis_service.job_controls import (
+    AppliedControl,
+    AppliedScope,
+    CopiedEvidence,
+    CopiedRow,
+)
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.sources import text_digest
 from analysis_service.system_model import SystemModel
 from evals.critic_review import __main__ as critic_review
 from evals.critic_review import replay as R
@@ -33,15 +42,19 @@ from evals.critic_review.loading import (
 from evals.critic_review.model import CriticFixture, Expectation
 from evals.harness import critic_replay
 from evals.harness.assembly import ruling_type
+from evals.harness.bundle import write_reports
 from evals.harness.provenance import ProvenanceError
 from evals.harness.run_record import loaded
+from tests import test_evals_run_grounds as grounds
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixtures)
     finished,
+    record_requests,
     recorded,
 )
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
 PACKAGE = PACKAGES["stride"]
+AUDIT_YAML = "order_changes:\n  audit: append-only\n  identity: caller\n"
 PACKAGE_RULINGS = schemas_for("stride").rulings
 
 
@@ -122,6 +135,79 @@ def test_the_replays_request_is_the_graphs(recorded, case):  # noqa: F811
     assert sent[instruction] == [turn]
 
 
+#: One Control the graph applies to every STRIDE draft: the whole application,
+#: a row on each lane and one evidence file.
+EVERY_LANE = AppliedControl(
+    name="Order audit log",
+    scope=AppliedScope(control="control-" + "a" * 32, outcome="application"),
+    rows=[
+        CopiedRow(framework="stride", unit=lane, version=PACKAGE.version, ticked=True)
+        for lane in PACKAGE.lanes
+    ],
+    evidence=[
+        CopiedEvidence.model_validate(
+            {
+                "id": "evidence-" + "e" * 32,
+                "name": "audit.yaml",
+                "class": "config",
+                "sha256": text_digest(AUDIT_YAML),
+                "text": AUDIT_YAML,
+            }
+        )
+    ],
+)
+
+
+def test_the_replays_request_is_the_graphs_with_a_control(
+    monkeypatch,
+    case,  # noqa: F811
+    tmp_path,
+):
+    """With a Control applied, each draft carries a ``controls`` key, and the
+    request this harness sends still equals the one the graph sent.
+
+    The scripted critic answers no row, so the row check is off for this
+    sweep. This test holds the request, and ``tests/test_critic_controls.py``
+    holds the check.
+    """
+    monkeypatch.setattr(graph, "held_controls", lambda state: [EVERY_LANE])
+    monkeypatch.setattr(CriticRound, "shown", lambda self: {})
+    seen = record_requests(monkeypatch)
+    run = grounds.sweep(monkeypatch, case, None)
+    out = tmp_path / "artifact.json"
+    write_reports(str(out), "analysis", run.runs)
+    archived = critic_replay.load(finished(out, case.id), case.id, "stride")
+    fixtures = [
+        CriticFixture(
+            id=draft.id,
+            kind="control-covers",
+            framework="stride",
+            case=case.id,
+            draft=draft.model_dump(mode="json"),
+            expect=Expectation(survives=False),
+            rationale="a draft the recorded run produced",
+            controls=[EVERY_LANE],
+        )
+        for draft in archived.drafts
+    ]
+
+    instruction, turn = asyncio.run(
+        R.compose(
+            fixtures,
+            archived.model,
+            case.sources,
+            PACKAGE,
+            PACKAGE_LOADER,
+            PROMPT_LOADER,
+        )
+    )
+
+    sent = {text: contents for text, contents in seen}
+    assert instruction in sent, "no node sent this critic instruction"
+    assert sent[instruction] == [turn]
+    assert '"excerpt"' in instruction
+
+
 def re_placeholders(text: str) -> list[str]:
     return re.findall(r"\{([a-z_]+)\}", text)
 
@@ -196,6 +282,11 @@ def survivors(fixtures) -> list:
     return [f for f in fixtures if f.expect.survives]
 
 
+#: Each fixture by its draft's ID, so a scripted ruling answers the Control
+#: rows the draft is shown.
+FIXTURE_OF_DRAFT = {fixture.draft["id"]: fixture for fixture in load_fixtures()}
+
+
 def rule(claim_id: str, status: str, reason: str = "") -> dict:
     """One scripted ruling, in the shape this package's critic really emits.
 
@@ -206,11 +297,36 @@ def rule(claim_id: str, status: str, reason: str = "") -> dict:
 
     The critic writes no status, so ``status`` is the one the fields decide: a
     rejection names its check, and any other ruling leaves the verdict to the
-    draft's own unknown grounds, as :func:`surviving_status` reads them.
+    draft's own unknown grounds, as :func:`surviving_status` reads them. A
+    fixture whose reader expects a ``control`` rejection is rejected on its
+    first row, and every other row it is shown is refused.
     """
     verdict: dict = {"reason": reason}
-    if status == "rejected":
+    fixture = FIXTURE_OF_DRAFT.get(claim_id)
+    rows = (
+        []
+        if fixture is None
+        else [
+            {"control": control.id, "unit": row.unit}
+            for control in fixture.controls
+            for row in control.rows
+        ]
+    )
+    if (
+        status == "rejected"
+        and fixture
+        and fixture.expect.rejected_because == "control"
+    ):
+        verdict["rejected_because"] = "control"
+        verdict["control_row"], *rows = rows
+    elif status == "rejected":
         verdict["rejected_because"] = "reasoning"
+        rows = []
+    if rows:
+        verdict["refused_controls"] = [
+            {**row, "reason": "it shows nothing the draft calls missing"}
+            for row in rows
+        ]
     return {"id": claim_id, "verdict": verdict, **PACKAGE_REQUIRED}
 
 
@@ -248,7 +364,8 @@ def test_a_critic_answering_every_fixture_correctly_scores_both_halves(fixtures,
 
     score, _ = run(fixtures, model, payload)
 
-    assert score.unsupported_removed == (5, 5)
+    removed = len(fixtures) - len(survivors(fixtures))
+    assert score.unsupported_removed == (removed, removed)
     kept = len(survivors(fixtures))
     assert score.valid_preserved == (kept, kept)
     assert score.rejected_without_engaging == ()
@@ -269,10 +386,11 @@ def test_a_critic_that_rejects_everything_fails_the_preserved_half(fixtures, mod
 
     score, _ = run(fixtures, model, payload)
 
-    assert score.valid_preserved == (0, len(survivors(fixtures)))
+    kept = len(survivors(fixtures))
+    assert score.valid_preserved == (0, kept)
     # And it does not even earn the removals: none of those reasons engages.
-    assert score.unsupported_removed == (0, 5)
-    assert len(score.rejected_without_engaging) == 5
+    assert score.unsupported_removed == (0, len(fixtures) - kept)
+    assert len(score.rejected_without_engaging) == len(fixtures) - kept
 
 
 def test_killing_the_right_draft_for_the_wrong_reason_is_reported_apart(
@@ -289,7 +407,7 @@ def test_killing_the_right_draft_for_the_wrong_reason_is_reported_apart(
 
     kept = len(survivors(fixtures))
     assert score.valid_preserved == (kept, kept)
-    assert score.unsupported_removed == (0, 5)
+    assert score.unsupported_removed == (0, len(fixtures) - kept)
     assert {o.fixture_id for o in score.rejected_without_engaging} == {
         f.id for f in fixtures if not f.expect.survives
     }

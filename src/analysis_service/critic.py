@@ -46,6 +46,7 @@ from analysis_service.assertions import AssertionCatalog
 from analysis_service.claims import (
     ASSERTION_GROUNDS,
     Claim,
+    ControlRowRef,
     ProposedVerdict,
     RepairedQuote,
     RuledClaim,
@@ -59,7 +60,8 @@ from analysis_service.claims import (
     rests_on,
 )
 from analysis_service.evidence import ground_gloss
-from analysis_service.frameworks import FrameworkSchemas
+from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
+from analysis_service.job_controls import AppliedControl, shown_controls
 from analysis_service.question_kinds import parse_question_kind
 from analysis_service.references import snap
 from analysis_service.sources import quotable
@@ -453,6 +455,81 @@ def _unresolved_unknown_ref_issues(
     return issues
 
 
+#: The rows each draft was shown, by draft ID (:func:`shown_rows`).
+ShownRows = Mapping[str, frozenset[ControlRowRef]]
+
+
+def shown_rows(
+    drafts: Iterable[Claim],
+    package: FrameworkPackage,
+    controls: Sequence[AppliedControl],
+) -> dict[str, frozenset[ControlRowRef]]:
+    """Each draft's ID against the Control rows its ``controls`` key shows."""
+    return {
+        draft.id: frozenset(
+            ControlRowRef(control=control.id, unit=row.unit)
+            for control in shown_controls(draft, package, controls)
+            for row in control.rows
+        )
+        for draft in drafts
+    }
+
+
+def _control_row_issues(
+    rulings: Iterable[Ruling], shown: ShownRows
+) -> list[UnreconciledRuling]:
+    """Every completed ruling whose Control rows do not answer what it was shown.
+
+    A ``control_row`` goes on a ``control`` rejection and on no other, and a
+    ruling names only rows its draft was shown (ADR 0126). A draft that reached
+    the control step, kept or rejected for ``control``, answers each shown row
+    in ``control_row`` or in ``refused_controls``. A draft rejected at an
+    earlier step never reached it, so it answers none.
+    """
+    issues = []
+    for ruling in rulings:
+        verdict = ruling.verdict
+        rows = shown.get(ruling.id, frozenset())
+        messages = []
+        if verdict.rejected_because == "control" and verdict.control_row is None:
+            messages.append(
+                "is rejected for control and names no control_row: name the row"
+                " whose evidence covers the draft"
+            )
+        if verdict.control_row is not None and verdict.rejected_because != "control":
+            messages.append(
+                "names a control_row on a ruling not rejected for control: a"
+                " control_row goes only on a control rejection"
+            )
+        named = [
+            ControlRowRef(control=ref.control, unit=ref.unit)
+            for ref in (verdict.control_row, *verdict.refused_controls)
+            if ref is not None
+        ]
+        messages += [
+            f"names the row {ref.unit} of {ref.control}, which the draft was not shown"
+            for ref in named
+            if ref not in rows
+        ]
+        if verdict.rejected_because in (None, "control"):
+            messages += [
+                f"leaves the row {ref.unit} of {ref.control} unanswered: answer it"
+                " in control_row or in refused_controls"
+                for ref in sorted(
+                    rows - set(named), key=lambda ref: (ref.control, ref.unit)
+                )
+            ]
+        issues += [
+            UnreconciledRuling.of(
+                claim_id=ruling.id,
+                kind="control-row",
+                message=f"claim {ruling.id!r} {message}",
+            )
+            for message in messages
+        ]
+    return issues
+
+
 def _duplicate_id_issues(
     entries: Iterable[Claim | Ruling],
 ) -> list[UnreconciledRuling]:
@@ -524,6 +601,8 @@ def complete_rulings(
                     "reason": misfiled[ruling.id],
                     "related_unknowns": [],
                     "rejected_because": "lane",
+                    "control_row": None,
+                    "refused_controls": [],
                 }
             )
             completed.append(ruling.model_copy(update={"verdict": verdict}))
@@ -578,6 +657,7 @@ def review_issues(
     drafts: Sequence[Claim],
     rulings: Sequence[Ruling],
     system_model: SystemModel,
+    shown: ShownRows,
 ) -> ReviewProblems:
     """Every way the critic's rulings fail to account for the drafts it saw.
 
@@ -616,6 +696,9 @@ def review_issues(
     them there is no second place they can break. An issue
     listed here has to be one the re-ask can actually fix, and a draft's bad
     reference never was.
+
+    ``shown`` is the Control rows each draft was shown (:func:`shown_rows`),
+    which the rulings answer.
     """
     rulings = complete_rulings(drafts, rulings)
     drafted_ids = {draft.id for draft in drafts}
@@ -625,6 +708,7 @@ def review_issues(
         _verdict_shape_issues(rulings)
         + _confirmed_exclusion_issues(drafts, rulings)
         + _unresolved_unknown_ref_issues(rulings, system_model)
+        + _control_row_issues(rulings, shown)
     )
     problems = [
         UnreconciledRuling.of(
@@ -768,6 +852,7 @@ def assemble_claims(
     rulings: Sequence[Ruling],
     system_model: SystemModel,
     schemas: FrameworkSchemas,
+    shown: ShownRows,
 ) -> AssembledClaims:
     """Merge one critic's rulings onto its drafts, split into the block's arrays.
 
@@ -782,7 +867,7 @@ def assemble_claims(
     :func:`~analysis_service.fan_in.join_drafts` left them — so the audit array does not inherit
     whatever order the critic happened to emit its rulings in.
     """
-    problems = review_issues(drafts, rulings, system_model)
+    problems = review_issues(drafts, rulings, system_model, shown)
     if problems:
         raise CriticOutputError("; ".join(problems.messages))
 
@@ -831,6 +916,8 @@ def _ruling_view(
     repaired: Sequence[RepairedQuote],
     unverified: Sequence[UnverifiedGround],
     assertions: AssertionCatalog | None,
+    package: FrameworkPackage,
+    controls: Sequence[AppliedControl],
 ) -> list[dict]:
     """The drafts as a critic reads them, with no empty branches.
 
@@ -920,8 +1007,37 @@ def _ruling_view(
         # framework whose claims are an open set.
         if text := type(draft).unit_text(draft):
             view["unit_text"] = text
+        # Computed: each applied Control that reaches this draft, with the rows
+        # on its unit and the service's copy of each evidence file (ADR 0126).
+        if shown := shown_controls(draft, package, controls):
+            view["controls"] = [_control_entry(control, package) for control in shown]
         views.append(view)
     return views
+
+
+def _control_entry(control: AppliedControl, package: FrameworkPackage) -> dict:
+    """One applied Control as a draft's ``controls`` key shows it."""
+    return {
+        "control": control.id,
+        "name": control.name,
+        "scope": {
+            "outcome": control.scope.outcome,
+            "elements": list(control.scope.element_ids()),
+        },
+        "rows": [
+            {"unit": row.unit, "label": package.record.text_of_unit(row.unit)}
+            for row in control.rows
+        ],
+        "evidence": [
+            {
+                "label": file.name,
+                "class": file.evidence_class,
+                "sha256": file.sha256,
+                "excerpt": file.text,
+            }
+            for file in control.evidence
+        ],
+    }
 
 
 def _assertion_rows(draft: Claim, assertions: AssertionCatalog | None) -> list[dict]:
@@ -950,6 +1066,8 @@ def critic_view(
     repaired: Sequence[RepairedQuote],
     unverified: Sequence[UnverifiedGround],
     assertions: AssertionCatalog | None,
+    package: FrameworkPackage,
+    controls: Sequence[AppliedControl],
 ) -> list[dict]:
     """The drafts a critic is shown, with everything computed for it already.
 
@@ -980,6 +1098,9 @@ def critic_view(
     draft's assertion grounds point at. A ground carries the row's computed
     identity, whose value and scope are digests, so without this the critic is
     asked whether a claim follows from a fact it cannot read.
+
+    ``controls`` is each Control that applies to the job, and ``package`` reads
+    the unit of each draft, so each draft carries the Controls that reach it.
     """
     chosen = list(drafts) if only is None else [d for d in drafts if d.id in only]
-    return _ruling_view(chosen, repaired, unverified, assertions)
+    return _ruling_view(chosen, repaired, unverified, assertions, package, controls)

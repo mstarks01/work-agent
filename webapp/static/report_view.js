@@ -165,6 +165,8 @@
   // rule's own answer, which may be unknown.
   const REVIEW_EXCLUDED = ["Excluded by review",
     "A lane excluded it and the critic agreed. The rule's own answer is above."];
+  const CONTROL_COVERED = ["Covered by a Control",
+    "The owner states that a Control covers it. The service verified nothing."];
 
   // The same for a claim's verdict, in this service's terms rather than the
   // schema's. No verdict here reports a pass, and the wording says so.
@@ -174,19 +176,20 @@
     "rejected": ["Rejected", "The critic ruled this draft out. The reason says which check ended it."],
   };
 
-  // A rejection for `evidence` is the one rejection that rules on the unit a
-  // draft names: for a framework that answers in units it means the unit does
-  // not apply, and the reason says why. That is an answer about the
-  // requirement, so it belongs on the requirement's own row and not in the
-  // list of drafts that argued badly. Only a block with unit rows reads it so:
+  // A rejection for `evidence` or `control` rules on the unit a draft names:
+  // for a framework that answers in units, `evidence` means the unit does not
+  // apply, and `control` means the owner states that a Control covers it. Each
+  // is an answer about the requirement, so it belongs on the requirement's own
+  // row and not in the list of drafts that argued badly. Only a block with unit rows reads it so:
   // for a framework whose claims are an open set, an `evidence` rejection is a
   // draft that failed on its own substance, and it stays dismissed. A
   // rejection with no cause, from a report read back, is a ruling too, as
   // `RuledClaim.rules_on_unit` reads it.
   const answersInUnits = (block) => (UNITS[block.framework] || []).length > 0;
-  const rulesOut = (block, c) =>
+  const rulesOnUnit = (block, c) =>
     answersInUnits(block) && c.verdict.status === "rejected"
-    && (c.verdict.rejected_because ?? "evidence") === "evidence";
+    && ["evidence", "control"].includes(c.verdict.rejected_because ?? "evidence");
+  const coveredByControl = (c) => c.verdict.rejected_because === "control";
 
   // Each kind named in its own words, so they read as different *kinds* of
   // justification rather than formattings of one. The two attribute kinds
@@ -267,7 +270,12 @@
     // invented ID never had a claim -- so they render as a block-level note
     // rather than on a finding, grouped by kind.
     const unreconciled = (block.unreconciled_rulings || []);
-    return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless, unreconciled };
+    // Claims the review kept against every Control row they were shown. The
+    // job holds no evidence of the kind their unit needs, so the unit is listed
+    // as needing other evidence, and the claim is gone from the block. Each
+    // entry keeps the review's reason for each row it refused.
+    const returned = (block.returned_claims || []);
+    return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless, unreconciled, returned };
   }
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
@@ -645,8 +653,8 @@
       const claim = row.claim_id ? byId[row.claim_id] : null;
       const entry = byUnit[row.unit];
       const [label, meaning] = claim
-        ? (rulesOut(block, claim)
-            ? REVIEW_EXCLUDED
+        ? (rulesOnUnit(block, claim)
+            ? (coveredByControl(claim) ? CONTROL_COVERED : REVIEW_EXCLUDED)
             : (VERDICT_STATE[claim.verdict.status] || ["Ruled", ""]))
         : (SCOPE_STATE[entry ? entry.state : "not-raised"] || ["Listed", ""]);
 
@@ -747,7 +755,7 @@
     }
     // A requirement ruled out by review is an answer about the requirement,
     // and sits on its unit's row; a draft dismissed for arguing badly is not.
-    const dismissed = bySeverity(block.rejected_claims.filter(c => !rulesOut(block, c)));
+    const dismissed = bySeverity(block.rejected_claims.filter(c => !rulesOnUnit(block, c)));
     const confirmed = bySeverity(block.claims.filter(c => c.verdict.status === "confirmed"));
     const conditional = bySeverity(block.claims.filter(c => c.verdict.status === "needs-info"));
     section.append(summaryOf(block, conditional.length, dismissed.length));
@@ -1347,12 +1355,17 @@
     if (block.scope.length) {
       const byState = {};
       block.scope.forEach(e => { (byState[e.state] = byState[e.state] || []).push(e); });
-      const ruledOutClaims = block.rejected_claims.filter(c => rulesOut(block, c));
+      const onUnit = block.rejected_claims.filter(c => rulesOnUnit(block, c));
+      const ruledOutClaims = onUnit.filter(c => !coveredByControl(c));
+      const coveredClaims = onUnit.filter(coveredByControl);
       const lines = [`${counted(block.scope.length, "unit", "units")} with no claim raised`];
       const count = (state) => (byState[state] || []).length;
       if (count("not-applicable")) lines.push(`${count("not-applicable")} ruled out — does not apply`);
       if (ruledOutClaims.length) {
         lines.push(`${ruledOutClaims.length} ruled out by review — does not apply; each on its own row in the report`);
+      }
+      if (coveredClaims.length) {
+        lines.push(`${coveredClaims.length} covered by a Control the owner states — not verified; each on its own row in the report`);
       }
       if (count("undecidable")) {
         lines.push(`${count("undecidable")} undecidable — the input never says whether this framework applies`);
@@ -1394,6 +1407,22 @@
       marks.groundless.forEach(m => {
         const item = el("li");
         item.append(code(m.claim_id), " — ", prose(m.title), " (", prose(m.reason), ")");
+        list.append(item);
+      });
+      note.append(list);
+      notes.append(note);
+    }
+    if (marks.returned.length) {
+      const note = el("div", "dropped");
+      note.append(el("b", null,
+        `${counted(marks.returned.length, "finding", "findings")} the review kept against every Control row, so each unit needs other evidence`));
+      const list = el("ul");
+      marks.returned.forEach(m => {
+        const item = el("li");
+        item.append(code(m.claim_id), " — ", code(m.unit), ` needs ${m.needs}`);
+        m.refused_controls.forEach(r => {
+          item.append("; row ", code(r.unit), " of ", code(r.control), " refused: ", prose(r.reason));
+        });
         list.append(item);
       });
       note.append(list);

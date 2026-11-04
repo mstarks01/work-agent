@@ -45,6 +45,7 @@ from analysis_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_HEAD_ONLY,
     ENTRY_RESUME,
+    STATE_APPLIED_CONTROLS,
     STATE_ASSERTION_CATALOG,
     STATE_CONTROL_LINES,
     STATE_FACT_ANSWERS,
@@ -57,7 +58,11 @@ from analysis_service.graph import (
     Rejected,
     paused_at,
 )
-from analysis_service.job_controls import control_lines
+from analysis_service.job_controls import (
+    AppliedControl,
+    applied_controls,
+    control_lines,
+)
 from analysis_service.jobs import (
     Checkpoint,
     JobRecord,
@@ -240,6 +245,7 @@ def answered_state(
     links: Sequence[LinkAnswer],
     facts: Sequence[FactAnswer],
     controls: ControlLines = (),
+    applied: Sequence[AppliedControl] = (),
 ) -> dict[str, Any]:
     """The state a run starts from with a submitter's answers.
 
@@ -249,12 +255,16 @@ def answered_state(
     own. The catalog pass reads the link and fact answers: it writes each
     assertion answer over its open row, and removes every unscoped row that
     reaches an answered attribute. ``controls`` are the Control lines of the
-    answers Source (:func:`~analysis_service.links.with_link_answers`).
+    answers Source (:func:`~analysis_service.links.with_link_answers`), and
+    ``applied`` each Control that applies to ``model``.
     """
     state: dict[str, Any] = {
         STATE_LINK_ANSWERS: [link.model_dump() for link in links],
         STATE_FACT_ANSWERS: [fact.model_dump() for fact in facts],
         STATE_CONTROL_LINES: [[name, fact.model_dump()] for name, fact in controls],
+        STATE_APPLIED_CONTROLS: [
+            control.model_dump(mode="json") for control in applied
+        ],
     }
     if model is not None:
         state[STATE_VALID_MODEL] = answered_model(model, facts).model_dump(mode="json")
@@ -266,7 +276,8 @@ def _seeded_state(job: JobRecord) -> dict[str, Any]:
 
     A resumed job is seeded at the keys the validity gate and ``prepare`` write
     in a full run, so the resumed graph's ``prepare`` reads them exactly as it
-    reads its own. A job that starts from its sources carries only its answers.
+    reads its own, with each Control that applies to the held model. A job
+    that starts from its sources carries only its answers.
     """
     held = None if job.resumption is None else job.resumption.checkpoint
     controls = job.control_facts or []
@@ -275,6 +286,11 @@ def _seeded_state(job: JobRecord) -> dict[str, Any]:
         job.answers.links,
         job.written_answers().facts,
         control_lines(controls),
+        (
+            ()
+            if held is None
+            else applied_controls(job.controls, job.control_scopes, held.system_model)
+        ),
     )
     if held is not None and held.assertions is not None:
         seeded[STATE_ASSERTION_CATALOG] = held.assertions.model_dump(mode="json")

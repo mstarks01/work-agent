@@ -103,15 +103,17 @@ VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
 # fact both answer it, and it rules on the unit. ``reasoning`` says the draft
 # asserts or infers what the model does not state, so the draft fails and the
 # unit stays open: a package answering in units lists it as ``not-raised``.
+# ``control`` is the third check: a row of an applied Control covers the
+# draft's unit, as the owner states it, and it rules on the unit (ADR 0126).
 # The vocabulary describes the check rather than what the check was about, so
 # it answers for a package nobody has written.
-RejectionStep = Literal["evidence", "reasoning", "lane", "duplicate"]
+RejectionStep = Literal["evidence", "reasoning", "lane", "duplicate", "control"]
 
 # The steps a critic may fail a draft on. ``duplicate`` is not among them: the
 # critic rules every draft on its own, because every duplicate rejection on
 # record dropped a different finding (QA-2026-10-03-02-E3). It stays in
 # :data:`RejectionStep` because archived reports carry it and are re-scored.
-CriticStep = Literal["evidence", "reasoning", "lane"]
+CriticStep = Literal["evidence", "reasoning", "lane", "control"]
 
 #: The ground kinds that cite an attribute of an element.
 AttributeGround = Literal["unknown-attribute", "absent-attribute"]
@@ -741,6 +743,28 @@ def rests_on(refs: Sequence[UnknownRef]) -> str:
     return reason
 
 
+#: The bound on a Control ID and a unit ID that a ruling copies. The review
+#: seam checks each against the rows the draft was shown, so the bound is the
+#: only check here.
+CONTROL_REF_MAX_CHARS = 64
+
+
+class ControlRowRef(BaseModel):
+    """One row of an applied Control: the Control's ID and the row's unit."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    control: str = Field(max_length=CONTROL_REF_MAX_CHARS)
+    unit: str = Field(max_length=CONTROL_REF_MAX_CHARS)
+
+
+class RefusedControl(ControlRowRef):
+    """A row the critic was shown on a draft and that does not cover it, with
+    why. Prose, because the judgement is the critic's (ADR 0126)."""
+
+    reason: str = Field(min_length=1, max_length=REASON_MAX_CHARS)
+
+
 class VerdictFields(BaseModel):
     """What a critic writes about one draft, and what a report's verdict keeps.
 
@@ -765,6 +789,11 @@ class VerdictFields(BaseModel):
     #: grounds. A dismissal is a claim somebody can check (#894).
     immaterial_unknowns: list[UnknownRef] = Field(default_factory=list)
     rejected_because: RejectionStep | None = None
+    #: The row that covers the draft, exactly where ``rejected_because`` is
+    #: ``control``. The reason quotes the sentence that covers it.
+    control_row: ControlRowRef | None = None
+    #: Each row the draft was shown that does not cover it.
+    refused_controls: list[RefusedControl] = Field(default_factory=list)
 
     def dismissed_refs(self) -> frozenset[UnknownKey]:
         """``immaterial_unknowns`` as the keys it names, by :attr:`UnknownRef.key`.
@@ -882,6 +911,11 @@ class Verdict(VerdictFields):
                 f"rejected_because is only meaningful for rejected verdicts,"
                 f" not {self.status!r}"
             )
+        if (self.rejected_because == "control") != (self.control_row is not None):
+            raise ValueError(
+                "a control_row is required on a control rejection, and on no"
+                " other verdict"
+            )
         return self
 
 
@@ -972,7 +1006,11 @@ class Claim(BaseModel):
 
     @classmethod
     def partition_proposals(
-        cls, proposals: Sequence[Any], lane: str, carried: Collection[str]
+        cls,
+        proposals: Sequence[Any],
+        lane: str,
+        carried: Collection[str],
+        covered: Collection[str],
     ) -> tuple[list[Any], dict[str, str]]:
         """Split a lane's proposals into the ones this job can settle, and the rest.
 
@@ -1001,8 +1039,12 @@ class Claim(BaseModel):
         ``carried`` is what the job's input actually holds. It is an argument
         rather than a constant so that the answer changes when the service
         accepts a second kind of input, with no edit to any package.
+
+        ``covered`` is each unit a row of an applied Control covers. A proposal
+        on one is kept whatever kind it names, so the critic judges it against
+        the row (ADR 0126).
         """
-        del lane, carried
+        del lane, carried, covered
         return list(proposals), {}
 
     @classmethod
@@ -1327,7 +1369,7 @@ class RuledClaim(Claim):
     def rules_on_unit(self) -> bool:
         """Whether this ruling says something about the unit the claim names.
 
-        A rejection has four causes and only one of them is a ruling. Rejected
+        A rejection has five causes and two of them are rulings. Rejected
         for ``evidence``, the critic says the unit does not apply to a system of
         this shape, which is an answer. Rejected for ``reasoning``, the critic
         says the *draft's argument* does not hold — it asserted or inferred what
@@ -1335,8 +1377,10 @@ class RuledClaim(Claim):
         open (#659). Rejected for ``lane`` or ``duplicate``, the critic says the
         draft was in the wrong place or was a second copy, and again says
         nothing about the unit. All three leave it unruled, exactly as if no
-        lane had drafted it. A rejection with no cause, from a report read
-        back, carries ``None`` and reads as a ruling.
+        lane had drafted it. Rejected for ``control``, the critic says a row of
+        an applied Control covers the unit, as the owner states it, which is a
+        ruling (ADR 0126). A rejection with no cause, from a report read back,
+        carries ``None`` and reads as a ruling.
 
         **One reader.** The scope builder that decides which units a block
         still has to list, the coverage check that audits it, and the eval
@@ -1346,7 +1390,7 @@ class RuledClaim(Claim):
         """
         if self.verdict.status != "rejected":
             return True
-        return self.verdict.rejected_because in (None, "evidence")
+        return self.verdict.rejected_because in (None, "evidence", "control")
 
 
 class QuoteCandidate(BaseModel):
@@ -2039,6 +2083,9 @@ UNNAMED_CLAIM = "(unnamed)"
 #: * ``verdict-shape`` — a verdict's fields cannot make a coherent verdict;
 #: * ``unresolved-unknown`` — a ``needs-info`` names an element or attribute
 #:   the model does not hold, or names nothing at all;
+#: * ``control-row`` — a ruling names a Control row the draft was not shown,
+#:   names a ``control_row`` on a step other than ``control``, or leaves a
+#:   shown row unanswered (ADR 0126);
 #: * ``unbriefed-change`` — the re-ask changed a ruling no problem named, and
 #:   the first pass's ruling was kept.
 #:
@@ -2055,6 +2102,7 @@ UnreconciledKind = Literal[
     "duplicate-on-unit",
     "verdict-shape",
     "unresolved-unknown",
+    "control-row",
     "unbriefed-change",
 ]
 
@@ -2415,6 +2463,23 @@ class ScopeEntry(BaseModel):
         return self
 
 
+class ReturnedClaim(BaseModel):
+    """A claim the critic kept against every Control row it was shown, whose
+    unit went back to the deferred set (ADR 0126).
+
+    The job carries no evidence of the kind the unit needs, so the claim
+    leaves the block and the unit is listed ``needs-other-evidence``. The
+    critic's refusals of the rows stay here, so each row keeps its rulings.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
+    unit: str = Field(min_length=1, max_length=300)
+    needs: str = Field(min_length=1, max_length=100)
+    refused_controls: list[RefusedControl] = Field(default_factory=list)
+
+
 class DecidingFact(BaseModel):
     """One capability that decided an applicability entry, with what states it."""
 
@@ -2632,6 +2697,9 @@ class FrameworkAnalysis(BaseModel):
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
     dropped_claims: list[DroppedClaim] = Field(default_factory=list)
+    #: Each claim the critic kept against every Control row, whose unit went
+    #: back to the deferred set with the row refusals of its ruling.
+    returned_claims: list[ReturnedClaim] = Field(default_factory=list)
     fired_rules: list[str] = Field(default_factory=list)
     knowledge_docs: list[str] = Field(default_factory=list)
     #: How many **Candidates** fire only because of the assertion catalog: the
