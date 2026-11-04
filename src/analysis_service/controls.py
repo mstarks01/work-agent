@@ -250,6 +250,8 @@ class ControlDocument(BaseModel):
                 " the zone instead."
             )
         for ref in refs:
+            if len(ref.spellings) != 1:
+                raise ValueError("A fact names one fact, in one spelling.")
             if ref.kind not in SCOPE_FACT_KINDS[self.scope.type]:
                 raise ValueError(SCOPE_FACT_REFUSALS[self.scope.type])
         for key in _repeated(fact.key for fact in self.facts):

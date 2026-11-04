@@ -87,14 +87,14 @@ const formControls = (() => {
 
   // ---- The pause -----------------------------------------------------------
   // Each reason a Control is left out (LeftOutReason), and each reason a
-  // zone lists a part (CoverReason). A stated zone needs no words.
+  // zone lists a part (CoverReason).
   const REASONS = {
     "missing-element": "missing-element: no part of this description has the name or an alias",
     "empty-zone": "empty-zone: the zone holds no part of this description",
     "unticked": "unticked: you left it out",
     "zone-inferred": "zone-inferred: the service inferred this placement",
     "no-zone-stated": "no-zone-stated: no source places this part",
-    "stated-zone": "",
+    "stated-zone": "stated-zone: the description places this part in the zone",
   };
   // The candidates of a zone Control on `element`: the zone it matched, or a
   // zone the owner chose from its choices. Empty for any other element.
@@ -185,7 +185,7 @@ const formControls = (() => {
               send();
             } } });
           return h("li", {}, tick, " ", h("label", { for: tick.id }, cover.name),
-            REASONS[cover.reason] ? h("span", { class: "hint" }, ` — ${REASONS[cover.reason]}`) : null);
+            h("span", { class: "hint" }, ` — ${REASONS[cover.reason]}`));
         })));
       }
       const own = facts.filter((fact) => fact.control === entry.id);

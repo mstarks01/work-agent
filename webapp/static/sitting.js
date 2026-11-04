@@ -416,7 +416,7 @@ function frameworkChoice(name, details) {
     details.classList.toggle("hidden", !input.checked);
     if (input.checked) details.open = true;
   });
-  label.append(input, document.createTextNode(name));
+  label.append(input, document.createTextNode(name.toUpperCase()));
   return label;
 }
 

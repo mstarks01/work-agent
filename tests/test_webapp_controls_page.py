@@ -125,6 +125,17 @@ class TestCreate:
                 ),
             ),
             (
+                {
+                    "facts": [
+                        {
+                            "key": ["", "encryption_at_rest", "", "", "", "database"],
+                            "value": "yes",
+                        }
+                    ]
+                },
+                "A fact names one fact, in one spelling.",
+            ),
+            (
                 {"scope": {"type": "application"}},
                 (
                     "The whole application takes only a capability. Choose the"
@@ -394,9 +405,13 @@ class RulingRunner(ZonedRunner):
                 )
             ],
         )
+        # Two drafts on one row, each ruled out by the same quoted line.
         ruled = sample_analysis(
             [],
-            [claim.model_copy(update={"verdict": verdict})],
+            [
+                claim.model_copy(update={"verdict": verdict}),
+                claim.model_copy(update={"id": f"{claim.id}-2", "verdict": verdict}),
+            ],
             returned_claims=[returned],
         )
         analyses = [ruled if one is block else one for one in report.analyses]
@@ -447,8 +462,10 @@ class TestTheReportSection:
             "tampering": "refused",
             "repudiation": "no-finding",
         }
-        [applied] = rows["spoofing"]["rulings"]
-        assert applied["ruling"] == "applied"
+        assert [one["ruling"] for one in rows["spoofing"]["rulings"]] == [
+            "applied",
+            "applied",
+        ]
         assert rows["spoofing"]["quoted"] == [
             {"file": "WAF.yaml", "class": "config", "line": 1, "text": "WAF: on"}
         ]
@@ -555,6 +572,22 @@ class TestTheTables:
         assert set(EVIDENCE_LABELS) == set(get_args(EvidenceClass))
         assert set(ROW_MEANINGS) == set(get_args(RowOutcome))
 
+    def test_the_fact_kind_tables_name_each_scope_and_kind(self):
+        from typing import get_args
+
+        from analysis_service.controls import (
+            SCOPE_FACT_KINDS,
+            SCOPE_FACT_REFUSALS,
+            ControlFactKind,
+            ScopeType,
+        )
+        from webapp.controls_page import _FACT_OFFERS
+
+        assert set(SCOPE_FACT_KINDS) == set(get_args(ScopeType))
+        assert set(SCOPE_FACT_REFUSALS) == set(get_args(ScopeType))
+        assert set(_FACT_OFFERS) == set(get_args(ControlFactKind))
+        assert set().union(*SCOPE_FACT_KINDS.values()) == set(get_args(ControlFactKind))
+
 
 EVIDENCE = (
     "rate_limit:\n"
@@ -574,6 +607,7 @@ EVIDENCE = (
         ("It quotes “enabled”, a word of many lines.", []),
         ("The file says waf: enabled, with no quotation.", []),
         ("“waf: enabled” and again “waf: enabled”.", [4]),
+        ("The file says ‘the owner’s requests: 100 a minute for each client’.", [3]),
     ],
 )
 def test_an_evidence_line_counts_only_where_a_quotation_quotes_it(reason, lines):
