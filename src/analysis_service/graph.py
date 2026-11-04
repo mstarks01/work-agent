@@ -2487,8 +2487,9 @@ def _framework_block(
     )
     if isinstance(outcome, Failed):
         raise outcome.error
-    claims, returned = returned_to_deferred(
+    claims, returned, back = returned_to_deferred(
         outcome.claims,
+        outcome.rejected,
         state.get(nodes.key("undeferred")) or {},
         package.record,
     )
@@ -2507,7 +2508,7 @@ def _framework_block(
             claims=(*claims, *rejected),
             options=options,
             refusal=refusal,
-            deferred={**(state.get(nodes.key("deferred")) or {}), **returned},
+            deferred={**(state.get(nodes.key("deferred")) or {}), **back},
             ruled_out=state.get(nodes.key("ruled_out")) or {},
             ruled_in=state.get(nodes.key("ruled_in")) or {},
         ),
@@ -2519,6 +2520,7 @@ def _framework_block(
             LaneCoverage.model_validate(row)
             for row in state.get(nodes.key("coverage")) or []
         ],
+        returned_claims=returned,
         fired_rules=list(retrieved.get("fired_rules", [])),
         knowledge_docs=list(retrieved.get("knowledge_docs", [])),
         catalog_leads=retrieved.get("catalog_leads"),

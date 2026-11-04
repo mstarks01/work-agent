@@ -2463,6 +2463,23 @@ class ScopeEntry(BaseModel):
         return self
 
 
+class ReturnedClaim(BaseModel):
+    """A claim the critic kept against every Control row it was shown, whose
+    unit went back to the deferred set (ADR 0126).
+
+    The job carries no evidence of the kind the unit needs, so the claim
+    leaves the block and the unit is listed ``needs-other-evidence``. The
+    critic's refusals of the rows stay here, so each row keeps its rulings.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
+    unit: str = Field(min_length=1, max_length=300)
+    needs: str = Field(min_length=1, max_length=100)
+    refused_controls: list[RefusedControl] = Field(default_factory=list)
+
+
 class DecidingFact(BaseModel):
     """One capability that decided an applicability entry, with what states it."""
 
@@ -2680,6 +2697,9 @@ class FrameworkAnalysis(BaseModel):
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
     dropped_claims: list[DroppedClaim] = Field(default_factory=list)
+    #: Each claim the critic kept against every Control row, whose unit went
+    #: back to the deferred set with the row refusals of its ruling.
+    returned_claims: list[ReturnedClaim] = Field(default_factory=list)
     fired_rules: list[str] = Field(default_factory=list)
     knowledge_docs: list[str] = Field(default_factory=list)
     #: How many **Candidates** fire only because of the assertion catalog: the

@@ -34,7 +34,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.answer_sets import AnswerSet
 from analysis_service.assertions import AssertionCatalog
-from analysis_service.claims import Claim, ControlRowRef, RuledClaim
+from analysis_service.claims import Claim, ControlRowRef, ReturnedClaim, RuledClaim
 from analysis_service.controls import (
     CONTROL_ID,
     EVIDENCE_ID,
@@ -556,10 +556,12 @@ class RowRuling(BaseModel):
     reason: str
 
 
-def row_rulings(claims: Iterable[RuledClaim]) -> dict[ControlRowRef, list[RowRuling]]:
-    """Each row a verdict of ``claims`` names, against its rulings in claim
-    order. The report holds each ruling in a verdict, so the job keeps no
-    second record of it."""
+def row_rulings(
+    claims: Iterable[RuledClaim], returned: Iterable[ReturnedClaim]
+) -> dict[ControlRowRef, list[RowRuling]]:
+    """Each row a verdict of ``claims`` or an entry of ``returned`` names,
+    against its rulings in that order. The report holds each ruling once, so
+    the job keeps no second record of it."""
     rulings: dict[ControlRowRef, list[RowRuling]] = {}
     for claim in claims:
         verdict = claim.verdict
@@ -571,6 +573,12 @@ def row_rulings(claims: Iterable[RuledClaim]) -> dict[ControlRowRef, list[RowRul
             row = ControlRowRef(control=refused.control, unit=refused.unit)
             rulings.setdefault(row, []).append(
                 RowRuling(claim=claim.id, ruling="refused", reason=refused.reason)
+            )
+    for entry in returned:
+        for refused in entry.refused_controls:
+            row = ControlRowRef(control=refused.control, unit=refused.unit)
+            rulings.setdefault(row, []).append(
+                RowRuling(claim=entry.claim_id, ruling="refused", reason=refused.reason)
             )
     return rulings
 

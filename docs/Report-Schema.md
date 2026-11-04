@@ -31,7 +31,7 @@ framework's own findings sit in its own block under `analyses`.
 
 ```python
 class Report:
-    schema_version: str  # "3.3"
+    schema_version: str  # "3.4"
     disclaimer: str  # the SERVICE's: AI-generated, not human-reviewed
     job: Job  # id, status="completed", timestamps, revise_rounds, frameworks
     input: InputRef  # system_name + one ref per submitted source
@@ -95,6 +95,7 @@ class FrameworkAnalysis:
     unresolved_evidence: list[UnresolvedEvidence]
     unknown_claim_identities: list[UnknownClaimIdentity]
     dropped_claims: list[DroppedClaim]
+    returned_claims: list[ReturnedClaim]  # kept against every Control row, unit deferred
     fired_rules: list[str]  # this package's deterministic rules that matched
     knowledge_docs: list[str]  # local-corpus documents those rules retrieved
     catalog_leads: int | None  # leads only the assertion catalog gave; null with no pass
@@ -214,7 +215,7 @@ an empty list where STRIDE narrows it.
 
 **An ASVS claim never reports a pass.** `confirmed` means the requirement applies
 and the input does not show it satisfied; `needs-info` means the input does not
-settle it; `rejected` with `rejected_because` of `evidence` means the requirement does not apply; a rejection for `reasoning` or `lane` answers nothing about it, and the requirement stays listed in `scope` as `not-raised`. Verification needs
+settle it; `rejected` with `rejected_because` of `evidence` means the requirement does not apply; `control` means the owner states that a Control covers it, which the service did not verify; a rejection for `reasoning` or `lane` answers nothing about it, and the requirement stays listed in `scope` as `not-raised`. Verification needs
 source code, configuration and the people who built the system, and a job here
 carries prose. See
 [ADR 0013](adr/0013-asvs-rules-applicability-and-never-a-pass.md).
@@ -524,6 +525,22 @@ the replaced span with `written` and `moved` beside it, and the viewer shows
 the difference to a reader. `scan_complete` is `False` where the work budget
 or a deadline stopped the scan before every window was ranked, so the span is
 the best found by then. See [ADR 0018](adr/0018-the-repair-rung.md).
+
+## `returned_claims` — claims a Control row kept that went back to the deferred set
+
+```python
+class ReturnedClaim:
+    claim_id: str  # the claim the critic kept against every Control row
+    unit: str  # the unit, now listed needs-other-evidence
+    needs: str  # the kind of evidence the unit needs
+    refused_controls: list[RefusedControl]  # the critic's refusal of each row
+```
+
+A Control row keeps a unit that the job cannot settle from the deferred set,
+so the critic can judge the row (ADR 0126). Where the critic keeps the draft
+against every row, the job still carries no evidence of the kind the unit
+needs. The claim leaves `claims`, the unit is listed `needs-other-evidence`
+with its kind, and this entry keeps the critic's refusals.
 
 ## `dropped_claims` — claims the service dropped for a fault in one entry
 
@@ -915,7 +932,9 @@ class Verdict:
     reason: str  # required unless confirmed
     related_unknowns: list[UnknownRef]  # required iff needs-info
     immaterial_unknowns: list[UnknownRef]  # unknown grounds the critic dismissed
-    rejected_because: "evidence" | "reasoning" | "lane" | "duplicate" | None
+    rejected_because: "evidence" | "reasoning" | "lane" | "duplicate" | "control" | None
+    control_row: ControlRowRef | None  # {control, unit}; exactly on a control rejection
+    refused_controls: list[RefusedControl]  # {control, unit, reason}; rows that do not cover it
 ```
 
 - `confirmed` — grounded in the model's facts.
@@ -1287,3 +1306,10 @@ version before it. Read it when you load an archived report.
   a run wrote before the field existed. Additive for a consumer that reads only
   the 3.2 fields. A route that parses a stored 3.2 job record answers `409`
   (see [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).
+- **Version 3.4:** `rejected_because` holds `control`: a row of the owner's
+  Control covers the claim's unit, as the owner states it, and the service
+  verified nothing. A verdict carries `control_row` exactly on a `control`
+  rejection, and `refused_controls` for each row the critic refused. Each block
+  carries `returned_claims`. Additive for a consumer that reads only the 3.3
+  fields. A route that parses a stored 3.3 job record answers `409` (see
+  [HTTP-API](HTTP-API.md#a-job-from-an-older-schema-version)).

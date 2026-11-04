@@ -58,6 +58,7 @@ from analysis_service.claims import (
     LaneCoverage,
     ProposalBatch,
     RepairedQuote,
+    ReturnedClaim,
     RuledClaim,
     UnresolvedEvidence,
     UnresolvedMention,
@@ -315,23 +316,46 @@ def fan_in(
     return FanIn(merged, marks, deferred, coverage, undeferred)
 
 
-def returned_to_deferred(
-    claims: Sequence[RuledClaim], undeferred: Mapping[str, str], record: type[Claim]
-) -> tuple[list[RuledClaim], dict[str, str]]:
-    """``claims`` without each claim a Control row alone kept from the
-    deferred set, and each such claim's unit against its kind.
+class Returned(NamedTuple):
+    """The claims a block keeps, the claims that went back, and their units."""
 
-    ``claims`` are the claims the critic kept, so it refused every row they
-    were shown. The job carries no evidence of the kind the unit needs, so
-    the unit goes back to the deferred set (ADR 0126).
+    claims: list[RuledClaim]
+    returned: list[ReturnedClaim]
+    deferred: dict[str, str]
+
+
+def returned_to_deferred(
+    claims: Sequence[RuledClaim],
+    rejected: Sequence[RuledClaim],
+    undeferred: Mapping[str, str],
+    record: type[Claim],
+) -> Returned:
+    """Each unit a Control row alone kept from the deferred set and that no
+    ruling settled, back in the deferred set with its kind (ADR 0126).
+
+    The job carries no evidence of the kind such a unit needs. A claim the
+    critic kept refused every row it was shown, so it leaves ``claims`` as a
+    :class:`ReturnedClaim` with those refusals. A claim rejected at a step that
+    does not rule on the unit stays in the rejected array.
     """
-    kept = [claim for claim in claims if record.unit_of(claim) not in undeferred]
-    back = {
-        unit: undeferred[unit]
+    back: dict[str, str] = {}
+    for claim in (*claims, *rejected):
+        unit = record.unit_of(claim)
+        ruled = claim.verdict.status == "rejected" and claim.rules_on_unit()
+        if unit in undeferred and not ruled:
+            back[unit] = undeferred[unit]
+    returned = [
+        ReturnedClaim(
+            claim_id=claim.id,
+            unit=unit,
+            needs=back[unit],
+            refused_controls=claim.verdict.refused_controls,
+        )
         for claim in claims
-        if (unit := record.unit_of(claim)) in undeferred
-    }
-    return kept, back
+        if (unit := record.unit_of(claim)) in back
+    ]
+    kept = [claim for claim in claims if record.unit_of(claim) not in back]
+    return Returned(kept, returned, back)
 
 
 class DraftJoinError(ValueError):

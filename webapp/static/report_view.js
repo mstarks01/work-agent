@@ -270,7 +270,12 @@
     // invented ID never had a claim -- so they render as a block-level note
     // rather than on a finding, grouped by kind.
     const unreconciled = (block.unreconciled_rulings || []);
-    return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless, unreconciled };
+    // Claims the review kept against every Control row they were shown. The
+    // job holds no evidence of the kind their unit needs, so the unit is listed
+    // as needing other evidence, and the claim is gone from the block. Each
+    // entry keeps the review's reason for each row it refused.
+    const returned = (block.returned_claims || []);
+    return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless, unreconciled, returned };
   }
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
@@ -1402,6 +1407,22 @@
       marks.groundless.forEach(m => {
         const item = el("li");
         item.append(code(m.claim_id), " — ", prose(m.title), " (", prose(m.reason), ")");
+        list.append(item);
+      });
+      note.append(list);
+      notes.append(note);
+    }
+    if (marks.returned.length) {
+      const note = el("div", "dropped");
+      note.append(el("b", null,
+        `${counted(marks.returned.length, "finding", "findings")} the review kept against every Control row, so each unit needs other evidence`));
+      const list = el("ul");
+      marks.returned.forEach(m => {
+        const item = el("li");
+        item.append(code(m.claim_id), " — ", code(m.unit), ` needs ${m.needs}`);
+        m.refused_controls.forEach(r => {
+          item.append("; row ", code(r.unit), " refused: ", prose(r.reason));
+        });
         list.append(item);
       });
       note.append(list);

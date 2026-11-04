@@ -201,7 +201,12 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # Version 3.3: each STRIDE threat carries ``attacker_position``, from a closed
 # set of five, and ``None`` only on a threat a run wrote before the field. A
 # stored 3.2 job record gets 409 ``UnreadableSchema``.
-SCHEMA_VERSION = "3.3"
+#
+# Version 3.4: ``rejected_because`` holds ``control``, a verdict carries
+# ``control_row`` and ``refused_controls``, and each block carries
+# ``returned_claims`` (ADR 0126). A stored 3.3 job record gets 409
+# ``UnreadableSchema``.
+SCHEMA_VERSION = "3.4"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
 # one framework. It does not say "threat model": that is false of a report

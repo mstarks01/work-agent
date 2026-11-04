@@ -4,8 +4,22 @@ the review seam checks the rulings on them, and what the run keeps (ADR 0126).
 
 from __future__ import annotations
 
-from analysis_service.claims import AnalysisMarks, ControlRowRef, QuoteCandidate
+from typing import get_args
+
+import pytest
+from pydantic import ValidationError
+
+from analysis_service.claims import (
+    AnalysisMarks,
+    ControlRowRef,
+    CriticStep,
+    ProposedVerdict,
+    QuoteCandidate,
+    Ruling,
+    Verdict,
+)
 from analysis_service.controls import Control, ControlDocument
+from analysis_service.critic import review_issues
 from analysis_service.critic_round import Accepted, CriticRound, Reask
 from analysis_service.fan_in import fan_in, returned_to_deferred
 from analysis_service.frameworks import PACKAGES
@@ -316,7 +330,7 @@ class TestTheRowOutcome:
             [_ruling(**APPLIED, refused_controls=[_refused("V11.2.1")])]
         )
 
-        rulings = row_rulings([*outcome.claims, *outcome.rejected])
+        rulings = row_rulings([*outcome.claims, *outcome.rejected], [])
 
         assert rulings == {
             ControlRowRef(control=DB_CONTROL, unit="V11"): [
@@ -409,12 +423,19 @@ class TestTheUnDefer:
             {"refused_controls": [_refused("V11.2.1")], "reason": "open"}
         )
 
-        claims, deferred = returned_to_deferred(
-            outcome.claims, merged.undeferred, PACKAGES["asvs"].record
+        claims, returned, deferred = returned_to_deferred(
+            outcome.claims, outcome.rejected, merged.undeferred, PACKAGES["asvs"].record
         )
 
         assert claims == []
         assert deferred == {"V11.2.1": "config"}
+        [entry] = returned
+        assert (entry.claim_id, entry.unit, entry.needs) == (
+            "v5.0.0-11.2.1",
+            "V11.2.1",
+            "config",
+        )
+        assert row_outcome(row_rulings(claims, returned)[ROW]) == "refused"
         entries = AsvsAnalysis.scope_entries(
             lanes=["cryptography"],
             claims=[*claims, *outcome.rejected],
@@ -429,11 +450,12 @@ class TestTheUnDefer:
             {**APPLIED, "control_row": {"control": DB_CONTROL, "unit": "V11.2.1"}}
         )
 
-        claims, deferred = returned_to_deferred(
-            outcome.claims, merged.undeferred, PACKAGES["asvs"].record
+        claims, returned, deferred = returned_to_deferred(
+            outcome.claims, outcome.rejected, merged.undeferred, PACKAGES["asvs"].record
         )
 
-        assert (claims, deferred) == ([], {})
+        assert (claims, returned, deferred) == ([], [], {})
+        assert row_outcome(row_rulings(outcome.rejected, returned)[ROW]) == "applied"
         entries = AsvsAnalysis.scope_entries(
             lanes=["cryptography"],
             claims=outcome.rejected,
@@ -441,3 +463,57 @@ class TestTheUnDefer:
             deferred=deferred,
         )
         assert "V11.2.1" not in {entry.unit for entry in entries}
+
+    def test_a_draft_rejected_at_step_one_leaves_its_unit_deferred(self):
+        """A rejection that does not rule on the unit leaves it open, and the
+        job still carries no evidence of its kind."""
+        merged, outcome = self._ruled(
+            {"rejected_because": "reasoning", "reason": "It misreads V11.2.1."}
+        )
+
+        claims, returned, deferred = returned_to_deferred(
+            outcome.claims, outcome.rejected, merged.undeferred, PACKAGES["asvs"].record
+        )
+
+        assert (claims, returned) == ([], [])
+        assert deferred == {"V11.2.1": "config"}
+        entries = AsvsAnalysis.scope_entries(
+            lanes=["cryptography"],
+            claims=outcome.rejected,
+            options={"level": 3},
+            deferred=deferred,
+        )
+        [entry] = [entry for entry in entries if entry.unit == "V11.2.1"]
+        assert (entry.state, entry.needs) == ("needs-other-evidence", "config")
+
+
+ROW = ControlRowRef(control=DB_CONTROL, unit="V11.2.1")
+
+
+@pytest.mark.parametrize("step", [None, *get_args(CriticStep)])
+@pytest.mark.parametrize("names_a_row", [False, True])
+def test_the_verdict_and_the_seam_hold_one_row_rule(step, names_a_row):
+    """``Verdict`` and the review seam both read "a control_row exactly on a
+    control rejection", so each combination is put to both."""
+    fields = {
+        "reason": "rds.tf: storage_encrypted = true",
+        "rejected_because": step,
+        "control_row": {"control": DB_CONTROL, "unit": "V11"} if names_a_row else None,
+        # The one shown row is answered either way, so only the row rule speaks.
+        "refused_controls": [] if names_a_row else [_refused("V11")],
+    }
+    try:
+        Verdict(status="rejected" if step else "confirmed", **fields)
+    except ValidationError:
+        verdict_refuses = True
+    else:
+        verdict_refuses = False
+    seam = review_issues(
+        [DRAFT],
+        [Ruling(id=DRAFT.id, verdict=ProposedVerdict(**fields))],
+        valid_model(),
+        {DRAFT.id: frozenset({ControlRowRef(control=DB_CONTROL, unit="V11")})},
+    )
+    seam_refuses = any(problem.kind == "control-row" for problem in seam.problems)
+
+    assert seam_refuses is verdict_refuses
