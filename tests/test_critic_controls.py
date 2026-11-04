@@ -21,6 +21,7 @@ from analysis_service.claims import (
 from analysis_service.controls import Control, ControlDocument
 from analysis_service.critic import review_issues
 from analysis_service.critic_round import Accepted, CriticRound, Reask
+from analysis_service.fact_answers import FactAnswer
 from analysis_service.fan_in import fan_in, returned_to_deferred
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.asvs.record import (
@@ -31,10 +32,13 @@ from analysis_service.frameworks.asvs.record import (
 )
 from analysis_service.job_controls import (
     AppliedControl,
+    ControlFact,
+    ControlFacts,
     CopiedControl,
     RowRuling,
     applied_controls,
     controls_section,
+    refuse_disagreement,
     row_outcome,
     row_rulings,
     unreached_rows,
@@ -584,3 +588,19 @@ def test_the_verdict_and_the_seam_hold_one_row_rule(step, names_a_row):
     seam_refuses = any(problem.kind == "control-row" for problem in seam.problems)
 
     assert seam_refuses is verdict_refuses
+
+
+def test_a_control_whose_fact_its_part_cannot_take_cannot_apply():
+    # The answer check refuses a question about an element the model lacks,
+    # and the refusal names the Control.
+    wrong = FactAnswer(
+        key=("store:nowhere", "", "", "", "audit-evidence", ""),
+        facets={"records-actor": "yes"},
+    )
+    written = ControlFacts(
+        control=DB_CONTROL,
+        name="Audit",
+        facts=[ControlFact(answer=wrong, state="written")],
+    )
+    with pytest.raises(ValueError, match="The Control “Audit” cannot apply:"):
+        refuse_disagreement([written], valid_model(), None)
