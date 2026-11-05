@@ -26,11 +26,9 @@ const formControls = (() => {
     return node;
   };
   const counted = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  // The noun of each scope type, in the service's words (SCOPE_NOUNS).
-  const SCOPE_NOUNS = JSON.parse(el("scope_nouns").textContent);
-  const scopeText = (scope) => (scope.type === "application"
-    ? `The ${SCOPE_NOUNS.application}`
-    : `The ${SCOPE_NOUNS[scope.type]} “${scope.name}”`);
+  // The service's phrase for what a Control protects (scope_phrase), as the
+  // start of a line.
+  const scopeText = (phrase) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
   const rowText = (row) => `${row.framework} ${row.unit}`;
   // The frameworks the form selects now.
   const selected = () => new Set([...document.querySelectorAll('#frameworks input[name="framework"]:checked')]
@@ -84,7 +82,7 @@ const formControls = (() => {
           : oldRows ? "Only its facts apply here: its rows are not at the framework version this service carries."
             : `Only its facts apply here: its rows cover ${coveredBy(control)}.`;
       return h("li", { hidden: !shown(control) }, box, " ", h("label", { for: box.id }, h("b", {}, control.name)),
-        h("span", { class: "hint" }, ` · ${scopeText(control.scope)}`,
+        h("span", { class: "hint" }, ` · ${scopeText(control.scope_phrase)}`,
           control.rows.length ? ` · ${control.rows.map(rowText).join(", ")}` : ""),
         note ? h("span", { class: "hint control-fit" }, ` · ${note}`) : null);
     };
@@ -226,7 +224,7 @@ const formControls = (() => {
       const parts = [
         box, " ",
         h("label", { for: box.id }, h("b", {}, entry.name), " ", h("span", { class: `tag ${resolution.state}` }, chip)),
-        h("div", { class: "hint" }, scopeText(entry.scope), rows.length ? ` · ${rows.join(", ")}` : ""),
+        h("div", { class: "hint" }, scopeText(entry.scope_phrase), rows.length ? ` · ${rows.join(", ")}` : ""),
       ];
       if (needsChoice) {
         const choose = h("select", { id: `apply-${entry.id}`, on: { change: (event) => {

@@ -50,6 +50,7 @@ from analysis_service.controls import (
     ControlDocument,
     ControlRow,
     ControlScope,
+    scope_phrase,
 )
 from analysis_service.fact_answers import (
     FactAnswer,
@@ -508,6 +509,7 @@ def control_offer(
                 "id": copy.id,
                 "name": copy.document.name,
                 "scope": copy.document.scope.model_dump(mode="json"),
+                "scope_phrase": scope_phrase(copy.document.scope),
                 "match": found.outcome,
                 "element": (
                     {"id": found.element, "name": names[found.element]}
@@ -986,6 +988,8 @@ class SectionEntry(BaseModel):
     id: str
     name: str
     scope: ControlScope
+    #: The words that name the scope in a sentence (:func:`scope_phrase`).
+    scope_phrase: str
     state: ResolutionState
     outcome: MatchOutcome | None
     reason: LeftOutReason | None
@@ -1108,6 +1112,7 @@ def controls_section(
                 id=copy.id,
                 name=copy.document.name,
                 scope=copy.document.scope,
+                scope_phrase=scope_phrase(copy.document.scope),
                 state=resolution.state,
                 outcome=outcome,
                 reason=reason,

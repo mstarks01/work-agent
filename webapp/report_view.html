@@ -97,7 +97,7 @@
   .model-diagram .element-box, .model-diagram .element-line {
     stroke: hsl(var(--h) var(--tag-line-s) var(--tag-line-l)); stroke-width: 1.2; }
   .model-diagram .process .element-box { stroke-width: 1.6; }
-  .model-diagram .external-entity .element-box { stroke-width: 1.6; }
+  .model-diagram .entity .element-box { stroke-width: 1.6; }
   .model-diagram .element-line { fill: none; stroke-width: 1.6; }
   .model-diagram .element-fill { stroke: none; }
   .model-diagram .element-label { fill: var(--ink); font-size: 12.5px; font-weight: 500; text-anchor: middle; }
@@ -513,9 +513,9 @@
      UNIT_VERDICT_WORDS. Escaped the same way. -->
 <script type="application/json" id="verdict_labels" nonce="__CSP_NONCE__"><!--verdict_labels--></script>
 <script type="application/json" id="unit_verdict_words" nonce="__CSP_NONCE__"><!--unit_verdict_words--></script>
-<!-- The noun of each scope type, from analysis_service.controls.SCOPE_NOUNS.
-     Escaped the same way. -->
-<script type="application/json" id="scope_nouns" nonce="__CSP_NONCE__"><!--scope_nouns--></script>
+<!-- The noun of each element type, from
+     analysis_service.system_model.ELEMENT_TYPE_NOUNS. Escaped the same way. -->
+<script type="application/json" id="element_type_nouns" nonce="__CSP_NONCE__"><!--element_type_nouns--></script>
 
 <!-- Each element whose trust zone the service inferred rather than read, from
      SystemModel.assumed_zone_elements. Escaped the same way. -->

@@ -1273,14 +1273,9 @@
     detectedDrawn = true;
     const detected = data.detected_facts || [];
     if (!detected.length) return;
-    // Each element's type, by its ID prefix (ElementPrefix).
-    const TYPES = {
-      "entity": "external party",
-      "process": "process",
-      "store": "data store",
-      "flow": "data flow",
-      "boundary": "trust zone",
-    };
+    // The noun of each element type, by its ID prefix, in the service's words
+    // (ELEMENT_TYPE_NOUNS).
+    const TYPES = JSON.parse(document.getElementById("element_type_nouns").textContent);
     const review = document.createElement("details");
     review.className = "detected";
     review.open = true;

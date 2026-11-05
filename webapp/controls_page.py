@@ -37,6 +37,7 @@ from analysis_service.controls import (
     EvidenceFile,
     ScopeType,
     evidence_full,
+    scope_phrase,
 )
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import FactAnswer
@@ -333,5 +334,6 @@ def control_view(control: Control) -> dict[str, object]:
     each row names the version this service carries, and no evidence text."""
     return control.document.model_dump(mode="json") | {
         "updated_at": control.updated_at.isoformat(),
+        "scope_phrase": scope_phrase(control.document.scope),
         "current_rows": [current_row(row) for row in control.document.rows],
     }
