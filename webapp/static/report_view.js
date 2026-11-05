@@ -1354,13 +1354,17 @@
   // ---- Controls ---------------------------------------------------------------
   // Each Control the job copied: what it matched, each fact it wrote with the
   // state the job keeps, and each row with its outcome over the job's
-  // rulings (ADR 0127). The service builds every value and sentence here;
-  // each one lands as text.
+  // rulings (ADR 0127). The service builds every value and sentence here,
+  // except the scope line, which the page builds from the service's nouns.
+  // Each one lands as text.
   const CONTROLS = JSON.parse(document.getElementById("controls").textContent);
+  // The noun of each scope type, in the service's words (SCOPE_NOUNS).
+  const SCOPE_NOUNS = JSON.parse(document.getElementById("scope_nouns").textContent);
   const controlMatch = (entry) => {
+    const noun = SCOPE_NOUNS[entry.scope.type];
     const scope = entry.scope.type === "application"
-      ? "The whole application"
-      : `The ${entry.scope.type} “${entry.scope.name}”`;
+      ? `The ${noun}`
+      : `The ${noun} “${entry.scope.name}”`;
     if (entry.state === "left-out") return [`${scope}: left out, because ${entry.meaning}`];
     if (!entry.elements.length) return [`${scope} (${entry.meaning})`];
     return [`${scope} → `, ...commaList(entry.elements.map((element) => tag(element.id))),

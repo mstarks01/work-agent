@@ -214,7 +214,7 @@
         h("span", {}, unitText(row), " ", h("span", { class: "sub" }, `version ${row.version}`)),
         remove(draft.rows, index, `the row ${row.unit}`)))),
       unplaced.length ? h("p", { class: "notice", id: "rows-reach", role: "note" },
-        `Many findings of ${unplaced.join(" and ")} are about the whole application, not one part of it. This Control protects only part of the application, so the analysis cannot apply it to those findings. To apply it to them, choose “The whole application” in “What it protects”.`) : null,
+        `Many findings of ${unplaced.join(" and ")} are about the whole application, not one part of it. This Control protects only part of the application, so the analysis cannot apply it to those findings. To apply it to them, choose “${SCOPES.application.label}” in “What it protects”.`) : null,
       h("div", { class: "add-line" },
         h("div", {}, h("label", { class: "field-label", for: "row-framework" }, "Framework"),
           h("select", { id: "row-framework", on: { change: (event) => {

@@ -27,6 +27,7 @@ from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import ANSWER_LIMITS
 from analysis_service.assertions import AssertionRecord
 from analysis_service.claims import UnknownRef
+from analysis_service.controls import SCOPE_NOUNS
 from analysis_service.fact_answers import (
     FACET_ANSWERS,
     MAX_FACT_ANSWERS,
@@ -588,7 +589,7 @@ for (const id of ["analyze","description","problem","go","load","ask",
                   "answer_limits","save-status","changes","upload","upload-file",
                   "transcript-note","transcript-name","transcript-remove","diagram-note",
                   "diagram-name","diagram-remove","analysis-name",
-                  "description-remaining","source_formats","file_refusals","page_labels",
+                  "description-remaining","source_formats","file_refusals","page_labels","scope_nouns",
                   "files-rows","chosen-files","files-dialog","files-cancel","files-select",
                   "upload-menu","upload-computer","upload-files","controls-offer",
                   "controls-rows","controls-summary","controls-used","controls-used-list",
@@ -607,6 +608,7 @@ ids.answer_limits.textContent = LIMITS;
 ids.source_formats.textContent = FORMATS;
 ids.file_refusals.textContent = REFUSALS;
 ids.page_labels.textContent = PAGE_LABELS;
+ids.scope_nouns.textContent = SCOPE_NOUN_TABLE;
 const framework = new Node("input");
 framework.value = "stride";
 framework.checked = true;
@@ -664,6 +666,7 @@ def _run_form_script(steps: str, search: str = "") -> dict:
         .replace("FORMATS", json.dumps(json.dumps(_FORMAT_TABLE)))
         .replace("REFUSALS", json.dumps(json.dumps(file_refusals(64, 3))))
         .replace("PAGE_LABELS", json.dumps(json.dumps(PAGE_SOURCE_LABELS)))
+        .replace("SCOPE_NOUN_TABLE", json.dumps(json.dumps(dict(SCOPE_NOUNS))))
         + script
         + "\n(async () => {\n"
         + steps

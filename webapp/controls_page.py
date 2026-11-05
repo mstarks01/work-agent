@@ -27,6 +27,7 @@ from analysis_service.controls import (
     MAX_CONTROL_ROWS,
     ROWS_FULL,
     SCOPE_FACT_KINDS,
+    SCOPE_WORDS,
     Control,
     ControlDocument,
     ControlFactKind,
@@ -49,17 +50,6 @@ from analysis_service.system_model import (
     Element,
     ZonedElement,
     attribute_names,
-)
-
-#: How the page names each scope type.
-SCOPE_LABELS: Mapping[ScopeType, str] = MappingProxyType(
-    {
-        "application": "The whole application",
-        "boundary": "A trust boundary",
-        "process": "A process",
-        "store": "A data store",
-        "entity": "An external entity",
-    }
 )
 
 #: How the page names each evidence class.
@@ -152,14 +142,14 @@ def scope_types() -> list[dict[str, object]]:
     return [
         {
             "type": scope_type,
-            "label": label,
+            "label": words.label,
             "statements": [
                 statement
                 for kind in sorted(SCOPE_FACT_KINDS[scope_type])
                 for statement in _FACT_OFFERS[kind](scope_type)
             ],
         }
-        for scope_type, label in SCOPE_LABELS.items()
+        for scope_type, words in SCOPE_WORDS.items()
     ]
 
 

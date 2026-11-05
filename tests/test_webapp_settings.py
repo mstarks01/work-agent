@@ -7,9 +7,7 @@ browser gets them.
 
 from __future__ import annotations
 
-import json
 import logging
-import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,7 +31,7 @@ from tests.test_settings_env import (
     settings_client,
     write_settings,
 )
-from tests.test_webapp import LOOPBACK, SAME_ORIGIN
+from tests.test_webapp import LOOPBACK, SAME_ORIGIN, _island
 from webapp.main import Workspace, create_app
 from webapp.settings_page import (
     CHANGED_SAMPLING,
@@ -64,13 +62,7 @@ def memory_client(tmp_path, **process: str) -> TestClient:
 
 def page_data(response) -> dict:
     """The data the page's script draws from."""
-    block = re.search(
-        r'<script type="application/json" id="settings"[^>]*>(.*?)</script>',
-        response.text,
-        re.DOTALL,
-    )
-    assert block is not None, "the page carries no settings data"
-    return json.loads(block.group(1))
+    return _island(response.text, "settings")
 
 
 def rows_of(client) -> dict[str, dict]:

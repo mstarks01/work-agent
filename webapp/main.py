@@ -177,6 +177,7 @@ from analysis_service.controls import (
     CONTROL_ID,
     CONTROL_ID_PATTERN,
     MAX_CONTROLS_CEILING,
+    SCOPE_NOUNS,
     Control,
     ControlLimits,
     ControlScope,
@@ -1234,6 +1235,7 @@ def render_report(
         severity_order=script_json(list(SEVERITY_ORDER)),
         verdict_labels=script_json(dict(VERDICT_LABELS)),
         unit_verdict_words=script_json(dict(UNIT_VERDICT_WORDS)),
+        scope_nouns=script_json(dict(SCOPE_NOUNS)),
         assumed_zones=script_json(sorted(report.system_model.assumed_zone_elements())),
         mermaid=script_json(styled_mermaid(report.system_model)),
         element_hues=script_json(element_hues(report.system_model)),
@@ -1740,6 +1742,7 @@ def create_app(
                 ),
                 upload_accept=_UPLOAD_ACCEPT,
                 page_labels=script_json(PAGE_SOURCE_LABELS),
+                scope_nouns=script_json(dict(SCOPE_NOUNS)),
                 store_note=""
                 if workspace.store.durable
                 else escape(_MEMORY_STORE_NOTE),
