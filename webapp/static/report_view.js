@@ -200,13 +200,8 @@
   const CONTROL_COVERED = ["Covered by a Control",
     "The owner states that a Control covers it. The service verified nothing."];
 
-  // The same for a claim's verdict, in this service's terms rather than the
-  // schema's. No verdict here reports a pass, and the wording says so.
-  const VERDICT_STATE = {
-    "confirmed": ["Gap", "Applies, and the input does not show it satisfied."],
-    "needs-info": ["Needs info", "Applies, and the input does not settle it."],
-    "rejected": ["Rejected", "The critic ruled this draft out. The reason says which check ended it."],
-  };
+  // The same for a claim's verdict, in the service's words (UNIT_VERDICT_WORDS).
+  const VERDICT_STATE = JSON.parse(document.getElementById("unit_verdict_words").textContent);
 
   // A rejection for `evidence` or `control` rules on the unit a draft names:
   // for a framework that answers in units, `evidence` means the unit does not
@@ -322,13 +317,16 @@
   // two to each other.
   const severityLevel = (t) => (t.severity ? t.severity.level : "");
   const mitigationSummaries = (t) => (t.mitigations || []).map((m) => m.summary);
-  const VERDICT = { confirmed: ["Confirmed","✓"], "needs-info": ["Needs info","?"], rejected: ["Rejected","✕"] };
+  // The label of each verdict status, in the service's words (VERDICT_WORDS),
+  // and the glyph beside it on a finding's row.
+  const VERDICT = JSON.parse(document.getElementById("verdict_words").textContent);
+  const VERDICT_GLYPH = { "confirmed": "✓", "needs-info": "?", "rejected": "✕" };
   // What the tally says for each kind of change. A kind the table does not
   // hold throws, so it cannot render as a verdict.
   const CHANGE_LINE = {
     new: () => "new",
     unchanged: () => "unchanged",
-    changed: (c) => `${VERDICT[c.before][0]} \u2192 ${VERDICT[c.after][0]}`,
+    changed: (c) => `${VERDICT[c.before]} \u2192 ${VERDICT[c.after]}`,
     gone: () => "no longer raised",
   };
   const svar = (lvl) => `var(${SEV[lvl][1]})`;
@@ -492,7 +490,7 @@
     if (moved && moved.change === "new") {
       body.append(el("div", "meta", "New since the earlier report."));
     } else if (moved && moved.change === "changed") {
-      body.append(el("div", "meta", `Was ${VERDICT[moved.before][0]} in the earlier report.`));
+      body.append(el("div", "meta", `Was ${VERDICT[moved.before]} in the earlier report.`));
     }
     // A final report's owner changed an answer this finding rests on, after
     // the analysis ran; the analysis did not run again (ADR 0054).
@@ -517,8 +515,8 @@
       sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact} → ${level}`;
       facts.append(sev);
     }
-    const [vlabel, vglyph] = VERDICT[t.verdict.status];
-    facts.append(el("span", "chip verdict", `${vglyph} ${vlabel}`));
+    const status = t.verdict.status;
+    facts.append(el("span", "chip verdict", `${VERDICT_GLYPH[status]} ${VERDICT[status]}`));
     if (t.confidence) facts.append(el("span", "chip confidence", `confidence: ${t.confidence}`));
     body.append(facts);
 
@@ -1409,8 +1407,7 @@
       const tr = el("tr");
       const facts = el("ul");
       for (const fact of entry.facts) {
-        const item = el("li", null, `${fact.label}: ${fact.value} `);
-        item.append(el("span", `tag ${fact.state}`, fact.state));
+        const item = el("li", null, `${fact.label}: ${fact.value} — ${fact.meaning}.`);
         if (fact.stated) item.append(el("span", "meta", ` The description states “${fact.stated}”.`));
         facts.append(item);
       }

@@ -115,6 +115,38 @@ RejectionStep = Literal["evidence", "reasoning", "lane", "duplicate", "control"]
 # :data:`RejectionStep` because archived reports carry it and are re-scored.
 CriticStep = Literal["evidence", "reasoning", "lane", "control"]
 
+#: How a person reads each verdict status: the label of a finding on the
+#: report page and in the Markdown export.
+VERDICT_WORDS: Mapping[VerdictStatus, str] = MappingProxyType(
+    {"confirmed": "Confirmed", "needs-info": "Needs info", "rejected": "Rejected"}
+)
+
+#: How the report page reads the verdict of a claim on a unit's row, for a
+#: framework that answers in units: a label and what it means. No verdict here
+#: reports a pass, and the words say so.
+UNIT_VERDICT_WORDS: Mapping[VerdictStatus, tuple[str, str]] = MappingProxyType(
+    {
+        "confirmed": ("Gap", "Applies, and the input does not show it satisfied."),
+        "needs-info": ("Needs info", "Applies, and the input does not settle it."),
+        "rejected": (
+            "Rejected",
+            "The critic ruled this draft out. The reason says which check ended it.",
+        ),
+    }
+)
+
+#: How a person reads each step that ended a rejected draft, in the Markdown
+#: export. The words describe the check, as :data:`RejectionStep` does.
+REJECTION_WORDS: Mapping[RejectionStep, str] = MappingProxyType(
+    {
+        "evidence": "the stated facts show that its subject is not there",
+        "reasoning": "it asserts or infers what the description does not state",
+        "lane": "it was filed in a lane that does not own it",
+        "duplicate": "it repeats another finding",
+        "control": "the owner states that a Control covers its unit",
+    }
+)
+
 #: The ground kinds that cite an attribute of an element.
 AttributeGround = Literal["unknown-attribute", "absent-attribute"]
 

@@ -683,8 +683,7 @@ def _scope_states():
     [
         ("GROUND_KIND", "analysis_service.claims:GroundKind"),
         ("SEV", "analysis_service.claims:SeverityLevel"),
-        ("VERDICT", "analysis_service.claims:VerdictStatus"),
-        ("VERDICT_STATE", "analysis_service.claims:VerdictStatus"),
+        ("VERDICT_GLYPH", "analysis_service.claims:VerdictStatus"),
         ("SCOPE_STATE", None),
         ("CHANGE_LINE", "analysis_service.report_changes:Change"),
         ("RECOMMENDATIONS", "analysis_service.claims:VerdictStatus"),
@@ -706,6 +705,52 @@ def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
         values = get_args(getattr(importlib.import_module(module), name))
 
     assert _page_table_keys(table) == set(values)
+
+
+@pytest.mark.parametrize(
+    ("table", "vocabulary"),
+    [
+        ("VERDICT_WORDS", "VerdictStatus"),
+        ("UNIT_VERDICT_WORDS", "VerdictStatus"),
+        ("REJECTION_WORDS", "RejectionStep"),
+    ],
+)
+def test_each_word_table_answers_for_its_whole_vocabulary(table, vocabulary):
+    """A table of the words for a closed set holds every value of it, and no
+    other. A value the table lacks raises where the export or the page reads
+    it."""
+    from typing import get_args
+
+    from analysis_service import claims
+
+    assert set(getattr(claims, table)) == set(get_args(getattr(claims, vocabulary)))
+
+
+@pytest.mark.parametrize(
+    ("island", "table", "words"),
+    [
+        ("verdict_words", "VERDICT", "VERDICT_WORDS"),
+        ("unit_verdict_words", "VERDICT_STATE", "UNIT_VERDICT_WORDS"),
+    ],
+)
+def test_the_page_reads_the_service_s_verdict_words(island, table, words):
+    """The page labels a verdict with the words the server sends, which the
+    Markdown export reads too. The page holds no verdict words of its own."""
+    from analysis_service import claims
+    from tests.test_webapp import viewer_javascript
+
+    (sent,) = re.findall(
+        rf'<script type="application/json" id="{island}"[^>]*>(.*?)</script>',
+        page(),
+    )
+    assert json.loads(sent) == json.loads(json.dumps(dict(getattr(claims, words))))
+    script = viewer_javascript()
+    assert re.search(
+        rf'const {table} = JSON\.parse\(document\.getElementById\("{island}"\)',
+        script,
+    )
+    for label in claims.VERDICT_WORDS.values():
+        assert f'"{label}"' not in script, label
 
 
 def test_the_page_reads_the_service_s_severity_order():

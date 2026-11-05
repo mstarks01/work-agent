@@ -167,7 +167,7 @@ from analysis_service.api import (
 )
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
-from analysis_service.claims import UnknownKey
+from analysis_service.claims import UNIT_VERDICT_WORDS, VERDICT_WORDS, UnknownKey
 from analysis_service.config_files import (
     SETTINGS_FILE,
     SettingsFileError,
@@ -1232,6 +1232,8 @@ def render_report(
             else {}
         ),
         severity_order=script_json(list(SEVERITY_ORDER)),
+        verdict_words=script_json(dict(VERDICT_WORDS)),
+        unit_verdict_words=script_json(dict(UNIT_VERDICT_WORDS)),
         assumed_zones=script_json(sorted(report.system_model.assumed_zone_elements())),
         mermaid=script_json(styled_mermaid(report.system_model)),
         element_hues=script_json(element_hues(report.system_model)),

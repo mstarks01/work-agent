@@ -726,6 +726,16 @@ def controls_used(
 #: model states the fact and the Control writes nothing.
 FactState = Literal["written", "changed", "stated"]
 
+#: How a person reads each fact state, on the report page and in the
+#: Markdown export.
+FACT_MEANINGS: Mapping[FactState, str] = MappingProxyType(
+    {
+        "written": "the Control wrote it onto an open fact",
+        "changed": "your own answer lies over it",
+        "stated": "the description states the fact, so the Control wrote nothing",
+    }
+)
+
 
 class ControlFact(BaseModel):
     """One fact a Control writes, with its element, and its state.
@@ -955,6 +965,7 @@ class SectionFact(BaseModel):
     label: str
     value: str
     state: FactState
+    meaning: str
     stated: str
 
 
@@ -1107,6 +1118,7 @@ def controls_section(
                         label=fact_label(fact.answer.key, model),
                         value=fact.answer.value,
                         state=fact.state,
+                        meaning=FACT_MEANINGS[fact.state],
                         stated=fact.stated,
                     )
                     for fact in (entry.facts if entry else ())
