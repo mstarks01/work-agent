@@ -8,6 +8,7 @@ sent, instruction and user turn, byte for byte.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 from typing import get_args
@@ -21,6 +22,7 @@ from evals.harness import critic_replay, recritic_replay
 from evals.harness.bundle import write_failures, write_reports
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
+from evals.harness.run_record import loaded
 from tests import test_evals_run_grounds as grounds
 from tests.test_critic_review_replay import EVERY_LANE
 from tests.test_evals_critic_replay import failed
@@ -222,4 +224,66 @@ def test_a_fault_set_that_names_no_draft_is_refused(archived):
     with pytest.raises(EvalRunError, match="on no draft"):
         recritic_replay.fault_view(
             archived, misspelt, archived.drafts[0].id, "row-unanswered"
+        )
+
+
+def test_the_command_writes_the_repair_after_its_record(
+    recorded,  # noqa: F811
+    case,  # noqa: F811
+    tmp_path,
+    monkeypatch,
+):
+    """One scripted re-ask that repairs the fault, through the command."""
+    out, _ = recorded
+    artifact = finished(out, case.id)
+    archived = critic_replay.load(artifact, case.id, "stride")
+    draft = archived.drafts[0].id
+    faults = tmp_path / "faults.json"
+    faults.write_text(faults_for(archived).model_dump_json(), encoding="utf-8")
+    view = recritic_replay.fault_view(
+        archived, recritic_replay.read_faults(faults), draft, "row-not-shown"
+    )
+
+    def scripted(deployment, graph_node, schema, spent):
+        async def call(instruction, turn):
+            spent.append(0.01)
+            return answer(view, draft)
+
+        return call
+
+    monkeypatch.setattr(recritic_replay, "node_call", scripted)
+    monkeypatch.setattr(recritic_replay.Deployment, "from_env", lambda: None)
+    written = tmp_path / "repair.json"
+    args = argparse.Namespace(
+        artifact=artifact.path,
+        case=case.id,
+        framework="stride",
+        faults=faults,
+        draft=draft,
+        fault="row-not-shown",
+        accept_cost="unknown",
+        out=written,
+    )
+
+    assert recritic_replay.command_recritic_replay(args) == 0
+
+    held = json.loads(written.read_text(encoding="utf-8"))
+    assert held["record"]["command"] == "recritic-replay"
+    assert [one["path"] for one in held["record"]["inputs"]] == sorted(
+        str(path)
+        for path in (
+            artifact.path,
+            faults,
+            *archived.files,
+            *loaded((PACKAGE_LOADER, PROMPT_LOADER)),
+        )
+    )
+    assert (held["draft"], held["fault"]) == (draft, "row-not-shown")
+    assert (held["remaining"], held["unbriefed"]) == ([], [])
+
+
+def test_a_draft_id_that_names_no_draft_is_refused(archived):
+    with pytest.raises(EvalRunError, match="no draft X-99"):
+        recritic_replay.fault_view(
+            archived, faults_for(archived), "X-99", "row-unanswered"
         )

@@ -3,14 +3,15 @@
 This builds a re-ask on a ``control-row`` problem from a first pass that
 holds none. It reads an archived case's critic first pass from its report,
 applies one written Control to the drafts, and answers each row the Control
-shows with the refusal the fault set states, so the first pass reconciles. It then injects one fault of one shape on one draft:
+shows with the refusal the fault set states, so the first pass reconciles.
+It then injects one fault of one shape on one draft:
 
 * ``row-unanswered`` — a shown row is in neither ``control_row`` nor
   ``refused_controls``;
-* ``row-not-shown`` — ``refused_controls`` names a row of the Control the draft was
-  not shown;
-* ``row-on-other-step`` — the shown row sits in ``control_row`` on a ruling that is
-  not rejected for ``control``.
+* ``row-not-shown`` — ``refused_controls`` names a row of the Control the
+  draft was not shown;
+* ``row-on-other-step`` — the shown row sits in ``control_row`` on a ruling
+  that is not rejected for ``control``.
 
 The round's own check must name exactly that one fault, or the command refuses
 the view before the call. The re-ask request is
@@ -65,7 +66,7 @@ from evals.harness.critic_replay import (
     shared_keys,
 )
 from evals.harness.modes import EvalRunError
-from evals.harness.node_call import NodeCall, node_call
+from evals.harness.node_call import NodeCall, node_call, spent_line
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, refuse_holdout
 from evals.harness.run_record import loaded, run_record_for
@@ -101,7 +102,7 @@ class FaultView:
 
     draft_id: str
     critic_round: CriticRound
-    #: The ruling set with every shown row answered, which reconciles.
+    #: The first pass with every shown row answered, accepted and assembled.
     clean: Accepted
     reask: Reask
 
@@ -173,6 +174,8 @@ def fault_view(
     was shown no row, or where the check names anything but one
     ``control-row`` problem on the draft.
     """
+    if draft_id not in {draft.id for draft in archived.drafts}:
+        raise EvalRunError(f"no draft {draft_id}")
     critic_round = round_of(archived, [faults.control])
     rulings = answered_first_pass(archived, faults)
     clean = critic_round.first(_emitted(rulings, archived.framework))
@@ -389,9 +392,5 @@ def command_recritic_replay(args: argparse.Namespace) -> int:
         f" {len(result['unbriefed'])} unbriefed changes; status"
         f" {result['status']['answered']} -> {result['status']['repaired']}"
     )
-    charged = [charge for charge in spent if charge is not None]
-    print(
-        f"spent: ${sum(charged):.4f} reported"
-        + ("" if len(charged) == len(spent) else "; the provider reported no charge")
-    )
+    print(spent_line(spent))
     return 0

@@ -68,7 +68,7 @@ from evals.harness.artifact import (
 from evals.harness.bundle import check_out, finished_file, read_report
 from evals.harness.lane_replay import material_at
 from evals.harness.modes import EvalRunError
-from evals.harness.node_call import NodeCall, node_call
+from evals.harness.node_call import NodeCall, node_call, spent_line
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, load_case, refuse_holdout
 from evals.harness.run_record import loaded, run_record_for
@@ -354,9 +354,5 @@ def command_critic_replay(args: argparse.Namespace) -> int:
         f"{len(problems)} problems the re-ask would be sent"
         + "".join(f"; {kind} {count}" for kind, count in sorted(kinds.items()))
     )
-    charged = [charge for charge in spent if charge is not None]
-    print(
-        f"spent: ${sum(charged):.4f} reported"
-        + ("" if len(charged) == len(spent) else "; the provider reported no charge")
-    )
+    print(spent_line(spent))
     return 0

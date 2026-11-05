@@ -34,8 +34,9 @@ never substitute one for a triage label, and never read one as a triage state:
 - **`needs-sweep`** — the next necessary step needs fresh paid model output: a sweep, a
   spread of repeated runs, or a command that sends a request again, such as `lane-replay`,
   `critic-replay` or `recritic-replay`. Classify a command by what it does, not by its
-  name: `score` and `replay` re-read an archive and are offline. The label marks a spend decision, never a readiness
-  state, so it sits beside a triage label rather than in place of one. A run needs explicit
+  name: `score` and `replay` re-read an archive and are offline. The label marks a spend
+  decision, never a readiness state, so it sits beside a triage label rather than in place
+  of one. A run needs explicit
   approval every time; the label records that the ask is pending, and it authorises nothing.
 
   Apply it only when no offline step remains before the paid one. Offline work on the issue —
