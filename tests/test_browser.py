@@ -2671,9 +2671,9 @@ def test_a_zone_control_fans_out_and_the_owner_ticks_a_part(zoned_page):
     assert page.locator("#control-offer b").first.inner_text() == "Internal <b>WAF</b>"
     fanout = page.locator("#control-offer .fanout li")
     assert [text.strip() for text in fanout.all_inner_texts()] == [
-        "Web App — stated-zone: a source places this part in the zone",
-        "Orders DB — zone-inferred: the service inferred this placement",
-        "Audit Log — no-zone-stated: no source places this part",
+        "Web App — a source places this part in the zone",
+        "Orders DB — the service inferred this placement",
+        "Audit Log — no source places this part",
     ]
     assert page.is_checked(f"#cover-{zone}-process\\:web-app")
     assert not page.is_checked(f"#cover-{zone}-store\\:orders-db")
@@ -2694,7 +2694,7 @@ def test_an_unmatched_control_takes_a_choice_and_keeps_the_name(zoned_page):
     waf = keep_control(page, "WAF", {"type": "process", "name": "Edge"})
     submit_with_controls(page)
     offer = page.locator("#control-offer")
-    assert "missing-element" in offer.inner_text()
+    assert "left out: no part of this description has the name" in offer.inner_text()
     assert page.is_disabled(f"#offer-{waf}")
     choices = page.locator(f"#apply-{waf} option").all_inner_texts()
     assert choices == ["Not this time", "Web App"]
@@ -2731,7 +2731,7 @@ def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_pa
     assert body["control_scopes"] == [{"control": kms, "element": "store:orders-db"}]
     assert page.is_hidden("#answer-problem")
     assert not page.is_checked(f"#offer-{aes}")
-    assert "unticked: you left it out" in page.inner_text("#control-offer")
+    assert "left out: it is not ticked" in page.inner_text("#control-offer")
 
 
 def test_a_job_the_app_did_not_continue_waits_for_the_owner(zoned_page, monkeypatch):

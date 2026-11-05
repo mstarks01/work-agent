@@ -227,10 +227,10 @@ finding on its unit reached the critic with the row, and a finding on its
 unit names no part that the Control's scope holds. A row opens to the claim
 IDs it ruled out, the critic's reason, each line of the evidence that the
 quotation of an applied ruling quotes, by file, class and line, and one
-sentence that says what the outcome means. A Control that the job left out
-shows its reason. The section reads the job's
-copy and the report's rulings, so a later edit of a Control changes nothing
-here.
+sentence that says what the outcome means. The match, or the reason that the
+job left a Control out, shows as a sentence from the service. The section
+reads the job's copy and the report's rulings, so a later edit of a Control
+changes nothing here.
 
 The download icon at the end of the tab row opens a menu of **Download as
 Markdown**, **Download as JSON** and **Download as CSV**. They send
@@ -245,8 +245,10 @@ for each finding of each framework, and the findings ruled out too. Its columns
 are `framework`, `id`, `title`, `status`, `severity`, `category`, `affected
 elements`, `description`, `mitigation` and `controls`. The category is the
 claim's lane, the field that each framework's ID rule names. For example, a
-STRIDE finding's category is its STRIDE category. A framework that gives no severity or no mitigation leaves that cell
-empty. The `controls` cell names each Control row that ruled on the finding,
+STRIDE finding's category is its STRIDE category. The severity and the
+mitigation cells come from the record's own fields, through `JUDGEMENT_CELLS`
+in `webapp/report_export.py`. A record that declares no such field leaves that
+cell empty. The `controls` cell names each Control row that ruled on the finding,
 and its ruling. A cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage
 return gets an apostrophe first, so a spreadsheet shows the cell as text and
 does not run it as a formula. A `/v1` report carries no Controls section.

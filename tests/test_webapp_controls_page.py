@@ -11,6 +11,8 @@ import csv
 import io
 import json
 import re
+import shutil
+import subprocess
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +41,7 @@ from analysis_service.controls import (
 from analysis_service.fact_answers import FACT_VALUE_MAX_CHARS
 from analysis_service.frameworks import lane_of
 from analysis_service.frameworks.asvs.catalog import requirement_text
+from analysis_service.job_controls import MATCH_MEANINGS
 from analysis_service.jobs import PipelineCompleted
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
 from analysis_service.sources import MAX_LABEL_CHARS
@@ -53,7 +56,12 @@ from tests.test_webapp_controls import BOB, ORDERS_DB, Owner, ZonedRunner
 from tests.test_webapp_questions import app_for, ran
 from webapp.controls_page import ControlSave
 from webapp.main import Workspace
-from webapp.report_export import CSV_COLUMNS, report_csv
+from webapp.report_export import (
+    CSV_COLUMNS,
+    JUDGEMENT_CELLS,
+    judgement_cells,
+    report_csv,
+)
 
 tiers = test_webapp.tiers
 
@@ -634,6 +642,7 @@ class TestTheReportSection:
         ]
         assert rows["repudiation"]["meaning"].startswith("No finding")
         assert section["WAF"]["outcome"] == "application"
+        assert section["WAF"]["meaning"] == MATCH_MEANINGS["application"]
         assert [
             (fact["value"], fact["state"]) for fact in section["Encrypted"]["facts"]
         ] == [("AES-256", "written")]
@@ -653,13 +662,18 @@ class TestTheReportSection:
         text = exported.text
         assert "## Controls" in text
         assert "### WAF" in text
-        assert "- Row: stride spoofing — applied." in text
-        assert "- Row: stride tampering — refused." in text
-        assert "- Row: stride repudiation — no-finding." in text
+        assert "- Row: stride spoofing — Applied: the critic" in text
+        assert "- Row: stride tampering — Refused: the critic" in text
+        assert "- Row: stride repudiation — No finding: no draft" in text
+        assert "— no-finding" not in text
         assert "It shows no \\<b\\>signing\\</b\\> at https\\://evil.example." in text
         assert "Evidence: WAF.yaml (config), line 1: WAF: on" in text
         assert "AES-256 — written" in text
-        assert "Protects the process “Billing”: left out, missing-element." in text
+        assert (
+            "Protects the process “Billing”: left out, because no part of this"
+            " description has the name or an alias." in text
+        )
+        assert "Protects the whole application: it applies with no match." in text
         assert "applied to Orders DB." in text
 
     def test_the_csv_export_holds_a_row_for_each_finding(self, ruled):
@@ -721,6 +735,63 @@ def test_the_csv_export_reads_each_lane_through_lane_of(framework):
     assert {one["framework"] for one in cells} == {framework}
 
 
+def test_the_judgement_cells_name_each_judgement_field_of_each_record():
+    """The table is keyed by the field, so a new package needs no row. Each
+    judgement field a package's record declares has a row, and each row's
+    field has its judgement type wherever a record declares it. The CSV reads
+    the verdict as the status, so the verdict has no row."""
+    from tests.test_evals_content import _is_shared_judgement, _ruled_records
+
+    records = _ruled_records()
+    declared = {
+        name
+        for record in records
+        for name, field in record.model_fields.items()
+        if _is_shared_judgement(field.annotation)
+    }
+    assert declared - {"verdict"} == set(JUDGEMENT_CELLS)
+    assert all(
+        _is_shared_judgement(record.model_fields[name].annotation)
+        for record in records
+        for name in JUDGEMENT_CELLS
+        if name in record.model_fields
+    )
+
+
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_the_report_page_reads_the_judgement_cells_the_csv_writes(framework):
+    """``severityLevel`` and ``mitigationSummaries`` in report_view.js read the
+    fields that :data:`JUDGEMENT_CELLS` reads, so each claim of each package is
+    put to both."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the page's script")
+    script = test_webapp.page_javascript("report_view.js")
+    helpers = "\n".join(
+        re.search(rf"^\s*const {name} = .*;$", script, re.MULTILINE).group(0)
+        for name in ("severityLevel", "mitigationSummaries")
+    )
+    claims = [
+        claim
+        for block in sound_report(framework).analyses
+        for claim in [*block.claims, *block.rejected_claims]
+    ]
+    assert claims
+    dumped = json.dumps([claim.model_dump(mode="json") for claim in claims])
+    program = (
+        f"{helpers}\nconst claims = {dumped};\n"
+        "console.log(JSON.stringify(claims.map((t) =>"
+        ' [severityLevel(t), mitigationSummaries(t).join(" | ")])));'
+    )
+    done = subprocess.run(
+        [node, "-"], input=program, capture_output=True, text=True, check=True
+    )
+    assert json.loads(done.stdout) == [
+        [cells["severity"], cells["mitigations"]]
+        for cells in map(judgement_cells, claims)
+    ]
+
+
 @pytest.mark.parametrize("lead", ["=", "+", "-", "@", "\t", "\r"])
 def test_a_csv_cell_that_reads_as_a_formula_starts_with_an_apostrophe(ruled, lead):
     owner, child, _ = ruled
@@ -760,27 +831,34 @@ class TestTheTables:
         from typing import get_args
 
         from analysis_service.controls import ScopeType
-        from analysis_service.job_controls import CoverReason, LeftOutReason, UsedState
+        from analysis_service.job_controls import CoverReason, UsedState
         from tests.test_webapp import _table_keys
 
         assert _table_keys("form_controls.js", "TYPES") == set(get_args(ScopeType))
-        assert _table_keys("form_controls.js", "REASONS") == {
-            *get_args(LeftOutReason),
-            *get_args(CoverReason),
-        }
+        assert _table_keys("form_controls.js", "COVER_REASONS") == set(
+            get_args(CoverReason)
+        )
         assert _table_keys("form_controls.js", "STATES") == set(get_args(UsedState))
 
     def test_the_page_tables_name_each_member(self):
         from typing import get_args
 
         from analysis_service.controls import ScopeType
-        from analysis_service.job_controls import ROW_MEANINGS, RowOutcome
+        from analysis_service.job_controls import (
+            LEFT_OUT_MEANINGS,
+            ROW_MEANINGS,
+            LeftOutReason,
+            MatchOutcome,
+            RowOutcome,
+        )
         from analysis_service.sources import EvidenceClass
         from webapp.controls_page import EVIDENCE_LABELS, SCOPE_LABELS
 
         assert set(SCOPE_LABELS) == set(get_args(ScopeType))
         assert set(EVIDENCE_LABELS) == set(get_args(EvidenceClass))
         assert set(ROW_MEANINGS) == set(get_args(RowOutcome))
+        assert set(MATCH_MEANINGS) == set(get_args(MatchOutcome))
+        assert set(LEFT_OUT_MEANINGS) == set(get_args(LeftOutReason))
 
     def test_the_fact_kind_tables_name_each_scope_and_kind(self):
         from typing import get_args
