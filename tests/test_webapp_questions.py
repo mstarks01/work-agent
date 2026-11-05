@@ -59,6 +59,7 @@ from tests.test_webapp import (
     LOOPBACK,
     PROJECT_ROOT,
     SAME_ORIGIN,
+    WEBAPP_LIMITS,
     posted,
     startup_for,
 )
@@ -4972,3 +4973,18 @@ def test_a_held_run_without_its_sources_reads_as_this_service_s_defect(
 
     assert response.status_code == 500
     assert "holds no sources" in caplog.text
+
+
+def test_an_amendment_over_the_byte_budget_is_refused_with_a_message(tiers):
+    """The page shows the server's refusal of an amendment that takes the
+    sources over the deployment's byte budget, so it checks no size itself."""
+    client = client_for(tiers, PausingRunner())
+    paused = start(client, questions=True)
+    client.get(f"/events/{paused}")
+    refused = client.post(
+        f"/amend/{paused}",
+        json={"text": "a" * WEBAPP_LIMITS.max_total_bytes, "revision": 0},
+        headers=SAME_ORIGIN,
+    )
+    assert 400 <= refused.status_code < 500, refused.text
+    assert "bytes" in refused.json()["message"]

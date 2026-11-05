@@ -14,10 +14,12 @@ from typing import Any
 
 import pytest
 
-from analysis_service.controls import ControlLimits
+from analysis_service.controls import MAX_CONTROL_EVIDENCE_TOTAL_BYTES, ControlLimits
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.resilience import (
     ATTEMPTS_VAR,
+    ENV_OVERRIDES,
+    JOB_DEADLINE_MS_CEILING,
     JOB_DEADLINE_MS_VAR,
     MAX_ACTIVE_JOBS_VAR,
     MAX_CONTROL_EVIDENCE_VAR,
@@ -26,11 +28,15 @@ from analysis_service.resilience import (
     MAX_SOURCE_BYTES_VAR,
     MAX_SOURCES_VAR,
     SUPPORTED_VERSION,
+    TIMEOUT_MS_CEILING,
     TIMEOUT_MS_VAR,
     ResilienceConfig,
     ResilienceConfigError,
+    UpstreamBounds,
     load_resilience,
+    numeric_bounds,
 )
+from analysis_service.sources import MAX_SOURCE_BYTES_CEILING
 from tests.factories import secret_env, translator_of
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -531,3 +537,73 @@ def test_the_environment_overrides_the_control_bounds(tmp_path):
     assert loaded.control_limits() == ControlLimits(
         max_controls=7, max_evidence=3, max_evidence_bytes=102400
     )
+
+
+@pytest.mark.parametrize("field", list(ENV_OVERRIDES))
+def test_each_bound_has_a_ceiling_that_the_shipped_file_keeps_under(field):
+    most = numeric_bounds(field).most
+    assert most is not None
+    shipped = load_resilience(CONFIG_PATH, env={})
+    assert getattr(shipped, field) <= most
+    with pytest.raises(ValueError):
+        config(**{field: most * 2})
+
+
+def test_the_evidence_one_control_holds_is_bounded_as_a_whole():
+    """The most evidence files times the most bytes of one file is at most
+    16 MiB, so a Control save's body guard stays bounded at every setting."""
+    files = MAX_CONTROL_EVIDENCE_TOTAL_BYTES // MAX_SOURCE_BYTES_CEILING
+    assert config(max_control_evidence=files, max_source_bytes=MAX_SOURCE_BYTES_CEILING)
+    with pytest.raises(ValueError, match="at most 16,777,216 bytes"):
+        config(
+            max_control_evidence=files + 1, max_source_bytes=MAX_SOURCE_BYTES_CEILING
+        )
+
+
+def test_the_loader_refuses_evidence_over_its_whole_bound(tmp_path):
+    with pytest.raises(ResilienceConfigError, match="max_control_evidence"):
+        load_resilience(
+            write(tmp_path, VALID),
+            env={MAX_CONTROL_EVIDENCE_VAR: "100", MAX_SOURCE_BYTES_VAR: "10485760"},
+        )
+
+
+@pytest.mark.parametrize(
+    ("bound", "ceiling"),
+    [("timeout_ms", TIMEOUT_MS_CEILING), ("job_deadline_ms", JOB_DEADLINE_MS_CEILING)],
+)
+def test_an_upstream_row_has_the_ceiling_of_its_base_bound(bound, ceiling):
+    row = {"timeout_ms": 1000, "job_deadline_ms": 1000}
+    assert UpstreamBounds(**row | {bound: ceiling})
+    with pytest.raises(ValueError):
+        UpstreamBounds(**row | {bound: ceiling + 1})
+    assert numeric_bounds(bound).most == ceiling
+
+
+def test_an_exclusive_integer_floor_is_the_next_integer():
+    assert numeric_bounds("timeout_ms") == (1, None, 3_600_000)
+    assert numeric_bounds("attempts") == (1, None, 10)
+
+
+def test_a_decimal_keeps_its_exclusive_floor():
+    assert numeric_bounds("retry_budget_ratio") == (None, 0, 1)
+
+
+def _stated(number: str) -> float:
+    return float(number.replace(",", "").replace("10<sup>12</sup>", str(10**12)))
+
+
+def test_the_configuration_guide_states_each_range():
+    """Each row's Range cell states the floor and the ceiling the loader takes:
+    "1 to 10", or "over 0, to 1" for an exclusive floor."""
+    guide = (PROJECT_ROOT / "docs" / "Configuration.md").read_text(encoding="utf-8")
+    for field, (var, _) in ENV_OVERRIDES.items():
+        row = next(
+            line for line in guide.splitlines() if line.startswith(f"| `{var}` |")
+        )
+        floor, ceiling = row.rstrip(" |").rsplit("|", 1)[1].strip().split(" to ")
+        if floor.startswith("over "):
+            stated = (None, _stated(floor.removeprefix("over ").rstrip(",")))
+        else:
+            stated = (_stated(floor), None)
+        assert numeric_bounds(field) == (*stated, _stated(ceiling)), var

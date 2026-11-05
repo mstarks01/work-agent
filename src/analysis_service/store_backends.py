@@ -218,8 +218,9 @@ async def audited_delete(
     return removed
 
 
-#: The longest retention period: a century. The bound keeps the cutoff of a
-#: sweep inside the range of ``datetime``.
+#: The shortest retention period, and the longest: a century. The longest
+#: keeps the cutoff of a sweep inside the range of ``datetime``.
+MIN_RETENTION_DAYS = 1
 MAX_RETENTION_DAYS = 36_500
 
 
@@ -227,17 +228,18 @@ def retention_days(env: Mapping[str, str]) -> int | None:
     """The retention period from ``ANALYSIS_RETENTION_DAYS``, in days.
 
     ``None`` where the setting is unset: the service keeps every job (#1530).
-    A value that is not a whole number from 1 to :data:`MAX_RETENTION_DAYS`
-    raises, so the startup stops.
+    A value that is not a whole number from :data:`MIN_RETENTION_DAYS` to
+    :data:`MAX_RETENTION_DAYS` raises, so the startup stops.
     """
     value = env.get(RETENTION_DAYS_VAR)
     if value is None:
         return None
     days = ascii_int(value, max_digits=len(str(MAX_RETENTION_DAYS)))
-    if days is None or not 1 <= days <= MAX_RETENTION_DAYS:
+    if days is None or not MIN_RETENTION_DAYS <= days <= MAX_RETENTION_DAYS:
         raise StoreConfigError(
-            f"{RETENTION_DAYS_VAR} must be a whole number of days from 1 to"
-            f" {MAX_RETENTION_DAYS}, or unset to keep every job"
+            f"{RETENTION_DAYS_VAR} must be a whole number of days from"
+            f" {MIN_RETENTION_DAYS} to {MAX_RETENTION_DAYS}, or unset to keep"
+            " every job"
         )
     return days
 

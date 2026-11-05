@@ -7,28 +7,53 @@ Offline, through the first-run app over an in-memory store.
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import json
 import re
 
 import pytest
 from fastapi.testclient import TestClient
 
+from analysis_service import PACKAGES, Report
+from analysis_service.api import max_body_bytes, max_control_body_bytes
 from analysis_service.claims import (
+    UNKNOWN_KEY_FIELDS,
     ControlRowRef,
     RefusedControl,
     ReturnedClaim,
+    UnknownRef,
     Verdict,
 )
+from analysis_service.controls import (
+    ALIASES_FULL,
+    CONTROL_ROW_FIELD_MAX_CHARS,
+    MAX_CONTROL_ALIASES,
+    MAX_CONTROL_EVIDENCE_CEILING,
+    MAX_CONTROL_FACTS,
+    MAX_CONTROL_ROWS,
+    ROWS_FULL,
+    ControlRow,
+    evidence_full,
+)
+from analysis_service.fact_answers import FACT_VALUE_MAX_CHARS
+from analysis_service.frameworks import lane_of
 from analysis_service.frameworks.asvs.catalog import requirement_text
 from analysis_service.jobs import PipelineCompleted
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT
+from analysis_service.sources import MAX_LABEL_CHARS
+from analysis_service.system_model import ELEMENT_ID_MAX_CHARS
 from tests import test_webapp
 from tests.factories import sample_analysis
 from tests.test_controls import fact, row
-from tests.test_webapp import LOOPBACK, SAME_ORIGIN
+from tests.test_doc_copy_lints import SHIPPED_RESILIENCE
+from tests.test_structural_readers import sound_report
+from tests.test_webapp import LOOPBACK, SAME_ORIGIN, WEBAPP_LIMITS
 from tests.test_webapp_controls import BOB, ORDERS_DB, Owner, ZonedRunner
 from tests.test_webapp_questions import app_for, ran
+from webapp.controls_page import ControlSave
 from webapp.main import Workspace
+from webapp.report_export import CSV_COLUMNS, report_csv
 
 tiers = test_webapp.tiers
 
@@ -237,6 +262,102 @@ class TestCreate:
             " add another."
         )
 
+    def test_a_body_past_the_job_guard_reaches_the_control_rules(self, owner):
+        """A save with more text than one job's body holds is read, so its
+        refusal names the rule it breaks and not the body size."""
+        sent = [
+            {"name": f"{number}.txt", "class": "people", "text": '"' * 10_000}
+            for number in range(LIMITS.max_evidence + 1)
+        ]
+        assert len(json.dumps(body(evidence=sent))) > max_body_bytes(WEBAPP_LIMITS)
+        refused = create(owner, evidence=sent)
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["message"].startswith("A Control holds at most 10")
+
+    def test_the_guard_holds_a_full_control_at_the_shipped_limits(self):
+        limits = SHIPPED_RESILIENCE.control_limits()
+        text = '"' * limits.max_evidence_bytes
+        sent = [
+            {"name": "a" * 200, "class": "code", "text": text}
+            for _ in range(limits.max_evidence)
+        ]
+        full = json.dumps(body(evidence=sent)).encode()
+        assert len(full) > max_body_bytes(SHIPPED_RESILIENCE.source_limits())
+        assert len(full) <= max_control_body_bytes(limits)
+
+    def test_the_guard_counts_the_bounds_the_models_state(self):
+        """The guard counts each Control field from a constant. A field that
+        the models add, or a bound that they raise, breaks this test and not a
+        save of a full Control."""
+
+        def longest(model) -> dict[str, int | None]:
+            return {
+                name: next(
+                    (
+                        rule.max_length
+                        for rule in field.metadata
+                        if hasattr(rule, "max_length")
+                    ),
+                    None,
+                )
+                for name, field in model.model_fields.items()
+            }
+
+        assert set(ControlSave.model_fields) == {
+            "name",
+            "scope",
+            "facts",
+            "rows",
+            "evidence",
+        }
+        assert set(longest(ControlRow).values()) == {CONTROL_ROW_FIELD_MAX_CHARS}
+        keys = longest(UnknownRef)
+        assert all(
+            keys[name] is None or keys[name] <= ELEMENT_ID_MAX_CHARS
+            for name in UNKNOWN_KEY_FIELDS
+        )
+
+    def test_the_guard_holds_a_control_with_every_field_at_its_bound(self):
+        """Every bounded field at its bound, in 4-byte characters, and evidence
+        text that JSON escapes to twice its bytes, as a page sends it."""
+        limits = SHIPPED_RESILIENCE.control_limits()
+
+        def wide(chars: int) -> str:
+            return "\U0001f600" * chars
+
+        label = wide(MAX_LABEL_CHARS)
+        sent = {
+            "name": label,
+            "scope": {
+                "type": "store",
+                "name": label,
+                "aliases": [label] * MAX_CONTROL_ALIASES,
+            },
+            "facts": [
+                {
+                    "key": [wide(ELEMENT_ID_MAX_CHARS)] * len(UNKNOWN_KEY_FIELDS),
+                    "value": wide(FACT_VALUE_MAX_CHARS),
+                }
+            ]
+            * MAX_CONTROL_FACTS,
+            "rows": [
+                dict.fromkeys(
+                    ("framework", "unit", "version"), wide(CONTROL_ROW_FIELD_MAX_CHARS)
+                )
+            ]
+            * MAX_CONTROL_ROWS,
+            "evidence": [
+                {
+                    "name": label,
+                    "class": "code",
+                    "text": '"' * limits.max_evidence_bytes,
+                }
+            ]
+            * limits.max_evidence,
+        }
+        full = json.dumps(sent, ensure_ascii=False).encode()
+        assert len(full) <= max_control_body_bytes(limits)
+
     @pytest.mark.parametrize(
         "evidence",
         [
@@ -255,6 +376,18 @@ class TestCreate:
     def test_an_unknown_key_is_refused(self, owner):
         refused = create(owner, owner_id="someone")
         assert refused.status_code == 400
+
+    def test_a_fact_with_a_detail_is_refused(self, owner):
+        refused = create(owner, facts=[fact() | {"detail": "but not the logs"}])
+        assert refused.status_code == 400
+        assert refused.json()["message"] == "A fact of a Control takes no detail."
+
+    def test_a_list_of_evidence_over_the_ceiling_is_refused(self, owner):
+        sent = [
+            {"name": f"{number}.txt", "class": "people", "text": "signed\n"}
+            for number in range(MAX_CONTROL_EVIDENCE_CEILING + 1)
+        ]
+        assert create(owner, evidence=sent).status_code == 400
 
 
 class TestReplace:
@@ -364,6 +497,14 @@ class TestThePage:
             "tampering",
         }
         assert payload["limits"]["max_controls"] == LIMITS.max_controls
+        # The page checks each count with the sentence the save refuses with.
+        assert payload["limits"]["max_aliases"] == MAX_CONTROL_ALIASES
+        assert payload["limits"]["max_rows"] == MAX_CONTROL_ROWS
+        assert payload["full"] == {
+            "aliases": ALIASES_FULL,
+            "rows": ROWS_FULL,
+            "evidence": evidence_full(LIMITS.max_evidence),
+        }
         # A STRIDE finding always names a part; an ASVS finding may name none.
         assert payload["units"]["stride"]["names_a_part"] is True
         assert payload["units"]["asvs"]["names_a_part"] is False
@@ -506,6 +647,30 @@ class TestTheReportSection:
         assert "AES-256 — written" in text
         assert "Protects the process “Billing”: left out, missing-element." in text
 
+    def test_the_csv_export_holds_a_row_for_each_finding(self, ruled):
+        owner, child, _ = ruled
+        exported = owner.client.get(f"/report/{child}/export.csv")
+        assert exported.status_code == 200
+        assert exported.headers["content-type"].startswith("text/csv")
+        assert 'filename="report.csv"' in exported.headers["content-disposition"]
+        assert exported.text.startswith("\ufeff")
+        header, *rows = csv.reader(exported.text.removeprefix("\ufeff").splitlines())
+        assert tuple(header) == CSV_COLUMNS
+        assert dict(zip(header, rows[0], strict=True)) == {
+            "framework": "stride",
+            "id": "S-01",
+            "title": "Session cookie theft enables account takeover",
+            "status": "rejected",
+            "severity": "high",
+            "category": "spoofing",
+            "affected elements": "Customer → Web App",
+            "description": "Stolen session cookies let an attacker impersonate"
+            " the customer against the web app.",
+            "mitigation": "Set HttpOnly and Secure on cookies",
+            "controls": "WAF: applied",
+        }
+        assert [one[1] for one in rows] == ["S-01", "S-01-2"]
+
     def test_the_report_page_carries_the_section(self, ruled):
         owner, child, _ = ruled
         page = owner.client.get(f"/report/{child}").text
@@ -523,8 +688,35 @@ class TestTheReportSection:
 
     def test_an_unknown_report_is_missing(self, ruled):
         owner, _, _ = ruled
-        for path in ("export.md", "export.json"):
+        for path in ("export.md", "export.json", "export.csv"):
             assert owner.client.get(f"/report/job-missing/{path}").status_code == 404
+
+
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_the_csv_export_reads_each_lane_through_lane_of(framework):
+    report = sound_report(framework)
+    (block,) = [one for one in report.analyses if one.framework == framework]
+    header, *rows = csv.reader(io.StringIO(report_csv(report, [])))
+    cells = [dict(zip(header, one, strict=True)) for one in rows]
+    claims = [*block.claims, *block.rejected_claims]
+    assert [one["id"] for one in cells] == [claim.id for claim in claims]
+    assert [one["category"] for one in cells] == [
+        str(lane_of(claim) or "") for claim in claims
+    ]
+    assert {one["framework"] for one in cells} == {framework}
+
+
+@pytest.mark.parametrize("lead", ["=", "+", "-", "@", "\t", "\r"])
+def test_a_csv_cell_that_reads_as_a_formula_starts_with_an_apostrophe(ruled, lead):
+    owner, child, _ = ruled
+    body = owner.client.get(f"/report/{child}/export.json").json()["report"]
+    claim = body["analyses"][0]["rejected_claims"][0]
+    claim["title"] = f'{lead}HYPERLINK("https://evil.example", "a, b")'
+    claim["description"] = 'Two lines,\nwith "quotes".'
+    text = report_csv(Report.model_validate(body), [])
+    row = list(csv.reader(io.StringIO(text)))[1]
+    assert row[2] == f'\'{lead}HYPERLINK("https://evil.example", "a, b")'
+    assert row[7] == 'Two lines,\nwith "quotes".'
 
 
 @pytest.mark.parametrize(

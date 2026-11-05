@@ -11,6 +11,12 @@
   --error:light-dark(#963a31,#ffc2b9);
   --error-bg:light-dark(#fff2ef,#402925)
 }
+:root[data-theme="light"] {
+  color-scheme:light
+}
+:root[data-theme="dark"] {
+  color-scheme:dark
+}
 * {
   box-sizing:border-box
 }
@@ -230,6 +236,7 @@ small {
 .sidebar nav>* {
   display:flex;
   align-items:center;
+  justify-content:flex-start;
   gap:10px;
   text-align:left;
   padding:10px 12px;
@@ -294,9 +301,54 @@ main {
   margin:auto;
   padding:36px
 }
- .entry {
-  max-width:700px;
+/* The new analysis form: the description on the left, the settings in a
+   column on the right. On a narrow screen the settings go under the
+   description, at the full width. */
+.entry {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-start;
+  gap:32px;
+  max-width:1080px;
   margin:24px auto
+}
+.entry-main {
+  flex:999 1 460px;
+  min-width:0
+}
+.entry-main h1 {
+  margin:0
+}
+.entry-settings {
+  flex:1 1 260px;
+  min-width:0;
+  padding:18px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--soft)
+}
+.entry-settings fieldset {
+  margin:0 0 16px
+}
+.entry-settings .field-label {
+  margin:16px 0 8px
+}
+.entry-settings .question-help-content {
+  left:auto;
+  right:0
+}
+.entry-settings .entry-actions .primary {
+  width:100%
+}
+.label-with-help {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  position:relative;
+  margin:24px 0 8px
+}
+.label-with-help .field-label {
+  margin:0
 }
 .field-label {
   display:block;
@@ -337,13 +389,55 @@ main {
 }
 .composer-tools {
   display:flex;
-  position:relative;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
   padding:0 8px 8px
+}
+.upload-anchor {
+  position:relative;
+  flex:none
+}
+/* The files the analysis reads show as chips beside the + button. */
+.composer-files {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  min-width:0
+}
+.composer-files [hidden] {
+  display:none
+}
+.composer-files p,#chosen-files {
+  margin:0
+}
+#chosen-files {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px
+}
+.file-chip,#chosen-files li {
+  display:inline-flex;
+  align-items:center;
+  gap:2px;
+  max-width:100%;
+  padding:0 2px 0 10px;
+  border-radius:999px;
+  background:var(--soft);
+  color:var(--text);
+  font-size:13px;
+  overflow-wrap:anywhere
+}
+.file-chip button,#chosen-files li button {
+  min-height:32px;
+  padding:2px 8px;
+  border-radius:999px;
+  font-size:13px
 }
 .upload-menu {
   position:absolute;
   top:100%;
-  left:8px;
+  left:0;
   z-index:5;
   display:flex;
   flex-direction:column;
@@ -1034,6 +1128,16 @@ code {
 .ask-option .hint {
   display:block;
   margin:6px 0 0 25px
+}
+/* The label's text wraps beside its checkbox, not under it. */
+.ask-option label {
+  display:flex;
+  align-items:flex-start;
+  gap:8px
+}
+.ask-option label input {
+  flex:none;
+  margin-top:4px
 }
 a.analysis-row {
   text-decoration:none;

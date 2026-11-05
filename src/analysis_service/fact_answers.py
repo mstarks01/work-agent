@@ -77,6 +77,7 @@ from analysis_service.system_model import SystemModel
 
 __all__ = [
     "FACET_ANSWERS",
+    "FACT_VALUE_MAX_CHARS",
     "MAX_FACT_ANSWERS",
     "MAX_HELD_FACTS",
     "STORED",
@@ -153,13 +154,17 @@ def read_back(info: ValidationInfo) -> bool:
     return bool(info.context and info.context.get("stored"))
 
 
+#: The longest value of one answer to an open fact.
+FACT_VALUE_MAX_CHARS = 1000
+
+
 class FactAnswer(BaseModel):
     """One submitter answer to one open fact, named by the fact's key."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     key: UnknownKey
-    value: str = Field(min_length=1, max_length=1000)
+    value: str = Field(min_length=1, max_length=FACT_VALUE_MAX_CHARS)
     #: A ``facets`` kind's answer: each facet's ID and one of
     #: :data:`FACET_ANSWERS` or ``unknown``. The service writes ``value`` from
     #: it, so a submission sends one or the other.

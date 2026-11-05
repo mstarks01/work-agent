@@ -1,18 +1,27 @@
-"""A report of the web app as one Markdown file (#2157).
+"""A report of the web app as one Markdown file (#2157), and its findings as
+one CSV file.
 
-The file holds each framework's findings, the findings it ruled out, and the
-report's Controls section. Each value a submitter, an owner or a model wrote
-is escaped, so it forms no Markdown markup, no HTML, no Markdown link and no
-GFM autolink. A viewer that links any bare domain name can still link one.
+The Markdown file holds each framework's findings, the findings it ruled out,
+and the report's Controls section. Each value a submitter, an owner or a model
+wrote is escaped, so it forms no Markdown markup, no HTML, no Markdown link and
+no GFM autolink. A viewer that links any bare domain name can still link one.
+
+The CSV file holds one row for each finding of each framework, the findings it
+ruled out too. A cell that a spreadsheet can read as a formula starts with an
+apostrophe, so the spreadsheet shows it as text.
 """
 
 from __future__ import annotations
 
+import csv
+import io
 import re
 from collections.abc import Sequence
 
 from analysis_service import Report
+from analysis_service.frameworks import lane_of
 from analysis_service.job_controls import SectionEntry
+from analysis_service.open_facts import element_names
 
 #: The characters that start Markdown markup or an HTML tag inline.
 _MARKUP = re.compile(r"([\\`*_\[\]<>#|!~&])")
@@ -115,3 +124,70 @@ def report_markdown(name: str, report: Report, section: Sequence[SectionEntry]) 
         *controls_markdown(section),
     ]
     return "\n".join(lines).rstrip() + "\n"
+
+
+#: The CSV file's columns, in order.
+CSV_COLUMNS = (
+    "framework",
+    "id",
+    "title",
+    "status",
+    "severity",
+    "category",
+    "affected elements",
+    "description",
+    "mitigation",
+    "controls",
+)
+
+#: The first characters that make a spreadsheet read a cell as a formula
+#: (OWASP, CSV injection).
+_FORMULA_LEAD = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _cell(value: str) -> str:
+    """``value`` as a spreadsheet shows it as text, never as a formula."""
+    return f"'{value}" if value.startswith(_FORMULA_LEAD) else value
+
+
+def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
+    """The findings of ``report`` as one CSV file, with a row for each.
+
+    The category is the claim's lane, as :func:`lane_of` reads it. A
+    framework that grades nothing or recommends nothing leaves the severity or
+    the mitigation empty. The controls cell names each Control row that ruled
+    on the finding, with its ruling.
+    """
+    names = element_names(report.system_model)
+    rulings: dict[tuple[str, str], list[str]] = {}
+    for entry in section:
+        for row in entry.rows:
+            for ruling in row.rulings:
+                rulings.setdefault((row.framework, ruling.claim), []).append(
+                    f"{entry.name}: {ruling.ruling}"
+                )
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(CSV_COLUMNS)
+    for block in report.analyses:
+        for claim in [*block.claims, *block.rejected_claims]:
+            fields = claim.model_dump(mode="json")
+            severity = fields.get("severity") or {}
+            mitigations = fields.get("mitigations") or []
+            cells = (
+                block.framework,
+                claim.id,
+                claim.title,
+                claim.verdict.status,
+                severity.get("level") or "",
+                str(lane_of(claim) or ""),
+                " | ".join(
+                    names.get(element, element)
+                    for element in claim.affected_element_ids
+                ),
+                claim.description,
+                " | ".join(mitigation["summary"] for mitigation in mitigations),
+                " | ".join(rulings.get((block.framework, claim.id), [])),
+            )
+            writer.writerow([_cell(value) for value in cells])
+    return out.getvalue()

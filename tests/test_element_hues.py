@@ -57,6 +57,20 @@ def test_the_page_and_the_service_state_one_light_tag():
     assert tuple(map(int, light.groups())) == (*FILL, *LINE)
 
 
+def test_the_system_dark_theme_and_the_toggle_state_one_dark_tag():
+    page = Path("webapp/report_view.html").read_text(encoding="utf-8")
+    tags = [
+        tuple(map(int, found))
+        for found in re.findall(
+            r"--tag-fill-s: ?(\d+)%; --tag-fill-l: ?(\d+)%;\s*--tag-line-s: ?(\d+)%;"
+            r" --tag-line-l: ?(\d+)%;",
+            page,
+        )
+    ]
+    assert len(tags) == 3
+    assert tags[1] == tags[2] != (*FILL, *LINE)
+
+
 def test_the_download_styles_each_element_in_its_colour():
     model = valid_model()
     plain = model_mermaid(model)

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Report</title>
+<script nonce="__CSP_NONCE__"><!--theme--></script>
 <style nonce="__CSP_NONCE__"><!--workspace_style-->
   /* Palette roles (dataviz reference instance). Status hues are fixed, never themed. */
   .viz-root {
@@ -18,8 +19,8 @@
     --hairline:     #e1e0d9;
     /* An element's tag: its hue (element_hues) at these saturations and
        lightnesses. analysis_service.element_hues states the light ones too. */
-    --tag-fill-s: 70%; --tag-fill-l: 93%;
-    --tag-line-s: 50%; --tag-line-l: 40%;
+    --tag-fill-s: 25%; --tag-fill-l: 96%;
+    --tag-line-s: 25%; --tag-line-l: 55%;
     /* severity = status palette: critical / high(serious) / medium(warning) / low(good) */
     --sev-critical: #d03b3b;
     --sev-high:     #ec835a;
@@ -46,8 +47,8 @@
       --muted:    #898781;
       --border:   rgba(255,255,255,0.10);
       --hairline: #2c2c2a;
-      --tag-fill-s: 30%; --tag-fill-l: 22%;
-      --tag-line-s: 55%; --tag-line-l: 65%;
+      --tag-fill-s: 15%; --tag-fill-l: 18%;
+      --tag-line-s: 25%; --tag-line-l: 50%;
       --g-quote:  #7ea6ee;
       --g-unknown:#ac8ce8;
       --g-absent: #d47fc6;
@@ -60,7 +61,7 @@
       --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
       --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781; --border:rgba(255,255,255,0.10); --hairline:#2c2c2a;
       --g-quote:#7ea6ee; --g-unknown:#ac8ce8; --g-absent:#d47fc6; --g-derived:#49b6b1;
-      --tag-fill-s:30%; --tag-fill-l:22%; --tag-line-s:55%; --tag-line-l:65%;
+      --tag-fill-s:15%; --tag-fill-l:18%; --tag-line-s:25%; --tag-line-l:50%;
     }
   }
 
@@ -125,10 +126,10 @@
   .meta code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   /* An element as a tag in its own colour, as the diagram draws it. A zone or
      a reference with no hue takes a grey tag. */
-  .ref { --h: 0; display: inline-block; padding: 0 6px; margin: 1px 0; border-radius: 4px;
+  .ref { --h: 0; display: inline-block; padding: 0 6px; margin: 3px 0; border-radius: 4px;
     border: 1px solid hsl(var(--h) var(--tag-line-s) var(--tag-line-l));
     background: hsl(var(--h) var(--tag-fill-s) var(--tag-fill-l));
-    line-height: 1.5; cursor: help; overflow-wrap: anywhere; }
+    line-height: 1.05; cursor: help; overflow-wrap: anywhere; }
   .ref.neutral { --tag-fill-s: 0%; --tag-line-s: 0%; }
   /* A flow as its two endpoints, with an arrow in the weight of the tags. */
   .ref-flow { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
@@ -347,10 +348,6 @@
   :where(.viz-root) summary { font-size: inherit; color: inherit; }
   :where(.viz-root) details { margin: 0; }
   .viz-root .section-nav { margin: 20px 0 8px; }
-  /* The theme toggle reaches the sidebar too. */
-  :root[data-theme="light"] { color-scheme: light; }
-  :root[data-theme="dark"] { color-scheme: dark; }
-
   /* The complete export: the report, its questions and About the analysis
      in one document, with no tabs, no editors and no invitation. */
   .preview-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
@@ -371,7 +368,7 @@
 
   /* A print is the complete export: no navigation and no controls. */
   @media print {
-    .skip-link, .sidebar, #themebtn, #analysis-tabs, #report-head, #invite,
+    .skip-link, .sidebar, #analysis-tabs, #report-head, #invite,
     #preview-bar, .mermaid-link { display: none; }
     .workspace { display: block; min-height: 0; }
     main.report-main > .viz-root { min-height: 0; padding: 0; background: none; }
@@ -394,12 +391,11 @@
         <h1 id="sysname"></h1>
         <div class="meta">Security assessment</div>
       </div>
-      <button class="toggle" id="themebtn" type="button">Toggle theme</button>
     </div>
     <!-- The tabs of the report's analysis, as the workspace shows them. -->
     <nav class="section-nav" id="analysis-tabs" aria-label="Analysis" hidden><a id="description-tab">Description</a><a id="reports-tab" aria-current="page">Reports</a></nav>
     <!-- The report's own sections. The report is the one a reader lands on. -->
-    <div class="report-head" id="report-head"><nav class="report-tabs" id="report-tabs" aria-label="Report sections"><a id="report-tab" aria-current="page">Report</a><a id="questions-tab">Questions</a><a id="about-tab">About the analysis</a></nav><div class="report-tools" id="report-tools"><button type="button" class="icon-button" id="export-preview" aria-label="Preview complete export" title="Preview complete export"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button type="button" class="icon-button" id="export-download" aria-label="Download the report" title="Download the report" aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg></button><div id="export-menu" class="tool-menu" role="menu" aria-label="Download the report" hidden><a role="menuitem" id="export-md" download="report.md">Download as Markdown</a><a role="menuitem" id="export-json" download="report.json">Download as JSON</a></div></div></div>
+    <div class="report-head" id="report-head"><nav class="report-tabs" id="report-tabs" aria-label="Report sections"><a id="report-tab" aria-current="page">Report</a><a id="questions-tab">Questions</a><a id="about-tab">About the analysis</a></nav><div class="report-tools" id="report-tools"><button type="button" class="icon-button" id="export-preview" aria-label="Preview complete export" title="Preview complete export"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button><button type="button" class="icon-button" id="export-download" aria-label="Download the report" title="Download the report" aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg></button><div id="export-menu" class="tool-menu" role="menu" aria-label="Download the report" hidden><a role="menuitem" id="export-md" download="report.md">Download as Markdown</a><a role="menuitem" id="export-json" download="report.json">Download as JSON</a><a role="menuitem" id="export-csv" download="report.csv">Download as CSV</a></div></div></div>
 
     <!-- Shown while the complete export is previewed or printed. -->
     <div class="preview-bar" id="preview-bar" hidden><span>Complete export preview</span> <button type="button" class="primary" id="export-print">Print or save as PDF</button> <button type="button" class="toggle" id="export-close">Close preview</button></div>

@@ -17,12 +17,28 @@
     const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
     toggle.setAttribute("aria-label", label);
     toggle.title = label;
-    // A collapsed link shows only its icon, so its title names it on hover.
-    document.querySelectorAll("#sidebar-navigation a").forEach((link) => {
-      if (collapsed) link.title = link.textContent;
-      else link.removeAttribute("title");
+    // A collapsed link or button shows only its icon, so its title names it
+    // on hover.
+    document.querySelectorAll("#sidebar-navigation > *").forEach((item) => {
+      if (collapsed) item.title = item.textContent;
+      else item.removeAttribute("title");
     });
   };
+
+  // The theme button: the reader's choice for every page. theme.js keeps it
+  // in the browser and sets it before each page draws.
+  const themeButton = document.getElementById("theme-toggle");
+  const isDark = () => {
+    const chosen = document.documentElement.dataset.theme;
+    return chosen ? chosen === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  };
+  const showTheme = () => themeButton.setAttribute("aria-pressed", String(isDark()));
+  showTheme();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", showTheme);
+  themeButton.addEventListener("click", () => {
+    window.workAgentTheme.choose(isDark() ? "light" : "dark");
+    showTheme();
+  });
 
   try {
     setCollapsed(localStorage.getItem(key) === "true");

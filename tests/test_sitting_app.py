@@ -431,6 +431,20 @@ class TestTheOwnListRuleIsEnforced:
         app, _, _ = client
         assert f"const MIN_OWN_LIST = {MIN_OWN_LIST};" in app.get("/").text
 
+    def test_the_page_bounds_the_notes_and_the_username_as_the_server_does(
+        self, client
+    ):
+        from webapp.sitting import AUTHOR_MAX_CHARS
+        from webapp.sitting_base import NOTES_MAX_CHARS
+
+        app, _, _ = client
+        page = app.get("/").text
+        assert f'<textarea id="notes" maxlength="{NOTES_MAX_CHARS}"' in page
+        assert (
+            f'id="githubAuthor" class="text-input" maxlength="{AUTHOR_MAX_CHARS}"'
+            in page
+        )
+
 
 class TestThePosture:
     def test_a_rebound_host_is_refused(self, tree):

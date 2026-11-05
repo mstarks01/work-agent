@@ -163,6 +163,7 @@ from analysis_service.api import (
     FrameworkRequest,
     JobSubmission,
     max_body_bytes,
+    max_control_body_bytes,
 )
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
@@ -175,6 +176,7 @@ from analysis_service.config_files import (
 from analysis_service.controls import (
     CONTROL_ID,
     CONTROL_ID_PATTERN,
+    MAX_CONTROLS_CEILING,
     Control,
     ControlLimits,
     ControlScope,
@@ -265,6 +267,7 @@ from analysis_service.sources import (
     ANSWERS_LABEL,
     FORMATS,
     MAX_LABEL_CHARS,
+    MAX_SOURCES_CEILING,
     MAX_SYSTEM_NAME_CHARS,
     OWNER_FILE_ID,
     SourceFormat,
@@ -304,7 +307,7 @@ from webapp.page import (
     response,
     script_json,
 )
-from webapp.report_export import report_markdown
+from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
     Refusal,
@@ -842,12 +845,12 @@ class _Submission(BaseModel):
     #: :meth:`~analysis_service.job_answers.JobAnswers.owner_file_sources`
     #: refuses more of them than the deployment's source limit.
     owner_files: list[Annotated[str, Field(pattern=OWNER_FILE_ID)]] = Field(
-        default_factory=list
+        default_factory=list, max_length=MAX_SOURCES_CEILING
     )
     #: The Controls the new job copies (ADR 0127). Only this route takes
     #: them: ``POST /v1/jobs`` has no Controls.
     controls: list[Annotated[str, Field(pattern=CONTROL_ID)]] = Field(
-        default_factory=list
+        default_factory=list, max_length=MAX_CONTROLS_CEILING
     )
 
 
@@ -1174,6 +1177,7 @@ def render_report(
         ),
         workspace_style=WORKSPACE_STYLE,
         sidebar=_SIDEBAR,
+        theme=_THEME,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
         controls=script_json([entry.model_dump(mode="json") for entry in controls]),
@@ -1700,6 +1704,7 @@ def create_app(
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
+                theme=_THEME,
                 frameworks=_framework_fields(current.answers.carried_frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
@@ -1734,6 +1739,7 @@ def create_app(
                 settings=script_json(settings_view(process_env, error)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
+                theme=_THEME,
             )
         )
 
@@ -1826,6 +1832,7 @@ def create_app(
                 ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
+                theme=_THEME,
                 source_formats=_SOURCE_FORMATS,
                 file_refusals=script_json(
                     file_refusals(limits["max_bytes"], limits["max_owner_files"])
@@ -1929,6 +1936,7 @@ def create_app(
                 ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
+                theme=_THEME,
                 source_formats=_SOURCE_FORMATS,
                 file_refusals=script_json(evidence_refusals(limits)),
                 controls_page=script_json(page_data(limits)),
@@ -1949,7 +1957,7 @@ def create_app(
         request: Request, current: Current, model: type[ControlSave]
     ) -> ControlSave | JSONResponse:
         """The body of a Control save, or the ``400`` that refuses it."""
-        raw = await _job_body(request, current.answers)
+        raw = await _json_body(request, max_control_body_bytes(current.control_limits))
         try:
             return model.model_validate(_body_of(raw, model))
         except _UnknownKey as exc:
@@ -2510,6 +2518,21 @@ def create_app(
             headers={"Content-Disposition": 'attachment; filename="report.json"'},
         )
 
+    @app.get("/report/{run_id}/export.csv")
+    async def report_csv_export(run_id: str) -> Response:
+        """The report's findings as one CSV file, a row for each."""
+        served_report = await report_of(run_id)
+        if served_report is None:
+            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        text = report_csv(report, _section_of(answerable.record, report))
+        # The byte order mark tells a spreadsheet that the file is UTF-8.
+        return Response(
+            "\ufeff" + text,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="report.csv"'},
+        )
+
     @app.post("/correct/{run_id}")
     async def correct(run_id: str, request: Request) -> Response:
         """Correct a final report's answers, and run nothing (ADR 0054)."""
@@ -2838,6 +2861,9 @@ _UPLOAD_ACCEPT = escape(
 #: The sidebar of every workspace page: the form, Settings and the report.
 #: Static markup, so it takes no escape.
 _SIDEBAR = (Path(__file__).parent / "sidebar.html").read_text(encoding="utf-8")
+#: The script each sidebar page runs in its head, to set the theme the reader
+#: chose before the page draws.
+_THEME = client_script("theme.js")
 
 #: The question toggle. Every install can pause: one with no catalog asks its
 #: early questions and no link question.

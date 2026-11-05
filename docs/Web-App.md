@@ -62,6 +62,12 @@ LD_LIBRARY_PATH=~/.local/lib/chromium-deps/usr/lib/x86_64-linux-gnu uv run --gro
 
 ## What you select
 
+The form shows the name and the description on the left. A settings column on
+the right holds the frameworks, the "Ask me questions" box, the Controls,
+"Reuse answers from" and **Prepare analysis**. On a narrow screen, the column
+goes under the description. The "?" beside "What are you building?" shows
+what to describe.
+
 **The frameworks to run**, one checkbox per framework this install carries. The
 carried set comes from [`config/frameworks.toml`](../config/frameworks.toml).
 Every box starts unticked, so tick each framework you want **Prepare analysis**
@@ -223,13 +229,23 @@ copy and the report's rulings, so a later edit of a Control changes nothing
 here.
 
 The download icon at the end of the tab row opens a menu of **Download as
-Markdown** and **Download as JSON**. They send `GET /report/{run}/export.md` and `GET /report/{run}/export.json`. The
+Markdown**, **Download as JSON** and **Download as CSV**. They send
+`GET /report/{run}/export.md`, `GET /report/{run}/export.json` and
+`GET /report/{run}/export.csv`. The
 Markdown file holds the findings, the findings ruled out and the Controls
 section. It escapes each value, so a value forms no Markdown markup, no HTML,
 no Markdown link and no GFM autolink. A viewer that links any bare domain name
 can still link one. The JSON file holds the report and
-the Controls section as `report` and `controls`. A `/v1` report carries no
-Controls section.
+the Controls section as `report` and `controls`. The CSV file holds one row
+for each finding of each framework, and the findings ruled out too. Its columns
+are `framework`, `id`, `title`, `status`, `severity`, `category`, `affected
+elements`, `description`, `mitigation` and `controls`. The category is the
+claim's lane, the field that each framework's ID rule names. For example, a
+STRIDE finding's category is its STRIDE category. A framework that gives no severity or no mitigation leaves that cell
+empty. The `controls` cell names each Control row that ruled on the finding,
+and its ruling. A cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage
+return gets an apostrophe first, so a spreadsheet shows the cell as text and
+does not run it as a formula. A `/v1` report carries no Controls section.
 
 ## When the configuration is wrong
 
@@ -307,10 +323,10 @@ transcripts and Mermaid diagrams that you add to any of your analyses
   own copy. `DELETE /workspace/files/{file_id}` removes the row and the text,
   and keeps nothing.
 
-The plus button under the description opens a menu with two items. "Upload
+The plus button in the description box opens a menu with two items. "Upload
 from computer" reads a file from your computer. "Select
 from Files" opens a dialog with a checklist of your files and a "Manage
-files" link. The form lists each chosen file with a Remove button. The
+files" link. The box shows each chosen file as a chip with a Remove button. The
 submission sends the chosen IDs in `owner_files`, and the server copies each
 file's text into the job as a Source with the file's name as its label
 (ADR 0119). A later delete or a new upload changes no job and no report. When
@@ -352,6 +368,11 @@ it.
   reads the file with the checks of an Owner File and sends only its text.
   Each line has a "Remove" button. "Save Control" sends the Control, and an
   edit replaces it and keeps no earlier version.
+- **The counts.** A Control holds at most 20 aliases, 50 rows and
+  `max_control_evidence` evidence files. The page checks each count before it
+  adds an item, and it shows the sentence that the server uses for the same
+  refusal. A fact of a Control takes no detail: the service refuses a fact
+  with a detail, from the page and from `/v1`.
 - **The routes.** `GET /workspace/controls` lists your Controls with no
   evidence text. `POST /workspace/controls` adds one and answers `201`.
   `PUT /workspace/controls/{control_id}` replaces one, and the body names the
@@ -372,7 +393,7 @@ it.
 
 A **Control** records a protection that your systems already have, and it
 names what it protects: the whole application, one zone or one element (ADR
-0124). "Controls for this analysis", under the Files list, lists each of your
+0124). "Controls for this analysis", in the settings column, lists each of your
 Controls with what it protects and its rows, each ticked. The submission sends
 the IDs of the Controls you tick in `controls`, and the job copies each one,
 with the text of each evidence file (ADR 0127). A later edit or delete changes
@@ -650,8 +671,11 @@ page, so the page and the server word a refusal in one way.
 `webapp/main.py`. It refuses a media type other than `application/json` with
 `415`. It refuses a body over the route's limit with `413`, and it stops the
 read at the first byte over the limit. The limit is `MAX_SAVE_BYTES` for the
-two Settings routes. Each other route is a job route, and it reads its body
-through `_job_body`. There the limit is twice the deployment's
+two Settings routes. The two Control save routes use `max_control_body_bytes`.
+It takes the most evidence files, each at its largest, and each other field at
+its bound in 4-byte characters, and it doubles that, as the job guard does. So
+the routes accept each Control that the rules accept. Each other route is a job route, and it reads its
+body through `_job_body`. There the limit is twice the deployment's
 `max_source_bytes`, the guard that `/v1` also applies.
 
 **Every page carries a strict nonce CSP,** `default-src 'none'` with a fresh
@@ -691,6 +715,11 @@ or its link in the group index, to open it. The group index jumps to a group wit
 changing its answers or the engine's question order. Shared answers, row
 exceptions, earlier answers, skipped questions and follow-up rules use the
 existing answer service.
+
+The last item of the sidebar on each page is the theme button, "Dark theme".
+It changes the page between the light and the dark theme, and it shows as
+pressed when the dark theme is on. The browser keeps the choice, and each page
+sets it before it draws. With no choice, each page follows the system setting.
 
 **Description**, **Questions** and **Reports** belong to the same analysis.
 Use **Analyses** to reopen a paused analysis or review its retained reports.

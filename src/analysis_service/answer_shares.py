@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -33,6 +34,7 @@ from analysis_service.fact_answers import (
     key_ref,
     with_element,
 )
+from analysis_service.system_model import ELEMENT_ID_MAX_CHARS
 
 __all__ = ["SharedAnswer", "check_shares", "merged_shares"]
 
@@ -48,7 +50,9 @@ class SharedAnswer(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     answer: FactAnswer
-    covers: tuple[str, ...] = Field(max_length=MAX_FACT_ANSWERS)
+    covers: tuple[Annotated[str, Field(max_length=ELEMENT_ID_MAX_CHARS)], ...] = Field(
+        max_length=MAX_FACT_ANSWERS
+    )
 
     @field_validator("answer")
     @classmethod

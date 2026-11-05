@@ -56,6 +56,19 @@ EVIDENCE_ID_PATTERN = re.compile(EVIDENCE_ID)
 MAX_CONTROL_FACTS = 50
 MAX_CONTROL_ROWS = 50
 MAX_CONTROL_ALIASES = 20
+#: The longest framework, unit or version of one Control row.
+CONTROL_ROW_FIELD_MAX_CHARS = 32
+
+#: The refusals of a Control over a count. The Controls page shows the same
+#: sentences before it sends a save (``page_data``).
+ALIASES_FULL = (
+    f"A Control has at most {MAX_CONTROL_ALIASES} other names. Remove a name"
+    " before you add another."
+)
+ROWS_FULL = (
+    f"A Control covers at most {MAX_CONTROL_ROWS} rows. Remove a row before you"
+    " add another."
+)
 
 #: What a Control protects: the whole application, one Trust Boundary by name,
 #: or one Element of these types by name (ADR 0124). A flow is not a scope: its
@@ -193,7 +206,7 @@ class ControlScope(BaseModel):
 
     type: ScopeType
     name: str = _Name
-    aliases: list[str] = Field(default_factory=list, max_length=MAX_CONTROL_ALIASES)
+    aliases: list[str] = Field(default_factory=list)
 
     @field_validator("name")
     @classmethod
@@ -203,6 +216,8 @@ class ControlScope(BaseModel):
     @field_validator("aliases")
     @classmethod
     def _plain_aliases(cls, values: list[str]) -> list[str]:
+        if len(values) > MAX_CONTROL_ALIASES:
+            raise ValueError(ALIASES_FULL)
         for value in values:
             if len(value) > MAX_LABEL_CHARS:
                 raise ValueError(f"an alias is over {MAX_LABEL_CHARS} characters")
@@ -266,9 +281,9 @@ class ControlRow(BaseModel):
     #: A ``str`` and not a ``FrameworkName``: :func:`check_unit` names the
     #: refusal of a submission, and a row read back keeps a framework that a
     #: later build drops.
-    framework: str = Field(max_length=32)
-    unit: str = Field(max_length=32)
-    version: str = Field(min_length=1, max_length=32)
+    framework: str = Field(max_length=CONTROL_ROW_FIELD_MAX_CHARS)
+    unit: str = Field(max_length=CONTROL_ROW_FIELD_MAX_CHARS)
+    version: str = Field(min_length=1, max_length=CONTROL_ROW_FIELD_MAX_CHARS)
 
     @model_validator(mode="after")
     def _a_carried_unit(self, info: ValidationInfo) -> Self:
@@ -308,7 +323,7 @@ class ControlDocument(BaseModel):
     name: str = Field(max_length=MAX_LABEL_CHARS)
     scope: ControlScope
     facts: list[FactAnswer] = Field(max_length=MAX_CONTROL_FACTS)
-    rows: list[ControlRow] = Field(max_length=MAX_CONTROL_ROWS)
+    rows: list[ControlRow]
     evidence: list[EvidenceFile]
 
     @field_validator("name")
@@ -317,6 +332,13 @@ class ControlDocument(BaseModel):
         if not value.strip():
             raise ValueError("Give the Control a name.")
         return plain_name(value)
+
+    @field_validator("rows")
+    @classmethod
+    def _within_the_row_bound(cls, rows: list[ControlRow]) -> list[ControlRow]:
+        if len(rows) > MAX_CONTROL_ROWS:
+            raise ValueError(ROWS_FULL)
+        return rows
 
     @model_validator(mode="after")
     def _one_of_each(self) -> Self:
@@ -342,6 +364,8 @@ class ControlDocument(BaseModel):
             if ref.kind not in SCOPE_FACT_KINDS[self.scope.type] or not protective:
                 raise ValueError(SCOPE_FACT_REFUSALS[self.scope.type])
         for fact, ref in zip(self.facts, refs, strict=True):
+            if fact.detail:
+                raise ValueError("A fact of a Control takes no detail.")
             if ref.kind == "attribute" and len(fact.value) > CONTROL_VALUE_MAX_CHARS:
                 raise ValueError(
                     f"The value of “{ref.attribute}” is longer than"
@@ -450,6 +474,17 @@ def check_texts(
             raise ValueError(f"evidence {file.id} holds another digest than its text")
 
 
+#: The most Controls and evidence files a deployment can set
+#: (``resilience.toml``). A body list of Controls or of evidence files takes
+#: these as its static bound.
+MAX_CONTROLS_CEILING = 1000
+MAX_CONTROL_EVIDENCE_CEILING = 100
+#: The most evidence text one Control can hold at any setting: its most
+#: files times the most bytes of one file. This bounds a Control save's body
+#: guard (:func:`~analysis_service.api.max_control_body_bytes`).
+MAX_CONTROL_EVIDENCE_TOTAL_BYTES = 16 * 1024 * 1024
+
+
 @dataclass(frozen=True)
 class ControlLimits:
     """The deployment's bounds on an owner's Controls (``resilience.toml``)."""
@@ -529,17 +564,21 @@ def control_refusal(
     control character, some text) and the credential table.
     """
     if len(document.evidence) > limits.max_evidence:
-        return EvidenceRefusal(
-            None,
-            f"A Control holds at most {limits.max_evidence} evidence files. Remove a"
-            " file before you add another.",
-        )
+        return EvidenceRefusal(None, evidence_full(limits.max_evidence))
     for file in document.evidence:
         if file.id in texts:
             message = _text_refusal(file.name, texts[file.id], limits)
             if message is not None:
                 return EvidenceRefusal(file.id, message)
     return None
+
+
+def evidence_full(max_evidence: int) -> str:
+    """The refusal of a Control over ``max_evidence`` evidence files."""
+    return (
+        f"A Control holds at most {max_evidence} evidence files. Remove a file"
+        " before you add another."
+    )
 
 
 def evidence_too_large(max_bytes: int) -> str:

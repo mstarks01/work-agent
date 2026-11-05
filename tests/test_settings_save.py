@@ -240,6 +240,21 @@ class TestASaveThatPasses:
         assert "extreme" not in refused.text
         assert "THINKING" not in settings_text(tmp_path)
 
+    def test_more_evidence_than_one_control_holds_is_refused(self, tmp_path):
+        client, _ = app_on(tmp_path, hand_written())
+
+        refused = save(
+            client,
+            {
+                "resilience.max_control_evidence": "100",
+                "resilience.max_source_bytes": "10485760",
+            },
+        )
+
+        assert refused.status_code == 422, refused.text
+        assert "16,777,216 bytes of evidence" in refused.text
+        assert "MAX_CONTROL_EVIDENCE" not in settings_text(tmp_path)
+
     def test_a_level_on_a_model_that_takes_none_is_refused_on_its_row(self, tmp_path):
         client, _ = app_on(tmp_path, hand_written())
 

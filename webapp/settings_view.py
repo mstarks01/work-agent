@@ -34,11 +34,12 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Any, Literal, TypedDict, get_args
 
 from analysis_service import resilience
 from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.config_files import (
+    MAX_VALUE_CHARS,
     SETTINGS_FILE,
     SettingsFileError,
     SettingsLine,
@@ -68,6 +69,8 @@ from analysis_service.store_backends import (
     CLOSED_SETTINGS,
     JOB_STORE_VAR,
     JOB_STORES,
+    MAX_RETENTION_DAYS,
+    MIN_RETENTION_DAYS,
     RETENTION_DAYS_VAR,
     JobStore,
     build_store,
@@ -219,6 +222,8 @@ def settings_view(
             if var not in page
         ],
         "rows": rows,
+        # The longest value the value rule and the secret rule take.
+        "value_chars": MAX_VALUE_CHARS,
         "store_shown": _store_keys(merged),
         "modes": {
             vendor: [mode.value for mode in VENDORS[vendor].credential_modes]
@@ -300,7 +305,22 @@ def _numeric(parser: Callable[[str], float]) -> Numeric:
     return "integer" if parser is int else "decimal"
 
 
-def _controls() -> dict[str, dict[str, Any]]:
+class NumericEntry(TypedDict):
+    """A numeric setting's control: its kind and the range the loader takes.
+    ``above`` is an exclusive floor."""
+
+    numeric: Numeric
+    min: float | None
+    above: float | None
+    max: float | None
+
+
+def _resilience_entry(field: str, parser: Callable[[str], float]) -> NumericEntry:
+    least, above, most = resilience.numeric_bounds(field)
+    return {"numeric": _numeric(parser), "min": least, "above": above, "max": most}
+
+
+def _controls() -> dict[str, Mapping[str, object]]:
     """The closed set of each Deployment Setting whose loader holds one, from
     that loader's table, so the page offers a choice in place of free text.
     ``multiple`` marks a list of names separated by commas. A tier's model row
@@ -329,11 +349,16 @@ def _controls() -> dict[str, dict[str, Any]]:
             if setting.variable in CLOSED_SETTINGS
         },
     }
-    numeric: dict[str, dict[str, Numeric]] = {
-        f"resilience.{field}": {"numeric": _numeric(parser)}
+    numeric: dict[str, NumericEntry] = {
+        f"resilience.{field}": _resilience_entry(field, parser)
         for field, (_, parser) in resilience.ENV_OVERRIDES.items()
     }
-    numeric["store.retention_days"] = {"numeric": "integer"}
+    numeric["store.retention_days"] = {
+        "numeric": "integer",
+        "min": MIN_RETENTION_DAYS,
+        "above": None,
+        "max": MAX_RETENTION_DAYS,
+    }
     return {
         **numeric,
         **{

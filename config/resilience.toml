@@ -127,6 +127,7 @@ max_owner_files = 100
 # many evidence files one Control holds. A save over either is refused.
 # Controls do not expire, and one evidence file is at most `max_source_bytes`,
 # so these two bound one owner's Controls.
+# `max_control_evidence` times `max_source_bytes` must be 16 MiB or less.
 max_controls = 50
 max_control_evidence = 10
 

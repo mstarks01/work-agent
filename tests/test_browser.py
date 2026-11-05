@@ -186,6 +186,44 @@ def test_sidebar_collapses_and_stays_collapsed_on_settings(page):
     )
 
 
+def test_the_theme_button_sets_the_theme_on_every_page(page):
+    """The sidebar's theme button sets the theme, and each page the reader
+    opens next, the report too, draws in that theme."""
+    page.emulate_media(color_scheme="light")
+    button = page.get_by_role("button", name="Dark theme")
+    assert button.get_attribute("aria-pressed") == "false"
+    canvas = "getComputedStyle(document.body).backgroundColor"
+    light = page.evaluate(canvas)
+    button.click()
+    assert button.get_attribute("aria-pressed") == "true"
+    dark = page.evaluate(canvas)
+    assert dark != light
+    for path in ("/settings", "/files", "/controls"):
+        page.goto(path)
+        assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+        assert page.evaluate(canvas) == dark
+        assert (
+            page.get_by_role("button", name="Dark theme").get_attribute("aria-pressed")
+            == "true"
+        )
+    page.get_by_role("button", name="Dark theme").click()
+    page.goto("/")
+    assert page.evaluate(canvas) == light
+
+
+def test_the_report_draws_in_the_chosen_theme(page):
+    """The report's own palette obeys the sidebar's theme button."""
+    page.emulate_media(color_scheme="light")
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    ink = "n => getComputedStyle(n).getPropertyValue('--ink').trim()"
+    light = page.locator(".viz-root").evaluate(ink)
+    page.click("#theme-toggle")
+    page.reload()
+    assert page.locator(".viz-root").evaluate(ink) != light
+
+
 def test_clearing_a_control_sends_no_answer_for_it(page):
     """Blank after "There is none" still sent ``none`` (#1289, B1)."""
     pause(page)
@@ -358,7 +396,7 @@ def test_a_new_analysis_reuses_the_answers_of_an_earlier_one(page):
     page.wait_for_selector("#answers-from-field", state="visible")
     ask_row = page.locator(".ask-with-help").bounding_box()
     reuse_row = page.locator("#answers-from-field").bounding_box()
-    help = page.locator(".question-help summary").bounding_box()
+    help = page.locator(".ask-with-help .question-help summary").bounding_box()
     assert ask_row and reuse_row and help
     assert reuse_row["y"] >= ask_row["y"] + ask_row["height"]
     assert ask_row["y"] <= help["y"] < ask_row["y"] + ask_row["height"]
@@ -1001,6 +1039,23 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
             page.locator(f'tr[data-key="{row}"] input').get_attribute("placeholder")
             for row in ("credentials.vertex.location", "credentials.openai.api_key")
         )
+        attempts = page.locator('tr[data-key="resilience.attempts"] input')
+        bounds = (attempts.get_attribute("min"), attempts.get_attribute("max"))
+        attempts.fill("11")
+        page.locator("#settings-search").click()
+        over = page.locator('tr[data-key="resilience.attempts"] .field-error')
+        over_text = over.inner_text()
+        attempts.fill("3")
+        ratio = page.locator('tr[data-key="resilience.retry_budget_ratio"] input')
+        ratio.fill("0")
+        page.locator("#settings-search").click()
+        floor_text = page.locator(
+            'tr[data-key="resilience.retry_budget_ratio"] .field-error'
+        ).inner_text()
+        ratio.fill("0.1")
+        text_bound = page.locator(
+            'tr[data-key="credentials.vertex.location"] input'
+        ).get_attribute("maxlength")
         page.fill("#settings-search", "timeout")
         found = page.locator("#settings-rows tr[data-key]").all_inner_texts()
         page.set_viewport_size({"width": 390, "height": 844})
@@ -1016,6 +1071,10 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
     assert key is not None and "e.g." not in key
     assert found and all("imeout" in row for row in found)
     assert fits
+    assert bounds == ("1", "10")
+    assert over_text == "Enter a number from 1 to 10."
+    assert floor_text == "Enter a number over 0 and up to 1."
+    assert text_bound == "4096"
 
 
 def test_the_settings_page_saves_resets_and_refuses_a_stale_tab(browser, tmp_path):
@@ -1342,6 +1401,35 @@ def test_an_uploaded_mermaid_file_starts_an_analysis_as_a_diagram(page):
     page.wait_for_selector("#asked", state="visible")
 
 
+def test_the_settings_column_sits_beside_the_description_and_stacks_on_a_phone(page):
+    """The settings column holds the frameworks, the questions box and the
+    button. A wide screen shows it beside the description box, and a phone
+    shows it under the box."""
+    page.set_viewport_size({"width": 1280, "height": 900})
+    settings = page.locator("aside.entry-settings")
+    for held in ("#frameworks", "#ask", "#go"):
+        assert settings.locator(held).count() == 1, held
+    box = page.locator(".composer").bounding_box()
+    column = settings.bounding_box()
+    assert box and column
+    assert column["x"] >= box["x"] + box["width"]
+    page.set_viewport_size({"width": 390, "height": 844})
+    box = page.locator(".composer").bounding_box()
+    column = settings.bounding_box()
+    assert box and column
+    assert column["y"] >= box["y"] + box["height"]
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+
+
+def test_the_description_guidance_opens_from_its_help(page):
+    """The box holds a short prompt, and its help holds the full guidance."""
+    help = page.locator(".label-with-help .question-help")
+    assert not help.locator(".question-help-content").is_visible()
+    help.locator("summary").click()
+    assert "how each side proves who it is" in help.inner_text()
+    assert len(page.get_attribute("#description", "placeholder")) < 100
+
+
 def test_workspace_mobile_has_no_page_overflow(page):
     page.set_viewport_size({"width": 390, "height": 844})
     pause(page)
@@ -1443,13 +1531,12 @@ def test_a_printed_report_is_the_complete_export(page):
     pause(page)
     page.click("#continue")
     page.wait_for_url("**/report/**")
-    page.click("#themebtn")
+    page.click("#theme-toggle")
     group = page.locator("details.finding-group").first
     assert group.get_attribute("open") is None
     page.emulate_media(media="print")
     for hidden in (
         ".sidebar",
-        "#themebtn",
         "#analysis-tabs",
         "#report-tabs",
         "#invite",
@@ -2200,6 +2287,29 @@ def save_control(page) -> None:
     )
 
 
+def test_the_controls_page_refuses_an_alias_or_a_row_over_its_count(page):
+    from analysis_service.controls import (
+        ALIASES_FULL,
+        MAX_CONTROL_ALIASES,
+        MAX_CONTROL_ROWS,
+        ROWS_FULL,
+    )
+
+    page.goto("/controls")
+    new_control(page, "SSO")
+    for number in range(MAX_CONTROL_ALIASES + 1):
+        page.fill("#alias-input", f"alias {number}")
+        page.press("#alias-input", "Enter")
+    aliases = page.locator(".aliases .tag").count()
+    alias_refusal = page.inner_text("#editor-problem")
+    for _ in range(MAX_CONTROL_ROWS + 1):
+        page.click("#add-row")
+    rows = page.locator("#rows-list li").count()
+    row_refusal = page.inner_text("#editor-problem")
+    assert (aliases, alias_refusal) == (MAX_CONTROL_ALIASES, ALIASES_FULL)
+    assert (rows, row_refusal) == (MAX_CONTROL_ROWS, ROWS_FULL)
+
+
 def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
     page.goto("/controls")
     assert page.get_attribute("#controls-nav", "aria-current") == "page"
@@ -2601,13 +2711,16 @@ def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers)
         )
         assert "applied" in section.inner_text() and "refused" in section.inner_text()
         assert page.get_attribute("#export-md", "href").endswith("/export.md")
-        # The download icon opens its two formats, and Escape closes them.
+        # The download icon opens its three formats, and Escape closes them.
         assert page.is_hidden("#export-menu")
         page.click("#export-download")
         assert page.is_visible("#export-menu")
         assert page.evaluate("document.activeElement.id") == "export-md"
         page.keyboard.press("ArrowDown")
         assert page.evaluate("document.activeElement.id") == "export-json"
+        page.keyboard.press("ArrowDown")
+        assert page.evaluate("document.activeElement.id") == "export-csv"
+        assert page.get_attribute("#export-csv", "href").endswith("/export.csv")
         page.keyboard.press("Escape")
         assert page.is_hidden("#export-menu")
         page.click("#export-preview")
