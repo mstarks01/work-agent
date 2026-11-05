@@ -1052,10 +1052,10 @@ def migrate_first_run_database(env: Mapping[str, str]) -> None:
 
 
 def _migrate(env: Mapping[str, str], by: Migrator) -> None:
-    """The steps of each migration: make the database where it does not exist, read its
-    revision, refuse a revision that the tree does not hold, and upgrade a
-    database below the latest revision, with one log line that names the two
-    revisions."""
+    """The steps of each migration: make the database where it does not
+    exist, read its revision, refuse a revision that the tree does not hold,
+    and upgrade a database below the latest revision, with one log line that
+    names the two revisions."""
     create_database(env)
     with _failed(by, "read"):
         current = asyncio.run(_current_revision(env))
@@ -1330,8 +1330,9 @@ class SqlJobStore:
     ) -> Admission:
         """Check every admission bound and insert, in one write transaction.
 
-        The objects go first, so the row never names an object that does not exist, and they
-        go again at once where admission refuses the job or raises. A failed
+        The objects go first, so the row never names an object that does not
+        exist, and they go again at once where admission refuses the job or
+        raises. A failed
         object delete there changes neither the refusal nor the error.
         """
         if principal is not None and principal.owner_id != record.owner_id:
@@ -2051,8 +2052,8 @@ class SqlJobStore:
         """Put the text, then count and insert the row in one write
         transaction (ADR 0118).
 
-        The object goes first, so a row never names an object that does not exist, and it
-        goes again at once where the insert is refused or raises.
+        The object goes first, so a row never names an object that does not
+        exist, and it goes again at once where the insert is refused or raises.
         """
         if principal is not None and principal.owner_id != file.owner_id:
             raise ValueError(f"file {file.id} names another owner than its principal")
@@ -2200,8 +2201,8 @@ class SqlJobStore:
         """Put each evidence text, then count and insert the row in one write
         transaction (ADR 0127).
 
-        The objects go first, so a row never lists an object that does not exist, and they go
-        again at once where the insert is refused or raises.
+        The objects go first, so a row never lists an object that does not
+        exist, and they go again at once where the insert is refused or raises.
         """
         if principal is not None and principal.owner_id != control.owner_id:
             raise ValueError(

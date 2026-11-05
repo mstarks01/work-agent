@@ -130,7 +130,7 @@
         const alias = event.target.value.trim();
         if (!alias) return;
         if (draft.scope.aliases.length >= limits.max_aliases) {
-          refuse(PAGE.full.aliases);
+          refuse(PAGE.at_limit.aliases);
           return;
         }
         draft.scope.aliases.push(alias);
@@ -224,7 +224,7 @@
         holder,
         h("button", { type: "button", id: "add-row", on: { click: () => {
           if (draft.rows.length >= limits.max_rows) {
-            refuse(PAGE.full.rows);
+            refuse(PAGE.at_limit.rows);
             return;
           }
           draft.rows.push({ framework, unit: el("row-unit").value, version: units[framework].version });
@@ -241,7 +241,7 @@
       event.target.value = "";
       if (!file) return;
       if (draft.evidence.length >= limits.max_evidence) {
-        refuse(PAGE.full.evidence);
+        refuse(PAGE.at_limit.evidence);
         return;
       }
       const read = await textFile.decode(file, limits.max_evidence_bytes);

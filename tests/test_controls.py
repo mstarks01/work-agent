@@ -29,7 +29,12 @@ from analysis_service.controls import (
 from analysis_service.fact_answers import STORED
 from analysis_service.frameworks import PACKAGES
 from analysis_service.job_controls import CopiedControl
-from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
+from analysis_service.owner_files import (
+    NO_TEXT,
+    NOT_PLAIN_TEXT,
+    NOT_UTF_8,
+    text_refusal,
+)
 from analysis_service.sources import text_digest
 from analysis_service.system_model import (
     CONTROL_VALUE_MAX_CHARS,
@@ -470,7 +475,28 @@ def test_a_long_or_unclosed_credential_is_refused(line, shape):
     )
 
 
-@pytest.mark.parametrize("end", ["\n", "\r\n", "\r", "\u2028", "\u2029"])
+#: The line ends that :func:`~analysis_service.owner_files.text_refusal`
+#: lets through.
+LINE_ENDS = ["\n", "\r\n", "\r", "\u2028", "\u2029"]
+
+
+def test_each_other_splitlines_break_is_refused():
+    """``str.splitlines`` also breaks on six characters that are not in
+    :data:`LINE_ENDS`. ``text_refusal`` refuses each of them, so the line ends
+    that ``text_lines`` meets are the five the tests use."""
+    breaks = [
+        chr(point)
+        for point in range(0x2100)
+        if len(f"a{chr(point)}b".splitlines()) == 2
+    ]
+    others = [char for char in breaks if char not in LINE_ENDS]
+    assert others == ["\v", "\f", "\x1c", "\x1d", "\x1e", "\x85"]
+    for char in others:
+        refusal = text_refusal(f"a{char}b", max_bytes=99, too_large="")
+        assert refusal == NOT_PLAIN_TEXT
+
+
+@pytest.mark.parametrize("end", LINE_ENDS)
 def test_a_credential_line_counts_each_line_end_a_text_may_hold(end):
     """Each line end that ``text_refusal`` lets through starts a line, as it
     does in an editor."""

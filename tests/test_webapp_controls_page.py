@@ -512,7 +512,7 @@ class TestThePage:
         # The page checks each count with the sentence the save refuses with.
         assert payload["limits"]["max_aliases"] == MAX_CONTROL_ALIASES
         assert payload["limits"]["max_rows"] == MAX_CONTROL_ROWS
-        assert payload["full"] == {
+        assert payload["at_limit"] == {
             "aliases": ALIASES_FULL,
             "rows": ROWS_FULL,
             "evidence": evidence_full(LIMITS.max_evidence),

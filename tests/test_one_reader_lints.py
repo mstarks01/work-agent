@@ -483,7 +483,8 @@ NEWLINE_SPLITS: dict[Site, str] = {
         " \\r\\n and \\r become \\n first"
     ),
     ("src/analysis_service/config_files.py", "read_settings"): (
-        "a settings file is KEY=value lines that the service writes with \\n"
+        "a \\r or a Unicode line separator stays in a settings line, where the"
+        " key pattern or the value rule refuses it"
     ),
     ("src/analysis_service/graph.py", "unfence"): (
         "the inverse of the \\n join of render_fenced"

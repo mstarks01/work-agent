@@ -220,7 +220,7 @@ def page_data(limits: ControlLimits) -> dict[str, object]:
         },
         # The sentences a save over a count gets, which the page shows before
         # it sends one.
-        "full": {
+        "at_limit": {
             "aliases": ALIASES_FULL,
             "rows": ROWS_FULL,
             "evidence": evidence_full(limits.max_evidence),
