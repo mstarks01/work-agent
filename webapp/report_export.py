@@ -22,7 +22,7 @@ from typing import Any, Literal
 
 from analysis_service import Report
 from analysis_service.claims import (
-    REJECTION_WORDS,
+    REJECTION_MEANINGS,
     VERDICT_WORDS,
     Claim,
     Mitigation,
@@ -53,7 +53,7 @@ def _because(verdict: Verdict) -> str:
     """Why the critic rejected the draft, or nothing where a report read back
     names no step."""
     step = verdict.rejected_because
-    return "" if step is None else f", because {REJECTION_WORDS[step]}"
+    return "" if step is None else f", because {REJECTION_MEANINGS[step]}"
 
 
 def _findings(report: Report) -> list[str]:

@@ -137,7 +137,7 @@ UNIT_VERDICT_WORDS: Mapping[VerdictStatus, tuple[str, str]] = MappingProxyType(
 
 #: How a person reads each step that ended a rejected draft, in the Markdown
 #: export. The words describe the check, as :data:`RejectionStep` does.
-REJECTION_WORDS: Mapping[RejectionStep, str] = MappingProxyType(
+REJECTION_MEANINGS: Mapping[RejectionStep, str] = MappingProxyType(
     {
         "evidence": "the stated facts show that its subject is not there",
         "reasoning": "it asserts or infers what the description does not state",

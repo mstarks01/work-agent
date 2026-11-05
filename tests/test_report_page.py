@@ -712,7 +712,7 @@ def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
     [
         ("VERDICT_WORDS", "VerdictStatus"),
         ("UNIT_VERDICT_WORDS", "VerdictStatus"),
-        ("REJECTION_WORDS", "RejectionStep"),
+        ("REJECTION_MEANINGS", "RejectionStep"),
     ],
 )
 def test_each_word_table_answers_for_its_whole_vocabulary(table, vocabulary):
@@ -730,7 +730,7 @@ def test_each_word_table_answers_for_its_whole_vocabulary(table, vocabulary):
     ("island", "table", "words"),
     [
         ("verdict_words", "VERDICT", "VERDICT_WORDS"),
-        ("unit_verdict_words", "VERDICT_STATE", "UNIT_VERDICT_WORDS"),
+        ("unit_verdict_words", "UNIT_VERDICT", "UNIT_VERDICT_WORDS"),
     ],
 )
 def test_the_page_reads_the_service_s_verdict_words(island, table, words):
@@ -749,8 +749,12 @@ def test_the_page_reads_the_service_s_verdict_words(island, table, words):
         rf'const {table} = JSON\.parse\(document\.getElementById\("{island}"\)',
         script,
     )
-    for label in claims.VERDICT_WORDS.values():
-        assert f'"{label}"' not in script, label
+    words = [
+        *claims.VERDICT_WORDS.values(),
+        *(word for pair in claims.UNIT_VERDICT_WORDS.values() for word in pair),
+    ]
+    for word in words:
+        assert f'"{word}"' not in script, word
 
 
 def test_the_page_reads_the_service_s_severity_order():

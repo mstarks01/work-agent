@@ -201,7 +201,7 @@
     "The owner states that a Control covers it. The service verified nothing."];
 
   // The same for a claim's verdict, in the service's words (UNIT_VERDICT_WORDS).
-  const VERDICT_STATE = JSON.parse(document.getElementById("unit_verdict_words").textContent);
+  const UNIT_VERDICT = JSON.parse(document.getElementById("unit_verdict_words").textContent);
 
   // A rejection for `evidence` or `control` rules on the unit a draft names:
   // for a framework that answers in units, `evidence` means the unit does not
@@ -699,7 +699,7 @@
       const [label, meaning] = claim
         ? (rulesOnUnit(block, claim)
             ? (coveredByControl(claim) ? CONTROL_COVERED : REVIEW_EXCLUDED)
-            : (VERDICT_STATE[claim.verdict.status] || ["Ruled", ""]))
+            : UNIT_VERDICT[claim.verdict.status])
         : (SCOPE_STATE[entry ? entry.state : "not-raised"] || ["Listed", ""]);
 
       const box = el("details", "unit");
