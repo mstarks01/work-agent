@@ -232,7 +232,7 @@ faults of the other kinds, or add problems or unbriefed changes?
 
 **The instrument.** `run.py recritic-replay` with the eleven fault shapes of
 #2196. The first pass is case 05's, as in E1 to E3, from the same archive and
-with the same Control. `faults-e4.json` is `faults.json` with `covers`: the
+with the same Control. `faults-e4.json` is `faults.json` with `control_reasons`: the
 reason a ruling of I-02 rejected for `control` gives.
 
 **The seven views**, one fault each:

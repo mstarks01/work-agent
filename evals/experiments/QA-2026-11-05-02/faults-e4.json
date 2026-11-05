@@ -46,7 +46,7 @@
       }
     ]
   },
-  "covers": {
+  "control_reasons": {
     "I-02": "worker.env states file mode 0600 with owner and group svc-worker, so only the worker account reads the configuration the draft says other readers can reach."
   }
 }
