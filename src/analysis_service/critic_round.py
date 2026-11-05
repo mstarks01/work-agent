@@ -159,8 +159,7 @@ class Unreconciled:
 
     @property
     def revise_output(self) -> dict[str, int]:
-        """What the router outputs on the ``revise`` edge, and so the re-ask's
-        user turn."""
+        """What the router outputs on the ``revise`` edge: the re-ask's user turn."""
         return {"issue_count": len(self.problems)}
 
 

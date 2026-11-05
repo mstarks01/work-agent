@@ -101,7 +101,7 @@ class FaultView:
     """One first pass with one injected fault, and the re-ask it routes to."""
 
     draft_id: str
-    round: CriticRound
+    critic_round: CriticRound
     #: The ruling set with every shown row answered, which reconciles.
     clean: Accepted
     reask: Reask
@@ -115,6 +115,9 @@ def answered_first_pass(archived: Archived, faults: FaultSet) -> list[Ruling]:
         rulings = rulings_from_report(archived.block, archived.drafts)
     except ArchivedRulingError as error:
         raise EvalRunError(str(error)) from error
+    unknown = set(faults.refused) - {ruling.id for ruling in rulings}
+    if unknown:
+        raise EvalRunError(f"the fault set refuses rows on no draft: {sorted(unknown)}")
     return [
         _with(ruling, refused_controls=faults.refused[ruling.id])
         if ruling.id in faults.refused
@@ -180,7 +183,7 @@ def fault_view(
             + "; ".join(clean.messages)
         )
     shown = critic_round.shown().get(draft_id, frozenset())
-    if not shown or draft_id not in faults.refused:
+    if not shown:
         raise EvalRunError(f"{draft_id} was shown no row of {faults.control.id}")
     outcome = critic_round.first(
         _emitted(
@@ -230,7 +233,7 @@ async def compose(
     )
 
 
-class Status(TypedDict):
+class StatusChange(TypedDict):
     """The draft's verdict with every row answered, and after the repair."""
 
     answered: VerdictStatus
@@ -246,7 +249,7 @@ class Repair(TypedDict):
     schema_error: str | None
     remaining: list[dict[str, Any]]
     drift: list[dict[str, Any]]
-    status: Status
+    status: StatusChange
 
 
 def repair(view: FaultView, raw: str) -> Repair:
@@ -263,16 +266,16 @@ def repair(view: FaultView, raw: str) -> Repair:
         schema_error=None,
         remaining=[],
         drift=[],
-        status=Status(answered=_status(view.clean, view.draft_id), repaired=None),
+        status=StatusChange(answered=_status(view.clean, view.draft_id), repaired=None),
     )
     try:
-        merged, drift = view.round.merge(
-            view.reask.first, stored(raw, view.round.framework)
+        merged, drift = view.critic_round.merge(
+            view.reask.first, stored(raw, view.critic_round.framework)
         )
-        outcome = view.round.outcome(merged)
-    except ValueError as error:
+    except ValidationError as error:
         result["schema_error"] = str(error)
         return result
+    outcome = view.critic_round.outcome(merged)
     result["drift"] = [problem.model_dump(mode="json") for problem in drift]
     if isinstance(outcome, Accepted):
         result["status"]["repaired"] = _status(outcome, view.draft_id)

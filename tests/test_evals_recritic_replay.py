@@ -94,7 +94,7 @@ def answer(view, draft_id, **verdict) -> str:
     """The re-ask's answer: the faulted draft's clean ruling, with changes."""
     (ruling,) = (
         ruling
-        for ruling in view.round.canonical(view.reask.emitted)
+        for ruling in view.critic_round.canonical(view.reask.emitted)
         if ruling["id"] == draft_id
     )
     clean = view.clean
@@ -209,3 +209,17 @@ def test_the_re_ask_request_is_rebuilt_byte_for_byte(
         return
     assert instruction in sent, "no node sent this re-ask instruction"
     assert sent[instruction] == [turn]
+
+
+def test_a_fault_set_that_names_no_draft_is_refused(archived):
+    faults = faults_for(archived)
+    misspelt = faults.model_copy(
+        update={
+            "refused": {**faults.refused, "X-99": faults.refused[archived.drafts[0].id]}
+        }
+    )
+
+    with pytest.raises(EvalRunError, match="on no draft"):
+        recritic_replay.fault_view(
+            archived, misspelt, archived.drafts[0].id, "row-unanswered"
+        )

@@ -65,8 +65,11 @@ def test_offline_mode_refuses_before_the_transport_on_every_attempt():
 
 
 def test_offline_mode_refuses_a_single_node_replay():
-    """The path each of ``critic-replay``, ``recritic-replay`` and
-    ``lane-replay`` pays for one call on."""
+    """The one paid call of each single-node replay.
+
+    ``critic-replay``, ``recritic-replay`` and ``lane-replay`` each pay for one
+    call on this path.
+    """
     call = node_call(
         Deployment.from_env(),
         FrameworkNodes("stride").node(CRITIC_ROLE),
