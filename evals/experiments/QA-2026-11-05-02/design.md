@@ -197,3 +197,21 @@ What E3 does not measure: the drop of the fault list in step 1 on the other
 fault kinds (dropped, invented, duplicate, unresolved unknown, verdict shape,
 confirmed exclusion), and a Control row fault on a ruling rejected for
 `control`.
+
+## E3 result, added after the run
+
+The run read `e8cad1a2` with `treatment-e3.patch` applied (`clean: false`;
+the `prompts/recritic.md` input digest `b20ec3cb` is the patched file). It
+spent $0.1658 for 12 calls.
+
+Each of the 12 files was read by hand against its `count.sh` line before the
+totals. Each answer returns only the faulted draft, with `rejected_because`
+empty, `control_row` empty and the shown row alone in `refused_controls` with
+a reason. The related unknowns are the first pass's (3 on I-02, 2 on R-03). On
+1 call (`e3-R-03-row-unanswered-1`) the re-ask also adds a sentence on the
+Control to the draft's reason. The check accepts this, and the counting rule
+does not count it.
+
+**E3:** 12 of 12 repaired, 0 new problems, 0 unbriefed changes, 0 status
+changes, 0 unread answers. `row-on-other-step` is repaired 4 of 4. The
+falsifier does not hold, so the hypothesis is supported.
