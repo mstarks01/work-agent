@@ -117,7 +117,7 @@ def test_a_repair_that_answers_the_row_leaves_no_problem(archived):
         archived, faults_for(archived), draft, "row-not-shown"
     )
 
-    result = recritic_replay.repair(view, draft, answer(view, draft))
+    result = recritic_replay.repair(view, answer(view, draft))
 
     assert (result["refused"], result["remaining"], result["drift"]) == (None, [], [])
     assert result["status"]["repaired"] == result["status"]["answered"]
@@ -129,9 +129,7 @@ def test_a_repair_that_leaves_the_row_unanswered_still_fails(archived):
         archived, faults_for(archived), draft, "row-unanswered"
     )
 
-    result = recritic_replay.repair(
-        view, draft, answer(view, draft, refused_controls=[])
-    )
+    result = recritic_replay.repair(view, answer(view, draft, refused_controls=[]))
 
     assert [problem["kind"] for problem in result["remaining"]] == ["control-row"]
     assert result["status"]["repaired"] is None
@@ -145,9 +143,7 @@ def test_a_change_to_a_ruling_no_problem_named_is_drift(archived):
     repaired = json.loads(answer(view, draft))["claims"]
     changed = json.loads(answer(view, other, reason="changed"))["claims"]
 
-    result = recritic_replay.repair(
-        view, draft, json.dumps({"claims": repaired + changed})
-    )
+    result = recritic_replay.repair(view, json.dumps({"claims": repaired + changed}))
 
     assert [problem["kind"] for problem in result["drift"]] == ["unbriefed-change"]
     assert result["remaining"] == []
@@ -159,7 +155,7 @@ def test_an_answer_outside_the_contract_is_kept_and_refused(archived):
         archived, faults_for(archived), draft, "row-not-shown"
     )
 
-    result = recritic_replay.repair(view, draft, json.dumps({"threats": []}))
+    result = recritic_replay.repair(view, json.dumps({"threats": []}))
 
     assert "no 'claims'" in result["refused"]
     assert result["answer"] == json.dumps({"threats": []})

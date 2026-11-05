@@ -32,7 +32,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Any, Literal, TypedDict, assert_never, get_args
 
 from google.adk.utils._schema_utils import validate_schema
 from google.genai import types
@@ -100,6 +100,7 @@ def read_faults(path: Path) -> FaultSet:
 class FaultView:
     """One first pass with one injected fault, and the re-ask it routes to."""
 
+    draft_id: str
     round: CriticRound
     #: The ruling set with every shown row answered, which reconciles.
     clean: Accepted
@@ -156,9 +157,11 @@ def inject(
             raise EvalRunError(f"{control.id} has no row that {draft_id} was not shown")
         extra = RefusedControl(**unshown[0].model_dump(), reason=first.reason)
         faulty = _with(ruling, refused_controls=[first, *rest, extra])
-    else:
+    elif shape == "row-on-other-step":
         row = ControlRowRef(control=first.control, unit=first.unit)
         faulty = _with(ruling, control_row=row, refused_controls=rest)
+    else:
+        assert_never(shape)
     return [faulty if each.id == draft_id else each for each in rulings]
 
 
@@ -188,14 +191,16 @@ def fault_view(
             archived.framework,
         )
     )
-    if not isinstance(outcome, Reask) or [
-        (problem.kind, problem.claim_id) for problem in outcome.problems
-    ] != [("control-row", draft_id)]:
+    if isinstance(outcome, Accepted):
+        raise EvalRunError(f"the {shape} fault on {draft_id} gives no problem")
+    if [(problem.kind, problem.claim_id) for problem in outcome.problems] != [
+        ("control-row", draft_id)
+    ]:
         raise EvalRunError(
             f"the {shape} fault on {draft_id} does not give one control-row"
-            f" problem: {getattr(outcome, 'messages', [])}"
+            f" problem: {outcome.messages}"
         )
-    return FaultView(critic_round, clean, outcome)
+    return FaultView(draft_id, critic_round, clean, outcome)
 
 
 def stored(raw: str, framework: FrameworkName) -> list[Any]:
@@ -228,7 +233,26 @@ async def compose(
     )
 
 
-def repair(view: FaultView, draft_id: str, raw: str) -> dict[str, Any]:
+class Status(TypedDict):
+    """The draft's verdict with every row answered, and after the repair."""
+
+    answered: str
+    #: ``None`` where the merged set still does not reconcile.
+    repaired: str | None
+
+
+class Repair(TypedDict):
+    """What one re-ask answer did to one fault view."""
+
+    problems: list[str]
+    answer: str
+    refused: str | None
+    remaining: list[dict[str, Any]]
+    drift: list[dict[str, Any]]
+    status: Status
+
+
+def repair(view: FaultView, raw: str) -> Repair:
     """What the re-ask's answer did, merged and checked as the second look does.
 
     ``refused`` is why an answer outside the rulings schema was not read.
@@ -236,22 +260,23 @@ def repair(view: FaultView, draft_id: str, raw: str) -> dict[str, Any]:
     each ruling the re-ask changed that no problem named. The statuses are the
     draft's verdict with every row answered, and after the repair.
     """
-    result: dict[str, Any] = {
-        "problems": view.reask.messages,
-        "answer": raw,
-        "refused": None,
-        "remaining": [],
-        "drift": [],
-        "status": {"answered": _status(view.clean, draft_id), "repaired": None},
-    }
+    result = Repair(
+        problems=view.reask.messages,
+        answer=raw,
+        refused=None,
+        remaining=[],
+        drift=[],
+        status=Status(answered=_status(view.clean, view.draft_id), repaired=None),
+    )
     try:
         merged, drift = view.round.merge(view.reask.first, claims_of(raw))
         outcome = view.round.outcome(merged)
     except ValueError as error:
-        return result | {"refused": str(error)}
+        result["refused"] = str(error)
+        return result
     result["drift"] = [problem.model_dump(mode="json") for problem in drift]
     if isinstance(outcome, Accepted):
-        result["status"]["repaired"] = _status(outcome, draft_id)
+        result["status"]["repaired"] = _status(outcome, view.draft_id)
     else:
         result["remaining"] = [
             problem.model_dump(mode="json") for problem in outcome.problems
@@ -270,16 +295,15 @@ def _status(accepted: Accepted, draft_id: str) -> str:
 async def replay(
     archived: Archived,
     view: FaultView,
-    draft_id: str,
     call: NodeCall,
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
-) -> dict[str, Any]:
+) -> Repair:
     """The re-ask sent once, and what its answer repaired."""
     instruction, turn = await compose(
         archived, view.reask, package_loader, prompt_loader
     )
-    return repair(view, draft_id, await call(instruction, turn))
+    return repair(view, await call(instruction, turn))
 
 
 def arguments(parser: argparse.ArgumentParser) -> None:
@@ -351,9 +375,7 @@ def command_recritic_replay(args: argparse.Namespace) -> int:
         schemas_for(args.framework).rulings,
         spent,
     )
-    result = asyncio.run(
-        replay(archived, view, args.draft, call, package_loader, prompt_loader)
-    )
+    result = asyncio.run(replay(archived, view, call, package_loader, prompt_loader))
     if args.out is not None:
         payload = {"record": record, "draft": args.draft, "fault": args.fault, **result}
         args.out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

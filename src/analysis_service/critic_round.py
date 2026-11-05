@@ -12,8 +12,8 @@ and turns an accepted set into claims.
 The round ends in one of three outcomes. :class:`Accepted` carries the claims
 and the rejected claims the block holds. :class:`Reask` carries what the
 re-ask reads: the problems, the roster, the drafts it must read, the first
-pass as the critic emitted it, and the first pass it is merged onto. :class:`Failed` carries the problems a second look
-still did not reconcile. The graph node parks what an outcome carries and
+pass as the critic emitted it, and the first pass it is merged onto.
+:class:`Failed` carries the problems a second look still did not reconcile. The graph node parks what an outcome carries and
 takes the edge it names, and decides nothing else.
 
 The module also renders the request a critic node sends, instruction and
