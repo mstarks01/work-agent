@@ -2444,7 +2444,7 @@ def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):
         "Encrypts its data at rest: AES-256 <script>window.ran=1</script>;"
         " Encrypts its backups and snapshots" in cells.nth(1).inner_text()
     )
-    assert cells.nth(2).inner_text() == "A data store: Orders DB"
+    assert cells.nth(2).inner_text() == "The data store “Orders DB”"
     assert cells.nth(3).inner_text().split("\n") == [
         "asvs V11.2",
         "stride information-disclosure",

@@ -250,15 +250,15 @@ def _island(page: str, name: str) -> Any:
     return json.loads(sent)
 
 
-def test_the_form_page_reads_the_service_s_scope_nouns(client):
-    """The form page names a Control's scope type with the words the server
-    sends, which the Markdown export reads too."""
-    from analysis_service.controls import SCOPE_NOUNS
+def test_the_form_page_reads_the_service_s_element_type_nouns(client):
+    """The form page names an element type with the words the server sends."""
+    from analysis_service.system_model import ELEMENT_TYPE_NOUNS
 
-    assert _island(client.get("/").text, "scope_nouns") == dict(SCOPE_NOUNS)
+    page = client.get("/").text
+    assert _island(page, "element_type_nouns") == dict(ELEMENT_TYPE_NOUNS)
     assert re.search(
-        r'const SCOPE_NOUNS = JSON\.parse\(el\("scope_nouns"\)',
-        page_javascript("form_controls.js"),
+        r'const TYPE_NOUNS = JSON\.parse\(document\.getElementById\("element_type_nouns"\)',
+        page_javascript("first_run.js"),
     )
 
 
@@ -1137,16 +1137,6 @@ def test_the_first_run_page_reads_each_carried_reason():
     assert _table_keys("first_run.js", "waitsForElement") == set(
         get_args(CarriedReason)
     )
-
-
-def test_the_first_run_page_names_each_element_type():
-    """``first_run.js`` names each
-    :data:`~analysis_service.system_model.ElementPrefix` that
-    ``detected_facts`` sends as an element's type, and no other. A type the
-    table lacks renders as ``undefined``."""
-    from analysis_service.system_model import ElementPrefix
-
-    assert _table_keys("first_run.js", "TYPES") == set(get_args(ElementPrefix))
 
 
 def test_the_settings_page_shows_each_source():

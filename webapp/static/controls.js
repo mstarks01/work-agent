@@ -35,9 +35,9 @@
     el(box).hidden = !text;
   };
   const day = (iso) => new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
-  const scopeText = (scope) => (scope.type === "application"
-    ? SCOPES.application.label
-    : `${SCOPES[scope.type].label}: ${scope.name}`);
+  // The service's phrase for what a Control protects (scope_phrase), as the
+  // start of a cell.
+  const scopeText = (phrase) => phrase.charAt(0).toUpperCase() + phrase.slice(1);
   // Each statement of a scope type that a fact ticks: the fact's own, or
   // each facet's that the fact answers.
   const keyText = (key) => JSON.stringify(key);
@@ -327,7 +327,7 @@
     const kind = el("controls-kind").value;
     const framework = el("controls-framework").value;
     const shown = controls.filter((control) =>
-      [control.name, scopeText(control.scope), ...control.scope.aliases, ...control.rows.map(unitText), ...control.evidence.map((file) => file.name)]
+      [control.name, scopeText(control.scope_phrase), ...control.scope.aliases, ...control.rows.map(unitText), ...control.evidence.map((file) => file.name)]
         .some((value) => value.toLocaleLowerCase().includes(text))
       && (!kind || control.scope.type === kind)
       && (!framework || control.rows.some((row) => row.framework === framework)));
@@ -351,7 +351,7 @@
       h("td", { class: "name-cell" },
         h("a", { href: "#", on: { click: (event) => { event.preventDefault(); startEdit(control); } } }, control.name),
         facts.length ? h("div", { class: "sub" }, facts.join("; ")) : null),
-      h("td", {}, scopeText(control.scope)),
+      h("td", {}, scopeText(control.scope_phrase)),
       h("td", {}, h("div", { class: "chips" }, ...control.rows.map((one) => h("span", { class: `chip tint-${FRAMEWORKS.indexOf(one.framework) % 3}`, title: unitText(one) },
         `${one.framework} ${one.unit}`)))),
       h("td", {}, control.evidence.length

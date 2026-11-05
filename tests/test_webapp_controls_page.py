@@ -37,7 +37,9 @@ from analysis_service.controls import (
     ROWS_FULL,
     SCOPE_WORDS,
     ControlRow,
+    ControlScope,
     evidence_full,
+    scope_phrase,
 )
 from analysis_service.fact_answers import FACT_VALUE_MAX_CHARS
 from analysis_service.frameworks import lane_of
@@ -46,9 +48,10 @@ from analysis_service.job_controls import FACT_MEANINGS, MATCH_MEANINGS
 from analysis_service.jobs import PipelineCompleted
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
 from analysis_service.sources import MAX_LABEL_CHARS
-from analysis_service.system_model import ELEMENT_ID_MAX_CHARS
+from analysis_service.system_model import ELEMENT_ID_MAX_CHARS, ELEMENT_TYPE_NOUNS
 from tests import test_webapp
 from tests.factories import sample_analysis
+from tests.source_tree import REPO_ROOT
 from tests.test_controls import LINE_ENDS, fact, row
 from tests.test_doc_copy_lints import SHIPPED_RESILIENCE
 from tests.test_structural_readers import sound_report
@@ -682,6 +685,20 @@ class TestTheReportSection:
         assert "the store “" not in text
         assert "applied to Orders DB." in text
 
+    def test_the_exports_and_the_pages_read_one_scope_phrase(self, ruled):
+        """The Markdown export, the JSON export, the report page and the
+        Controls list (the form page and the Controls page) name each scope
+        with :func:`scope_phrase`."""
+        owner, child, _ = ruled
+        page = owner.client.get(f"/report/{child}").text
+        sent = owner.client.get(f"/report/{child}/export.json").json()["controls"]
+        markdown = owner.client.get(f"/report/{child}/export.md").text
+        held = owner.client.get("/workspace/controls").json()
+        for entry in [*test_webapp._island(page, "controls"), *sent, *held]:
+            phrase = scope_phrase(ControlScope.model_validate(entry["scope"]))
+            assert entry["scope_phrase"] == phrase
+            assert f"Protects {phrase}: " in markdown
+
     def test_the_csv_export_holds_a_row_for_each_finding(self, ruled):
         owner, child, _ = ruled
         exported = owner.client.get(f"/report/{child}/export.csv")
@@ -865,34 +882,40 @@ class TestTheTables:
         assert set(LEFT_OUT_MEANINGS) == set(get_args(LeftOutReason))
         assert set(FACT_MEANINGS) == set(get_args(FactState))
 
-    def test_no_page_script_holds_a_scope_type_word(self):
-        """Each page names a scope type with the words the server sends, which
-        the Markdown export reads too. A noun that equals its key is also the
-        key a script compares, so only the other words are refused.
+    def test_the_element_type_nouns_name_each_prefix_in_glossary_words(self):
+        """Each element type prefix has a noun, and each noun is a
+        GLOSSARY.md term."""
+        from typing import get_args
+
+        from analysis_service.system_model import ElementPrefix
+
+        assert set(ELEMENT_TYPE_NOUNS) == set(get_args(ElementPrefix))
+        glossary = (REPO_ROOT / "GLOSSARY.md").read_text(encoding="utf-8")
+        for noun in ELEMENT_TYPE_NOUNS.values():
+            assert f"**{noun.title()}**" in glossary, noun
+
+    def test_no_page_script_holds_an_element_type_or_scope_type_word(self):
+        """Each page names an element type or a scope type with the words the
+        server sends, which the Markdown export reads too. A noun that equals
+        its key is also the key a script compares, so only the other words
+        are refused.
 
         The test reads a word as a whole string in any of the three quotes,
-        the form a table of words takes. It does not read a word in a sentence of a page, because
-        page prose names a type in its own words, as in "a rectangle is an
-        external entity".
-
-        The test leaves out the two tables that word an element type, a set
-        that holds the flow, which is no scope type: ``TYPES`` in
-        ``first_run.js`` (``ElementPrefix``) and ``KIND_WORDS`` in
-        ``report_view.js`` (the diagram's kinds).
+        the form a table of words takes. It does not read a word in a sentence
+        of a page, because page prose names a type in its own words, as in "a
+        rectangle is an external entity".
         """
-        element_tables = {"first_run.js": "TYPES", "report_view.js": "KIND_WORDS"}
         words = {
             word
-            for scope_type, pair in SCOPE_WORDS.items()
-            for word in pair
-            if word != scope_type
+            for key, word in [
+                *ELEMENT_TYPE_NOUNS.items(),
+                *((key, words.noun) for key, words in SCOPE_WORDS.items()),
+                *((key, words.label) for key, words in SCOPE_WORDS.items()),
+            ]
+            if word != key
         }
         for name in test_webapp.STATIC_SCRIPTS:
             script = test_webapp.page_javascript(name)
-            if name in element_tables:
-                table = rf"const {element_tables[name]} = \{{.*?\}};"
-                script, left_out = re.subn(table, "", script, flags=re.DOTALL)
-                assert left_out == 1, name
             for word in words:
                 for quote in "\"'`":
                     assert f"{quote}{word}{quote}" not in script, (name, word)

@@ -441,6 +441,18 @@ ElementPrefix = Literal["entity", "process", "store", "flow", "boundary"]
 #: Every element type prefix.
 _ELEMENT_PREFIXES: tuple[ElementPrefix, ...] = get_args(ElementPrefix)
 
+#: The noun that names each element type on a page and in the export, in the
+#: words of the GLOSSARY.md Element entry.
+ELEMENT_TYPE_NOUNS: Mapping[ElementPrefix, str] = MappingProxyType(
+    {
+        "entity": "external entity",
+        "process": "process",
+        "store": "data store",
+        "flow": "data flow",
+        "boundary": "trust boundary",
+    }
+)
+
 
 def element_prefix(element_id: str) -> ElementPrefix | None:
     """The element type prefix ``element_id`` carries before its first colon.

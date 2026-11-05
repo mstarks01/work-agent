@@ -41,6 +41,7 @@ from analysis_service.sources import (
 )
 from analysis_service.system_model import (
     CONTROL_VALUE_MAX_CHARS,
+    ELEMENT_TYPE_NOUNS,
     ZONE_ATTRIBUTE,
     make_element_id,
 )
@@ -79,28 +80,28 @@ ScopeType = Literal["application", "entity", "process", "store", "boundary"]
 class ScopeWords(NamedTuple):
     """How the pages and the Markdown export name one scope type."""
 
-    #: The label that offers the type, as in "A data store".
-    label: str
+    #: The article of the label, as in "A data store".
+    article: str
     #: The noun that a sentence names one scope by, as in "the data store
     #: “Orders DB”" or "the whole application".
     noun: str
 
+    @property
+    def label(self) -> str:
+        """The label that offers the type, as in "A data store"."""
+        return f"{self.article} {self.noun}"
 
-#: The words of each scope type.
+
+#: The words of each scope type. A scope type that is an element type takes
+#: its noun from :data:`ELEMENT_TYPE_NOUNS`.
 SCOPE_WORDS: Mapping[ScopeType, ScopeWords] = MappingProxyType(
     {
-        "application": ScopeWords("The whole application", "whole application"),
-        "boundary": ScopeWords("A trust boundary", "trust boundary"),
-        "process": ScopeWords("A process", "process"),
-        "store": ScopeWords("A data store", "data store"),
-        "entity": ScopeWords("An external entity", "external entity"),
+        "application": ScopeWords("The", "whole application"),
+        "boundary": ScopeWords("A", ELEMENT_TYPE_NOUNS["boundary"]),
+        "process": ScopeWords("A", ELEMENT_TYPE_NOUNS["process"]),
+        "store": ScopeWords("A", ELEMENT_TYPE_NOUNS["store"]),
+        "entity": ScopeWords("An", ELEMENT_TYPE_NOUNS["entity"]),
     }
-)
-
-#: The noun of each scope type, from :data:`SCOPE_WORDS`, for the pages and
-#: the export that name one scope in a sentence.
-SCOPE_NOUNS: Mapping[ScopeType, str] = MappingProxyType(
-    {scope_type: words.noun for scope_type, words in SCOPE_WORDS.items()}
 )
 
 
@@ -292,6 +293,16 @@ class ControlScope(BaseModel):
         if self.type == "application":
             return frozenset()
         return frozenset((self.name_id(), *self.alias_ids()))
+
+
+def scope_phrase(scope: ControlScope) -> str:
+    """The words that name ``scope`` in a sentence, as in "the data store
+    “Orders DB”" or "the whole application". The pages and the Markdown
+    export read this phrase."""
+    noun = SCOPE_WORDS[scope.type].noun
+    if scope.type == "application":
+        return f"the {noun}"
+    return f"the {noun} “{scope.name}”"
 
 
 def _scope_id(scope_type: ScopeType, name: str) -> str:

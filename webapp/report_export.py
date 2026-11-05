@@ -29,7 +29,7 @@ from analysis_service.claims import (
     Severity,
     Verdict,
 )
-from analysis_service.controls import SCOPE_NOUNS
+from analysis_service.controls import scope_phrase
 from analysis_service.frameworks import lane_of
 from analysis_service.job_controls import SectionEntry
 from analysis_service.open_facts import element_names
@@ -81,14 +81,6 @@ def _findings(report: Report) -> list[str]:
     return lines
 
 
-def _scope(entry: SectionEntry) -> str:
-    scope = entry.scope
-    noun = SCOPE_NOUNS[scope.type]
-    if scope.type == "application":
-        return f"the {noun}"
-    return f"the {noun} “{_text(scope.name)}”"
-
-
 def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
     """The Controls section as Markdown lines."""
     lines = ["", "## Controls", ""]
@@ -97,16 +89,15 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
     for entry in section:
         lines.append(f"### {_text(entry.name)}")
         lines.append("")
+        phrase = _text(scope_phrase(entry.scope))
         if entry.state == "applied":
             reached = ", ".join(_text(element.name) for element in entry.elements)
             lines.append(
-                f"Protects {_scope(entry)}: {entry.meaning}"
+                f"Protects {phrase}: {entry.meaning}"
                 + (f", applied to {reached}." if reached else ".")
             )
         else:
-            lines.append(
-                f"Protects {_scope(entry)}: left out, because {entry.meaning}."
-            )
+            lines.append(f"Protects {phrase}: left out, because {entry.meaning}.")
         for fact in entry.facts:
             stated = (
                 f" (the description states “{_text(fact.stated)}”)"

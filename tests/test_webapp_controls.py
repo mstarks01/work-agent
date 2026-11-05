@@ -17,7 +17,12 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service.controls import Control, ControlDocument
+from analysis_service.controls import (
+    Control,
+    ControlDocument,
+    ControlScope,
+    scope_phrase,
+)
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.graph import STATE_CONTROL_LINES, STATE_FACT_ANSWERS
 from analysis_service.job_answers import JobAnswers
@@ -250,6 +255,9 @@ class TestTheOffer:
             owner.keep("Near", {"type": "store", "name": "Order DB"}),
         ]
         offer = owner.offer(owner.paused(*ids))
+        for entry in offer.values():
+            scope = ControlScope.model_validate(entry["scope"])
+            assert entry["scope_phrase"] == scope_phrase(scope)
         assert {name: entry["match"] for name, entry in offer.items()} == {
             "Encrypted": "matched-by-name",
             "WAF": "matched-by-alias",
@@ -401,6 +409,18 @@ class TestTheSave:
         refused = owner.save(owner.paused(billing), [{"control": billing} | entry])
         assert refused.status_code == 400
         assert message in refused.json()["message"]
+
+    def test_an_element_of_another_type_is_refused_in_the_scope_words(self, owner):
+        partner = owner.keep("Partner", {"type": "entity", "name": "Partner"})
+        refused = owner.save(
+            owner.paused(partner),
+            [{"control": partner, "element": "process:web-app"}],
+        )
+        assert refused.status_code == 400
+        assert (
+            "“Partner” protects an external entity, and process:web-app is not one."
+            in refused.json()["message"]
+        )
 
     def test_a_tick_outside_the_zone_list_is_refused(self, owner):
         zone = owner.keep("Segmented", INTERNAL)

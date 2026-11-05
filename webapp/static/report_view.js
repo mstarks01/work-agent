@@ -1355,16 +1355,11 @@
   // Each Control the job copied: what it matched, each fact it wrote with the
   // state the job keeps, and each row with its outcome over the job's
   // rulings (ADR 0127). The service builds every value and sentence here,
-  // except the scope line, which the page builds from the service's nouns.
-  // Each one lands as text.
+  // and the scope line starts with the service's phrase (scope_phrase). Each
+  // one lands as text.
   const CONTROLS = JSON.parse(document.getElementById("controls").textContent);
-  // The noun of each scope type, in the service's words (SCOPE_NOUNS).
-  const SCOPE_NOUNS = JSON.parse(document.getElementById("scope_nouns").textContent);
   const controlMatch = (entry) => {
-    const noun = SCOPE_NOUNS[entry.scope.type];
-    const scope = entry.scope.type === "application"
-      ? `The ${noun}`
-      : `The ${noun} “${entry.scope.name}”`;
+    const scope = entry.scope_phrase.charAt(0).toUpperCase() + entry.scope_phrase.slice(1);
     if (entry.state === "left-out") return [`${scope}: left out, because ${entry.meaning}`];
     if (!entry.elements.length) return [`${scope} (${entry.meaning})`];
     return [`${scope} → `, ...commaList(entry.elements.map((element) => tag(element.id))),
@@ -1659,11 +1654,9 @@
     });
     return (out.length > 2 ? [out[0], out.slice(1).join(" ")] : out).map(line => clip(line, width));
   };
-  const KIND_WORDS = {
-    "external-entity": "external entity",
-    "process": "process",
-    "data-store": "data store",
-  };
+  // The noun of each element type, by its ID prefix, in the service's words
+  // (ELEMENT_TYPE_NOUNS).
+  const TYPE_NOUNS = JSON.parse($("element_type_nouns").textContent);
   // The geometry, in viewBox units.
   const DIAGRAM = { pad: 12, inset: 14, nodeW: 128, nodeH: 54, slotGap: 18,
     columnGap: 26, rowGap: 68, bottom: 16 };
@@ -1683,9 +1676,9 @@
 
   function drawModel(model) {
     const nodes = [
-      ...model.external_entities.map(e => ({ kind: "external-entity", e })),
+      ...model.external_entities.map(e => ({ kind: "entity", e })),
       ...model.processes.map(e => ({ kind: "process", e })),
-      ...model.data_stores.map(e => ({ kind: "data-store", e })),
+      ...model.data_stores.map(e => ({ kind: "store", e })),
     ];
     if (!nodes.length) return null;
     const index = new Map(nodes.map((node, i) => [node.e.id, i]));
@@ -1983,8 +1976,8 @@
       const group = paint(svg("g", { class: `element ${kind}`, "data-element": e.id,
         "data-zone": column.id === null ? "" : column.id }), e.id);
       const assumed = ASSUMED_ZONES.has(e.id);
-      group.append(svg("title", {}, `${e.name} (${KIND_WORDS[kind]})${assumed ? ", zone assumed" : ""}`));
-      if (kind === "data-store") {
+      group.append(svg("title", {}, `${e.name} (${TYPE_NOUNS[kind]})${assumed ? ", zone assumed" : ""}`));
+      if (kind === "store") {
         group.append(
           svg("rect", { x, y, width: D.nodeW, height: D.nodeH, class: "element-fill" }),
           svg("path", { d: `M${x},${y} H${x + D.nodeW} M${x},${y + D.nodeH} H${x + D.nodeW}`, class: "element-line" }),

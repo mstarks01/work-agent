@@ -748,15 +748,15 @@ def test_the_page_reads_the_service_s_verdict_labels(island, table, words):
     )
 
 
-def test_the_page_reads_the_service_s_scope_nouns():
-    """The report page names a Control's scope type with the words the server
-    sends, which the Markdown export reads too."""
-    from analysis_service.controls import SCOPE_NOUNS
+def test_the_page_reads_the_service_s_element_type_nouns():
+    """The report page names an element type with the words the server
+    sends."""
+    from analysis_service.system_model import ELEMENT_TYPE_NOUNS
     from tests.test_webapp import _island, viewer_javascript
 
-    assert _island(page(), "scope_nouns") == dict(SCOPE_NOUNS)
+    assert _island(page(), "element_type_nouns") == dict(ELEMENT_TYPE_NOUNS)
     assert re.search(
-        r'const SCOPE_NOUNS = JSON\.parse\(document\.getElementById\("scope_nouns"\)',
+        r'const TYPE_NOUNS = JSON\.parse\(\$\("element_type_nouns"\)',
         viewer_javascript(),
     )
 

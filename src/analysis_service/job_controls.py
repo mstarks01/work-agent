@@ -46,10 +46,12 @@ from analysis_service.claims import (
 from analysis_service.controls import (
     CONTROL_ID,
     EVIDENCE_ID,
+    SCOPE_WORDS,
     Control,
     ControlDocument,
     ControlRow,
     ControlScope,
+    scope_phrase,
 )
 from analysis_service.fact_answers import (
     FactAnswer,
@@ -405,12 +407,14 @@ def _stated(
     if scope.type == "application":
         if entry.element or entry.ticked:
             raise ValueError(
-                f"“{name}” protects the whole application, so it names no element."
+                f"“{name}” protects {scope_phrase(scope)}, so it names no element."
             )
         return AppliedScope(control=copy.id, outcome="application")
     if element_prefix(entry.element) != scope.type:
+        words = SCOPE_WORDS[scope.type]
         raise ValueError(
-            f"“{name}” protects a {scope.type}, and {entry.element} is not one."
+            f"“{name}” protects {words.article.lower()} {words.noun}, and"
+            f" {entry.element} is not one."
         )
     if model.get(entry.element) is None:
         raise ValueError(f"{entry.element} is not an element of this model.")
@@ -508,6 +512,7 @@ def control_offer(
                 "id": copy.id,
                 "name": copy.document.name,
                 "scope": copy.document.scope.model_dump(mode="json"),
+                "scope_phrase": scope_phrase(copy.document.scope),
                 "match": found.outcome,
                 "element": (
                     {"id": found.element, "name": names[found.element]}
@@ -986,6 +991,8 @@ class SectionEntry(BaseModel):
     id: str
     name: str
     scope: ControlScope
+    #: The words that name the scope in a sentence (:func:`scope_phrase`).
+    scope_phrase: str
     state: ResolutionState
     outcome: MatchOutcome | None
     reason: LeftOutReason | None
@@ -1108,6 +1115,7 @@ def controls_section(
                 id=copy.id,
                 name=copy.document.name,
                 scope=copy.document.scope,
+                scope_phrase=scope_phrase(copy.document.scope),
                 state=resolution.state,
                 outcome=outcome,
                 reason=reason,
