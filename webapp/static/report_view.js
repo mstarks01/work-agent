@@ -1357,10 +1357,14 @@
   // rulings (ADR 0127). The service builds every value and sentence here;
   // each one lands as text.
   const CONTROLS = JSON.parse(document.getElementById("controls").textContent);
+  // The label and the noun of each scope type, in the service's words
+  // (SCOPE_WORDS).
+  const SCOPE_WORDS = JSON.parse(document.getElementById("scope_words").textContent);
   const controlMatch = (entry) => {
+    const noun = SCOPE_WORDS[entry.scope.type][1];
     const scope = entry.scope.type === "application"
-      ? "The whole application"
-      : `The ${entry.scope.type} “${entry.scope.name}”`;
+      ? `The ${noun}`
+      : `The ${noun} “${entry.scope.name}”`;
     if (entry.state === "left-out") return [`${scope}: left out, because ${entry.meaning}`];
     if (!entry.elements.length) return [`${scope} (${entry.meaning})`];
     return [`${scope} → `, ...commaList(entry.elements.map((element) => tag(element.id))),

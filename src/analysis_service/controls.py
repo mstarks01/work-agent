@@ -75,6 +75,19 @@ ROWS_FULL = (
 #: identity is two endpoints and a label, so a name alone is not its ID.
 ScopeType = Literal["application", "entity", "process", "store", "boundary"]
 
+#: How the pages and the Markdown export name each scope type: the label that
+#: offers the type, and the noun that a sentence names one scope by, as in
+#: "the process “Billing”" or "the whole application".
+SCOPE_WORDS: Mapping[ScopeType, tuple[str, str]] = MappingProxyType(
+    {
+        "application": ("The whole application", "whole application"),
+        "boundary": ("A trust boundary", "trust boundary"),
+        "process": ("A process", "process"),
+        "store": ("A data store", "data store"),
+        "entity": ("An external entity", "external entity"),
+    }
+)
+
 #: The kinds of fact a Control writes: a subject or an assertion is a question
 #: of one job, and a Capability says what the application does rather than
 #: what protects it, so no Control writes one.

@@ -26,17 +26,12 @@ const formControls = (() => {
     return node;
   };
   const counted = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  // Each scope type (ScopeType), as a line names it.
-  const TYPES = {
-    "application": "The whole application",
-    "boundary": "trust boundary",
-    "process": "process",
-    "store": "data store",
-    "entity": "external entity",
-  };
+  // The label and the noun of each scope type, in the service's words
+  // (SCOPE_WORDS).
+  const SCOPE_WORDS = JSON.parse(el("scope_words").textContent);
   const scopeText = (scope) => (scope.type === "application"
-    ? TYPES.application
-    : `The ${TYPES[scope.type]} “${scope.name}”`);
+    ? `The ${SCOPE_WORDS.application[1]}`
+    : `The ${SCOPE_WORDS[scope.type][1]} “${scope.name}”`);
   const rowText = (row) => `${row.framework} ${row.unit}`;
   // The frameworks the form selects now.
   const selected = () => new Set([...document.querySelectorAll('#frameworks input[name="framework"]:checked')]

@@ -240,6 +240,27 @@ def test_the_transcript_input_carries_the_deployment_s_byte_limit(client):
     assert f'data-max-bytes="{limit}"' in client.get("/").text
 
 
+def _island(page: str, name: str) -> object:
+    """The JSON value of the island ``name`` that a page carries."""
+    (sent,) = re.findall(
+        rf'<script type="application/json" id="{name}"[^>]*>(.*?)</script>', page
+    )
+    return json.loads(sent)
+
+
+def test_the_form_page_reads_the_service_s_scope_words(client):
+    """The form page names a Control's scope type with the words the server
+    sends, which the Markdown export reads too."""
+    from analysis_service.controls import SCOPE_WORDS
+
+    sent = _island(client.get("/").text, "scope_words")
+    assert sent == json.loads(json.dumps(dict(SCOPE_WORDS)))
+    assert re.search(
+        r'const SCOPE_WORDS = JSON\.parse\(el\("scope_words"\)',
+        page_javascript("form_controls.js"),
+    )
+
+
 def test_the_page_reads_the_format_table_the_server_renders(client):
     """The form page gets the format table and its ``accept`` value from
     :data:`FORMATS`, and no page file holds a copy of an extension (ADR 0120)."""

@@ -750,6 +750,19 @@ def test_the_page_reads_the_service_s_verdict_labels(island, table, words):
     )
 
 
+def test_the_page_reads_the_service_s_scope_words():
+    """The report page names a Control's scope type with the words the server
+    sends, which the Markdown export reads too."""
+    from analysis_service.controls import SCOPE_WORDS
+    from tests.test_webapp import _island, viewer_javascript
+
+    assert _island(page(), "scope_words") == json.loads(json.dumps(dict(SCOPE_WORDS)))
+    assert re.search(
+        r'const SCOPE_WORDS = JSON\.parse\(document\.getElementById\("scope_words"\)',
+        viewer_javascript(),
+    )
+
+
 def test_the_page_script_holds_no_verdict_labels():
     """The page holds no copy of the verdict words the server sends it."""
     from analysis_service import claims
