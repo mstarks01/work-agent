@@ -47,6 +47,7 @@ from analysis_service.claims import (
     ASSERTION_GROUNDS,
     Claim,
     ControlRowRef,
+    CriticStep,
     ProposedVerdict,
     RepairedQuote,
     RuledClaim,
@@ -473,6 +474,27 @@ def shown_rows(
     }
 
 
+def _reaches_control_step(verdict: ProposedVerdict) -> bool:
+    """Whether the critic's control step rules on this verdict's draft (ADR 0126).
+
+    **The one reader** of the steps that reach the control step, which
+    ``ONE_READERS`` in ``tests/test_one_reader_lints.py`` holds. A draft kept,
+    or rejected for ``control``, reached the step. A draft rejected for
+    ``evidence``, ``reasoning`` or ``lane`` stopped at an earlier step, so it
+    answers no Control row.
+    """
+    reached: frozenset[CriticStep | None] = frozenset({None, "control"})
+    return verdict.rejected_because in reached
+
+
+def _without_control_rows(verdict: ProposedVerdict, **update: Any) -> ProposedVerdict:
+    """``verdict`` with ``update`` and no Control row: a verdict on a draft that
+    did not reach the control step."""
+    return verdict.model_copy(
+        update={**update, "control_row": None, "refused_controls": []}
+    )
+
+
 def _control_row_issues(
     rulings: Iterable[Ruling], shown: ShownRows
 ) -> list[UnreconciledRuling]:
@@ -482,7 +504,8 @@ def _control_row_issues(
     ruling names only rows its draft was shown (ADR 0126). A draft that reached
     the control step, kept or rejected for ``control``, answers each shown row
     in ``control_row`` or in ``refused_controls``. A draft rejected at an
-    earlier step never reached it, so it answers none.
+    earlier step answers none, and :func:`complete_rulings` drops any row it
+    names.
     """
     issues = []
     for ruling in rulings:
@@ -509,7 +532,7 @@ def _control_row_issues(
             for ref in named
             if ref not in rows
         ]
-        if verdict.rejected_because in (None, "control"):
+        if _reaches_control_step(verdict):
             messages += [
                 f"leaves the row {ref.unit} of {ref.control} unanswered: answer it"
                 " in control_row or in refused_controls"
@@ -579,8 +602,11 @@ def complete_rulings(
     answered a question. A near-miss spelling of a cited fact therefore leaves
     that fact open, and the ruling reads ``needs-info`` on it.
 
-    A rejection passes through untouched apart from that removal, and so does
-    a ruling that names no drafted ID: the reconciliation check owns that.
+    A rejection at a step before the control step loses its ``control_row``
+    and its ``refused_controls``: the draft did not reach the control step, so
+    it answers no row. Apart from these two removals a rejection passes
+    through untouched, and so does a ruling that names no drafted ID: the
+    reconciliation check owns that.
     """
     by_id = {draft.id: draft.unknown_grounds() for draft in drafts}
     misfiled = {
@@ -594,14 +620,11 @@ def complete_rulings(
             # whatever the critic said (#442). The reason names the lanes the verb
             # belongs to, which is what the audit array must give a reader, and
             # the step is `lane` by construction: the table is the lane check.
-            verdict = ruling.verdict.model_copy(
-                update={
-                    "reason": misfiled[ruling.id],
-                    "related_unknowns": [],
-                    "rejected_because": "lane",
-                    "control_row": None,
-                    "refused_controls": [],
-                }
+            verdict = _without_control_rows(
+                ruling.verdict,
+                reason=misfiled[ruling.id],
+                related_unknowns=[],
+                rejected_because="lane",
             )
             completed.append(ruling.model_copy(update={"verdict": verdict}))
             continue
@@ -612,6 +635,9 @@ def complete_rulings(
         dismissed = ruling.verdict.dismissed_refs()
         derived = [ref for ref in by_id.get(ruling.id, []) if ref.key not in dismissed]
         if ruling.verdict.rejected_because is not None:
+            if not _reaches_control_step(ruling.verdict):
+                verdict = _without_control_rows(ruling.verdict)
+                ruling = ruling.model_copy(update={"verdict": verdict})
             completed.append(ruling)
             continue
         named = {ref.key for ref in ruling.verdict.related_unknowns}

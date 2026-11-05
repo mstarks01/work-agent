@@ -18,12 +18,12 @@ from collections.abc import Callable, Iterable, Iterator
 from functools import cache, partial
 from itertools import pairwise
 from pathlib import Path
-from typing import TypeGuard
+from typing import TypeGuard, get_args
 
 import pytest
 
 from analysis_service.analysis import CONTROL_ATTRIBUTES
-from analysis_service.claims import UNKNOWN_KEY_FIELDS, Ruling
+from analysis_service.claims import UNKNOWN_KEY_FIELDS, CriticStep, Ruling
 from analysis_service.sql_store import DIGEST_COLUMNS
 from evals.harness.prices import UnitPrices
 from tests.source_tree import (
@@ -1777,6 +1777,14 @@ def _reads_a_flow_label(node: ast.AST) -> bool:
     return _loads_attribute(node, "label") and _calls(node.value, "parse_flow_id")
 
 
+def _tests_the_control_step(node: ast.AST) -> bool:
+    """Whether ``node`` spells the steps that reach the control step (none, and
+    ``control``) or the steps that stop before it."""
+    return isinstance(node, ast.Tuple | ast.Set | ast.List) and {
+        getattr(item, "value", object()) for item in node.elts
+    } in ({None, "control"}, set(get_args(CriticStep)) - {"control"})
+
+
 #: The score fields that hold an extraction's endpoint keys.
 _ENDPOINT_FIELDS = frozenset({"endpoint_missing", "missing", "matched"})
 
@@ -2112,6 +2120,12 @@ ONE_READERS: dict[str, _OneReader] = {
     "a flow's label": _OneReader(
         _reads_a_flow_label,
         ("src/analysis_service/system_model.py", "flow_label"),
+        {},
+        "",
+    ),
+    "the steps that reach the control step": _OneReader(
+        _tests_the_control_step,
+        ("src/analysis_service/critic.py", "_reaches_control_step"),
         {},
         "",
     ),

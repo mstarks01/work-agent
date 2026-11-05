@@ -279,15 +279,33 @@ class TestTheReviewSeam:
 
         assert any("V6" in problem and "not shown" in problem for problem in problems)
 
-    def test_a_control_row_on_another_step_is_refused(self):
+    def test_a_control_row_on_a_kept_draft_is_refused(self):
         problems = _problems(
-            _db(_row("V11")),
-            rejected_because="reasoning",
-            reason="It reads an obligation V11.2.1 does not carry.",
-            control_row={"control": DB_CONTROL, "unit": "V11"},
+            _db(_row("V11")), control_row={"control": DB_CONTROL, "unit": "V11"}
         )
 
         assert any("control_row" in problem for problem in problems)
+
+    @pytest.mark.parametrize("step", ["evidence", "reasoning", "lane"])
+    def test_a_draft_rejected_before_the_control_step_loses_its_rows(self, step):
+        # The draft stopped before the control step, so code drops each row it
+        # names, a row it was not shown included, and the seam asks nothing.
+        outcome = _round(_db(*ROWS)).first(
+            [
+                _ruling(
+                    rejected_because=step,
+                    reason="It reads an obligation V11.2.1 does not carry.",
+                    control_row={"control": DB_CONTROL, "unit": "V11"},
+                    refused_controls=[_refused("V11.2.1"), _refused("V6")],
+                )
+            ]
+        )
+
+        assert isinstance(outcome, Accepted)
+        [claim] = outcome.rejected
+        assert claim.verdict.rejected_because == step
+        assert claim.verdict.control_row is None
+        assert claim.verdict.refused_controls == []
 
     def test_a_control_rejection_with_no_row_is_refused(self):
         problems = _problems(
@@ -573,7 +591,8 @@ ROW = ControlRowRef(control=DB_CONTROL, unit="V11.2.1")
 @pytest.mark.parametrize("names_a_row", [False, True])
 def test_the_verdict_and_the_seam_hold_one_row_rule(step, names_a_row):
     """``Verdict`` and the review seam both read "a control_row exactly on a
-    control rejection", so each combination is put to both."""
+    control rejection", so each combination is put to both. The verdict is
+    built from the ruling the seam completed, as assembly builds it."""
     fields = {
         "reason": "rds.tf: storage_encrypted = true",
         "rejected_because": step,
@@ -581,18 +600,22 @@ def test_the_verdict_and_the_seam_hold_one_row_rule(step, names_a_row):
         # The one shown row is answered either way, so only the row rule speaks.
         "refused_controls": [] if names_a_row else [_refused("V11")],
     }
-    try:
-        Verdict(status="rejected" if step else "confirmed", **fields)
-    except ValidationError:
-        verdict_refuses = True
-    else:
-        verdict_refuses = False
     seam = review_issues(
         [DRAFT],
         [Ruling(id=DRAFT.id, verdict=ProposedVerdict(**fields))],
         valid_model(),
         {DRAFT.id: frozenset({ControlRowRef(control=DB_CONTROL, unit="V11")})},
     )
+    [completed] = seam.rulings
+    try:
+        Verdict(
+            status="rejected" if step else "confirmed",
+            **completed.verdict.model_dump(),
+        )
+    except ValidationError:
+        verdict_refuses = True
+    else:
+        verdict_refuses = False
     seam_refuses = any(problem.kind == "control-row" for problem in seam.problems)
 
     assert seam_refuses is verdict_refuses
