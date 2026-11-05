@@ -133,3 +133,21 @@ problem). Each of those four jobs would fail with no report.
 repairs 8 or fewer, or has more than 4 new problems, or has 1 or more
 unbriefed change. Expected cost: about $0.17. The runner cap for stage 2:
 $0.30. Stage 2 needs a new grant from the maintainer.
+
+## Stage 2 result, added after the run
+
+The maintainer's grant of 2026-11-05 covers stage 2, because stage 1 left a
+fault open (the grant row of 22:08Z). `run_treatment.sh` is `run_control.sh`
+with `treatment.patch` applied in the run worktree and a cap of $0.30. The run
+read `9468e79d` with the patch (`clean: false`; the `prompts/recritic.md`
+input digest `fab74487` is the patched file). It spent $0.1666 for 12 calls.
+
+Each of the 12 files was read by hand before the totals. Each answer returns
+only the faulted draft, with `control_row` empty and the shown row in
+`refused_controls` with a reason. On 4 calls the re-ask also adds a sentence
+on the Control to the draft's reason. The check accepts this, and the
+counting rule does not count it.
+
+**The treatment:** 12 of 12 repaired, 0 new problems, 0 unbriefed changes,
+0 status changes, 0 unread answers. `row-on-other-step` is repaired 4 of 4.
+The falsifier does not hold, so the hypothesis is supported (E2).
