@@ -142,14 +142,14 @@ def scope_types() -> list[dict[str, object]]:
     return [
         {
             "type": scope_type,
-            "label": label,
+            "label": words.label,
             "statements": [
                 statement
                 for kind in sorted(SCOPE_FACT_KINDS[scope_type])
                 for statement in _FACT_OFFERS[kind](scope_type)
             ],
         }
-        for scope_type, (label, _noun) in SCOPE_WORDS.items()
+        for scope_type, words in SCOPE_WORDS.items()
     ]
 
 

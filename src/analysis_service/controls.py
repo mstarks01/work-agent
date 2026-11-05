@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Literal, Self, TypeVar, cast, get_args
+from typing import Literal, NamedTuple, Self, TypeVar, cast, get_args
 
 from pydantic import (
     BaseModel,
@@ -75,24 +75,34 @@ ROWS_FULL = (
 #: identity is two endpoints and a label, so a name alone is not its ID.
 ScopeType = Literal["application", "entity", "process", "store", "boundary"]
 
-#: How the pages and the Markdown export name each scope type: the label that
-#: offers the type, and the noun that a sentence names one scope by, as in
-#: "the process “Billing”" or "the whole application".
-SCOPE_WORDS: Mapping[ScopeType, tuple[str, str]] = MappingProxyType(
+
+class ScopeWords(NamedTuple):
+    """How the pages and the Markdown export name one scope type."""
+
+    #: The label that offers the type, as in "A data store".
+    label: str
+    #: The noun that a sentence names one scope by, as in "the data store
+    #: “Orders DB”" or "the whole application".
+    noun: str
+
+
+#: The words of each scope type.
+SCOPE_WORDS: Mapping[ScopeType, ScopeWords] = MappingProxyType(
     {
-        "application": ("The whole application", "whole application"),
-        "boundary": ("A trust boundary", "trust boundary"),
-        "process": ("A process", "process"),
-        "store": ("A data store", "data store"),
-        "entity": ("An external entity", "external entity"),
+        "application": ScopeWords("The whole application", "whole application"),
+        "boundary": ScopeWords("A trust boundary", "trust boundary"),
+        "process": ScopeWords("A process", "process"),
+        "store": ScopeWords("A data store", "data store"),
+        "entity": ScopeWords("An external entity", "external entity"),
     }
 )
 
 #: The noun of each scope type, from :data:`SCOPE_WORDS`, for the pages and
 #: the export that name one scope in a sentence.
 SCOPE_NOUNS: Mapping[ScopeType, str] = MappingProxyType(
-    {scope_type: noun for scope_type, (_label, noun) in SCOPE_WORDS.items()}
+    {scope_type: words.noun for scope_type, words in SCOPE_WORDS.items()}
 )
+
 
 #: The kinds of fact a Control writes: a subject or an assertion is a question
 #: of one job, and a Capability says what the application does rather than

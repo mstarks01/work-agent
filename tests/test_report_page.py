@@ -737,13 +737,11 @@ def test_the_page_reads_the_service_s_verdict_labels(island, table, words):
     """The page labels a verdict with the words the server sends, which the
     Markdown export reads too."""
     from analysis_service import claims
-    from tests.test_webapp import viewer_javascript
+    from tests.test_webapp import _island, viewer_javascript
 
-    (sent,) = re.findall(
-        rf'<script type="application/json" id="{island}"[^>]*>(.*?)</script>',
-        page(),
+    assert _island(page(), island) == json.loads(
+        json.dumps(dict(getattr(claims, words)))
     )
-    assert json.loads(sent) == json.loads(json.dumps(dict(getattr(claims, words))))
     assert re.search(
         rf'const {table} = JSON\.parse\(document\.getElementById\("{island}"\)',
         viewer_javascript(),

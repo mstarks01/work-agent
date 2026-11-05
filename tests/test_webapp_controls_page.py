@@ -875,6 +875,11 @@ class TestTheTables:
         the Markdown export reads too. A noun that equals its key is also the
         key a script compares, so only the other words are refused.
 
+        The test reads a word as a double-quoted string, the form a table of
+        words takes. It does not read a word in a sentence of a page, because
+        page prose names a type in its own words, as in "a rectangle is an
+        external entity".
+
         The test leaves out the two tables that word an element type, a set
         that holds the flow, which is no scope type: ``TYPES`` in
         ``first_run.js`` (``ElementPrefix``) and ``KIND_WORDS`` in
