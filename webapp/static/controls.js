@@ -205,10 +205,10 @@
       ...units[framework].units.map((unit) => h("option", { value: unit.id },
         unit.label ? `${unit.id} · ${unit.label}`.slice(0, 120) : unit.id)));
     const holder = h("div", {}, h("label", { class: "field-label", for: "row-unit" }, "Unit"), unitPick());
-    // A finding that names no part reaches only a Control of the whole
+    // A finding that names no element reaches only a Control of the whole
     // application. The note names each framework as the rows do.
     const unplaced = draft.scope.type === "application" ? []
-      : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_a_part).map((row) => row.framework))];
+      : [...new Set(draft.rows.filter((row) => !units[row.framework]?.names_an_element).map((row) => row.framework))];
     return card("What it covers", "Each row names one unit this Control covers. The analysis judges each row against its findings, and refuses a row that does not bear on its unit.",
       h("ul", { class: "lines", id: "rows-list" }, ...draft.rows.map((row, index) => h("li", {},
         h("span", {}, unitText(row), " ", h("span", { class: "sub" }, `version ${row.version}`)),
@@ -366,7 +366,7 @@
   const draw = () => {
     el("controls-count").textContent = `${controls.length} of ${counted(limits.max_controls, "Control", "Controls")}`;
     el("new-control").disabled = atLimit() || editing === "new";
-    show("controls-full", atLimit() ? textFile.refusals.full : "");
+    show("controls-full", atLimit() ? textFile.refusals.at_limit : "");
     el("editor").replaceChildren(...(draft ? [editor()] : []));
     const shown = shownControls();
     const picked = controls.filter((control) => chosen.has(control.id));

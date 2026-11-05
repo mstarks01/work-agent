@@ -34,7 +34,7 @@
   const draw = () => {
     el("files-count").textContent = `${files.length} of ${limits.max_owner_files} files`;
     el("upload-file-button").disabled = atLimit();
-    if (atLimit()) show("files-problem", textFile.refusals.full);
+    if (atLimit()) show("files-problem", textFile.refusals.at_limit);
     const text = el("files-search").value.toLocaleLowerCase();
     const kind = el("files-kind").value;
     const format = el("files-format").value;
@@ -98,7 +98,7 @@
     if (!file) return;
     show("files-notice", "");
     if (atLimit()) {
-      show("files-problem", textFile.refusals.full);
+      show("files-problem", textFile.refusals.at_limit);
       return;
     }
     const read = await textFile.read(file, limits.max_bytes, "Files keeps");

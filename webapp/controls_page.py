@@ -163,20 +163,20 @@ def scope_types() -> list[dict[str, object]]:
     ]
 
 
-def _names_a_part(package: FrameworkPackage) -> bool:
-    """Whether each finding of ``package`` names a part of the model, as its
-    record's bound on ``affected_element_ids`` says."""
+def _names_an_element(package: FrameworkPackage) -> bool:
+    """Whether each finding of ``package`` names an element of the System
+    Model, as its record's bound on ``affected_element_ids`` says."""
     metadata = package.record.model_fields["affected_element_ids"].metadata
     return any(getattr(bound, "min_length", 0) > 0 for bound in metadata)
 
 
 def units() -> dict[str, dict[str, object]]:
     """Each package's version and units, with the label its catalog gives
-    each unit at run time, and whether each finding names a part."""
+    each unit at run time, and whether each finding names an element."""
     return {
         name: {
             "version": package.version,
-            "names_a_part": _names_a_part(package),
+            "names_an_element": _names_an_element(package),
             "units": [
                 {
                     "id": unit.id,
@@ -247,10 +247,8 @@ class HeldEvidence(BaseModel):
     id: str = Field(pattern=EVIDENCE_ID)
 
 
-class ControlSave(BaseModel):
-    """The body of ``POST /workspace/controls``: a Control as the editor wrote
-    it. The service gives each new Control and each new evidence file its
-    ID."""
+class ControlBody(BaseModel):
+    """The fields of each Control save: a Control as the editor wrote it."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -258,21 +256,27 @@ class ControlSave(BaseModel):
     scope: ControlScope
     facts: list[FactAnswer]
     rows: list[ControlRow]
+
+
+class ControlSave(ControlBody):
+    """The body of ``POST /workspace/controls``. The service gives each new
+    Control and each new evidence file its ID."""
+
     evidence: list[NewEvidence] = Field(max_length=MAX_CONTROL_EVIDENCE_CEILING)
 
 
-class ControlEdit(ControlSave):
-    """The body of ``PUT /workspace/controls/{id}``: the Control as the editor
-    wrote it, each held file by its ID, and the ``updated_at`` it read."""
+class ControlEdit(ControlBody):
+    """The body of ``PUT /workspace/controls/{id}``: each held file by its ID,
+    each new file, and the ``updated_at`` the editor read."""
 
-    evidence: list[HeldEvidence | NewEvidence] = Field(  # type: ignore[assignment]
+    evidence: list[HeldEvidence | NewEvidence] = Field(
         max_length=MAX_CONTROL_EVIDENCE_CEILING
     )
     updated_at: datetime
 
 
 def saved_control(
-    save: ControlSave,
+    save: ControlSave | ControlEdit,
     *,
     owner_id: str,
     control_id: str | None = None,
@@ -292,6 +296,9 @@ def saved_control(
                 raise ValueError("The save names an evidence file this Control lacks.")
             files.append(kept[sent.id])
             continue
+        # The digest encodes strict UTF-8 before the store applies
+        # control_refusal, so a lone surrogate is refused here, in the words
+        # text_refusal gives it.
         try:
             data = sent.text.encode("utf-8")
         except UnicodeEncodeError:

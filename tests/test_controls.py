@@ -470,6 +470,14 @@ def test_a_long_or_unclosed_credential_is_refused(line, shape):
     )
 
 
+@pytest.mark.parametrize("end", ["\n", "\r\n", "\r", "\u2028", "\u2029"])
+def test_a_credential_line_counts_each_line_end_a_text_may_hold(end):
+    """Each line end that ``text_refusal`` lets through starts a line, as it
+    does in an editor."""
+    text = end.join(["first line", "second line", "DB_PASSWORD=s3cr3t!", ""])
+    assert credential_hit(text) == (3, "a password, secret or token set to a value")
+
+
 @pytest.mark.parametrize(
     "line",
     [

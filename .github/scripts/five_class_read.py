@@ -189,7 +189,9 @@ def rendered(body: str) -> list[str]:
     fenced code block."""
     lines = []
     fence = None
-    for line in _COMMENT.sub("", body.replace("\r\n", "\n")).split("\n"):
+    # CommonMark ends a line at "\n", "\r\n" or "\r", and at nothing else.
+    text = body.replace("\r\n", "\n").replace("\r", "\n")
+    for line in _COMMENT.sub("", text).split("\n"):
         opener = _FENCE.match(line)
         if fence is None and opener:
             fence = opener.group(1)

@@ -474,6 +474,42 @@ def test_kept_text_has_one_reader():
     assert _sites(tests) == [("src/analysis_service/grounding.py", "keeps_text")]
 
 
+#: Each site that splits a text on ``"\n"`` alone, with the reason. Every
+#: other line split of a text calls
+#: :func:`~analysis_service.owner_files.text_lines`.
+NEWLINE_SPLITS: dict[Site, str] = {
+    (".github/scripts/five_class_read.py", "rendered"): (
+        "CommonMark ends a line only at \\n, \\r\\n or \\r, and the body's"
+        " \\r\\n and \\r become \\n first"
+    ),
+    ("src/analysis_service/config_files.py", "read_settings"): (
+        "a settings file is KEY=value lines that the service writes with \\n"
+    ),
+    ("src/analysis_service/graph.py", "unfence"): (
+        "the inverse of the \\n join of render_fenced"
+    ),
+    ("src/analysis_service/sources.py", "diagram_header"): (
+        "diagram_reader/read.mjs splits a Mermaid text on the same string, and"
+        " tests/test_sources.py runs both on one set of headers"
+    ),
+}
+
+
+def _splits_on_newline(node: ast.AST) -> bool:
+    return (
+        _calls(node, "split")
+        and len(node.args) == 1
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == "\n"
+    )
+
+
+def test_a_text_has_one_line_split():
+    r"""A split on ``"\n"`` misses ``"\r"``, U+2028 and U+2029, which an
+    uploaded text may hold (``docs/agents/value-shapes.md``)."""
+    assert _sites(_splits_on_newline) == sorted(NEWLINE_SPLITS)
+
+
 #: The fields of :class:`~analysis_service.claims.UnknownRef` that spell a
 #: kind of fact.
 SPELLING_FIELDS = frozenset(

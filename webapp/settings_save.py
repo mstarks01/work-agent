@@ -353,7 +353,7 @@ def _check(
     except StoreConfigError as exc:
         found.append(Refusal(None, str(exc)))
     except ImportError as exc:
-        # Each store converts a missing extra into a StoreConfigError, so an
+        # Each store converts an absent extra into a StoreConfigError, so an
         # ImportError here is a broken install of a library the store loads.
         found.append(
             Refusal(

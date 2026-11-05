@@ -391,7 +391,7 @@ it.
 - **Delete.** A dialog says that each analysis that applied the Control keeps
   its own copy. `DELETE /workspace/controls/{control_id}` removes the row and
   each evidence file, and keeps nothing. "Delete selected" asks once for the
-  count it shows. Another owner's Control answers as a missing one.
+  count it shows. Another owner's Control answers as a Control that does not exist.
 
 ## Controls in an analysis
 

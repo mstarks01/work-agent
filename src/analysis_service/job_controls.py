@@ -61,6 +61,7 @@ from analysis_service.fact_answers import (
 from analysis_service.fact_writes import check_fact_answers
 from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from analysis_service.open_facts import open_attribute, prepared_model
+from analysis_service.owner_files import text_lines
 from analysis_service.parsing import Sha256Hex
 from analysis_service.sources import EvidenceClass
 from analysis_service.system_model import (
@@ -977,7 +978,7 @@ def _quoted(reason: str, evidence: Sequence[CopiedEvidence]) -> list[EvidenceLin
     ]
     lines = []
     for file in evidence:
-        for number, line in enumerate(file.text.split("\n"), start=1):
+        for number, line in enumerate(text_lines(file.text), start=1):
             text = line.strip()
             if any(char.isalnum() for char in text) and any(
                 _quotes(text, quotation) for quotation in quotations
@@ -1007,12 +1008,14 @@ def controls_section(
         [entry for block in blocks for entry in block.returned_claims],
     )
     written = {entry.control: entry for entry in facts or ()}
-    ran = {block.framework for block in blocks}
+    ran: dict[str, FrameworkPackage] = {
+        block.framework: PACKAGES[block.framework] for block in blocks
+    }
     unreached = {
         (control.id, unit)
         for control in applied_controls(copies, scopes, model)
         for block in blocks
-        for unit in unreached_rows(block.claims, PACKAGES[block.framework], control)
+        for unit in unreached_rows(block.claims, ran[block.framework], control)
     }
     entries = []
     for copy, resolution in zip(
@@ -1036,12 +1039,11 @@ def controls_section(
         for row in (row for row in copy.rows if row.framework in ran):
             ruled = rulings.get(ControlRowRef(control=copy.id, unit=row.unit), [])
             row_result = row_outcome(ruled, unreached=(copy.id, row.unit) in unreached)
-            package = PACKAGES.get(cast(FrameworkName, row.framework))
             rows.append(
                 SectionRow(
                     framework=row.framework,
                     unit=row.unit,
-                    label=package.record.text_of_unit(row.unit) if package else "",
+                    label=ran[row.framework].record.text_of_unit(row.unit),
                     version=row.version,
                     ticked=row.ticked,
                     outcome=row_result,

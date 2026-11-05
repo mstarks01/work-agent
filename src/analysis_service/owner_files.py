@@ -158,6 +158,19 @@ def text_refusal(text: str, *, max_bytes: int, too_large: str) -> str | None:
     return None
 
 
+def text_lines(text: str) -> list[str]:
+    """Each line of an uploaded ``text``, in order, so that line 1 is the
+    first item.
+
+    A text that passes :func:`text_refusal` ends its lines with ``"\\n"``,
+    ``"\\r\\n"``, ``"\\r"``, U+2028 or U+2029. ``str.splitlines`` splits on
+    each of them, as an editor does, so a line number here is the number a
+    person sees. A lint refuses a split on ``"\\n"`` alone
+    (``tests/test_one_reader_lints.py``).
+    """
+    return text.splitlines()
+
+
 def upload_refusal(
     name: str,
     kind: SourceKind,
