@@ -80,6 +80,7 @@ from analysis_service.controls import (
     MAX_CONTROL_FACTS,
     MAX_CONTROL_ROWS,
     ControlLimits,
+    ControlRow,
 )
 from analysis_service.deployment import Deployment, FrameworkNotCarried
 from analysis_service.errors import ConfigError, shown_errors
@@ -177,7 +178,7 @@ def max_control_body_bytes(limits: ControlLimits) -> int:
     chars = (
         labels * MAX_LABEL_CHARS
         + MAX_CONTROL_FACTS * fact_chars
-        + MAX_CONTROL_ROWS * 3 * CONTROL_ROW_FIELD_MAX_CHARS
+        + MAX_CONTROL_ROWS * len(ControlRow.model_fields) * CONTROL_ROW_FIELD_MAX_CHARS
     )
     whole = SourceLimits(
         max_total_bytes=limits.max_evidence * limits.max_evidence_bytes

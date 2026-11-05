@@ -22,6 +22,7 @@ from analysis_service.claims import (
     ControlRowRef,
     RefusedControl,
     ReturnedClaim,
+    UnknownRef,
     Verdict,
 )
 from analysis_service.controls import (
@@ -32,6 +33,7 @@ from analysis_service.controls import (
     MAX_CONTROL_FACTS,
     MAX_CONTROL_ROWS,
     ROWS_FULL,
+    ControlRow,
     evidence_full,
 )
 from analysis_service.fact_answers import FACT_VALUE_MAX_CHARS
@@ -49,6 +51,7 @@ from tests.test_structural_readers import sound_report
 from tests.test_webapp import LOOPBACK, SAME_ORIGIN, WEBAPP_LIMITS
 from tests.test_webapp_controls import BOB, ORDERS_DB, Owner, ZonedRunner
 from tests.test_webapp_questions import app_for, ran
+from webapp.controls_page import ControlSave
 from webapp.main import Workspace
 from webapp.report_export import CSV_COLUMNS, report_csv
 
@@ -281,6 +284,38 @@ class TestCreate:
         full = json.dumps(body(evidence=sent)).encode()
         assert len(full) > max_body_bytes(SHIPPED_RESILIENCE.source_limits())
         assert len(full) <= max_control_body_bytes(limits)
+
+    def test_the_guard_counts_the_bounds_the_models_state(self):
+        """The guard counts each Control field from a constant. A field that
+        the models add, or a bound that they raise, breaks this test and not a
+        save of a full Control."""
+
+        def longest(model) -> dict[str, int | None]:
+            return {
+                name: next(
+                    (
+                        rule.max_length
+                        for rule in field.metadata
+                        if hasattr(rule, "max_length")
+                    ),
+                    None,
+                )
+                for name, field in model.model_fields.items()
+            }
+
+        assert set(ControlSave.model_fields) == {
+            "name",
+            "scope",
+            "facts",
+            "rows",
+            "evidence",
+        }
+        assert set(longest(ControlRow).values()) == {CONTROL_ROW_FIELD_MAX_CHARS}
+        keys = longest(UnknownRef)
+        assert all(
+            keys[name] is None or keys[name] <= ELEMENT_ID_MAX_CHARS
+            for name in UNKNOWN_KEY_FIELDS
+        )
 
     def test_the_guard_holds_a_control_with_every_field_at_its_bound(self):
         """Every bounded field at its bound, in 4-byte characters, and evidence

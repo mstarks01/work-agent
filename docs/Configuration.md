@@ -1264,7 +1264,7 @@ Settings page. The page shows each range and checks it before it saves.
 One more bound applies to two settings together. `max_control_evidence` ×
 `max_source_bytes` must be 16,777,216 bytes (16 MiB) or less, because one
 Control holds that many evidence files of that size. The loader and a Settings
-save refuse a larger product. The shipped values give 1 MiB.
+save refuse a larger product. The shipped values give 1,024,000 bytes.
 
 ### How strictly each override family is checked
 
