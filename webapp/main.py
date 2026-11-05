@@ -2839,9 +2839,9 @@ _STYLE = """
   :root { color-scheme: light dark; }
   body { font: 15px/1.55 system-ui, sans-serif; max-width: 46rem;
          margin: 3rem auto; padding: 0 1.25rem; }
-  h1 { font-size: 1.4rem; margin-bottom: .25rem; }
-  h2 { font-size: 1.05rem; margin-top: 1.75rem; }
-  h3 { font-size: .9rem; font-family: ui-monospace, monospace; margin-bottom: .3rem; }
+  h1 { font-size: 20px; margin-bottom: .25rem; }
+  h2 { font-size: 17px; margin-top: 1.75rem; }
+  h3 { font-size: 15px; font-family: ui-monospace, monospace; margin-bottom: .3rem; }
   .sub { opacity: .7; margin-top: 0; }
   .problem { border-left: 3px solid #c00; padding: .5rem .75rem; margin: 1rem 0; }
   .not { color: #c00; font-weight: 600; }

@@ -591,7 +591,11 @@ for (const id of ["analyze","description","problem","go","load","ask",
                   "description-remaining","source_formats","file_refusals","page_labels",
                   "files-rows","chosen-files","files-dialog","files-cancel","files-select",
                   "upload-menu","upload-computer","upload-files","controls-offer",
-                  "controls-rows","controls-summary","controls-used","controls-used-list"])
+                  "controls-rows","controls-summary","controls-used","controls-used-list",
+                  "controls-choose","controls-dialog","controls-find","controls-all","controls-none",
+                  "controls-count","controls-unfit","controls-unfit-summary","controls-unfit-rows",
+                  "controls-done","frameworks","frameworks-toggle","frameworks-panel",
+                  "frameworks-summary"])
   ids[id] = new Node(id);
 ids.questions.append(ids.list);
 ids["upload-file"].dataset.maxBytes = "64";

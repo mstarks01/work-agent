@@ -68,7 +68,10 @@ the right holds the frameworks, the "Ask me questions" box, the Controls,
 goes under the description. The "?" beside "What are you building?" shows
 what to describe.
 
-**The frameworks to run**, one checkbox per framework this install carries. The
+**The frameworks to run**, in the "Frameworks" menu: one checkbox per framework
+this install carries, with the options of each framework on its row. The menu
+button names the ticked frameworks with their options, such as "STRIDE, ASVS
+level 1". Escape, or a click outside the menu, closes it. The
 carried set comes from [`config/frameworks.toml`](../config/frameworks.toml).
 Every box starts unticked, so tick each framework you want **Prepare analysis**
 to run.
@@ -394,14 +397,18 @@ it.
 
 A **Control** records a protection that your systems already have, and it
 names what it protects: the whole application, one zone or one element (ADR
-0124). "Controls for this analysis", in the settings column, lists each of your
-Controls with what it protects and its rows, each ticked. The submission sends
+0124). "Controls", in the settings column, names the ticked Controls in one line:
+up to three names, then a count. **Choose Controls** opens a dialog that lists
+each of your Controls with what it protects and its rows, each ticked. The
+dialog finds a Control by its name, and **Tick all** and **Untick all** act on
+the Controls it shows. It folds the Controls that are not for this analysis
+under a count. The submission sends
 the IDs of the Controls you tick in `controls`, and the job copies each one,
 with the text of each evidence file (ADR 0127). A later edit or delete changes
-no job. When a ticked Control is gone, the submission is refused and the list
-shows the Control as "Missing". A Control that states no fact and has no row
+no job. When a ticked Control is gone, the submission is refused, the line
+counts it as missing, and the dialog shows it as "Missing". A Control that states no fact and has no row
 of a selected framework at the version the service carries changes nothing in
-the analysis, so the list shows it unticked and disabled, with the note "Not
+the analysis, so the dialog shows it unticked and disabled, with the note "Not
 for this analysis". The note says when its rows are not at the framework
 version the service carries. The service refuses a submission that names one.
 A Control with facts and rows only of other frameworks stays ticked, with the
@@ -719,10 +726,11 @@ changing its answers or the engine's question order. Shared answers, row
 exceptions, earlier answers, skipped questions and follow-up rules use the
 existing answer service.
 
-The last item of the sidebar on each page is the theme button, "Dark theme".
-It changes the page between the light and the dark theme, and it shows as
-pressed when the dark theme is on. The browser keeps the choice, and each page
-sets it before it draws. With no choice, each page follows the system setting.
+**Settings** and the theme switch are at the foot of the sidebar on each page.
+The switch has two buttons, "Light theme" and "Dark theme", and the button of
+the theme the page shows is pressed. The browser keeps the choice, and each
+page sets it before it draws. With no choice, each page follows the system
+setting. The sidebar stays in view as the page scrolls.
 
 **Description**, **Questions** and **Reports** belong to the same analysis.
 Use **Analyses** to reopen a paused analysis or review its retained reports.

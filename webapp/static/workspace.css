@@ -5,7 +5,7 @@
   --text:light-dark(#242a24,#edf1e9);
   --muted:light-dark(#616a5e,#b4bdb0);
   --line:light-dark(#dde1d8,#45503f);
-  --soft:light-dark(#eaf0e5,#303f29);
+  --soft:light-dark(#eaeee7,#313c2c);
   --accent:light-dark(#365b3e,#b0d4a4);
   --on-accent:light-dark(#fff,#172613);
   --error:light-dark(#963a31,#ffc2b9);
@@ -163,20 +163,21 @@ h1,h2,h3,p {
   margin-top:0
 }
 h1 {
-  font-size:30px;
-  line-height:1.2;
-  letter-spacing:-.025em;
+  font-size:20px;
+  line-height:1.3;
+  letter-spacing:-.01em;
   font-weight:600;
   margin-bottom:12px
 }
 h2 {
-  font-size:21px;
+  font-size:17px;
   line-height:1.35;
   letter-spacing:-.015em;
   font-weight:600
 }
 h3 {
-  font-size:17px
+  font-size:15px;
+  font-weight:600
 }
 small {
   font-size:12px
@@ -216,7 +217,75 @@ small {
   padding:28px 18px;
   display:flex;
   flex-direction:column;
-  gap:32px
+  gap:32px;
+  position:sticky;
+  top:0;
+  height:100dvh;
+  overflow-y:auto
+}
+/* Settings and the theme switch, last in the sidebar whatever a page puts
+   after the sidebar's own items. */
+.sidebar-foot {
+  order:1;
+  margin-top:auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:4px;
+  padding-top:12px;
+  border-top:1px solid var(--line)
+}
+.sidebar-foot>a {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex:1;
+  min-width:0;
+  padding:10px 4px 10px 12px;
+  border-radius:7px;
+  color:var(--text);
+  font-weight:500;
+  text-decoration:none;
+  white-space:nowrap
+}
+.sidebar-foot>a:hover,.sidebar-foot>a[aria-current=page] {
+  background:var(--soft);
+  color:var(--accent)
+}
+.theme-switch {
+  display:flex;
+  flex:none;
+  gap:2px;
+  padding:2px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--canvas)
+}
+.theme-switch button {
+  width:28px;
+  height:28px;
+  min-height:28px;
+  padding:0;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  color:var(--muted)
+}
+.theme-switch button[aria-pressed=true] {
+  background:var(--soft);
+  color:var(--accent)
+}
+.sidebar-collapsed .sidebar-foot {
+  flex-direction:column;
+  align-items:stretch
+}
+.sidebar-collapsed .sidebar-foot>a {
+  justify-content:center;
+  padding:10px 12px
+}
+.sidebar-collapsed .theme-switch {
+  flex-direction:column;
+  align-self:center
 }
 .sidebar-head {
   display:flex;
@@ -352,19 +421,62 @@ main {
   flex:999 1 460px;
   min-width:0
 }
+/* The title sits on the line of "Frameworks" in the settings column. */
 .entry-main h1 {
-  margin:0
+  margin:15px 0 0
 }
+.entry-main h1+.field-label {
+  margin-top:20px
+}
+/* The settings column takes the colours of an element tag of the green of
+   --soft, so it follows the tag tokens in each theme. */
 .entry-settings {
   flex:1 1 260px;
   min-width:0;
   padding:18px;
-  border:1px solid var(--line);
+  border:1px solid hsl(93 var(--tag-line-s) var(--tag-line-l));
   border-radius:10px;
-  background:var(--soft)
+  background:hsl(93 var(--tag-fill-s) var(--tag-fill-l))
 }
 .entry-settings fieldset {
+  position:relative;
   margin:0 0 16px
+}
+/* The frameworks menu: a button that names the choice, over a panel of the
+   framework rows. */
+.frameworks-toggle {
+  display:flex;
+  width:100%;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  background:var(--canvas);
+  font-weight:400;
+  text-align:left
+}
+.frameworks-toggle:hover {
+  background:var(--canvas)
+}
+.frameworks-toggle[aria-expanded=true] {
+  border-color:var(--accent)
+}
+.frameworks-toggle svg {
+  flex:none
+}
+.frameworks-panel {
+  position:absolute;
+  z-index:3;
+  top:calc(100% + 4px);
+  left:0;
+  right:0;
+  padding:0 12px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--canvas);
+  box-shadow:0 6px 18px rgb(0 0 0 / .16)
+}
+.frameworks-panel .pick:last-child {
+  border-bottom:0
 }
 .entry-settings .field-label {
   margin:16px 0 8px
@@ -1084,6 +1196,23 @@ code {
   .sidebar nav>.new-analysis {
     margin:0
   }
+  .sidebar {
+    position:static;
+    height:auto
+  }
+  .sidebar-foot {
+    margin:0;
+    padding:0;
+    border:0
+  }
+  .sidebar-foot>a {
+    font-size:13px;
+    padding:8px
+  }
+  .theme-switch button {
+    width:44px;
+    height:44px
+  }
   .workspace:not(.sidebar-collapsed) .nav-icon {
     display:none
   }
@@ -1102,8 +1231,8 @@ code {
   .entry {
     margin:0 auto
   }
-  h1 {
-    font-size:27px
+  .entry-main h1 {
+    margin-top:0
   }
   .heading-row {
     flex-wrap:wrap
@@ -1437,8 +1566,78 @@ a.analysis-row:hover {
   overflow-wrap:anywhere
 }
 .controls-offer h2, .control-offer h2 {
-  font-size:16px;
   margin:16px 0 4px
+}
+.controls-line {
+  margin:4px 0 10px;
+  font-size:14px;
+  overflow-wrap:anywhere
+}
+/* A button that opens a dialog, drawn as a text link. */
+.link-button {
+  min-height:0;
+  padding:0;
+  border:0;
+  background:none;
+  color:var(--accent);
+  font-size:14px;
+  font-weight:400;
+  text-decoration:underline;
+  text-underline-offset:3px
+}
+.link-button:hover {
+  background:none
+}
+.controls-dialog {
+  width:min(36rem,94vw);
+  max-height:calc(100dvh - 32px);
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--canvas);
+  color:var(--text);
+  padding:20px
+}
+.controls-dialog[open] {
+  display:flex;
+  flex-direction:column
+}
+.controls-dialog::backdrop {
+  background:rgb(0 0 0 / .35)
+}
+.controls-dialog h2 {
+  margin:0 0 12px
+}
+.controls-tools {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+  margin-bottom:8px
+}
+.controls-tools input {
+  flex:1 1 12rem;
+  width:auto
+}
+.controls-dialog .controls-list {
+  overflow:auto;
+  min-height:0;
+  flex:1;
+  border-top:1px solid var(--line)
+}
+.controls-dialog ul {
+  margin:0
+}
+.controls-dialog li {
+  padding:8px 0;
+  border-bottom:1px solid var(--line)
+}
+.controls-dialog details summary {
+  cursor:pointer;
+  padding:10px 0;
+  color:var(--muted)
+}
+.controls-dialog .dialog-actions {
+  margin-top:14px
 }
 .control-offer {
   border:1px solid var(--line);

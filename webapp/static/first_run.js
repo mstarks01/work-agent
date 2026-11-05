@@ -34,6 +34,42 @@
     sync(checkbox);
   }
 
+  // The frameworks menu: its button names the ticked frameworks with their
+  // options, as "STRIDE, ASVS level 1", and opens the panel of rows. Escape,
+  // or a click or focus outside the menu, closes it. A click on a row's text
+  // moves focus to no element, so only a focus that lands outside closes it.
+  const picker = document.getElementById("frameworks");
+  const menuButton = document.getElementById("frameworks-toggle");
+  const menu = document.getElementById("frameworks-panel");
+  const optionText = (select) =>
+    `${select.closest("label").firstChild.textContent.trim()} ${select.selectedOptions[0].textContent}`;
+  const showFrameworks = () => {
+    const names = boxes
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => [checkbox.value.toUpperCase(), ...optionsOf(checkbox).map(optionText)].join(" "));
+    document.getElementById("frameworks-summary").textContent = names.join(", ") || "Choose frameworks";
+  };
+  const openMenu = (open) => {
+    menu.hidden = !open;
+    menuButton.setAttribute("aria-expanded", String(open));
+  };
+  menuButton.addEventListener("click", () => openMenu(menu.hidden));
+  picker.addEventListener("change", showFrameworks);
+  picker.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || menu.hidden) return;
+    openMenu(false);
+    menuButton.focus();
+  });
+  picker.addEventListener("focusout", (event) => {
+    if (event.relatedTarget && !picker.contains(event.relatedTarget)) openMenu(false);
+  });
+  document.addEventListener("click", (event) => {
+    if (!picker.contains(event.target)) openMenu(false);
+  });
+  // A reload can restore ticks after this script runs.
+  showFrameworks();
+  window.addEventListener("pageshow", showFrameworks);
+
   // What the server allow-lists. Each choice's value is the JSON of the choice
   // itself, so a level posts as the number its options model declares rather
   // than as the string a form control would otherwise send.

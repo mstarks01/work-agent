@@ -142,9 +142,9 @@ _PAGE = """<!doctype html>
 #rail{width:270px;flex:none;background:var(--sidebar);border-right:1px solid var(--line);
 padding:28px 14px;position:sticky;top:0;height:100vh;overflow:auto}
 #stage{flex:1;padding:36px;max-width:900px}
-h1{font-size:18px;margin:0 0 4px}
+h1{font-size:20px;margin:0 0 4px}
 h2{font-size:17px;margin:28px 0 8px}
-h3{font-size:14px;margin:18px 0 6px;color:var(--muted)}
+h3{font-size:15px;margin:18px 0 6px;color:var(--muted)}
 .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
 .row{display:block;width:100%;min-height:0;text-align:left;background:none;border:0;
 padding:10px 12px;border-radius:7px;color:var(--text);font-weight:400}

@@ -648,4 +648,4 @@ class TestLoopbackControls:
     def test_the_first_run_nav_links_to_it(self, tmp_path, path):
         client = client_for(tmp_path, hand_written())
 
-        assert '<a href="/settings"' in client.get(path).text
+        assert '<a id="settings-nav" href="/settings"' in client.get(path).text

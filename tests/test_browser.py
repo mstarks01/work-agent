@@ -135,6 +135,17 @@ def open_groups(page) -> None:
             summary.click()
 
 
+def open_frameworks(page) -> None:
+    """Open the frameworks menu, so its rows take a tick."""
+    if page.get_attribute("#frameworks-toggle", "aria-expanded") == "false":
+        page.click("#frameworks-toggle")
+
+
+def close_frameworks(page) -> None:
+    """Close the frameworks menu, which lies over the column under it."""
+    page.press("#frameworks-toggle", "Escape")
+
+
 def pause(page, opened: bool = True) -> None:
     """Submit a description that asks questions, wait for the list, and open
     its groups unless ``opened`` is false."""
@@ -143,8 +154,10 @@ def pause(page, opened: bool = True) -> None:
     page.fill("#description", "A web app talks to a database.")
     page.check("#ask")
     if not page.locator('input[name="framework"]:checked').count():
+        open_frameworks(page)
         for framework in page.locator('input[name="framework"]').all():
             framework.check()
+        close_frameworks(page)
     page.click("#go")
     page.wait_for_selector("#asked", state="visible")
     if opened:
@@ -186,16 +199,19 @@ def test_sidebar_collapses_and_stays_collapsed_on_settings(page):
     )
 
 
-def test_the_theme_button_sets_the_theme_on_every_page(page):
-    """The sidebar's theme button sets the theme, and each page the reader
-    opens next, the report too, draws in that theme."""
+def test_the_theme_switch_sets_the_theme_on_every_page(page):
+    """The sidebar's theme switch sets the theme, its pressed button names the
+    theme the page shows, and each page the reader opens next draws in it."""
     page.emulate_media(color_scheme="light")
-    button = page.get_by_role("button", name="Dark theme")
-    assert button.get_attribute("aria-pressed") == "false"
+    light_button = page.get_by_role("button", name="Light theme")
+    dark_button = page.get_by_role("button", name="Dark theme")
+    assert light_button.get_attribute("aria-pressed") == "true"
+    assert dark_button.get_attribute("aria-pressed") == "false"
     canvas = "getComputedStyle(document.body).backgroundColor"
     light = page.evaluate(canvas)
-    button.click()
-    assert button.get_attribute("aria-pressed") == "true"
+    dark_button.click()
+    assert dark_button.get_attribute("aria-pressed") == "true"
+    assert light_button.get_attribute("aria-pressed") == "false"
     dark = page.evaluate(canvas)
     assert dark != light
     for path in ("/settings", "/files", "/controls"):
@@ -206,20 +222,44 @@ def test_the_theme_button_sets_the_theme_on_every_page(page):
             page.get_by_role("button", name="Dark theme").get_attribute("aria-pressed")
             == "true"
         )
-    page.get_by_role("button", name="Dark theme").click()
+    page.get_by_role("button", name="Light theme").click()
     page.goto("/")
     assert page.evaluate(canvas) == light
 
 
+def test_settings_and_the_theme_switch_sit_at_the_foot_of_the_sidebar(page):
+    """Settings leaves the menu for the foot of the sidebar, beside the theme
+    switch, and the foot stays at the bottom of the window as the page
+    scrolls."""
+    page.set_viewport_size({"width": 1280, "height": 800})
+    assert page.locator("#sidebar-navigation a[href='/settings']").count() == 0
+    foot = page.locator(".sidebar-foot")
+    assert foot.get_by_role("link", name="Settings").count() == 1
+    assert foot.get_by_role("group", name="Theme").count() == 1
+    menu = page.locator("#sidebar-navigation").bounding_box()
+    box = foot.bounding_box()
+    assert menu and box
+    assert box["y"] > menu["y"] + menu["height"]
+    assert 800 - (box["y"] + box["height"]) <= 40
+    page.goto("/settings")
+    page.wait_for_selector("#settings-rows tr[data-key]")
+    height = page.evaluate("document.documentElement.scrollHeight")
+    assert height > 1600, "a page that scrolls past the window"
+    page.evaluate(f"window.scrollTo(0, {height // 2 - 400})")
+    box = page.locator(".sidebar-foot").bounding_box()
+    assert box and 800 - (box["y"] + box["height"]) <= 40
+    assert page.get_attribute("#settings-nav", "aria-current") == "page"
+
+
 def test_the_report_draws_in_the_chosen_theme(page):
-    """The report's own palette obeys the sidebar's theme button."""
+    """The report's own palette obeys the sidebar's theme switch."""
     page.emulate_media(color_scheme="light")
     pause(page)
     page.click("#continue")
     page.wait_for_url("**/report/**")
     ink = "n => getComputedStyle(n).getPropertyValue('--ink').trim()"
     light = page.locator(".viz-root").evaluate(ink)
-    page.click("#theme-toggle")
+    page.get_by_role("button", name="Dark theme").click()
     page.reload()
     assert page.locator(".viz-root").evaluate(ink) != light
 
@@ -517,8 +557,10 @@ def test_a_running_analysis_keeps_a_tab_that_leads_back_to_its_progress(browser,
         opened.fill("#analysis-name", "Test analysis")
         opened.fill("#description", "A web app talks to a database.")
         opened.check("#ask")
+        open_frameworks(opened)
         for framework in opened.locator('input[name="framework"]').all():
             framework.check()
+        close_frameworks(opened)
         opened.click("#go")
         opened.wait_for_function(
             "() => document.querySelector('#questions-nav')"
@@ -1031,7 +1073,7 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
         page, errors = opened(browser, url + "/settings")
         page.wait_for_selector("#settings-rows tr[data-key]")
         assert page.is_hidden("#changes-panel")
-        current = page.locator('#sidebar-navigation a[aria-current="page"]')
+        current = page.locator('#settings-nav[aria-current="page"]')
         assert current.inner_text() == "Settings"
         review = page.locator('tr[data-key="tiers.review.model"]').inner_text()
         sources = page.locator('tr[data-key="resilience.max_sources"]').inner_text()
@@ -1349,7 +1391,9 @@ def test_a_saved_vendor_that_names_an_object_key_still_draws_the_table(
 def test_an_uploaded_transcript_alone_starts_an_analysis(page):
     """The menu's upload opens a file chooser, a binary file is refused on the
     page, and a text file goes to ``/analyze`` as the one source, as text."""
+    open_frameworks(page)
     page.locator('input[name="framework"]').first.check()
+    close_frameworks(page)
 
     def upload(name: str, data: bytes) -> None:
         page.click("#upload")
@@ -1381,7 +1425,9 @@ def test_an_uploaded_transcript_alone_starts_an_analysis(page):
 def test_an_uploaded_mermaid_file_starts_an_analysis_as_a_diagram(page):
     """A ``.mmd`` file goes to ``/analyze`` as a ``diagram`` source, and the
     server accepts it."""
+    open_frameworks(page)
     page.locator('input[name="framework"]').first.check()
+    close_frameworks(page)
     diagram = "flowchart LR\n    user[Customer] -->|HTTPS| app(Web App)\n"
     page.click("#upload")
     with page.expect_file_chooser() as chosen:
@@ -1440,8 +1486,10 @@ def test_workspace_mobile_has_no_page_overflow(page):
 
 
 def test_workspace_reopens_selected_framework_options(page):
+    open_frameworks(page)
     page.check('input[name="framework"][value="asvs"]')
     page.select_option('select[data-option="level"]', "2")
+    close_frameworks(page)
     pause(page)
     page.reload()
     page.wait_for_selector("#asked", state="visible")
@@ -1453,6 +1501,7 @@ def test_workspace_reopens_selected_framework_options(page):
 
 def test_an_unticked_framework_shows_its_options_disabled(page):
     """A submitter sees a framework's options before ticking it (#1541)."""
+    open_frameworks(page)
     level = page.locator('select[data-option="level"]')
     assert not page.is_checked('input[name="framework"][value="asvs"]'), "a control"
     assert level.is_visible()
@@ -1464,6 +1513,63 @@ def test_an_unticked_framework_shows_its_options_disabled(page):
     assert level.is_visible() and level.is_disabled()
     page.check('input[name="framework"][value="asvs"]')
     assert page.input_value('select[data-option="level"]') == "3", "kept on re-tick"
+
+
+def test_the_frameworks_menu_names_the_choice_and_closes(page):
+    """The menu's button names the ticked frameworks with their options, and
+    Escape or a click outside the menu closes it."""
+    toggle = page.locator("#frameworks-toggle")
+    assert toggle.inner_text() == "Choose frameworks"
+    assert page.is_hidden("#frameworks-panel")
+    open_frameworks(page)
+    page.check('input[name="framework"][value="stride"]')
+    page.check('input[name="framework"][value="asvs"]')
+    page.select_option('select[data-option="level"]', "2")
+    assert toggle.inner_text() == "STRIDE, ASVS level 2"
+    page.keyboard.press("Escape")
+    assert page.is_hidden("#frameworks-panel")
+    assert toggle.get_attribute("aria-expanded") == "false"
+    assert page.evaluate("document.activeElement.id") == "frameworks-toggle"
+    open_frameworks(page)
+    page.click("#analysis-name")
+    assert page.is_hidden("#frameworks-panel")
+
+
+def test_a_click_on_a_framework_name_ticks_it_and_keeps_the_menu_open(page):
+    """A click on a row's text moves focus to no element, and the menu stays
+    open so the tick lands."""
+    open_frameworks(page)
+    page.click('.pick:has(input[value="stride"]) b')
+    assert page.is_checked('input[name="framework"][value="stride"]')
+    assert page.is_visible("#frameworks-panel")
+    assert page.inner_text("#frameworks-toggle") == "STRIDE"
+
+
+def test_the_new_analysis_title_is_on_the_line_of_frameworks(page):
+    """The page title sits level with "Frameworks" in the settings column, and
+    takes the 20px title size."""
+    page.set_viewport_size({"width": 1280, "height": 900})
+    title = page.locator("#new-analysis-title")
+    legend = page.locator("#frameworks legend")
+    assert title.evaluate("(node) => getComputedStyle(node).fontSize") == "20px"
+    one, two = title.bounding_box(), legend.bounding_box()
+    assert one and two
+    title_middle = one["y"] + one["height"] / 2
+    legend_middle = two["y"] + two["height"] / 2
+    assert abs(title_middle - legend_middle) <= 4
+
+
+def test_every_page_title_and_heading_takes_one_scale(page):
+    """A page title is 20px, a section heading 17px and a sub-heading 15px,
+    on the Controls editor that shows all three."""
+    page.goto("/controls")
+    page.click("#new-control")
+    size = "(node) => getComputedStyle(node).fontSize"
+    assert page.locator("h1").first.evaluate(size) == "20px"
+    assert page.locator(".editor h2").first.evaluate(size) == "17px"
+    assert page.locator(".editor .card-head h3").first.evaluate(size) == "15px"
+    page.goto("/")
+    assert page.locator("#controls-offer > h2").evaluate(size) == "17px"
 
 
 def test_question_guidance_without_a_misleading_progress_count(page):
@@ -1531,7 +1637,7 @@ def test_a_printed_report_is_the_complete_export(page):
     pause(page)
     page.click("#continue")
     page.wait_for_url("**/report/**")
-    page.click("#theme-toggle")
+    page.get_by_role("button", name="Dark theme").click()
     group = page.locator("details.finding-group").first
     assert group.get_attribute("open") is None
     page.emulate_media(media="print")
@@ -2198,7 +2304,9 @@ def test_a_chosen_file_goes_into_the_analysis_and_shows_when_it_opens_again(page
     choose_from_files(page)
     assert page.inner_text("#chosen-files").startswith("File: network.mmd · Diagram")
     assert "Up to 102,3" in page.inner_text("#description-remaining")
+    open_frameworks(page)
     page.locator('input[name="framework"]').first.check()
+    close_frameworks(page)
     page.fill("#analysis-name", "Files analysis")
     with page.expect_response("**/analyze") as answered:
         page.click("#go")
@@ -2226,7 +2334,9 @@ def test_a_file_deleted_before_the_submission_shows_as_missing(page):
     choose_from_files(page)
     file_id = page.evaluate("fetch('/workspace/files').then((r) => r.json())")[0]["id"]
     page.evaluate(f"fetch('/workspace/files/{file_id}', {{method: 'DELETE'}})")
+    open_frameworks(page)
     page.locator('input[name="framework"]').first.check()
+    close_frameworks(page)
     page.fill("#analysis-name", "Gone file")
     page.click("#go")
     page.wait_for_selector("#problem:not([hidden])")
@@ -2530,7 +2640,9 @@ def submit_with_controls(page) -> dict:
     page.wait_for_selector("#controls-offer:not([hidden])")
     page.fill("#description", "A web app talks to a database.")
     page.fill("#analysis-name", "Controls analysis")
+    open_frameworks(page)
     page.locator('input[name="framework"]').first.check()
+    close_frameworks(page)
     with page.expect_response("**/analyze") as answered:
         page.click("#go")
     assert answered.value.ok, answered.value.text()
@@ -2626,7 +2738,8 @@ def test_a_control_that_fits_no_selected_framework_takes_no_tick(zoned_page):
     page = zoned_page
     spoofing = keep_control(page, "Spoof guard", {"type": "application"})
     page.goto("/")
-    page.wait_for_selector(f"#control-{spoofing}")
+    page.wait_for_selector(f"#control-{spoofing}", state="attached")
+    open_frameworks(page)
     stride = page.locator('#frameworks input[name="framework"][value="stride"]')
     asvs = page.locator('#frameworks input[name="framework"][value="asvs"]')
     asvs.check()
@@ -2634,7 +2747,7 @@ def test_a_control_that_fits_no_selected_framework_takes_no_tick(zoned_page):
     # Its one row is STRIDE's and it states no fact, so ASVS alone takes none.
     assert page.is_disabled(f"#control-{spoofing}")
     assert not page.is_checked(f"#control-{spoofing}")
-    assert "Not for this analysis" in page.inner_text("#controls-rows")
+    assert "Not for this analysis" in page.text_content("#controls-unfit-rows")
     stride.check()
     assert page.is_enabled(f"#control-{spoofing}")
     assert page.is_checked(f"#control-{spoofing}")
@@ -2645,12 +2758,13 @@ def test_a_control_whose_rows_are_of_an_older_version_takes_no_tick(zoned_page):
     old_rows = [{"framework": "stride", "unit": "spoofing", "version": "0.9"}]
     old = keep_control(page, "Old guard", {"type": "application"}, rows=old_rows)
     page.goto("/")
-    page.wait_for_selector(f"#control-{old}")
+    page.wait_for_selector(f"#control-{old}", state="attached")
+    open_frameworks(page)
     page.locator('#frameworks input[name="framework"][value="stride"]').check()
     assert page.is_disabled(f"#control-{old}")
     assert (
         "its rows are not at the framework version this service carries"
-        in page.inner_text("#controls-rows")
+        in page.text_content("#controls-unfit-rows")
     )
 
 
@@ -2681,12 +2795,13 @@ def test_the_form_and_the_service_agree_on_a_control_that_changes_nothing(
         for name, (scope, facts, rows, _) in cases.items()
     }
     page.goto("/")
+    open_frameworks(page)
     page.locator('#frameworks input[name="framework"][value="stride"]').check()
     page.locator('#frameworks input[name="framework"][value="asvs"]').uncheck()
     body = posted("A web app talks to a database.", ("stride",))
     for name, (*_, fits) in cases.items():
         control = ids[name]
-        page.wait_for_selector(f"#control-{control}")
+        page.wait_for_selector(f"#control-{control}", state="attached")
         status = page.evaluate(
             """(body) => fetch('/analyze', {method: 'POST',
                  headers: {'Content-Type': 'application/json'},
@@ -2723,7 +2838,7 @@ def test_a_control_shows_each_element_as_its_tag(zoned_page):
 
 def test_the_tag_colours_follow_the_theme_on_every_page(page):
     """The tag tokens live in the shared style, so a page other than the
-    report takes the dark ones from the sidebar's theme button."""
+    report takes the dark ones from the sidebar's theme switch."""
     page.emulate_media(color_scheme="light")
     page.goto("/")
     fill = (
@@ -2731,8 +2846,48 @@ def test_the_tag_colours_follow_the_theme_on_every_page(page):
         ".getPropertyValue('--tag-fill-l').trim()"
     )
     assert page.evaluate(fill) == "96%"
-    page.click("#theme-toggle")
+    page.get_by_role("button", name="Dark theme").click()
     assert page.evaluate(fill) == "18%"
+
+
+def test_the_controls_line_names_the_ticked_controls_and_the_dialog_chooses(
+    zoned_page,
+):
+    """The settings column names up to three ticked Controls, then a count;
+    the dialog finds a Control by name, ticks and unticks what it shows, and
+    Enter in its find box submits nothing."""
+    page = zoned_page
+    ids = [keep_control(page, name, {"type": "application"}) for name in "ABCDE"]
+    page.goto("/")
+    page.wait_for_selector(f"#control-{ids[-1]}", state="attached")
+    # A form that would submit, so Enter in the find box would send it.
+    page.fill("#analysis-name", "Controls analysis")
+    page.fill("#description", "A web app talks to a database.")
+    open_frameworks(page)
+    page.check('input[name="framework"][value="stride"]')
+    close_frameworks(page)
+    line = page.locator("#controls-summary")
+    assert line.inner_text() == "5 ticked: E, D, C and 2 more."
+    assert page.is_hidden("#controls-rows")
+    page.click("#controls-choose")
+    page.fill("#controls-find", "d")
+    assert page.is_hidden(f"#control-{ids[0]}")
+    assert page.is_visible(f"#control-{ids[3]}")
+    page.click("#controls-none")
+    assert line.inner_text() == "4 ticked: E, C, B and 1 more."
+    assert page.inner_text("#controls-count") == "4 of 5 ticked"
+    sent: list[str] = []
+    page.on("request", lambda request: sent.append(request.url))
+    page.press("#controls-find", "Enter")
+    page.wait_for_timeout(300)
+    assert not [url for url in sent if url.endswith("/analyze")]
+    page.fill("#controls-find", "")
+    page.uncheck(f"#control-{ids[0]}")
+    assert page.evaluate("document.activeElement.id") == f"control-{ids[0]}"
+    page.click("#controls-all")
+    assert line.inner_text() == "5 ticked: E, D, C and 2 more."
+    page.click("#controls-done")
+    assert page.is_hidden("#controls-dialog")
 
 
 def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
@@ -2741,24 +2896,29 @@ def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
     page = zoned_page
     gone = keep_control(page, "Gone", {"type": "application"})
     page.goto("/")
-    page.wait_for_selector(f"#control-{gone}")
+    page.wait_for_selector(f"#control-{gone}", state="attached")
     assert page.is_checked(f"#control-{gone}")
     page.evaluate(f"fetch('/workspace/controls/{gone}', {{method: 'DELETE'}})")
     page.fill("#description", "A web app talks to a database.")
     page.fill("#analysis-name", "Gone control")
+    open_frameworks(page)
     page.locator('input[name="framework"]').first.check()
+    close_frameworks(page)
     page.click("#go")
     page.wait_for_selector("#problem:not([hidden])")
     assert "no longer in Controls" in page.inner_text("#problem")
+    assert "1 ticked Control is missing." in page.inner_text("#controls-summary")
+    page.click("#controls-choose")
     page.wait_for_selector("#controls-rows li >> text=Missing")
     page.click("#controls-rows button:text('Remove')")
+    # The list is empty now, so the line and its dialog close.
+    assert page.is_hidden("#controls-dialog")
 
     kept = keep_control(page, "SSO", {"type": "application"})
     page.reload()
-    page.wait_for_selector(f"#control-{kept}")
+    page.wait_for_selector(f"#control-{kept}", state="attached")
     page.uncheck("#ask")
     assert page.is_enabled(f"#control-{kept}")
-    assert "continues at once" in page.inner_text("#controls-summary")
     page.check("#ask")
     sent = submit_with_controls(page)
     assert sent["controls"] == [kept]

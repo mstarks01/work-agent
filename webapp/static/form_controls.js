@@ -1,7 +1,8 @@
 // The Controls of an analysis on the form page (ADRs 0124 and 0127).
 //
-// At the submission, "Controls for this analysis" lists each Control the
-// operator keeps, ticked, and the job copies each ticked one. The model
+// At the submission, the settings column names the ticked Controls in one
+// line, and "Choose Controls" opens a dialog that lists each Control the
+// operator keeps, ticked. The job copies each ticked one. The model
 // exists only after the extraction, so the pause shows each copy with its
 // match: the element it matched, a zone's parts, or a choice of the elements
 // of its type. Each change there saves the `control_scopes` of the pause.
@@ -52,6 +53,11 @@ const formControls = (() => {
     || rowsOf(control, frameworks, true);
   const coveredBy = (control) => [...new Set(control.rows.map((row) => row.framework))].join(" and ");
   const manage = () => h("a", { href: "/controls" }, "Manage Controls");
+  // "A, B and C", or "A, B, C and 4 more" past three names.
+  const nameList = (names) => {
+    const shown = names.length > 3 ? [...names.slice(0, 3), `${names.length - 3} more`] : names;
+    return shown.length > 1 ? `${shown.slice(0, -1).join(", ")} and ${shown.at(-1)}` : shown.join("");
+  };
 
   // ---- The submission ------------------------------------------------------
   let held = [];
@@ -59,12 +65,17 @@ const formControls = (() => {
   // A reopened analysis shows what it used and offers no choice.
   let reopened = false;
   const ticked = new Set();
-  const asking = () => Boolean(el("ask")?.checked);
 
+  // The dialog lists the Controls that fit the selected frameworks first,
+  // and folds the ones that do not. The find box shows the Controls whose
+  // name holds its text.
   const drawChecklist = () => {
+    const focused = document.activeElement?.id;
     const present = new Set(held.map((control) => control.id));
     const frameworks = selected();
-    const lines = held.map((control) => {
+    const found = el("controls-find").value.trim().toLocaleLowerCase();
+    const shown = (control) => control.name.toLocaleLowerCase().includes(found);
+    const line = (control) => {
       const fit = fits(control, frameworks);
       const ownRows = rowsOf(control, frameworks, true);
       const oldRows = !ownRows && rowsOf(control, frameworks, false);
@@ -78,22 +89,52 @@ const formControls = (() => {
         : !control.rows.length || ownRows ? ""
           : oldRows ? "Only its facts apply here: its rows are not at the framework version this service carries."
             : `Only its facts apply here: its rows cover ${coveredBy(control)}.`;
-      return h("li", {}, box, " ", h("label", { for: box.id }, h("b", {}, control.name)),
+      return h("li", { hidden: !shown(control) }, box, " ", h("label", { for: box.id }, h("b", {}, control.name)),
         h("span", { class: "hint" }, ` · ${scopeText(control.scope)}`,
           control.rows.length ? ` · ${control.rows.map(rowText).join(", ")}` : ""),
         note ? h("span", { class: "hint control-fit" }, ` · ${note}`) : null);
-    });
+    };
+    const fitting = held.filter((control) => fits(control, frameworks));
+    const unfit = held.filter((control) => !fits(control, frameworks));
     const missing = [...ticked].filter((id) => !present.has(id)).map((id) => h("li", { class: "hint" },
       "Missing: a Control you ticked is no longer in Controls. ",
-      h("button", { type: "button", class: "quiet", on: { click: () => { ticked.delete(id); drawChecklist(); } } }, "Remove")));
-    el("controls-rows").replaceChildren(...lines, ...missing);
-    const count = chosenIds().filter((id) => present.has(id)).length;
-    el("controls-summary").replaceChildren(
-      `${counted(count, "Control is", "Controls are")} ticked. The service matches each one to your system, `,
-      asking() ? "and you confirm the match with the questions. " : "and continues at once with no questions. ",
-      manage());
+      h("button", { type: "button", class: "quiet", on: { click: () => { ticked.delete(id); drawChecklist(); el("controls-find").focus(); } } }, "Remove")));
+    el("controls-rows").replaceChildren(...fitting.map(line), ...missing);
+    el("controls-unfit-rows").replaceChildren(...unfit.map(line));
+    el("controls-unfit-summary").textContent = `${counted(unfit.length, "does", "do")} not apply to this analysis`;
+    el("controls-unfit").hidden = !unfit.length;
+    const names = fitting.filter((control) => ticked.has(control.id)).map((control) => control.name);
+    el("controls-count").textContent = `${names.length} of ${fitting.length} ticked`;
+    el("controls-summary").replaceChildren(...[
+      names.length ? `${names.length} ticked: ${nameList(names)}.` : "None ticked.",
+      unfit.length ? h("span", { class: "hint" }, ` ${counted(unfit.length, "does", "do")} not apply.`) : null,
+      missing.length ? h("span", { class: "hint" }, ` ${counted(missing.length, "ticked Control is", "ticked Controls are")} missing.`) : null,
+    ].filter(Boolean));
     el("controls-offer").hidden = reopened || (!held.length && !missing.length);
+    // A hidden line takes its dialog with it, so no closed list holds the
+    // page, and focus goes to the form.
+    if (el("controls-offer").hidden && el("controls-dialog").open) {
+      el("controls-dialog").close();
+      el("analysis-name").focus();
+    }
+    if (focused && document.activeElement?.id !== focused) el(focused)?.focus();
   };
+  // Tick all and Untick all act on the Controls that fit and that the find
+  // box shows.
+  const tickShown = (on) => {
+    const frameworks = selected();
+    const found = el("controls-find").value.trim().toLocaleLowerCase();
+    held.filter((control) => fits(control, frameworks) && control.name.toLocaleLowerCase().includes(found))
+      .forEach((control) => { if (on) ticked.add(control.id); else ticked.delete(control.id); });
+    drawChecklist();
+  };
+  el("controls-choose")?.addEventListener("click", () => el("controls-dialog").showModal());
+  el("controls-done")?.addEventListener("click", () => el("controls-dialog").close());
+  el("controls-all")?.addEventListener("click", () => tickShown(true));
+  el("controls-none")?.addEventListener("click", () => tickShown(false));
+  el("controls-find")?.addEventListener("input", drawChecklist);
+  // The dialog sits in the form, so Enter in the find box must not submit it.
+  el("controls-find")?.addEventListener("keydown", (event) => { if (event.key === "Enter") event.preventDefault(); });
   // Every Control is ticked when the page first lists it.
   const load = async () => {
     try {
@@ -107,7 +148,6 @@ const formControls = (() => {
     loaded = true;
     drawChecklist();
   };
-  el("ask")?.addEventListener("change", drawChecklist);
   el("frameworks")?.addEventListener("change", drawChecklist);
   // The IDs a submission sends, or nothing where none is ticked. A Control
   // that does not fit the selected frameworks stays ticked for later, but
