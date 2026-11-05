@@ -100,9 +100,10 @@ VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
 # about the draft's *unit* (#659). ``evidence`` says the model's stated facts
 # settle that the draft's subject is not there — a framework that ruled a
 # requirement out of scope and one that rejected an attacker action on a stated
-# fact both answer it, and it rules on the unit. ``reasoning`` says the draft
-# asserts or infers what the model does not state, so the draft fails and the
-# unit stays open: a package answering in units lists it as ``not-raised``.
+# fact both answer it, and it rules on the unit. ``reasoning`` says the draft's
+# argument does not follow even if every open fact it depends on holds, so the
+# draft fails and the unit stays open: a package answering in units lists it
+# as ``not-raised``.
 # ``control`` is the third check: a row of an applied Control covers the
 # draft's unit, as the owner states it, and it rules on the unit (ADR 0126).
 # The vocabulary describes the check rather than what the check was about, so
@@ -117,7 +118,7 @@ CriticStep = Literal["evidence", "reasoning", "lane", "control"]
 
 #: How a person reads each verdict status: the label of a finding on the
 #: report page and in the Markdown export.
-VERDICT_WORDS: Mapping[VerdictStatus, str] = MappingProxyType(
+VERDICT_LABELS: Mapping[VerdictStatus, str] = MappingProxyType(
     {"confirmed": "Confirmed", "needs-info": "Needs info", "rejected": "Rejected"}
 )
 
@@ -129,11 +130,11 @@ UNIT_VERDICT_WORDS: Mapping[VerdictStatus, tuple[str, str]] = MappingProxyType(
     {
         "confirmed": ("Gap", "Applies, and the input does not show it satisfied."),
         "needs-info": (
-            VERDICT_WORDS["needs-info"],
+            VERDICT_LABELS["needs-info"],
             "Applies, and the input does not settle it.",
         ),
         "rejected": (
-            VERDICT_WORDS["rejected"],
+            VERDICT_LABELS["rejected"],
             "The critic ruled this draft out. The reason says which check ended it.",
         ),
     }
@@ -143,9 +144,11 @@ UNIT_VERDICT_WORDS: Mapping[VerdictStatus, tuple[str, str]] = MappingProxyType(
 #: export. The words describe the check, as :data:`RejectionStep` does.
 REJECTION_MEANINGS: Mapping[RejectionStep, str] = MappingProxyType(
     {
-        "evidence": "the stated facts show that its subject is not there",
-        "reasoning": "it asserts or infers what the description does not state",
-        "lane": "it was filed in a lane that does not own it",
+        "evidence": "the stated facts settle that its subject is not there",
+        "reasoning": (
+            "its argument does not follow, even if each open fact it rests on holds"
+        ),
+        "lane": "it was filed under a category or chapter it does not belong to",
         "duplicate": "it repeats another finding",
         "control": "the owner states that a Control covers its unit",
     }

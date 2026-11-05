@@ -23,7 +23,7 @@ from typing import Any, Literal
 from analysis_service import Report
 from analysis_service.claims import (
     REJECTION_MEANINGS,
-    VERDICT_WORDS,
+    VERDICT_LABELS,
     Claim,
     Mitigation,
     Severity,
@@ -49,7 +49,7 @@ def _text(value: str) -> str:
     return _AUTOLINK.sub(lambda found: "\\" + found.group(0), escaped)
 
 
-def _because(verdict: Verdict) -> str:
+def _rejection_clause(verdict: Verdict) -> str:
     """Why the critic rejected the draft, or nothing where a report read back
     names no step."""
     step = verdict.rejected_because
@@ -66,7 +66,7 @@ def _findings(report: Report) -> list[str]:
         lines += ["", "### Findings", ""]
         lines += [
             f"- **{_text(claim.id)}** {_text(claim.title)}"
-            f" ({VERDICT_WORDS[claim.verdict.status]})."
+            f" ({VERDICT_LABELS[claim.verdict.status]})."
             f" {_text(claim.description)}"
             for claim in block.claims
         ] or ["No finding."]
@@ -74,7 +74,7 @@ def _findings(report: Report) -> list[str]:
             lines += ["", "### Ruled out", ""]
             lines += [
                 f"- **{_text(claim.id)}** {_text(claim.title)}: rejected"
-                f"{_because(claim.verdict)}. {_text(claim.verdict.reason)}"
+                f"{_rejection_clause(claim.verdict)}. {_text(claim.verdict.reason)}"
                 for claim in block.rejected_claims
             ]
     return lines

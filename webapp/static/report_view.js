@@ -317,9 +317,9 @@
   // two to each other.
   const severityLevel = (t) => (t.severity ? t.severity.level : "");
   const mitigationSummaries = (t) => (t.mitigations || []).map((m) => m.summary);
-  // The label of each verdict status, in the service's words (VERDICT_WORDS),
+  // The label of each verdict status, in the service's words (VERDICT_LABELS),
   // and the glyph beside it on a finding's row.
-  const VERDICT = JSON.parse(document.getElementById("verdict_words").textContent);
+  const VERDICT = JSON.parse(document.getElementById("verdict_labels").textContent);
   const VERDICT_GLYPH = { "confirmed": "✓", "needs-info": "?", "rejected": "✕" };
   // What the tally says for each kind of change. A kind the table does not
   // hold throws, so it cannot render as a verdict.

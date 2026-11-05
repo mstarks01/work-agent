@@ -710,7 +710,7 @@ def test_each_page_table_answers_for_its_whole_vocabulary(table, vocabulary):
 @pytest.mark.parametrize(
     ("table", "vocabulary"),
     [
-        ("VERDICT_WORDS", "VerdictStatus"),
+        ("VERDICT_LABELS", "VerdictStatus"),
         ("UNIT_VERDICT_WORDS", "VerdictStatus"),
         ("REJECTION_MEANINGS", "RejectionStep"),
     ],
@@ -729,11 +729,11 @@ def test_each_word_table_answers_for_its_whole_vocabulary(table, vocabulary):
 @pytest.mark.parametrize(
     ("island", "table", "words"),
     [
-        ("verdict_words", "VERDICT", "VERDICT_WORDS"),
+        ("verdict_labels", "VERDICT", "VERDICT_LABELS"),
         ("unit_verdict_words", "UNIT_VERDICT", "UNIT_VERDICT_WORDS"),
     ],
 )
-def test_the_page_reads_the_service_s_verdict_words(island, table, words):
+def test_the_page_reads_the_service_s_verdict_labels(island, table, words):
     """The page labels a verdict with the words the server sends, which the
     Markdown export reads too."""
     from analysis_service import claims
@@ -750,14 +750,14 @@ def test_the_page_reads_the_service_s_verdict_words(island, table, words):
     )
 
 
-def test_the_page_script_holds_no_verdict_words():
+def test_the_page_script_holds_no_verdict_labels():
     """The page holds no copy of the verdict words the server sends it."""
     from analysis_service import claims
     from tests.test_webapp import viewer_javascript
 
     script = viewer_javascript()
     labels = [
-        *claims.VERDICT_WORDS.values(),
+        *claims.VERDICT_LABELS.values(),
         *(text for pair in claims.UNIT_VERDICT_WORDS.values() for text in pair),
     ]
     for label in labels:
