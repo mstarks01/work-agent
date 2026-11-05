@@ -1409,12 +1409,12 @@
     section.append(table);
     $("analyses").append(section);
   }
-  // The two downloads: the report as Markdown and as JSON, each with the
-  // Controls section.
-  for (const format of ["md", "json"]) {
+  // The three downloads: the report as Markdown and as JSON, each with the
+  // Controls section, and its findings as CSV.
+  for (const format of ["md", "json", "csv"]) {
     $(`export-${format}`).href = `/report/${encodeURIComponent(R.job.id)}/export.${format}`;
   }
-  // The download icon opens a menu of the two formats, as the + of the
+  // The download icon opens a menu of the three formats, as the + of the
   // analysis form opens its menu: arrows move, Escape and a click outside close.
   const downloadButton = $("export-download");
   const downloadMenu = $("export-menu");

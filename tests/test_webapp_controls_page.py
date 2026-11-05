@@ -7,12 +7,15 @@ Offline, through the first-run app over an in-memory store.
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import json
 import re
 
 import pytest
 from fastapi.testclient import TestClient
 
+from analysis_service import PACKAGES, Report
 from analysis_service.claims import (
     ControlRowRef,
     RefusedControl,
@@ -25,10 +28,12 @@ from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT
 from tests import test_webapp
 from tests.factories import sample_analysis
 from tests.test_controls import fact, row
+from tests.test_structural_readers import sound_report
 from tests.test_webapp import LOOPBACK, SAME_ORIGIN
 from tests.test_webapp_controls import BOB, ORDERS_DB, Owner, ZonedRunner
 from tests.test_webapp_questions import app_for, ran
 from webapp.main import Workspace
+from webapp.report_export import CSV_COLUMNS, report_csv
 
 tiers = test_webapp.tiers
 
@@ -506,6 +511,30 @@ class TestTheReportSection:
         assert "AES-256 — written" in text
         assert "Protects the process “Billing”: left out, missing-element." in text
 
+    def test_the_csv_export_holds_a_row_for_each_finding(self, ruled):
+        owner, child, _ = ruled
+        exported = owner.client.get(f"/report/{child}/export.csv")
+        assert exported.status_code == 200
+        assert exported.headers["content-type"].startswith("text/csv")
+        assert 'filename="report.csv"' in exported.headers["content-disposition"]
+        assert exported.text.startswith("\ufeff")
+        header, *rows = csv.reader(exported.text.removeprefix("\ufeff").splitlines())
+        assert tuple(header) == CSV_COLUMNS
+        assert dict(zip(header, rows[0], strict=True)) == {
+            "framework": "stride",
+            "id": "S-01",
+            "title": "Session cookie theft enables account takeover",
+            "status": "rejected",
+            "severity": "high",
+            "category": "spoofing",
+            "affected elements": "Customer → Web App",
+            "description": "Stolen session cookies let an attacker impersonate"
+            " the customer against the web app.",
+            "mitigation": "Set HttpOnly and Secure on cookies",
+            "controls": "WAF: applied",
+        }
+        assert [one[1] for one in rows] == ["S-01", "S-01-2"]
+
     def test_the_report_page_carries_the_section(self, ruled):
         owner, child, _ = ruled
         page = owner.client.get(f"/report/{child}").text
@@ -523,8 +552,36 @@ class TestTheReportSection:
 
     def test_an_unknown_report_is_missing(self, ruled):
         owner, _, _ = ruled
-        for path in ("export.md", "export.json"):
+        for path in ("export.md", "export.json", "export.csv"):
             assert owner.client.get(f"/report/job-missing/{path}").status_code == 404
+
+
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_the_csv_export_reads_each_framework_through_its_id_rule(framework):
+    report = sound_report(framework)
+    (block,) = [one for one in report.analyses if one.framework == framework]
+    lane_field = PACKAGES[framework].id_rule.lane_field
+    header, *rows = csv.reader(io.StringIO(report_csv(report, [])))
+    cells = [dict(zip(header, one, strict=True)) for one in rows]
+    claims = [*block.claims, *block.rejected_claims]
+    assert [one["id"] for one in cells] == [claim.id for claim in claims]
+    assert [one["category"] for one in cells] == [
+        str(getattr(claim, lane_field)) for claim in claims
+    ]
+    assert {one["framework"] for one in cells} == {framework}
+
+
+@pytest.mark.parametrize("lead", ["=", "+", "-", "@", "\t", "\r"])
+def test_a_csv_cell_that_reads_as_a_formula_starts_with_an_apostrophe(ruled, lead):
+    owner, child, _ = ruled
+    body = owner.client.get(f"/report/{child}/export.json").json()["report"]
+    claim = body["analyses"][0]["rejected_claims"][0]
+    claim["title"] = f'{lead}HYPERLINK("https://evil.example", "a, b")'
+    claim["description"] = 'Two lines,\nwith "quotes".'
+    text = report_csv(Report.model_validate(body), [])
+    row = list(csv.reader(io.StringIO(text)))[1]
+    assert row[2] == f'\'{lead}HYPERLINK("https://evil.example", "a, b")'
+    assert row[7] == 'Two lines,\nwith "quotes".'
 
 
 @pytest.mark.parametrize(

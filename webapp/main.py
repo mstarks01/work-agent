@@ -304,7 +304,7 @@ from webapp.page import (
     response,
     script_json,
 )
-from webapp.report_export import report_markdown
+from webapp.report_export import report_csv, report_markdown
 from webapp.settings_save import (
     MAX_SAVE_BYTES,
     Refusal,
@@ -2508,6 +2508,21 @@ def create_app(
                 "controls": [entry.model_dump(mode="json") for entry in section],
             },
             headers={"Content-Disposition": 'attachment; filename="report.json"'},
+        )
+
+    @app.get("/report/{run_id}/export.csv")
+    async def report_csv_export(run_id: str) -> Response:
+        """The report's findings as one CSV file, a row for each."""
+        served_report = await report_of(run_id)
+        if served_report is None:
+            return PlainTextResponse("no such report", status_code=404)
+        answerable, report = served_report
+        text = report_csv(report, _section_of(answerable.record, report))
+        # The byte order mark tells a spreadsheet that the file is UTF-8.
+        return Response(
+            "\ufeff" + text,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="report.csv"'},
         )
 
     @app.post("/correct/{run_id}")

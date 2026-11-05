@@ -229,13 +229,23 @@ copy and the report's rulings, so a later edit of a Control changes nothing
 here.
 
 The download icon at the end of the tab row opens a menu of **Download as
-Markdown** and **Download as JSON**. They send `GET /report/{run}/export.md` and `GET /report/{run}/export.json`. The
+Markdown**, **Download as JSON** and **Download as CSV**. They send
+`GET /report/{run}/export.md`, `GET /report/{run}/export.json` and
+`GET /report/{run}/export.csv`. The
 Markdown file holds the findings, the findings ruled out and the Controls
 section. It escapes each value, so a value forms no Markdown markup, no HTML,
 no Markdown link and no GFM autolink. A viewer that links any bare domain name
 can still link one. The JSON file holds the report and
-the Controls section as `report` and `controls`. A `/v1` report carries no
-Controls section.
+the Controls section as `report` and `controls`. The CSV file holds one row
+for each finding of each framework, and the findings ruled out too. Its columns
+are `framework`, `id`, `title`, `status`, `severity`, `category`, `affected
+elements`, `description`, `mitigation` and `controls`. The category is the
+field that names the framework's lane: the STRIDE category or the ASVS
+chapter. A framework that gives no severity or no mitigation leaves that cell
+empty. The `controls` cell names each Control row that ruled on the finding,
+and its ruling. A cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage
+return gets an apostrophe first, so a spreadsheet shows the cell as text and
+does not run it as a formula. A `/v1` report carries no Controls section.
 
 ## When the configuration is wrong
 

@@ -2630,13 +2630,16 @@ def test_the_report_shows_the_controls_section_and_its_downloads(browser, tiers)
         )
         assert "applied" in section.inner_text() and "refused" in section.inner_text()
         assert page.get_attribute("#export-md", "href").endswith("/export.md")
-        # The download icon opens its two formats, and Escape closes them.
+        # The download icon opens its three formats, and Escape closes them.
         assert page.is_hidden("#export-menu")
         page.click("#export-download")
         assert page.is_visible("#export-menu")
         assert page.evaluate("document.activeElement.id") == "export-md"
         page.keyboard.press("ArrowDown")
         assert page.evaluate("document.activeElement.id") == "export-json"
+        page.keyboard.press("ArrowDown")
+        assert page.evaluate("document.activeElement.id") == "export-csv"
+        assert page.get_attribute("#export-csv", "href").endswith("/export.csv")
         page.keyboard.press("Escape")
         assert page.is_hidden("#export-menu")
         page.click("#export-preview")
