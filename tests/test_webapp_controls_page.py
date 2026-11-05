@@ -667,7 +667,7 @@ class TestTheReportSection:
         assert "- Row: stride repudiation — No finding: no draft" in text
         assert "— no-finding" not in text
         assert "It shows no \\<b\\>signing\\</b\\> at https\\://evil.example." in text
-        assert "Evidence: WAF.yaml (Configuration), line 1: WAF: on" in text
+        assert "Evidence: WAF.yaml (config), line 1: WAF: on" in text
         assert "AES-256 — written" in text
         assert (
             "Protects the process “Billing”: left out, because no part of this"

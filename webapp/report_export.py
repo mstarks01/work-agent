@@ -18,19 +18,13 @@ import io
 import re
 from collections.abc import Callable, Mapping, Sequence
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Literal
 
 from analysis_service import Report
-from analysis_service.claims import (
-    Claim,
-    Mitigation,
-    Severity,
-    derive_severity_level,
-)
+from analysis_service.claims import Claim, Mitigation, Severity
 from analysis_service.frameworks import lane_of
 from analysis_service.job_controls import SectionEntry
 from analysis_service.open_facts import element_names
-from webapp.controls_page import EVIDENCE_LABELS
 
 #: The characters that start Markdown markup or an HTML tag inline.
 _MARKUP = re.compile(r"([\\`*_\[\]<>#|!~&])")
@@ -118,8 +112,7 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
                 )
             for line in row.quoted:
                 lines.append(
-                    f"  - Evidence: {_text(line.file)}"
-                    f" ({EVIDENCE_LABELS[line.evidence_class]}),"
+                    f"  - Evidence: {_text(line.file)} ({line.evidence_class}),"
                     f" line {line.line}: {_text(line.text)}"
                 )
         lines.append("")
@@ -158,23 +151,30 @@ _FORMULA_LEAD = ("=", "+", "-", "@", "\t", "\r")
 
 
 def _level(severity: Severity) -> str:
-    return derive_severity_level(severity.likelihood, severity.impact)
+    # The validator of a Severity sets its level, so the level is never None.
+    return severity.level or ""
 
 
 def _summaries(mitigations: Sequence[Mitigation]) -> str:
     return " | ".join(mitigation.summary for mitigation in mitigations)
 
 
+#: A judgement field of a record that the CSV export reads into a cell.
+JudgementField = Literal["severity", "mitigations"]
+
 #: The CSV columns that read a judgement field a record may declare, keyed by
 #: the field and never by a framework. A record that does not declare the
-#: field leaves its cell empty. A test holds the keys to the judgement fields
-#: of each package's record, and the report page's readers to these cells.
-JUDGEMENT_CELLS: Mapping[str, Callable[[Any], str]] = MappingProxyType(
+#: field leaves its cell empty.
+#: ``test_the_judgement_cells_name_each_judgement_field_of_each_record`` holds
+#: the keys to the judgement fields of each package's record, and
+#: ``test_the_report_page_reads_the_judgement_cells_the_csv_writes`` holds the
+#: report page's readers to these cells.
+JUDGEMENT_CELLS: Mapping[JudgementField, Callable[[Any], str]] = MappingProxyType(
     {"severity": _level, "mitigations": _summaries}
 )
 
 
-def judgement_cells(claim: Claim) -> dict[str, str]:
+def judgement_cells(claim: Claim) -> dict[JudgementField, str]:
     """The cell of each judgement field for ``claim``, empty where its record
     does not declare the field."""
     declared = type(claim).model_fields
@@ -193,8 +193,9 @@ def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
     """The findings of ``report`` as one CSV file, with a row for each.
 
     The category is the claim's lane, as :func:`lane_of` reads it. The
-    severity and the mitigation come from :func:`judgement_cells`. The controls cell names each Control row that ruled
-    on the finding, with its ruling.
+    severity and the mitigation come from :func:`judgement_cells`. The
+    controls cell names each Control row that ruled on the finding, with its
+    ruling.
     """
     names = element_names(report.system_model)
     rulings: dict[tuple[str, str], list[str]] = {}

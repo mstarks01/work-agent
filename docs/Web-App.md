@@ -228,9 +228,9 @@ unit names no part that the Control's scope holds. A row opens to the claim
 IDs it ruled out, the critic's reason, each line of the evidence that the
 quotation of an applied ruling quotes, by file, class and line, and one
 sentence that says what the outcome means. The match, or the reason that the
-job left a Control out, shows as a sentence from the service. The section reads the job's
-copy and the report's rulings, so a later edit of a Control changes nothing
-here.
+job left a Control out, shows as a sentence from the service. The section
+reads the job's copy and the report's rulings, so a later edit of a Control
+changes nothing here.
 
 The download icon at the end of the tab row opens a menu of **Download as
 Markdown**, **Download as JSON** and **Download as CSV**. They send

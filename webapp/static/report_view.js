@@ -317,7 +317,9 @@
   const SEV_ORDER = JSON.parse(document.getElementById("severity_order").textContent);
   // A finding's severity level and its mitigations' summaries, or nothing
   // where its record declares no such field. The CSV export reads the same
-  // cells through `JUDGEMENT_CELLS`, and a test holds the two to each other.
+  // cells through `JUDGEMENT_CELLS`, and
+  // `test_the_report_page_reads_the_judgement_cells_the_csv_writes` holds the
+  // two to each other.
   const severityLevel = (t) => (t.severity ? t.severity.level : "");
   const mitigationSummaries = (t) => (t.mitigations || []).map((m) => m.summary);
   const VERDICT = { confirmed: ["Confirmed","✓"], "needs-info": ["Needs info","?"], rejected: ["Rejected","✕"] };
