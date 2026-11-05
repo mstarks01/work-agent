@@ -737,15 +737,26 @@ def test_the_page_reads_the_service_s_verdict_labels(island, table, words):
     """The page labels a verdict with the words the server sends, which the
     Markdown export reads too."""
     from analysis_service import claims
-    from tests.test_webapp import viewer_javascript
+    from tests.test_webapp import _island, viewer_javascript
 
-    (sent,) = re.findall(
-        rf'<script type="application/json" id="{island}"[^>]*>(.*?)</script>',
-        page(),
+    assert _island(page(), island) == json.loads(
+        json.dumps(dict(getattr(claims, words)))
     )
-    assert json.loads(sent) == json.loads(json.dumps(dict(getattr(claims, words))))
     assert re.search(
         rf'const {table} = JSON\.parse\(document\.getElementById\("{island}"\)',
+        viewer_javascript(),
+    )
+
+
+def test_the_page_reads_the_service_s_scope_nouns():
+    """The report page names a Control's scope type with the words the server
+    sends, which the Markdown export reads too."""
+    from analysis_service.controls import SCOPE_NOUNS
+    from tests.test_webapp import _island, viewer_javascript
+
+    assert _island(page(), "scope_nouns") == dict(SCOPE_NOUNS)
+    assert re.search(
+        r'const SCOPE_NOUNS = JSON\.parse\(document\.getElementById\("scope_nouns"\)',
         viewer_javascript(),
     )
 
@@ -772,13 +783,9 @@ def test_the_page_reads_the_service_s_severity_order():
     table test holds its keys.
     """
     from analysis_service.critic import SEVERITY_ORDER
-    from tests.test_webapp import viewer_javascript
+    from tests.test_webapp import _island, viewer_javascript
 
-    (order,) = re.findall(
-        r'<script type="application/json" id="severity_order"[^>]*>(.*?)</script>',
-        page(),
-    )
-    assert json.loads(order) == list(SEVERITY_ORDER)
+    assert _island(page(), "severity_order") == list(SEVERITY_ORDER)
     assert re.search(
         r'const SEV_ORDER = JSON\.parse\(document\.getElementById\("severity_order"\)',
         viewer_javascript(),

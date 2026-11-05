@@ -35,6 +35,7 @@ from analysis_service.controls import (
     MAX_CONTROL_FACTS,
     MAX_CONTROL_ROWS,
     ROWS_FULL,
+    SCOPE_WORDS,
     ControlRow,
     evidence_full,
 )
@@ -500,13 +501,9 @@ class TestThePage:
             assert f'nonce="{nonce}"' in attributes
 
     def test_the_page_reads_the_unit_labels_from_the_catalog(self, owner):
-        page = owner.client.get("/controls").text
-        data = re.search(
-            r'<script type="application/json" id="controls_page"[^>]*>(.*?)</script>',
-            page,
-            re.DOTALL,
-        ).group(1)
-        payload = json.loads(data)
+        payload = test_webapp._island(
+            owner.client.get("/controls").text, "controls_page"
+        )
         asvs = {unit["id"]: unit for unit in payload["units"]["asvs"]["units"]}
         assert asvs["V2.4.1"]["label"] == requirement_text("V2.4.1")
         assert asvs["V2"]["label"] == "Validation and Business Logic"
@@ -681,6 +678,8 @@ class TestTheReportSection:
             " description has the name or an alias." in text
         )
         assert "Protects the whole application: it applies with no match." in text
+        assert "Protects the data store “Orders DB”: " in text
+        assert "the store “" not in text
         assert "applied to Orders DB." in text
 
     def test_the_csv_export_holds_a_row_for_each_finding(self, ruled):
@@ -710,17 +709,16 @@ class TestTheReportSection:
     def test_the_report_page_carries_the_section(self, ruled):
         owner, child, _ = ruled
         page = owner.client.get(f"/report/{child}").text
-        data = re.search(
-            r'<script type="application/json" id="controls"[^>]*>(.*?)</script>',
-            page,
-            re.DOTALL,
-        ).group(1)
-        assert [entry["name"] for entry in json.loads(data)] == [
+        assert [entry["name"] for entry in test_webapp._island(page, "controls")] == [
             "WAF",
             "Encrypted",
             "Billing",
         ]
-        assert "\\u003cb>signing" in data
+        (sent,) = re.findall(
+            r'<script type="application/json" id="controls"[^>]*>(.*?)</script>',
+            page,
+        )
+        assert "\\u003cb>signing" in sent
 
     def test_an_unknown_report_is_missing(self, ruled):
         owner, _, _ = ruled
@@ -834,14 +832,12 @@ class TestTheTables:
     """Each table of the pages names each member of its set, so no value
     shows as ``undefined``."""
 
-    def test_the_form_words_each_type_reason_and_state(self):
+    def test_the_form_words_each_reason_and_state(self):
         from typing import get_args
 
-        from analysis_service.controls import ScopeType
         from analysis_service.job_controls import CoverReason, UsedState
         from tests.test_webapp import _table_keys
 
-        assert _table_keys("form_controls.js", "TYPES") == set(get_args(ScopeType))
         assert _table_keys("form_controls.js", "COVER_REASONS") == set(
             get_args(CoverReason)
         )
@@ -860,14 +856,46 @@ class TestTheTables:
             RowOutcome,
         )
         from analysis_service.sources import EvidenceClass
-        from webapp.controls_page import EVIDENCE_LABELS, SCOPE_LABELS
+        from webapp.controls_page import EVIDENCE_LABELS
 
-        assert set(SCOPE_LABELS) == set(get_args(ScopeType))
+        assert set(SCOPE_WORDS) == set(get_args(ScopeType))
         assert set(EVIDENCE_LABELS) == set(get_args(EvidenceClass))
         assert set(ROW_MEANINGS) == set(get_args(RowOutcome))
         assert set(MATCH_MEANINGS) == set(get_args(MatchOutcome))
         assert set(LEFT_OUT_MEANINGS) == set(get_args(LeftOutReason))
         assert set(FACT_MEANINGS) == set(get_args(FactState))
+
+    def test_no_page_script_holds_a_scope_type_word(self):
+        """Each page names a scope type with the words the server sends, which
+        the Markdown export reads too. A noun that equals its key is also the
+        key a script compares, so only the other words are refused.
+
+        The test reads a word as a whole string in any of the three quotes,
+        the form a table of words takes. It does not read a word in a sentence of a page, because
+        page prose names a type in its own words, as in "a rectangle is an
+        external entity".
+
+        The test leaves out the two tables that word an element type, a set
+        that holds the flow, which is no scope type: ``TYPES`` in
+        ``first_run.js`` (``ElementPrefix``) and ``KIND_WORDS`` in
+        ``report_view.js`` (the diagram's kinds).
+        """
+        element_tables = {"first_run.js": "TYPES", "report_view.js": "KIND_WORDS"}
+        words = {
+            word
+            for scope_type, pair in SCOPE_WORDS.items()
+            for word in pair
+            if word != scope_type
+        }
+        for name in test_webapp.STATIC_SCRIPTS:
+            script = test_webapp.page_javascript(name)
+            if name in element_tables:
+                table = rf"const {element_tables[name]} = \{{.*?\}};"
+                script, left_out = re.subn(table, "", script, flags=re.DOTALL)
+                assert left_out == 1, name
+            for word in words:
+                for quote in "\"'`":
+                    assert f"{quote}{word}{quote}" not in script, (name, word)
 
     def test_the_fact_kind_tables_name_each_scope_and_kind(self):
         from typing import get_args
