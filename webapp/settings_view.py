@@ -39,6 +39,7 @@ from typing import Any, Literal, get_args
 from analysis_service import resilience
 from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.config_files import (
+    MAX_VALUE_CHARS,
     SETTINGS_FILE,
     SettingsFileError,
     SettingsLine,
@@ -68,6 +69,7 @@ from analysis_service.store_backends import (
     CLOSED_SETTINGS,
     JOB_STORE_VAR,
     JOB_STORES,
+    MAX_RETENTION_DAYS,
     RETENTION_DAYS_VAR,
     JobStore,
     build_store,
@@ -219,6 +221,8 @@ def settings_view(
             if var not in page
         ],
         "rows": rows,
+        # The longest value the value rule and the secret rule take.
+        "value_chars": MAX_VALUE_CHARS,
         "store_shown": _store_keys(merged),
         "modes": {
             vendor: [mode.value for mode in VENDORS[vendor].credential_modes]
@@ -329,11 +333,18 @@ def _controls() -> dict[str, dict[str, Any]]:
             if setting.variable in CLOSED_SETTINGS
         },
     }
-    numeric: dict[str, dict[str, Numeric]] = {
-        f"resilience.{field}": {"numeric": _numeric(parser)}
+    numeric: dict[str, dict[str, Any]] = {
+        f"resilience.{field}": {
+            "numeric": _numeric(parser),
+            **dict(zip(("min", "max"), resilience.numeric_bounds(field), strict=True)),
+        }
         for field, (_, parser) in resilience.ENV_OVERRIDES.items()
     }
-    numeric["store.retention_days"] = {"numeric": "integer"}
+    numeric["store.retention_days"] = {
+        "numeric": "integer",
+        "min": 1,
+        "max": MAX_RETENTION_DAYS,
+    }
     return {
         **numeric,
         **{

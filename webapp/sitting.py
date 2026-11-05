@@ -61,10 +61,15 @@ REVIEW_LABELS: dict[sittings.RowState, str] = {
 assert set(REVIEW_LABELS) == set(get_args(sittings.RowState))
 
 
+#: The longest GitHub username the contribution takes. The page's username
+#: box takes the same bound.
+AUTHOR_MAX_CHARS = 64
+
+
 class ContributionChoice(BaseModel):
     model_config = ConfigDict(extra="forbid")
     reviewer: ReviewerMode = "anonymous"
-    author: str | None = Field(default=None, max_length=64)
+    author: str | None = Field(default=None, max_length=AUTHOR_MAX_CHARS)
 
 
 build_session = base.build_session
@@ -391,7 +396,7 @@ details.standard { margin:5px 0 2px; font-size:14px; } details.standard summary 
 <h2>What did your independent review find that these findings missed?</h2><p class="note">If something on your original list is not represented by the framework findings you reviewed, enter it here, one per line. Leave this blank if nothing is missing.</p>
 <textarea id="missing" placeholder="one potentially missed issue per line"></textarea>
 <h2>Notes</h2><p id="markCounts" class="note"></p><p class="hint">Counts are calculated automatically. Use notes only for context the structured choices do not capture.</p>
-<textarea id="notes" placeholder="optional context or explanation"></textarea>
+<textarea id="notes" maxlength="<!--noteschars-->" placeholder="optional context or explanation"></textarea>
 <p><button class="primary" id="finish" disabled>Record review</button><span id="saveStatus" class="save-status" role="status"></span></p><p id="finishHint" class="hint" role="status"></p>
 <p><button id="resetReview" type="button">Reset review answers</button></p><p class="hint">Reset clears Part 2 marks, missed issues, notes, and any recorded result for this case. Your independent Part 1 list remains locked because the model findings have already been revealed.</p>
 </section>
@@ -413,7 +418,7 @@ details.standard { margin:5px 0 2px; font-size:14px; } details.standard summary 
 <section id="waysOut"><h2>Contribute (optional)</h2>
 <p>Contribution sends one structured JSON review file in a pull request. The file contains your independent list, marks, missed issues, notes, and digests of the case material you reviewed. The app uses an existing GitHub CLI login when available; otherwise it prepares the same single file for GitHub's browser flow. It never asks for your GitHub password or token.</p>
 <fieldset class="attribution"><legend>Reviewer attribution</legend><label><input type="radio" name="reviewerAttribution" value="anonymous" checked> Anonymous / on behalf of someone else</label><label><input type="radio" name="reviewerAttribution" value="self"> Myself</label><p class="hint">Anonymous hides reviewer attribution, not the GitHub account that opens the pull request.</p></fieldset>
-<div id="browserIdentity" class="hidden"><label for="githubAuthor"><b>GitHub username for the pull request</b></label><br><input id="githubAuthor" class="text-input" autocomplete="username" spellcheck="false"><p class="hint">CI requires this name to match the GitHub account that opens the pull request.</p></div>
+<div id="browserIdentity" class="hidden"><label for="githubAuthor"><b>GitHub username for the pull request</b></label><br><input id="githubAuthor" class="text-input" maxlength="<!--authorchars-->" autocomplete="username" spellcheck="false"><p class="hint">CI requires this name to match the GitHub account that opens the pull request.</p></div>
 <p><button id="showFiles">Show files</button> <button class="primary" id="submit">Contribute</button><span id="contributeStatus" class="save-status" role="status"></span></p>
 <pre id="result" class="hidden"></pre><p id="thanks" class="hidden">Thank you for contributing this review.</p>
 <div id="browserSteps" class="note hidden"><p><b>Your review is ready to publish.</b></p><p>The link below opens GitHub with the file and its name already filled in. Sign in if you need to. GitHub shows one of two buttons. An account without write access presses <b>Propose changes</b>, and GitHub opens the pull request. An account with write access presses <b>Commit changes</b> and then chooses <b>Create a new branch for this commit and start a pull request</b>, because the default there commits straight to main. CI validates the review before it can merge.</p><p><a id="contributeLink" href="#" target="_blank" rel="noopener">Open the pull request on GitHub</a></p><p class="sub">A copy has also been downloaded, in case you would rather upload it by hand.</p></div>
@@ -432,7 +437,10 @@ const DONE = <!--donestates-->;
 
 
 def create_app(session: Session) -> FastAPI:
-    app = base.create_app(session, _PAGE, client_script("sitting.js"))
+    page = _PAGE.replace("<!--noteschars-->", str(base.NOTES_MAX_CHARS)).replace(
+        "<!--authorchars-->", str(AUTHOR_MAX_CHARS)
+    )
+    app = base.create_app(session, page, client_script("sitting.js"))
     app.title = "Review"
 
     @app.get("/api/review-states")

@@ -19,8 +19,13 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.claims import UnknownRef
 from analysis_service.controls import (
+    ALIASES_FULL,
     ATTRIBUTE_STATEMENTS,
     EVIDENCE_ID,
+    MAX_CONTROL_ALIASES,
+    MAX_CONTROL_EVIDENCE_CEILING,
+    MAX_CONTROL_ROWS,
+    ROWS_FULL,
     SCOPE_FACT_KINDS,
     Control,
     ControlDocument,
@@ -30,6 +35,7 @@ from analysis_service.controls import (
     ControlScope,
     EvidenceFile,
     ScopeType,
+    evidence_full,
 )
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import FactAnswer
@@ -206,8 +212,17 @@ def page_data(limits: ControlLimits) -> dict[str, object]:
             "max_controls": limits.max_controls,
             "max_evidence": limits.max_evidence,
             "max_evidence_bytes": limits.max_evidence_bytes,
+            "max_aliases": MAX_CONTROL_ALIASES,
+            "max_rows": MAX_CONTROL_ROWS,
             "name_chars": MAX_LABEL_CHARS,
             "value_chars": CONTROL_VALUE_MAX_CHARS,
+        },
+        # The sentences a save over a count gets, which the page shows before
+        # it sends one.
+        "full": {
+            "aliases": ALIASES_FULL,
+            "rows": ROWS_FULL,
+            "evidence": evidence_full(limits.max_evidence),
         },
     }
 
@@ -218,7 +233,7 @@ class NewEvidence(BaseModel):
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    name: str
+    name: str = Field(max_length=MAX_LABEL_CHARS)
     evidence_class: EvidenceClass = Field(alias="class")
     text: str
 
@@ -242,14 +257,16 @@ class ControlSave(BaseModel):
     scope: ControlScope
     facts: list[FactAnswer]
     rows: list[ControlRow]
-    evidence: list[NewEvidence]
+    evidence: list[NewEvidence] = Field(max_length=MAX_CONTROL_EVIDENCE_CEILING)
 
 
 class ControlEdit(ControlSave):
     """The body of ``PUT /workspace/controls/{id}``: the Control as the editor
     wrote it, each held file by its ID, and the ``updated_at`` it read."""
 
-    evidence: list[HeldEvidence | NewEvidence]  # type: ignore[assignment]
+    evidence: list[HeldEvidence | NewEvidence] = Field(  # type: ignore[assignment]
+        max_length=MAX_CONTROL_EVIDENCE_CEILING
+    )
     updated_at: datetime
 
 

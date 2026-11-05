@@ -19,7 +19,7 @@ from analysis_service.answer_shares import SharedAnswer, check_shares
 from analysis_service.answer_state import Answers, SavedAnswers
 from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
 from analysis_service.jobs import JobRecord
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import ELEMENT_ID_MAX_CHARS, SystemModel
 from evals.harness.early_rounds import paused_state
 from tests.factories import sample_report, sample_selection, sample_threat, valid_model
 from tests.test_api import admit, auth, make_client
@@ -71,6 +71,11 @@ def _save(held: AnswerSet, given: SentAnswers) -> AnswerSet:
 
 def _values(answers: AnswerSet) -> dict[str, str]:
     return {fact.key[0]: fact.value for fact in answers.facts}
+
+
+def test_a_covered_element_over_the_id_bound_is_refused():
+    with pytest.raises(ValidationError):
+        _share("mTLS", "process:" + "a" * ELEMENT_ID_MAX_CHARS)
 
 
 def test_one_answer_covers_two_parts_and_leaves_a_third_unknown():

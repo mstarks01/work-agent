@@ -176,6 +176,7 @@ from analysis_service.config_files import (
 from analysis_service.controls import (
     CONTROL_ID,
     CONTROL_ID_PATTERN,
+    MAX_CONTROLS_CEILING,
     Control,
     ControlLimits,
     ControlScope,
@@ -266,6 +267,7 @@ from analysis_service.sources import (
     ANSWERS_LABEL,
     FORMATS,
     MAX_LABEL_CHARS,
+    MAX_SOURCES_CEILING,
     MAX_SYSTEM_NAME_CHARS,
     OWNER_FILE_ID,
     SourceFormat,
@@ -843,12 +845,12 @@ class _Submission(BaseModel):
     #: :meth:`~analysis_service.job_answers.JobAnswers.owner_file_sources`
     #: refuses more of them than the deployment's source limit.
     owner_files: list[Annotated[str, Field(pattern=OWNER_FILE_ID)]] = Field(
-        default_factory=list
+        default_factory=list, max_length=MAX_SOURCES_CEILING
     )
     #: The Controls the new job copies (ADR 0127). Only this route takes
     #: them: ``POST /v1/jobs`` has no Controls.
     controls: list[Annotated[str, Field(pattern=CONTROL_ID)]] = Field(
-        default_factory=list
+        default_factory=list, max_length=MAX_CONTROLS_CEILING
     )
 
 
@@ -858,7 +860,7 @@ class _AliasBody(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    alias: str
+    alias: str = Field(max_length=MAX_LABEL_CHARS)
 
 
 #: The ``control_scopes`` key of an ``/answer`` body (ADR 0124). Only this

@@ -606,6 +606,10 @@ class TestKeepThisName:
             headers=SAME_ORIGIN,
         )
 
+    def test_an_alias_over_the_label_bound_is_refused(self, owner):
+        billing = owner.keep("Billing", {"type": "process", "name": "Billing"})
+        assert self.alias(owner, billing, "a" * 201).status_code == 400
+
     def test_the_alias_is_appended_once(self, owner):
         billing = owner.keep("Billing", {"type": "process", "name": "Billing"})
         kept = self.alias(owner, billing, "Web App")

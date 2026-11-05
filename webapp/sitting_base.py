@@ -85,12 +85,17 @@ class OwnList(BaseModel):
     items: list[Line] = Field(default_factory=list, max_length=200)
 
 
+#: The longest note one case's progress holds. The sitting page's notes box
+#: takes the same bound.
+NOTES_MAX_CHARS = 4000
+
+
 class Progress(BaseModel):
     model_config = ConfigDict(extra="forbid")
     case: CaseId
     marks: dict[Line, sittings.Mark] = Field(default_factory=dict, max_length=200)
     missing: list[Line] = Field(default_factory=list, max_length=200)
-    notes: str = Field(default="", max_length=4000)
+    notes: str = Field(default="", max_length=NOTES_MAX_CHARS)
 
 
 @dataclass

@@ -11,11 +11,13 @@ from pydantic import ValidationError
 from analysis_service.analysis import CONTROL_ATTRIBUTES
 from analysis_service.capabilities import CAPABILITIES
 from analysis_service.controls import (
+    ALIASES_FULL,
     ATTRIBUTE_STATEMENTS,
     MAX_CONTROL_ALIASES,
     MAX_CONTROL_FACTS,
     MAX_CONTROL_ROWS,
     PROTECTIVE_ATTRIBUTES,
+    ROWS_FULL,
     Control,
     ControlDocument,
     ControlLimits,
@@ -197,7 +199,10 @@ class TestTheDocument:
     def test_the_rows_take_a_fixed_bound(self):
         rows = [row(unit.id) for unit in PACKAGES["asvs"].units][: MAX_CONTROL_ROWS + 1]
         assert ControlDocument.model_validate(document(rows=rows[:-1]))
-        assert "rows\n  List should have at most" in refusal(rows=rows)
+        assert ROWS_FULL in refusal(rows=rows)
+
+    def test_a_fact_with_a_detail_is_refused(self):
+        assert "takes no detail" in refusal(facts=[fact() | {"detail": "but not logs"}])
 
     def test_the_protective_attributes_are_the_control_attributes_of_a_scope(self):
         # Each control attribute that a scope's element holds is protective,
@@ -295,9 +300,7 @@ class TestTheDocument:
         aliases = [f"alias {at}" for at in range(MAX_CONTROL_ALIASES + 1)]
         scope = {"type": "store", "name": "Orders DB", "aliases": aliases[:-1]}
         assert ControlDocument.model_validate(document(scope=scope))
-        assert "scope.aliases\n  List should have at most" in refusal(
-            scope={**scope, "aliases": aliases}
-        )
+        assert ALIASES_FULL in refusal(scope={**scope, "aliases": aliases})
 
 
 LIMITS = ControlLimits(max_controls=50, max_evidence=2, max_evidence_bytes=102_400)
@@ -484,3 +487,13 @@ def test_a_hostile_line_is_read_in_linear_time(line):
     started = time.perf_counter()
     credential_hit(line)
     assert time.perf_counter() - started < 1
+
+
+def test_a_pause_save_ticks_at_most_one_model_of_elements():
+    from analysis_service.job_controls import ControlScopeEntry
+    from analysis_service.validation import MAX_ELEMENTS
+
+    ticked = [f"store:part-{n}" for n in range(MAX_ELEMENTS + 1)]
+    assert ControlScopeEntry(control=CONTROL_ID, ticked=ticked[:-1])
+    with pytest.raises(ValidationError):
+        ControlScopeEntry(control=CONTROL_ID, ticked=ticked)

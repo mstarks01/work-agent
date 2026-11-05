@@ -104,11 +104,19 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.config_files import read_toml, validation_problems
-from analysis_service.controls import ControlLimits
+from analysis_service.controls import (
+    MAX_CONTROL_EVIDENCE_CEILING,
+    MAX_CONTROLS_CEILING,
+    ControlLimits,
+)
 from analysis_service.errors import ConfigError
 from analysis_service.parsing import is_version
 from analysis_service.retry import RetryBudget, RetryPolicy
-from analysis_service.sources import SourceLimits
+from analysis_service.sources import (
+    MAX_SOURCE_BYTES_CEILING,
+    MAX_SOURCES_CEILING,
+    SourceLimits,
+)
 from analysis_service.vendors import UPSTREAM_SLUG
 
 # The only schema version this loader accepts. The version check fires before
@@ -204,8 +212,11 @@ class ResilienceConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: int = Field(ge=1)
-    attempts: int = Field(ge=1)
-    timeout_ms: int = Field(gt=0)
+    #: Each bound has a ceiling as well as a floor, so a typing slip cannot
+    #: lift a bound out of reach. The Settings page reads both from here
+    #: (:func:`numeric_bounds`).
+    attempts: int = Field(ge=1, le=10)
+    timeout_ms: int = Field(gt=0, le=3_600_000)
     #: The bounds a request pinned to a named upstream reads, keyed by the
     #: gateway's slug for it. :meth:`request_timeout_seconds` and
     #: :meth:`deadline_seconds` read a row where a tier's ``[upstreams]`` pin
@@ -213,22 +224,22 @@ class ResilienceConfig(BaseModel):
     #: other request and job. Required and empty-able rather than defaulted, so
     #: a file states whether it has one.
     bounds_by_upstream: dict[str, UpstreamBounds]
-    max_source_bytes: int = Field(gt=0)
-    max_sources: int = Field(ge=1)
+    max_source_bytes: int = Field(gt=0, le=MAX_SOURCE_BYTES_CEILING)
+    max_sources: int = Field(ge=1, le=MAX_SOURCES_CEILING)
     #: How many Owner Files one owner keeps (ADR 0118). Owner Files do not
     #: expire, so this bound keeps one owner's store finite.
-    max_owner_files: int = Field(ge=1)
+    max_owner_files: int = Field(ge=1, le=10_000)
     #: How many Controls one owner keeps, and how many evidence files one
     #: Control holds (ADR 0127). Controls do not expire either.
-    max_controls: int = Field(ge=1)
-    max_control_evidence: int = Field(ge=1)
-    job_deadline_ms: int = Field(gt=0)
+    max_controls: int = Field(ge=1, le=MAX_CONTROLS_CEILING)
+    max_control_evidence: int = Field(ge=1, le=MAX_CONTROL_EVIDENCE_CEILING)
+    job_deadline_ms: int = Field(gt=0, le=86_400_000)
     retry_budget_ratio: float = Field(gt=0, le=1)
-    max_active_jobs: int = Field(ge=1)
-    budget_window_seconds: int = Field(gt=0)
-    max_jobs_per_window: int = Field(ge=1)
-    max_tokens_per_window: int = Field(ge=1)
-    global_max_tokens_per_window: int = Field(ge=1)
+    max_active_jobs: int = Field(ge=1, le=100)
+    budget_window_seconds: int = Field(gt=0, le=2_592_000)
+    max_jobs_per_window: int = Field(ge=1, le=100_000)
+    max_tokens_per_window: int = Field(ge=1, le=10**12)
+    global_max_tokens_per_window: int = Field(ge=1, le=10**12)
 
     @model_validator(mode="after")
     def _check_upstream_keys(self) -> Self:
@@ -340,6 +351,18 @@ class ResilienceConfig(BaseModel):
         second copy of itself.
         """
         return self._pinned("timeout_ms", upstreams, self.timeout_ms) / 1000
+
+
+def numeric_bounds(field: str) -> tuple[float | None, float | None]:
+    """The least and the largest value of ``field`` that :class:`ResilienceConfig`
+    takes, from its schema. ``None`` where a bound is absent, or is an
+    exclusive floor of a decimal. An exclusive floor of an integer is the next
+    integer."""
+    schema = ResilienceConfig.model_json_schema()["properties"][field]
+    least = schema.get("minimum")
+    if least is None and schema["type"] == "integer" and "exclusiveMinimum" in schema:
+        least = schema["exclusiveMinimum"] + 1
+    return least, schema.get("maximum")
 
 
 def _override(

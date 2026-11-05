@@ -113,7 +113,10 @@ function change(row, value) {
 
 function textControl(row) {
   const placeholder = row.example ? `e.g. ${row.example}` : "Not set";
-  const attrs = { type: "text", "aria-label": row.label, value: pending(row) ?? "", placeholder };
+  const attrs = {
+    type: "text", "aria-label": row.label, value: pending(row) ?? "", placeholder,
+    maxlength: String(SETTINGS.value_chars),
+  };
   if (suggests(row)) attrs.list = `models-${suggests(row)}`;
   const input = h("input", attrs);
   input.addEventListener("input", () => change(row, input.value));
@@ -125,12 +128,22 @@ function textControl(row) {
   return input;
 }
 
+// The server states each bound, and the save refuses a value outside it.
+function rangeError(row, number) {
+  const low = row.min ?? -Infinity;
+  const high = row.max ?? Infinity;
+  if (number >= low && number <= high) return null;
+  if (row.min == null) return `Enter a number of ${row.max.toLocaleString()} or less.`;
+  return `Enter a number from ${row.min.toLocaleString()} to ${row.max.toLocaleString()}.`;
+}
+
 function numberError(row, value) {
   if (row.numeric === "integer") {
     return /^-?\d+$/.test(value) && Number.isSafeInteger(Number(value))
-      ? null : "Enter a whole number.";
+      ? rangeError(row, Number(value)) : "Enter a whole number.";
   }
-  return value !== "" && Number.isFinite(Number(value)) ? null : "Enter a number.";
+  return value !== "" && Number.isFinite(Number(value))
+    ? rangeError(row, Number(value)) : "Enter a number.";
 }
 
 function markNumber(row, input, note) {
@@ -149,6 +162,8 @@ function numberControl(row) {
     inputmode: row.numeric === "integer" ? "numeric" : "decimal",
     step: row.numeric === "integer" ? "1" : "any",
   };
+  if (row.min != null) attrs.min = String(row.min);
+  if (row.max != null) attrs.max = String(row.max);
   if (row.example) attrs.placeholder = `e.g. ${row.example}`;
   const input = h("input", attrs);
   const note = h("small", { class: "field-error", id: `error-${row.key.replaceAll(".", "-")}` });
@@ -246,6 +261,7 @@ function keyControl(row) {
     type: "password",
     "aria-label": row.label,
     autocomplete: "off",
+    maxlength: String(SETTINGS.value_chars),
     placeholder: row.key_saved ? "Type a key to replace the saved key" : "Type the key",
   });
   input.value = changes.get(row.key) ?? "";

@@ -18,6 +18,7 @@ from analysis_service.controls import ControlLimits
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.resilience import (
     ATTEMPTS_VAR,
+    ENV_OVERRIDES,
     JOB_DEADLINE_MS_VAR,
     MAX_ACTIVE_JOBS_VAR,
     MAX_CONTROL_EVIDENCE_VAR,
@@ -30,6 +31,7 @@ from analysis_service.resilience import (
     ResilienceConfig,
     ResilienceConfigError,
     load_resilience,
+    numeric_bounds,
 )
 from tests.factories import secret_env, translator_of
 
@@ -531,3 +533,31 @@ def test_the_environment_overrides_the_control_bounds(tmp_path):
     assert loaded.control_limits() == ControlLimits(
         max_controls=7, max_evidence=3, max_evidence_bytes=102400
     )
+
+
+@pytest.mark.parametrize("field", list(ENV_OVERRIDES))
+def test_each_bound_has_a_ceiling_that_the_shipped_file_keeps_under(field):
+    _, most = numeric_bounds(field)
+    assert most is not None
+    shipped = load_resilience(CONFIG_PATH, env={})
+    assert getattr(shipped, field) <= most
+    with pytest.raises(ValueError):
+        config(**{field: most * 2})
+
+
+def test_an_exclusive_integer_floor_is_the_next_integer():
+    assert numeric_bounds("timeout_ms") == (1, 3_600_000)
+    assert numeric_bounds("attempts") == (1, 10)
+    assert numeric_bounds("retry_budget_ratio") == (None, 1)
+
+
+def test_the_configuration_guide_states_each_ceiling():
+    guide = (PROJECT_ROOT / "docs" / "Configuration.md").read_text(encoding="utf-8")
+    for field, (var, _) in ENV_OVERRIDES.items():
+        _, most = numeric_bounds(field)
+        row = next(
+            line for line in guide.splitlines() if line.startswith(f"| `{var}` |")
+        )
+        stated = row.rstrip(" |").rsplit("|", 1)[1].split(" to ")[-1]
+        stated = stated.replace(",", "").replace("10<sup>12</sup>", str(10**12))
+        assert float(stated) == most, var

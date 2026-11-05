@@ -1039,6 +1039,16 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
             page.locator(f'tr[data-key="{row}"] input').get_attribute("placeholder")
             for row in ("credentials.vertex.location", "credentials.openai.api_key")
         )
+        attempts = page.locator('tr[data-key="resilience.attempts"] input')
+        bounds = (attempts.get_attribute("min"), attempts.get_attribute("max"))
+        attempts.fill("11")
+        page.locator("#settings-search").click()
+        over = page.locator('tr[data-key="resilience.attempts"] .field-error')
+        over_text = over.inner_text()
+        attempts.fill("3")
+        text_bound = page.locator(
+            'tr[data-key="credentials.vertex.location"] input'
+        ).get_attribute("maxlength")
         page.fill("#settings-search", "timeout")
         found = page.locator("#settings-rows tr[data-key]").all_inner_texts()
         page.set_viewport_size({"width": 390, "height": 844})
@@ -1054,6 +1064,9 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
     assert key is not None and "e.g." not in key
     assert found and all("imeout" in row for row in found)
     assert fits
+    assert bounds == ("1", "10")
+    assert over_text == "Enter a number from 1 to 10."
+    assert text_bound == "4096"
 
 
 def test_the_settings_page_saves_resets_and_refuses_a_stale_tab(browser, tmp_path):
@@ -2264,6 +2277,29 @@ def save_control(page) -> None:
           .some((link) => link.textContent === name)""",
         arg=name,
     )
+
+
+def test_the_controls_page_refuses_an_alias_or_a_row_over_its_count(page):
+    from analysis_service.controls import (
+        ALIASES_FULL,
+        MAX_CONTROL_ALIASES,
+        MAX_CONTROL_ROWS,
+        ROWS_FULL,
+    )
+
+    page.goto("/controls")
+    new_control(page, "SSO")
+    for number in range(MAX_CONTROL_ALIASES + 1):
+        page.fill("#alias-input", f"alias {number}")
+        page.press("#alias-input", "Enter")
+    aliases = page.locator(".aliases .tag").count()
+    alias_refusal = page.inner_text("#editor-problem")
+    for _ in range(MAX_CONTROL_ROWS + 1):
+        page.click("#add-row")
+    rows = page.locator("#rows-list li").count()
+    row_refusal = page.inner_text("#editor-problem")
+    assert (aliases, alias_refusal) == (MAX_CONTROL_ALIASES, ALIASES_FULL)
+    assert (rows, row_refusal) == (MAX_CONTROL_ROWS, ROWS_FULL)
 
 
 def test_the_controls_page_saves_each_card_and_shows_values_as_text(page):

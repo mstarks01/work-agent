@@ -23,6 +23,14 @@ from analysis_service.claims import (
     ReturnedClaim,
     Verdict,
 )
+from analysis_service.controls import (
+    ALIASES_FULL,
+    MAX_CONTROL_ALIASES,
+    MAX_CONTROL_EVIDENCE_CEILING,
+    MAX_CONTROL_ROWS,
+    ROWS_FULL,
+    evidence_full,
+)
 from analysis_service.frameworks.asvs.catalog import requirement_text
 from analysis_service.jobs import PipelineCompleted
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT
@@ -286,6 +294,18 @@ class TestCreate:
         refused = create(owner, owner_id="someone")
         assert refused.status_code == 400
 
+    def test_a_fact_with_a_detail_is_refused(self, owner):
+        refused = create(owner, facts=[fact() | {"detail": "but not the logs"}])
+        assert refused.status_code == 400
+        assert refused.json()["message"] == "A fact of a Control takes no detail."
+
+    def test_a_list_of_evidence_over_the_ceiling_is_refused(self, owner):
+        sent = [
+            {"name": f"{number}.txt", "class": "people", "text": "signed\n"}
+            for number in range(MAX_CONTROL_EVIDENCE_CEILING + 1)
+        ]
+        assert create(owner, evidence=sent).status_code == 400
+
 
 class TestReplace:
     def test_an_edit_replaces_the_control_and_keeps_named_evidence(self, owner):
@@ -394,6 +414,14 @@ class TestThePage:
             "tampering",
         }
         assert payload["limits"]["max_controls"] == LIMITS.max_controls
+        # The page checks each count with the sentence the save refuses with.
+        assert payload["limits"]["max_aliases"] == MAX_CONTROL_ALIASES
+        assert payload["limits"]["max_rows"] == MAX_CONTROL_ROWS
+        assert payload["full"] == {
+            "aliases": ALIASES_FULL,
+            "rows": ROWS_FULL,
+            "evidence": evidence_full(LIMITS.max_evidence),
+        }
         # A STRIDE finding always names a part; an ASVS finding may name none.
         assert payload["units"]["stride"]["names_a_part"] is True
         assert payload["units"]["asvs"]["names_a_part"] is False

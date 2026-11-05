@@ -91,6 +91,26 @@ class TestTheRows:
                 SETTINGS[key].mark,
             )
 
+    def test_each_numeric_entry_carries_the_bounds_the_loader_takes(self, tmp_path):
+        from analysis_service.config_files import MAX_VALUE_CHARS
+        from analysis_service.store_backends import MAX_RETENTION_DAYS
+
+        data = page_data(client_for(tmp_path, hand_written()).get("/settings"))
+        rows = {row["key"]: row for row in data["rows"]}
+        assert data["value_chars"] == MAX_VALUE_CHARS
+        assert (
+            rows["resilience.attempts"]["min"],
+            rows["resilience.attempts"]["max"],
+        ) == (
+            1,
+            10,
+        )
+        assert rows["resilience.retry_budget_ratio"]["max"] == 1
+        assert rows["store.retention_days"]["max"] == MAX_RETENTION_DAYS
+        assert all(
+            row["max"] is not None for row in rows.values() if row.get("numeric")
+        )
+
     def test_each_entry_that_no_selection_hides_shows(self, tmp_path):
         rows = rows_of(client_for(tmp_path, hand_written()))
 

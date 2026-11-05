@@ -1240,22 +1240,25 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 
 ### Resilience overrides
 
-| Variable | Effect |
-| --- | --- |
-| `ANALYSIS_RETRY_ATTEMPTS` | Total attempts per LLM call. |
-| `ANALYSIS_TIMEOUT_MS` | Per-request timeout, milliseconds, for a request pinned to no upstream with a row in `[bounds_by_upstream]`. |
-| `ANALYSIS_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. |
-| `ANALYSIS_MAX_SOURCES` | How many sources one job may carry. |
-| `ANALYSIS_MAX_OWNER_FILES` | How many Owner Files one owner keeps in the web app's Files section. |
-| `ANALYSIS_MAX_CONTROLS` | How many Controls one owner keeps in the web app's Controls section. |
-| `ANALYSIS_MAX_CONTROL_EVIDENCE` | How many evidence files one Control holds. |
-| `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds, where no pinned upstream has a row in `[bounds_by_upstream]`. Turn it down to shed load. |
-| `ANALYSIS_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
-| `ANALYSIS_BUDGET_WINDOW_SECONDS` | Width of the rolling budget window. |
-| `ANALYSIS_MAX_JOBS_PER_WINDOW` | Jobs one owner may start per window. Turn it down to shed load. |
-| `ANALYSIS_MAX_TOKENS_PER_WINDOW` | Tokens one owner may commit per window. |
-| `ANALYSIS_GLOBAL_MAX_TOKENS_PER_WINDOW` | Tokens every owner may commit per window, together. Turn it down to protect a provider quota mid-incident. |
-| `ANALYSIS_MAX_ACTIVE_JOBS` | Jobs one owner may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. |
+| Variable | Effect | Range |
+| --- | --- | --- |
+| `ANALYSIS_RETRY_ATTEMPTS` | Total attempts per LLM call. | 1 to 10 |
+| `ANALYSIS_TIMEOUT_MS` | Per-request timeout, milliseconds, for a request pinned to no upstream with a row in `[bounds_by_upstream]`. | 1 to 3,600,000 |
+| `ANALYSIS_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. | 1 to 10,485,760 |
+| `ANALYSIS_MAX_SOURCES` | How many sources one job may carry. | 1 to 100 |
+| `ANALYSIS_MAX_OWNER_FILES` | How many Owner Files one owner keeps in the web app's Files section. | 1 to 10,000 |
+| `ANALYSIS_MAX_CONTROLS` | How many Controls one owner keeps in the web app's Controls section. | 1 to 1,000 |
+| `ANALYSIS_MAX_CONTROL_EVIDENCE` | How many evidence files one Control holds. | 1 to 100 |
+| `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds, where no pinned upstream has a row in `[bounds_by_upstream]`. Turn it down to shed load. | 1 to 86,400,000 |
+| `ANALYSIS_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. | over 0, to 1 |
+| `ANALYSIS_BUDGET_WINDOW_SECONDS` | Width of the rolling budget window. | 1 to 2,592,000 |
+| `ANALYSIS_MAX_JOBS_PER_WINDOW` | Jobs one owner may start per window. Turn it down to shed load. | 1 to 100,000 |
+| `ANALYSIS_MAX_TOKENS_PER_WINDOW` | Tokens one owner may commit per window. | 1 to 10<sup>12</sup> |
+| `ANALYSIS_GLOBAL_MAX_TOKENS_PER_WINDOW` | Tokens every owner may commit per window, together. Turn it down to protect a provider quota mid-incident. | 1 to 10<sup>12</sup> |
+| `ANALYSIS_MAX_ACTIVE_JOBS` | Jobs one owner may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. | 1 to 100 |
+
+The loader refuses a value outside its range, and so does a save on the
+Settings page. The page shows each range and checks it before it saves.
 
 ### How strictly each override family is checked
 

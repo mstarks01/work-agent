@@ -406,6 +406,14 @@ class LimitBreach:
     message: str
 
 
+#: The largest byte budget and source count a deployment can set
+#: (``resilience.toml``). A body field that holds a source's text, or lists
+#: sources, takes these as its static bound; the deployment's own limit then
+#: refuses with its sentence.
+MAX_SOURCE_BYTES_CEILING = 10 * 1024 * 1024
+MAX_SOURCES_CEILING = 100
+
+
 @dataclass(frozen=True)
 class SourceLimits:
     """One deployment's bounds on what a single job may carry.

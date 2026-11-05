@@ -72,6 +72,7 @@ from analysis_service.system_model import (
     element_prefix,
     is_zone,
 )
+from analysis_service.validation import MAX_ELEMENTS
 
 #: How a scope that applies reached its element. ``application`` needs no
 #: element; ``owner-mapped`` is an element the owner chose at the pause.
@@ -254,7 +255,7 @@ class ControlScopeEntry(BaseModel):
 
     control: str = Field(pattern=CONTROL_ID)
     element: Annotated[str, Field(max_length=ELEMENT_ID_MAX_CHARS)] = ""
-    ticked: list[_ElementId] = Field(default_factory=list)
+    ticked: list[_ElementId] = Field(default_factory=list, max_length=MAX_ELEMENTS)
 
 
 @dataclass(frozen=True)

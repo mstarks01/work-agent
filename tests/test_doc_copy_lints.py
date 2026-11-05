@@ -286,7 +286,9 @@ def test_the_resilience_override_table_is_every_variable_the_loader_reads():
     """Both directions: each ``*_VAR`` the module defines is listed, and each
     listed variable changes what the loader returns."""
     text = section(CONFIGURATION, "### Resilience overrides")
-    documented = {backticked(row[0])[0] for row in table(text, "Variable", "Effect")}
+    documented = {
+        backticked(row[0])[0] for row in table(text, "Variable", "Effect", "Range")
+    }
     defined = {
         getattr(resilience, name) for name in dir(resilience) if name.endswith("_VAR")
     }

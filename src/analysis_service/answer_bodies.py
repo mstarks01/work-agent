@@ -48,6 +48,7 @@ from analysis_service.fact_answers import (
     SkipKey,
 )
 from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
+from analysis_service.sources import MAX_SOURCE_BYTES_CEILING
 
 __all__ = [
     "AmendmentSubmission",
@@ -116,7 +117,9 @@ class AmendmentSubmission(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    text: str
+    #: The deployment's byte budget refuses a longer text with its sentence;
+    #: this bound is the largest budget any deployment can set.
+    text: str = Field(max_length=MAX_SOURCE_BYTES_CEILING)
     revision: Revision
 
 
