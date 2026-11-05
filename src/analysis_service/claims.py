@@ -123,13 +123,17 @@ VERDICT_WORDS: Mapping[VerdictStatus, str] = MappingProxyType(
 
 #: How the report page reads the verdict of a claim on a unit's row, for a
 #: framework that answers in units: a label and what it means. No verdict here
-#: reports a pass, and the words say so.
+#: reports a pass, so a confirmed claim on a unit reads as a gap. The other
+#: labels are the finding labels.
 UNIT_VERDICT_WORDS: Mapping[VerdictStatus, tuple[str, str]] = MappingProxyType(
     {
         "confirmed": ("Gap", "Applies, and the input does not show it satisfied."),
-        "needs-info": ("Needs info", "Applies, and the input does not settle it."),
+        "needs-info": (
+            VERDICT_WORDS["needs-info"],
+            "Applies, and the input does not settle it.",
+        ),
         "rejected": (
-            "Rejected",
+            VERDICT_WORDS["rejected"],
             "The critic ruled this draft out. The reason says which check ended it.",
         ),
     }

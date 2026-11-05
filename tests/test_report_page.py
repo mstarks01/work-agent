@@ -735,7 +735,7 @@ def test_each_word_table_answers_for_its_whole_vocabulary(table, vocabulary):
 )
 def test_the_page_reads_the_service_s_verdict_words(island, table, words):
     """The page labels a verdict with the words the server sends, which the
-    Markdown export reads too. The page holds no verdict words of its own."""
+    Markdown export reads too."""
     from analysis_service import claims
     from tests.test_webapp import viewer_javascript
 
@@ -744,17 +744,24 @@ def test_the_page_reads_the_service_s_verdict_words(island, table, words):
         page(),
     )
     assert json.loads(sent) == json.loads(json.dumps(dict(getattr(claims, words))))
-    script = viewer_javascript()
     assert re.search(
         rf'const {table} = JSON\.parse\(document\.getElementById\("{island}"\)',
-        script,
+        viewer_javascript(),
     )
-    words = [
+
+
+def test_the_page_script_holds_no_verdict_words():
+    """The page holds no copy of the verdict words the server sends it."""
+    from analysis_service import claims
+    from tests.test_webapp import viewer_javascript
+
+    script = viewer_javascript()
+    labels = [
         *claims.VERDICT_WORDS.values(),
-        *(word for pair in claims.UNIT_VERDICT_WORDS.values() for word in pair),
+        *(text for pair in claims.UNIT_VERDICT_WORDS.values() for text in pair),
     ]
-    for word in words:
-        assert f'"{word}"' not in script, word
+    for label in labels:
+        assert f'"{label}"' not in script, label
 
 
 def test_the_page_reads_the_service_s_severity_order():
