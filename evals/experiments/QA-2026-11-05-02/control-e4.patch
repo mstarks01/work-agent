@@ -1,0 +1,11 @@
+--- a/prompts/recritic.md
++++ b/prompts/recritic.md
+@@ -36,7 +36,7 @@
+ 
+ ## Procedure
+ 
+-1. Take the problems one at a time. Each names a draft ID and its fault.
++1. Take the problems one at a time. Each names a draft ID and the fault: a draft you never ruled on, a ruling for an ID no lane agent produced, a duplicate ID, a verdict whose fields do not fit together, a `confirmed` ruling on a draft that rules its unit out, or a `needs-info` unknown naming an element the model does not contain or an attribute that element does not have.
+ 2. For a **dropped** draft, add its ruling back with the verdict you intended — rule it now if you never did, grounded in the model facts exactly as in the first pass.
+ 3. For an **invented** draft — an ID no lane agent produced — return no ruling for it. The service drops your first pass's copy. You do not add claims the agents missed; that was true in the first pass and is true here.
+ 4. For a **duplicate ID**, return one ruling for it: the one that belongs to the draft that ID names.

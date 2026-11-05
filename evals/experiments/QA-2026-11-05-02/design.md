@@ -215,3 +215,68 @@ does not count it.
 **E3:** 12 of 12 repaired, 0 new problems, 0 unbriefed changes, 0 status
 changes, 0 unread answers. `row-on-other-step` is repaired 4 of 4. The
 falsifier does not hold, so the hypothesis is supported.
+
+## E4 design, fixed before the first call
+
+PR #2192 (`b8319a8f`) cut the list of faults from step 1 of
+`prompts/recritic.md` to fit the token cap. Step 1 now reads "Each names a
+draft ID and its fault." No run measured that cut on the fault kinds other
+than the Control row. A standards read also found that step 8 covers a
+Control row problem only "on a ruling with no `rejected_because`". So a ruling
+rejected for `control` with a row unanswered, or with a row it was not shown,
+has no step. The maintainer ruled on 2026-11-05: measure it. The maintainer's
+$2.00 grant of 2026-11-05 covers E4: spent $1.2564; E4 cap $0.50.
+
+**The question.** Does the cut of the step 1 list make the re-ask repair fewer
+faults of the other kinds, or add problems or unbriefed changes?
+
+**The instrument.** `run.py recritic-replay` with the eleven fault shapes of
+#2196. The first pass is case 05's, as in E1 to E3, from the same archive and
+with the same Control. `faults-e4.json` is `faults.json` with `covers`: the
+reason a ruling of I-02 rejected for `control` gives.
+
+**The seven views**, one fault each:
+
+- On I-01 (a `needs-info` draft that is shown no Control row): `dropped`,
+  `invented`, `duplicate-id`, `verdict-shape` and `unresolved-unknown`.
+- On I-02, rejected for `control` on its `information-disclosure` row:
+  `control-row-missing` (no `control_row`, so the row is unanswered) and
+  `control-row-not-shown` (`refused_controls` also names the `repudiation`
+  row, which I-02 was not shown).
+
+Offline, the round's check names exactly the expected problems for each view
+(`EXPECTED` in `evals/harness/recritic_replay.py`), and the command refuses a
+view otherwise.
+
+**The sixth kind is not run.** A `confirmed` ruling on a draft that rules its
+unit out needs a draft that excludes its unit. No STRIDE draft does that
+(`Claim.excludes` is the neutral answer), and no archive holds an ASVS first
+pass of case 05. So `confirmed-ruled-out` is refused on case 05, and E4
+measures five of the six other kinds. That view needs an ASVS archive.
+
+**The two arms.** Each arm runs the same seven views:
+
+- control: `prompts/recritic.md` with `control-e4.patch`. The patch puts back
+  the step 1 list of `b8319a8f^`. Step 8 stays as on `main`.
+- treatment: `prompts/recritic.md` as on `main`.
+
+The route is the route of E1 to E3: OpenRouter, `openai/flex` upstream,
+strong tier `openai/gpt-5.6-terra`. `run_e4.sh` runs repeat 1: each view once
+in each arm, the control first. It runs repeat 2 only if repeat 1 spent $0.20
+or less. It stops before a call that could take the total over $0.50 (the
+total plus $0.10). It stops on a non-zero exit, a missing charge or a credit
+error, and it does not switch route or model. Expected cost: about $0.02 a
+call, $0.30 for 14 calls.
+
+**The counting rule** is `count.sh` of E1, unchanged, read per arm and per
+fault kind. Each file is read by hand against its `count.sh` line before any
+total.
+
+**The falsifier.** The cut does harm if the treatment repairs fewer of the
+five other kinds' views than the control, or if the treatment has a new
+problem or an unbriefed change that the control does not have.
+
+**The two control-rejection views** are reported apart and do not enter the
+falsifier. Neither arm has a step for a Control row on a ruling rejected for
+`control`. A view the treatment does not repair says that step 8 needs to
+cover a `control` rejection.

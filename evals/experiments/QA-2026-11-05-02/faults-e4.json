@@ -1,0 +1,52 @@
+{
+  "control": {
+    "name": "Worker config file permissions",
+    "scope": {
+      "control": "control-55555555555555555555555555555555",
+      "outcome": "matched-by-name",
+      "element": "store:worker-config"
+    },
+    "rows": [
+      {
+        "framework": "stride",
+        "unit": "information-disclosure",
+        "version": "1.0",
+        "ticked": true
+      },
+      {
+        "framework": "stride",
+        "unit": "repudiation",
+        "version": "1.0",
+        "ticked": true
+      }
+    ],
+    "evidence": [
+      {
+        "id": "evidence-66666666666666666666666666666666",
+        "name": "worker.env",
+        "class": "config",
+        "sha256": "3e56b47771fc40840264abf72f5eeed5db8d7c7d7e0c0b8fb9648679aafd98cc",
+        "text": "# worker.env, deployed to the background worker host\n# file mode 0600, owner svc-worker, group svc-worker\nDATABASE_URL=postgres://worker@db.internal:5432/cookbook\nQUEUE_URL=amqp://worker@mq.internal:5672/jobs\n"
+      }
+    ]
+  },
+  "refused": {
+    "I-02": [
+      {
+        "control": "control-55555555555555555555555555555555",
+        "unit": "information-disclosure",
+        "reason": "worker.env states a file mode of 0600 for the worker account; it says nothing of encryption at rest or of the protection on the read-configuration flow the draft calls open."
+      }
+    ],
+    "R-03": [
+      {
+        "control": "control-55555555555555555555555555555555",
+        "unit": "repudiation",
+        "reason": "worker.env states who may read the file, not that a read is logged or attributed, which is what the draft calls missing."
+      }
+    ]
+  },
+  "covers": {
+    "I-02": "worker.env states file mode 0600 with owner and group svc-worker, so only the worker account reads the configuration the draft says other readers can reach."
+  }
+}
