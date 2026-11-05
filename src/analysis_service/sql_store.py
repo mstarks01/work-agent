@@ -1333,7 +1333,9 @@ class SqlJobStore:
 
         The objects go first, so the row never names a missing one, and they
         go again at once where admission refuses the job or raises. A failed
-        object delete there changes neither the refusal nor the error.
+        object delete there changes neither the refusal nor the error. The
+        admission of a child clears its parent's ``continue_refusal`` in the
+        same transaction (ADR 0125).
         """
         if principal is not None and principal.owner_id != record.owner_id:
             raise ValueError(f"job {record.id} names another owner than its principal")
@@ -1698,7 +1700,9 @@ class SqlJobStore:
         values = _job_row(record)
         # Only set_title writes the title after admission (ADR 0106), and
         # only set_continue_refusal and a child's admission write the
-        # continue refusal (ADR 0125).
+        # continue refusal (ADR 0125), as
+        # `test_a_continue_refusal_lands_only_on_the_owners_job_and_a_save_keeps_it`
+        # checks.
         del values["title"]
         del values["continue_refusal"]
         if record.report is not None and not _names(row, "report.json"):

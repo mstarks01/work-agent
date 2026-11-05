@@ -915,7 +915,7 @@ class TestTheAutomaticContinue:
         # The stream sends "continuing" where the continue still runs when
         # the run's events end, and the page follows "continued" either way.
         assert list(frames)[-1] == "continued"
-        assert "questions" not in frames
+        assert set(frames) <= {"continuing", "continued"}
         child = frames["continued"]["run"]
         assert ran(owner.client, child) == "completed"
         assert owner.answers_source(child) == [DB_LINE]
@@ -993,6 +993,7 @@ class TestTheAutomaticContinue:
         kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
         run_id, frames = self.continued(owner, aes, kms)
         assert list(frames)[-1] == "questions"
+        assert set(frames) <= {"continuing", "questions"}
         message = (
             "Two Controls write “encryption_at_rest” on Orders DB with two values:"
             " “AES-256” and “KMS”. Untick one, or edit one Control so that they"

@@ -2679,7 +2679,11 @@ async def _stream(
             yield _frame("continuing", {})
             await workspace.settled(run_id)
             # The continue stores its refusal, so the record is read again.
-            record = await workspace.envelope(answers, run_id)
+            try:
+                record = await workspace.envelope(answers, run_id)
+            except UnreadableSchema as refusal:
+                yield _frame("failed", {"message": str(refusal)})
+                return
             if record is None:
                 return
         child = await workspace.store.resumed_by(run_id, record.owner_id)

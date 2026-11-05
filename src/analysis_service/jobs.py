@@ -466,6 +466,9 @@ class JobRecord(BaseModel):
     # page's words (ADR 0125), or ``None``. Only
     # :meth:`JobStore.set_continue_refusal` writes it, and the admission of a
     # job that names this one as its parent clears it.
+    # ``test_a_continue_refusal_lands_only_on_the_owners_job_and_a_save_keeps_it``
+    # and ``test_a_child_s_admission_clears_the_parent_s_continue_refusal``
+    # check both.
     continue_refusal: str | None = None
     # What a paused job holds while it waits: the answers resume from it.
     checkpoint: Checkpoint | None = None
@@ -933,8 +936,9 @@ class JobStore(Protocol):
 
         A report is written once, and a save never clears or replaces it. A
         save only appends events, and never writes an envelope. A save keeps
-        the stored title and the stored continue refusal. :func:`check_save` raises :class:`ValueError` where a save breaks one
-        of these rules, and the store writes nothing.
+        the stored title and the stored continue refusal. :func:`check_save`
+        raises :class:`ValueError` where a save breaks one of these rules, and
+        the store writes nothing.
         """
         ...
 
@@ -1361,7 +1365,8 @@ class InMemoryJobStore:
         owner holds no principal where none is given is the caller's defect
         too, and it raises. Then the parent: the owner must hold it, no other
         child may lock it, and its revision must be the record's. Last,
-        :func:`check_bounds` checks the bounds.
+        :func:`check_bounds` checks the bounds. The admission of a child clears
+        its parent's ``continue_refusal`` in the same step (ADR 0125).
         """
         if principal is not None and principal.owner_id != record.owner_id:
             raise ValueError(f"job {record.id} names another owner than its principal")
