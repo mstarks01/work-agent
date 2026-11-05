@@ -67,7 +67,7 @@ not switch route or model. Expected cost: about $0.05 a call, $0.60 in all.
 
 `count.sh` reads each run file. For each call:
 
-- **repaired**: the answer was read (`refused` is empty), the merged set has
+- **repaired**: the answer was read (`schema_error` is empty), the merged set has
   no problem (`remaining` is empty), and the re-ask changed no ruling that no
   problem named (`drift` is empty);
 - **kept fault**: a remaining problem with the message that was sent;

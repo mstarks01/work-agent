@@ -5,8 +5,8 @@ set -eu
 for file in "$1"/"$2"-*.json; do
   jq -c --arg file "$(basename "$file")" '{
     file: $file,
-    read: (.refused == null),
-    repaired: (.refused == null and (.remaining | length) == 0 and (.drift | length) == 0),
+    read: (.schema_error == null),
+    repaired: (.schema_error == null and (.remaining | length) == 0 and (.drift | length) == 0),
     kept_fault: [.remaining[] | select(.message as $m | $m | IN($ARGS.named.p[]))] | length,
     new_problems: [.remaining[] as $r | select(.problems | index($r.message) | not) | $r] | length,
     drift: (.drift | length),
