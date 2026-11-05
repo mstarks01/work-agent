@@ -14,7 +14,7 @@ from typing import get_args
 import pytest
 
 from evals.critic_review import __main__ as critic_review
-from evals.harness import critic_replay, lane_replay, run
+from evals.harness import critic_replay, lane_replay, recritic_replay, run
 from evals.harness.archive import CaseKind, kind_of
 from evals.harness.bundle import case_file
 from evals.harness.modes import EvalRunError
@@ -154,6 +154,31 @@ def test_a_critic_replay_refuses_a_bad_out_before_the_call(
     )
 
     assert critic_replay.command_critic_replay(args) == 1
+    assert str(missing) in capsys.readouterr().err
+
+
+def test_a_recritic_replay_refuses_a_bad_out_before_the_call(
+    recorded,  # noqa: F811
+    case,  # noqa: F811
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    artifact = _swept(recorded)
+    monkeypatch.setattr(recritic_replay, "node_call", _spend_point)
+    missing = tmp_path / "missing"
+    args = argparse.Namespace(
+        artifact=artifact,
+        case=case.id,
+        framework="stride",
+        faults=tmp_path / "faults.json",
+        draft="S-01",
+        fault="row-unanswered",
+        accept_cost="unknown",
+        out=missing / "repair.json",
+    )
+
+    assert recritic_replay.command_recritic_replay(args) == 1
     assert str(missing) in capsys.readouterr().err
 
 

@@ -200,13 +200,8 @@
   const CONTROL_COVERED = ["Covered by a Control",
     "The owner states that a Control covers it. The service verified nothing."];
 
-  // The same for a claim's verdict, in this service's terms rather than the
-  // schema's. No verdict here reports a pass, and the wording says so.
-  const VERDICT_STATE = {
-    "confirmed": ["Gap", "Applies, and the input does not show it satisfied."],
-    "needs-info": ["Needs info", "Applies, and the input does not settle it."],
-    "rejected": ["Rejected", "The critic ruled this draft out. The reason says which check ended it."],
-  };
+  // The same for a claim's verdict, in the service's words (UNIT_VERDICT_WORDS).
+  const UNIT_VERDICT = JSON.parse(document.getElementById("unit_verdict_words").textContent);
 
   // A rejection for `evidence` or `control` rules on the unit a draft names:
   // for a framework that answers in units, `evidence` means the unit does not
@@ -315,13 +310,23 @@
   // holds a label and a colour for each level, and a test holds its keys to
   // the same set.
   const SEV_ORDER = JSON.parse(document.getElementById("severity_order").textContent);
-  const VERDICT = { confirmed: ["Confirmed","✓"], "needs-info": ["Needs info","?"], rejected: ["Rejected","✕"] };
+  // A finding's severity level and its mitigations' summaries, or nothing
+  // where its record declares no such field. The CSV export reads the same
+  // cells through `JUDGEMENT_CELLS`, and
+  // `test_the_report_page_reads_the_judgement_cells_the_csv_writes` holds the
+  // two to each other.
+  const severityLevel = (t) => (t.severity ? t.severity.level : "");
+  const mitigationSummaries = (t) => (t.mitigations || []).map((m) => m.summary);
+  // The label of each verdict status, in the service's words (VERDICT_LABELS),
+  // and the glyph beside it on a finding's row.
+  const VERDICT = JSON.parse(document.getElementById("verdict_labels").textContent);
+  const VERDICT_GLYPH = { "confirmed": "✓", "needs-info": "?", "rejected": "✕" };
   // What the tally says for each kind of change. A kind the table does not
   // hold throws, so it cannot render as a verdict.
   const CHANGE_LINE = {
     new: () => "new",
     unchanged: () => "unchanged",
-    changed: (c) => `${VERDICT[c.before][0]} \u2192 ${VERDICT[c.after][0]}`,
+    changed: (c) => `${VERDICT[c.before]} \u2192 ${VERDICT[c.after]}`,
     gone: () => "no longer raised",
   };
   const svar = (lvl) => `var(${SEV[lvl][1]})`;
@@ -473,7 +478,8 @@
       return `Information needed: ${waits[0].label}`;
     }
     if (t.verdict.status === "rejected") return "Dismissed";
-    return t.mitigations && t.mitigations.length ? prose(t.mitigations[0].summary) : "";
+    const [first] = mitigationSummaries(t);
+    return first ? prose(first) : "";
   };
 
   function findingBody(marks, t) {
@@ -484,7 +490,7 @@
     if (moved && moved.change === "new") {
       body.append(el("div", "meta", "New since the earlier report."));
     } else if (moved && moved.change === "changed") {
-      body.append(el("div", "meta", `Was ${VERDICT[moved.before][0]} in the earlier report.`));
+      body.append(el("div", "meta", `Was ${VERDICT[moved.before]} in the earlier report.`));
     }
     // A final report's owner changed an answer this finding rests on, after
     // the analysis ran; the analysis did not run again (ADR 0054).
@@ -498,18 +504,19 @@
     const facts = el("div", "badges");
     const lane = laneOf(t.framework, t);
     if (lane) facts.append(el("span", "cat", lane));
-    if (t.severity) {
+    const level = severityLevel(t);
+    if (level) {
       const sev = el("span", "chip");
       const swatch = el("span", "swatch");
-      swatch.style.background = svar(t.severity.level);
-      sev.append(swatch, SEV[t.severity.level][0]);
+      swatch.style.background = svar(level);
+      sev.append(swatch, SEV[level][0]);
       // A property assignment, not an attribute: there is no markup context
       // to escape out of.
-      sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact} → ${t.severity.level}`;
+      sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact} → ${level}`;
       facts.append(sev);
     }
-    const [vlabel, vglyph] = VERDICT[t.verdict.status];
-    facts.append(el("span", "chip verdict", `${vglyph} ${vlabel}`));
+    const status = t.verdict.status;
+    facts.append(el("span", "chip verdict", `${VERDICT_GLYPH[status]} ${VERDICT[status]}`));
     if (t.confidence) facts.append(el("span", "chip confidence", `confidence: ${t.confidence}`));
     body.append(facts);
 
@@ -561,9 +568,10 @@
 
     const next = el("div", "field");
     next.append(el("div", "lbl", RECOMMENDATIONS[t.verdict.status]));
-    if (t.mitigations && t.mitigations.length) {
+    const summaries = mitigationSummaries(t);
+    if (summaries.length) {
       const list = el("ul", "mits");
-      t.mitigations.forEach(m => list.append(proseEl("li", null, m.summary)));
+      summaries.forEach(summary => list.append(proseEl("li", null, summary)));
       next.append(list);
     } else if (marks.unmitigated.has(t.id)) {
       next.append(el("div", "caveat",
@@ -620,10 +628,11 @@
     row.id = findingId(t);
     const head = el("summary");
     const sev = el("span", "finding-sev");
-    if (t.severity) {
+    const level = severityLevel(t);
+    if (level) {
       const swatch = el("span", "swatch");
-      swatch.style.background = svar(t.severity.level);
-      sev.append(swatch, SEV[t.severity.level][0]);
+      swatch.style.background = svar(level);
+      sev.append(swatch, SEV[level][0]);
     }
     const what = el("span", "finding-what");
     what.append(proseEl("span", "finding-title", t.title));
@@ -641,8 +650,8 @@
   // Severity order where every claim is graded, and the given order otherwise
   // — the package's declared lane order, the only ranking a framework that
   // grades nothing has.
-  const bySeverity = (list) => list.every(c => c.severity)
-    ? [...list].sort((a, b) => SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level))
+  const bySeverity = (list) => list.every(severityLevel)
+    ? [...list].sort((a, b) => SEV_ORDER.indexOf(severityLevel(a)) - SEV_ORDER.indexOf(severityLevel(b)))
     : list;
   // Open every `details` around a node, and the node itself, so a link to it
   // lands on it.
@@ -690,7 +699,7 @@
       const [label, meaning] = claim
         ? (rulesOnUnit(block, claim)
             ? (coveredByControl(claim) ? CONTROL_COVERED : REVIEW_EXCLUDED)
-            : (VERDICT_STATE[claim.verdict.status] || ["Ruled", ""]))
+            : UNIT_VERDICT[claim.verdict.status])
         : (SCOPE_STATE[entry ? entry.state : "not-raised"] || ["Listed", ""]);
 
       const box = el("details", "unit");
@@ -1352,10 +1361,10 @@
     const scope = entry.scope.type === "application"
       ? "The whole application"
       : `The ${entry.scope.type} “${entry.scope.name}”`;
-    if (entry.state === "left-out") return [`${scope}: left out, ${entry.reason}`];
-    if (!entry.elements.length) return [`${scope} (${entry.outcome})`];
+    if (entry.state === "left-out") return [`${scope}: left out, because ${entry.meaning}`];
+    if (!entry.elements.length) return [`${scope} (${entry.meaning})`];
     return [`${scope} → `, ...commaList(entry.elements.map((element) => tag(element.id))),
-      ` (${entry.outcome})`];
+      ` (${entry.meaning})`];
   };
   const controlRow = (row) => {
     const open = el("details", "control-row");
@@ -1398,8 +1407,7 @@
       const tr = el("tr");
       const facts = el("ul");
       for (const fact of entry.facts) {
-        const item = el("li", null, `${fact.label}: ${fact.value} `);
-        item.append(el("span", `tag ${fact.state}`, fact.state));
+        const item = el("li", null, `${fact.label}: ${fact.value} — ${fact.meaning}.`);
         if (fact.stated) item.append(el("span", "meta", ` The description states “${fact.stated}”.`));
         facts.append(item);
       }

@@ -90,6 +90,26 @@ NoMatch = Literal["missing-element", "empty-zone"]
 #: holds only candidates that the default does not tick.
 LeftOutReason = Literal["missing-element", "empty-zone", "unticked"]
 
+#: How a person reads each match outcome, on the pause and in the report.
+MATCH_MEANINGS: Mapping[MatchOutcome, str] = MappingProxyType(
+    {
+        "application": "it applies with no match",
+        "matched-by-name": "a part of this description has its name",
+        "matched-by-alias": "a part of this description has one of its aliases",
+        "owner-mapped": "you chose the part at the pause",
+    }
+)
+
+#: How a person reads each reason a Control is left out, on the pause and in
+#: the report.
+LEFT_OUT_MEANINGS: Mapping[LeftOutReason, str] = MappingProxyType(
+    {
+        "missing-element": "no part of this description has the name or an alias",
+        "empty-zone": "the zone holds no part of this description",
+        "unticked": "it is not ticked",
+    }
+)
+
 #: Why an element is a candidate of a zone scope: its zone is stated, its
 #: zone is an inference, or no source placed it.
 CoverReason = Literal["stated-zone", "zone-inferred", "no-zone-stated"]
@@ -237,6 +257,11 @@ class AppliedScope(BaseModel):
             return tuple(cover.element for cover in self.covers if cover.ticked)
         return (self.element,) if self.element else ()
 
+    @property
+    def meaning(self) -> str:
+        """How a person reads the outcome."""
+        return MATCH_MEANINGS[self.outcome]
+
 
 class LeftOutScope(BaseModel):
     """A copied Control that does not apply, and why."""
@@ -246,6 +271,11 @@ class LeftOutScope(BaseModel):
     state: Literal["left-out"] = "left-out"
     control: str = Field(pattern=CONTROL_ID)
     reason: LeftOutReason
+
+    @property
+    def meaning(self) -> str:
+        """How a person reads the reason."""
+        return LEFT_OUT_MEANINGS[self.reason]
 
 
 ControlResolution = Annotated[AppliedScope | LeftOutScope, Field(discriminator="state")]
@@ -498,6 +528,7 @@ def control_offer(
                 ],
                 "covers": covers(found.covers),
                 "resolution": resolution.model_dump(mode="json"),
+                "meaning": resolution.meaning,
                 "rows": [row.model_dump(mode="json") for row in copy.rows],
             }
         )
@@ -694,6 +725,16 @@ def controls_used(
 #: ``changed`` where an own answer lies over it, or ``stated`` where the
 #: model states the fact and the Control writes nothing.
 FactState = Literal["written", "changed", "stated"]
+
+#: How a person reads each fact state, on the report page and in the
+#: Markdown export.
+FACT_MEANINGS: Mapping[FactState, str] = MappingProxyType(
+    {
+        "written": "the Control wrote it onto an open fact",
+        "changed": "your own answer lies over it",
+        "stated": "the description states the fact, so the Control wrote nothing",
+    }
+)
 
 
 class ControlFact(BaseModel):
@@ -924,6 +965,7 @@ class SectionFact(BaseModel):
     label: str
     value: str
     state: FactState
+    meaning: str
     stated: str
 
 
@@ -947,6 +989,7 @@ class SectionEntry(BaseModel):
     state: ResolutionState
     outcome: MatchOutcome | None
     reason: LeftOutReason | None
+    meaning: str
     elements: list[SectionElement]
     facts: list[SectionFact]
     rows: list[SectionRow]
@@ -1068,12 +1111,14 @@ def controls_section(
                 state=resolution.state,
                 outcome=outcome,
                 reason=reason,
+                meaning=resolution.meaning,
                 elements=elements,
                 facts=[
                     SectionFact(
                         label=fact_label(fact.answer.key, model),
                         value=fact.answer.value,
                         state=fact.state,
+                        meaning=FACT_MEANINGS[fact.state],
                         stated=fact.stated,
                     )
                     for fact in (entry.facts if entry else ())

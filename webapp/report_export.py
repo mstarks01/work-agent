@@ -16,9 +16,19 @@ from __future__ import annotations
 import csv
 import io
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
+from types import MappingProxyType
+from typing import Any, Literal
 
 from analysis_service import Report
+from analysis_service.claims import (
+    REJECTION_MEANINGS,
+    VERDICT_LABELS,
+    Claim,
+    Mitigation,
+    Severity,
+    Verdict,
+)
 from analysis_service.frameworks import lane_of
 from analysis_service.job_controls import SectionEntry
 from analysis_service.open_facts import element_names
@@ -39,6 +49,13 @@ def _text(value: str) -> str:
     return _AUTOLINK.sub(lambda found: "\\" + found.group(0), escaped)
 
 
+def _rejection_clause(verdict: Verdict) -> str:
+    """Why the critic rejected the draft, or nothing where a report read back
+    names no step."""
+    step = verdict.rejected_because
+    return "" if step is None else f", because {REJECTION_MEANINGS[step]}"
+
+
 def _findings(report: Report) -> list[str]:
     lines: list[str] = []
     for block in report.analyses:
@@ -48,16 +65,16 @@ def _findings(report: Report) -> list[str]:
         ]
         lines += ["", "### Findings", ""]
         lines += [
-            f"- **{_text(claim.id)}** {_text(claim.title)} ({claim.verdict.status})."
+            f"- **{_text(claim.id)}** {_text(claim.title)}"
+            f" ({VERDICT_LABELS[claim.verdict.status]})."
             f" {_text(claim.description)}"
             for claim in block.claims
         ] or ["No finding."]
         if block.rejected_claims:
             lines += ["", "### Ruled out", ""]
             lines += [
-                f"- **{_text(claim.id)}** {_text(claim.title)}: rejected for"
-                f" {claim.verdict.rejected_because or 'no stated step'}."
-                f" {_text(claim.verdict.reason)}"
+                f"- **{_text(claim.id)}** {_text(claim.title)}: rejected"
+                f"{_rejection_clause(claim.verdict)}. {_text(claim.verdict.reason)}"
                 for claim in block.rejected_claims
             ]
     return lines
@@ -81,11 +98,13 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
         if entry.state == "applied":
             reached = ", ".join(_text(element.name) for element in entry.elements)
             lines.append(
-                f"Protects {_scope(entry)}: {entry.outcome}"
+                f"Protects {_scope(entry)}: {entry.meaning}"
                 + (f", applied to {reached}." if reached else ".")
             )
         else:
-            lines.append(f"Protects {_scope(entry)}: left out, {entry.reason}.")
+            lines.append(
+                f"Protects {_scope(entry)}: left out, because {entry.meaning}."
+            )
         for fact in entry.facts:
             stated = (
                 f" (the description states “{_text(fact.stated)}”)"
@@ -93,13 +112,13 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
                 else ""
             )
             lines.append(
-                f"- Fact: {_text(fact.label)}: {_text(fact.value)} — {fact.state}{stated}"
+                f"- Fact: {_text(fact.label)}: {_text(fact.value)} — {fact.meaning}{stated}"
             )
         for row in entry.rows:
             label = f" · {_text(row.label)}" if row.label else ""
             lines.append(
                 f"- Row: {_text(row.framework)} {_text(row.unit)}{label} —"
-                f" {row.outcome}. {row.meaning}"
+                f" {row.meaning}"
             )
             for ruling in row.rulings:
                 lines.append(
@@ -145,6 +164,41 @@ CSV_COLUMNS = (
 _FORMULA_LEAD = ("=", "+", "-", "@", "\t", "\r")
 
 
+def _level(severity: Severity) -> str:
+    # The type allows None, but the validator of a Severity always sets the
+    # level. The page reads the same field with no fallback.
+    return severity.level or ""
+
+
+def _summaries(mitigations: Sequence[Mitigation]) -> str:
+    return " | ".join(mitigation.summary for mitigation in mitigations)
+
+
+#: A judgement field of a record that the CSV export reads into a cell.
+JudgementField = Literal["severity", "mitigations"]
+
+#: The CSV columns that read a judgement field a record may declare, keyed by
+#: the field and never by a framework. A record that does not declare the
+#: field leaves its cell empty.
+#: ``test_the_judgement_cells_name_each_judgement_field_of_each_record`` holds
+#: the keys to the judgement fields of each package's record, and
+#: ``test_the_report_page_reads_the_judgement_cells_the_csv_writes`` holds the
+#: report page's readers to these cells.
+JUDGEMENT_CELLS: Mapping[JudgementField, Callable[[Any], str]] = MappingProxyType(
+    {"severity": _level, "mitigations": _summaries}
+)
+
+
+def judgement_cells(claim: Claim) -> dict[JudgementField, str]:
+    """The cell of each judgement field for ``claim``, empty where its record
+    does not declare the field."""
+    declared = type(claim).model_fields
+    return {
+        field: read(getattr(claim, field)) if field in declared else ""
+        for field, read in JUDGEMENT_CELLS.items()
+    }
+
+
 def _cell(value: str) -> str:
     """``value`` as a spreadsheet shows it as text, never as a formula."""
     return f"'{value}" if value.startswith(_FORMULA_LEAD) else value
@@ -153,10 +207,10 @@ def _cell(value: str) -> str:
 def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
     """The findings of ``report`` as one CSV file, with a row for each.
 
-    The category is the claim's lane, as :func:`lane_of` reads it. A
-    framework that grades nothing or recommends nothing leaves the severity or
-    the mitigation empty. The controls cell names each Control row that ruled
-    on the finding, with its ruling.
+    The category is the claim's lane, as :func:`lane_of` reads it. The
+    severity and the mitigation come from :func:`judgement_cells`. The
+    controls cell names each Control row that ruled on the finding, with its
+    ruling.
     """
     names = element_names(report.system_model)
     rulings: dict[tuple[str, str], list[str]] = {}
@@ -171,22 +225,20 @@ def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
     writer.writerow(CSV_COLUMNS)
     for block in report.analyses:
         for claim in [*block.claims, *block.rejected_claims]:
-            fields = claim.model_dump(mode="json")
-            severity = fields.get("severity") or {}
-            mitigations = fields.get("mitigations") or []
+            judged = judgement_cells(claim)
             cells = (
                 block.framework,
                 claim.id,
                 claim.title,
                 claim.verdict.status,
-                severity.get("level") or "",
+                judged["severity"],
                 str(lane_of(claim) or ""),
                 " | ".join(
                     names.get(element, element)
                     for element in claim.affected_element_ids
                 ),
                 claim.description,
-                " | ".join(mitigation["summary"] for mitigation in mitigations),
+                judged["mitigations"],
                 " | ".join(rulings.get((block.framework, claim.id), [])),
             )
             writer.writerow([_cell(value) for value in cells])

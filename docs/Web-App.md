@@ -219,34 +219,38 @@ the same export. A print leaves out the sidebar, the tabs and the buttons, and
 it always uses the light colours.
 
 **Controls**, under the findings of a job that copied a Control, is one table
-of each Control: what it matched, the facts it wrote with the state
-`written`, `changed` or `stated`, and its rows of the frameworks the job ran,
-each with the outcome `applied`,
-`refused`, `not-reached` or `no-finding`. A row is `not-reached` when no
+of each Control: what it matched, the facts it wrote, each with the meaning
+of its state (`written`, `changed` or `stated`), and its rows of the
+frameworks the job ran, each with the outcome `applied`, `refused`,
+`not-reached` or `no-finding`. A row is `not-reached` when no
 finding on its unit reached the critic with the row, and a finding on its
 unit names no part that the Control's scope holds. A row opens to the claim
 IDs it ruled out, the critic's reason, each line of the evidence that the
 quotation of an applied ruling quotes, by file, class and line, and one
-sentence that says what the outcome means. A Control that the job left out
-shows its reason. The section reads the job's
-copy and the report's rulings, so a later edit of a Control changes nothing
-here.
+sentence that says what the outcome means. The match, or the reason that the
+job left a Control out, shows as a sentence from the service. The section
+reads the job's copy and the report's rulings, so a later edit of a Control
+changes nothing here.
 
 The download icon at the end of the tab row opens a menu of **Download as
 Markdown**, **Download as JSON** and **Download as CSV**. They send
 `GET /report/{run}/export.md`, `GET /report/{run}/export.json` and
 `GET /report/{run}/export.csv`. The
 Markdown file holds the findings, the findings ruled out and the Controls
-section. It escapes each value, so a value forms no Markdown markup, no HTML,
-no Markdown link and no GFM autolink. A viewer that links any bare domain name
+section. It labels each verdict in the words the report page shows, and it
+says in words which check of the critic ruled a finding out. It escapes each
+value, so a value forms no Markdown markup, no HTML, no Markdown link and no
+GFM autolink. A viewer that links any bare domain name
 can still link one. The JSON file holds the report and
 the Controls section as `report` and `controls`. The CSV file holds one row
 for each finding of each framework, and the findings ruled out too. Its columns
 are `framework`, `id`, `title`, `status`, `severity`, `category`, `affected
 elements`, `description`, `mitigation` and `controls`. The category is the
 claim's lane, the field that each framework's ID rule names. For example, a
-STRIDE finding's category is its STRIDE category. A framework that gives no severity or no mitigation leaves that cell
-empty. The `controls` cell names each Control row that ruled on the finding,
+STRIDE finding's category is its STRIDE category. The severity and the
+mitigation cells come from the record's own fields, through `JUDGEMENT_CELLS`
+in `webapp/report_export.py`. A record that declares no such field leaves that
+cell empty. The `controls` cell names each Control row that ruled on the finding,
 and its ruling. A cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage
 return gets an apostrophe first, so a spreadsheet shows the cell as text and
 does not run it as a formula. A `/v1` report carries no Controls section.

@@ -164,15 +164,11 @@ const formControls = (() => {
   };
 
   // ---- The pause -----------------------------------------------------------
-  // Each reason a Control is left out (LeftOutReason), and each reason a
-  // zone lists a part (CoverReason).
-  const REASONS = {
-    "missing-element": "missing-element: no part of this description has the name or an alias",
-    "empty-zone": "empty-zone: the zone holds no part of this description",
-    "unticked": "unticked: you left it out",
-    "zone-inferred": "zone-inferred: the service inferred this placement",
-    "no-zone-stated": "no-zone-stated: no source places this part",
-    "stated-zone": "stated-zone: a source places this part in the zone",
+  // Each reason a zone lists a part (CoverReason).
+  const COVER_REASONS = {
+    "zone-inferred": "the service inferred this placement",
+    "no-zone-stated": "no source places this part",
+    "stated-zone": "a source places this part in the zone",
   };
   // The candidates of a zone Control on `element`: the zone it matched, or a
   // zone the owner chose from its choices. Empty for any other element.
@@ -230,8 +226,8 @@ const formControls = (() => {
       const box = h("input", { type: "checkbox", id: `offer-${entry.id}`, checked: pick.on, disabled: needsChoice && !pick.element,
         on: { change: (event) => { pick.on = event.target.checked; send(); } } });
       const chip = resolution.state === "applied"
-        ? (resolution.outcome === "application" ? "matches the application" : `matches ${names.get(resolution.element)}`)
-        : REASONS[resolution.reason];
+        ? (resolution.outcome === "application" ? entry.meaning : `matches ${names.get(resolution.element)}: ${entry.meaning}`)
+        : `left out: ${entry.meaning}`;
       const rows = entry.rows.map((row) => (row.ticked ? rowText(row) : `${rowText(row)} (left out: version ${row.version} is not the version this service carries)`));
       const parts = [
         box, " ",
@@ -263,7 +259,7 @@ const formControls = (() => {
               send();
             } } });
           return h("li", {}, tick, " ", h("label", { for: tick.id }, cover.name),
-            h("span", { class: "hint" }, ` — ${REASONS[cover.reason]}`));
+            h("span", { class: "hint" }, ` — ${COVER_REASONS[cover.reason]}`));
         })));
       }
       const own = facts.filter((fact) => fact.control === entry.id);
