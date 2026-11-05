@@ -1,0 +1,14 @@
+material from today's prepare, catalog signed; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Inference requests may be readable across the public-to-gateway boundary if transport encryption is absent | ['flow:entity:calling-service>process:inference-gateway>submit-inference-request', 'entity:calling-service', 'process:inference-gateway']
+- Gateway-to-model-server requests may be readable between serving zones if transport encryption is absent | ['flow:process:inference-gateway>process:model-server>forward-request', 'process:inference-gateway', 'process:model-server']
+- Model artifacts may be intercepted while the model server retrieves them | ['flow:process:model-server>store:model-registry-bucket>load-artifact', 'process:model-server', 'store:model-registry-bucket']
+- Customer feature records may be intercepted on the model-server-to-Redis read path | ['flow:process:model-server>store:redis-feature-store>read-features', 'process:model-server', 'store:redis-feature-store']
+- Raw prompts and responses may be intercepted while written to the inference log | ['flow:process:inference-gateway>store:inference-log>write-request-log', 'process:inference-gateway', 'store:inference-log']
+- Model artifacts may be intercepted while engineers publish them to the registry | ['flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact', 'entity:ml-engineer', 'store:model-registry-bucket']
+- Model artifacts are exposed from storage copies if registry encryption at rest is absent | ['store:model-registry-bucket']
+- A Redis storage copy exposes confidential customer financial features if encryption at rest is absent | ['store:redis-feature-store']
+- A copied inference log may disclose raw user prompts if at-rest encryption is absent | ['store:inference-log']
+- An attacker with model-server execution can read registry artifacts through the server account | ['process:model-server', 'flow:process:model-server>store:model-registry-bucket>load-artifact', 'store:model-registry-bucket']
+- A model-network foothold can read customer features from Redis without password authentication | ['store:redis-feature-store', 'flow:process:model-server>store:redis-feature-store>read-features', 'process:model-server']
+spent: $0.0601 reported
+must-finds matched: [8, 9]

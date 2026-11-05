@@ -1,0 +1,16 @@
+material from today's prepare, catalog none; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Sequential unauthenticated payment links disclose invoices to anyone who guesses an invoice number | ['flow:entity:payer>process:billing-app>open-payment-page', 'process:billing-app']
+- A company user may conditionally retrieve another tenant's invoice by changing its sequential number | ['flow:entity:company-user>process:billing-app>manage-invoices', 'process:billing-app']
+- Any customer user can request PDFs containing another tenant's invoice data | ['process:billing-app', 'flow:process:billing-app>store:render-queue>queue-render-job', 'process:pdf-renderer']
+- Tenant-database traffic may expose all companies' financial records if transport encryption is absent | ['flow:process:billing-app>store:tenant-database>read-and-write-tenant-data', 'process:billing-app', 'store:tenant-database']
+- Render jobs may reveal tenant and invoice identifiers in transit | ['flow:process:billing-app>store:render-queue>queue-render-job', 'process:billing-app', 'store:render-queue']
+- Renderer retrieval of invoices may expose invoice content on an unverified internal channel | ['flow:process:pdf-renderer>store:tenant-database>read-invoice', 'process:pdf-renderer', 'store:tenant-database']
+- Invoice PDFs may be exposed while the renderer writes them to the bucket | ['flow:process:pdf-renderer>store:pdf-bucket>write-pdf', 'process:pdf-renderer', 'store:pdf-bucket']
+- PDF retrieval traffic may disclose invoice documents if internal transport is unencrypted | ['flow:process:billing-app>store:pdf-bucket>fetch-pdfs', 'process:billing-app', 'store:pdf-bucket']
+- Support-office observers may capture privileged admin-console credentials if the connection is unencrypted | ['flow:entity:support-agent>process:admin-console>use-admin-console', 'process:admin-console']
+- Customer-user session material may be exposed between the admin console and billing app | ['flow:process:admin-console>process:billing-app>open-session-as-customer-user', 'process:admin-console', 'process:billing-app']
+- A storage copy may disclose the entire tenant database if encryption at rest is absent | ['store:tenant-database']
+- A copied PDF bucket may expose every tenant's invoice documents if encryption at rest is absent | ['store:pdf-bucket']
+- Render-queue copies may disclose tenant-to-invoice mappings if encryption at rest is absent | ['store:render-queue']
+spent: $0.0674 reported
+must-finds matched: [5, 6]
