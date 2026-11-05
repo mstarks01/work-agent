@@ -49,6 +49,7 @@ from analysis_service.graph import (
     STATE_VALID_MODEL,
     FrameworkNodes,
 )
+from analysis_service.job_controls import AppliedControl
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
@@ -165,40 +166,53 @@ def _from_failure(
     )
 
 
+def round_of(archived: Archived, controls: Sequence[AppliedControl]) -> CriticRound:
+    """The round the archived critic ran, with ``controls`` applied."""
+    record = archived.assertions
+    return CriticRound.of(
+        archived.framework,
+        archived.model,
+        archived.drafts,
+        archived.marks,
+        None if record is None else record.catalog,
+        controls,
+    )
+
+
+def shared_keys(archived: Archived) -> dict[str, str]:
+    """The job-wide rendered keys both review prompts read."""
+    return {
+        key: archived.shared[key]
+        for key in (STATE_SYSTEM_MODEL, STATE_BOUNDARY_CROSSINGS, STATE_INPUT_TEXT)
+    }
+
+
 async def compose(
     archived: Archived,
     package_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
 ) -> tuple[str, types.Content]:
     """The instruction and the user turn the critic was sent, rebuilt."""
-    record = archived.assertions
-    critic_round = CriticRound.of(
-        archived.framework,
-        archived.model,
-        archived.drafts,
-        archived.marks,
-        None if record is None else record.catalog,
-        (),
-    )
-    shared = {
-        key: archived.shared[key]
-        for key in (STATE_SYSTEM_MODEL, STATE_BOUNDARY_CROSSINGS, STATE_INPUT_TEXT)
-    }
     return await critic_request(
         package_loader,
         prompt_loader,
         FrameworkNodes(archived.framework),
-        shared,
-        critic_round,
+        shared_keys(archived),
+        round_of(archived, ()),
     )
+
+
+def claims_of(raw: str) -> list[Any]:
+    """The ``claims`` array of a critic's answer, or a refusal."""
+    payload = json.loads(raw)
+    if not isinstance(payload, dict) or "claims" not in payload:
+        raise ValueError("critic output carries no 'claims' array")
+    return payload["claims"]
 
 
 def parse(raw: str, framework: FrameworkName) -> list[Ruling]:
     """The critic's answer, read by the graph's own reader, or a refusal."""
-    payload = json.loads(raw)
-    if not isinstance(payload, dict) or "claims" not in payload:
-        raise ValueError("critic output carries no 'claims' array")
-    return rulings_of(payload["claims"], schemas_for(framework))
+    return rulings_of(claims_of(raw), schemas_for(framework))
 
 
 @dataclass(frozen=True)

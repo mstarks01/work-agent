@@ -141,8 +141,8 @@ in this conversation.
   before it leaves the process, on every node, every retry and every
   single-node replay. It guards against an accident and is not consent.
 - **Classify a command by what it does.** `score` and `replay` re-read an
-  archive. `lane-replay` and `critic-replay` send a request again and cost a
-  call, whatever their names say.
+  archive. `lane-replay`, `critic-replay` and `recritic-replay` send a request
+  again and cost a call, whatever their names say.
 - **A cache hit is not free.** Meter paid requests.
 - **Do not substitute a cheaper model in a confirmation run.** That is a
   changed condition, and the comparison stops being a comparison. A cheaper

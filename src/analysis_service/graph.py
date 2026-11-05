@@ -2079,16 +2079,10 @@ def route_review(
         recorded += drift
         outcome = critic_round.outcome(merged)
     if isinstance(outcome, Reask):
-        # ``previous_review`` is the emission itself rather than anything
-        # recomputed, because what the re-ask must reconcile with is the bytes
-        # the critic actually returned. ``first_review`` is the same rulings
-        # in the spelling the second look merges onto.
-        state.prompt(nodes.key("previous_review"), render_fenced(emitted))
-        state.prompt(nodes.key("critic_issues"), render_fenced(outcome.messages))
-        state.prompt(nodes.key("draft_roster"), render_fenced(outcome.roster))
-        state.prompt(
-            nodes.key("unreconciled_drafts"), render_fenced(outcome.unreconciled)
-        )
+        # ``first_review`` is the first pass in the spelling the second look
+        # merges onto.
+        for artifact, text in outcome.prompts.items():
+            state.prompt(nodes.key(artifact), text)
         state.put(nodes.key("first_review"), outcome.first.rulings)
         state.put(nodes.key("repairable"), outcome.first.repairable)
     if isinstance(outcome, Accepted):
@@ -2112,7 +2106,7 @@ def route_review(
         )
     if isinstance(outcome, Accepted):
         return _routed(ROUTE_ACCEPT, {"reviewed_count": outcome.count})
-    return _routed(ROUTE_REVISE, {"issue_count": len(outcome.messages)})
+    return _routed(ROUTE_REVISE, outcome.summary)
 
 
 def _parked_round(

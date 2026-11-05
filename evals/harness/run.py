@@ -92,6 +92,7 @@ from evals.harness import (
     promotion,
     question_prior,
     queue,
+    recritic_replay,
     replay,
     roster,
     rule_applicability,
@@ -2789,6 +2790,13 @@ COMMANDS: dict[str, Command] = {
         " verdicts with the archived ones (#1091, one paid call)",
         run=critic_replay.command_critic_replay,
         arguments=critic_replay.arguments,
+    ),
+    "recritic-replay": Command(
+        help="send one critic re-ask over an archived first pass with an"
+        " injected Control row fault, and check what it repaired (one paid"
+        " call)",
+        run=recritic_replay.command_recritic_replay,
+        arguments=recritic_replay.arguments,
     ),
     "descendants": Command(
         help="run a sweep's fan-in again over its archived proposals, with"

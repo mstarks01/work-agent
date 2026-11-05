@@ -11,15 +11,16 @@ and turns an accepted set into claims.
 
 The round ends in one of three outcomes. :class:`Accepted` carries the claims
 and the rejected claims the block holds. :class:`Reask` carries what the
-re-ask reads: the problems, the roster, the drafts it must read and the first
-pass it is merged onto. :class:`Failed` carries the problems a second look
+re-ask reads: the problems, the roster, the drafts it must read, the first
+pass as the critic emitted it, and the first pass it is merged onto. :class:`Failed` carries the problems a second look
 still did not reconcile. The graph node parks what an outcome carries and
 takes the edge it names, and decides nothing else.
 
 The module also renders the request a critic node sends, instruction and
 user turn, as ADK renders it from session state. The two critic replays call
-:func:`critic_request`, so neither copies the prompt join, the placeholder
-substitution or the state templating.
+:func:`critic_request`, and the re-ask replay calls :func:`recritic_request`, so
+none copies the prompt join, the placeholder substitution or the state
+templating.
 
 The primitives this module calls, :func:`~analysis_service.critic.critic_view`,
 :func:`~analysis_service.critic.review_issues`,
@@ -148,6 +149,12 @@ class Unreconciled:
         """Each problem's sentence, in the words the re-ask reads."""
         return problem_messages(self.problems)
 
+    @property
+    def summary(self) -> dict[str, int]:
+        """What the router outputs on the ``revise`` edge, and so the re-ask's
+        user turn."""
+        return {"issue_count": len(self.problems)}
+
 
 @dataclass(frozen=True)
 class Reask(Unreconciled):
@@ -165,6 +172,19 @@ class Reask(Unreconciled):
     unreconciled: list[dict]
     #: The first pass, for the second look to merge the re-ask onto.
     first: FirstPass
+    #: The first pass as the critic emitted it. The re-ask reconciles with
+    #: the bytes the critic returned, not with a recomputed set.
+    emitted: list[Any]
+
+    @property
+    def prompts(self) -> dict[str, str]:
+        """Each rendered artifact the re-ask prompt reads, by artifact name."""
+        return {
+            "previous_review": render_fenced(self.emitted),
+            "critic_issues": render_fenced(self.messages),
+            "draft_roster": render_fenced(self.roster),
+            "unreconciled_drafts": render_fenced(self.unreconciled),
+        }
 
 
 @dataclass(frozen=True)
@@ -275,6 +295,7 @@ class CriticRound:
                 rulings=[ruling.model_dump(mode="json") for ruling in rulings],
                 repairable=sorted(problems.repairable),
             ),
+            emitted=list(emitted),
         )
 
     def merge(
@@ -389,3 +410,24 @@ async def critic_request(
     state = {**shared, nodes.key("draft_view"): render_fenced(critic_round.view())}
     template = critic_instruction(package_loader, prompt_loader, nodes)
     return await node_request(template, state, critic_round.summary(), None)
+
+
+async def recritic_request(
+    package_loader: MarkdownLoader,
+    prompt_loader: MarkdownLoader,
+    nodes: FrameworkNodes,
+    shared: Mapping[str, str],
+    reask: Reask,
+) -> tuple[str, types.Content]:
+    """The request this framework's recritic node sends over ``reask``.
+
+    ``shared`` holds the job-wide rendered keys, as for :func:`critic_request`.
+    The re-ask's own keys are rendered here from ``reask``, and the user turn
+    is the router's output on the ``revise`` edge.
+    """
+    state = {
+        **shared,
+        **{nodes.key(artifact): text for artifact, text in reask.prompts.items()},
+    }
+    template = recritic_instruction(package_loader, prompt_loader, nodes)
+    return await node_request(template, state, reask.summary, None)
