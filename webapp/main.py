@@ -117,7 +117,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Any, Literal, TypedDict, get_args
+from typing import Annotated, Any, Literal, TypedDict, TypeVar, get_args
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -286,6 +286,7 @@ from analysis_service.vendors import (
     vendor_for,
 )
 from webapp.controls_page import (
+    ControlBody,
     ControlEdit,
     ControlSave,
     control_view,
@@ -1418,8 +1419,13 @@ _ADMISSION_MESSAGES: dict[RefusalOutcome, str] = {
 
 
 #: The key of each refusal that ``text_file.js`` and ``files.js`` show for a
-#: file they check before the server does.
-FileRefusal = Literal["too_large", "not_utf_8", "not_plain_text", "no_text", "full"]
+#: file they check before the server does. ``at_limit`` is the refusal that a
+#: page shows where its list holds the most items it can keep.
+FileRefusal = Literal["too_large", "not_utf_8", "not_plain_text", "no_text", "at_limit"]
+
+
+#: The model of a Control save's body.
+_ControlBodyT = TypeVar("_ControlBodyT", bound=ControlBody)
 
 
 class FilesLimits(TypedDict):
@@ -1437,19 +1443,21 @@ def file_refusals(max_bytes: int, max_files: int) -> dict[FileRefusal, str]:
         "not_utf_8": NOT_UTF_8,
         "not_plain_text": NOT_PLAIN_TEXT,
         "no_text": NO_TEXT,
-        "full": over_limit(max_files),
+        "at_limit": over_limit(max_files),
     }
 
 
 def evidence_refusals(limits: ControlLimits) -> dict[FileRefusal, str]:
-    """Each :data:`FileRefusal` of the Controls page's read of an evidence
-    file, in the words of :func:`~analysis_service.controls.control_refusal`."""
+    """Each :data:`FileRefusal` of the Controls page. The file refusals are
+    those of an evidence file, in the words of
+    :func:`~analysis_service.controls.control_refusal`, and ``at_limit`` is
+    the refusal of a new Control where the owner holds the most Controls."""
     return {
         "too_large": evidence_too_large(limits.max_evidence_bytes),
         "not_utf_8": NOT_UTF_8,
         "not_plain_text": NOT_PLAIN_TEXT,
         "no_text": NO_TEXT,
-        "full": controls_full(limits),
+        "at_limit": controls_full(limits),
     }
 
 
@@ -1954,8 +1962,8 @@ def create_app(
         return JSONResponse([control_view(control) for control in controls])
 
     async def control_body(
-        request: Request, current: Current, model: type[ControlSave]
-    ) -> ControlSave | JSONResponse:
+        request: Request, current: Current, model: type[_ControlBodyT]
+    ) -> _ControlBodyT | JSONResponse:
         """The body of a Control save, or the ``400`` that refuses it."""
         raw = await _json_body(request, max_control_body_bytes(current.control_limits))
         try:
@@ -2016,7 +2024,6 @@ def create_app(
         edit = await control_body(request, current, ControlEdit)
         if isinstance(edit, JSONResponse):
             return edit
-        assert isinstance(edit, ControlEdit)
         if not CONTROL_ID_PATTERN.fullmatch(control_id):
             return _message(404, _NO_SUCH_CONTROL)
         held = await workspace.store.principal(OPERATOR)

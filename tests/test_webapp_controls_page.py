@@ -40,12 +40,12 @@ from analysis_service.fact_answers import FACT_VALUE_MAX_CHARS
 from analysis_service.frameworks import lane_of
 from analysis_service.frameworks.asvs.catalog import requirement_text
 from analysis_service.jobs import PipelineCompleted
-from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT
+from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
 from analysis_service.sources import MAX_LABEL_CHARS
 from analysis_service.system_model import ELEMENT_ID_MAX_CHARS
 from tests import test_webapp
 from tests.factories import sample_analysis
-from tests.test_controls import fact, row
+from tests.test_controls import LINE_ENDS, fact, row
 from tests.test_doc_copy_lints import SHIPPED_RESILIENCE
 from tests.test_structural_readers import sound_report
 from tests.test_webapp import LOOPBACK, SAME_ORIGIN, WEBAPP_LIMITS
@@ -249,6 +249,18 @@ class TestCreate:
         refused = create(owner, evidence=sent)
         assert refused.status_code == 400, refused.text
         assert refused.json()["message"] == message
+
+    def test_a_lone_surrogate_is_refused_as_not_utf_8(self, owner):
+        """The digest of a new file encodes strict UTF-8, so the save refuses
+        a lone surrogate before the store reads the evidence rules."""
+        sent = [{"name": "rds.tf", "class": "code", "text": "half \ud800 a pair"}]
+        refused = owner.client.post(
+            "/workspace/controls",
+            content=json.dumps(body(evidence=sent)),
+            headers=SAME_ORIGIN | {"content-type": "application/json"},
+        )
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["message"] == NOT_UTF_8
 
     def test_the_evidence_count_limit(self, owner):
         sent = [
@@ -500,14 +512,14 @@ class TestThePage:
         # The page checks each count with the sentence the save refuses with.
         assert payload["limits"]["max_aliases"] == MAX_CONTROL_ALIASES
         assert payload["limits"]["max_rows"] == MAX_CONTROL_ROWS
-        assert payload["full"] == {
+        assert payload["at_limit"] == {
             "aliases": ALIASES_FULL,
             "rows": ROWS_FULL,
             "evidence": evidence_full(LIMITS.max_evidence),
         }
-        # A STRIDE finding always names a part; an ASVS finding may name none.
-        assert payload["units"]["stride"]["names_a_part"] is True
-        assert payload["units"]["asvs"]["names_a_part"] is False
+        # A STRIDE finding always names an element; an ASVS finding may name none.
+        assert payload["units"]["stride"]["names_an_element"] is True
+        assert payload["units"]["asvs"]["names_an_element"] is False
 
     def test_the_sidebar_lists_controls_between_files_and_settings(self, owner):
         page = owner.client.get("/controls").text
@@ -861,3 +873,22 @@ def test_an_evidence_line_counts_only_where_a_quotation_quotes_it(reason, lines)
         }
     )
     assert sorted({line.line for line in _quoted(reason, [file])}) == lines
+
+
+@pytest.mark.parametrize("end", LINE_ENDS)
+def test_a_quoted_line_counts_each_line_end_a_text_may_hold(end):
+    """Each line end that ``text_refusal`` lets through starts a line, as it
+    does in an editor."""
+    from analysis_service.job_controls import CopiedEvidence, _quoted
+
+    file = CopiedEvidence.model_validate(
+        {
+            "id": f"evidence-{'0' * 32}",
+            "name": "waf.yaml",
+            "class": "config",
+            "sha256": "0" * 64,
+            "text": EVIDENCE.replace("\n", end),
+        }
+    )
+    [line] = _quoted("The file says “waf: enabled”.", [file])
+    assert (line.line, line.text) == (4, "waf: enabled")

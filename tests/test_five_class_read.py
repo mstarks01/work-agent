@@ -174,6 +174,11 @@ def test_a_name_wrapped_over_two_lines_counts():
     assert check.missing(body) == []
 
 
+def test_a_lone_carriage_return_ends_a_line():
+    body = FULL_SECTION.replace(LAST, f"## Docs\r{LAST}")
+    assert check.missing(body) == [check.CLASSES[-1]]
+
+
 @pytest.mark.parametrize(
     "hide",
     [

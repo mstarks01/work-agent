@@ -83,12 +83,12 @@ the workflow diff.
 ### The step before the code
 
 A defect that the standards read finds costs a new head and a new CI run. Stop
-the recurring classes before the code exists.
+the classes that come back before the code exists.
 
 Do this step before you add a function, a constant, a table, a type, a check
 or a comment claim. Read each row of the table "The classes that come back
 in fixes" in [the standards read](#the-standards-read-before-the-merge) as a
-question. For a second reader, search the tree for an existing reader of the
+question. For a second reader, search the tree for another reader of the
 same rule. Search by the name, by the literal values and by the data that the
 code reads.
 
