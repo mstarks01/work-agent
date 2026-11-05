@@ -358,7 +358,7 @@ def test_a_new_analysis_reuses_the_answers_of_an_earlier_one(page):
     page.wait_for_selector("#answers-from-field", state="visible")
     ask_row = page.locator(".ask-with-help").bounding_box()
     reuse_row = page.locator("#answers-from-field").bounding_box()
-    help = page.locator(".question-help summary").bounding_box()
+    help = page.locator(".ask-with-help .question-help summary").bounding_box()
     assert ask_row and reuse_row and help
     assert reuse_row["y"] >= ask_row["y"] + ask_row["height"]
     assert ask_row["y"] <= help["y"] < ask_row["y"] + ask_row["height"]
@@ -1340,6 +1340,35 @@ def test_an_uploaded_mermaid_file_starts_an_analysis_as_a_diagram(page):
         {"kind": "diagram", "label": "Uploaded diagram", "text": diagram}
     ]
     page.wait_for_selector("#asked", state="visible")
+
+
+def test_the_settings_column_sits_beside_the_description_and_stacks_on_a_phone(page):
+    """The settings column holds the frameworks, the questions box and the
+    button. A wide screen shows it beside the description box, and a phone
+    shows it under the box."""
+    page.set_viewport_size({"width": 1280, "height": 900})
+    settings = page.locator("aside.entry-settings")
+    for held in ("#frameworks", "#ask", "#go"):
+        assert settings.locator(held).count() == 1, held
+    box = page.locator(".composer").bounding_box()
+    column = settings.bounding_box()
+    assert box and column
+    assert column["x"] >= box["x"] + box["width"]
+    page.set_viewport_size({"width": 390, "height": 844})
+    box = page.locator(".composer").bounding_box()
+    column = settings.bounding_box()
+    assert box and column
+    assert column["y"] >= box["y"] + box["height"]
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+
+
+def test_the_description_guidance_opens_from_its_help(page):
+    """The box holds a short prompt, and its help holds the full guidance."""
+    help = page.locator(".label-with-help .question-help")
+    assert not help.locator(".question-help-content").is_visible()
+    help.locator("summary").click()
+    assert "how each side proves who it is" in help.inner_text()
+    assert len(page.get_attribute("#description", "placeholder")) < 100
 
 
 def test_workspace_mobile_has_no_page_overflow(page):

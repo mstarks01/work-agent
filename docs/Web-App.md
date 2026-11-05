@@ -62,6 +62,12 @@ LD_LIBRARY_PATH=~/.local/lib/chromium-deps/usr/lib/x86_64-linux-gnu uv run --gro
 
 ## What you select
 
+The form shows the name and the description on the left. A settings column on
+the right holds the frameworks, the "Ask me questions" box, the Controls,
+"Reuse answers from" and **Prepare analysis**. On a narrow screen, the column
+goes under the description. The "?" beside "What are you building?" shows
+what to describe.
+
 **The frameworks to run**, one checkbox per framework this install carries. The
 carried set comes from [`config/frameworks.toml`](../config/frameworks.toml).
 Every box starts unticked, so tick each framework you want **Prepare analysis**
@@ -307,10 +313,10 @@ transcripts and Mermaid diagrams that you add to any of your analyses
   own copy. `DELETE /workspace/files/{file_id}` removes the row and the text,
   and keeps nothing.
 
-The plus button under the description opens a menu with two items. "Upload
+The plus button in the description box opens a menu with two items. "Upload
 from computer" reads a file from your computer. "Select
 from Files" opens a dialog with a checklist of your files and a "Manage
-files" link. The form lists each chosen file with a Remove button. The
+files" link. The box shows each chosen file as a chip with a Remove button. The
 submission sends the chosen IDs in `owner_files`, and the server copies each
 file's text into the job as a Source with the file's name as its label
 (ADR 0119). A later delete or a new upload changes no job and no report. When
@@ -372,7 +378,7 @@ it.
 
 A **Control** records a protection that your systems already have, and it
 names what it protects: the whole application, one zone or one element (ADR
-0124). "Controls for this analysis", under the Files list, lists each of your
+0124). "Controls for this analysis", in the settings column, lists each of your
 Controls with what it protects and its rows, each ticked. The submission sends
 the IDs of the Controls you tick in `controls`, and the job copies each one,
 with the text of each evidence file (ADR 0127). A later edit or delete changes
