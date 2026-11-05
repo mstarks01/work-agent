@@ -1554,8 +1554,9 @@ def test_the_new_analysis_title_is_on_the_line_of_frameworks(page):
     assert title.evaluate("(node) => getComputedStyle(node).fontSize") == "20px"
     one, two = title.bounding_box(), legend.bounding_box()
     assert one and two
-    middle = lambda box: box["y"] + box["height"] / 2  # noqa: E731
-    assert abs(middle(one) - middle(two)) <= 4
+    title_middle = one["y"] + one["height"] / 2
+    legend_middle = two["y"] + two["height"] / 2
+    assert abs(title_middle - legend_middle) <= 4
 
 
 def test_every_page_title_and_heading_takes_one_scale(page):
