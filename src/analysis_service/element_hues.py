@@ -26,8 +26,8 @@ FIRST_HUE = 210
 #: The saturation and the lightness, in percent, of an element's fill and of
 #: its outline in the light theme. The report page's CSS states the same
 #: numbers, and a test checks that the two agree.
-FILL = (70, 93)
-LINE = (50, 40)
+FILL = (25, 96)
+LINE = (25, 55)
 
 
 def element_hues(model: SystemModel) -> dict[str, int]:
