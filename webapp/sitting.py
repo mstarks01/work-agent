@@ -283,7 +283,7 @@ nav { flex:0 0 20rem; background:var(--sidebar); border-right:1px solid var(--li
       flex-direction:column; overflow-x:hidden; }
 #cases { flex:1; overflow-y:auto; overflow-x:hidden; list-style:none; padding:0; margin:12px 0; }
 main { flex:1; margin:0; padding:36px 36px 6rem; max-width:52rem; }
-h1 { font-size:18px; margin:0 0 4px; } h2 { font-size:19px; } h3 { font-size:16px; }
+h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:17px; } h3 { font-size:15px; }
 .sub { color:var(--muted); margin-top:0; }
 input[type=radio] { width:auto; padding:0; accent-color:var(--accent); }
 .help-button,.pin button { width:100%; }.pin { border-top:1px solid var(--line); padding-top:12px; }

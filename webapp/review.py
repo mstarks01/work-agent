@@ -423,7 +423,7 @@ _STYLE = """
   :root { color-scheme: light dark; --line: #8884; }
   body { font: 15px/1.6 system-ui, sans-serif; max-width: 60rem;
          margin: 2rem auto; padding: 0 1.25rem; }
-  h1 { font-size: 1.35rem; margin-bottom: .2rem; }
+  h1 { font-size: 20px; margin-bottom: .2rem; }
   .sub { opacity: .7; margin-top: 0; font-size: .9rem; }
   .bar { display: flex; gap: 1.5rem; font-size: .85rem; opacity: .8;
          border-bottom: 1px solid var(--line); padding-bottom: .6rem;

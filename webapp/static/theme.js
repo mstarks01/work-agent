@@ -1,6 +1,6 @@
 // The theme the reader chose on the sidebar, set before the page draws, so no
 // page shows the other theme first. With no choice, the system setting stays.
-// Only this file reads or writes the stored choice. The sidebar button calls
+// Only this file reads or writes the stored choice. The sidebar's theme switch calls
 // workAgentTheme.choose.
 window.workAgentTheme = (() => {
   const key = "work-agent-theme";
