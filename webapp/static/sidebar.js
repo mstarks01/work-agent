@@ -17,12 +17,30 @@
     const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
     toggle.setAttribute("aria-label", label);
     toggle.title = label;
-    // A collapsed link shows only its icon, so its title names it on hover.
-    document.querySelectorAll("#sidebar-navigation a").forEach((link) => {
+    // A collapsed link or button shows only its icon, so its title names it
+    // on hover.
+    document.querySelectorAll("#sidebar-navigation > *").forEach((link) => {
       if (collapsed) link.title = link.textContent;
       else link.removeAttribute("title");
     });
   };
+
+  // The theme button: the reader's choice for every page, kept in the
+  // browser. theme.js sets it before each page draws.
+  const themeButton = document.getElementById("theme-toggle");
+  const isDark = () => {
+    const chosen = document.documentElement.dataset.theme;
+    return chosen ? chosen === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  };
+  const showTheme = () => themeButton.setAttribute("aria-pressed", String(isDark()));
+  showTheme();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", showTheme);
+  themeButton.addEventListener("click", () => {
+    const theme = isDark() ? "light" : "dark";
+    document.documentElement.dataset.theme = theme;
+    showTheme();
+    try { localStorage.setItem("work-agent-theme", theme); } catch { /* Keep the theme for this page only. */ }
+  });
 
   try {
     setCollapsed(localStorage.getItem(key) === "true");

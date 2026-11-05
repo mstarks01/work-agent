@@ -11,6 +11,12 @@
   --error:light-dark(#963a31,#ffc2b9);
   --error-bg:light-dark(#fff2ef,#402925)
 }
+:root[data-theme="light"] {
+  color-scheme:light
+}
+:root[data-theme="dark"] {
+  color-scheme:dark
+}
 * {
   box-sizing:border-box
 }

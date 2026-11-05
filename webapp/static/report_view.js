@@ -2258,9 +2258,3 @@
     landed.scrollIntoView();
   }
 
-  // theme toggle
-  $("themebtn").addEventListener("click", () => {
-    const cur = document.documentElement.getAttribute("data-theme");
-    const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
-  });

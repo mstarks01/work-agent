@@ -1881,6 +1881,7 @@ PAGE_SCRIPTS = {
     "webapp/sitting.py": "sitting.js",
     "webapp/review.py": ("review_queue.js", "review_finding.js"),
     "webapp/main.py": (
+        "theme.js",
         "sidebar.js",
         "workspace.js",
         "answer_editor.js",

@@ -186,6 +186,44 @@ def test_sidebar_collapses_and_stays_collapsed_on_settings(page):
     )
 
 
+def test_the_theme_button_sets_the_theme_on_every_page(page):
+    """The sidebar's theme button sets the theme, and each page the reader
+    opens next, the report too, draws in that theme."""
+    page.emulate_media(color_scheme="light")
+    button = page.get_by_role("button", name="Dark theme")
+    assert button.get_attribute("aria-pressed") == "false"
+    canvas = "getComputedStyle(document.body).backgroundColor"
+    light = page.evaluate(canvas)
+    button.click()
+    assert button.get_attribute("aria-pressed") == "true"
+    dark = page.evaluate(canvas)
+    assert dark != light
+    for path in ("/settings", "/files", "/controls"):
+        page.goto(path)
+        assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+        assert page.evaluate(canvas) == dark
+        assert (
+            page.get_by_role("button", name="Dark theme").get_attribute("aria-pressed")
+            == "true"
+        )
+    page.get_by_role("button", name="Dark theme").click()
+    page.goto("/")
+    assert page.evaluate(canvas) == light
+
+
+def test_the_report_draws_in_the_chosen_theme(page):
+    """The report's own palette obeys the sidebar's theme button."""
+    page.emulate_media(color_scheme="light")
+    pause(page)
+    page.click("#continue")
+    page.wait_for_url("**/report/**")
+    ink = "n => getComputedStyle(n).getPropertyValue('--ink').trim()"
+    light = page.locator(".viz-root").evaluate(ink)
+    page.click("#theme-toggle")
+    page.reload()
+    assert page.locator(".viz-root").evaluate(ink) != light
+
+
 def test_clearing_a_control_sends_no_answer_for_it(page):
     """Blank after "There is none" still sent ``none`` (#1289, B1)."""
     pause(page)
@@ -1472,13 +1510,12 @@ def test_a_printed_report_is_the_complete_export(page):
     pause(page)
     page.click("#continue")
     page.wait_for_url("**/report/**")
-    page.click("#themebtn")
+    page.click("#theme-toggle")
     group = page.locator("details.finding-group").first
     assert group.get_attribute("open") is None
     page.emulate_media(media="print")
     for hidden in (
         ".sidebar",
-        "#themebtn",
         "#analysis-tabs",
         "#report-tabs",
         "#invite",

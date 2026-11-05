@@ -66,9 +66,11 @@ globalThis.document = {
   querySelectorAll: () => [],
   addEventListener: () => {},
   body: new Node("body"),
+  documentElement: new Node("html"),
 };
 globalThis.window = globalThis;
 globalThis.addEventListener = () => {};
+globalThis.matchMedia = () => ({ matches: false, addEventListener() {} });
 globalThis.location = { pathname: "/report/r1", href: "", search: "" };
 globalThis.history = { replaceState() {} };
 """
@@ -91,7 +93,8 @@ def page_script() -> str:
     html = render_report(
         report, report_state(report), previous=None, parent=None, controls=()
     ).html
-    (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
+    # The head's theme script, then the page's code slot.
+    _, script = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
     return script
 
 
@@ -106,7 +109,8 @@ def run_report_page(html: str, search: str = "") -> dict[str, str]:
     node = shutil.which("node")
     if node is None:
         pytest.skip("no node on PATH to run the report page")
-    (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
+    # The head's theme script, then the page's code slot.
+    _, script = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
     program = (
         shim(payloads_of(html))
         + f"location.search = {json.dumps(search)};\n"
@@ -520,7 +524,8 @@ def _split_by_provenance(html: str) -> tuple[str, str]:
             re.DOTALL,
         )
     )
-    (script,) = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
+    # The head's theme script, then the page's code slot.
+    _, script = re.findall(r"<script nonce=\"[^\"]*\">(.*?)</script>", html, re.DOTALL)
     walk = r"""
 const text = (n) => typeof n === "object" ? n.textContent : String(n);
 const split = (n, out) => {

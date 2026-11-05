@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Report</title>
+<script nonce="__CSP_NONCE__"><!--theme--></script>
 <style nonce="__CSP_NONCE__"><!--workspace_style-->
   /* Palette roles (dataviz reference instance). Status hues are fixed, never themed. */
   .viz-root {
@@ -347,10 +348,6 @@
   :where(.viz-root) summary { font-size: inherit; color: inherit; }
   :where(.viz-root) details { margin: 0; }
   .viz-root .section-nav { margin: 20px 0 8px; }
-  /* The theme toggle reaches the sidebar too. */
-  :root[data-theme="light"] { color-scheme: light; }
-  :root[data-theme="dark"] { color-scheme: dark; }
-
   /* The complete export: the report, its questions and About the analysis
      in one document, with no tabs, no editors and no invitation. */
   .preview-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
@@ -371,7 +368,7 @@
 
   /* A print is the complete export: no navigation and no controls. */
   @media print {
-    .skip-link, .sidebar, #themebtn, #analysis-tabs, #report-head, #invite,
+    .skip-link, .sidebar, #analysis-tabs, #report-head, #invite,
     #preview-bar, .mermaid-link { display: none; }
     .workspace { display: block; min-height: 0; }
     main.report-main > .viz-root { min-height: 0; padding: 0; background: none; }
@@ -394,7 +391,6 @@
         <h1 id="sysname"></h1>
         <div class="meta">Security assessment</div>
       </div>
-      <button class="toggle" id="themebtn" type="button">Toggle theme</button>
     </div>
     <!-- The tabs of the report's analysis, as the workspace shows them. -->
     <nav class="section-nav" id="analysis-tabs" aria-label="Analysis" hidden><a id="description-tab">Description</a><a id="reports-tab" aria-current="page">Reports</a></nav>

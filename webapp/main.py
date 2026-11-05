@@ -1174,6 +1174,7 @@ def render_report(
         ),
         workspace_style=WORKSPACE_STYLE,
         sidebar=_SIDEBAR,
+        theme=_THEME,
         answer_limits=script_json(dict(ANSWER_LIMITS)),
         report=script_json(report.model_dump(mode="json")),
         controls=script_json([entry.model_dump(mode="json") for entry in controls]),
@@ -1700,6 +1701,7 @@ def create_app(
                 answer_limits=script_json(dict(ANSWER_LIMITS)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
+                theme=_THEME,
                 frameworks=_framework_fields(current.answers.carried_frameworks),
                 questions=_QUESTIONS_FIELD,
                 name_limit=str(MAX_SYSTEM_NAME_CHARS),
@@ -1734,6 +1736,7 @@ def create_app(
                 settings=script_json(settings_view(process_env, error)),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
+                theme=_THEME,
             )
         )
 
@@ -1826,6 +1829,7 @@ def create_app(
                 ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
+                theme=_THEME,
                 source_formats=_SOURCE_FORMATS,
                 file_refusals=script_json(
                     file_refusals(limits["max_bytes"], limits["max_owner_files"])
@@ -1929,6 +1933,7 @@ def create_app(
                 ),
                 workspace_style=WORKSPACE_STYLE,
                 sidebar=_SIDEBAR,
+                theme=_THEME,
                 source_formats=_SOURCE_FORMATS,
                 file_refusals=script_json(evidence_refusals(limits)),
                 controls_page=script_json(page_data(limits)),
@@ -2853,6 +2858,9 @@ _UPLOAD_ACCEPT = escape(
 #: The sidebar of every workspace page: the form, Settings and the report.
 #: Static markup, so it takes no escape.
 _SIDEBAR = (Path(__file__).parent / "sidebar.html").read_text(encoding="utf-8")
+#: The script each sidebar page runs in its head, to set the theme the reader
+#: chose before the page draws.
+_THEME = client_script("theme.js")
 
 #: The question toggle. Every install can pause: one with no catalog asks its
 #: early questions and no link question.
