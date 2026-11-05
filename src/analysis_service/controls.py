@@ -30,7 +30,7 @@ from pydantic import (
 from analysis_service.analysis import control_state
 from analysis_service.fact_answers import FactAnswer, key_ref, read_back
 from analysis_service.frameworks import check_unit
-from analysis_service.owner_files import text_refusal
+from analysis_service.owner_files import text_lines, text_refusal
 from analysis_service.parsing import Sha256Hex
 from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
 from analysis_service.sources import (
@@ -546,7 +546,7 @@ CREDENTIAL_SHAPES: Mapping[CredentialShape, re.Pattern[str]] = {
 def credential_hit(text: str) -> tuple[int, CredentialShape] | None:
     """The number of the first line of ``text`` that holds a credential shape,
     and the shape, or ``None``."""
-    for number, line in enumerate(text.split("\n"), start=1):
+    for number, line in enumerate(text_lines(text), start=1):
         for shape, pattern in CREDENTIAL_SHAPES.items():
             if pattern.search(line):
                 return number, shape
