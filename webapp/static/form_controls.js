@@ -40,11 +40,16 @@ const formControls = (() => {
   // The frameworks the form selects now.
   const selected = () => new Set([...document.querySelectorAll('#frameworks input[name="framework"]:checked')]
     .map((box) => box.value));
-  // A Control with no fact and no row of a selected framework changes nothing
-  // in this analysis (job_controls.changes_nothing), so the list offers no tick.
-  // Before any framework is chosen, the list judges no Control.
+  // Whether a row of the Control names a selected framework, at the version
+  // this service carries (`current`, from control_view's current_rows) or at
+  // another.
+  const rowsOf = (control, frameworks, current) => control.rows.some((row, at) =>
+    frameworks.has(row.framework) && control.current_rows[at] === current);
+  // A Control with no fact and no current row of a selected framework changes
+  // nothing in this analysis (job_controls.changes_nothing), so the list
+  // offers no tick. Before any framework is chosen, the list judges no Control.
   const fits = (control, frameworks) => !frameworks.size || control.facts.length > 0
-    || control.rows.some((row) => frameworks.has(row.framework));
+    || rowsOf(control, frameworks, true);
   const coveredBy = (control) => [...new Set(control.rows.map((row) => row.framework))].join(" and ");
   const manage = () => h("a", { href: "/controls" }, "Manage Controls");
 
@@ -61,13 +66,18 @@ const formControls = (() => {
     const frameworks = selected();
     const lines = held.map((control) => {
       const fit = fits(control, frameworks);
-      const ownRows = control.rows.some((row) => frameworks.has(row.framework));
+      const ownRows = rowsOf(control, frameworks, true);
+      const oldRows = !ownRows && rowsOf(control, frameworks, false);
       const box = h("input", { type: "checkbox", id: `control-${control.id}`, checked: fit && ticked.has(control.id),
         disabled: !fit,
         on: { change: (event) => { if (event.target.checked) ticked.add(control.id); else ticked.delete(control.id); drawChecklist(); } } });
       const note = !fit
-        ? `Not for this analysis: it states no fact and covers only ${coveredBy(control)}.`
-        : control.rows.length && !ownRows ? `Only its facts apply here: its rows cover ${coveredBy(control)}.` : "";
+        ? (oldRows
+          ? "Not for this analysis: it states no fact, and its rows are not at the framework version this service carries. Edit its rows in Controls."
+          : `Not for this analysis: it states no fact and covers only ${coveredBy(control)}.`)
+        : !control.rows.length || ownRows ? ""
+          : oldRows ? "Only its facts apply here: its rows are not at the framework version this service carries."
+            : `Only its facts apply here: its rows cover ${coveredBy(control)}.`;
       return h("li", {}, box, " ", h("label", { for: box.id }, h("b", {}, control.name)),
         h("span", { class: "hint" }, ` · ${scopeText(control.scope)}`,
           control.rows.length ? ` · ${control.rows.map(rowText).join(", ")}` : ""),

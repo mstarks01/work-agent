@@ -816,6 +816,8 @@
     reopen: true,
     contextOf,
     extras: (row) => [skipControl(row)],
+    // Each element's hue, from the payload the page drew last.
+    hueOf: (id) => (view && Object.hasOwn(view.element_hues, id) ? view.element_hues[id] : undefined),
   });
   const removeRow = (row) => {
     rows.delete(rowKey(row));

@@ -625,7 +625,9 @@ class TestTheReportSection:
         assert [
             (fact["value"], fact["state"]) for fact in section["Encrypted"]["facts"]
         ] == [("AES-256", "written")]
-        assert section["Encrypted"]["elements"] == ["Orders DB"]
+        assert section["Encrypted"]["elements"] == [
+            {"id": "store:orders-db", "name": "Orders DB"}
+        ]
         assert (section["Billing"]["state"], section["Billing"]["reason"]) == (
             "left-out",
             "missing-element",
@@ -646,6 +648,7 @@ class TestTheReportSection:
         assert "Evidence: WAF.yaml (config), line 1: WAF: on" in text
         assert "AES-256 — written" in text
         assert "Protects the process “Billing”: left out, missing-element." in text
+        assert "applied to Orders DB." in text
 
     def test_the_csv_export_holds_a_row_for_each_finding(self, ruled):
         owner, child, _ = ruled

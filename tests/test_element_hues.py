@@ -47,10 +47,10 @@ def test_a_colour_is_written_as_hex():
 
 
 def test_the_page_and_the_service_state_one_light_tag():
-    page = Path("webapp/report_view.html").read_text(encoding="utf-8")
+    page = Path("webapp/static/workspace.css").read_text(encoding="utf-8")
     light = re.search(
-        r"--tag-fill-s: (\d+)%; --tag-fill-l: (\d+)%;\s*--tag-line-s: (\d+)%;"
-        r" --tag-line-l: (\d+)%;",
+        r"--tag-fill-s:(\d+)%; --tag-fill-l:(\d+)%;\s*--tag-line-s:(\d+)%;"
+        r" --tag-line-l:(\d+)%;",
         page,
     )
     assert light is not None
@@ -58,7 +58,7 @@ def test_the_page_and_the_service_state_one_light_tag():
 
 
 def test_the_system_dark_theme_and_the_toggle_state_one_dark_tag():
-    page = Path("webapp/report_view.html").read_text(encoding="utf-8")
+    page = Path("webapp/static/workspace.css").read_text(encoding="utf-8")
     tags = [
         tuple(map(int, found))
         for found in re.findall(

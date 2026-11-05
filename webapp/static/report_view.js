@@ -136,8 +136,8 @@
   };
   // A labelled identifier as a tag in its element's colour, the identifier on
   // hover; a zone or another reference takes a grey tag.
-  const tag = (id) => paint(Object.assign(
-    el("span", Object.hasOwn(HUES, id) ? "ref" : "ref neutral", NAMES[id]), { title: id }), id);
+  const hueOf = (id) => (Object.hasOwn(HUES, id) ? HUES[id] : undefined);
+  const tag = (id) => elementTag(NAMES[id], id, hueOf(id));
   const arrow = () => {
     const glyph = el("span", "flow-arrow", "\u2192");
     glyph.setAttribute("aria-hidden", "true");
@@ -941,6 +941,7 @@
       }),
       contextOf: whyAsked,
       notes,
+      hueOf,
     });
     let prev = null;
     entries.forEach(({ q, kind, saved, compact }) => {
@@ -1351,8 +1352,10 @@
     const scope = entry.scope.type === "application"
       ? "The whole application"
       : `The ${entry.scope.type} “${entry.scope.name}”`;
-    if (entry.state === "left-out") return `${scope}: left out, ${entry.reason}`;
-    return entry.elements.length ? `${scope} → ${entry.elements.join(", ")} (${entry.outcome})` : `${scope} (${entry.outcome})`;
+    if (entry.state === "left-out") return [`${scope}: left out, ${entry.reason}`];
+    if (!entry.elements.length) return [`${scope} (${entry.outcome})`];
+    return [`${scope} → `, ...commaList(entry.elements.map((element) => tag(element.id))),
+      ` (${entry.outcome})`];
   };
   const controlRow = (row) => {
     const open = el("details", "control-row");
@@ -1402,7 +1405,9 @@
       }
       const rows = el("td");
       entry.rows.forEach((row) => rows.append(controlRow(row)));
-      tr.append(el("td", "name", entry.name), el("td", null, controlMatch(entry)), el("td"), rows);
+      const match = el("td");
+      match.append(...controlMatch(entry));
+      tr.append(el("td", "name", entry.name), match, el("td"), rows);
       tr.children[2].append(facts);
       table.tBodies[0].append(tr);
     }
@@ -2017,7 +2022,7 @@
   // copied out of submitted prose.
   const mark = (v) => (v === "unknown" ? el("span", "unk", "unknown") : String(v));
   const named = (e) => cell(Object.hasOwn(HUES, e.id)
-    ? paint(Object.assign(el("span", "ref", e.name), { title: e.id }), e.id)
+    ? elementTag(e.name, e.id, HUES[e.id])
     : Object.assign(el("span", null, e.name), { title: e.id }));
   const zoneCell = (zone) => cell(zone === "unknown" ? mark(zone) : ref(zone));
   const ELEMENT_TABLES = [

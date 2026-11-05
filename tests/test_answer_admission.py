@@ -243,6 +243,8 @@ class TestOnlyAnAskedFactTakesAnAnswer:
         client, store = catalog_client()
         job = waiting(store)
         body = client.get(f"/v1/jobs/{job}/questions", headers=auth()).json()
+        # Each element of the model takes a hue for its tag.
+        assert body["element_hues"]
         served = {
             tuple(question["key"])
             for question in (

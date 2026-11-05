@@ -156,7 +156,8 @@ attribute or an asset tag, shows as words. The name itself shows when you hover
 over the words. An element shows as a tag in its own colour, with an outline
 in a darker shade of it; each element of the model has a colour of its own,
 the same in every view. A trust zone shows as a grey tag, and a flow as its
-two endpoint tags with an arrow between them.
+two endpoint tags with an arrow between them. A question about an element and
+the Controls section show the element as the same tag.
 
 **Questions** shows only for an analysis with **Ask me questions to make the
 report better.** ticked. It asks the facts that the conditional findings need,
@@ -399,10 +400,12 @@ the IDs of the Controls you tick in `controls`, and the job copies each one,
 with the text of each evidence file (ADR 0127). A later edit or delete changes
 no job. When a ticked Control is gone, the submission is refused and the list
 shows the Control as "Missing". A Control that states no fact and has no row
-of a selected framework changes nothing in the analysis, so the list shows it
-unticked and disabled, with the note "Not for this analysis". The service
-refuses a submission that names one. A Control with facts and rows only of
-other frameworks stays ticked, with the note "Only its facts apply here".
+of a selected framework at the version the service carries changes nothing in
+the analysis, so the list shows it unticked and disabled, with the note "Not
+for this analysis". The note says when its rows are not at the framework
+version the service carries. The service refuses a submission that names one.
+A Control with facts and rows only of other frameworks stays ticked, with the
+note "Only its facts apply here".
 Controls apply at the pause. With the questions off, a job with Controls also
 pauses, and the service continues it at once with no answers (ADR 0125). The
 page shows "Continuing with your Controls…" until the next run starts. Each

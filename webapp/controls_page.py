@@ -40,6 +40,7 @@ from analysis_service.controls import (
 from analysis_service.errors import refusal_text
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks import PACKAGES, FrameworkPackage
+from analysis_service.job_controls import current_row
 from analysis_service.owner_files import NOT_UTF_8
 from analysis_service.question_kinds import QUESTION_KINDS
 from analysis_service.sources import MAX_LABEL_CHARS, EvidenceClass, text_digest
@@ -331,8 +332,9 @@ def save_refusal(exc: ValueError) -> str:
 
 
 def control_view(control: Control) -> dict[str, object]:
-    """What the page shows of a Control: the document and its last save, and
-    no evidence text."""
+    """What the page shows of a Control: the document, its last save, whether
+    each row names the version this service carries, and no evidence text."""
     return control.document.model_dump(mode="json") | {
-        "updated_at": control.updated_at.isoformat()
+        "updated_at": control.updated_at.isoformat(),
+        "current_rows": [current_row(row) for row in control.document.rows],
     }
