@@ -69,10 +69,10 @@ not switch route or model. Expected cost: about $0.05 a call, $0.60 in all.
 
 - **repaired**: the answer was read (`schema_error` is empty), the merged set has
   no problem (`remaining` is empty), and the re-ask changed no ruling that no
-  problem named (`drift` is empty);
+  problem named (`unbriefed` is empty);
 - **kept fault**: a remaining problem with the message that was sent;
 - **new problem**: a remaining problem with a message that was not sent;
-- **unbriefed change**: an entry in `drift`;
+- **unbriefed change**: an entry in `unbriefed`;
 - **status change**: the draft's verdict after the repair is not the verdict
   with every row answered (for example, a kept draft rejected for `control`).
   This is read and reported. It does not enter the repaired count, because
