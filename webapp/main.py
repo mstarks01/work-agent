@@ -163,6 +163,7 @@ from analysis_service.api import (
     FrameworkRequest,
     JobSubmission,
     max_body_bytes,
+    max_control_body_bytes,
 )
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.certification import CertificationGate
@@ -1954,7 +1955,7 @@ def create_app(
         request: Request, current: Current, model: type[ControlSave]
     ) -> ControlSave | JSONResponse:
         """The body of a Control save, or the ``400`` that refuses it."""
-        raw = await _job_body(request, current.answers)
+        raw = await _json_body(request, max_control_body_bytes(current.control_limits))
         try:
             return model.model_validate(_body_of(raw, model))
         except _UnknownKey as exc:

@@ -74,6 +74,7 @@ from analysis_service.auth import (
 )
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import FrameworkName
+from analysis_service.controls import ControlLimits
 from analysis_service.deployment import Deployment, FrameworkNotCarried
 from analysis_service.errors import ConfigError, shown_errors
 from analysis_service.frameworks import PACKAGES
@@ -145,6 +146,25 @@ def max_body_bytes(limits: SourceLimits) -> int:
     ``tests/test_one_reader_lints.py`` refuses a second reader.
     """
     return limits.max_total_bytes * _BODY_SLACK
+
+
+#: The room in a Control save's body for all but its evidence text: the name,
+#: the scope, at most 50 facts and 50 rows, and the evidence names.
+_CONTROL_FIELDS_BYTES = 64 * 1024
+
+
+def max_control_body_bytes(limits: ControlLimits) -> int:
+    """The raw-body guard of a Control save: the guard of a job whose sources
+    are a full Control's evidence, and room for the other fields.
+
+    The web app's ``control_body`` enforces it, and
+    ``tests/test_one_reader_lints.py`` refuses another caller.
+    """
+    evidence = SourceLimits(
+        max_total_bytes=limits.max_evidence * limits.max_evidence_bytes,
+        max_sources=limits.max_evidence,
+    )
+    return max_body_bytes(evidence) + _CONTROL_FIELDS_BYTES
 
 
 #: How many event streams one owner may hold open at once. Each stream polls

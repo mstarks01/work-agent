@@ -1697,7 +1697,11 @@ def test_the_raw_body_guard_has_one_reader():
     ]
     assert _sites(lambda node: _calls(node, "max_body_bytes")) == [
         ("src/analysis_service/api.py", "create_app"),
+        ("src/analysis_service/api.py", "max_control_body_bytes"),
         ("webapp/main.py", "_job_body"),
+    ]
+    assert _sites(lambda node: _calls(node, "max_control_body_bytes")) == [
+        ("webapp/main.py", "control_body"),
     ]
 
 

@@ -666,8 +666,11 @@ page, so the page and the server word a refusal in one way.
 `webapp/main.py`. It refuses a media type other than `application/json` with
 `415`. It refuses a body over the route's limit with `413`, and it stops the
 read at the first byte over the limit. The limit is `MAX_SAVE_BYTES` for the
-two Settings routes. Each other route is a job route, and it reads its body
-through `_job_body`. There the limit is twice the deployment's
+two Settings routes. The two Control save routes use `max_control_body_bytes`:
+twice the text of a Control that holds the most evidence files, each at its
+largest, and 64 KiB for the other fields. So the routes accept each Control that
+the evidence rules accept. Each other route is a job route, and it reads its
+body through `_job_body`. There the limit is twice the deployment's
 `max_source_bytes`, the guard that `/v1` also applies.
 
 **Every page carries a strict nonce CSP,** `default-src 'none'` with a fresh

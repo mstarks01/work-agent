@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service import PACKAGES, Report
+from analysis_service.api import max_body_bytes, max_control_body_bytes
 from analysis_service.claims import (
     ControlRowRef,
     RefusedControl,
@@ -28,8 +29,9 @@ from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT
 from tests import test_webapp
 from tests.factories import sample_analysis
 from tests.test_controls import fact, row
+from tests.test_doc_copy_lints import SHIPPED_RESILIENCE
 from tests.test_structural_readers import sound_report
-from tests.test_webapp import LOOPBACK, SAME_ORIGIN
+from tests.test_webapp import LOOPBACK, SAME_ORIGIN, WEBAPP_LIMITS
 from tests.test_webapp_controls import BOB, ORDERS_DB, Owner, ZonedRunner
 from tests.test_webapp_questions import app_for, ran
 from webapp.main import Workspace
@@ -241,6 +243,29 @@ class TestCreate:
             "A Control holds at most 10 evidence files. Remove a file before you"
             " add another."
         )
+
+    def test_a_body_past_the_job_guard_reaches_the_control_rules(self, owner):
+        """A save with more text than one job's body holds is read, so its
+        refusal names the rule it breaks and not the body size."""
+        sent = [
+            {"name": f"{number}.txt", "class": "people", "text": '"' * 10_000}
+            for number in range(LIMITS.max_evidence + 1)
+        ]
+        assert len(json.dumps(body(evidence=sent))) > max_body_bytes(WEBAPP_LIMITS)
+        refused = create(owner, evidence=sent)
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["message"].startswith("A Control holds at most 10")
+
+    def test_the_guard_holds_a_full_control_at_the_shipped_limits(self):
+        limits = SHIPPED_RESILIENCE.control_limits()
+        text = '"' * limits.max_evidence_bytes
+        sent = [
+            {"name": "a" * 200, "class": "code", "text": text}
+            for _ in range(limits.max_evidence)
+        ]
+        full = json.dumps(body(evidence=sent)).encode()
+        assert len(full) > max_body_bytes(SHIPPED_RESILIENCE.source_limits())
+        assert len(full) <= max_control_body_bytes(limits)
 
     @pytest.mark.parametrize(
         "evidence",
