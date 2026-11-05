@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import get_args
 
 import pytest
 
@@ -20,16 +21,19 @@ from analysis_service.claims import (
 )
 from analysis_service.critic import CriticOutputError
 from analysis_service.critic_round import (
+    REVIEW_ARTIFACTS,
     Accepted,
     CriticRound,
     Failed,
     FirstPass,
     Reask,
+    ReaskArtifact,
     critic_request,
     rulings_of,
 )
 from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.graph import (
+    FRAMEWORK_RENDERED_ARTIFACTS,
     STATE_BOUNDARY_CROSSINGS,
     STATE_INPUT_TEXT,
     STATE_SYSTEM_MODEL,
@@ -325,3 +329,15 @@ class TestTheRequest:
             "unverified_count": 1,
             "unresolved_mention_count": 0,
         }
+
+
+def test_the_re_ask_artifacts_are_the_rendered_review_keys_but_the_view():
+    """``Reask.rendered_artifacts`` renders each key the re-ask prompt reads, and no other.
+
+    The first pass's ``draft_view`` is the one review key a re-ask does not
+    render. So the three spellings of the set are held together here.
+    """
+    reask = set(get_args(ReaskArtifact))
+
+    assert reask == set(REVIEW_ARTIFACTS.values()) - {"draft_view"}
+    assert reask == set(FRAMEWORK_RENDERED_ARTIFACTS) - {"draft_view"}

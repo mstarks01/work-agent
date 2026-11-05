@@ -64,7 +64,15 @@ this checkout's, and the command prints both commits. To compare a lane with and
 with no artifact: it runs today's `prepare` offline, so the two arms differ only in the
 catalog, and it prints the must-finds the lane's drafts match.
 
-Both replays send a live request, so `ANALYSIS_OFFLINE` refuses them. Their
+`python -m evals.harness.run recritic-replay <artifact> --case <case> --framework <package> --faults <file> --draft <id> --fault <shape> --accept-cost unknown`
+costs one re-ask call. It reads the case's critic first pass from its report,
+applies the one Control the fault set holds, answers each row it shows with the
+refusal the file states, and puts one Control row fault of the shape on the
+draft. With `--out <file>` it writes the problems the re-ask was sent, its
+answer, the problems that remain and each ruling it changed that no problem
+named.
+
+The three replays send a live request, so `ANALYSIS_OFFLINE` refuses them. Their
 names say "replay"; their cost says paid. `replay` and `score` above re-read an
 archive and are free.
 

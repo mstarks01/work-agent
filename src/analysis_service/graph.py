@@ -1862,7 +1862,7 @@ def prepare_node(
     return _node(prepare_analysis_node, PREPARE_NODE)
 
 
-def _claims_of(payload: object) -> list[Any]:
+def claims_of(payload: object) -> list[Any]:
     """The list inside an LLM node's emission, or empty if the node never ran.
 
     Lane agents and review nodes emit ``{"claims": [...]}`` rather than a bare
@@ -1894,7 +1894,7 @@ def _batch_of(payload: object) -> dict[str, Any]:
     The node already validated and dumped the batch, so state holds both its
     lists, and re-validating the whole payload keeps the invalid entries the
     node salvaged. A key that was never written reads as a batch of nothing,
-    the same absence :func:`_claims_of` reads for the review nodes.
+    the same absence :func:`claims_of` reads for the review nodes.
 
     A payload that is a mapping goes back as it stands, including one carrying
     no ``claims``. That shape is nothing this graph writes, so the caller's
@@ -2066,7 +2066,7 @@ def route_review(
     """
     state = keys.state(ctx)
     critic_round = _parked_round(state, SystemModel.model_validate(valid_model), nodes)
-    emitted = _claims_of(state.get(nodes.key("reviewed")))
+    emitted = claims_of(state.get(nodes.key("reviewed")))
     recorded = list(critic_round.marks.unreconciled_rulings)
     first = state.get(nodes.key("first_review"))
     if first is None:
@@ -2079,16 +2079,10 @@ def route_review(
         recorded += drift
         outcome = critic_round.outcome(merged)
     if isinstance(outcome, Reask):
-        # ``previous_review`` is the emission itself rather than anything
-        # recomputed, because what the re-ask must reconcile with is the bytes
-        # the critic actually returned. ``first_review`` is the same rulings
-        # in the spelling the second look merges onto.
-        state.prompt(nodes.key("previous_review"), render_fenced(emitted))
-        state.prompt(nodes.key("critic_issues"), render_fenced(outcome.messages))
-        state.prompt(nodes.key("draft_roster"), render_fenced(outcome.roster))
-        state.prompt(
-            nodes.key("unreconciled_drafts"), render_fenced(outcome.unreconciled)
-        )
+        # ``first_review`` is the first pass in the spelling the second look
+        # merges onto.
+        for artifact, text in outcome.rendered_artifacts.items():
+            state.prompt(nodes.key(artifact), text)
         state.put(nodes.key("first_review"), outcome.first.rulings)
         state.put(nodes.key("repairable"), outcome.first.repairable)
     if isinstance(outcome, Accepted):
@@ -2112,7 +2106,7 @@ def route_review(
         )
     if isinstance(outcome, Accepted):
         return _routed(ROUTE_ACCEPT, {"reviewed_count": outcome.count})
-    return _routed(ROUTE_REVISE, {"issue_count": len(outcome.messages)})
+    return _routed(ROUTE_REVISE, outcome.revise_output)
 
 
 def _parked_round(
@@ -2162,7 +2156,7 @@ def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) 
     # reconcile.
     outcome = _parked_round(
         state, SystemModel.model_validate(valid_model), nodes
-    ).outcome(_claims_of(state.get(nodes.key("reviewed"))))
+    ).outcome(claims_of(state.get(nodes.key("reviewed"))))
     if isinstance(outcome, Failed):
         raise outcome.error
     raise AssertionError("fail_review reached on reconciled critic output")
@@ -2483,7 +2477,7 @@ def _framework_block(
     accepted = bool(state.get(nodes.key("accepted")))
     critic_round = _parked_round(state, model, nodes, accepted=accepted)
     outcome = critic_round.outcome(
-        _claims_of(state.get(nodes.key("reviewed")) if accepted else None)
+        claims_of(state.get(nodes.key("reviewed")) if accepted else None)
     )
     if isinstance(outcome, Failed):
         raise outcome.error

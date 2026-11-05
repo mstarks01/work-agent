@@ -35,7 +35,7 @@ runs" in [`AGENTS.md`](../AGENTS.md).
   a model to sweep with" below.
 - **Classify a command by what it does, not by its name.** `score`, `replay`,
   `stability` and the other re-reads of an archive are offline. `run`,
-  `lane-replay` and `critic-replay` send requests and are paid. Set
+  `lane-replay`, `critic-replay` and `recritic-replay` send requests and are paid. Set
   `ANALYSIS_OFFLINE=1` for offline work, and a paid path fails before it
   reaches a provider.
 

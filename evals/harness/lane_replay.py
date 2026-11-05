@@ -78,7 +78,7 @@ from evals.harness.bundle import check_out, finished_file
 from evals.harness.descendants import FRAMEWORK as SCORED
 from evals.harness.descendants import lane_must_finds
 from evals.harness.modes import EvalRunError, case_framework_options
-from evals.harness.node_call import NodeCall, node_call
+from evals.harness.node_call import NodeCall, node_call, spent_line
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import (
     DEFAULT_CORPUS,
@@ -386,11 +386,7 @@ def command_lane_replay(args: argparse.Namespace) -> int:
     dumped = batch.model_dump(mode="json")
     for claim in dumped["claims"]:
         print(f"- {claim.get('title')} | {claim.get('affected_element_ids')}")
-    charged = [charge for charge in spent if charge is not None]
-    print(
-        f"spent: ${sum(charged):.4f} reported"
-        + ("" if len(charged) == len(spent) else "; the provider reported no charge")
-    )
+    print(spent_line(spent))
     if args.out:
         written = {"record": record, **dumped}
         args.out.write_text(json.dumps(written, indent=2) + "\n", encoding="utf-8")
