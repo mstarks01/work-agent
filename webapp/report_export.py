@@ -29,7 +29,7 @@ from analysis_service.claims import (
     Severity,
     Verdict,
 )
-from analysis_service.controls import SCOPE_WORDS
+from analysis_service.controls import SCOPE_NOUNS
 from analysis_service.frameworks import lane_of
 from analysis_service.job_controls import SectionEntry
 from analysis_service.open_facts import element_names
@@ -83,7 +83,7 @@ def _findings(report: Report) -> list[str]:
 
 def _scope(entry: SectionEntry) -> str:
     scope = entry.scope
-    _label, noun = SCOPE_WORDS[scope.type]
+    noun = SCOPE_NOUNS[scope.type]
     if scope.type == "application":
         return f"the {noun}"
     return f"the {noun} “{_text(scope.name)}”"

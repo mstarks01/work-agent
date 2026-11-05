@@ -88,6 +88,12 @@ SCOPE_WORDS: Mapping[ScopeType, tuple[str, str]] = MappingProxyType(
     }
 )
 
+#: The noun of each scope type, from :data:`SCOPE_WORDS`, for the pages and
+#: the export that name one scope in a sentence.
+SCOPE_NOUNS: Mapping[ScopeType, str] = MappingProxyType(
+    {scope_type: noun for scope_type, (_label, noun) in SCOPE_WORDS.items()}
+)
+
 #: The kinds of fact a Control writes: a subject or an assertion is a question
 #: of one job, and a Capability says what the application does rather than
 #: what protects it, so no Control writes one.
