@@ -1508,10 +1508,12 @@ async def _refused(status: int, request: Request, exc: Exception) -> JSONRespons
 _NOT_STARTED = "The analysis could not be started. Check the server log."
 
 #: What the page says for a job that waits to continue at its pause where no
-#: task of this process continues it and no refusal is stored (ADR 0125).
+#: task of this process continues it, no refusal is stored and no Resumed Job
+#: exists (ADR 0125): the app restarted, a stop came after the pause, or the
+#: last continue ended without a report.
 _NOT_CONTINUED = (
-    "The app did not continue this job. It restarted, or the last continue"
-    " did not finish. Continue it."
+    "The app did not continue this job, for example after a restart or a stop."
+    " Continue it."
 )
 
 
