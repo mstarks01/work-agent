@@ -89,15 +89,15 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
     for entry in section:
         lines.append(f"### {_text(entry.name)}")
         lines.append("")
-        scope = _text(scope_phrase(entry.scope))
+        phrase = _text(scope_phrase(entry.scope))
         if entry.state == "applied":
             reached = ", ".join(_text(element.name) for element in entry.elements)
             lines.append(
-                f"Protects {scope}: {entry.meaning}"
+                f"Protects {phrase}: {entry.meaning}"
                 + (f", applied to {reached}." if reached else ".")
             )
         else:
-            lines.append(f"Protects {scope}: left out, because {entry.meaning}.")
+            lines.append(f"Protects {phrase}: left out, because {entry.meaning}.")
         for fact in entry.facts:
             stated = (
                 f" (the description states “{_text(fact.stated)}”)"

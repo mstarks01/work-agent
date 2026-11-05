@@ -407,12 +407,13 @@ def _stated(
     if scope.type == "application":
         if entry.element or entry.ticked:
             raise ValueError(
-                f"“{name}” protects the whole application, so it names no element."
+                f"“{name}” protects {scope_phrase(scope)}, so it names no element."
             )
         return AppliedScope(control=copy.id, outcome="application")
     if element_prefix(entry.element) != scope.type:
+        words = SCOPE_WORDS[scope.type]
         raise ValueError(
-            f"“{name}” protects {SCOPE_WORDS[scope.type].label.lower()}, and"
+            f"“{name}” protects {words.article.lower()} {words.noun}, and"
             f" {entry.element} is not one."
         )
     if model.get(entry.element) is None:
