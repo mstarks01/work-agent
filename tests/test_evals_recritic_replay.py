@@ -1,9 +1,9 @@
-"""The re-ask replay injects one Control row fault and rebuilds the re-ask.
+"""The re-ask replay injects one fault and rebuilds the re-ask.
 
 Two claims are tested offline. The round's check names exactly the injected
-fault, one ``control-row`` problem on the faulted draft, for each shape. And
-the re-ask request rebuilt from an archive equals the one a scripted graph run
-sent, instruction and user turn, byte for byte.
+fault, the problems ``EXPECTED`` gives the shape on the faulted ID, for each
+shape. And the re-ask request rebuilt from an archive equals the one a scripted
+graph run sent, instruction and user turn, byte for byte.
 """
 
 from __future__ import annotations
@@ -11,19 +11,25 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-from typing import get_args
+from types import SimpleNamespace
+from typing import cast, get_args
 
 import pytest
 
-from analysis_service.claims import RefusedControl
+from analysis_service import graph
+from analysis_service.claims import ProposedVerdict, RefusedControl, Ruling, UnknownRef
+from analysis_service.critic import review_issues
 from analysis_service.frameworks import PACKAGES
 from analysis_service.markdown_loader import MarkdownLoader
-from evals.harness import critic_replay, recritic_replay
+from analysis_service.system_model import attribute_names
+from evals.harness import critic_replay, modes, recritic_replay
 from evals.harness.bundle import write_failures, write_reports
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.run_record import loaded
+from tests import test_critic
 from tests import test_evals_run_grounds as grounds
+from tests.factories import valid_model
 from tests.test_critic_review_replay import EVERY_LANE
 from tests.test_evals_critic_replay import failed
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixtures)
@@ -34,15 +40,27 @@ from tests.test_evals_lane_replay import (  # noqa: F401  (fixtures)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)
 
 PACKAGE = PACKAGES["stride"]
+#: The pipeline builder as the module defines it, before a sweep replaces it.
+BUILD_EVAL_PIPELINE = modes.build_eval_pipeline
 PACKAGE_LOADER = MarkdownLoader(REPO_ROOT / "frameworks" / "stride")
 PROMPT_LOADER = MarkdownLoader(REPO_ROOT / "prompts")
 SHAPES = get_args(recritic_replay.FaultShape)
+#: The shapes a STRIDE first pass can carry: no STRIDE draft rules its unit out.
+STRIDE_SHAPES = [shape for shape in SHAPES if shape != "confirmed-ruled-out"]
 
-#: The sentence of each shape's problem, as the round's check words it.
+#: The sentence of each shape's first problem, as the round's check words it.
 WORDS = {
     "row-unanswered": "unanswered: answer it in control_row or in refused_controls",
     "row-not-shown": "which the draft was not shown",
     "row-on-other-step": "names a control_row on a ruling not rejected for control",
+    "control-row-missing": "is rejected for control and names no control_row",
+    "control-row-not-shown": "which the draft was not shown",
+    "dropped": "critic dropped draft",
+    "invented": "which no lane agent drafted",
+    "duplicate-id": "is used by 2 drafts",
+    "verdict-shape": "is rejected for reasoning but also names open facts",
+    "confirmed-ruled-out": "excludes its requirement and is ruled confirmed",
+    "unresolved-unknown": "which element",
 }
 
 
@@ -61,6 +79,10 @@ def faults_for(archived, refused_by=None) -> recritic_replay.FaultSet:
             for draft in archived.drafts
             if refused_by is None or draft.id in refused_by
         },
+        covers={
+            draft.id: "the audit log names every write to this element"
+            for draft in archived.drafts
+        },
     )
 
 
@@ -70,17 +92,127 @@ def archived(recorded, case):  # noqa: F811
     return critic_replay.load(finished(out, case.id), case.id, "stride")
 
 
-@pytest.mark.parametrize("shape", SHAPES)
-def test_each_fault_gives_one_control_row_problem_on_its_draft(archived, shape):
+@pytest.fixture
+def open_facts(monkeypatch, archived):
+    """Every archived ruling also names one open fact, an element's attribute,
+    and a reason.
+
+    The scripted sweep confirms each draft with no reason, and a
+    ``verdict-shape`` or an ``unresolved-unknown`` fault needs a ruling that
+    names an open fact and gives a reason.
+    """
+    element = next(iter(archived.model.elements()))
+    fact = UnknownRef(element_id=element.id, attribute=attribute_names(element)[0])
+    real = recritic_replay.rulings_from_report
+
+    def with_a_fact(block, drafts):
+        return [
+            ruling.model_copy(
+                update={
+                    "verdict": ruling.verdict.model_copy(
+                        update={"related_unknowns": [fact], "reason": "open"}
+                    )
+                }
+            )
+            for ruling in real(block, drafts)
+        ]
+
+    monkeypatch.setattr(recritic_replay, "rulings_from_report", with_a_fact)
+
+
+def test_each_shape_states_its_problems():
+    assert set(recritic_replay.EXPECTED) == set(SHAPES) == set(WORDS)
+
+
+@pytest.mark.parametrize("shape", STRIDE_SHAPES)
+@pytest.mark.usefixtures("open_facts")
+def test_each_fault_gives_its_problems_on_its_draft(archived, shape):
     faults = faults_for(archived)
 
     for draft in archived.drafts[:2]:
         view = recritic_replay.fault_view(archived, faults, draft.id, shape)
 
-        (problem,) = view.reask.problems
-        assert (problem.kind, problem.claim_id) == ("control-row", draft.id)
-        assert WORDS[shape] in problem.message
-        assert [item["id"] for item in view.reask.unreconciled] == [draft.id]
+        faulted = f"{draft.id}a" if shape == "invented" else draft.id
+        assert [(each.kind, each.claim_id) for each in view.reask.problems] == [
+            (kind, faulted) for kind in recritic_replay.EXPECTED[shape]
+        ]
+        assert WORDS[shape] in view.reask.problems[0].message
+        implicated = [] if shape in {"invented", "duplicate-id"} else [draft.id]
+        assert [item["id"] for item in view.reask.unreconciled] == implicated
+
+
+def test_a_draft_that_keeps_its_unit_cannot_be_confirmed_ruled_out(archived):
+    draft = archived.drafts[0].id
+
+    with pytest.raises(EvalRunError, match="does not rule its unit out"):
+        recritic_replay.fault_view(
+            archived, faults_for(archived), draft, "confirmed-ruled-out"
+        )
+
+
+def test_a_confirmed_exclusion_is_the_one_fault_on_an_asvs_draft():
+    """No case archive holds an ASVS first pass, so the draft is the check's own."""
+    draft = test_critic.TestAConfirmedExclusion()._draft("excluded")
+    ruled = Ruling(
+        id=draft.id,
+        verdict=ProposedVerdict(rejected_because="evidence", reason="not applicable"),
+    )
+    archived = cast(
+        critic_replay.Archived, SimpleNamespace(drafts=[draft], model=valid_model())
+    )
+    faults = cast(recritic_replay.FaultSet, None)
+
+    faulty, faulted = recritic_replay.inject(
+        archived, [ruled], faults, frozenset(), draft.id, "confirmed-ruled-out"
+    )
+
+    problems = review_issues([draft], faulty, valid_model(), {})
+    assert [(each.kind, each.claim_id) for each in problems.problems] == [
+        ("verdict-shape", faulted)
+    ]
+    assert WORDS["confirmed-ruled-out"] in problems.messages[0]
+
+
+def test_a_control_rejection_needs_the_reason_it_is_covered(archived):
+    draft = archived.drafts[0].id
+    faults = faults_for(archived).model_copy(update={"covers": {}})
+
+    with pytest.raises(EvalRunError, match="no reason"):
+        recritic_replay.fault_view(archived, faults, draft, "control-row-missing")
+
+
+@pytest.mark.parametrize("shape", STRIDE_SHAPES)
+@pytest.mark.usefixtures("open_facts")
+def test_each_fault_view_sends_the_graphs_re_ask(
+    monkeypatch,
+    archived,
+    case,  # noqa: F811
+    shape,
+):
+    """A graph run whose critic emits the faulted first pass sends this re-ask.
+
+    The archive's own sweep put its pipeline in place of the builder, so the
+    builder is restored before a second sweep builds its own.
+    """
+    draft = archived.drafts[0].id
+    view = recritic_replay.fault_view(archived, faults_for(archived), draft, shape)
+    monkeypatch.setattr(modes, "build_eval_pipeline", BUILD_EVAL_PIPELINE)
+    monkeypatch.setattr(graph, "held_controls", lambda state: [EVERY_LANE])
+    seen = record_requests(monkeypatch)
+
+    grounds.sweep(
+        monkeypatch,
+        case,
+        None,
+        critic_first=[json.dumps({"claims": view.reask.emitted})],
+    )
+
+    instruction, turn = asyncio.run(
+        recritic_replay.compose(archived, view.reask, PACKAGE_LOADER, PROMPT_LOADER)
+    )
+    sent = {text: contents for text, contents in seen}
+    assert instruction in sent, "no node sent this re-ask instruction"
+    assert sent[instruction] == [turn]
 
 
 def test_a_first_pass_that_leaves_a_shown_row_unanswered_is_refused(archived):
@@ -221,7 +353,7 @@ def test_a_fault_set_that_names_no_draft_is_refused(archived):
         }
     )
 
-    with pytest.raises(EvalRunError, match="on no draft"):
+    with pytest.raises(EvalRunError, match="names no draft"):
         recritic_replay.fault_view(
             archived, misspelt, archived.drafts[0].id, "row-unanswered"
         )

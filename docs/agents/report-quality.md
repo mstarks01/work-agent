@@ -31,8 +31,8 @@ in `GLOSSARY.md`.
 **Instruments for one lane or one critic call.** `run.py lane-replay` sends one
 captured lane request again, and `run.py lane-replay --append` adds a user part
 after the captured input. `run.py critic-replay` does the same for a critic
-call, and `run.py recritic-replay` sends one critic re-ask over an injected
-Control row fault. `run.py lane-replay --fresh-leads` rebuilds a lane's leads
+call, and `run.py recritic-replay` sends one critic re-ask over one injected
+fault of a named shape. `run.py lane-replay --fresh-leads` rebuilds a lane's leads
 with the current rules through the function the prepare node calls. A replay costs one
 model call, about $0.03 to $0.06 on the strong tier, and `ANALYSIS_OFFLINE`
 refuses it.
