@@ -56,11 +56,11 @@ critic answers every row of the draft's `controls` key in `control_row` or in
 neither place or names a row the draft was not shown. A draft rejected for
 `evidence`, `reasoning` or `lane` did not reach the control step, so code
 removes each row its ruling names and the seam asks nothing of it. The reason
-is prose and not a closed set, because the judgement is the critic's. Each row has a list of
-rulings: the claim ID, `applied` or `refused`, and the reason. The report holds
-each ruling in a verdict, so one reader builds each row's list from the
-report's claims and rejected claims, and the job keeps no second record of it.
-One reader computes the row's outcome: `applied` when any ruling
+is prose and not a closed set, because the judgement is the critic's. Each row
+has a list of rulings: the claim ID, `applied` or `refused`, and the reason.
+The report holds each ruling in a verdict, so one reader builds each row's
+list from the report's claims and rejected claims, and the job keeps no second
+record of it. One reader computes the row's outcome: `applied` when any ruling
 applied it, `refused` when every ruling refused it. A row with an empty list is
 `not-reached` when a finding sits on its unit and the scope does not reach the
 finding's elements, and `no-finding` otherwise. A framework whose record lets
