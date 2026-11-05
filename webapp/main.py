@@ -488,10 +488,17 @@ class Workspace:
             if words is None:
                 logger.exception("job %s did not continue at its pause", record.id)
                 words = _NOT_STARTED
-            if not await self.store.set_continue_refusal(
-                record.id, record.owner_id, words
-            ):
-                logger.warning("job %s left the store before its refusal", record.id)
+            try:
+                kept = await self.store.set_continue_refusal(
+                    record.id, record.owner_id, words
+                )
+            except Exception:
+                logger.exception("job %s did not store its refusal", record.id)
+            else:
+                if not kept:
+                    logger.warning(
+                        "job %s left the store before its refusal", record.id
+                    )
 
     async def settled(self, job_id: str) -> None:
         """Wait for the task of ``job_id`` to end, where this process runs
@@ -512,14 +519,21 @@ class Workspace:
         waits to continue, and this process runs its task (ADR 0125)."""
         return record.waits_to_continue() and record.id in self._runs
 
-    def refusal(self, record: JobRecord) -> dict[str, str]:
+    async def refusal(self, record: JobRecord) -> dict[str, str]:
         """The ``refusal`` key of the questions of ``record``: why the job
         waits at its pause. A job that waits to continue, with no task in this
-        process and no stored refusal, did not continue, and the owner
-        continues it (ADR 0125). Empty for every other job."""
+        process, no stored refusal and no Resumed Job, did not continue, and
+        the owner continues it (ADR 0125). Empty for every other job."""
         words = record.continue_refusal
         if words is None and record.waits_to_continue() and not self.continuing(record):
-            words = NOT_CONTINUED
+            # The task ends after it stores its refusal or admits the Resumed
+            # Job, so the store holds either one now, though ``record`` was
+            # read before.
+            held = await self.store.owned(record.id, record.owner_id)
+            if isinstance(held, JobRecord) and held.continue_refusal is not None:
+                words = held.continue_refusal
+            elif await self.store.resumed_by(record.id, record.owner_id) is None:
+                words = _NOT_CONTINUED
         return {} if words is None else {"refusal": words}
 
     async def stop(self, job_ids: Iterable[str]) -> bool:
@@ -1495,7 +1509,7 @@ _NOT_STARTED = "The analysis could not be started. Check the server log."
 
 #: What the page says for a job that waits to continue at its pause where no
 #: task of this process continues it and no refusal is stored (ADR 0125).
-NOT_CONTINUED = (
+_NOT_CONTINUED = (
     "The app did not continue this job. It restarted, or the last continue"
     " did not finish. Continue it."
 )
@@ -2210,7 +2224,7 @@ def create_app(
             payload["questions"] = (
                 {"run": record.id}
                 | await answers.payload_of(asked)
-                | workspace.refusal(record)
+                | await workspace.refusal(record)
             )
         return JSONResponse(payload)
 
@@ -2680,14 +2694,6 @@ async def _stream(
         if workspace.continuing(record):
             yield _frame("continuing", {})
             await workspace.settled(run_id)
-            # The continue stores its refusal, so the record is read again.
-            try:
-                record = await workspace.envelope(answers, run_id)
-            except UnreadableSchema as refusal:
-                yield _frame("failed", {"message": str(refusal)})
-                return
-            if record is None:
-                return
         child = await workspace.store.resumed_by(run_id, record.owner_id)
         if child is not None:
             yield _frame("continued", {"run": child})
@@ -2700,7 +2706,9 @@ async def _stream(
             # The response has started, so a refusal is a frame, never a status.
             yield _frame("failed", {"message": str(refusal)})
             return
-        yield _frame("questions", {"run": run_id} | payload | workspace.refusal(record))
+        yield _frame(
+            "questions", {"run": run_id} | payload | await workspace.refusal(record)
+        )
     elif status == "completed":
         # The envelope read above refuses an unreadable record. The frame
         # names why a report is withheld, which :func:`served` does not give.

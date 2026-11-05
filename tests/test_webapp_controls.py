@@ -46,7 +46,7 @@ from tests.test_webapp_questions import (
     app_for,
     ran,
 )
-from webapp.main import NOT_CONTINUED, OPERATOR, Workspace
+from webapp.main import _NOT_CONTINUED, OPERATOR, Workspace
 
 tiers = test_webapp.tiers
 
@@ -125,7 +125,8 @@ class Owner:
     def restart(self) -> None:
         """Serve a new app over the same store, as a restart of the process
         does: the store keeps its jobs, and the workspace runs no task."""
-        app = app_for(self.tiers, self.runner, workspace=Workspace(store=self.store))
+        self.workspace = Workspace(store=self.store)
+        app = app_for(self.tiers, self.runner, workspace=self.workspace)
         self.client = TestClient(app, base_url=LOOPBACK)
 
     def owner_id(self) -> str:
@@ -1028,7 +1029,20 @@ class TestTheAutomaticContinue:
         assert started.status_code == 200, started.text
         assert ran(owner.client, started.json()["run"]) == "failed"
         assert asyncio.run(owner.store.get(run_id)).continue_refusal is None
-        assert owner.questions(run_id)["refusal"] == NOT_CONTINUED
+        assert owner.questions(run_id)["refusal"] == _NOT_CONTINUED
+
+    def test_a_record_read_before_the_refusal_shows_the_stored_refusal(self, owner):
+        """The task can store its refusal and end between a route's read and
+        its check, so the reason comes from the store."""
+        aes = owner.keep("Encrypted", ORDERS_DB)
+        kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
+        run_id, frames = self.continued(owner, aes, kms)
+        stale = asyncio.run(owner.store.get(run_id)).model_copy(
+            update={"continue_refusal": None}
+        )
+        assert asyncio.run(owner.workspace.refusal(stale)) == {
+            "refusal": frames["questions"]["refusal"]
+        }
 
     def test_a_refusal_outlives_a_restart(self, owner):
         aes = owner.keep("Encrypted", ORDERS_DB)
@@ -1059,8 +1073,8 @@ class TestTheAutomaticContinue:
         with owner.client:
             stream = owner.client.get(f"/events/{run_id}").text
             assert list(end_frames(stream)) == ["questions"]
-            assert end_frames(stream)["questions"]["refusal"] == NOT_CONTINUED
-            assert owner.questions(run_id)["refusal"] == NOT_CONTINUED
+            assert end_frames(stream)["questions"]["refusal"] == _NOT_CONTINUED
+            assert owner.questions(run_id)["refusal"] == _NOT_CONTINUED
             held = asyncio.run(owner.store.get(run_id))
             assert held.status == "awaiting-answers"
             assert asyncio.run(owner.store.resumed_by(run_id, owner.owner_id())) is None

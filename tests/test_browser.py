@@ -2737,7 +2737,7 @@ def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_pa
 def test_a_job_the_app_did_not_continue_waits_for_the_owner(zoned_page, monkeypatch):
     """A job that waits to continue, with no task and no stored refusal,
     shows why, and the page does not continue it by itself (ADR 0125)."""
-    from webapp.main import NOT_CONTINUED, Workspace
+    from webapp.main import _NOT_CONTINUED, Workspace
 
     async def ended_first(*_):
         """The process ends after the pause and before the continue."""
@@ -2764,7 +2764,7 @@ def test_a_job_the_app_did_not_continue_waits_for_the_owner(zoned_page, monkeypa
     )
     page.click("#go")
     page.wait_for_selector("#answer-problem:not([hidden])")
-    assert page.inner_text("#answer-problem") == NOT_CONTINUED
+    assert page.inner_text("#answer-problem") == _NOT_CONTINUED
     assert page.is_visible("#continue")
     assert continues == []
 
