@@ -151,3 +151,67 @@ counting rule does not count it.
 **The treatment:** 12 of 12 repaired, 0 new problems, 0 unbriefed changes,
 0 status changes, 0 unread answers. `row-on-other-step` is repaired 4 of 4.
 The falsifier does not hold, so the hypothesis is supported (E2).
+
+## E3 design, fixed before the first call
+
+The treatment of E2 has two blockers in #2192. First, it takes the body of
+`prompts/recritic.md` to 1511 tokens, and the cap is 1400. Second, its step 8
+moves a `control_row` to `refused_controls` on every ruling. For a ruling
+rejected for `evidence`, `reasoning` or `lane`, the draft did not reach the
+control step, so the row must be dropped.
+
+The maintainer ruled on 2026-11-05. Code drops a `control_row` and the
+`refused_controls` of a ruling rejected before the control step. The prompt
+step covers only a ruling with no `rejected_because`, and the whole body fits
+under the cap.
+
+`treatment-e3.patch` changes `prompts/recritic.md` in two places:
+
+- Step 1 keeps its first two sentences and drops the list of faults. Each
+  step that follows names its fault in bold, so the list repeated them. The
+  list also had no entry for a Control row fault, and step 8 covers only one
+  case of it.
+- A new step 8: "For a **Control row** problem on a ruling with no
+  `rejected_because`, answer each row the draft was shown once, in
+  `refused_controls` with a reason, and name no other row. Move a
+  `control_row` to `refused_controls`." The old step 8 becomes step 9.
+
+The held phrase "a `rejected` ruling owes its reader" is unchanged. The body
+is 1367 tokens by `estimate_tokens`, against 1396 on `main` and a cap of 1400.
+
+The run: `run_e3.sh` is `run_treatment.sh` with the run worktree at `main`
+plus `treatment-e3.patch`, the `e3-` prefix and the same cap of $0.30. The
+same 12 calls, the same `faults.json`, the same route (OpenRouter,
+`openai/flex`, `openai/gpt-5.6-terra`). Expected cost: about $0.17. The
+code change does not run in E3. Each faulted draft in the 12 views has no
+`rejected_because`, and the code change acts only on a rejected ruling.
+
+The counting rule is `count.sh` of E1, unchanged. Each of the 12 files is read
+by hand against its `count.sh` line before the totals.
+
+**The falsifier.** "The shorter step repairs the Control row faults as the E2
+step does" is refuted if E3 repairs 11 or fewer of the 12 calls, or has 1 or
+more new problem, or has 1 or more unbriefed change.
+
+What E3 does not measure: the drop of the fault list in step 1 on the other
+fault kinds (dropped, invented, duplicate, unresolved unknown, verdict shape,
+confirmed exclusion), and a Control row fault on a ruling rejected for
+`control`.
+
+## E3 result, added after the run
+
+The run read `e8cad1a2` with `treatment-e3.patch` applied (`clean: false`;
+the `prompts/recritic.md` input digest `b20ec3cb` is the patched file). It
+spent $0.1658 for 12 calls.
+
+Each of the 12 files was read by hand against its `count.sh` line before the
+totals. Each answer returns only the faulted draft, with `rejected_because`
+empty, `control_row` empty and the shown row alone in `refused_controls` with
+a reason. The related unknowns are the first pass's (3 on I-02, 2 on R-03). On
+1 call (`e3-R-03-row-unanswered-1`) the re-ask also adds a sentence on the
+Control to the draft's reason. The check accepts this, and the counting rule
+does not count it.
+
+**E3:** 12 of 12 repaired, 0 new problems, 0 unbriefed changes, 0 status
+changes, 0 unread answers. `row-on-other-step` is repaired 4 of 4. The
+falsifier does not hold, so the hypothesis is supported.
