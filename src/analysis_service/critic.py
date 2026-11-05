@@ -47,6 +47,7 @@ from analysis_service.claims import (
     ASSERTION_GROUNDS,
     Claim,
     ControlRowRef,
+    CriticStep,
     ProposedVerdict,
     RepairedQuote,
     RuledClaim,
@@ -482,7 +483,8 @@ def _reaches_control_step(verdict: ProposedVerdict) -> bool:
     ``evidence``, ``reasoning`` or ``lane`` stopped at an earlier step, so it
     answers no Control row.
     """
-    return verdict.rejected_because in (None, "control")
+    reached: frozenset[CriticStep | None] = frozenset({None, "control"})
+    return verdict.rejected_because in reached
 
 
 def _without_control_rows(verdict: ProposedVerdict, **update: Any) -> ProposedVerdict:

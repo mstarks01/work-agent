@@ -55,8 +55,8 @@ critic answers every row of the draft's `controls` key in `control_row` or in
 `refused_controls`; the review seam sends back a ruling that leaves a row in
 neither place or names a row the draft was not shown. A draft rejected for
 `evidence`, `reasoning` or `lane` did not reach the control step, so code
-removes each row its ruling names and the seam asks nothing of it. The reason is prose and
-not a closed set, because the judgement is the critic's. Each row has a list of
+removes each row its ruling names and the seam asks nothing of it. The reason
+is prose and not a closed set, because the judgement is the critic's. Each row has a list of
 rulings: the claim ID, `applied` or `refused`, and the reason. The report holds
 each ruling in a verdict, so one reader builds each row's list from the
 report's claims and rejected claims, and the job keeps no second record of it.

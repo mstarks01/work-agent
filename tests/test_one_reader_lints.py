@@ -1778,18 +1778,11 @@ def _reads_a_flow_label(node: ast.AST) -> bool:
 
 
 def _tests_the_control_step(node: ast.AST) -> bool:
-    """Whether ``node`` tests ``rejected_because`` against the steps that
-    reach the control step: none, and ``control``."""
-    return (
-        isinstance(node, ast.Compare)
-        and _loads_attribute(node.left, "rejected_because")
-        and any(
-            isinstance(part, ast.Tuple | ast.Set | ast.List)
-            and {getattr(item, "value", object()) for item in part.elts}
-            == {None, "control"}
-            for part in node.comparators
-        )
-    )
+    """Whether ``node`` spells the steps that reach the control step (none, and
+    ``control``) or the steps that stop before it."""
+    return isinstance(node, ast.Tuple | ast.Set | ast.List) and {
+        getattr(item, "value", object()) for item in node.elts
+    } in ({None, "control"}, {"evidence", "reasoning", "lane"})
 
 
 #: The score fields that hold an extraction's endpoint keys.
