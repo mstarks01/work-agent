@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from analysis_service.markdown_loader import MarkdownLoader
+from evals.harness.descendants import FRAMEWORK
 from evals.harness.lane_replay import compose, prepare_today
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import DEFAULT_CORPUS, load_case
@@ -43,14 +44,14 @@ def _sha(text: str) -> str:
 def request_digests(case_id: str, arm: str) -> dict[str, str]:
     """The instruction and user-turn digests of one case's lane request."""
     prepared = prepare_today(
-        load_case(REPO_ROOT / DEFAULT_CORPUS / case_id), "stride", arm
+        load_case(REPO_ROOT / DEFAULT_CORPUS / case_id), FRAMEWORK, arm
     )
     instruction, turn = asyncio.run(
         compose(
             prepared.material,
-            "stride",
+            FRAMEWORK,
             LANE,
-            MarkdownLoader(REPO_ROOT / "frameworks" / "stride"),
+            MarkdownLoader(REPO_ROOT / "frameworks" / FRAMEWORK),
             MarkdownLoader(REPO_ROOT / "prompts"),
         )
     )
