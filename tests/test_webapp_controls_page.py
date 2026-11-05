@@ -45,7 +45,7 @@ from analysis_service.sources import MAX_LABEL_CHARS
 from analysis_service.system_model import ELEMENT_ID_MAX_CHARS
 from tests import test_webapp
 from tests.factories import sample_analysis
-from tests.test_controls import fact, row
+from tests.test_controls import LINE_ENDS, fact, row
 from tests.test_doc_copy_lints import SHIPPED_RESILIENCE
 from tests.test_structural_readers import sound_report
 from tests.test_webapp import LOOPBACK, SAME_ORIGIN, WEBAPP_LIMITS
@@ -875,7 +875,7 @@ def test_an_evidence_line_counts_only_where_a_quotation_quotes_it(reason, lines)
     assert sorted({line.line for line in _quoted(reason, [file])}) == lines
 
 
-@pytest.mark.parametrize("end", ["\n", "\r\n", "\r", "\u2028", "\u2029"])
+@pytest.mark.parametrize("end", LINE_ENDS)
 def test_a_quoted_line_counts_each_line_end_a_text_may_hold(end):
     """Each line end that ``text_refusal`` lets through starts a line, as it
     does in an editor."""

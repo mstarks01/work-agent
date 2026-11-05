@@ -1008,14 +1008,14 @@ def controls_section(
         [entry for block in blocks for entry in block.returned_claims],
     )
     written = {entry.control: entry for entry in facts or ()}
-    ran: dict[str, FrameworkPackage] = {
+    packages_run: dict[str, FrameworkPackage] = {
         block.framework: PACKAGES[block.framework] for block in blocks
     }
     unreached = {
         (control.id, unit)
         for control in applied_controls(copies, scopes, model)
         for block in blocks
-        for unit in unreached_rows(block.claims, ran[block.framework], control)
+        for unit in unreached_rows(block.claims, packages_run[block.framework], control)
     }
     entries = []
     for copy, resolution in zip(
@@ -1036,14 +1036,14 @@ def controls_section(
         ]
         rows = []
         # A row of a framework the analysis did not run has no outcome here.
-        for row in (row for row in copy.rows if row.framework in ran):
+        for row in (row for row in copy.rows if row.framework in packages_run):
             ruled = rulings.get(ControlRowRef(control=copy.id, unit=row.unit), [])
             row_result = row_outcome(ruled, unreached=(copy.id, row.unit) in unreached)
             rows.append(
                 SectionRow(
                     framework=row.framework,
                     unit=row.unit,
-                    label=ran[row.framework].record.text_of_unit(row.unit),
+                    label=packages_run[row.framework].record.text_of_unit(row.unit),
                     version=row.version,
                     ticked=row.ticked,
                     outcome=row_result,

@@ -1332,8 +1332,8 @@ class SqlJobStore:
 
         The objects go first, so the row never names an object that does not
         exist, and they go again at once where admission refuses the job or
-        raises. A failed
-        object delete there changes neither the refusal nor the error.
+        raises. A failed object delete there changes neither the refusal nor
+        the error.
         """
         if principal is not None and principal.owner_id != record.owner_id:
             raise ValueError(f"job {record.id} names another owner than its principal")
