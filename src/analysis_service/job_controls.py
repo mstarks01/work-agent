@@ -93,7 +93,7 @@ LeftOutReason = Literal["missing-element", "empty-zone", "unticked"]
 #: How a person reads each match outcome, on the pause and in the report.
 MATCH_MEANINGS: Mapping[MatchOutcome, str] = MappingProxyType(
     {
-        "application": "it needs no match",
+        "application": "it applies with no match",
         "matched-by-name": "a part of this description has its name",
         "matched-by-alias": "a part of this description has one of its aliases",
         "owner-mapped": "you chose the part at the pause",

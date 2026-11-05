@@ -673,7 +673,7 @@ class TestTheReportSection:
             "Protects the process “Billing”: left out, because no part of this"
             " description has the name or an alias." in text
         )
-        assert "Protects the whole application: it needs no match." in text
+        assert "Protects the whole application: it applies with no match." in text
         assert "applied to Orders DB." in text
 
     def test_the_csv_export_holds_a_row_for_each_finding(self, ruled):

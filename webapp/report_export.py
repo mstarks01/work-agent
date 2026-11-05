@@ -151,7 +151,8 @@ _FORMULA_LEAD = ("=", "+", "-", "@", "\t", "\r")
 
 
 def _level(severity: Severity) -> str:
-    # The validator of a Severity sets its level, so the level is never None.
+    # The type allows None, but the validator of a Severity always sets the
+    # level. The page reads the same field with no fallback.
     return severity.level or ""
 
 
