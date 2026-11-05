@@ -46,6 +46,7 @@ from analysis_service.claims import (
 from analysis_service.controls import (
     CONTROL_ID,
     EVIDENCE_ID,
+    SCOPE_WORDS,
     Control,
     ControlDocument,
     ControlRow,
@@ -411,7 +412,8 @@ def _stated(
         return AppliedScope(control=copy.id, outcome="application")
     if element_prefix(entry.element) != scope.type:
         raise ValueError(
-            f"“{name}” protects a {scope.type}, and {entry.element} is not one."
+            f"“{name}” protects {SCOPE_WORDS[scope.type].label.lower()}, and"
+            f" {entry.element} is not one."
         )
     if model.get(entry.element) is None:
         raise ValueError(f"{entry.element} is not an element of this model.")

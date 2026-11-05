@@ -410,6 +410,18 @@ class TestTheSave:
         assert refused.status_code == 400
         assert message in refused.json()["message"]
 
+    def test_an_element_of_another_type_is_refused_in_the_scope_words(self, owner):
+        partner = owner.keep("Partner", {"type": "entity", "name": "Partner"})
+        refused = owner.save(
+            owner.paused(partner),
+            [{"control": partner, "element": "process:web-app"}],
+        )
+        assert refused.status_code == 400
+        assert (
+            "“Partner” protects an external entity, and process:web-app is not one."
+            in refused.json()["message"]
+        )
+
     def test_a_tick_outside_the_zone_list_is_refused(self, owner):
         zone = owner.keep("Segmented", INTERNAL)
         refused = owner.save(
