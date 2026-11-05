@@ -687,7 +687,8 @@ class TestTheReportSection:
 
     def test_the_exports_and_the_pages_read_one_scope_phrase(self, ruled):
         """The Markdown export, the JSON export, the report page and the
-        Controls list name each scope with :func:`scope_phrase`."""
+        Controls list (the form page and the Controls page) name each scope
+        with :func:`scope_phrase`."""
         owner, child, _ = ruled
         page = owner.client.get(f"/report/{child}").text
         sent = owner.client.get(f"/report/{child}/export.json").json()["controls"]
@@ -882,6 +883,8 @@ class TestTheTables:
         assert set(FACT_MEANINGS) == set(get_args(FactState))
 
     def test_the_element_type_nouns_name_each_prefix_in_glossary_words(self):
+        """Each element type prefix has a noun, and each noun is a
+        GLOSSARY.md term."""
         from typing import get_args
 
         from analysis_service.system_model import ElementPrefix

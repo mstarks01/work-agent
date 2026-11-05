@@ -1275,7 +1275,7 @@
     if (!detected.length) return;
     // The noun of each element type, by its ID prefix, in the service's words
     // (ELEMENT_TYPE_NOUNS).
-    const TYPES = JSON.parse(document.getElementById("element_type_nouns").textContent);
+    const TYPE_NOUNS = JSON.parse(document.getElementById("element_type_nouns").textContent);
     const review = document.createElement("details");
     review.className = "detected";
     review.open = true;
@@ -1289,7 +1289,7 @@
       name.textContent = element.name;
       const facts = element.facts.map((fact) => `${fact.attribute.replaceAll("_", " ")}: ${fact.value}`
         + (fact.inferred ? ` (inferred: ${fact.inferred})` : ""));
-      line.append(name, ` (${TYPES[element.type]})`, facts.length ? ` — ${facts.join("; ")}` : "");
+      line.append(name, ` (${TYPE_NOUNS[element.type]})`, facts.length ? ` — ${facts.join("; ")}` : "");
       review.append(line);
       if (element.excerpt) review.append(hint(`From ${element.source_label}: “${element.excerpt}”`));
     }

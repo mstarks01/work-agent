@@ -257,7 +257,7 @@ def test_the_form_page_reads_the_service_s_element_type_nouns(client):
     page = client.get("/").text
     assert _island(page, "element_type_nouns") == dict(ELEMENT_TYPE_NOUNS)
     assert re.search(
-        r'const TYPES = JSON\.parse\(document\.getElementById\("element_type_nouns"\)',
+        r'const TYPE_NOUNS = JSON\.parse\(document\.getElementById\("element_type_nouns"\)',
         page_javascript("first_run.js"),
     )
 
