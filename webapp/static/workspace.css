@@ -1123,6 +1123,16 @@ code {
   display:block;
   margin:6px 0 0 25px
 }
+/* The label's text wraps beside its checkbox, not under it. */
+.ask-option label {
+  display:flex;
+  align-items:flex-start;
+  gap:8px
+}
+.ask-option label input {
+  flex:none;
+  margin-top:4px
+}
 a.analysis-row {
   text-decoration:none;
   color:var(--text)
