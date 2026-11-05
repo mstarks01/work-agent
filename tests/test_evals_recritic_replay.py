@@ -119,7 +119,7 @@ def test_a_repair_that_answers_the_row_leaves_no_problem(archived):
 
     result = recritic_replay.repair(view, answer(view, draft))
 
-    assert (result["schema_error"], result["remaining"], result["drift"]) == (
+    assert (result["schema_error"], result["remaining"], result["unbriefed"]) == (
         None,
         [],
         [],
@@ -139,7 +139,7 @@ def test_a_repair_that_leaves_the_row_unanswered_still_fails(archived):
     assert result["status"]["repaired"] is None
 
 
-def test_a_change_to_a_ruling_no_problem_named_is_drift(archived):
+def test_a_change_to_a_ruling_no_problem_named_is_unbriefed(archived):
     draft, other = (each.id for each in archived.drafts[:2])
     view = recritic_replay.fault_view(
         archived, faults_for(archived), draft, "row-on-other-step"
@@ -149,7 +149,7 @@ def test_a_change_to_a_ruling_no_problem_named_is_drift(archived):
 
     result = recritic_replay.repair(view, json.dumps({"claims": repaired + changed}))
 
-    assert [problem["kind"] for problem in result["drift"]] == ["unbriefed-change"]
+    assert [problem["kind"] for problem in result["unbriefed"]] == ["unbriefed-change"]
     assert result["remaining"] == []
 
 

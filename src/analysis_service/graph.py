@@ -2081,7 +2081,7 @@ def route_review(
     if isinstance(outcome, Reask):
         # ``first_review`` is the first pass in the spelling the second look
         # merges onto.
-        for artifact, text in outcome.prompts.items():
+        for artifact, text in outcome.rendered_artifacts.items():
             state.prompt(nodes.key(artifact), text)
         state.put(nodes.key("first_review"), outcome.first.rulings)
         state.put(nodes.key("repairable"), outcome.first.repairable)

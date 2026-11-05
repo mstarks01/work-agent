@@ -184,7 +184,7 @@ class Reask(Unreconciled):
     emitted: list[Any]
 
     @property
-    def prompts(self) -> dict[ReaskArtifact, str]:
+    def rendered_artifacts(self) -> dict[ReaskArtifact, str]:
         """Each rendered artifact the re-ask prompt reads, by artifact name."""
         return {
             "previous_review": render_fenced(self.emitted),
@@ -434,7 +434,10 @@ async def recritic_request(
     """
     state = {
         **shared,
-        **{nodes.key(artifact): text for artifact, text in reask.prompts.items()},
+        **{
+            nodes.key(artifact): text
+            for artifact, text in reask.rendered_artifacts.items()
+        },
     }
     template = recritic_instruction(package_loader, prompt_loader, nodes)
     return await node_request(template, state, reask.revise_output, None)

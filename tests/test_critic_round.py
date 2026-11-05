@@ -332,7 +332,7 @@ class TestTheRequest:
 
 
 def test_the_re_ask_artifacts_are_the_rendered_review_keys_but_the_view():
-    """``Reask.prompts`` renders each key the re-ask prompt reads, and no other.
+    """``Reask.rendered_artifacts`` renders each key the re-ask prompt reads, and no other.
 
     The first pass's ``draft_view`` is the one review key a re-ask does not
     render. So the three spellings of the set are held together here.
