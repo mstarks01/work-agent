@@ -16,12 +16,21 @@ from __future__ import annotations
 import csv
 import io
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
+from types import MappingProxyType
+from typing import Any
 
 from analysis_service import Report
+from analysis_service.claims import (
+    Claim,
+    Mitigation,
+    Severity,
+    derive_severity_level,
+)
 from analysis_service.frameworks import lane_of
 from analysis_service.job_controls import SectionEntry
 from analysis_service.open_facts import element_names
+from webapp.controls_page import EVIDENCE_LABELS
 
 #: The characters that start Markdown markup or an HTML tag inline.
 _MARKUP = re.compile(r"([\\`*_\[\]<>#|!~&])")
@@ -81,11 +90,13 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
         if entry.state == "applied":
             reached = ", ".join(_text(element.name) for element in entry.elements)
             lines.append(
-                f"Protects {_scope(entry)}: {entry.outcome}"
+                f"Protects {_scope(entry)}: {entry.meaning}"
                 + (f", applied to {reached}." if reached else ".")
             )
         else:
-            lines.append(f"Protects {_scope(entry)}: left out, {entry.reason}.")
+            lines.append(
+                f"Protects {_scope(entry)}: left out, because {entry.meaning}."
+            )
         for fact in entry.facts:
             stated = (
                 f" (the description states “{_text(fact.stated)}”)"
@@ -99,7 +110,7 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
             label = f" · {_text(row.label)}" if row.label else ""
             lines.append(
                 f"- Row: {_text(row.framework)} {_text(row.unit)}{label} —"
-                f" {row.outcome}. {row.meaning}"
+                f" {row.meaning}"
             )
             for ruling in row.rulings:
                 lines.append(
@@ -107,7 +118,8 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
                 )
             for line in row.quoted:
                 lines.append(
-                    f"  - Evidence: {_text(line.file)} ({line.evidence_class}),"
+                    f"  - Evidence: {_text(line.file)}"
+                    f" ({EVIDENCE_LABELS[line.evidence_class]}),"
                     f" line {line.line}: {_text(line.text)}"
                 )
         lines.append("")
@@ -145,6 +157,33 @@ CSV_COLUMNS = (
 _FORMULA_LEAD = ("=", "+", "-", "@", "\t", "\r")
 
 
+def _level(severity: Severity) -> str:
+    return derive_severity_level(severity.likelihood, severity.impact)
+
+
+def _summaries(mitigations: Sequence[Mitigation]) -> str:
+    return " | ".join(mitigation.summary for mitigation in mitigations)
+
+
+#: The CSV columns that read a judgement field a record may declare, keyed by
+#: the field and never by a framework. A record that does not declare the
+#: field leaves its cell empty. A test holds the keys to the judgement fields
+#: of each package's record, and the report page's readers to these cells.
+JUDGEMENT_CELLS: Mapping[str, Callable[[Any], str]] = MappingProxyType(
+    {"severity": _level, "mitigations": _summaries}
+)
+
+
+def judgement_cells(claim: Claim) -> dict[str, str]:
+    """The cell of each judgement field for ``claim``, empty where its record
+    does not declare the field."""
+    declared = type(claim).model_fields
+    return {
+        field: read(getattr(claim, field)) if field in declared else ""
+        for field, read in JUDGEMENT_CELLS.items()
+    }
+
+
 def _cell(value: str) -> str:
     """``value`` as a spreadsheet shows it as text, never as a formula."""
     return f"'{value}" if value.startswith(_FORMULA_LEAD) else value
@@ -153,9 +192,8 @@ def _cell(value: str) -> str:
 def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
     """The findings of ``report`` as one CSV file, with a row for each.
 
-    The category is the claim's lane, as :func:`lane_of` reads it. A
-    framework that grades nothing or recommends nothing leaves the severity or
-    the mitigation empty. The controls cell names each Control row that ruled
+    The category is the claim's lane, as :func:`lane_of` reads it. The
+    severity and the mitigation come from :func:`judgement_cells`. The controls cell names each Control row that ruled
     on the finding, with its ruling.
     """
     names = element_names(report.system_model)
@@ -171,22 +209,20 @@ def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
     writer.writerow(CSV_COLUMNS)
     for block in report.analyses:
         for claim in [*block.claims, *block.rejected_claims]:
-            fields = claim.model_dump(mode="json")
-            severity = fields.get("severity") or {}
-            mitigations = fields.get("mitigations") or []
+            judged = judgement_cells(claim)
             cells = (
                 block.framework,
                 claim.id,
                 claim.title,
                 claim.verdict.status,
-                severity.get("level") or "",
+                judged["severity"],
                 str(lane_of(claim) or ""),
                 " | ".join(
                     names.get(element, element)
                     for element in claim.affected_element_ids
                 ),
                 claim.description,
-                " | ".join(mitigation["summary"] for mitigation in mitigations),
+                judged["mitigations"],
                 " | ".join(rulings.get((block.framework, claim.id), [])),
             )
             writer.writerow([_cell(value) for value in cells])
