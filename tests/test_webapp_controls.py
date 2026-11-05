@@ -471,6 +471,19 @@ class TestTheSubmission:
         with_fact = owner.keep("Encrypted", ORDERS_DB)
         assert owner.submit(with_fact, frameworks=stride).status_code == 200
 
+    def test_a_row_of_another_version_changes_nothing(self, owner):
+        # The row names STRIDE at a version this service does not carry, so
+        # the copy leaves it unticked and the Control changes nothing.
+        old = owner.keep(
+            "Old", {"type": "application"}, rows=[row("spoofing", "stride", "0.9")]
+        )
+        listed = owner.client.get("/workspace/controls").json()
+        assert [entry["current_rows"] for entry in listed] == [[False]]
+        stride = posted("x", ("stride",))["frameworks"]
+        refused = owner.submit(old, frameworks=stride)
+        assert refused.status_code == 400
+        assert "at the version this service carries" in refused.json()["message"]
+
     def test_a_repeated_id_is_refused(self, owner):
         sso = owner.keep("SSO", {"type": "application"})
         refused = owner.submit(sso, sso)

@@ -2023,6 +2023,7 @@ SHARED_ROW_RULES: dict[str, tuple[str, ...]] = {
     "shareChanged": ("question_list.js", "first_run.js"),
     "sameShare": ("question_list.js", "first_run.js"),
     "shareable": ("question_list.js",),
+    "elementTag": ("question_list.js", "report_view.js"),
 }
 
 

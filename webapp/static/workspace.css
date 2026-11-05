@@ -11,6 +11,42 @@
   --error:light-dark(#963a31,#ffc2b9);
   --error-bg:light-dark(#fff2ef,#402925)
 }
+/* An element's tag: its hue (element_hues) at these saturations and
+   lightnesses. analysis_service.element_hues states the light ones too. A
+   print is always light. */
+:root {
+  --tag-fill-s:25%; --tag-fill-l:96%;
+  --tag-line-s:25%; --tag-line-l:55%;
+}
+@media screen and (prefers-color-scheme:dark) {
+  :root:not([data-theme="light"]) {
+    --tag-fill-s:15%; --tag-fill-l:18%;
+    --tag-line-s:25%; --tag-line-l:50%;
+  }
+}
+@media screen {
+  :root[data-theme="dark"] {
+    --tag-fill-s:15%; --tag-fill-l:18%; --tag-line-s:25%; --tag-line-l:50%;
+  }
+}
+/* An element as a tag in its own colour, as the report's diagram draws it. A
+   zone or a reference with no hue takes a grey tag. */
+.ref {
+  --h:0;
+  display:inline-block;
+  padding:0 6px;
+  margin:3px 0;
+  border-radius:4px;
+  border:1px solid hsl(var(--h) var(--tag-line-s) var(--tag-line-l));
+  background:hsl(var(--h) var(--tag-fill-s) var(--tag-fill-l));
+  line-height:1.05;
+  cursor:help;
+  overflow-wrap:anywhere
+}
+.ref.neutral {
+  --tag-fill-s:0%;
+  --tag-line-s:0%
+}
 :root[data-theme="light"] {
   color-scheme:light
 }

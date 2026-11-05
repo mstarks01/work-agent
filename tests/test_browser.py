@@ -2640,6 +2640,101 @@ def test_a_control_that_fits_no_selected_framework_takes_no_tick(zoned_page):
     assert page.is_checked(f"#control-{spoofing}")
 
 
+def test_a_control_whose_rows_are_of_an_older_version_takes_no_tick(zoned_page):
+    page = zoned_page
+    old_rows = [{"framework": "stride", "unit": "spoofing", "version": "0.9"}]
+    old = keep_control(page, "Old guard", {"type": "application"}, rows=old_rows)
+    page.goto("/")
+    page.wait_for_selector(f"#control-{old}")
+    page.locator('#frameworks input[name="framework"][value="stride"]').check()
+    assert page.is_disabled(f"#control-{old}")
+    assert (
+        "its rows are not at the framework version this service carries"
+        in page.inner_text("#controls-rows")
+    )
+
+
+def test_the_form_and_the_service_agree_on_a_control_that_changes_nothing(
+    zoned_page,
+):
+    """The form's check (form_controls.js ``fits``) and the service's
+    (``job_controls.changes_nothing``), held against each other over each
+    kind of row, in a STRIDE-only analysis."""
+    from analysis_service.frameworks import PACKAGES
+    from tests.test_webapp import posted
+
+    page = zoned_page
+    stride = PACKAGES["stride"].version
+    db = {"type": "store", "name": "Orders DB"}
+    fact = {"key": ["", "encryption_at_rest", "", "", "", ""], "value": "AES-256"}
+    current = {"framework": "stride", "unit": "spoofing", "version": stride}
+    old = current | {"version": f"{stride}-old"}
+    asvs = {"framework": "asvs", "unit": "V11.2", "version": PACKAGES["asvs"].version}
+    cases = {
+        "Current row": ({"type": "application"}, [], [current], True),
+        "Old row": ({"type": "application"}, [], [old], False),
+        "Other framework": ({"type": "application"}, [], [asvs], False),
+        "Fact and old row": (db, [fact], [old], True),
+    }
+    ids = {
+        name: keep_control(page, name, scope, facts=facts, rows=rows)
+        for name, (scope, facts, rows, _) in cases.items()
+    }
+    page.goto("/")
+    page.locator('#frameworks input[name="framework"][value="stride"]').check()
+    page.locator('#frameworks input[name="framework"][value="asvs"]').uncheck()
+    body = posted("A web app talks to a database.", ("stride",))
+    for name, (*_, fits) in cases.items():
+        control = ids[name]
+        page.wait_for_selector(f"#control-{control}")
+        status = page.evaluate(
+            """(body) => fetch('/analyze', {method: 'POST',
+                 headers: {'Content-Type': 'application/json'},
+                 body: JSON.stringify(body)}).then((r) => r.status)""",
+            body | {"controls": [control]},
+        )
+        assert page.is_enabled(f"#control-{control}") is fits, name
+        assert (status == 200) is fits, (name, status)
+
+
+def test_a_control_shows_each_element_as_its_tag(zoned_page):
+    page = zoned_page
+    key = ["", "encryption_at_rest", "", "", "", ""]
+    keep_control(
+        page,
+        "Encrypted",
+        {"type": "store", "name": "Orders DB"},
+        facts=[{"key": key, "value": "AES-256"}],
+    )
+    submit_with_controls(page)
+    tags = page.locator("#questions .ref:not(.neutral)")
+    assert tags.count() > 0
+    assert page.evaluate(
+        "() => [...document.querySelectorAll('#questions .ref:not(.neutral)')]"
+        ".every((tag) => tag.style.getPropertyValue('--h') !== '')"
+    )
+    with page.expect_response("**/answer/**"):
+        page.click("#continue")
+    page.wait_for_url("**/report/**", timeout=20_000)
+    reached = page.locator('#controls-section .ref[title="store:orders-db"]')
+    assert reached.inner_text() == "Orders DB"
+    assert reached.evaluate("(tag) => tag.style.getPropertyValue('--h')") != ""
+
+
+def test_the_tag_colours_follow_the_theme_on_every_page(page):
+    """The tag tokens live in the shared style, so a page other than the
+    report takes the dark ones from the sidebar's theme button."""
+    page.emulate_media(color_scheme="light")
+    page.goto("/")
+    fill = (
+        "() => getComputedStyle(document.documentElement)"
+        ".getPropertyValue('--tag-fill-l').trim()"
+    )
+    assert page.evaluate(fill) == "96%"
+    page.click("#theme-toggle")
+    assert page.evaluate(fill) == "18%"
+
+
 def test_a_deleted_control_shows_missing_and_a_reopened_analysis_lists_its_copy(
     zoned_page,
 ):

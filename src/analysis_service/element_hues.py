@@ -24,7 +24,7 @@ GOLDEN_FRACTION = 0.382
 #: The hue of the first element, a blue.
 FIRST_HUE = 210
 #: The saturation and the lightness, in percent, of an element's fill and of
-#: its outline in the light theme. The report page's CSS states the same
+#: its outline in the light theme. ``webapp/static/workspace.css`` states the same
 #: numbers, and a test checks that the two agree.
 FILL = (25, 96)
 LINE = (25, 55)

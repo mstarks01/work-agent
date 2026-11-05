@@ -11,7 +11,8 @@
 // `inputFor(q, prefill, changed)`, the answerEditor for a row; `reopen`,
 // whether a facet offers "I don't know" over a known answer; `contextOf(q)`,
 // the lines under a question's "?"; `notes(row)`, nodes under a row's title;
-// and `extras(row)`, nodes after a row's input, such as a skip button.
+// `extras(row)`, nodes after a row's input, such as a skip button; and
+// `hueOf(id)`, an element's hue (analysis_service.element_hues) or undefined.
 //
 // A row is the page's own object: `{ q, kind, node }`, `kind` "fact" or
 // "link". Drawing sets `row.read`, the answer as the service takes it or
@@ -28,7 +29,13 @@ const questionList = ({
   contextOf = () => [],
   notes = () => [],
   extras = () => [],
+  hueOf = () => undefined,
 }) => {
+  // A row's element as its tag.
+  const partTag = (q) => {
+    const id = keyRef(q.key).element_id;
+    return elementTag(q.element, id, hueOf(id));
+  };
   const button = (text, onClick, className = "quiet") => {
     const control = document.createElement("button");
     control.type = "button";
@@ -61,7 +68,7 @@ const questionList = ({
     const title = document.createElement("div");
     title.className = "question-title";
     const label = document.createElement("b");
-    label.textContent = text;
+    label.append(text);
     title.append(label);
     const about = context(q);
     if (about) title.append(about);
@@ -98,14 +105,14 @@ const questionList = ({
     const members = box.rows.filter((row) => row.kind === "fact");
     const before = heldElsewhere(box.held, members).length;
     const parts = [
-      ...members.filter((row) => row.inherited).map((row) => row.q.element),
+      ...members.filter((row) => row.inherited).map((row) => partTag(row.q)),
       ...(before ? [counted(before, "part answered before", "parts answered before")] : []),
     ];
-    box.coverLine.textContent = parts.length
-      ? `This answer covers: ${parts.join(", ")}`
-      : answered
+    box.coverLine.replaceChildren(...(parts.length
+      ? ["This answer covers: ", ...commaList(parts)]
+      : [answered
         ? "This answer covers no part yet. Tick each part it covers, or use Cover every part."
-        : "This answer covers no part yet.";
+        : "This answer covers no part yet."]));
   };
   // Undo the last change of a shared answer: the answer before it, and each
   // element it wrote as that element was. One step back.
@@ -254,7 +261,10 @@ const questionList = ({
     const name = document.createElement("b");
     name.textContent = row.q.principal;
     const shown = document.createElement("span");
-    shown.textContent = ` — ${linkAnswerText(answer)}`;
+    const chosen = row.q.options.find((option) => option.id === answer.element);
+    shown.append(" — ", chosen && chosen.name
+      ? elementTag(chosen.name, chosen.id, hueOf(chosen.id))
+      : linkAnswerText(answer));
     row.compact = true;
     row.read = () => null;
     const fields = document.createElement("div");
@@ -326,7 +336,7 @@ const questionList = ({
     const q = row.q;
     const grid = row.grid;
     const name = document.createElement("td");
-    name.append(...(row.tick ? [row.tick] : []), questionTitle(q, q.element), ...notes(row));
+    name.append(...(row.tick ? [row.tick] : []), questionTitle(q, partTag(q)), ...notes(row));
     // A facet answered before offers no blank where the page cannot reopen
     // it: the service keeps the earlier answer to a facet left out.
     const selects = q.facets.map((facet) => {
@@ -387,7 +397,7 @@ const questionList = ({
   };
   const drawCompactFacets = (row, answer) => {
     const name = document.createElement("td");
-    name.append(questionTitle(row.q, row.q.element), ...notes(row));
+    name.append(questionTitle(row.q, partTag(row.q)), ...notes(row));
     const shown = document.createElement("td");
     shown.textContent = answerText(answer);
     const change = document.createElement("td");
@@ -553,7 +563,7 @@ const questionList = ({
     }
     if (!box.shared) box.shared = sharedControl(box, members[0].q);
     box.each.open = true;
-    box.applies.textContent = "Parts: " + members.map((row) => row.q.element).join(", ");
+    box.applies.replaceChildren("Parts: ", ...commaList(members.map((row) => partTag(row.q))));
     const hint = document.createElement("p");
     hint.className = "hint";
     hint.textContent = "Tick each part this answer covers. A part left unticked keeps"
@@ -763,6 +773,19 @@ const shareable = (a, b) => {
 };
 // The heading of the box of link questions, on both pages and in the export.
 const LINK_GROUP_HEADING = "Match each user, team or account to a part of your system";
+// An element as a tag in its colour (`hue`, from
+// analysis_service.element_hues), its ID on hover; with no hue, a grey tag.
+// The report page and the question rows draw each element tag here.
+const elementTag = (name, id, hue) => {
+  const tag = document.createElement("span");
+  tag.className = hue === undefined ? "ref neutral" : "ref";
+  tag.textContent = name;
+  tag.title = id;
+  if (hue !== undefined) tag.style.setProperty("--h", String(hue));
+  return tag;
+};
+// Nodes or strings with ", " between them, so a list of tags reads as a list.
+const commaList = (items) => items.flatMap((item, at) => (at ? [", ", item] : [item]));
 // A link answer as one line of text: the element, or "none of these".
 const linkAnswerText = (answer) => (answer.element === "none" ? "none of these" : answer.element);
 // The index beside the list: a link for each box with a row that shows, with

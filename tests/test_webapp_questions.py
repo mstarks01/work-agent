@@ -554,6 +554,8 @@ def test_the_report_page_may_reach_its_own_origin_and_nothing_else(tiers, runner
 # needed, so the flow a person walks is checked on every run of the suite.
 _FORM_HARNESS = r"""
 const calls = [], streams = [];
+// A node's text with its children's, as a browser gives textContent.
+const textOf = (n) => typeof n === "string" ? n : [n.textContent || "", ...(n.children || []).map(textOf)].join("");
 class Node {
   constructor(tag) { this.tag = tag; this.children = []; this.dataset = {}; this.parentNode = null;
     this.hidden = false; this.value = ""; this.textContent = ""; this.listeners = {};
@@ -691,7 +693,7 @@ def test_the_conflict_line_words_a_link_answer_of_none_as_the_page_does():
     theirs = {"principal": "shopper accounts", "element": "none"}
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}},
   link_questions: [{json.dumps(question)}], early_questions: [], revision: 0 }}) }});
 globalThis.fetch = async (url) => url.startsWith("/answer/")
   ? {{ ok: false, status: 409, json: async () => ({{ message: "stale" }}) }}
@@ -811,7 +813,7 @@ console.log(JSON.stringify({
 def test_the_form_script_asks_answers_and_follows_to_the_report():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [
   { principal: "shopper accounts", rows: 2,
     options: [{ id: "entity:shopper", name: "Shopper" }] }], early_questions: [] }) });
 const select = ids.questions.querySelectorAll("select")[0];
@@ -1023,7 +1025,7 @@ await submit();
 def test_an_unanswered_question_is_left_out_of_the_answers():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [
   { principal: "ml engineers", rows: 1, options: [] }], early_questions: [] }) });
 await ids.continue.listeners.click(); await settle();
 """
@@ -1052,7 +1054,7 @@ def test_the_form_script_sends_an_early_answer_with_the_links():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [first] = ids.questions.querySelectorAll("input");
 first.value = "  TLS 1.3 ";
@@ -1305,7 +1307,7 @@ def test_the_form_page_keeps_why_and_the_description_in_help():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(rows)}, 
   answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
@@ -1914,7 +1916,7 @@ def test_the_form_script_sends_a_control_s_state():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [state] = ids.questions.querySelectorAll("select");
 state.value = "none";
@@ -1965,7 +1967,7 @@ def _early_control_calls(steps: str) -> list:
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [state] = ids.questions.querySelectorAll("select");
 const [input] = ids.questions.querySelectorAll("input");
@@ -2040,7 +2042,7 @@ def test_the_form_script_shows_what_the_service_is_doing():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
 calls.push({ building: !ids.status.hidden, text: ids["status-text"].textContent });
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [] }) });
 calls.push({ paused: ids.status.hidden });
 await ids.continue.listeners.click(); await settle();
@@ -2080,7 +2082,7 @@ def _control_row(flow, form="control"):
 
 _SHARED_STEPS = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: FACTS, answered_early: [], answered_links: [], revision: 0 }) });
 const group = ids.questions.querySelectorAll("details").find((d) => d.className === "question-group");
 const child = (r, tag) => r.children.find(c => typeof c === "object" && c.tag === tag);
@@ -2138,7 +2140,7 @@ def test_one_shared_answer_fills_only_the_elements_a_person_ticks():
 const heading = group.children.find(c => c.tag === "summary");
 calls.push({ open: each.open,
   ticked: rowsOf().map(r => child(r, "input").checked),
-  applies: heading.children.find(c => c.className === "group-applies").textContent });
+  applies: textOf(heading.children.find(c => c.className === "group-applies")) });
 const tick = child(rowsOf()[0], "input");
 tick.checked = true; tick.listeners.change();
 const state = child(shared[0].children[0], "select");
@@ -2213,7 +2215,7 @@ def test_a_part_ticked_after_a_reload_joins_the_held_share():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps([_control_row(second), _control_row(third)])},
   answered_early: [{json.dumps(answered)}], answered_shares: [{json.dumps(held)}],
   answered_links: [], revision: 1 }}) }});
@@ -2244,7 +2246,7 @@ def test_the_box_says_which_parts_its_answer_covers():
     steps = (
         _SHARED_STEPS.replace("FACTS", json.dumps(facts))
         + """
-const line = () => shared[0].children.find(c => c.className === "share-covers").textContent;
+const line = () => textOf(shared[0].children.find(c => c.className === "share-covers"));
 calls.push({ line: line() });
 const t = child(rowsOf()[1], "input"); t.checked = true; t.listeners.change();
 calls.push({ line: line() });
@@ -2273,7 +2275,7 @@ def test_cover_every_part_ticks_each_element_with_no_answer_of_its_own():
         _SHARED_STEPS.replace("FACTS", json.dumps(facts))
         + """
 const own = (r) => walk(r).find(c => c.tag === "select");
-const line = () => shared[0].children.find(c => c.className === "share-covers").textContent;
+const line = () => textOf(shared[0].children.find(c => c.className === "share-covers"));
 const ticks = () => rowsOf().map(r => child(r, "input").checked);
 const [one] = rowsOf();
 own(one).value = "none"; own(one).listeners.change();
@@ -2425,7 +2427,7 @@ def test_the_form_script_keeps_the_list_s_order_with_a_box_for_each_run():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const groups = ids.questions.querySelectorAll("details").filter(g => g.className === "question-group");
 const rowsOf = g => g.children.find(c => c.className === "each-one").children.filter(r => r.tag === "p");
@@ -2433,7 +2435,7 @@ const child = (r, tag) => {{ for (const c of r.children) {{ if (typeof c !== "ob
   if (c.tag === tag) return c; const nested = child(c, tag); if (nested) return nested; }} }};
 calls.push({{ groups: groups.map(g => ({{
   title: g.children[0].children.find(n => n.className === "group-heading").textContent,
-  rows: rowsOf(g).map(r => child(r, "b").textContent),
+  rows: rowsOf(g).map(r => textOf(child(r, "b"))),
   open: Boolean(g.open) }})) }});
 child(rowsOf(groups[0])[0], "select").value = "no";
 child(rowsOf(groups[2])[0], "select").value = "yes";
@@ -2492,7 +2494,7 @@ def test_the_pause_asks_facets_once_with_a_table_for_the_exceptions():
     facts = [facet_fact(store), facet_fact(flow)]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 const [head, ...rows] = table.children;
@@ -2546,7 +2548,7 @@ def test_the_shared_question_appears_only_over_two_rows(rows, shared):
     facts = [facet_fact(element) for element in elements[:rows]]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 const top = ids.questions.querySelectorAll("div").filter(d => d.className === "shared-controls");
@@ -2565,7 +2567,7 @@ def test_every_facet_answer_the_page_offers_is_one_the_service_takes(value):
     facts = [facet_fact(store)]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(facts)} }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 const select = table.children[1].children[1].children[0];
@@ -2650,7 +2652,7 @@ calls.push(document.getElementById("invite").textContent);
 def test_a_pause_with_nothing_to_ask_starts_the_analysis_at_once():
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [], early_stop: "nothing-left", answered_early: [], answered_links: [] }) });
 await settle();
 """
@@ -2674,6 +2676,7 @@ def test_the_last_save_waits_for_the_start_button(withheld, said):
     ready = {
         "run": "r1",
         "revision": 4,
+        "element_hues": {},
         "link_questions": [],
         "early_questions": [],
         "early_stop": "budget-exhausted" if withheld else "nothing-left",
@@ -2693,7 +2696,7 @@ def test_the_last_save_waits_for_the_start_button(withheld, said):
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [
   {{ principal: "shopper accounts", rows: 2,
     options: [{{ id: "entity:shopper", name: "Shopper" }}] }}], early_questions: [],
   answered_early: [], answered_links: [], asks: true, revision: 3 }}) }});
@@ -2759,7 +2762,7 @@ def test_a_capability_says_it_decides_what_an_analysis_covers():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}},
   link_questions: [], early_questions: [{json.dumps(row)}],
   answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
@@ -2794,7 +2797,7 @@ def test_no_to_the_rest_answers_only_the_blank_capability_questions():
     ]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(rows)},
   answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 const yes = ids.questions.querySelectorAll("select")[0];
@@ -2826,7 +2829,7 @@ def test_skip_the_rest_skips_only_the_blank_questions():
     rows = [_text_row(answered, "who?"), _text_row(blank, "when?")]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(rows)}, 
   answered_early: [], answered_links: [] }}) }});
 ids.questions.querySelectorAll("input")[0].value = "the admins";
@@ -2860,7 +2863,7 @@ def test_skip_the_rest_sets_aside_a_question_answered_in_part():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [{json.dumps(row)}], 
   answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 const selects = ids.questions.querySelectorAll("select");
@@ -2880,7 +2883,7 @@ def test_a_skipped_question_can_be_answered_from_its_list():
     kept, skipped = (["", "", "", name, "", ""] for name in ("who?", "when?"))
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [{json.dumps(_text_row(kept, "who?"))}], 
   skipped_early: [{json.dumps(_text_row(skipped, "when?"))}],
   answered_early: [], answered_links: [] }}) }});
@@ -2918,7 +2921,7 @@ def _suggested(click: bool) -> list:
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}},
   link_questions: [{json.dumps(link)}], early_questions: [], answered_early: [],
   answered_links: [], revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
@@ -2952,7 +2955,7 @@ def _skip_the_rest(links, facts) -> dict:
     """The body "Skip the rest" sends for a list of these, every row blank."""
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1",
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}},
   link_questions: {json.dumps(links)}, early_questions: {json.dumps(facts)},
   answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 globalThis.fetch = async (url, init) => {{
@@ -2981,7 +2984,7 @@ def test_skip_the_rest_skips_the_blank_links_and_facts_together():
 def test_a_skipped_link_can_be_answered_from_its_list():
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [], skipped_early: [], skipped_links: [{json.dumps(_LINK)}],
   answered_early: [], answered_links: [], asks: true, revision: 1 }}) }});
 const [open] = ids.skipped.querySelectorAll("button");
@@ -3017,7 +3020,7 @@ def test_a_question_answered_in_part_and_skipped_has_one_editor():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [], skipped_early: [{json.dumps(question)}],
   answered_early: [{json.dumps(answered)}], answered_links: [], revision: 1 }}) }});
 calls.push({{ earlier: ids.earlier.querySelectorAll("button").length }});
@@ -3049,7 +3052,7 @@ def test_a_link_answered_and_skipped_has_one_editor():
     answered = _LINK | {"answer": {"element": "entity:shopper"}}
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [], skipped_early: [], skipped_links: [{json.dumps(_LINK)}],
   answered_early: [], answered_links: [{json.dumps(answered)}], revision: 1 }}) }});
 calls.push({{ earlier: ids.earlier.querySelectorAll("button").length,
@@ -3077,7 +3080,7 @@ def test_an_earlier_answer_can_be_changed():
     del pending["answer"]
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [{json.dumps(pending)}], 
   answered_early: [{json.dumps(answered)}], answered_links: [] }}) }});
 const walk = (n, tag, out = []) => {{ for (const c of n.children || [])
@@ -3102,7 +3105,7 @@ def test_a_table_that_comes_back_keeps_its_earlier_facets():
     earlier = {**fact, "answer": {"key": fact["key"], "facets": {"rate": "yes"}}}
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [{json.dumps(fact)}], answered_early: [{json.dumps(earlier)}] }}) }});
 const [table] = ids.questions.querySelectorAll("table");
 const size = table.children[1].children[2].children[0];
@@ -3414,7 +3417,7 @@ def test_the_page_opens_the_list_with_the_questions_the_service_counts(case):
         return
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps(asked.to_json()["early_questions"])},
   answered_early: [], answered_links: [], asks: true, revision: 0 }}) }});
 const walk = (n, out = []) => {{ for (const c of n.children || [])
@@ -3849,7 +3852,7 @@ def test_a_pause_whose_framework_will_not_run_explains_it_and_waits():
     says why instead of starting the analysis unseen (#1542 F1, ADR 0067)."""
     steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [], early_stop: "nothing-left",
   framework_gates: {asvs: "refuted"}, answered_early: [], answered_links: [], revision: 0 }) });
 await settle();
@@ -3875,7 +3878,7 @@ def test_a_question_that_decides_a_framework_says_so():
     }
     steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: [{json.dumps(row)}], 
   framework_gates: {{asvs: "undecidable"}}, answered_early: [], answered_links: [], revision: 0 }}) }});
 const text = (n) => typeof n === "string" ? n
@@ -4147,7 +4150,7 @@ class TestTheAmendment:
     def test_the_page_sends_the_correction_and_follows_the_new_run(self):
         steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
   answered_early: [], answered_links: [], asks: true, revision: 2 }) });
 const box = ids.questions.querySelectorAll("details").find(d => d.className === "amend");
@@ -4162,7 +4165,7 @@ await box.querySelectorAll("button")[0].listeners.click(); await settle();
     def test_the_page_lists_a_carried_answer_that_does_not_fit(self):
         steps = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
   answered_early: [], answered_links: [], asks: true, revision: 0,
   carried_dropped: [{ label: "Old DB: encryption at rest", value: "AES", reason: "not-taken",
@@ -4370,7 +4373,7 @@ class TestTheRenameOfACarriedElement:
 
     PAUSE = """
 await ids.analyze.listeners.submit({ preventDefault() {} }); await settle();
-streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", link_questions: [],
+streams[0].listeners.questions({ data: JSON.stringify({ run: "r1", element_hues: {}, link_questions: [],
   early_questions: [], early_stop: "nothing-left", framework_gates: {asvs: "refuted"},
   answered_early: [], answered_links: [], asks: true, revision: 3,
   carried_dropped: [{ label: "store:old: encryption at rest", value: "AES",
@@ -4699,6 +4702,21 @@ await box.all("button").find(b => b.textContent === "Save draft").listeners.clic
         calls = _run_answer_block(payloads, steps)["calls"]
         return [c["body"] for c in calls if "body" in c], store, flow
 
+    def test_a_row_shows_its_element_as_a_hued_tag(self):
+        payloads, store, _ = self.payloads(
+            {"draft": {"links": [], "facts": [], "shares": []}, "revision": 0}
+        )
+        steps = """
+calls.push({ tags: box.all("span").filter(s => (s.className || "").startsWith("ref"))
+  .map(s => [s.title, s.className, s.style["--h"] ?? null]) });
+"""
+        calls = _run_answer_block(payloads, steps)["calls"]
+        [tags] = [c["tags"] for c in calls if "tags" in c]
+        # The row's title and the box's "Parts:" line each show the tag.
+        hued = [(kind, hue) for title, kind, hue in tags if title == store.id]
+        assert len(hued) == 2
+        assert all(kind == "ref" and hue is not None for kind, hue in hued)
+
     def test_a_shared_box_saves_one_share(self):
         bodies, store, flow = self.sent(
             {"draft": {"links": [], "facts": [], "shares": []}, "revision": 0}, [0, 1]
@@ -4910,7 +4928,7 @@ await followUp().listeners.click();
         row = _text_row(["", "", "", "", "", "authentication"], "Sign-in?") | shape
         steps = f"""
 await ids.analyze.listeners.submit({{ preventDefault() {{}} }}); await settle();
-streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", link_questions: [],
+streams[0].listeners.questions({{ data: JSON.stringify({{ run: "r1", element_hues: {{}}, link_questions: [],
   early_questions: {json.dumps([row])}, answered_early: [],
   answered_links: [], revision: 0 }}) }});
 ids.questions.querySelectorAll("select")[0].value = "yes";

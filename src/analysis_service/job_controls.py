@@ -110,13 +110,14 @@ _ElementId = Annotated[str, Field(max_length=ELEMENT_ID_MAX_CHARS, pattern=ELEME
 
 def changes_nothing(copy: CopiedControl, frameworks: Iterable[str]) -> bool:
     """Whether ``copy`` would change nothing in an analysis of ``frameworks``:
-    it states no fact, and no row of it names one of them. The form page
-    states the same rule in ``form_controls.js``. A route test and a browser
-    test each check it on their side: a Control with no fact and rows of one
-    framework does not fit an analysis of only the other."""
+    it states no fact, and no ticked row of it names one of them. A row of
+    another package version is not ticked. The form page states the same
+    rule in ``form_controls.js`` over ``current_rows``, and
+    ``test_the_form_and_the_service_agree_on_a_control_that_changes_nothing``
+    holds the two against each other."""
     names = set(frameworks)
     return not copy.document.facts and not any(
-        row.framework in names for row in copy.rows
+        row.ticked and row.framework in names for row in copy.rows
     )
 
 
@@ -124,8 +125,9 @@ def not_for_this_analysis(name: str) -> str:
     """The refusal of a submission that names a Control that changes nothing."""
     return (
         f"The Control “{name}” states no fact and covers no framework of this"
-        " analysis, so it changes nothing here. Untick it, or choose a"
-        " framework it covers."
+        " analysis at the version this service carries, so it changes nothing"
+        " here. Untick it, choose a framework it covers, or edit its rows in"
+        " Controls."
     )
 
 
@@ -154,7 +156,9 @@ class CopiedRow(BaseModel):
     ticked: bool
 
 
-def _current(row: ControlRow) -> bool:
+def current_row(row: ControlRow) -> bool:
+    """Whether ``row`` names the package version this build carries. A copy
+    ticks a row by it, and the form page reads it through ``control_view``."""
     if row.framework not in PACKAGES:
         return False
     return PACKAGES[cast(FrameworkName, row.framework)].version == row.version
@@ -190,7 +194,7 @@ class CopiedControl(BaseModel):
                     framework=row.framework,
                     unit=row.unit,
                     version=row.version,
-                    ticked=_current(row),
+                    ticked=current_row(row),
                 )
                 for row in document.rows
             ],
@@ -922,6 +926,15 @@ class SectionFact(BaseModel):
     stated: str
 
 
+class SectionElement(BaseModel):
+    """One element a Control in the report's Controls section reached."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    name: str
+
+
 class SectionEntry(BaseModel):
     """One copied Control in the report's Controls section."""
 
@@ -933,7 +946,7 @@ class SectionEntry(BaseModel):
     state: ResolutionState
     outcome: MatchOutcome | None
     reason: LeftOutReason | None
-    elements: list[str]
+    elements: list[SectionElement]
     facts: list[SectionFact]
     rows: list[SectionRow]
 
@@ -1014,7 +1027,7 @@ def controls_section(
         else:
             reached, outcome, reason = (), None, resolution.reason
         elements = [
-            element.name
+            SectionElement(id=element.id, name=element.name)
             for element_id in reached
             if (element := model.get(element_id)) is not None
         ]

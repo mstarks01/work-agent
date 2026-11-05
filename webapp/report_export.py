@@ -79,7 +79,7 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
         lines.append(f"### {_text(entry.name)}")
         lines.append("")
         if entry.state == "applied":
-            reached = ", ".join(_text(name) for name in entry.elements)
+            reached = ", ".join(_text(element.name) for element in entry.elements)
             lines.append(
                 f"Protects {_scope(entry)}: {entry.outcome}"
                 + (f", applied to {reached}." if reached else ".")

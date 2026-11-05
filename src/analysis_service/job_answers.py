@@ -55,6 +55,7 @@ from analysis_service.claims import (
 )
 from analysis_service.deployment import FrameworkNotCarried
 from analysis_service.detected_facts import detected_facts
+from analysis_service.element_hues import element_hues
 from analysis_service.errors import ConfigError, refusal_text
 from analysis_service.fact_answers import FactAnswer, fact_label
 from analysis_service.fact_writes import LineageConflict
@@ -333,6 +334,8 @@ class Answerable:
                 # What the extraction read, for a person to review at the
                 # pause; a finished report shows its model itself.
                 "detected_facts": detected_facts(self.model) if state.waiting else [],
+                # Each element's hue, so a question row shows the element's tag.
+                "element_hues": element_hues(self.model),
             }
             | self._controls(state)
         )
