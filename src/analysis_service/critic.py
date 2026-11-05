@@ -476,11 +476,21 @@ def shown_rows(
 def _reaches_control_step(verdict: ProposedVerdict) -> bool:
     """Whether the critic's control step rules on this verdict's draft (ADR 0126).
 
-    A draft kept, or rejected for ``control``, reached the step. A draft
-    rejected for ``evidence``, ``reasoning`` or ``lane`` stopped at an earlier
-    step, so it answers no Control row.
+    **The one reader** of the steps that reach the control step, which
+    ``ONE_READERS`` in ``tests/test_one_reader_lints.py`` holds. A draft kept,
+    or rejected for ``control``, reached the step. A draft rejected for
+    ``evidence``, ``reasoning`` or ``lane`` stopped at an earlier step, so it
+    answers no Control row.
     """
     return verdict.rejected_because in (None, "control")
+
+
+def _without_control_rows(verdict: ProposedVerdict, **update: Any) -> ProposedVerdict:
+    """``verdict`` with ``update`` and no Control row: a verdict on a draft that
+    did not reach the control step."""
+    return verdict.model_copy(
+        update={**update, "control_row": None, "refused_controls": []}
+    )
 
 
 def _control_row_issues(
@@ -608,14 +618,11 @@ def complete_rulings(
             # whatever the critic said (#442). The reason names the lanes the verb
             # belongs to, which is what the audit array must give a reader, and
             # the step is `lane` by construction: the table is the lane check.
-            verdict = ruling.verdict.model_copy(
-                update={
-                    "reason": misfiled[ruling.id],
-                    "related_unknowns": [],
-                    "rejected_because": "lane",
-                    "control_row": None,
-                    "refused_controls": [],
-                }
+            verdict = _without_control_rows(
+                ruling.verdict,
+                reason=misfiled[ruling.id],
+                related_unknowns=[],
+                rejected_because="lane",
             )
             completed.append(ruling.model_copy(update={"verdict": verdict}))
             continue
@@ -627,9 +634,7 @@ def complete_rulings(
         derived = [ref for ref in by_id.get(ruling.id, []) if ref.key not in dismissed]
         if ruling.verdict.rejected_because is not None:
             if not _reaches_control_step(ruling.verdict):
-                verdict = ruling.verdict.model_copy(
-                    update={"control_row": None, "refused_controls": []}
-                )
+                verdict = _without_control_rows(ruling.verdict)
                 ruling = ruling.model_copy(update={"verdict": verdict})
             completed.append(ruling)
             continue

@@ -1777,6 +1777,21 @@ def _reads_a_flow_label(node: ast.AST) -> bool:
     return _loads_attribute(node, "label") and _calls(node.value, "parse_flow_id")
 
 
+def _tests_the_control_step(node: ast.AST) -> bool:
+    """Whether ``node`` tests ``rejected_because`` against the steps that
+    reach the control step: none, and ``control``."""
+    return (
+        isinstance(node, ast.Compare)
+        and _loads_attribute(node.left, "rejected_because")
+        and any(
+            isinstance(part, ast.Tuple | ast.Set | ast.List)
+            and {getattr(item, "value", object()) for item in part.elts}
+            == {None, "control"}
+            for part in node.comparators
+        )
+    )
+
+
 #: The score fields that hold an extraction's endpoint keys.
 _ENDPOINT_FIELDS = frozenset({"endpoint_missing", "missing", "matched"})
 
@@ -2112,6 +2127,12 @@ ONE_READERS: dict[str, _OneReader] = {
     "a flow's label": _OneReader(
         _reads_a_flow_label,
         ("src/analysis_service/system_model.py", "flow_label"),
+        {},
+        "",
+    ),
+    "the steps that reach the control step": _OneReader(
+        _tests_the_control_step,
+        ("src/analysis_service/critic.py", "_reaches_control_step"),
         {},
         "",
     ),
