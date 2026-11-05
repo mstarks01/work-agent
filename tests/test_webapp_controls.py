@@ -46,7 +46,7 @@ from tests.test_webapp_questions import (
     app_for,
     ran,
 )
-from webapp.main import OPERATOR, Workspace
+from webapp.main import NOT_CONTINUED, OPERATOR, Workspace
 
 tiers = test_webapp.tiers
 
@@ -117,9 +117,15 @@ class Owner:
     """The first-run app over an in-memory store, and the operator's Controls."""
 
     def __init__(self, tiers) -> None:
+        self.tiers = tiers
         self.store = InMemoryJobStore()
         self.runner = ZonedRunner()
-        app = app_for(tiers, self.runner, workspace=Workspace(store=self.store))
+        self.restart()
+
+    def restart(self) -> None:
+        """Serve a new app over the same store, as a restart of the process
+        does: the store keeps its jobs, and the workspace runs no task."""
+        app = app_for(self.tiers, self.runner, workspace=Workspace(store=self.store))
         self.client = TestClient(app, base_url=LOOPBACK)
 
     def owner_id(self) -> str:
@@ -906,7 +912,10 @@ class TestTheAutomaticContinue:
 
     def test_the_job_completes_with_each_control_fact_written(self, owner):
         _, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
-        assert list(frames) == ["continuing", "continued"]
+        # The stream sends "continuing" where the continue still runs when
+        # the run's events end, and the page follows "continued" either way.
+        assert list(frames)[-1] == "continued"
+        assert "questions" not in frames
         child = frames["continued"]["run"]
         assert ran(owner.client, child) == "completed"
         assert owner.answers_source(child) == [DB_LINE]
@@ -983,7 +992,7 @@ class TestTheAutomaticContinue:
         aes = owner.keep("Encrypted", ORDERS_DB)
         kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
         run_id, frames = self.continued(owner, aes, kms)
-        assert list(frames) == ["continuing", "questions"]
+        assert list(frames)[-1] == "questions"
         message = (
             "Two Controls write “encryption_at_rest” on Orders DB with two values:"
             " “AES-256” and “KMS”. Untick one, or edit one Control so that they"
@@ -997,7 +1006,7 @@ class TestTheAutomaticContinue:
         assert states(asyncio.run(owner.store.get(child)))[0][0] == "Encrypted"
         assert owner.runner.heads == 1
 
-    def test_a_manual_continue_takes_the_refusal_away(self, owner):
+    def test_a_manual_continue_takes_the_stored_refusal_away(self, owner):
         aes = owner.keep("Encrypted", ORDERS_DB)
         kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
         run_id, frames = self.continued(owner, aes, kms)
@@ -1007,7 +1016,46 @@ class TestTheAutomaticContinue:
         started = owner.answer(run_id, revision=0, control_scopes=untick)
         assert started.status_code == 200, started.text
         assert ran(owner.client, started.json()["run"]) == "failed"
-        assert "refusal" not in owner.questions(run_id)
+        assert asyncio.run(owner.store.get(run_id)).continue_refusal is None
+        assert owner.questions(run_id)["refusal"] == NOT_CONTINUED
+
+    def test_a_refusal_outlives_a_restart(self, owner):
+        aes = owner.keep("Encrypted", ORDERS_DB)
+        kms = owner.keep("KMS", ORDERS_DB, facts=[fact(value="KMS")])
+        run_id, frames = self.continued(owner, aes, kms)
+        message = frames["questions"]["refusal"]
+        owner.restart()
+        with owner.client:
+            assert owner.questions(run_id)["refusal"] == message
+            stream = owner.client.get(f"/events/{run_id}").text
+            assert list(end_frames(stream)) == ["questions"]
+            assert end_frames(stream)["questions"]["refusal"] == message
+            untick = [{"control": aes, "element": "store:orders-db"}]
+            child = owner.resumed(run_id, control_scopes=untick)
+            assert asyncio.run(owner.store.get(run_id)).continue_refusal is None
+            assert ran(owner.client, child) == "completed"
+
+    def test_a_job_the_app_did_not_continue_before_a_restart_waits(
+        self, owner, monkeypatch
+    ):
+        async def ended_first(*_):
+            """The process ends after the pause and before the continue."""
+
+        with monkeypatch.context() as patched:
+            patched.setattr(Workspace, "_continue", ended_first)
+            run_id, _ = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
+        owner.restart()
+        with owner.client:
+            stream = owner.client.get(f"/events/{run_id}").text
+            assert list(end_frames(stream)) == ["questions"]
+            assert end_frames(stream)["questions"]["refusal"] == NOT_CONTINUED
+            assert owner.questions(run_id)["refusal"] == NOT_CONTINUED
+            held = asyncio.run(owner.store.get(run_id))
+            assert held.status == "awaiting-answers"
+            assert asyncio.run(owner.store.resumed_by(run_id, owner.owner_id())) is None
+            child = owner.resumed(run_id)
+            assert owner.answers_source(child) == [DB_LINE]
+        assert owner.runner.heads == 1
 
     def test_an_admission_refusal_leaves_the_job_paused(self, owner, monkeypatch):
         reserve = owner.store.reserve

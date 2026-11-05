@@ -2734,6 +2734,41 @@ def test_two_controls_with_two_values_are_refused_until_one_is_unticked(zoned_pa
     assert "unticked: you left it out" in page.inner_text("#control-offer")
 
 
+def test_a_job_the_app_did_not_continue_waits_for_the_owner(zoned_page, monkeypatch):
+    """A job that waits to continue, with no task and no stored refusal,
+    shows why, and the page does not continue it by itself (ADR 0125)."""
+    from webapp.main import NOT_CONTINUED, Workspace
+
+    async def ended_first(*_):
+        """The process ends after the pause and before the continue."""
+
+    monkeypatch.setattr(Workspace, "_continue", ended_first)
+    page = zoned_page
+    key = ["", "encryption_at_rest", "", "", "", ""]
+    db = {"type": "store", "name": "Orders DB"}
+    keep_control(page, "AES", db, facts=[{"key": key, "value": "AES-256"}])
+    page.goto("/")
+    page.wait_for_selector("#controls-offer:not([hidden])")
+    page.fill("#description", "A web app talks to a database.")
+    page.fill("#analysis-name", "Controls analysis")
+    open_frameworks(page)
+    page.locator('input[name="framework"]').first.check()
+    close_frameworks(page)
+    page.uncheck("#ask")
+    continues: list[str] = []
+    page.on(
+        "request",
+        lambda request: (
+            continues.append(request.url) if "/answer/" in request.url else None
+        ),
+    )
+    page.click("#go")
+    page.wait_for_selector("#answer-problem:not([hidden])")
+    assert page.inner_text("#answer-problem") == NOT_CONTINUED
+    assert page.is_visible("#continue")
+    assert continues == []
+
+
 def test_a_control_that_fits_no_selected_framework_takes_no_tick(zoned_page):
     page = zoned_page
     spoofing = keep_control(page, "Spoof guard", {"type": "application"})

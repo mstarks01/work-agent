@@ -419,6 +419,9 @@ page shows "Continuing with your Controls…" until the next run starts. Each
 Control takes its default match. A refusal, such as two Controls that write
 one fact with two values, leaves the job at the pause, and the page shows the
 refusal above the questions. Untick or edit a Control there, then continue.
+The refusal is stored on the job, so it stays after a restart. A restart does
+not continue a waiting job. If the app stops before it continues the job, the
+page says that the app did not continue it, and you continue it.
 
 The model exists only after the extraction, so the pause shows the match. The
 questions of a paused analysis list each copied Control in `controls`: what

@@ -43,10 +43,19 @@ continues the job at once with no own answers, as a continue with an empty
 answer list does. Each copy takes its default resolution, and each applied
 Control writes its open facts and their lines of the answers Source. A refusal
 leaves the job paused and the page shows it: a two-value conflict, a value the
-fact cannot hold, or an admission refusal. The owner unticks or edits a Control
+fact cannot hold, or an admission refusal. The job row keeps the refusal's
+words in `continue_refusal`, so a restart keeps them, and the admission of a
+child of the job clears them. The owner unticks or edits a Control
 and continues, and the extraction does not run again. A submission with no
 Controls and no questions does not pause. The submission refuses
 `answers_from` without `questions`.
+
+**A restart does not continue a job.** The maintainer ruled this on
+2026-11-05. A job that waits to continue, with no task in the process and no
+stored refusal, stays paused. The page shows a fixed reason, that the app did
+not continue the job, and the start button. The page does not start the
+analysis by itself, so no run starts without a click. The same reason shows
+where a continue of the job ended without a report.
 
 **Two Controls that write one fact with two values refuse the save.** The
 refusal names the two Controls, the fact and the two values. The check runs at
@@ -93,6 +102,10 @@ the entry (ADR 0126). A Control the owner left out is listed with its reason
   over twelve elements costs twelve confirmations.
 - **A refusal on a `stated` fact.** Rejected: blocks a job on a fact that
   already has a value.
+- **A restart continues each waiting job.** Rejected by the maintainer's
+  ruling: the job then runs with no page open and no click.
+- **The refusal in process memory.** Rejected: a restart loses it, and the
+  page then starts the analysis by itself.
 
 ## Consequences
 

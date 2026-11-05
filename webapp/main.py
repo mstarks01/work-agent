@@ -436,10 +436,6 @@ class Workspace:
         self.store = store
         self._max_jobs = max_jobs
         self._runs: dict[str, tuple[asyncio.Task[None], StopSignal]] = {}
-        # Why the continue of each job that pauses for its Controls alone was
-        # refused (ADR 0125). A restart loses it, and the page then shows the
-        # job's pause with no reason.
-        self._refusals: dict[str, str] = {}
 
     def start(self, deadline_seconds: float, answers: JobAnswers) -> Start:
         """What runs an admitted job on this process's event loop, under
@@ -451,10 +447,6 @@ class Workspace:
             task = asyncio.create_task(
                 self._run(answers, record, runner, deadline_seconds, stop)
             )
-            # A Resumed Job answers its parent, so a refusal of an earlier
-            # continue of that parent no longer holds.
-            if record.resumption is not None:
-                self._refusals.pop(record.resumption.parent_id, None)
             # Held so the task is not garbage-collected mid-flight, and so
             # :meth:`stop` can reach it.
             self._runs[record.id] = (task, stop)
@@ -482,7 +474,7 @@ class Workspace:
     async def _continue(
         self, answers: JobAnswers, record: JobRecord, deadline_seconds: float
     ) -> None:
-        """Continue the paused job ``record`` with no own answers, and keep
+        """Continue the paused job ``record`` with no own answers, and store
         the page's words for a refusal, which leaves the job paused."""
         try:
             async with self.make_room(answers, answering=record.id):
@@ -496,13 +488,7 @@ class Workspace:
             if words is None:
                 logger.exception("job %s did not continue at its pause", record.id)
                 words = _NOT_STARTED
-            held = {job.id for job in await self.jobs(answers)}
-            self._refusals = {
-                job_id: kept
-                for job_id, kept in self._refusals.items()
-                if job_id in held
-            }
-            self._refusals[record.id] = words
+            await self.store.set_continue_refusal(record.id, record.owner_id, words)
 
     async def settled(self, job_id: str) -> None:
         """Wait for the task of ``job_id`` to end, where this process runs
@@ -514,23 +500,23 @@ class Workspace:
     def page_status(self, record: Envelope) -> PageStatus:
         """A job's status as the pages read it. A job that this process
         continues at its pause runs, because it asks nobody anything."""
-        if (
-            isinstance(record, JobRecord)
-            and record.waits_to_continue()
-            and self.continuing(record.id)
-        ):
+        if isinstance(record, JobRecord) and self.continuing(record):
             return "running"
         return _page_status(record)
 
-    def continuing(self, job_id: str) -> bool:
-        """Whether this process runs a task of the paused job ``job_id``: the
-        continue of a job that pauses for its Controls alone."""
-        return job_id in self._runs
+    def continuing(self, record: JobRecord) -> bool:
+        """Whether this process continues ``record`` at its pause: the job
+        waits to continue, and this process runs its task (ADR 0125)."""
+        return record.waits_to_continue() and record.id in self._runs
 
-    def refusal(self, job_id: str) -> dict[str, str]:
-        """The ``refusal`` key of the questions of ``job_id``: why its
-        continue at its pause was refused. Empty where nothing refused it."""
-        words = self._refusals.get(job_id)
+    def refusal(self, record: JobRecord) -> dict[str, str]:
+        """The ``refusal`` key of the questions of ``record``: why the job
+        waits at its pause. A job that waits to continue, with no task in this
+        process and no stored refusal, did not continue, and the owner
+        continues it (ADR 0125). Empty for every other job."""
+        words = record.continue_refusal
+        if words is None and record.waits_to_continue() and not self.continuing(record):
+            words = NOT_CONTINUED
         return {} if words is None else {"refusal": words}
 
     async def stop(self, job_ids: Iterable[str]) -> bool:
@@ -1504,6 +1490,13 @@ async def _refused(status: int, request: Request, exc: Exception) -> JSONRespons
 #: the server log only.
 _NOT_STARTED = "The analysis could not be started. Check the server log."
 
+#: What the page says for a job that waits to continue at its pause where no
+#: task of this process continues it and no refusal is stored (ADR 0125).
+NOT_CONTINUED = (
+    "The app did not continue this job. It restarted, or the last continue"
+    " did not finish. Continue it."
+)
+
 
 def _refusal_message(refusal: Exception) -> str | None:
     """What the page says for a typed refusal of the job operations, or
@@ -2202,9 +2195,7 @@ def create_app(
         )
         # While the service continues a job at its pause, the page shows the
         # continue rather than the questions (ADR 0125).
-        payload["continuing"] = record.waits_to_continue() and workspace.continuing(
-            record.id
-        )
+        payload["continuing"] = workspace.continuing(record)
         if payload["continuing"]:
             asked = None
         payload["error"] = record.error
@@ -2216,7 +2207,7 @@ def create_app(
             payload["questions"] = (
                 {"run": record.id}
                 | await answers.payload_of(asked)
-                | workspace.refusal(record.id)
+                | workspace.refusal(record)
             )
         return JSONResponse(payload)
 
@@ -2682,9 +2673,15 @@ async def _stream(
     status = record.status
     if record.waits_to_continue():
         # The service continues the job at once (ADR 0125). The page follows
-        # the Resumed Job, or shows the pause with the refusal.
-        yield _frame("continuing", {})
-        await workspace.settled(run_id)
+        # the Resumed Job, or shows the pause with the refusal. A job that no
+        # task of this process continues stays paused.
+        if workspace.continuing(record):
+            yield _frame("continuing", {})
+            await workspace.settled(run_id)
+            # The continue stores its refusal, so the record is read again.
+            record = await workspace.envelope(answers, run_id)
+            if record is None:
+                return
         child = await workspace.store.resumed_by(run_id, record.owner_id)
         if child is not None:
             yield _frame("continued", {"run": child})
@@ -2696,7 +2693,7 @@ async def _stream(
             # The response has started, so a refusal is a frame, never a status.
             yield _frame("failed", {"message": str(refusal)})
             return
-        yield _frame("questions", {"run": run_id} | payload | workspace.refusal(run_id))
+        yield _frame("questions", {"run": run_id} | payload | workspace.refusal(record))
     elif status == "completed":
         # The envelope read above refuses an unreadable record. The frame
         # names why a report is withheld, which :func:`served` does not give.
