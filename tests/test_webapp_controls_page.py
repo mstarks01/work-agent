@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from analysis_service import PACKAGES, Report
 from analysis_service.api import max_body_bytes, max_control_body_bytes
 from analysis_service.claims import (
+    UNKNOWN_KEY_FIELDS,
     ControlRowRef,
     RefusedControl,
     ReturnedClaim,
@@ -25,15 +26,21 @@ from analysis_service.claims import (
 )
 from analysis_service.controls import (
     ALIASES_FULL,
+    CONTROL_ROW_FIELD_MAX_CHARS,
     MAX_CONTROL_ALIASES,
     MAX_CONTROL_EVIDENCE_CEILING,
+    MAX_CONTROL_FACTS,
     MAX_CONTROL_ROWS,
     ROWS_FULL,
     evidence_full,
 )
+from analysis_service.fact_answers import FACT_VALUE_MAX_CHARS
+from analysis_service.frameworks import lane_of
 from analysis_service.frameworks.asvs.catalog import requirement_text
 from analysis_service.jobs import PipelineCompleted
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT
+from analysis_service.sources import MAX_LABEL_CHARS
+from analysis_service.system_model import ELEMENT_ID_MAX_CHARS
 from tests import test_webapp
 from tests.factories import sample_analysis
 from tests.test_controls import fact, row
@@ -273,6 +280,47 @@ class TestCreate:
         ]
         full = json.dumps(body(evidence=sent)).encode()
         assert len(full) > max_body_bytes(SHIPPED_RESILIENCE.source_limits())
+        assert len(full) <= max_control_body_bytes(limits)
+
+    def test_the_guard_holds_a_control_with_every_field_at_its_bound(self):
+        """Every bounded field at its bound, in 4-byte characters, and evidence
+        text that JSON escapes to twice its bytes, as a page sends it."""
+        limits = SHIPPED_RESILIENCE.control_limits()
+
+        def wide(chars: int) -> str:
+            return "\U0001f600" * chars
+
+        label = wide(MAX_LABEL_CHARS)
+        sent = {
+            "name": label,
+            "scope": {
+                "type": "store",
+                "name": label,
+                "aliases": [label] * MAX_CONTROL_ALIASES,
+            },
+            "facts": [
+                {
+                    "key": [wide(ELEMENT_ID_MAX_CHARS)] * len(UNKNOWN_KEY_FIELDS),
+                    "value": wide(FACT_VALUE_MAX_CHARS),
+                }
+            ]
+            * MAX_CONTROL_FACTS,
+            "rows": [
+                dict.fromkeys(
+                    ("framework", "unit", "version"), wide(CONTROL_ROW_FIELD_MAX_CHARS)
+                )
+            ]
+            * MAX_CONTROL_ROWS,
+            "evidence": [
+                {
+                    "name": label,
+                    "class": "code",
+                    "text": '"' * limits.max_evidence_bytes,
+                }
+            ]
+            * limits.max_evidence,
+        }
+        full = json.dumps(sent, ensure_ascii=False).encode()
         assert len(full) <= max_control_body_bytes(limits)
 
     @pytest.mark.parametrize(
@@ -610,16 +658,15 @@ class TestTheReportSection:
 
 
 @pytest.mark.parametrize("framework", sorted(PACKAGES))
-def test_the_csv_export_reads_each_framework_through_its_id_rule(framework):
+def test_the_csv_export_reads_each_lane_through_lane_of(framework):
     report = sound_report(framework)
     (block,) = [one for one in report.analyses if one.framework == framework]
-    lane_field = PACKAGES[framework].id_rule.lane_field
     header, *rows = csv.reader(io.StringIO(report_csv(report, [])))
     cells = [dict(zip(header, one, strict=True)) for one in rows]
     claims = [*block.claims, *block.rejected_claims]
     assert [one["id"] for one in cells] == [claim.id for claim in claims]
     assert [one["category"] for one in cells] == [
-        str(getattr(claim, lane_field)) for claim in claims
+        str(lane_of(claim) or "") for claim in claims
     ]
     assert {one["framework"] for one in cells} == {framework}
 

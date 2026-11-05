@@ -36,7 +36,11 @@ from analysis_service import (
 )
 from analysis_service.answer_shares import SharedAnswer
 from analysis_service.answer_state import ANSWER_LIMITS
-from analysis_service.api import JOB_REFUSAL_STATUS, max_body_bytes
+from analysis_service.api import (
+    JOB_REFUSAL_STATUS,
+    max_body_bytes,
+    max_control_body_bytes,
+)
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.claims import UNKNOWN_KEY_FIELDS
 from analysis_service.compact import FULL_FORMAT
@@ -380,7 +384,13 @@ NO_BODY = {("POST", "/workspace/runs/{run_id}/stop")}
 def _body_routes(client) -> list[tuple[str, str, int]]:
     """Each POST and PUT route that reads a body, as a request path, with the
     most bytes it reads."""
-    limits = {"/settings": MAX_SAVE_BYTES, "/settings/rows": MAX_SAVE_BYTES}
+    control = max_control_body_bytes(WEBAPP_CONTROL_LIMITS)
+    limits = {
+        "/settings": MAX_SAVE_BYTES,
+        "/settings/rows": MAX_SAVE_BYTES,
+        "/workspace/controls": control,
+        "/workspace/controls/{control_id}": control,
+    }
     return [
         (
             method,

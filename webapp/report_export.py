@@ -18,7 +18,8 @@ import io
 import re
 from collections.abc import Sequence
 
-from analysis_service import PACKAGES, Report
+from analysis_service import Report
+from analysis_service.frameworks import lane_of
 from analysis_service.job_controls import SectionEntry
 from analysis_service.open_facts import element_names
 
@@ -152,7 +153,7 @@ def _cell(value: str) -> str:
 def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
     """The findings of ``report`` as one CSV file, with a row for each.
 
-    The category is the field each framework's ID rule names its lane by. A
+    The category is the claim's lane, as :func:`lane_of` reads it. A
     framework that grades nothing or recommends nothing leaves the severity or
     the mitigation empty. The controls cell names each Control row that ruled
     on the finding, with its ruling.
@@ -169,7 +170,6 @@ def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
     writer = csv.writer(out)
     writer.writerow(CSV_COLUMNS)
     for block in report.analyses:
-        lane_field = PACKAGES[block.framework].id_rule.lane_field
         for claim in [*block.claims, *block.rejected_claims]:
             fields = claim.model_dump(mode="json")
             severity = fields.get("severity") or {}
@@ -180,7 +180,7 @@ def report_csv(report: Report, section: Sequence[SectionEntry]) -> str:
                 claim.title,
                 claim.verdict.status,
                 severity.get("level") or "",
-                str(fields.get(lane_field, "")) if lane_field else "",
+                str(lane_of(claim) or ""),
                 " | ".join(
                     names.get(element, element)
                     for element in claim.affected_element_ids

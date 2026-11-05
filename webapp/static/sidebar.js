@@ -19,14 +19,14 @@
     toggle.title = label;
     // A collapsed link or button shows only its icon, so its title names it
     // on hover.
-    document.querySelectorAll("#sidebar-navigation > *").forEach((link) => {
-      if (collapsed) link.title = link.textContent;
-      else link.removeAttribute("title");
+    document.querySelectorAll("#sidebar-navigation > *").forEach((item) => {
+      if (collapsed) item.title = item.textContent;
+      else item.removeAttribute("title");
     });
   };
 
-  // The theme button: the reader's choice for every page, kept in the
-  // browser. theme.js sets it before each page draws.
+  // The theme button: the reader's choice for every page. theme.js keeps it
+  // in the browser and sets it before each page draws.
   const themeButton = document.getElementById("theme-toggle");
   const isDark = () => {
     const chosen = document.documentElement.dataset.theme;
@@ -36,10 +36,8 @@
   showTheme();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", showTheme);
   themeButton.addEventListener("click", () => {
-    const theme = isDark() ? "light" : "dark";
-    document.documentElement.dataset.theme = theme;
+    window.workAgentTheme.choose(isDark() ? "light" : "dark");
     showTheme();
-    try { localStorage.setItem("work-agent-theme", theme); } catch { /* Keep the theme for this page only. */ }
   });
 
   try {

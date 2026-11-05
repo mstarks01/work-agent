@@ -129,10 +129,15 @@ function textControl(row) {
 }
 
 // The server states each bound, and the save refuses a value outside it.
+// A row has an inclusive floor (min), an exclusive floor (above) or neither.
 function rangeError(row, number) {
   const low = row.min ?? -Infinity;
   const high = row.max ?? Infinity;
-  if (number >= low && number <= high) return null;
+  const aboveFloor = row.above == null || number > row.above;
+  if (number >= low && number <= high && aboveFloor) return null;
+  if (row.above != null) {
+    return `Enter a number over ${row.above.toLocaleString()} and up to ${row.max.toLocaleString()}.`;
+  }
   if (row.min == null) return `Enter a number of ${row.max.toLocaleString()} or less.`;
   return `Enter a number from ${row.min.toLocaleString()} to ${row.max.toLocaleString()}.`;
 }

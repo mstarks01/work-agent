@@ -860,7 +860,7 @@ class _AliasBody(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    alias: str = Field(max_length=MAX_LABEL_CHARS)
+    alias: str
 
 
 #: The ``control_scopes`` key of an ``/answer`` body (ADR 0124). Only this

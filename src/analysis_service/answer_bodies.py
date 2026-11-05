@@ -117,8 +117,9 @@ class AmendmentSubmission(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    #: The deployment's byte budget refuses a longer text with its sentence;
-    #: this bound is the largest budget any deployment can set.
+    #: The deployment's byte budget refuses a longer text with its sentence.
+    #: This bound counts characters: a text of more characters than the
+    #: largest byte budget any deployment can set holds more bytes than it too.
     text: str = Field(max_length=MAX_SOURCE_BYTES_CEILING)
     revision: Revision
 

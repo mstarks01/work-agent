@@ -606,9 +606,11 @@ class TestKeepThisName:
             headers=SAME_ORIGIN,
         )
 
-    def test_an_alias_over_the_label_bound_is_refused(self, owner):
+    def test_an_alias_over_the_label_bound_is_refused_with_the_scope_rule(self, owner):
         billing = owner.keep("Billing", {"type": "process", "name": "Billing"})
-        assert self.alias(owner, billing, "a" * 201).status_code == 400
+        refused = self.alias(owner, billing, "a" * 201)
+        assert refused.status_code == 400, refused.text
+        assert "an alias is over 200 characters" in refused.json()["message"]
 
     def test_the_alias_is_appended_once(self, owner):
         billing = owner.keep("Billing", {"type": "process", "name": "Billing"})

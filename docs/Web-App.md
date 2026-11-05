@@ -240,8 +240,8 @@ the Controls section as `report` and `controls`. The CSV file holds one row
 for each finding of each framework, and the findings ruled out too. Its columns
 are `framework`, `id`, `title`, `status`, `severity`, `category`, `affected
 elements`, `description`, `mitigation` and `controls`. The category is the
-field that names the framework's lane: the STRIDE category or the ASVS
-chapter. A framework that gives no severity or no mitigation leaves that cell
+claim's lane, the field that each framework's ID rule names. For example, a
+STRIDE finding's category is its STRIDE category. A framework that gives no severity or no mitigation leaves that cell
 empty. The `controls` cell names each Control row that ruled on the finding,
 and its ruling. A cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage
 return gets an apostrophe first, so a spreadsheet shows the cell as text and
@@ -368,6 +368,11 @@ it.
   reads the file with the checks of an Owner File and sends only its text.
   Each line has a "Remove" button. "Save Control" sends the Control, and an
   edit replaces it and keeps no earlier version.
+- **The counts.** A Control holds at most 20 aliases, 50 rows and
+  `max_control_evidence` evidence files. The page checks each count before it
+  adds an item, and it shows the sentence that the server uses for the same
+  refusal. A fact of a Control takes no detail: the service refuses a fact
+  with a detail, from the page and from `/v1`.
 - **The routes.** `GET /workspace/controls` lists your Controls with no
   evidence text. `POST /workspace/controls` adds one and answers `201`.
   `PUT /workspace/controls/{control_id}` replaces one, and the body names the
@@ -666,10 +671,10 @@ page, so the page and the server word a refusal in one way.
 `webapp/main.py`. It refuses a media type other than `application/json` with
 `415`. It refuses a body over the route's limit with `413`, and it stops the
 read at the first byte over the limit. The limit is `MAX_SAVE_BYTES` for the
-two Settings routes. The two Control save routes use `max_control_body_bytes`:
-twice the text of a Control that holds the most evidence files, each at its
-largest, and 64 KiB for the other fields. So the routes accept each Control that
-the evidence rules accept. Each other route is a job route, and it reads its
+two Settings routes. The two Control save routes use `max_control_body_bytes`.
+It takes the most evidence files, each at its largest, and each other field at
+its bound in 4-byte characters, and it doubles that, as the job guard does. So
+the routes accept each Control that the rules accept. Each other route is a job route, and it reads its
 body through `_job_body`. There the limit is twice the deployment's
 `max_source_bytes`, the guard that `/v1` also applies.
 
@@ -710,6 +715,11 @@ or its link in the group index, to open it. The group index jumps to a group wit
 changing its answers or the engine's question order. Shared answers, row
 exceptions, earlier answers, skipped questions and follow-up rules use the
 existing answer service.
+
+The last item of the sidebar on each page is the theme button, "Dark theme".
+It changes the page between the light and the dark theme, and it shows as
+pressed when the dark theme is on. The browser keeps the choice, and each page
+sets it before it draws. With no choice, each page follows the system setting.
 
 **Description**, **Questions** and **Reports** belong to the same analysis.
 Use **Analyses** to reopen a paused analysis or review its retained reports.

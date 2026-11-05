@@ -46,6 +46,11 @@ from analysis_service.claims import (
 )
 from analysis_service.config_files import MAX_VALUE_CHARS
 from analysis_service.conformance import REFERENCE_MODELS
+from analysis_service.controls import (
+    MAX_CONTROL_ALIASES,
+    MAX_CONTROL_EVIDENCE_TOTAL_BYTES,
+    MAX_CONTROL_ROWS,
+)
 from analysis_service.deployment import ConfigPaths
 from analysis_service.diagrams import _install_argv
 from analysis_service.fact_answers import (
@@ -950,8 +955,15 @@ BOUND_COPIES: list[tuple[Path, str, int]] = [
     (CONFIGURATION, r"a whole number of days from 1 to (\d+)", MAX_RETENTION_DAYS),
     (CONFIGURATION, r"has ([\d,]+) characters or fewer", MAX_VALUE_CHARS),
     (CONFIGURATION, r"must have ([\d,]+) characters or fewer", MAX_VALUE_CHARS),
+    (
+        CONFIGURATION,
+        r"`max_source_bytes` must be ([\d,]+) bytes",
+        MAX_CONTROL_EVIDENCE_TOTAL_BYTES,
+    ),
     (FIRST_RUN, r"keeps at most (\d+) recent runs", MAX_RUNS),
     (WEB_APP, r"At most (\d+) runs\.", MAX_RUNS),
+    (WEB_APP, r"A Control holds at most (\d+) aliases", MAX_CONTROL_ALIASES),
+    (WEB_APP, r"A Control holds at most \d+ aliases, (\d+) rows", MAX_CONTROL_ROWS),
     (WEB_APP, r"The app holds at most (\d+) jobs", MAX_RUNS),
     (WEB_APP, r"The bound of (\d+) runs", MAX_RUNS),
     (REPORT_SCHEMA, r"the verbatim span, ≤(\d+) chars", GROUND_TEXT_MAX_CHARS),

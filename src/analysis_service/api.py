@@ -73,10 +73,17 @@ from analysis_service.auth import (
     build_verifier,
 )
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.claims import FrameworkName
-from analysis_service.controls import ControlLimits
+from analysis_service.claims import UNKNOWN_KEY_FIELDS, FrameworkName
+from analysis_service.controls import (
+    CONTROL_ROW_FIELD_MAX_CHARS,
+    MAX_CONTROL_ALIASES,
+    MAX_CONTROL_FACTS,
+    MAX_CONTROL_ROWS,
+    ControlLimits,
+)
 from analysis_service.deployment import Deployment, FrameworkNotCarried
 from analysis_service.errors import ConfigError, shown_errors
+from analysis_service.fact_answers import FACT_VALUE_MAX_CHARS
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.job_answers import (
@@ -119,12 +126,14 @@ from analysis_service.principals import Identity
 from analysis_service.report_changes import report_changes
 from analysis_service.selection import SelectionError
 from analysis_service.sources import (
+    MAX_LABEL_CHARS,
     LimitRung,
     Source,
     SourceLimits,
     clean_system_name,
 )
 from analysis_service.store_backends import audited_delete, build_store, store_lifespan
+from analysis_service.system_model import ELEMENT_ID_MAX_CHARS
 from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -148,23 +157,35 @@ def max_body_bytes(limits: SourceLimits) -> int:
     return limits.max_total_bytes * _BODY_SLACK
 
 
-#: The room in a Control save's body for all but its evidence text: the name,
-#: the scope, at most 50 facts and 50 rows, and the evidence names.
-_CONTROL_FIELDS_BYTES = 64 * 1024
+#: The most bytes one character takes in UTF-8.
+_UTF8_MAX_BYTES = 4
+#: The room for the keys, quotes and commas around one item of a Control save:
+#: a name, an alias, a fact, a row or an evidence file.
+_ITEM_FRAMING_BYTES = 256
 
 
 def max_control_body_bytes(limits: ControlLimits) -> int:
     """The raw-body guard of a Control save: the guard of a job whose sources
-    are a full Control's evidence, and room for the other fields.
+    are a full Control's evidence and each other field at its bound, in
+    4-byte characters, with room for the framing of each item.
 
     The web app's ``control_body`` enforces it, and
     ``tests/test_one_reader_lints.py`` refuses another caller.
     """
-    evidence = SourceLimits(
-        max_total_bytes=limits.max_evidence * limits.max_evidence_bytes,
+    labels = 2 + MAX_CONTROL_ALIASES + limits.max_evidence
+    fact_chars = FACT_VALUE_MAX_CHARS + len(UNKNOWN_KEY_FIELDS) * ELEMENT_ID_MAX_CHARS
+    chars = (
+        labels * MAX_LABEL_CHARS
+        + MAX_CONTROL_FACTS * fact_chars
+        + MAX_CONTROL_ROWS * 3 * CONTROL_ROW_FIELD_MAX_CHARS
+    )
+    whole = SourceLimits(
+        max_total_bytes=limits.max_evidence * limits.max_evidence_bytes
+        + chars * _UTF8_MAX_BYTES,
         max_sources=limits.max_evidence,
     )
-    return max_body_bytes(evidence) + _CONTROL_FIELDS_BYTES
+    items = labels + MAX_CONTROL_FACTS + MAX_CONTROL_ROWS
+    return max_body_bytes(whole) + items * _ITEM_FRAMING_BYTES
 
 
 #: How many event streams one owner may hold open at once. Each stream polls

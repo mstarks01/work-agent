@@ -1046,6 +1046,13 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
         over = page.locator('tr[data-key="resilience.attempts"] .field-error')
         over_text = over.inner_text()
         attempts.fill("3")
+        ratio = page.locator('tr[data-key="resilience.retry_budget_ratio"] input')
+        ratio.fill("0")
+        page.locator("#settings-search").click()
+        floor_text = page.locator(
+            'tr[data-key="resilience.retry_budget_ratio"] .field-error'
+        ).inner_text()
+        ratio.fill("0.1")
         text_bound = page.locator(
             'tr[data-key="credentials.vertex.location"] input'
         ).get_attribute("maxlength")
@@ -1066,6 +1073,7 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
     assert fits
     assert bounds == ("1", "10")
     assert over_text == "Enter a number from 1 to 10."
+    assert floor_text == "Enter a number over 0 and up to 1."
     assert text_bound == "4096"
 
 

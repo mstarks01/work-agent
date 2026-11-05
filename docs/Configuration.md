@@ -1001,7 +1001,8 @@ single trace.
 
 **A request pinned to a slow upstream reads its own bounds.** The
 `[bounds_by_upstream]` table is keyed by the gateway's slug for an upstream, and
-each row states a `timeout_ms` and a `job_deadline_ms`. A row is read only where
+each row states a `timeout_ms` and a `job_deadline_ms`, each in the same range
+as the base value. A row is read only where
 a tier's `[upstreams]` pin in the tiers file names its key. The timeout applies
 to that tier's requests, and the deadline to every job of a deployment that
 pins the upstream on any bound tier, because a slow upstream is slow for the
@@ -1259,6 +1260,11 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 
 The loader refuses a value outside its range, and so does a save on the
 Settings page. The page shows each range and checks it before it saves.
+
+One more bound applies to two settings together. `max_control_evidence` ×
+`max_source_bytes` must be 16,777,216 bytes (16 MiB) or less, because one
+Control holds that many evidence files of that size. The loader and a Settings
+save refuse a larger product. The shipped values give 1 MiB.
 
 ### How strictly each override family is checked
 

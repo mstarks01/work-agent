@@ -56,6 +56,8 @@ EVIDENCE_ID_PATTERN = re.compile(EVIDENCE_ID)
 MAX_CONTROL_FACTS = 50
 MAX_CONTROL_ROWS = 50
 MAX_CONTROL_ALIASES = 20
+#: The longest framework, unit or version of one Control row.
+CONTROL_ROW_FIELD_MAX_CHARS = 32
 
 #: The refusals of a Control over a count. The Controls page shows the same
 #: sentences before it sends a save (``page_data``).
@@ -279,9 +281,9 @@ class ControlRow(BaseModel):
     #: A ``str`` and not a ``FrameworkName``: :func:`check_unit` names the
     #: refusal of a submission, and a row read back keeps a framework that a
     #: later build drops.
-    framework: str = Field(max_length=32)
-    unit: str = Field(max_length=32)
-    version: str = Field(min_length=1, max_length=32)
+    framework: str = Field(max_length=CONTROL_ROW_FIELD_MAX_CHARS)
+    unit: str = Field(max_length=CONTROL_ROW_FIELD_MAX_CHARS)
+    version: str = Field(min_length=1, max_length=CONTROL_ROW_FIELD_MAX_CHARS)
 
     @model_validator(mode="after")
     def _a_carried_unit(self, info: ValidationInfo) -> Self:
@@ -477,6 +479,10 @@ def check_texts(
 #: these as its static bound.
 MAX_CONTROLS_CEILING = 1000
 MAX_CONTROL_EVIDENCE_CEILING = 100
+#: The most evidence text one Control can hold at any setting: its most
+#: files times the most bytes of one file. This bounds a Control save's body
+#: guard (:func:`~analysis_service.api.max_control_body_bytes`).
+MAX_CONTROL_EVIDENCE_TOTAL_BYTES = 16 * 1024 * 1024
 
 
 @dataclass(frozen=True)

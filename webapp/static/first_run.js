@@ -1288,12 +1288,6 @@
         refuse("Write the amendment first.");
         return;
       }
-      // The amendment joins the analysis's sources, which share one byte
-      // budget. The server checks the total.
-      if (new TextEncoder().encode(text).length > maxDescriptionBytes) {
-        refuse(`The amendment is longer than ${maxDescriptionBytes.toLocaleString()} bytes, the most one analysis takes. Shorten it.`);
-        return;
-      }
       await flush();
       if (edits.size) {
         refuse("Some answers are not saved yet. Save them, then amend.");
