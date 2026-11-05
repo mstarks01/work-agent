@@ -924,6 +924,16 @@ class TestTheAutomaticContinue:
         ]
         assert owner.runner.heads == 1
 
+    def test_the_paused_job_reads_as_its_resumed_job(self, owner):
+        """The parent waits with no task, and its Resumed Job locks it, so the
+        status route serves the child and shows no reason for a pause."""
+        run_id, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
+        child = frames["continued"]["run"]
+        assert ran(owner.client, child) == "completed"
+        shown = owner.client.get(f"/workspace/runs/{run_id}").json()
+        assert shown["status"] == "completed"
+        assert "questions" not in shown
+
     def test_the_analysis_shows_the_continued_job_and_asks_nothing(self, owner):
         _, frames = self.continued(owner, owner.keep("Encrypted", ORDERS_DB))
         child = frames["continued"]["run"]

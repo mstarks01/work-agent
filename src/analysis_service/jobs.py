@@ -984,7 +984,7 @@ class JobStore(Protocol):
     async def set_continue_refusal(
         self, job_id: str, owner_id: str, refusal: str
     ) -> bool:
-        """Keep why the service's continue of the owned paused job was refused
+        """Keep why the service's continue of the owned job was refused
         (ADR 0125). False where the job is missing or another owner's, and
         nothing changes. The revision and ``updated_at`` stay as they are."""
         ...

@@ -488,7 +488,10 @@ class Workspace:
             if words is None:
                 logger.exception("job %s did not continue at its pause", record.id)
                 words = _NOT_STARTED
-            await self.store.set_continue_refusal(record.id, record.owner_id, words)
+            if not await self.store.set_continue_refusal(
+                record.id, record.owner_id, words
+            ):
+                logger.warning("job %s left the store before its refusal", record.id)
 
     async def settled(self, job_id: str) -> None:
         """Wait for the task of ``job_id`` to end, where this process runs
@@ -2670,7 +2673,6 @@ async def _stream(
         return
     if record is None:
         return
-    status = record.status
     if record.waits_to_continue():
         # The service continues the job at once (ADR 0125). The page follows
         # the Resumed Job, or shows the pause with the refusal. A job that no
@@ -2690,6 +2692,7 @@ async def _stream(
         if child is not None:
             yield _frame("continued", {"run": child})
             return
+    status = record.status
     if status == "awaiting-answers":
         try:
             payload = await answers.questions(run_id, record.owner_id)
