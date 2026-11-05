@@ -1,0 +1,13 @@
+material from today's prepare, catalog signed; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Colleague shift responses may be readable across the public-to-app boundary | ['flow:entity:colleague>process:scheduling-web-app>view-shifts', 'entity:colleague', 'process:scheduling-web-app']
+- Store rota submissions may expose staff and rota data in transit | ['flow:entity:store-manager>process:scheduling-web-app>build-rota', 'entity:store-manager', 'process:scheduling-web-app']
+- Rota requests between the web app and scheduling service may be readable on the internal network | ['flow:process:scheduling-web-app>process:scheduling-service>rota-requests', 'process:scheduling-web-app', 'process:scheduling-service']
+- Rota database traffic may disclose the staff-record corpus on the internal network | ['flow:process:scheduling-service>store:rota-database>read-write-rotas', 'process:scheduling-service', 'store:rota-database']
+- Payroll export creation may expose PII on the internal network | ['flow:process:scheduling-service>store:file-share>write-payroll-export', 'process:scheduling-service', 'store:file-share']
+- Payroll export collection may expose PII across the payroll-team boundary | ['flow:entity:payroll-system>store:file-share>collect-payroll-export', 'entity:payroll-system', 'store:file-share']
+- A storage copy of the rota database may reveal colleague records if at-rest encryption is absent | ['store:rota-database']
+- A file-share storage copy may reveal payroll exports if at-rest encryption is absent | ['store:file-share']
+- Unverified database-reader authentication may permit unauthorized retrieval of rota records | ['store:rota-database', 'process:scheduling-service', 'flow:process:scheduling-service>store:rota-database>read-write-rotas']
+- Unverified payroll-system authentication may let an unauthorized reader obtain payroll exports | ['store:file-share', 'entity:payroll-system', 'flow:entity:payroll-system>store:file-share>collect-payroll-export']
+spent: $0.0568 reported
+must-finds matched: [9]

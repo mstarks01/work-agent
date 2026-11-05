@@ -1,0 +1,7 @@
+material from today's prepare, catalog signed; prompt files from ec6e8a1e9cbee758d186eb12799f9a023462e368
+- Database maintenance traffic exposes CMS data to on-path observers | ['flow:entity:admin>store:mysql-database>direct-administration', 'entity:admin', 'store:mysql-database']
+- Unverified database authentication may expose the CMS corpus through direct administration | ['store:mysql-database', 'flow:entity:admin>store:mysql-database>direct-administration', 'entity:admin']
+- CMS-to-MySQL traffic may disclose PII if internal transport encryption is absent | ['flow:process:web-server>store:mysql-database>cms-data', 'process:web-server', 'store:mysql-database']
+- A storage copy may expose MySQL account data if encryption at rest is not enabled | ['store:mysql-database']
+spent: $0.0454 reported
+must-finds matched: [9]
