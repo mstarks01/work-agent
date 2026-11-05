@@ -501,13 +501,9 @@ class TestThePage:
             assert f'nonce="{nonce}"' in attributes
 
     def test_the_page_reads_the_unit_labels_from_the_catalog(self, owner):
-        page = owner.client.get("/controls").text
-        data = re.search(
-            r'<script type="application/json" id="controls_page"[^>]*>(.*?)</script>',
-            page,
-            re.DOTALL,
-        ).group(1)
-        payload = json.loads(data)
+        payload = test_webapp._island(
+            owner.client.get("/controls").text, "controls_page"
+        )
         asvs = {unit["id"]: unit for unit in payload["units"]["asvs"]["units"]}
         assert asvs["V2.4.1"]["label"] == requirement_text("V2.4.1")
         assert asvs["V2"]["label"] == "Validation and Business Logic"
@@ -713,17 +709,16 @@ class TestTheReportSection:
     def test_the_report_page_carries_the_section(self, ruled):
         owner, child, _ = ruled
         page = owner.client.get(f"/report/{child}").text
-        data = re.search(
-            r'<script type="application/json" id="controls"[^>]*>(.*?)</script>',
-            page,
-            re.DOTALL,
-        ).group(1)
-        assert [entry["name"] for entry in json.loads(data)] == [
+        assert [entry["name"] for entry in test_webapp._island(page, "controls")] == [
             "WAF",
             "Encrypted",
             "Billing",
         ]
-        assert "\\u003cb>signing" in data
+        (sent,) = re.findall(
+            r'<script type="application/json" id="controls"[^>]*>(.*?)</script>',
+            page,
+        )
+        assert "\\u003cb>signing" in sent
 
     def test_an_unknown_report_is_missing(self, ruled):
         owner, _, _ = ruled
@@ -875,8 +870,8 @@ class TestTheTables:
         the Markdown export reads too. A noun that equals its key is also the
         key a script compares, so only the other words are refused.
 
-        The test reads a word as a double-quoted string, the form a table of
-        words takes. It does not read a word in a sentence of a page, because
+        The test reads a word as a whole string in any of the three quotes,
+        the form a table of words takes. It does not read a word in a sentence of a page, because
         page prose names a type in its own words, as in "a rectangle is an
         external entity".
 
@@ -899,7 +894,8 @@ class TestTheTables:
                 script, left_out = re.subn(table, "", script, flags=re.DOTALL)
                 assert left_out == 1, name
             for word in words:
-                assert f'"{word}"' not in script, (name, word)
+                for quote in "\"'`":
+                    assert f"{quote}{word}{quote}" not in script, (name, word)
 
     def test_the_fact_kind_tables_name_each_scope_and_kind(self):
         from typing import get_args

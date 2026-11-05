@@ -783,13 +783,9 @@ def test_the_page_reads_the_service_s_severity_order():
     table test holds its keys.
     """
     from analysis_service.critic import SEVERITY_ORDER
-    from tests.test_webapp import viewer_javascript
+    from tests.test_webapp import _island, viewer_javascript
 
-    (order,) = re.findall(
-        r'<script type="application/json" id="severity_order"[^>]*>(.*?)</script>',
-        page(),
-    )
-    assert json.loads(order) == list(SEVERITY_ORDER)
+    assert _island(page(), "severity_order") == list(SEVERITY_ORDER)
     assert re.search(
         r'const SEV_ORDER = JSON\.parse\(document\.getElementById\("severity_order"\)',
         viewer_javascript(),

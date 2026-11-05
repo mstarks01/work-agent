@@ -22,7 +22,7 @@ import tempfile
 from collections.abc import Sequence
 from dataclasses import asdict, replace
 from pathlib import Path
-from typing import get_args
+from typing import Any, get_args
 
 import pytest
 from fastapi.testclient import TestClient
@@ -240,10 +240,12 @@ def test_the_transcript_input_carries_the_deployment_s_byte_limit(client):
     assert f'data-max-bytes="{limit}"' in client.get("/").text
 
 
-def _island(page: str, name: str) -> object:
+def _island(page: str, name: str) -> Any:
     """The JSON value of the island ``name`` that a page carries."""
     (sent,) = re.findall(
-        rf'<script type="application/json" id="{name}"[^>]*>(.*?)</script>', page
+        rf'<script type="application/json" id="{name}"[^>]*>(.*?)</script>',
+        page,
+        re.DOTALL,
     )
     return json.loads(sent)
 
@@ -527,14 +529,7 @@ def test_the_run_gate_admits_one_at_a_time(tiers):
 
 def report_of(client, run_id: str) -> dict:
     """The report the viewer was handed, read back out of its JSON block."""
-    page = client.get(f"/report/{run_id}").text
-    block = re.search(
-        r'<script type="application/json" id="report"[^>]*>(.*?)</script>',
-        page,
-        re.DOTALL,
-    )
-    assert block is not None, "the report page carried no injected JSON block"
-    return json.loads(block.group(1))
+    return _island(client.get(f"/report/{run_id}").text, "report")
 
 
 def frameworks_of(client, body: dict) -> list[str]:
@@ -1562,12 +1557,7 @@ def test_no_free_text_field_reaches_the_page_as_markup():
     assert MARKUP_PAYLOAD not in page
     assert "<img" not in page
 
-    payload = re.search(
-        r'<script type="application/json" id="report"[^>]*>(.*?)</script>',
-        page,
-        re.DOTALL,
-    )
-    decoded = json.loads(payload.group(1))
+    decoded = _island(page, "report")
     assert decoded["analyses"][0]["rejected_claims"][0]["title"] == MARKUP_PAYLOAD
     assert (
         decoded["analyses"][0]["rejected_claims"][0]["grounds"][0]["text"]
@@ -1667,14 +1657,9 @@ def test_the_page_carries_the_link_questions_its_catalog_raises():
     rendered = render_report(
         report, report_state(report), previous=None, parent=None, controls=()
     )
-    payload = re.search(
-        r'<script type="application/json" id="link_questions"[^>]*>(.*?)</script>',
-        rendered.html,
-        re.DOTALL,
-    )
 
     catalog = report.assertions.catalog if report.assertions else None
-    assert json.loads(payload.group(1)) == [
+    assert _island(rendered.html, "link_questions") == [
         question.to_json() for question in link_questions(catalog, report.system_model)
     ]
 
