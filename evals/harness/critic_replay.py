@@ -57,7 +57,6 @@ from analysis_service.graph import (
 )
 from analysis_service.job_controls import AppliedControl
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from evals.harness.artifact import (
     CORPUS_DIR,
@@ -82,10 +81,8 @@ class Archived:
     framework: FrameworkName
     drafts: list[Claim]
     marks: AnalysisMarks
-    #: ``None`` where the case failed before it wrote one, and the material
-    #: came from its failure dump instead.
-    report: Report | None
-    #: This framework's block of ``report``, ``None`` where there is no report.
+    #: This framework's block of the case's report, or ``None`` where the case
+    #: failed before it wrote one, and the material came from its failure dump.
     block: FrameworkAnalysis | None
     shared: dict[str, Any]
     model: SystemModel
@@ -127,7 +124,6 @@ def load(artifact: EvalArtifact, case_id: str, framework: FrameworkName) -> Arch
         framework=framework,
         drafts=[record.model_validate(draft) for draft in held.get(framework, [])],
         marks=marks,
-        report=report,
         block=block,
         shared=shared,
         model=report.system_model,
@@ -157,7 +153,6 @@ def _from_failure(
         framework=framework,
         drafts=[record.model_validate(draft) for draft in state[nodes.key("drafts")]],
         marks=AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {}),
-        report=None,
         block=None,
         shared={
             STATE_SYSTEM_MODEL: state[STATE_SYSTEM_MODEL],

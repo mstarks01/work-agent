@@ -1,7 +1,7 @@
 """Replay one framework's critic re-ask over a first pass with a Control row fault.
 
-No archived run holds a Control, and no archived run holds a re-ask on a
-``control-row`` problem. This builds one. It reads an archived case's critic
+This builds a re-ask on a ``control-row`` problem from a first pass that
+holds none. It reads an archived case's critic
 first pass from its report, applies one written Control to the drafts, and
 answers each row the Control shows with the refusal the fault set states, so
 the first pass reconciles. It then injects one fault of one shape on one draft:
@@ -53,7 +53,7 @@ from analysis_service.critic_round import (
 )
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.graph import RECRITIC_ROLE, FrameworkNodes
+from analysis_service.graph import RECRITIC_ROLE, FrameworkNodes, claims_of
 from analysis_service.job_controls import AppliedControl
 from analysis_service.markdown_loader import MarkdownLoader
 from evals.harness.artifact import ProvenanceError, load_artifact, repo_commit
@@ -206,7 +206,7 @@ def stored(raw: str, framework: FrameworkName) -> list[Any]:
     ADK's own reader writes the node's output key, so ``previous_review`` holds
     the bytes the graph would hold.
     """
-    return validate_schema(schemas_for(framework).rulings, raw)["claims"]
+    return claims_of(validate_schema(schemas_for(framework).rulings, raw))
 
 
 def _emitted(rulings: list[Ruling], framework: FrameworkName) -> list[Any]:
@@ -243,7 +243,7 @@ class Repair(TypedDict):
 
     problems: list[str]
     answer: str
-    refused: str | None
+    schema_error: str | None
     remaining: list[dict[str, Any]]
     drift: list[dict[str, Any]]
     status: Status
@@ -252,7 +252,7 @@ class Repair(TypedDict):
 def repair(view: FaultView, raw: str) -> Repair:
     """What the re-ask's answer did, merged and checked as the second look does.
 
-    ``refused`` is why an answer outside the rulings schema was not read.
+    ``schema_error`` is why an answer outside the rulings schema was not read.
     ``remaining`` is every problem the merged set still has, and ``drift`` is
     each ruling the re-ask changed that no problem named. The statuses are the
     draft's verdict with every row answered, and after the repair.
@@ -260,7 +260,7 @@ def repair(view: FaultView, raw: str) -> Repair:
     result = Repair(
         problems=view.reask.messages,
         answer=raw,
-        refused=None,
+        schema_error=None,
         remaining=[],
         drift=[],
         status=Status(answered=_status(view.clean, view.draft_id), repaired=None),
@@ -271,7 +271,7 @@ def repair(view: FaultView, raw: str) -> Repair:
         )
         outcome = view.round.outcome(merged)
     except ValueError as error:
-        result["refused"] = str(error)
+        result["schema_error"] = str(error)
         return result
     result["drift"] = [problem.model_dump(mode="json") for problem in drift]
     if isinstance(outcome, Accepted):
@@ -378,8 +378,8 @@ def command_recritic_replay(args: argparse.Namespace) -> int:
     if args.out is not None:
         payload = {"record": record, "draft": args.draft, "fault": args.fault, **result}
         args.out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    if result["refused"] is not None:
-        print(f"the answer was not read: {result['refused']}")
+    if result["schema_error"] is not None:
+        print(f"the answer was not read: {result['schema_error']}")
     print(
         f"{args.draft} {args.fault}: {len(result['remaining'])} problems remain,"
         f" {len(result['drift'])} unbriefed changes; status"

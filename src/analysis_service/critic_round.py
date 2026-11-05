@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from google.genai import types
 
@@ -103,6 +103,13 @@ def rulings_of(ruled: Sequence[Any], schemas: FrameworkSchemas) -> list[Ruling]:
     for a ``confidence`` the neutral model forbids.
     """
     return list(schemas.rulings.model_validate({"claims": list(ruled)}).claims)
+
+
+#: The rendered artifacts the re-ask prompt reads, as ``REVIEW_ARTIFACTS``
+#: names them.
+ReaskArtifact = Literal[
+    "previous_review", "critic_issues", "draft_roster", "unreconciled_drafts"
+]
 
 
 @dataclass(frozen=True)
@@ -178,7 +185,7 @@ class Reask(Unreconciled):
     emitted: list[Any]
 
     @property
-    def prompts(self) -> dict[str, str]:
+    def prompts(self) -> dict[ReaskArtifact, str]:
         """Each rendered artifact the re-ask prompt reads, by artifact name."""
         return {
             "previous_review": render_fenced(self.emitted),

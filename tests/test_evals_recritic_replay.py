@@ -119,7 +119,11 @@ def test_a_repair_that_answers_the_row_leaves_no_problem(archived):
 
     result = recritic_replay.repair(view, answer(view, draft))
 
-    assert (result["refused"], result["remaining"], result["drift"]) == (None, [], [])
+    assert (result["schema_error"], result["remaining"], result["drift"]) == (
+        None,
+        [],
+        [],
+    )
     assert result["status"]["repaired"] == result["status"]["answered"]
 
 
@@ -157,7 +161,7 @@ def test_an_answer_outside_the_contract_is_kept_and_refused(archived):
 
     result = recritic_replay.repair(view, json.dumps({"threats": []}))
 
-    assert "Extra inputs are not permitted" in result["refused"]
+    assert "Extra inputs are not permitted" in result["schema_error"]
     assert result["answer"] == json.dumps({"threats": []})
 
 

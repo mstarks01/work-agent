@@ -78,7 +78,7 @@ def test_changed_drafts_make_a_request_the_critic_never_saw(recorded, case):  # 
 def test_a_replayed_answer_is_compared_draft_by_draft(recorded, case):  # noqa: F811
     out, _ = recorded
     archived = critic_replay.load(finished(out, case.id), case.id, "stride")
-    block = archived.report.analyses[0]
+    block = archived.block
     first = block.all_claims()[0]
     flipped = {
         "claims": [
@@ -222,7 +222,7 @@ def test_a_failed_case_rebuilds_its_critic_request_from_the_dump(
         critic_replay.compose(archived, PACKAGE_LOADER, PROMPT_LOADER)
     )
 
-    assert archived.report is None
+    assert archived.block is None
     assert next(contents for text, contents in seen if text == instruction) == [turn]
 
 
