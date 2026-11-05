@@ -104,3 +104,32 @@ is unchanged. The patch is not committed to `prompts/`.
 control" is refuted if the treatment's repaired count is not greater than the
 control's on the same 12 calls, or if the treatment has more new problems or
 more unbriefed changes than the control.
+
+## Stage 1 result, added after the run
+
+The run read `6201cfa4` (#2188), clean, and spent $0.1634 for 12 calls. The
+second six calls cost about $0.004 each, against about $0.024 for the first
+six. This fits a cached prompt prefix. Each answer is a separate call.
+
+**The counting rule, validated by hand.** Each of the 12 files was read
+against its `count.sh` line. One fault in the rule was found and fixed before
+any number was fixed: a view that was not repaired has no status after the
+repair, and the rule counted it as a status change. The status change now
+counts only repaired views. The repaired, kept-fault, new-problem and
+unbriefed counts needed no change.
+
+**The control:** 8 of 12 repaired, 4 new problems, 0 unbriefed changes, 0
+status changes, 0 unread answers. `row-unanswered` and `row-not-shown` are
+repaired 8 of 8. `row-on-other-step` is repaired 0 of 4: on each call the
+re-ask removes the `control_row` and does not put the row in
+`refused_controls`, so the row is left unanswered (a new `control-row`
+problem). Each of those four jobs would fail with no report.
+
+**The stop rule** does not hold, so the ceiling is 4 of 12, all on
+`row-on-other-step`.
+
+**The stage 2 numbers, fixed now.** The treatment runs the same 12 calls with
+`treatment.patch` applied. The hypothesis is refuted if the treatment
+repairs 8 or fewer, or has more than 4 new problems, or has 1 or more
+unbriefed change. Expected cost: about $0.17. The runner cap for stage 2:
+$0.30. Stage 2 needs a new grant from the maintainer.

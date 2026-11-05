@@ -15,4 +15,4 @@ for file in "$1"/"$2"-*.json; do
 done | jq -s '{views: ., repaired: map(select(.repaired)) | length, total: length,
   new_problems: map(.new_problems) | add, unbriefed: map(.unbriefed) | add,
   unread: map(select(.read | not)) | length,
-  status_changed: map(select(.status | test("^(\\S+) -> \\1$") | not)) | length}'
+  status_changed: map(select(.repaired and (.status | test("^(\\S+) -> \\1$") | not))) | length}'
