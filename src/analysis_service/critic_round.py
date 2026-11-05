@@ -13,8 +13,9 @@ The round ends in one of three outcomes. :class:`Accepted` carries the claims
 and the rejected claims the block holds. :class:`Reask` carries what the
 re-ask reads: the problems, the roster, the drafts it must read, the first
 pass as the critic emitted it, and the first pass it is merged onto.
-:class:`Failed` carries the problems a second look still did not reconcile. The graph node parks what an outcome carries and
-takes the edge it names, and decides nothing else.
+:class:`Failed` carries the problems a second look still did not reconcile.
+The graph node parks what an outcome carries and takes the edge it names, and
+decides nothing else.
 
 The module also renders the request a critic node sends, instruction and
 user turn, as ADK renders it from session state. The two critic replays call
@@ -150,7 +151,7 @@ class Unreconciled:
         return problem_messages(self.problems)
 
     @property
-    def summary(self) -> dict[str, int]:
+    def revise_output(self) -> dict[str, int]:
         """What the router outputs on the ``revise`` edge, and so the re-ask's
         user turn."""
         return {"issue_count": len(self.problems)}
@@ -430,4 +431,4 @@ async def recritic_request(
         **{nodes.key(artifact): text for artifact, text in reask.prompts.items()},
     }
     template = recritic_instruction(package_loader, prompt_loader, nodes)
-    return await node_request(template, state, reask.summary, None)
+    return await node_request(template, state, reask.revise_output, None)

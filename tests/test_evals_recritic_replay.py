@@ -157,7 +157,7 @@ def test_an_answer_outside_the_contract_is_kept_and_refused(archived):
 
     result = recritic_replay.repair(view, json.dumps({"threats": []}))
 
-    assert "no 'claims'" in result["refused"]
+    assert "Extra inputs are not permitted" in result["refused"]
     assert result["answer"] == json.dumps({"threats": []})
 
 

@@ -43,6 +43,7 @@ from analysis_service.claims import (
     FrameworkName,
     RefusedControl,
     Ruling,
+    VerdictStatus,
 )
 from analysis_service.critic_round import (
     Accepted,
@@ -60,7 +61,6 @@ from evals.harness.assembly import ArchivedRulingError, rulings_from_report
 from evals.harness.bundle import check_out
 from evals.harness.critic_replay import (
     Archived,
-    claims_of,
     load,
     round_of,
     shared_keys,
@@ -107,15 +107,12 @@ class FaultView:
     reask: Reask
 
 
-def answered(archived: Archived, faults: FaultSet) -> list[Ruling]:
+def answered_first_pass(archived: Archived, faults: FaultSet) -> list[Ruling]:
     """The archived first pass, with each shown row refused as ``faults`` says."""
-    if archived.report is None:
+    if archived.block is None:
         raise EvalRunError("the case wrote no report, so it holds no first pass")
-    block = next(
-        b for b in archived.report.analyses if b.framework == archived.framework
-    )
     try:
-        rulings = rulings_from_report(block, archived.drafts)
+        rulings = rulings_from_report(archived.block, archived.drafts)
     except ArchivedRulingError as error:
         raise EvalRunError(str(error)) from error
     return [
@@ -175,7 +172,7 @@ def fault_view(
     ``control-row`` problem on the draft.
     """
     critic_round = round_of(archived, [faults.control])
-    rulings = answered(archived, faults)
+    rulings = answered_first_pass(archived, faults)
     clean = critic_round.first(_emitted(rulings, archived.framework))
     if not isinstance(clean, Accepted):
         raise EvalRunError(
@@ -236,9 +233,9 @@ async def compose(
 class Status(TypedDict):
     """The draft's verdict with every row answered, and after the repair."""
 
-    answered: str
+    answered: VerdictStatus
     #: ``None`` where the merged set still does not reconcile.
-    repaired: str | None
+    repaired: VerdictStatus | None
 
 
 class Repair(TypedDict):
@@ -269,7 +266,9 @@ def repair(view: FaultView, raw: str) -> Repair:
         status=Status(answered=_status(view.clean, view.draft_id), repaired=None),
     )
     try:
-        merged, drift = view.round.merge(view.reask.first, claims_of(raw))
+        merged, drift = view.round.merge(
+            view.reask.first, stored(raw, view.round.framework)
+        )
         outcome = view.round.outcome(merged)
     except ValueError as error:
         result["refused"] = str(error)
@@ -284,7 +283,7 @@ def repair(view: FaultView, raw: str) -> Repair:
     return result
 
 
-def _status(accepted: Accepted, draft_id: str) -> str:
+def _status(accepted: Accepted, draft_id: str) -> VerdictStatus:
     return next(
         claim.verdict.status
         for claim in (*accepted.claims, *accepted.rejected)

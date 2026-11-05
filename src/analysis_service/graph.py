@@ -2106,7 +2106,7 @@ def route_review(
         )
     if isinstance(outcome, Accepted):
         return _routed(ROUTE_ACCEPT, {"reviewed_count": outcome.count})
-    return _routed(ROUTE_REVISE, outcome.summary)
+    return _routed(ROUTE_REVISE, outcome.revise_output)
 
 
 def _parked_round(
