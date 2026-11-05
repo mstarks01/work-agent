@@ -8,12 +8,12 @@ give equal digests send equal requests.
 """
 
 import asyncio
-import hashlib
 import json
 import sys
 from pathlib import Path
 
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.sources import text_digest
 from evals.harness.descendants import FRAMEWORK
 from evals.harness.lane_replay import compose, prepare_today
 from evals.harness.provenance import REPO_ROOT
@@ -37,10 +37,6 @@ ARMS = {
 LANE = "information-disclosure"
 
 
-def _sha(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
 def request_digests(case_id: str, arm: str) -> dict[str, str]:
     """The instruction and user-turn digests of one case's lane request."""
     prepared = prepare_today(
@@ -56,8 +52,8 @@ def request_digests(case_id: str, arm: str) -> dict[str, str]:
         )
     )
     return {
-        "instruction": _sha(instruction),
-        "turn": _sha(turn.model_dump_json()),
+        "instruction": text_digest(instruction),
+        "turn": text_digest(turn.model_dump_json()),
     }
 
 
