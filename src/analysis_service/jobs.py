@@ -210,6 +210,7 @@ RECORD_FIELDS: dict[str, EnvelopeHold] = {
     "control_facts": "same-schema",
     "ask_questions": "always",
     "continues_at_pause": "always",
+    "continue_refusal": "always",
     "checkpoint": "never",
     "status": "always",
     "created_at": "always",
@@ -461,6 +462,14 @@ class JobRecord(BaseModel):
     # own answers (ADR 0125): its submission named Controls and asked no
     # questions, and the pause is where the Controls write their facts.
     continues_at_pause: bool = False
+    # Why the service's continue of this job at its pause was refused, in the
+    # page's words (ADR 0125), or ``None``. Only
+    # :meth:`JobStore.set_continue_refusal` writes it, and the admission of a
+    # job that names this one as its parent clears it.
+    # ``test_a_continue_refusal_lands_only_on_the_owners_job_and_a_save_keeps_it``
+    # and ``test_a_child_s_admission_clears_the_parent_s_continue_refusal``
+    # check both.
+    continue_refusal: str | None = None
     # What a paused job holds while it waits: the answers resume from it.
     checkpoint: Checkpoint | None = None
     status: JobStatus = "queued"
@@ -926,9 +935,10 @@ class JobStore(Protocol):
         """Write ``record`` over the job it names.
 
         A report is written once, and a save never clears or replaces it. A
-        save only appends events, and never writes an envelope.
-        :func:`check_save` raises :class:`ValueError` where a save breaks one
-        of these rules, and the store writes nothing.
+        save only appends events, and never writes an envelope. A save keeps
+        the stored title and the stored continue refusal. :func:`check_save`
+        raises :class:`ValueError` where a save breaks one of these rules, and
+        the store writes nothing.
         """
         ...
 
@@ -969,6 +979,14 @@ class JobStore(Protocol):
         changes. The revision and ``updated_at`` stay as they are, so a
         rename makes no saved answer stale.
         """
+        ...
+
+    async def set_continue_refusal(
+        self, job_id: str, owner_id: str, refusal: str
+    ) -> bool:
+        """Keep why the service's continue of the owned job was refused
+        (ADR 0125). False where the job is missing or another owner's, and
+        nothing changes. The revision and ``updated_at`` stay as they are."""
         ...
 
     async def owned_jobs(self, owner_id: str) -> list[Envelope]:
@@ -1347,7 +1365,8 @@ class InMemoryJobStore:
         owner holds no principal where none is given is the caller's defect
         too, and it raises. Then the parent: the owner must hold it, no other
         child may lock it, and its revision must be the record's. Last,
-        :func:`check_bounds` checks the bounds.
+        :func:`check_bounds` checks the bounds. The admission of a child clears
+        its parent's ``continue_refusal`` in the same step (ADR 0125).
         """
         if principal is not None and principal.owner_id != record.owner_id:
             raise ValueError(f"job {record.id} names another owner than its principal")
@@ -1372,6 +1391,8 @@ class InMemoryJobStore:
         if admission.outcome == "admitted":
             if principal is not None:
                 self._principals.add(principal)
+            if parent is not None:
+                self._records[parent].continue_refusal = None
             self._records[record.id] = record.model_copy(deep=True)
         return admission
 
@@ -1538,7 +1559,8 @@ class InMemoryJobStore:
         digest = None if held.report is None else report_digest(held.report)
         check_save(record, digest, held.events)
         self._records[record.id] = record.model_copy(
-            deep=True, update={"title": held.title}
+            deep=True,
+            update={"title": held.title, "continue_refusal": held.continue_refusal},
         )
 
     async def save_answers(
@@ -1651,6 +1673,15 @@ class InMemoryJobStore:
         if record is None or record.owner_id != owner_id:
             return False
         record.title = title
+        return True
+
+    async def set_continue_refusal(
+        self, job_id: str, owner_id: str, refusal: str
+    ) -> bool:
+        record = self._records.get(job_id)
+        if record is None or record.owner_id != owner_id:
+            return False
+        record.continue_refusal = refusal
         return True
 
     async def owned_jobs(self, owner_id: str) -> list[Envelope]:

@@ -1073,6 +1073,33 @@ class TestTheSaves:
         asyncio.run(store.save(held))
         assert asyncio.run(store.get(job)).title == "Orders"
 
+    def test_a_continue_refusal_lands_only_on_the_owners_job_and_a_save_keeps_it(
+        self, store
+    ):
+        """ADR 0125: a runner saves the record it read, so a save never
+        writes the continue refusal, and a revision does not move."""
+        job = completed(store)
+        held = asyncio.run(store.get(job))
+        assert not asyncio.run(store.set_continue_refusal(job, "mallory", "No."))
+        assert not asyncio.run(
+            store.set_continue_refusal("job-missing", "alice", "No.")
+        )
+        assert asyncio.run(store.set_continue_refusal(job, "alice", "Untick one."))
+        asyncio.run(store.save(held))
+        saved = asyncio.run(store.get(job))
+        assert (saved.continue_refusal, saved.revision, saved.updated_at) == (
+            "Untick one.",
+            held.revision,
+            held.updated_at,
+        )
+        assert asyncio.run(store.owned(job, "alice")).continue_refusal == "Untick one."
+
+    def test_a_child_s_admission_clears_the_parent_s_continue_refusal(self, store):
+        job = completed(store)
+        assert asyncio.run(store.set_continue_refusal(job, "alice", "Untick one."))
+        final(store, job)
+        assert asyncio.run(store.get(job)).continue_refusal is None
+
 
 class TestTheControlsCopy:
     """A job keeps its own copy of its Controls (ADR 0127), and a pause save

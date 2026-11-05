@@ -258,6 +258,7 @@ jobs = Table(
     Column("error", Text),
     Column("ask_questions", Boolean, nullable=False),
     Column("continues_at_pause", Boolean, nullable=False),
+    Column("continue_refusal", Text),
     Column("frameworks", _Json, nullable=False),
     Column("answers", _Json, nullable=False),
     Column("shown_early", _Json, nullable=False),
@@ -1333,7 +1334,8 @@ class SqlJobStore:
         The objects go first, so the row never names an object that does not
         exist, and they go again at once where admission refuses the job or
         raises. A failed object delete there changes neither the refusal nor
-        the error.
+        the error. The admission of a child clears its parent's
+        ``continue_refusal`` in the same transaction (ADR 0125).
         """
         if principal is not None and principal.owner_id != record.owner_id:
             raise ValueError(f"job {record.id} names another owner than its principal")
@@ -1434,6 +1436,12 @@ class SqlJobStore:
                 return admission
             if principal is not None:
                 await self._add_principal(connection, principal)
+            if parent is not None:
+                await connection.execute(
+                    update(jobs)
+                    .where(jobs.c.id == parent)
+                    .values(continue_refusal=None)
+                )
             await connection.execute(
                 insert(jobs).values(
                     {
@@ -1690,8 +1698,13 @@ class SqlJobStore:
             raise ValueError(f"job {record.id!r} does not exist")
         check_save(record, row.report_sha256, _stored_events(row, events))
         values = _job_row(record)
-        # Only set_title writes the title after admission (ADR 0106).
+        # Only set_title writes the title after admission (ADR 0106), and
+        # only set_continue_refusal and a child's admission write the
+        # continue refusal (ADR 0125), as
+        # `test_a_continue_refusal_lands_only_on_the_owners_job_and_a_save_keeps_it`
+        # checks.
         del values["title"]
+        del values["continue_refusal"]
         if record.report is not None and not _names(row, "report.json"):
             data = stored_report(record.report)
             key = object_key(row.owner_id, row.id, "report.json")
@@ -1852,6 +1865,17 @@ class SqlJobStore:
                 update(jobs)
                 .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
                 .values(title=title)
+            )
+            return saved.rowcount == 1
+
+    async def set_continue_refusal(
+        self, job_id: str, owner_id: str, refusal: str
+    ) -> bool:
+        async with self._transaction(writes=True) as connection:
+            saved = await connection.execute(
+                update(jobs)
+                .where(jobs.c.id == job_id, jobs.c.owner_id == owner_id)
+                .values(continue_refusal=refusal)
             )
             return saved.rowcount == 1
 

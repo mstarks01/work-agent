@@ -566,6 +566,7 @@ def every_field(owner_id: str = "alice") -> JobRecord:
     record.certification = CertifyResult(certified=True)
     record.unreported_nodes = [NodeRun(node="extract", model="m", duration_ms=10)]
     record.error = "a stored message"
+    record.continue_refusal = "Untick one."
     record.report = sample_report()
     record.transition("completed")
     return record
