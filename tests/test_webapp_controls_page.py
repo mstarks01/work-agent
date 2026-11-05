@@ -41,7 +41,7 @@ from analysis_service.controls import (
 from analysis_service.fact_answers import FACT_VALUE_MAX_CHARS
 from analysis_service.frameworks import lane_of
 from analysis_service.frameworks.asvs.catalog import requirement_text
-from analysis_service.job_controls import MATCH_MEANINGS
+from analysis_service.job_controls import FACT_MEANINGS, MATCH_MEANINGS
 from analysis_service.jobs import PipelineCompleted
 from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
 from analysis_service.sources import MAX_LABEL_CHARS
@@ -646,6 +646,7 @@ class TestTheReportSection:
         assert [
             (fact["value"], fact["state"]) for fact in section["Encrypted"]["facts"]
         ] == [("AES-256", "written")]
+        assert section["Encrypted"]["facts"][0]["meaning"] == FACT_MEANINGS["written"]
         assert section["Encrypted"]["elements"] == [
             {"id": "store:orders-db", "name": "Orders DB"}
         ]
@@ -668,7 +669,13 @@ class TestTheReportSection:
         assert "— no-finding" not in text
         assert "It shows no \\<b\\>signing\\</b\\> at https\\://evil.example." in text
         assert "Evidence: WAF.yaml (config), line 1: WAF: on" in text
-        assert "AES-256 — written" in text
+        assert "AES-256 — the Control wrote it onto an open fact" in text
+        assert (
+            "Session cookie theft enables account takeover: rejected, because the"
+            " owner states that a Control covers its unit." in text
+        )
+        for key in ("— written", "rejected for", "(confirmed)", "(needs-info)"):
+            assert key not in text
         assert (
             "Protects the process “Billing”: left out, because no part of this"
             " description has the name or an alias." in text
@@ -847,6 +854,7 @@ class TestTheTables:
         from analysis_service.job_controls import (
             LEFT_OUT_MEANINGS,
             ROW_MEANINGS,
+            FactState,
             LeftOutReason,
             MatchOutcome,
             RowOutcome,
@@ -859,6 +867,7 @@ class TestTheTables:
         assert set(ROW_MEANINGS) == set(get_args(RowOutcome))
         assert set(MATCH_MEANINGS) == set(get_args(MatchOutcome))
         assert set(LEFT_OUT_MEANINGS) == set(get_args(LeftOutReason))
+        assert set(FACT_MEANINGS) == set(get_args(FactState))
 
     def test_the_fact_kind_tables_name_each_scope_and_kind(self):
         from typing import get_args

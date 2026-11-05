@@ -21,7 +21,14 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from analysis_service import Report
-from analysis_service.claims import Claim, Mitigation, Severity
+from analysis_service.claims import (
+    REJECTION_MEANINGS,
+    VERDICT_LABELS,
+    Claim,
+    Mitigation,
+    Severity,
+    Verdict,
+)
 from analysis_service.frameworks import lane_of
 from analysis_service.job_controls import SectionEntry
 from analysis_service.open_facts import element_names
@@ -42,6 +49,13 @@ def _text(value: str) -> str:
     return _AUTOLINK.sub(lambda found: "\\" + found.group(0), escaped)
 
 
+def _rejection_clause(verdict: Verdict) -> str:
+    """Why the critic rejected the draft, or nothing where a report read back
+    names no step."""
+    step = verdict.rejected_because
+    return "" if step is None else f", because {REJECTION_MEANINGS[step]}"
+
+
 def _findings(report: Report) -> list[str]:
     lines: list[str] = []
     for block in report.analyses:
@@ -51,16 +65,16 @@ def _findings(report: Report) -> list[str]:
         ]
         lines += ["", "### Findings", ""]
         lines += [
-            f"- **{_text(claim.id)}** {_text(claim.title)} ({claim.verdict.status})."
+            f"- **{_text(claim.id)}** {_text(claim.title)}"
+            f" ({VERDICT_LABELS[claim.verdict.status]})."
             f" {_text(claim.description)}"
             for claim in block.claims
         ] or ["No finding."]
         if block.rejected_claims:
             lines += ["", "### Ruled out", ""]
             lines += [
-                f"- **{_text(claim.id)}** {_text(claim.title)}: rejected for"
-                f" {claim.verdict.rejected_because or 'no stated step'}."
-                f" {_text(claim.verdict.reason)}"
+                f"- **{_text(claim.id)}** {_text(claim.title)}: rejected"
+                f"{_rejection_clause(claim.verdict)}. {_text(claim.verdict.reason)}"
                 for claim in block.rejected_claims
             ]
     return lines
@@ -98,7 +112,7 @@ def controls_markdown(section: Sequence[SectionEntry]) -> list[str]:
                 else ""
             )
             lines.append(
-                f"- Fact: {_text(fact.label)}: {_text(fact.value)} — {fact.state}{stated}"
+                f"- Fact: {_text(fact.label)}: {_text(fact.value)} — {fact.meaning}{stated}"
             )
         for row in entry.rows:
             label = f" · {_text(row.label)}" if row.label else ""
