@@ -94,8 +94,9 @@ from evals.harness.reference import CorpusError, refuse_holdout
 from evals.harness.run_record import loaded, run_record_for
 
 #: One fault each. The first five put a Control row fault on a ruling: three on
-#: a kept ruling, and two on a ruling rejected for ``control``. The other six
-#: are the other kinds of problem the round's check names.
+#: a ruling not rejected for ``control``, and two on a ruling rejected for
+#: ``control``. The other six are the other kinds of problem the round's check
+#: names.
 FaultShape = Literal[
     "row-unanswered",
     "row-not-shown",
@@ -147,15 +148,15 @@ class FaultSet(BaseModel):
 
     ``refused`` holds, by draft ID, the refusal of each row the Control shows
     that draft. With these answers the archived first pass reconciles.
-    ``covers`` holds, by draft ID, the reason a ruling rejected for ``control``
-    gives, for the shapes in :data:`ON_A_CONTROL_REJECTION`.
+    ``control_reasons`` holds, by draft ID, the reason a ruling rejected for
+    ``control`` gives, for the shapes in :data:`ON_A_CONTROL_REJECTION`.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     control: AppliedControl
     refused: dict[str, list[RefusedControl]]
-    covers: dict[str, str]
+    control_reasons: dict[str, str]
 
 
 def read_faults(path: Path) -> FaultSet:
@@ -171,6 +172,8 @@ class FaultView:
     """One first pass with one injected fault, and the re-ask it routes to."""
 
     draft_id: str
+    #: The ID the fault names: ``draft_id``, or the invented ID.
+    faulted: str
     critic_round: CriticRound
     #: The first pass before the fault, accepted and assembled.
     clean: Accepted
@@ -185,7 +188,7 @@ def answered_first_pass(archived: Archived, faults: FaultSet) -> list[Ruling]:
         rulings = rulings_from_report(archived.block, archived.drafts)
     except ArchivedRulingError as error:
         raise EvalRunError(str(error)) from error
-    unknown = (set(faults.refused) | set(faults.covers)) - {
+    unknown = (set(faults.refused) | set(faults.control_reasons)) - {
         ruling.id for ruling in rulings
     }
     if unknown:
@@ -205,7 +208,7 @@ def _with(ruling: Ruling, **fields: Any) -> Ruling:
 
 def _rejected_for_control(ruling: Ruling, faults: FaultSet) -> Ruling:
     """``ruling`` rejected for ``control`` on the first row it refuses."""
-    reason = faults.covers.get(ruling.id)
+    reason = faults.control_reasons.get(ruling.id)
     if reason is None:
         raise EvalRunError(f"the fault set gives no reason {ruling.id} is covered")
     first, *rest = faults.refused[ruling.id]
@@ -353,7 +356,7 @@ def fault_view(
             f"the {shape} fault on {draft_id} does not give the"
             f" {', '.join(EXPECTED[shape])} problems on {faulted}: {outcome.messages}"
         )
-    return FaultView(draft_id, critic_round, clean, outcome)
+    return FaultView(draft_id, faulted, critic_round, clean, outcome)
 
 
 def stored(raw: str, framework: FrameworkName) -> list[Any]:

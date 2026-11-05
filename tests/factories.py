@@ -68,6 +68,7 @@ from analysis_service.engine import Engine
 from analysis_service.fact_answers import FactAnswer
 from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from analysis_service.frameworks.asvs.record import (
+    DraftRequirementRuling,
     RequirementProposal,
     RequirementRulingProposal,
 )
@@ -766,6 +767,16 @@ def sample_draft(
             for name, value in ruled.items()
             if name in DraftThreat.model_fields
         }
+    )
+
+
+def asvs_draft(**overrides: Any) -> DraftRequirementRuling:
+    """One ASVS lane's draft on requirement 6.2.1, built from sample_draft()."""
+    threat = sample_draft("S-01").model_dump(
+        exclude={"category", "verb", "attacker_position", "severity", "mitigations"}
+    )
+    return DraftRequirementRuling.model_validate(
+        {**threat, "id": "v5.0.0-6.2.1", "chapter": "authentication", **overrides}
     )
 
 

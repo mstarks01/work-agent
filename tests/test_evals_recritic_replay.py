@@ -27,9 +27,8 @@ from evals.harness.bundle import write_failures, write_reports
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.run_record import loaded
-from tests import test_critic
 from tests import test_evals_run_grounds as grounds
-from tests.factories import valid_model
+from tests.factories import asvs_draft, valid_model
 from tests.test_critic_review_replay import EVERY_LANE
 from tests.test_evals_critic_replay import failed
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixtures)
@@ -79,7 +78,7 @@ def faults_for(archived, refused_by=None) -> recritic_replay.FaultSet:
             for draft in archived.drafts
             if refused_by is None or draft.id in refused_by
         },
-        covers={
+        control_reasons={
             draft.id: "the audit log names every write to this element"
             for draft in archived.drafts
         },
@@ -132,10 +131,10 @@ def test_each_fault_gives_its_problems_on_its_draft(archived, shape):
     for draft in archived.drafts[:2]:
         view = recritic_replay.fault_view(archived, faults, draft.id, shape)
 
-        faulted = f"{draft.id}a" if shape == "invented" else draft.id
         assert [(each.kind, each.claim_id) for each in view.reask.problems] == [
-            (kind, faulted) for kind in recritic_replay.EXPECTED[shape]
+            (kind, view.faulted) for kind in recritic_replay.EXPECTED[shape]
         ]
+        assert (view.faulted == draft.id) is (shape != "invented")
         assert WORDS[shape] in view.reask.problems[0].message
         implicated = [] if shape in {"invented", "duplicate-id"} else [draft.id]
         assert [item["id"] for item in view.reask.unreconciled] == implicated
@@ -152,7 +151,7 @@ def test_a_draft_that_keeps_its_unit_cannot_be_confirmed_ruled_out(archived):
 
 def test_a_confirmed_exclusion_is_the_one_fault_on_an_asvs_draft():
     """No case archive holds an ASVS first pass, so the draft is the check's own."""
-    draft = test_critic.TestAConfirmedExclusion()._draft("excluded")
+    draft = asvs_draft(direction="excluded")
     ruled = Ruling(
         id=draft.id,
         verdict=ProposedVerdict(rejected_because="evidence", reason="not applicable"),
@@ -160,7 +159,9 @@ def test_a_confirmed_exclusion_is_the_one_fault_on_an_asvs_draft():
     archived = cast(
         critic_replay.Archived, SimpleNamespace(drafts=[draft], model=valid_model())
     )
-    faults = cast(recritic_replay.FaultSet, None)
+    faults = recritic_replay.FaultSet(
+        control=EVERY_LANE, refused={}, control_reasons={}
+    )
 
     faulty, faulted = recritic_replay.inject(
         archived, [ruled], faults, frozenset(), draft.id, "confirmed-ruled-out"
@@ -173,9 +174,19 @@ def test_a_confirmed_exclusion_is_the_one_fault_on_an_asvs_draft():
     assert WORDS["confirmed-ruled-out"] in problems.messages[0]
 
 
+@pytest.mark.parametrize(
+    "path",
+    sorted((REPO_ROOT / "evals" / "experiments").glob("*/faults*.json")),
+    ids=lambda path: f"{path.parent.name}/{path.name}",
+)
+def test_each_tracked_fault_set_loads(path):
+    """A run script in the ledger passes its fault set to the command."""
+    recritic_replay.read_faults(path)
+
+
 def test_a_control_rejection_needs_the_reason_it_is_covered(archived):
     draft = archived.drafts[0].id
-    faults = faults_for(archived).model_copy(update={"covers": {}})
+    faults = faults_for(archived).model_copy(update={"control_reasons": {}})
 
     with pytest.raises(EvalRunError, match="no reason"):
         recritic_replay.fault_view(archived, faults, draft, "control-row-missing")
