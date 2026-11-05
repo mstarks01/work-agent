@@ -36,7 +36,8 @@
 
   // The frameworks menu: its button names the ticked frameworks with their
   // options, as "STRIDE, ASVS level 1", and opens the panel of rows. Escape,
-  // or a click or focus outside the menu, closes it.
+  // or a click or focus outside the menu, closes it. A click on a row's text
+  // moves focus to no element, so only a focus that lands outside closes it.
   const picker = document.getElementById("frameworks");
   const menuButton = document.getElementById("frameworks-toggle");
   const menu = document.getElementById("frameworks-panel");
@@ -60,7 +61,7 @@
     menuButton.focus();
   });
   picker.addEventListener("focusout", (event) => {
-    if (!picker.contains(event.relatedTarget)) openMenu(false);
+    if (event.relatedTarget && !picker.contains(event.relatedTarget)) openMenu(false);
   });
   document.addEventListener("click", (event) => {
     if (!picker.contains(event.target)) openMenu(false);

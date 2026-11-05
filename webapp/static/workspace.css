@@ -1231,6 +1231,9 @@ code {
   .entry {
     margin:0 auto
   }
+  .entry-main h1 {
+    margin-top:0
+  }
   .heading-row {
     flex-wrap:wrap
   }
@@ -1563,7 +1566,6 @@ a.analysis-row:hover {
   overflow-wrap:anywhere
 }
 .controls-offer h2, .control-offer h2 {
-  font-size:16px;
   margin:16px 0 4px
 }
 .controls-line {

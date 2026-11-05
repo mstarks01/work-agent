@@ -242,9 +242,12 @@ def test_settings_and_the_theme_switch_sit_at_the_foot_of_the_sidebar(page):
     assert box["y"] > menu["y"] + menu["height"]
     assert 800 - (box["y"] + box["height"]) <= 40
     page.goto("/settings")
-    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    page.wait_for_selector("#settings-rows tr[data-key]")
+    height = page.evaluate("document.documentElement.scrollHeight")
+    assert height > 1600, "a page that scrolls past the window"
+    page.evaluate(f"window.scrollTo(0, {height // 2 - 400})")
     box = page.locator(".sidebar-foot").bounding_box()
-    assert box and 0 <= box["y"] <= 800
+    assert box and 800 - (box["y"] + box["height"]) <= 40
     assert page.get_attribute("#settings-nav", "aria-current") == "page"
 
 
@@ -1532,6 +1535,16 @@ def test_the_frameworks_menu_names_the_choice_and_closes(page):
     assert page.is_hidden("#frameworks-panel")
 
 
+def test_a_click_on_a_framework_name_ticks_it_and_keeps_the_menu_open(page):
+    """A click on a row's text moves focus to no element, and the menu stays
+    open so the tick lands."""
+    open_frameworks(page)
+    page.click('.pick:has(input[value="stride"]) b')
+    assert page.is_checked('input[name="framework"][value="stride"]')
+    assert page.is_visible("#frameworks-panel")
+    assert page.inner_text("#frameworks-toggle") == "STRIDE"
+
+
 def test_the_new_analysis_title_is_on_the_line_of_frameworks(page):
     """The page title sits level with "Frameworks" in the settings column, and
     takes the 20px title size."""
@@ -1554,6 +1567,8 @@ def test_every_page_title_and_heading_takes_one_scale(page):
     assert page.locator("h1").first.evaluate(size) == "20px"
     assert page.locator(".editor h2").first.evaluate(size) == "17px"
     assert page.locator(".editor .card-head h3").first.evaluate(size) == "15px"
+    page.goto("/")
+    assert page.locator("#controls-offer > h2").evaluate(size) == "17px"
 
 
 def test_question_guidance_without_a_misleading_progress_count(page):

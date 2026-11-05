@@ -98,7 +98,7 @@ const formControls = (() => {
     const unfit = held.filter((control) => !fits(control, frameworks));
     const missing = [...ticked].filter((id) => !present.has(id)).map((id) => h("li", { class: "hint" },
       "Missing: a Control you ticked is no longer in Controls. ",
-      h("button", { type: "button", class: "quiet", on: { click: () => { ticked.delete(id); drawChecklist(); } } }, "Remove")));
+      h("button", { type: "button", class: "quiet", on: { click: () => { ticked.delete(id); drawChecklist(); el("controls-find").focus(); } } }, "Remove")));
     el("controls-rows").replaceChildren(...fitting.map(line), ...missing);
     el("controls-unfit-rows").replaceChildren(...unfit.map(line));
     el("controls-unfit-summary").textContent = `${counted(unfit.length, "does", "do")} not apply to this analysis`;
@@ -111,8 +111,12 @@ const formControls = (() => {
       missing.length ? h("span", { class: "hint" }, ` ${counted(missing.length, "ticked Control is", "ticked Controls are")} missing.`) : null,
     ].filter(Boolean));
     el("controls-offer").hidden = reopened || (!held.length && !missing.length);
-    // A hidden line takes its dialog with it, so no closed list holds the page.
-    if (el("controls-offer").hidden && el("controls-dialog").open) el("controls-dialog").close();
+    // A hidden line takes its dialog with it, so no closed list holds the
+    // page, and focus goes to the form.
+    if (el("controls-offer").hidden && el("controls-dialog").open) {
+      el("controls-dialog").close();
+      el("analysis-name").focus();
+    }
     if (focused && document.activeElement?.id !== focused) el(focused)?.focus();
   };
   // Tick all and Untick all act on the Controls that fit and that the find
