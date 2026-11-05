@@ -1425,7 +1425,7 @@ FileRefusal = Literal["too_large", "not_utf_8", "not_plain_text", "no_text", "at
 
 
 #: The model of a Control save's body.
-ControlBodyT = TypeVar("ControlBodyT", bound=ControlBody)
+_ControlBodyT = TypeVar("_ControlBodyT", bound=ControlBody)
 
 
 class FilesLimits(TypedDict):
@@ -1962,8 +1962,8 @@ def create_app(
         return JSONResponse([control_view(control) for control in controls])
 
     async def control_body(
-        request: Request, current: Current, model: type[ControlBodyT]
-    ) -> ControlBodyT | JSONResponse:
+        request: Request, current: Current, model: type[_ControlBodyT]
+    ) -> _ControlBodyT | JSONResponse:
         """The body of a Control save, or the ``400`` that refuses it."""
         raw = await _json_body(request, max_control_body_bytes(current.control_limits))
         try:

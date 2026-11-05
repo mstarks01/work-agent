@@ -474,8 +474,8 @@ def test_kept_text_has_one_reader():
     assert _sites(tests) == [("src/analysis_service/grounding.py", "keeps_text")]
 
 
-#: Each site that splits a text on ``"\n"`` alone, with the reason. Every
-#: other line split of a text calls
+#: Each site that splits a text on ``"\n"`` alone, with the reason. A line
+#: split of an uploaded text calls
 #: :func:`~analysis_service.owner_files.text_lines`.
 NEWLINE_SPLITS: dict[Site, str] = {
     (".github/scripts/five_class_read.py", "rendered"): (
@@ -496,11 +496,13 @@ NEWLINE_SPLITS: dict[Site, str] = {
 
 
 def _splits_on_newline(node: ast.AST) -> bool:
-    return (
-        _calls(node, "split")
-        and len(node.args) == 1
-        and isinstance(node.args[0], ast.Constant)
-        and node.args[0].value == "\n"
+    if not (_calls(node, "split") or _calls(node, "rsplit")):
+        return False
+    separators = node.args[:1] + [
+        keyword.value for keyword in node.keywords if keyword.arg == "sep"
+    ]
+    return any(
+        isinstance(sep, ast.Constant) and sep.value == "\n" for sep in separators
     )
 
 
