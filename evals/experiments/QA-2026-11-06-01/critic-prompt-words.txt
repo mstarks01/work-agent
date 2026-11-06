@@ -4,3 +4,6 @@ d51830a1 frameworks/asvs/critic.md 1047
 87e4c466 prompts/critic.md 2514
 87e4c466 frameworks/stride/critic.md 1031
 87e4c466 frameworks/asvs/critic.md 1290
+53de694a prompts/critic.md 2564
+53de694a frameworks/stride/critic.md 1031
+53de694a frameworks/asvs/critic.md 1290
