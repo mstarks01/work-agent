@@ -8,7 +8,7 @@ set -u
 S=/tmp/claude-1000/-home-me-work-agent/bf9d1c83-18bb-4da4-8280-cfda1752e71e/scratchpad
 CTL=$S/wt-run-e4-ctl
 TRT=$S/wt-run-e4-trt
-EXP=$S/wt-e4/evals/experiments/QA-2026-11-05-02
+EXP=$S/clone/evals/experiments/QA-2026-11-05-02
 RUNS=$EXP/runs
 ARTIFACT=/home/me/work-agent/evals/runs/20261024T-sonnet-medium-sweep/05-cookbook-queue-webapp.json
 CAP=0.50

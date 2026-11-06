@@ -280,3 +280,8 @@ problem or an unbriefed change that the control does not have.
 falsifier. Neither arm has a step for a Control row on a ruling rejected for
 `control`. A view the treatment does not repair says that step 8 needs to
 cover a `control` rejection.
+
+**The commit read.** Both arms read `523c6650` (#2196 merged). The control
+arm adds `control-e4.patch`, so its record reads `clean: false`. Offline, all
+seven views build in both run worktrees, and `confirmed-ruled-out` is refused
+on I-01 ("does not rule its unit out").
