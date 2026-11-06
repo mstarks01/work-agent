@@ -24,7 +24,7 @@ def case12_authentication(artifact: Path) -> list[str]:
     return values
 
 
-def kept_leads(artifact: Path) -> tuple[int, int, int, int]:
+def lead_fates_of(artifact: Path) -> dict:
     """Lead fates over the cases whose extracted model is valid."""
     sys.path[:0] = [str(REPO), str(REPO / "evals/experiments/QA-2026-11-06-02")]
     from lead_loss import lead_fates
@@ -35,38 +35,37 @@ def kept_leads(artifact: Path) -> tuple[int, int, int, int]:
     cases = development_cases(load_corpus(REPO / "evals/corpus"))
     loaded = load_artifact(artifact)
     present = [case for case in cases if case.id in loaded.cases]
-    totals = {"kept": 0, "unfired": 0, "unaligned": 0, "invalid": 0}
+    totals = {"kept": 0, "unfired": 0, "unaligned": 0, "invalid": [], "lead_12_1": None}
     for case in present:
         result = extractions_from_reports(loaded, [case]).get(case.id)
         if result is None or result.extracted is None:
-            totals["invalid"] += 1
+            totals["invalid"].append(case.id)
             continue
         try:
-            fates = [fate for _, _, fate in lead_fates(case, result.extracted)]
+            fates = list(lead_fates(case, result.extracted))
         except ValueError:
-            totals["invalid"] += 1
+            totals["invalid"].append(case.id)
             continue
-        for fate in fates:
-            if fate in totals:
+        for index, _, fate in fates:
+            if fate in ("kept", "unfired", "unaligned"):
                 totals[fate] += 1
-    return totals["kept"], totals["unfired"], totals["unaligned"], totals["invalid"]
+            if case.id == CASE and index == 1:
+                totals["lead_12_1"] = fate
+    return totals
 
 
 def row(artifact: Path) -> dict:
     data = json.loads(artifact.read_text())
     aggregate = data["attribute_aggregate"]
     recalls = [case["endpoint_recall"] for case in data["mode_output"]]
-    kept, unfired, unaligned, invalid = kept_leads(artifact)
     return {
         "sweep": artifact.stem,
         "cases": len(recalls),
         "agreement": aggregate["agreement"],
         "flow_auth": aggregate["by_attribute"]["flow.authentication"]["agreement"],
         "endpoint_recall": round(statistics.mean(recalls), 3),
-        "kept": kept,
-        "unfired": unfired,
-        "unaligned": unaligned,
-        "invalid": invalid,
+        **lead_fates_of(artifact),
+        "prompt_tokens": data["instruction"][0]["tokens"],
         "charged": round(sum((data.get("node_charges") or {}).values()), 4),
         "case12_manager_auth": case12_authentication(artifact),
     }
@@ -86,7 +85,12 @@ def main() -> None:
                 f"{metric}: before {statistics.mean(before):.3f} sd {spread:.3f}"
                 f" after {statistics.mean(after):.3f} delta {delta / spread:+.2f} sd"
             )
-    print("charged total:", round(sum(one["charged"] for one in rows), 4))
+    sweeps = round(sum(one["charged"] for one in rows), 4)
+    preflight = json.loads((OUT / "preflight-before.json").read_text())
+    first = round(sum((preflight.get("node_charges") or {}).values()), 4)
+    print(
+        f"charged: sweeps {sweeps}, preflight {first}, total {round(sweeps + first, 4)}"
+    )
 
 
 if __name__ == "__main__":

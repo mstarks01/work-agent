@@ -1,15 +1,15 @@
-{"sweep": "after-r1", "cases": 16, "agreement": 0.786, "flow_auth": 0.981, "endpoint_recall": 0.784, "kept": 99, "unfired": 1, "unaligned": 1, "invalid": 0, "charged": 0.0471, "case12_manager_auth": ["unknown"]}
-{"sweep": "after-r2", "cases": 16, "agreement": 0.791, "flow_auth": 0.963, "endpoint_recall": 0.783, "kept": 100, "unfired": 0, "unaligned": 1, "invalid": 0, "charged": 0.048, "case12_manager_auth": ["unknown"]}
-{"sweep": "after-r3", "cases": 16, "agreement": 0.783, "flow_auth": 0.962, "endpoint_recall": 0.778, "kept": 98, "unfired": 2, "unaligned": 1, "invalid": 0, "charged": 0.0472, "case12_manager_auth": ["unknown"]}
-{"sweep": "after-r4", "cases": 16, "agreement": 0.778, "flow_auth": 0.969, "endpoint_recall": 0.763, "kept": 97, "unfired": 1, "unaligned": 3, "invalid": 0, "charged": 0.0471, "case12_manager_auth": ["unknown"]}
-{"sweep": "after-r5", "cases": 16, "agreement": 0.795, "flow_auth": 0.972, "endpoint_recall": 0.791, "kept": 98, "unfired": 1, "unaligned": 2, "invalid": 0, "charged": 0.0468, "case12_manager_auth": ["unknown"]}
-{"sweep": "before-r1", "cases": 16, "agreement": 0.78, "flow_auth": 0.941, "endpoint_recall": 0.822, "kept": 90, "unfired": 7, "unaligned": 4, "invalid": 0, "charged": 0.0461, "case12_manager_auth": ["fully authenticated"]}
-{"sweep": "before-r2", "cases": 16, "agreement": 0.782, "flow_auth": 0.941, "endpoint_recall": 0.786, "kept": 91, "unfired": 0, "unaligned": 4, "invalid": 1, "charged": 0.0473, "case12_manager_auth": ["unknown"]}
-{"sweep": "before-r3", "cases": 16, "agreement": 0.779, "flow_auth": 0.95, "endpoint_recall": 0.716, "kept": 92, "unfired": 3, "unaligned": 3, "invalid": 1, "charged": 0.0462, "case12_manager_auth": ["fully authenticated"]}
-{"sweep": "before-r4", "cases": 16, "agreement": 0.782, "flow_auth": 0.947, "endpoint_recall": 0.754, "kept": 90, "unfired": 2, "unaligned": 3, "invalid": 1, "charged": 0.046, "case12_manager_auth": ["fully authenticated"]}
-{"sweep": "before-r5", "cases": 16, "agreement": 0.783, "flow_auth": 0.952, "endpoint_recall": 0.753, "kept": 89, "unfired": 2, "unaligned": 5, "invalid": 1, "charged": 0.0475, "case12_manager_auth": ["fully authenticated"]}
+{"sweep": "after-r1", "cases": 16, "agreement": 0.786, "flow_auth": 0.981, "endpoint_recall": 0.784, "kept": 99, "unfired": 1, "unaligned": 1, "invalid": [], "lead_12_1": "kept", "prompt_tokens": 4336, "charged": 0.0471, "case12_manager_auth": ["unknown"]}
+{"sweep": "after-r2", "cases": 16, "agreement": 0.791, "flow_auth": 0.963, "endpoint_recall": 0.783, "kept": 100, "unfired": 0, "unaligned": 1, "invalid": [], "lead_12_1": "kept", "prompt_tokens": 4336, "charged": 0.048, "case12_manager_auth": ["unknown"]}
+{"sweep": "after-r3", "cases": 16, "agreement": 0.783, "flow_auth": 0.962, "endpoint_recall": 0.778, "kept": 98, "unfired": 2, "unaligned": 1, "invalid": [], "lead_12_1": "kept", "prompt_tokens": 4336, "charged": 0.0472, "case12_manager_auth": ["unknown"]}
+{"sweep": "after-r4", "cases": 16, "agreement": 0.778, "flow_auth": 0.969, "endpoint_recall": 0.763, "kept": 97, "unfired": 1, "unaligned": 3, "invalid": [], "lead_12_1": "kept", "prompt_tokens": 4336, "charged": 0.0471, "case12_manager_auth": ["unknown"]}
+{"sweep": "after-r5", "cases": 16, "agreement": 0.795, "flow_auth": 0.972, "endpoint_recall": 0.791, "kept": 98, "unfired": 1, "unaligned": 2, "invalid": [], "lead_12_1": "kept", "prompt_tokens": 4336, "charged": 0.0468, "case12_manager_auth": ["unknown"]}
+{"sweep": "before-r1", "cases": 16, "agreement": 0.78, "flow_auth": 0.941, "endpoint_recall": 0.822, "kept": 90, "unfired": 7, "unaligned": 4, "invalid": [], "lead_12_1": "unfired", "prompt_tokens": 4236, "charged": 0.0461, "case12_manager_auth": ["fully authenticated"]}
+{"sweep": "before-r2", "cases": 16, "agreement": 0.782, "flow_auth": 0.941, "endpoint_recall": 0.786, "kept": 91, "unfired": 0, "unaligned": 4, "invalid": ["07-cicd-store-deploy"], "lead_12_1": "kept", "prompt_tokens": 4236, "charged": 0.0473, "case12_manager_auth": ["unknown"]}
+{"sweep": "before-r3", "cases": 16, "agreement": 0.779, "flow_auth": 0.95, "endpoint_recall": 0.716, "kept": 92, "unfired": 3, "unaligned": 3, "invalid": ["16-library-lending-interview"], "lead_12_1": "unfired", "prompt_tokens": 4236, "charged": 0.0462, "case12_manager_auth": ["fully authenticated"]}
+{"sweep": "before-r4", "cases": 16, "agreement": 0.782, "flow_auth": 0.947, "endpoint_recall": 0.754, "kept": 90, "unfired": 2, "unaligned": 3, "invalid": ["07-cicd-store-deploy"], "lead_12_1": "unfired", "prompt_tokens": 4236, "charged": 0.046, "case12_manager_auth": ["fully authenticated"]}
+{"sweep": "before-r5", "cases": 16, "agreement": 0.783, "flow_auth": 0.952, "endpoint_recall": 0.753, "kept": 89, "unfired": 2, "unaligned": 5, "invalid": ["03-batch-data-pipeline"], "lead_12_1": "unfired", "prompt_tokens": 4236, "charged": 0.0475, "case12_manager_auth": ["fully authenticated"]}
 agreement: before 0.781 sd 0.002 after 0.787 delta +3.29 sd
 flow_auth: before 0.946 sd 0.005 after 0.969 delta +4.58 sd
 endpoint_recall: before 0.766 sd 0.040 after 0.780 delta +0.34 sd
 kept: before 90.400 sd 1.140 after 98.400 delta +7.02 sd
-charged total: 0.4693
+charged: sweeps 0.4693, preflight 0.0031, total 0.4724
