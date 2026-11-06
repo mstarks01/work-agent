@@ -1,25 +1,38 @@
-"""Replay one framework's critic re-ask over a first pass with a Control row fault.
+"""Replay one framework's critic re-ask over a first pass with one injected fault.
 
-This builds a re-ask on a ``control-row`` problem from a first pass that
-holds none. It reads an archived case's critic first pass from its report,
-applies one written Control to the drafts, and answers each row the Control
-shows with the refusal the fault set states, so the first pass reconciles.
-It then injects one fault of one shape on one draft:
+This builds a re-ask from a first pass that holds no problem. It reads an
+archived case's critic first pass from its report, applies one written
+Control to the drafts, and answers each row the Control shows with the
+refusal the fault set states, so the first pass reconciles. It then injects
+one fault of one shape (:data:`FaultShape`) on one draft:
 
 * ``row-unanswered`` — a shown row is in neither ``control_row`` nor
   ``refused_controls``;
 * ``row-not-shown`` — ``refused_controls`` names a row of the Control the
   draft was not shown;
 * ``row-on-other-step`` — the shown row sits in ``control_row`` on a ruling
-  that is not rejected for ``control``.
+  that is not rejected for ``control``;
+* ``control-row-missing`` and ``control-row-not-shown`` — the draft's ruling is
+  rejected for ``control`` on its first shown row, and then names no
+  ``control_row``, or also refuses a row the draft was not shown;
+* ``dropped`` — the draft has no ruling;
+* ``invented`` — a copy of the draft's ruling stands under an ID no lane
+  drafted;
+* ``duplicate-id`` — the draft's ruling appears twice;
+* ``verdict-shape`` — the ruling is rejected for ``reasoning`` and still names
+  its open facts;
+* ``confirmed-ruled-out`` — the ruling confirms a draft that rules its unit
+  out;
+* ``unresolved-unknown`` — an open fact names an attribute its element does
+  not have.
 
-The round's own check must name exactly that one fault, or the command refuses
-the view before the call. The re-ask request is
-:func:`~analysis_service.critic_round.recritic_request` over the round's
+The round's own check must name exactly the problems :data:`PROBLEMS_BY_SHAPE` gives
+the shape, or the command refuses the view before the call. The re-ask request
+is :func:`~analysis_service.critic_round.recritic_request` over the round's
 :class:`~analysis_service.critic_round.Reask`, and the answer is merged and
 checked by the round, as the graph's second look does.
 ``tests/test_evals_recritic_replay.py`` holds the rebuilt request against the
-one a real graph run sent.
+one a real graph run sent, for each shape a STRIDE case can carry.
 
 **The prompt files are today's.** The command prints both commits.
 """
@@ -30,8 +43,10 @@ import argparse
 import asyncio
 import json
 import sys
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Literal, TypedDict, assert_never, get_args
 
 from google.adk.utils._schema_utils import validate_schema
@@ -39,10 +54,13 @@ from google.genai import types
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from analysis_service.claims import (
+    Claim,
     ControlRowRef,
     FrameworkName,
     RefusedControl,
     Ruling,
+    UnknownRef,
+    UnreconciledKind,
     VerdictStatus,
 )
 from analysis_service.critic_round import (
@@ -56,6 +74,11 @@ from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.graph import RECRITIC_ROLE, FrameworkNodes, claims_of
 from analysis_service.job_controls import AppliedControl
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.system_model import (
+    SystemModel,
+    all_attribute_names,
+    attribute_names,
+)
 from evals.harness.artifact import ProvenanceError, load_artifact, repo_commit
 from evals.harness.assembly import ArchivedRulingError, rulings_from_report
 from evals.harness.bundle import check_out
@@ -71,8 +94,54 @@ from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, refuse_holdout
 from evals.harness.run_record import loaded, run_record_for
 
-#: Three of the ways a ruling can fail the Control row check, one fault each.
-FaultShape = Literal["row-unanswered", "row-not-shown", "row-on-other-step"]
+#: One fault each. The shapes in :data:`NEEDS_A_REFUSED_ROW` put a Control row fault on
+#: a ruling, either rejected for ``control`` or not. The others are the other
+#: kinds of problem the round's check names.
+FaultShape = Literal[
+    "row-unanswered",
+    "row-not-shown",
+    "row-on-other-step",
+    "control-row-missing",
+    "control-row-not-shown",
+    "dropped",
+    "invented",
+    "duplicate-id",
+    "verdict-shape",
+    "confirmed-ruled-out",
+    "unresolved-unknown",
+]
+
+#: The problems the round's check must name for each shape, in its order, each
+#: on the faulted ID. One fault can give two sentences: a ``control`` rejection
+#: with no ``control_row`` names no row and leaves the row it was rejected on
+#: unanswered.
+PROBLEMS_BY_SHAPE: Mapping[FaultShape, tuple[UnreconciledKind, ...]] = MappingProxyType(
+    {
+        "row-unanswered": ("control-row",),
+        "row-not-shown": ("control-row",),
+        "row-on-other-step": ("control-row",),
+        "control-row-missing": ("control-row", "control-row"),
+        "control-row-not-shown": ("control-row",),
+        "dropped": ("dropped",),
+        "invented": ("invented",),
+        "duplicate-id": ("duplicate-id",),
+        "verdict-shape": ("verdict-shape",),
+        "confirmed-ruled-out": ("verdict-shape",),
+        "unresolved-unknown": ("unresolved-unknown",),
+    }
+)
+
+#: The shapes whose draft's ruling is rejected for ``control`` before the fault.
+ON_A_CONTROL_REJECTION: frozenset[FaultShape] = frozenset(
+    {"control-row-missing", "control-row-not-shown"}
+)
+
+#: The shapes that need a draft shown a row whose ruling refuses it.
+NEEDS_A_REFUSED_ROW: frozenset[FaultShape] = ON_A_CONTROL_REJECTION | {
+    "row-unanswered",
+    "row-not-shown",
+    "row-on-other-step",
+}
 
 
 class FaultSet(BaseModel):
@@ -80,12 +149,15 @@ class FaultSet(BaseModel):
 
     ``refused`` holds, by draft ID, the refusal of each row the Control shows
     that draft. With these answers the archived first pass reconciles.
+    ``control_reasons`` holds, by draft ID, the reason a ruling rejected for
+    ``control`` gives, for the shapes in :data:`ON_A_CONTROL_REJECTION`.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     control: AppliedControl
     refused: dict[str, list[RefusedControl]]
+    control_reasons: dict[str, str]
 
 
 def read_faults(path: Path) -> FaultSet:
@@ -101,8 +173,10 @@ class FaultView:
     """One first pass with one injected fault, and the re-ask it routes to."""
 
     draft_id: str
+    #: The ID the fault names: ``draft_id``, or the invented ID.
+    faulted_id: str
     critic_round: CriticRound
-    #: The first pass with every shown row answered, accepted and assembled.
+    #: The first pass before the fault, accepted and assembled.
     clean: Accepted
     reask: Reask
 
@@ -115,9 +189,11 @@ def answered_first_pass(archived: Archived, faults: FaultSet) -> list[Ruling]:
         rulings = rulings_from_report(archived.block, archived.drafts)
     except ArchivedRulingError as error:
         raise EvalRunError(str(error)) from error
-    unknown = set(faults.refused) - {ruling.id for ruling in rulings}
+    unknown = (set(faults.refused) | set(faults.control_reasons)) - {
+        ruling.id for ruling in rulings
+    }
     if unknown:
-        raise EvalRunError(f"the fault set refuses rows on no draft: {sorted(unknown)}")
+        raise EvalRunError(f"the fault set names no draft: {sorted(unknown)}")
     return [
         _with(ruling, refused_controls=faults.refused[ruling.id])
         if ruling.id in faults.refused
@@ -131,38 +207,128 @@ def _with(ruling: Ruling, **fields: Any) -> Ruling:
     return ruling.model_copy(update={"verdict": verdict})
 
 
+def _rejected_for_control(ruling: Ruling, faults: FaultSet) -> Ruling:
+    """``ruling`` rejected for ``control`` on the first row it refuses."""
+    reason = faults.control_reasons.get(ruling.id)
+    if reason is None:
+        raise EvalRunError(
+            f"the fault set's control_reasons give no reason for {ruling.id}"
+        )
+    return _first_refusal_as_control_row(
+        ruling,
+        faults.refused[ruling.id],
+        rejected_because="control",
+        reason=reason,
+        related_unknowns=[],
+    )
+
+
+def _first_refusal_as_control_row(
+    ruling: Ruling, refused: list[RefusedControl], **fields: Any
+) -> Ruling:
+    """``ruling`` with the first of ``refused`` as its ``control_row``, the rest
+    refused, and ``fields``."""
+    first, *rest = refused
+    row = ControlRowRef(control=first.control, unit=first.unit)
+    return _with(ruling, control_row=row, refused_controls=rest, **fields)
+
+
+def _unshown_row(
+    faults: FaultSet, shown: frozenset[ControlRowRef], draft_id: str
+) -> RefusedControl:
+    """A row of the Control the draft was not shown, refused for its first reason."""
+    control = faults.control
+    unshown = [
+        ref
+        for row in control.rows
+        if (ref := ControlRowRef(control=control.id, unit=row.unit)) not in shown
+    ]
+    if not unshown:
+        raise EvalRunError(f"{control.id} has no row that {draft_id} was not shown")
+    return RefusedControl(
+        **unshown[0].model_dump(), reason=faults.refused[draft_id][0].reason
+    )
+
+
+def _unknowns_with_a_foreign_attribute(
+    ruling: Ruling, model: SystemModel
+) -> list[UnknownRef]:
+    """The ruling's open facts, the first on an element given an attribute it lacks.
+
+    The attribute is the first of every element type's attributes that this
+    element does not have, so the provider schema still admits it.
+    """
+    by_id = {element.id: element for element in model.elements()}
+    unknowns = list(ruling.verdict.related_unknowns)
+    for index, ref in enumerate(unknowns):
+        element = by_id.get(ref.element_id)
+        if element is not None and ref.attribute:
+            own = attribute_names(element)
+            foreign = next(
+                (name for name in all_attribute_names() if name not in own), None
+            )
+            if foreign is None:
+                raise EvalRunError(f"element {element.id} has every attribute")
+            unknowns[index] = ref.model_copy(update={"attribute": foreign})
+            return unknowns
+    raise EvalRunError(f"{ruling.id} names no attribute of an element")
+
+
 def inject(
+    drafts: Sequence[Claim],
+    model: SystemModel,
     rulings: list[Ruling],
-    control: AppliedControl,
+    faults: FaultSet,
     shown: frozenset[ControlRowRef],
     draft_id: str,
     shape: FaultShape,
-) -> list[Ruling]:
-    """``rulings`` with one fault of ``shape`` on the ruling of ``draft_id``.
+) -> tuple[list[Ruling], str]:
+    """``rulings`` with one fault of ``shape`` on ``draft_id``, and the faulted ID.
 
-    ``shown`` is the rows the draft was shown, and the draft's ruling refuses
-    each of them.
+    The faulted ID is ``draft_id``, except for ``invented``: that fault copies
+    the draft's ruling, with no Control row, under an ID no lane drafted, the
+    draft's ID with ``a`` added. ``shown`` is the rows the draft was shown.
     """
-    ruling = next(ruling for ruling in rulings if ruling.id == draft_id)
-    first, *rest = ruling.verdict.refused_controls
+    index, ruling = next(
+        (index, ruling) for index, ruling in enumerate(rulings) if ruling.id == draft_id
+    )
+    before, after = rulings[:index], rulings[index + 1 :]
+    faulted_id = draft_id
+    refused = list(ruling.verdict.refused_controls)
     if shape == "row-unanswered":
-        faulty = _with(ruling, refused_controls=rest)
-    elif shape == "row-not-shown":
-        unshown = [
-            ref
-            for row in control.rows
-            if (ref := ControlRowRef(control=control.id, unit=row.unit)) not in shown
-        ]
-        if not unshown:
-            raise EvalRunError(f"{control.id} has no row that {draft_id} was not shown")
-        extra = RefusedControl(**unshown[0].model_dump(), reason=first.reason)
-        faulty = _with(ruling, refused_controls=[first, *rest, extra])
+        changed = [_with(ruling, refused_controls=refused[1:])]
+    elif shape == "row-not-shown" or shape == "control-row-not-shown":
+        extra = _unshown_row(faults, shown, draft_id)
+        changed = [_with(ruling, refused_controls=[*refused, extra])]
     elif shape == "row-on-other-step":
-        row = ControlRowRef(control=first.control, unit=first.unit)
-        faulty = _with(ruling, control_row=row, refused_controls=rest)
+        changed = [_first_refusal_as_control_row(ruling, refused)]
+    elif shape == "control-row-missing":
+        changed = [_with(ruling, control_row=None)]
+    elif shape == "dropped":
+        changed = []
+    elif shape == "invented":
+        faulted_id = f"{draft_id}a"
+        if faulted_id in {draft.id for draft in drafts}:
+            raise EvalRunError(f"a lane drafted {faulted_id}, so it is not invented")
+        invented_ruling = _with(ruling, control_row=None, refused_controls=[])
+        changed = [ruling, invented_ruling.model_copy(update={"id": faulted_id})]
+    elif shape == "duplicate-id":
+        changed = [ruling, ruling]
+    elif shape == "verdict-shape":
+        if not ruling.verdict.related_unknowns:
+            raise EvalRunError(f"{draft_id} names no open fact")
+        changed = [_with(ruling, rejected_because="reasoning")]
+    elif shape == "confirmed-ruled-out":
+        draft = next(draft for draft in drafts if draft.id == draft_id)
+        if not type(draft).excludes(draft):
+            raise EvalRunError(f"{draft_id} does not rule its unit out")
+        changed = [_with(ruling, rejected_because=None, related_unknowns=[])]
+    elif shape == "unresolved-unknown":
+        unknowns = _unknowns_with_a_foreign_attribute(ruling, model)
+        changed = [_with(ruling, related_unknowns=unknowns)]
     else:
         assert_never(shape)
-    return [faulty if each.id == draft_id else each for each in rulings]
+    return [*before, *changed, *after], faulted_id
 
 
 def fault_view(
@@ -170,41 +336,46 @@ def fault_view(
 ) -> FaultView:
     """The re-ask one injected fault routes to, or a refusal.
 
-    Refused where the answered first pass does not reconcile, where the draft
-    was shown no row, or where the check names anything but one
-    ``control-row`` problem on the draft.
+    Refused where the first pass before the fault does not reconcile, where a
+    shape in :data:`NEEDS_A_REFUSED_ROW` meets a draft shown no row or refusing none,
+    or where the check names anything but the problems :data:`PROBLEMS_BY_SHAPE` gives
+    the shape, on the faulted ID.
     """
     if draft_id not in {draft.id for draft in archived.drafts}:
         raise EvalRunError(f"no draft {draft_id}")
     critic_round = round_of(archived, [faults.control])
     rulings = answered_first_pass(archived, faults)
+    shown = critic_round.shown().get(draft_id, frozenset())
+    if shape in NEEDS_A_REFUSED_ROW:
+        if not shown:
+            raise EvalRunError(f"{draft_id} was shown no row of {faults.control.id}")
+        if not faults.refused.get(draft_id):
+            raise EvalRunError(f"{draft_id} refuses no shown row")
+    if shape in ON_A_CONTROL_REJECTION:
+        rulings = [
+            _rejected_for_control(ruling, faults) if ruling.id == draft_id else ruling
+            for ruling in rulings
+        ]
     clean = critic_round.first(_emitted(rulings, archived.framework))
     if not isinstance(clean, Accepted):
         raise EvalRunError(
-            "the first pass with the fault set's answers does not reconcile: "
+            "the first pass before the fault does not reconcile: "
             + "; ".join(clean.messages)
         )
-    shown = critic_round.shown().get(draft_id, frozenset())
-    if not shown:
-        raise EvalRunError(f"{draft_id} was shown no row of {faults.control.id}")
-    if not faults.refused.get(draft_id):
-        raise EvalRunError(f"{draft_id} refuses no shown row")
-    outcome = critic_round.first(
-        _emitted(
-            inject(rulings, faults.control, shown, draft_id, shape),
-            archived.framework,
-        )
+    faulty, faulted_id = inject(
+        archived.drafts, archived.model, rulings, faults, shown, draft_id, shape
     )
+    outcome = critic_round.first(_emitted(faulty, archived.framework))
     if isinstance(outcome, Accepted):
         raise EvalRunError(f"the {shape} fault on {draft_id} gives no problem")
-    if [(problem.kind, problem.claim_id) for problem in outcome.problems] != [
-        ("control-row", draft_id)
-    ]:
+    named = [(problem.kind, problem.claim_id) for problem in outcome.problems]
+    if named != [(kind, faulted_id) for kind in PROBLEMS_BY_SHAPE[shape]]:
         raise EvalRunError(
-            f"the {shape} fault on {draft_id} does not give one control-row"
-            f" problem: {outcome.messages}"
+            f"the {shape} fault on {draft_id} does not give the"
+            f" problems {list(PROBLEMS_BY_SHAPE[shape])} on {faulted_id}:"
+            f" {outcome.messages}"
         )
-    return FaultView(draft_id, critic_round, clean, outcome)
+    return FaultView(draft_id, faulted_id, critic_round, clean, outcome)
 
 
 def stored(raw: str, framework: FrameworkName) -> list[Any]:
@@ -324,7 +495,8 @@ def arguments(parser: argparse.ArgumentParser) -> None:
         "--faults",
         type=Path,
         required=True,
-        help="the fault set: one Control and the refusal of each row it shows",
+        help="the fault set: one Control, the refusal of each row it shows, and"
+        " the reason each draft rejected for control gives",
     )
     parser.add_argument("--draft", required=True, help="the draft to put the fault on")
     parser.add_argument(
@@ -344,7 +516,7 @@ def arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def command_recritic_replay(args: argparse.Namespace) -> int:
-    """Send one re-ask over an injected Control row fault and check the repair."""
+    """Send one re-ask over one injected fault and check the repair."""
     package_loader = MarkdownLoader(REPO_ROOT / "frameworks" / args.framework)
     prompt_loader = MarkdownLoader(REPO_ROOT / "prompts")
     try:
@@ -383,12 +555,19 @@ def command_recritic_replay(args: argparse.Namespace) -> int:
     )
     result = asyncio.run(replay(archived, view, call, package_loader, prompt_loader))
     if args.out is not None:
-        payload = {"record": record, "draft": args.draft, "fault": args.fault, **result}
+        payload = {
+            "record": record,
+            "draft": args.draft,
+            "fault": args.fault,
+            "faulted_id": view.faulted_id,
+            **result,
+        }
         args.out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     if result["schema_error"] is not None:
         print(f"the answer was not read: {result['schema_error']}")
     print(
-        f"{args.draft} {args.fault}: {len(result['remaining'])} problems remain,"
+        f"{args.draft} {args.fault} on {view.faulted_id}:"
+        f" {len(result['remaining'])} problems remain,"
         f" {len(result['unbriefed'])} unbriefed changes; status"
         f" {result['status']['answered']} -> {result['status']['repaired']}"
     )

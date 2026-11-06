@@ -30,7 +30,13 @@ from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import RecommendationReading
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from analysis_service.system_model import mentioned_ids
-from tests.factories import sample_draft, sample_ruling, severity, valid_model
+from tests.factories import (
+    asvs_draft,
+    sample_draft,
+    sample_ruling,
+    severity,
+    valid_model,
+)
 
 #: The five model-facing shapes STRIDE's own nodes speak in. ``assemble_claims``
 #: needs the ruled record to build; the package itself carries the draft.
@@ -1396,25 +1402,6 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
     table nobody compares to its registry fails as quietly as a branch.
     """
 
-    def _asvs_draft(self):
-        from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-
-        return DraftRequirementRuling.model_validate(
-            {
-                **sample_draft("S-01").model_dump(
-                    exclude={
-                        "category",
-                        "verb",
-                        "attacker_position",
-                        "severity",
-                        "mitigations",
-                    }
-                ),
-                "id": "v5.0.0-6.2.1",
-                "chapter": "authentication",
-            }
-        )
-
     def _dropped_and_invented(self):
         """One typo: the draft goes unruled and the ID nobody drafted arrives."""
         ruling = sample_ruling("S-01").model_copy(update={"id": "S-1"})
@@ -1594,28 +1581,8 @@ def test_a_rejected_threat_carries_no_reading_of_its_advice(verdict, kept):
 class TestAConfirmedExclusion:
     """An ASVS draft that rules its requirement out is never ``confirmed`` (#1559)."""
 
-    def _draft(self, direction):
-        from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-
-        return DraftRequirementRuling.model_validate(
-            {
-                **sample_draft("S-01").model_dump(
-                    exclude={
-                        "category",
-                        "verb",
-                        "attacker_position",
-                        "severity",
-                        "mitigations",
-                    }
-                ),
-                "id": "v5.0.0-6.2.1",
-                "chapter": "authentication",
-                "direction": direction,
-            }
-        )
-
     def _problems(self, direction, verdict):
-        draft = self._draft(direction)
+        draft = asvs_draft(direction=direction)
         ruling = Ruling(id=draft.id, verdict=verdict)
         return review_issues([draft], [ruling], valid_model(), {})
 
