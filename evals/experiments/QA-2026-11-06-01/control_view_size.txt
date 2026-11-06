@@ -1,0 +1,5 @@
+  1 drafts: view    103,374 bytes, about    25,843 tokens
+  2 drafts: view    207,129 bytes, about    51,782 tokens
+  3 drafts: view    310,626 bytes, about    77,656 tokens
+  4 drafts: view    414,018 bytes, about   103,504 tokens
+  5 drafts: view    517,398 bytes, about   129,349 tokens
