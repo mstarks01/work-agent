@@ -35,23 +35,25 @@ def lead_fates_of(artifact: Path) -> dict:
     cases = development_cases(load_corpus(REPO / "evals/corpus"))
     loaded = load_artifact(artifact)
     present = [case for case in cases if case.id in loaded.cases]
-    totals = {"kept": 0, "unfired": 0, "unaligned": 0, "invalid": [], "lead_12_1": None}
+    counts = {"kept": 0, "unfired": 0, "unaligned": 0}
+    invalid: list[str] = []
+    lead_12_1: str | None = None
     for case in present:
         result = extractions_from_reports(loaded, [case]).get(case.id)
         if result is None or result.extracted is None:
-            totals["invalid"].append(case.id)
+            invalid.append(case.id)
             continue
         try:
             fates = list(lead_fates(case, result.extracted))
         except ValueError:
-            totals["invalid"].append(case.id)
+            invalid.append(case.id)
             continue
         for index, _, fate in fates:
-            if fate in ("kept", "unfired", "unaligned"):
-                totals[fate] += 1
+            if fate in counts:
+                counts[fate] += 1
             if case.id == CASE and index == 1:
-                totals["lead_12_1"] = fate
-    return totals
+                lead_12_1 = fate
+    return {**counts, "invalid": invalid, "lead_12_1": lead_12_1}
 
 
 def row(artifact: Path) -> dict:
