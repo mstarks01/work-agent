@@ -220,7 +220,7 @@ somewhere else.
 | `harness/pairing.py` | The reading view behind one applicability disagreement: every requirement the run applied that the case did not expect, and every one the case expected that the run did not deliver, each with the standard's text and the argument made for it. Scores nothing and rules on nothing. |
 | `harness/attribution.py` | Which stage lost each requirement the ASVS matrix or the disposition scorer reports as wrong: precondition, generation, critic, verdict or deferral, read off the scope state, the rejection step or the verdict. Explains the two numbers beside it and moves neither. |
 | `harness/applicability.py` | ASVS's scorer: a confusion matrix over a finite catalog, matched by requirement ID. A closed claim set needs no composed identity, so no rule runs here. Carries the `disposition` instrument beside it, which reads what the run concluded rather than whether the requirement applies. |
-| `harness/gain.py` | Whether a coverage gain rests on supported output, read against a baseline on development cases: unmatched findings per case, findings no vote answers, and the rejected rate. A flooded run fails the volume gate offline; the vote gates wait for votes. Keyed by framework, and a package with no vote reading says so. `--held-out` reads the same gates on the held-out cases alone, for rung 5 of the experiment protocol; it refuses an exhausted case and names each case to record in `holdout_reads`. |
+| `harness/gain.py` | Whether a coverage gain rests on supported output, read against a baseline on development cases: unmatched findings per case, findings no live vote answers, and the rejected rate. A flooded run fails the volume gate offline; the vote gates wait for votes. Keyed by framework, and a package with no vote reading says so. `--held-out` reads the same gates on the held-out cases alone, for rung 5 of the experiment protocol; it refuses an exhausted case and names each case to record in `holdout_reads`. |
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. A kill is counted gross, the draft that had matched died, and net, nothing took its reference afterwards; and every kill carries the step the critic said it rejected the draft at. |
 | `harness/verb_pricing.py` | A verb equivalence priced before it ships: false splits and false merges over the labelled pairs, merges over the corpus's own reference pairs, and a sweep re-scored under it. `run.py price-verbs`. |
 | `harness/losses.py` | What lost each STRIDE reference a run missed: the verb, a position other than the ruled one, an unstated position (a draft from a run before `attacker_position` existed), a merge, a misfiling into another lane, the critic, the fan-in (a proposal it removed, or a draft it narrowed off the place, read from the archived proposals and the block's own marks), the place, or no lead. A `place` or `unled` row also names a surviving draft one element over, where the lane wrote near the reference rather than nowhere. A fix carries its ceiling before a run is paid for. |
@@ -654,8 +654,9 @@ the next sitting, and only the rate over it is a score.
 - **rejected rate** — of the threats the tool produced that aren't in the
   reference set, how many did a person vote down for substance? The one "extra
   threat" standing that counts against the tool. It reads 0.0 over a cold
-  ledger, beside an **unvoted** count that says how much of the answer still
-  waits on a review sitting — a plausible, grounded extra never gates.
+  ledger, beside the **unvoted** and **stale** counts, which say how much of
+  the answer still waits on a review sitting — a plausible, grounded extra
+  never gates.
 
   **It is not a false-positive rate, and the denominator is why.** It divides
   by every threat produced, while only an unmatched, in-lane threat citing a

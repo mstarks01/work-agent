@@ -1773,6 +1773,19 @@ def _parses_a_version_segment(node: ast.AST) -> bool:
     return _calls(node, "ascii_int") and isinstance(node.args[0], ast.Subscript)
 
 
+def _reads_an_answer_status(node: ast.AST) -> bool:
+    """Whether ``node`` reads the answered statuses, or an unanswered count."""
+    if _loads(node, "_ANSWERED"):
+        return True
+    if isinstance(node, ast.Subscript):
+        key = node.slice
+    elif _calls(node, "get") and node.args:
+        key = node.args[0]
+    else:
+        return False
+    return _is_constant(key, "unvoted") or _is_constant(key, "stale")
+
+
 def _reads_a_flow_label(node: ast.AST) -> bool:
     return _loads_attribute(node, "label") and _calls(node.value, "parse_flow_id")
 
@@ -2113,6 +2126,21 @@ ONE_READERS: dict[str, _OneReader] = {
             ("evals/harness/attribution.py", "_charge_miss"): (
                 "the loss attribution charges a miss to the critic, a separate"
                 " instrument with a rule of its own"
+            ),
+        },
+        "evals/",
+    ),
+    "which statuses answer a finding": _OneReader(
+        _reads_an_answer_status,
+        ("evals/harness/scorer.py", "review_coverage"),
+        {
+            ("evals/harness/scorer.py", "unvoted_count"): (
+                "counts the findings nobody voted on at all, which the review"
+                " prompt asks for, and claims nothing about what was answered"
+            ),
+            ("evals/harness/scorer.py", "stale_count"): (
+                "counts the findings whose votes judged an earlier argument, which"
+                " a sweep prints beside the unvoted count, and claims no total"
             ),
         },
         "evals/",
