@@ -5,6 +5,8 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from evals.harness.reference import MUST_FIND
+
 
 def main(replay_path, corpus_dir):
     targets = json.loads(Path(replay_path).read_text())["arms"][0]["extraction"][
@@ -15,7 +17,7 @@ def main(replay_path, corpus_dir):
     for path in Path(corpus_dir).glob("*/claims/*.json"):
         case, framework = path.parent.parent.name, path.stem
         for index, claim in enumerate(json.loads(path.read_text())):
-            if claim.get("tier") != "must-find":
+            if claim.get("tier") != MUST_FIND:
                 continue
             totals[framework] += 1
             for element in claim.get("affected_element_ids", []):

@@ -15,7 +15,7 @@ from collections import Counter
 from pathlib import Path
 
 from evals.harness.alignment import align
-from evals.harness.reference import diagnosable, load_corpus
+from evals.harness.reference import development_cases, load_corpus
 from evals.harness.run import extractions_from_reports, load_artifact
 from evals.harness.triggers import _hit
 
@@ -25,7 +25,7 @@ FRAMEWORK = "stride"
 def lead_fates(case, extracted):
     produced_of = align(case, extracted).produced_of
     for index, reference in enumerate(case.references.get(FRAMEWORK) or ()):
-        if reference.tier != "must-find":
+        if not reference.must_find:
             continue
         if not _hit(FRAMEWORK, reference, case.model).rule_ids:
             yield index, reference, "unled-on-signed"
@@ -45,7 +45,7 @@ def lead_fates(case, extracted):
 
 
 def main(corpus_dir, artifacts):
-    cases = [case for case in load_corpus(Path(corpus_dir)) if diagnosable(case)]
+    cases = development_cases(load_corpus(Path(corpus_dir)))
     totals = Counter()
     rows = []
     for path in artifacts:
