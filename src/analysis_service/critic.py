@@ -540,11 +540,7 @@ def _control_row_issues(
             for ref in named
             if ref not in rows
         ]
-        applied = verdict.control_row and rows.get(
-            ControlRowRef(
-                control=verdict.control_row.control, unit=verdict.control_row.unit
-            )
-        )
+        applied = verdict.control_row and rows.get(named[0])
         if (
             verdict.rejected_because == "control"
             and applied

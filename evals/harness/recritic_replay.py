@@ -150,7 +150,9 @@ class FaultSet(BaseModel):
     ``refused`` holds, by draft ID, the refusal of each row the Control shows
     that draft. With these answers the archived first pass reconciles.
     ``control_reasons`` holds, by draft ID, the reason a ruling rejected for
-    ``control`` gives, for the shapes in :data:`ON_A_CONTROL_REJECTION`.
+    ``control`` gives, for the shapes in :data:`ON_A_CONTROL_REJECTION`. That
+    reason quotes the Control's name or a line of its evidence, or the round's
+    check sends the first pass back and the view is refused.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
