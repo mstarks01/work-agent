@@ -609,20 +609,18 @@ def _privilege_zone_crossing(
     # do. A flow that somehow does not resolve yields no candidate instead.
     flows = {flow.id: flow for flow in model.data_flows}
     for crossing in model.boundary_crossings():
-        # The one crossing-keyed rule that skips an undecidable crossing, and
-        # its premise is why: this rule fires on what the two zones *are*, and
-        # an unknown zone has no kind to read. An undecidable crossing confers
-        # eligibility for analysis and never a privilege transition, so firing
-        # here would assert the authority change the crossing cannot establish
-        # (ADR 0039 rule 4). Stated rather than left to the empty kind that
-        # falls through both sets below.
-        if not crossing.decided:
-            continue
+        # This rule fires on what the zones *are*, so it reads the kind of the
+        # zone it names. A flow into a privilege or tenant zone fires on that
+        # zone's kind, also where no source places the other endpoint: the
+        # crossing stays undecided in the facts, so the lead confers
+        # eligibility for analysis and no transition (ADR 0039 rule 4, ADR
+        # 0128). A flow out of a tenant zone fires only on a decided crossing,
+        # because an unplaced destination may sit in the same zone.
         source_kind = kinds.get(crossing.source_zone, "")
         destination_kind = kinds.get(crossing.destination_zone, "")
         if destination_kind in ENTERED_ZONE_KINDS:
             zone, direction = crossing.destination_zone, "into"
-        elif source_kind in LEFT_ZONE_KINDS:
+        elif crossing.decided and source_kind in LEFT_ZONE_KINDS:
             zone, direction = crossing.source_zone, "out-of"
         else:
             continue

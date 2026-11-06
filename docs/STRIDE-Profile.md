@@ -80,8 +80,12 @@ two known zones that are equal is not; either end unplaced is an *undecidable*
 crossing, which carries `decided: false`. An undecidable crossing establishes
 nothing — not that a crossing occurred, not that a control is missing. It makes
 the flow eligible for analysis and no more, so a rule keyed on the crossing
-fires on one and says so, while the privilege-zone rule, which turns on what
-the two zones *are*, skips it. It is not in the evidence catalog either: the
+fires on one and says so. The privilege-zone rule reads the kind of the zone
+it names: it fires on a flow into a placed privilege or tenant zone whatever
+the source's placement, and on a flow out of a tenant zone only when the
+crossing is decided
+([ADR 0128](adr/0128-an-unplaced-source-entering-a-privilege-zone-is-a-lead.md)).
+It is not in the evidence catalog either: the
 two unplaced zones offer their own `unknown` entries instead.
 
 **Flow direction is who initiates.** A data flow records the initiator, not a
