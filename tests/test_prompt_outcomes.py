@@ -45,6 +45,7 @@ from analysis_service.frameworks.asvs.record import RequirementProposal
 from analysis_service.graph import parse_extraction
 from analysis_service.system_model import ModelIndex, normalize_name
 from analysis_service.validation import IssueCode, parse_and_validate, validate
+from tests import test_critic_controls as controls
 from tests.factories import sample_draft, sample_ruling, valid_model
 from tests.source_tree import REPO_ROOT
 from tests.test_capabilities import _facts
@@ -461,3 +462,15 @@ def a_ruling_whose_fields_do_not_fit_comes_back_to_the_critic(pipeline):  # noqa
     assert isinstance(outcome, Reask)
     assert [problem.kind for problem in outcome.problems] == ["verdict-shape"]
     assert routed_targets(pipeline, ROUTER_NODE)[graph.ROUTE_REVISE] == RECRITIC_NODE
+
+
+@decides
+def a_control_rejection_that_quotes_neither_comes_back_to_the_critic():
+    verdict = {**controls.APPLIED, "reason": "rds.tf covers it."}
+
+    outcome = controls._round(controls._db(controls._row("V11"))).first(
+        [controls._ruling(**verdict)]
+    )
+
+    assert isinstance(outcome, Reask)
+    assert [problem.kind for problem in outcome.problems] == ["control-row"]

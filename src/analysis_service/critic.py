@@ -540,7 +540,8 @@ def _control_row_issues(
             for ref in named
             if ref not in rows
         ]
-        applied = verdict.control_row and rows.get(named[0])
+        # ``named`` starts with the control_row where the ruling names one.
+        applied = rows.get(named[0]) if verdict.control_row else None
         if (
             verdict.rejected_because == "control"
             and applied
@@ -548,8 +549,9 @@ def _control_row_issues(
         ):
             messages.append(
                 f"is rejected for control and its reason quotes neither the name"
-                f" nor a line of the evidence of {applied.id}: quote the sentence"
-                " that covers the draft, with the document's label"
+                f" nor a line of the evidence of {applied.id}: quote, in double"
+                " quotes, the whole line of the excerpt that covers the draft,"
+                " with the document's label, or the Control's name"
             )
         if _reaches_control_step(verdict):
             messages += [
@@ -1067,7 +1069,7 @@ def _control_entry(
 ) -> dict:
     """One applied Control as a draft's ``controls`` key shows it.
 
-    ``excerpted`` holds the digest of each file an earlier draft of the view
+    ``excerpted`` holds the digest of each file an earlier entry of the view
     carries the text of. A file in it is named by its digest alone, so one
     view holds each text once; this adds the rest to it.
     """
@@ -1088,7 +1090,7 @@ def _control_entry(
 
 def _evidence_entry(file: CopiedEvidence, excerpted: set[str]) -> dict:
     """One evidence file of a ``controls`` entry, with its text where no
-    earlier draft of the view carries it."""
+    earlier entry of the view carries it."""
     entry = {"label": file.name, "class": file.evidence_class, "sha256": file.sha256}
     if file.sha256 not in excerpted:
         excerpted.add(file.sha256)

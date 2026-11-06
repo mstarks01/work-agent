@@ -203,6 +203,17 @@ class TestTheControlsKey:
         assert carried["excerpt"] == RDS_TF
         assert named == {key: carried[key] for key in ("label", "class", "sha256")}
 
+    def test_two_controls_on_one_draft_carry_a_shared_file_once(self):
+        [view] = _view(
+            [_asvs_draft("V11.2.1", "store:orders-db")],
+            _applied(_db(_row("V11")), _app(_row("V11"))),
+        )
+
+        first, second = (entry["evidence"][0] for entry in view["controls"])
+        assert first["excerpt"] == RDS_TF
+        assert "excerpt" not in second
+        assert second["sha256"] == first["sha256"]
+
     def test_a_stride_view_carries_each_evidence_text_once(self):
         drafts = [sample_draft(f"I-0{n}", "information-disclosure") for n in (1, 2)]
         rows = (_row("information-disclosure", "stride"),)
