@@ -1009,23 +1009,63 @@ class SectionEntry(BaseModel):
 _QUOTATION = re.compile(r"“([^”]+)”|\"([^\"]+)\"|‘(.+?)’(?!\w)|`([^`]+)`")
 
 
+#: The widest straight-quoted span on one line of a reason, so a quotation of
+#: a line that itself holds a straight double quote is read whole. On a line
+#: with two quotations it also spans the text between them, which quotes a
+#: line only where :func:`_quotes` admits it.
+_WIDEST_STRAIGHT_QUOTATION = re.compile(r'"(.+)"')
+
+
+#: The fewest words a quotation holds to quote part of a line: a phrase of a
+#: long line, such as one sentence of a paragraph, and not a word or a value.
+MIN_PART_WORDS = 5
+
+#: :data:`MIN_PART_WORDS` as the critic's prompt and its re-ask problem spell it.
+PART_WORDS_TEXT = {5: "five"}[MIN_PART_WORDS]
+
+#: Each curly quote mark, as the straight mark a model may copy it from.
+_STRAIGHT_QUOTES = str.maketrans({"“": '"', "”": '"', "‘": "'", "’": "'"})
+
+
 def _quotes(line: str, quotation: str) -> bool:
-    """Whether ``quotation`` quotes ``line``: the shorter of the two stands in
-    the longer, and is at least three quarters as long."""
+    """Whether ``quotation`` quotes ``line``, where each run of spaces counts
+    as one space and a curly quote mark as its straight mark: the shorter of
+    the two stands in the longer and is at least three quarters as long, or
+    the quotation stands in the line and holds at least
+    :data:`MIN_PART_WORDS` words. A quotation that spans two lines quotes
+    neither."""
+    line, quotation = (
+        " ".join(text.translate(_STRAIGHT_QUOTES).split()) for text in (line, quotation)
+    )
     short, long = sorted((line, quotation), key=len)
-    return short in long and 4 * len(short) >= 3 * len(long)
+    whole = short in long and 4 * len(short) >= 3 * len(long)
+    part = quotation in line and len(quotation.split()) >= MIN_PART_WORDS
+    return whole or part
+
+
+def _quotations(reason: str) -> list[str]:
+    """Each quotation of ``reason``, stripped, with the empty ones left out.
+    A straight-quoted span also counts at its widest on a line."""
+    found = [text for groups in _QUOTATION.findall(reason) for text in groups]
+    found += _WIDEST_STRAIGHT_QUOTATION.findall(reason)
+    return [text.strip() for text in found if text.strip()]
+
+
+def quotes_control(reason: str, control: AppliedControl) -> bool:
+    """Whether ``reason`` quotes the Control's name or a line of its evidence,
+    which is what a ``control`` rejection rests on (ADR 0126). The review seam
+    sends back a ``control`` rejection that quotes neither."""
+    quotations = _quotations(reason)
+    return any(_quotes(control.name, quotation) for quotation in quotations) or bool(
+        _quoted(reason, control.evidence)
+    )
 
 
 def _quoted(reason: str, evidence: Sequence[CopiedEvidence]) -> list[EvidenceLine]:
     """Each line of ``evidence`` that a quotation of ``reason`` quotes, once,
     by file and line. A line counts where its text, stripped, holds a letter
     or a digit. A reason that quotes nothing quotes no line."""
-    quotations = [
-        found.strip()
-        for groups in _QUOTATION.findall(reason)
-        for found in groups
-        if found.strip()
-    ]
+    quotations = _quotations(reason)
     lines = []
     for file in evidence:
         for number, line in enumerate(text_lines(file.text), start=1):

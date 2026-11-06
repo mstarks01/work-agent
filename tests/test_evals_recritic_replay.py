@@ -85,7 +85,7 @@ def faults_for(archived, refused_by=None) -> recritic_replay.FaultSet:
             if refused_by is None or draft.id in refused_by
         },
         control_reasons={
-            draft.id: "the audit log names every write to this element"
+            draft.id: f"the audit log names every write to this element: “{EVERY_LANE.name}”"
             for draft in archived.drafts
         },
     )

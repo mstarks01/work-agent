@@ -31,6 +31,8 @@ from analysis_service.frameworks.asvs.record import (
     RequirementProposals,
 )
 from analysis_service.job_controls import (
+    MIN_PART_WORDS,
+    PART_WORDS_TEXT,
     AppliedControl,
     ControlFact,
     ControlFacts,
@@ -38,6 +40,7 @@ from analysis_service.job_controls import (
     RowRuling,
     applied_controls,
     controls_section,
+    quotes_control,
     refuse_disagreement,
     row_outcome,
     row_rulings,
@@ -52,6 +55,7 @@ from tests.factories import (
     sample_threat,
     valid_model,
 )
+from tests.source_tree import REPO_ROOT
 
 DB_CONTROL = "control-" + "d" * 32
 APP_CONTROL = "control-" + "a" * 32
@@ -112,6 +116,15 @@ def _asvs_draft(requirement: str, *elements: str) -> DraftRequirementRuling:
         id=f"v5.0.0-{chapter}.{section}.{item}",
         chapter=lane,
         affected_element_ids=list(elements),
+    )
+
+
+def _with_evidence(line: str) -> AppliedControl:
+    """The Orders DB Control, applied, with ``line`` as its one evidence line."""
+    [control] = _applied(_db(_row("V11")))
+    [file] = control.evidence
+    return control.model_copy(
+        update={"evidence": [file.model_copy(update={"text": f"{line}\n"})]}
     )
 
 
@@ -192,6 +205,53 @@ class TestTheControlsKey:
 
         assert _shown(view) == {(APP_CONTROL, "information-disclosure")}
 
+    def test_a_view_carries_each_evidence_text_once(self):
+        drafts = [
+            _asvs_draft(unit, "store:orders-db") for unit in ("V11.2.1", "V11.2.2")
+        ]
+        first, second = _view(drafts, _applied(_db(_row("V11"))))
+
+        [carried] = first["controls"][0]["evidence"]
+        [named] = second["controls"][0]["evidence"]
+        assert carried["excerpt"] == RDS_TF
+        assert named == {key: carried[key] for key in ("label", "class", "sha256")}
+
+    def test_two_controls_on_one_draft_carry_a_shared_file_once(self):
+        [view] = _view(
+            [_asvs_draft("V11.2.1", "store:orders-db")],
+            _applied(_db(_row("V11")), _app(_row("V11"))),
+        )
+
+        first, second = (entry["evidence"][0] for entry in view["controls"])
+        assert first["excerpt"] == RDS_TF
+        assert "excerpt" not in second
+        assert second["sha256"] == first["sha256"]
+
+    def test_a_stride_view_carries_each_evidence_text_once(self):
+        drafts = [sample_draft(f"I-0{n}", "information-disclosure") for n in (1, 2)]
+        rows = (_row("information-disclosure", "stride"),)
+        first, second = _view(drafts, _applied(_app(*rows)), framework="stride")
+
+        assert "excerpt" in first["controls"][0]["evidence"][0]
+        assert "excerpt" not in second["controls"][0]["evidence"][0]
+
+    def test_a_re_ask_view_carries_the_text_of_the_drafts_it_holds(self):
+        drafts = [
+            _asvs_draft(unit, "store:orders-db") for unit in ("V11.2.1", "V11.2.2")
+        ]
+        critic_round = CriticRound.of(
+            "asvs",
+            valid_model(),
+            drafts,
+            AnalysisMarks(),
+            None,
+            _applied(_db(_row("V11"))),
+        )
+
+        [view] = critic_round.view(only={drafts[1].id})
+
+        assert view["controls"][0]["evidence"][0]["excerpt"] == RDS_TF
+
     def test_each_excerpt_is_the_services_copy_with_its_class_and_digest(self):
         [view] = _view(
             [_asvs_draft("V11.2.1", "store:orders-db")], _applied(_db(_row("V11")))
@@ -239,7 +299,7 @@ def _refused(unit: str, control: str = DB_CONTROL) -> dict:
 APPLIED = {
     "rejected_because": "control",
     "control_row": {"control": DB_CONTROL, "unit": "V11"},
-    "reason": "rds.tf: storage_encrypted = true",
+    "reason": "rds.tf: `storage_encrypted = true`",
 }
 
 
@@ -337,6 +397,70 @@ class TestTheReviewSeam:
         )
 
         assert isinstance(outcome, Accepted)
+
+    def test_a_control_rejection_quoting_the_controls_name_is_accepted(self):
+        verdict = {**APPLIED, "reason": "The owner states “Control d” for this store."}
+        outcome = _round(_db(_row("V11"))).first([_ruling(**verdict)])
+
+        assert isinstance(outcome, Accepted)
+
+    @pytest.mark.parametrize(
+        ("line", "reason"),
+        [
+            ('kms_key_id = "alias/orders"', 'rds.tf: "kms_key_id = "alias/orders""'),
+            ("storage_encrypted     = true", 'rds.tf: "storage_encrypted = true"'),
+        ],
+        ids=["a line with straight quotes", "a line with aligned spaces"],
+    )
+    def test_a_whole_line_quotes_the_control(self, line, reason):
+        assert quotes_control(reason, _with_evidence(line))
+
+    def test_a_sentence_of_a_long_line_quotes_the_control(self):
+        line = (
+            "The security team reviews each release. Each order change writes an"
+            " append-only audit event with the caller's identity."
+        )
+        reason = 'policy.md: "Each order change writes an append-only audit event"'
+
+        assert quotes_control(reason, _with_evidence(line))
+
+    @pytest.mark.parametrize(
+        "extra", [-1, 0, 1], ids=["one fewer", "the bound", "one more"]
+    )
+    def test_a_part_of_a_line_quotes_from_the_fewest_words(self, extra):
+        words = [f"word{n}" for n in range(12)]
+        quotation = " ".join(words[: MIN_PART_WORDS + extra])
+        reason = f'notes.md: "{quotation}"'
+
+        assert quotes_control(reason, _with_evidence(" ".join(words))) is (extra >= 0)
+
+    def test_a_curly_quote_quotes_a_straight_quoted_line(self):
+        reason = "rds.tf: “kms_key_id = “alias/orders””"
+
+        assert quotes_control(reason, _with_evidence('kms_key_id = "alias/orders"'))
+
+    def test_a_short_part_of_a_line_does_not_quote_the_control(self):
+        reason = 'rds.tf: "= true"'
+
+        assert not quotes_control(reason, _with_evidence("storage_encrypted = true"))
+
+    def test_the_prompt_states_the_fewest_words_of_a_part(self):
+        step = " ".join((REPO_ROOT / "prompts" / "critic.md").read_text().split())
+
+        assert f"or at least {PART_WORDS_TEXT} words of it" in step
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            "rds.tf says “Every column is encrypted with a KMS key.”",
+            "rds.tf covers it.",
+        ],
+        ids=["an invented quote", "no quote"],
+    )
+    def test_a_control_rejection_that_quotes_no_evidence_is_sent_back(self, reason):
+        problems = _problems(_db(_row("V11")), **{**APPLIED, "reason": reason})
+
+        assert any("quotes neither" in problem for problem in problems)
 
 
 class TestTheRowOutcome:
@@ -588,17 +712,18 @@ def test_the_verdict_and_the_seam_hold_one_row_rule(step, names_a_row):
     control rejection", so each combination is put to both. The verdict is
     built from the ruling the seam completed, as assembly builds it."""
     fields = {
-        "reason": "rds.tf: storage_encrypted = true",
+        "reason": "rds.tf: `storage_encrypted = true`",
         "rejected_because": step,
         "control_row": {"control": DB_CONTROL, "unit": "V11"} if names_a_row else None,
         # The one shown row is answered either way, so only the row rule speaks.
         "refused_controls": [] if names_a_row else [_refused("V11")],
     }
+    [applied] = _applied(_db(_row("V11")))
     seam = review_issues(
         [DRAFT],
         [Ruling(id=DRAFT.id, verdict=ProposedVerdict(**fields))],
         valid_model(),
-        {DRAFT.id: frozenset({ControlRowRef(control=DB_CONTROL, unit="V11")})},
+        {DRAFT.id: {ControlRowRef(control=DB_CONTROL, unit="V11"): applied}},
     )
     [completed] = seam.rulings
     try:

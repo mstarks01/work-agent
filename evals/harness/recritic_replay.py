@@ -150,7 +150,9 @@ class FaultSet(BaseModel):
     ``refused`` holds, by draft ID, the refusal of each row the Control shows
     that draft. With these answers the archived first pass reconciles.
     ``control_reasons`` holds, by draft ID, the reason a ruling rejected for
-    ``control`` gives, for the shapes in :data:`ON_A_CONTROL_REJECTION`.
+    ``control`` gives, for the shapes in :data:`ON_A_CONTROL_REJECTION`. That
+    reason quotes the Control's name or a line of its evidence, or the round's
+    check sends the first pass back and the view is refused.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -345,7 +347,7 @@ def fault_view(
         raise EvalRunError(f"no draft {draft_id}")
     critic_round = round_of(archived, [faults.control])
     rulings = answered_first_pass(archived, faults)
-    shown = critic_round.shown().get(draft_id, frozenset())
+    shown = frozenset(critic_round.shown().get(draft_id, {}))
     if shape in NEEDS_A_REFUSED_ROW:
         if not shown:
             raise EvalRunError(f"{draft_id} was shown no row of {faults.control.id}")

@@ -299,7 +299,8 @@ def rule(claim_id: str, status: str, reason: str = "") -> dict:
     rejection names its check, and any other ruling leaves the verdict to the
     draft's own unknown grounds, as :func:`surviving_status` reads them. A
     fixture whose reader expects a ``control`` rejection is rejected on its
-    first row, and every other row it is shown is refused.
+    first row, with a reason that quotes that row's Control by name, and every
+    other row it is shown is refused.
     """
     verdict: dict = {"reason": reason}
     fixture = FIXTURE_OF_DRAFT.get(claim_id)
@@ -319,6 +320,10 @@ def rule(claim_id: str, status: str, reason: str = "") -> dict:
     ):
         verdict["rejected_because"] = "control"
         verdict["control_row"], *rows = rows
+        applied = next(
+            c for c in fixture.controls if c.id == verdict["control_row"]["control"]
+        )
+        verdict["reason"] = f"{reason}: “{applied.name}”"
     elif status == "rejected":
         verdict["rejected_because"] = "reasoning"
         rows = []

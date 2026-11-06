@@ -334,8 +334,9 @@ class CriticRound:
             return Failed(problems=list(problems.problems))
         return self._assembled(rulings)
 
-    def shown(self) -> dict[str, frozenset[ControlRowRef]]:
-        """The Control rows each draft is shown, which its ruling answers."""
+    def shown(self) -> dict[str, dict[ControlRowRef, AppliedControl]]:
+        """The Control rows each draft is shown, each with its Control, which
+        its ruling answers."""
         return shown_rows(self.drafts, package_for(self.framework), self.controls)
 
     def _checked(self, emitted: Sequence[Any]) -> tuple[list[Ruling], ReviewProblems]:

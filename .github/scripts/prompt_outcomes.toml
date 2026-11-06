@@ -234,6 +234,16 @@ modules = [
 ]
 check = "a_ruling_whose_fields_do_not_fit_comes_back_to_the_critic"
 
+[[outcome]]
+prompt = "prompts/critic.md"
+sentence = """A `control` rejection whose reason quotes neither comes back to
+you."""
+modules = [
+    "src/analysis_service/critic.py",
+    "src/analysis_service/job_controls.py",
+]
+check = "a_control_rejection_that_quotes_neither_comes_back_to_the_critic"
+
 # --- Modules with no pinned sentence yet ---------------------------------------
 
 [[reader]]
