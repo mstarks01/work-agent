@@ -79,7 +79,7 @@ from analysis_service.sources import SourceLimits
 from analysis_service.system_model import CapabilityStatement, Process, SystemModel
 from tests.factories import (
     PROJECT_ROOT,
-    sample_draft,
+    asvs_draft,
     stand_in_engine,
     valid_model,
 )
@@ -1186,24 +1186,7 @@ class TestThisPackageCarriesNoActionVerb:
 
 def test_the_unit_of_a_draft_is_its_requirement():
     """The fan-in refuses a draft on a ruled-out unit through this hook (#443)."""
-    from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-
-    draft = DraftRequirementRuling.model_validate(
-        {
-            **sample_draft("S-01").model_dump(
-                exclude={
-                    "category",
-                    "verb",
-                    "attacker_position",
-                    "severity",
-                    "mitigations",
-                }
-            ),
-            "id": "v5.0.0-6.2.1",
-            "chapter": "authentication",
-        }
-    )
-    assert DraftRequirementRuling.unit_of(draft) == "V6.2.1"
+    assert DraftRequirementRuling.unit_of(asvs_draft()) == "V6.2.1"
 
 
 class TestNothingIsRuledOutByVocabulary:

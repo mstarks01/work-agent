@@ -67,10 +67,13 @@ catalog, and it prints the must-finds the lane's drafts match.
 `python -m evals.harness.run recritic-replay <artifact> --case <case> --framework <package> --faults <file> --draft <id> --fault <shape> --accept-cost unknown`
 costs one re-ask call. It reads the case's critic first pass from its report,
 applies the one Control the fault set holds, answers each row it shows with the
-refusal the file states, and puts one Control row fault of the shape on the
-draft. With `--out <file>` it writes the problems the re-ask was sent, its
-answer, the problems that remain and each ruling it changed that no problem
-named.
+refusal the file states, and puts one fault of the shape on the draft.
+`FaultShape` in `evals/harness/recritic_replay.py` lists the shapes: Control
+row faults, and at least one shape for each other kind of problem the check
+names. The round's check must name exactly the problems `PROBLEMS_BY_SHAPE`
+gives the shape, or the command refuses the view before the call. With `--out
+<file>` it writes the problems the re-ask was sent, its answer, the problems
+that remain and each ruling it changed that no problem named.
 
 The three replays send a live request, so `ANALYSIS_OFFLINE` refuses them. Their
 names say "replay"; their cost says paid. `replay` and `score` above re-read an

@@ -146,6 +146,14 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the entries that reach the routing half, which an entry stopping"
         " before it does not"
     ),
+    ("evals.harness.recritic_replay", "ON_A_CONTROL_REJECTION"): (
+        "the fault shapes on a ruling rejected for control, which is fewer than"
+        " the shapes that exist"
+    ),
+    ("evals.harness.recritic_replay", "NEEDS_A_REFUSED_ROW"): (
+        "the fault shapes that need a draft shown a row it refuses, which is"
+        " fewer than the shapes that exist"
+    ),
     ("analysis_service.sources", "KIND_FORMATS"): (
         "the kinds that an upload allows, so a kind that only the page or the"
         " service writes is absent by construction"

@@ -2792,9 +2792,8 @@ COMMANDS: dict[str, Command] = {
         arguments=critic_replay.arguments,
     ),
     "recritic-replay": Command(
-        help="send one critic re-ask over an archived first pass with an"
-        " injected Control row fault, and check what it repaired (one paid"
-        " call)",
+        help="send one critic re-ask over an archived first pass with one"
+        " injected fault, and check what it repaired (one paid call)",
         run=recritic_replay.command_recritic_replay,
         arguments=recritic_replay.arguments,
     ),

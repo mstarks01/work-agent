@@ -45,5 +45,6 @@
         "reason": "worker.env states who may read the file, not that a read is logged or attributed, which is what the draft calls missing."
       }
     ]
-  }
+  },
+  "control_reasons": {}
 }
