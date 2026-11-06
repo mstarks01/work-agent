@@ -19,6 +19,9 @@
   a derived fact rather than to a term.
 - **Evidence**: `run.py bottleneck` over the thirteen signed corpus cases, and
   the simulation in "What it costs" below.
+- **Amended by**: [ADR 0128](0128-an-unplaced-source-entering-a-privilege-zone-is-a-lead.md),
+  under which STRIDE's privilege-zone rule fires on an undecided flow into a
+  placed privilege or tenant zone.
 
 ## Context
 

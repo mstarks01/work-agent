@@ -424,9 +424,7 @@ class TestFiring:
 
         undecided = [hit for hit in keyed if hit.facts["crossing_decided"] is False]
         assert undecided, "the flow stays eligible for analysis"
-        assert all(hit.facts["crossing_decided"] is True for hit in privilege), (
-            "no privilege transition rests on a zone nobody stated"
-        )
+        assert privilege == [], "no lead names a zone nobody placed"
 
     def test_an_unplaced_source_entering_a_privilege_zone_raises_a_lead(self, model):
         """ADR 0128: the destination's kind is stated, so the flow is a lead.
