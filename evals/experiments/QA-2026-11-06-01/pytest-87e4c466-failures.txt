@@ -27,3 +27,4 @@ FAILED tests/test_vendor_neutrality.py::test_no_document_counts_the_registry[wt-
 FAILED tests/test_vendor_neutrality.py::test_no_document_counts_the_registry[wt-main/docs/adr/0015-adk-and-litellm-are-one-substrate.md]
 FAILED tests/test_vendor_neutrality.py::test_no_document_counts_the_ground_kinds[wt-main/docs/adr/0004-evidence-references.md]
 FAILED tests/test_vendor_neutrality.py::test_no_document_counts_the_ground_kinds[wt-main/docs/adr/0010-package-cannot-extend-the-evidence-catalog.md]
+29 failed, 21742 passed, 1113 skipped, 332 warnings in 329.48s (0:05:29)

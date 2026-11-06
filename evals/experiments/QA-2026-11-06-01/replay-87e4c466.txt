@@ -1,3 +1,4 @@
+commit: 87e4c466 (worktree /tmp/claude-1000/-home-me-work-agent/37d623de-836a-47f2-ae96-2f5c8806ea49/scratchpad/arm-new code, archive /home/me/work-agent/evals/emissions)
 NOT POOLED: 11 sweep(s) share a route, a prompt and a model but carry no rendered_sources block, so nothing records whether they read one input: 20260914T2200Z-extract-preflight-01.json, 20260914T2205Z-extract-sweep.json, 20260914T2230Z-extract-before-r2.json, 20260914T2230Z-extract-before-r3.json, 20260914T2230Z-extract-before-r4.json, 20260914T2230Z-extract-before-r5.json; 20260914T2300Z-extract-after-r1.json, 20260914T2300Z-extract-after-r2.json, 20260914T2300Z-extract-after-r3.json, 20260914T2300Z-extract-after-r4.json, 20260914T2300Z-extract-after-r5.json. Each is its own arm. To pool the sweeps that read one input, name their arm with --arm LABEL=GLOB, where GLOB matches the artifact file names.
 
 == extract@88f0740bd808 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2200Z-extract-preflight-01.json: 1 sweep(s)
@@ -377,4 +378,5 @@ NOT POOLED: 11 sweep(s) share a route, a prompt and a model but carry no rendere
       1  13-dispatch-control-plane/flow:entity:duty-engineer>process:corporate-web-host>load-console  (omitted 1)
       1  13-dispatch-control-plane/flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed  (omitted 1)
 
-replay written to /tmp/claude-1000/-home-me-work-agent/37d623de-836a-47f2-ae96-2f5c8806ea49/scratchpad/qa/replay.json
+replay written to /tmp/claude-1000/-home-me-work-agent/37d623de-836a-47f2-ae96-2f5c8806ea49/scratchpad/qa/replay2.json
+exit 0
