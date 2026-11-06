@@ -1,0 +1,3 @@
+a true quote       seam accepts: True   report quotes: ['storage_encrypted = true']
+an invented quote  seam accepts: False  report quotes: []
+no quote           seam accepts: False  report quotes: []

@@ -1,0 +1,26 @@
+02-iot-fleet-telemetry             stride claims  32 rejected   1  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+03-batch-data-pipeline             stride claims  25 rejected   2  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+04-ml-inference-service            stride claims  24 rejected   2  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+05-cookbook-queue-webapp           stride claims  19 rejected   3  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+06-cookbook-online-game            stride claims  29 rejected   3  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+07-cicd-store-deploy               stride claims  37 rejected   0  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+08-sso-identity-broker             stride claims  33 rejected   0  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+09-cookbook-sokify-retail          stride claims  33 rejected   0  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+10-cookbook-generic-cms            stride claims  29 rejected   0  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+11-sparse-shift-scheduling         stride claims  28 rejected   0  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+12-overclaiming-supplier-portal    stride claims  28 rejected   0  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+13-dispatch-control-plane          stride claims  32 rejected   0  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
+16-library-lending-interview       stride claims  25 rejected   0  same
+1 block(s), 0 differ, 0 refused by today's check; 0 report(s) refused by today's Report
