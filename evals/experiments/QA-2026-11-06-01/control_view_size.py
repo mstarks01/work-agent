@@ -11,8 +11,10 @@ from analysis_service.claims import AnalysisMarks
 from analysis_service.controls import Control, ControlDocument
 from analysis_service.critic_round import CriticRound
 from analysis_service.job_controls import CopiedControl
+from analysis_service.resilience import load_resilience
 from analysis_service.sources import text_digest
 from tests.factories import valid_model
+from tests.source_tree import REPO_ROOT
 from tests.test_critic_controls import (
     APP_CONTROL,
     EVIDENCE_ID,
@@ -21,7 +23,10 @@ from tests.test_critic_controls import (
     _row,
 )
 
-MAX_SOURCE_BYTES = 102_400
+#: The largest evidence file a Control can hold, as the deployment config sets it.
+MAX_SOURCE_BYTES = load_resilience(
+    REPO_ROOT / "config" / "resilience.toml", env={}
+).max_source_bytes
 
 
 def _app_control(text: str):
