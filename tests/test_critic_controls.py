@@ -38,6 +38,7 @@ from analysis_service.job_controls import (
     RowRuling,
     applied_controls,
     controls_section,
+    quotes_control,
     refuse_disagreement,
     row_outcome,
     row_rulings,
@@ -390,6 +391,23 @@ class TestTheReviewSeam:
         outcome = _round(_db(_row("V11"))).first([_ruling(**verdict)])
 
         assert isinstance(outcome, Accepted)
+
+    @pytest.mark.parametrize(
+        ("line", "reason"),
+        [
+            ('kms_key_id = "alias/orders"', 'rds.tf: "kms_key_id = "alias/orders""'),
+            ("storage_encrypted     = true", 'rds.tf: "storage_encrypted = true"'),
+        ],
+        ids=["a line with straight quotes", "a line with aligned spaces"],
+    )
+    def test_a_whole_line_quotes_the_control(self, line, reason):
+        [control] = _applied(_db(_row("V11")))
+        [file] = control.evidence
+        control = control.model_copy(
+            update={"evidence": [file.model_copy(update={"text": f"{line}\n"})]}
+        )
+
+        assert quotes_control(reason, control)
 
     @pytest.mark.parametrize(
         "reason",

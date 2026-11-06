@@ -1009,21 +1009,25 @@ class SectionEntry(BaseModel):
 _QUOTATION = re.compile(r"“([^”]+)”|\"([^\"]+)\"|‘(.+?)’(?!\w)|`([^`]+)`")
 
 
+#: The widest straight-quoted span on one line of a reason, so a quotation of
+#: a line that itself holds a straight double quote is read whole.
+_WIDEST_STRAIGHT_QUOTATION = re.compile(r'"(.+)"')
+
+
 def _quotes(line: str, quotation: str) -> bool:
     """Whether ``quotation`` quotes ``line``: the shorter of the two stands in
-    the longer, and is at least three quarters as long."""
-    short, long = sorted((line, quotation), key=len)
+    the longer, and is at least three quarters as long, where each run of
+    spaces counts as one space."""
+    short, long = sorted((" ".join(line.split()), " ".join(quotation.split())), key=len)
     return short in long and 4 * len(short) >= 3 * len(long)
 
 
 def _quotations(reason: str) -> list[str]:
-    """Each quotation of ``reason``, stripped, with the empty ones left out."""
-    return [
-        found.strip()
-        for groups in _QUOTATION.findall(reason)
-        for found in groups
-        if found.strip()
-    ]
+    """Each quotation of ``reason``, stripped, with the empty ones left out.
+    A straight-quoted span also counts at its widest on a line."""
+    found = [text for groups in _QUOTATION.findall(reason) for text in groups]
+    found += _WIDEST_STRAIGHT_QUOTATION.findall(reason)
+    return [text.strip() for text in found if text.strip()]
 
 
 def quotes_control(reason: str, control: AppliedControl) -> bool:

@@ -2137,8 +2137,9 @@ UNNAMED_CLAIM = "(unnamed)"
 #:   the model does not hold, or names nothing at all;
 #: * ``control-row`` — a ruling names a Control row the draft was not shown,
 #:   names a ``control_row`` on a step other than ``control``, is rejected for
-#:   ``control`` and names no ``control_row``, or leaves a shown row
-#:   unanswered (ADR 0126);
+#:   ``control`` and names no ``control_row``, is rejected for ``control`` with
+#:   a reason that quotes neither the Control's name nor a line of its
+#:   evidence, or leaves a shown row unanswered (ADR 0126);
 #: * ``unbriefed-change`` — the re-ask changed a ruling no problem named, and
 #:   the first pass's ruling was kept.
 #:

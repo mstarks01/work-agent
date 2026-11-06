@@ -39,13 +39,13 @@ passes of the critic round get the key.
 **`control` joins `RejectionStep` and `CriticStep`, and rules on the unit.**
 The verdict gains `control_row`, the Control's ID and the row's unit ID,
 required exactly when `rejected_because` is `control` and refused on every
-other value. The reason quotes the sentence of the Control's evidence that
-covers the draft, with the document's label, or the Control's name where the
-name covers it. The verdict carries no ground. The review seam refuses a
-`control` rejection whose row is not in the draft's `controls` list, and one
-whose reason quotes neither the name nor a line of the evidence of the Control
-it names (`quotes_control`). `rules_on_unit` returns true for `control`, so the
-unit does not fall to `not-raised`.
+other value. The reason quotes, in double quotes, the whole line of the
+Control's evidence that covers the draft, with the document's label, or the
+Control's name where the name covers it. The verdict carries no ground. The
+review seam refuses a `control` rejection whose row is not in the draft's
+`controls` list, and one whose reason quotes neither the name nor a line of the
+evidence of the Control it names (`quotes_control`). `rules_on_unit` returns
+true for `control`, so the unit does not fall to `not-raised`.
 
 **No new Scope Entry state.** A `control` rejection follows the `evidence`
 path: the unit is ruled, the scope builder lists no entry for it, and
