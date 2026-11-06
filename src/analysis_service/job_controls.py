@@ -1020,13 +1020,23 @@ _WIDEST_STRAIGHT_QUOTATION = re.compile(r'"(.+)"')
 #: long line, such as one sentence of a paragraph, and not a word or a value.
 MIN_PART_WORDS = 5
 
+#: :data:`MIN_PART_WORDS` as the critic's prompt and its re-ask problem spell it.
+PART_WORDS_TEXT = {5: "five"}[MIN_PART_WORDS]
+
+#: Each curly quote mark, as the straight mark a model may copy it from.
+_STRAIGHT_QUOTES = str.maketrans({"“": '"', "”": '"', "‘": "'", "’": "'"})
+
 
 def _quotes(line: str, quotation: str) -> bool:
     """Whether ``quotation`` quotes ``line``, where each run of spaces counts
-    as one space: the shorter of the two stands in the longer and is at least
-    three quarters as long, or the quotation stands in the line and holds at
-    least :data:`MIN_PART_WORDS` words."""
-    line, quotation = " ".join(line.split()), " ".join(quotation.split())
+    as one space and a curly quote mark as its straight mark: the shorter of
+    the two stands in the longer and is at least three quarters as long, or
+    the quotation stands in the line and holds at least
+    :data:`MIN_PART_WORDS` words. A quotation that spans two lines quotes
+    neither."""
+    line, quotation = (
+        " ".join(text.translate(_STRAIGHT_QUOTES).split()) for text in (line, quotation)
+    )
     short, long = sorted((line, quotation), key=len)
     whole = short in long and 4 * len(short) >= 3 * len(long)
     part = quotation in line and len(quotation.split()) >= MIN_PART_WORDS

@@ -32,6 +32,7 @@ from analysis_service.frameworks.asvs.record import (
 )
 from analysis_service.job_controls import (
     MIN_PART_WORDS,
+    PART_WORDS_TEXT,
     AppliedControl,
     ControlFact,
     ControlFacts,
@@ -423,16 +424,30 @@ class TestTheReviewSeam:
 
         assert quotes_control(reason, _with_evidence(line))
 
+    @pytest.mark.parametrize(
+        "extra", [-1, 0, 1], ids=["one fewer", "the bound", "one more"]
+    )
+    def test_a_part_of_a_line_quotes_from_the_fewest_words(self, extra):
+        words = [f"word{n}" for n in range(12)]
+        quotation = " ".join(words[: MIN_PART_WORDS + extra])
+        reason = f'notes.md: "{quotation}"'
+
+        assert quotes_control(reason, _with_evidence(" ".join(words))) is (extra >= 0)
+
+    def test_a_curly_quote_quotes_a_straight_quoted_line(self):
+        reason = "rds.tf: “kms_key_id = “alias/orders””"
+
+        assert quotes_control(reason, _with_evidence('kms_key_id = "alias/orders"'))
+
     def test_a_short_part_of_a_line_does_not_quote_the_control(self):
         reason = 'rds.tf: "= true"'
 
         assert not quotes_control(reason, _with_evidence("storage_encrypted = true"))
 
     def test_the_prompt_states_the_fewest_words_of_a_part(self):
-        words = {5: "five"}[MIN_PART_WORDS]
         step = " ".join((REPO_ROOT / "prompts" / "critic.md").read_text().split())
 
-        assert f"or at least {words} words of it" in step
+        assert f"or at least {PART_WORDS_TEXT} words of it" in step
 
     @pytest.mark.parametrize(
         "reason",

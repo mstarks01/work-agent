@@ -63,6 +63,7 @@ from analysis_service.claims import (
 from analysis_service.evidence import ground_gloss
 from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
 from analysis_service.job_controls import (
+    PART_WORDS_TEXT,
     AppliedControl,
     CopiedEvidence,
     quotes_control,
@@ -540,10 +541,7 @@ def _control_row_issues(
             for ref in named
             if ref not in rows
         ]
-        row = verdict.control_row
-        applied = (
-            rows.get(ControlRowRef(control=row.control, unit=row.unit)) if row else None
-        )
+        applied = rows.get(verdict.control_row) if verdict.control_row else None
         if (
             verdict.rejected_because == "control"
             and applied
@@ -553,8 +551,8 @@ def _control_row_issues(
                 f"is rejected for control and its reason quotes neither the name"
                 f" nor a line of the evidence of {applied.id}: quote, in double"
                 " quotes, the line of the excerpt that covers the draft or at"
-                " least five words of it, with the document's label, or the"
-                " Control's name"
+                f" least {PART_WORDS_TEXT} words of it, with the document's label,"
+                " or the Control's name"
             )
         if _reaches_control_step(verdict):
             messages += [
