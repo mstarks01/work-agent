@@ -345,7 +345,7 @@ def fault_view(
         raise EvalRunError(f"no draft {draft_id}")
     critic_round = round_of(archived, [faults.control])
     rulings = answered_first_pass(archived, faults)
-    shown = critic_round.shown().get(draft_id, frozenset())
+    shown = frozenset(critic_round.shown().get(draft_id, {}))
     if shape in NEEDS_A_REFUSED_ROW:
         if not shown:
             raise EvalRunError(f"{draft_id} was shown no row of {faults.control.id}")

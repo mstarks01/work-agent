@@ -1016,16 +1016,31 @@ def _quotes(line: str, quotation: str) -> bool:
     return short in long and 4 * len(short) >= 3 * len(long)
 
 
-def _quoted(reason: str, evidence: Sequence[CopiedEvidence]) -> list[EvidenceLine]:
-    """Each line of ``evidence`` that a quotation of ``reason`` quotes, once,
-    by file and line. A line counts where its text, stripped, holds a letter
-    or a digit. A reason that quotes nothing quotes no line."""
-    quotations = [
+def _quotations(reason: str) -> list[str]:
+    """Each quotation of ``reason``, stripped, with the empty ones left out."""
+    return [
         found.strip()
         for groups in _QUOTATION.findall(reason)
         for found in groups
         if found.strip()
     ]
+
+
+def quotes_control(reason: str, control: AppliedControl) -> bool:
+    """Whether ``reason`` quotes the Control's name or a line of its evidence,
+    which is what a ``control`` rejection rests on (ADR 0126). The review seam
+    sends back a ``control`` rejection that quotes neither."""
+    quotations = _quotations(reason)
+    return any(_quotes(control.name, quotation) for quotation in quotations) or bool(
+        _quoted(reason, control.evidence)
+    )
+
+
+def _quoted(reason: str, evidence: Sequence[CopiedEvidence]) -> list[EvidenceLine]:
+    """Each line of ``evidence`` that a quotation of ``reason`` quotes, once,
+    by file and line. A line counts where its text, stripped, holds a letter
+    or a digit. A reason that quotes nothing quotes no line."""
+    quotations = _quotations(reason)
     lines = []
     for file in evidence:
         for number, line in enumerate(text_lines(file.text), start=1):

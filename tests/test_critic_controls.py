@@ -192,6 +192,42 @@ class TestTheControlsKey:
 
         assert _shown(view) == {(APP_CONTROL, "information-disclosure")}
 
+    def test_a_view_carries_each_evidence_text_once(self):
+        drafts = [
+            _asvs_draft(unit, "store:orders-db") for unit in ("V11.2.1", "V11.2.2")
+        ]
+        first, second = _view(drafts, _applied(_db(_row("V11"))))
+
+        [carried] = first["controls"][0]["evidence"]
+        [named] = second["controls"][0]["evidence"]
+        assert carried["excerpt"] == RDS_TF
+        assert named == {key: carried[key] for key in ("label", "class", "sha256")}
+
+    def test_a_stride_view_carries_each_evidence_text_once(self):
+        drafts = [sample_draft(f"I-0{n}", "information-disclosure") for n in (1, 2)]
+        rows = (_row("information-disclosure", "stride"),)
+        first, second = _view(drafts, _applied(_app(*rows)), framework="stride")
+
+        assert "excerpt" in first["controls"][0]["evidence"][0]
+        assert "excerpt" not in second["controls"][0]["evidence"][0]
+
+    def test_a_re_ask_view_carries_the_text_of_the_drafts_it_holds(self):
+        drafts = [
+            _asvs_draft(unit, "store:orders-db") for unit in ("V11.2.1", "V11.2.2")
+        ]
+        critic_round = CriticRound.of(
+            "asvs",
+            valid_model(),
+            drafts,
+            AnalysisMarks(),
+            None,
+            _applied(_db(_row("V11"))),
+        )
+
+        [view] = critic_round.view(only={drafts[1].id})
+
+        assert view["controls"][0]["evidence"][0]["excerpt"] == RDS_TF
+
     def test_each_excerpt_is_the_services_copy_with_its_class_and_digest(self):
         [view] = _view(
             [_asvs_draft("V11.2.1", "store:orders-db")], _applied(_db(_row("V11")))
@@ -239,7 +275,7 @@ def _refused(unit: str, control: str = DB_CONTROL) -> dict:
 APPLIED = {
     "rejected_because": "control",
     "control_row": {"control": DB_CONTROL, "unit": "V11"},
-    "reason": "rds.tf: storage_encrypted = true",
+    "reason": "rds.tf: `storage_encrypted = true`",
 }
 
 
@@ -337,6 +373,25 @@ class TestTheReviewSeam:
         )
 
         assert isinstance(outcome, Accepted)
+
+    def test_a_control_rejection_quoting_the_controls_name_is_accepted(self):
+        verdict = {**APPLIED, "reason": "The owner states “Control d” for this store."}
+        outcome = _round(_db(_row("V11"))).first([_ruling(**verdict)])
+
+        assert isinstance(outcome, Accepted)
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            "rds.tf says “Every column is encrypted with a KMS key.”",
+            "rds.tf covers it.",
+        ],
+        ids=["an invented quote", "no quote"],
+    )
+    def test_a_control_rejection_that_quotes_no_evidence_is_sent_back(self, reason):
+        problems = _problems(_db(_row("V11")), **{**APPLIED, "reason": reason})
+
+        assert any("quotes neither" in problem for problem in problems)
 
 
 class TestTheRowOutcome:
@@ -588,17 +643,18 @@ def test_the_verdict_and_the_seam_hold_one_row_rule(step, names_a_row):
     control rejection", so each combination is put to both. The verdict is
     built from the ruling the seam completed, as assembly builds it."""
     fields = {
-        "reason": "rds.tf: storage_encrypted = true",
+        "reason": "rds.tf: `storage_encrypted = true`",
         "rejected_because": step,
         "control_row": {"control": DB_CONTROL, "unit": "V11"} if names_a_row else None,
         # The one shown row is answered either way, so only the row rule speaks.
         "refused_controls": [] if names_a_row else [_refused("V11")],
     }
+    [applied] = _applied(_db(_row("V11")))
     seam = review_issues(
         [DRAFT],
         [Ruling(id=DRAFT.id, verdict=ProposedVerdict(**fields))],
         valid_model(),
-        {DRAFT.id: frozenset({ControlRowRef(control=DB_CONTROL, unit="V11")})},
+        {DRAFT.id: {ControlRowRef(control=DB_CONTROL, unit="V11"): applied}},
     )
     [completed] = seam.rulings
     try:

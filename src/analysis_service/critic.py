@@ -62,7 +62,12 @@ from analysis_service.claims import (
 )
 from analysis_service.evidence import ground_gloss
 from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
-from analysis_service.job_controls import AppliedControl, shown_controls
+from analysis_service.job_controls import (
+    AppliedControl,
+    CopiedEvidence,
+    quotes_control,
+    shown_controls,
+)
 from analysis_service.question_kinds import parse_question_kind
 from analysis_service.references import snap
 from analysis_service.sources import quotable
@@ -454,22 +459,24 @@ def _unresolved_unknown_ref_issues(
     return issues
 
 
-#: The rows each draft was shown, by draft ID (:func:`shown_rows`).
-ShownRows = Mapping[str, frozenset[ControlRowRef]]
+#: The rows each draft was shown, each with its Control, by draft ID
+#: (:func:`shown_rows`).
+ShownRows = Mapping[str, Mapping[ControlRowRef, AppliedControl]]
 
 
 def shown_rows(
     drafts: Iterable[Claim],
     package: FrameworkPackage,
     controls: Sequence[AppliedControl],
-) -> dict[str, frozenset[ControlRowRef]]:
-    """Each draft's ID against the Control rows its ``controls`` key shows."""
+) -> dict[str, dict[ControlRowRef, AppliedControl]]:
+    """Each draft's ID against the Control rows its ``controls`` key shows,
+    each with its Control."""
     return {
-        draft.id: frozenset(
-            ControlRowRef(control=control.id, unit=row.unit)
+        draft.id: {
+            ControlRowRef(control=control.id, unit=row.unit): control
             for control in shown_controls(draft, package, controls)
             for row in control.rows
-        )
+        }
         for draft in drafts
     }
 
@@ -505,12 +512,13 @@ def _control_row_issues(
     the control step, kept or rejected for ``control``, answers each shown row
     in ``control_row`` or in ``refused_controls``. A draft rejected at an
     earlier step answers none, and :func:`complete_rulings` drops any row it
-    names.
+    names. A ``control`` rejection's reason quotes the name or a line of the
+    evidence of the Control it names (:func:`quotes_control`).
     """
     issues = []
     for ruling in rulings:
         verdict = ruling.verdict
-        rows = shown.get(ruling.id, frozenset())
+        rows = shown.get(ruling.id, {})
         messages = []
         if verdict.rejected_because == "control" and verdict.control_row is None:
             messages.append(
@@ -532,12 +540,27 @@ def _control_row_issues(
             for ref in named
             if ref not in rows
         ]
+        applied = verdict.control_row and rows.get(
+            ControlRowRef(
+                control=verdict.control_row.control, unit=verdict.control_row.unit
+            )
+        )
+        if (
+            verdict.rejected_because == "control"
+            and applied
+            and not quotes_control(verdict.reason, applied)
+        ):
+            messages.append(
+                f"is rejected for control and its reason quotes neither the name"
+                f" nor a line of the evidence of {applied.id}: quote the sentence"
+                " that covers the draft, with the document's label"
+            )
         if _reaches_control_step(verdict):
             messages += [
                 f"leaves the row {ref.unit} of {ref.control} unanswered: answer it"
                 " in control_row or in refused_controls"
                 for ref in sorted(
-                    rows - set(named), key=lambda ref: (ref.control, ref.unit)
+                    rows.keys() - set(named), key=lambda ref: (ref.control, ref.unit)
                 )
             ]
         issues += [
@@ -721,8 +744,8 @@ def review_issues(
     listed here has to be one the re-ask can actually fix, and a draft's bad
     reference never was.
 
-    ``shown`` is the Control rows each draft was shown (:func:`shown_rows`),
-    which the rulings answer.
+    ``shown`` is the Control rows each draft was shown, each with its Control
+    (:func:`shown_rows`), which the rulings answer.
     """
     rulings = complete_rulings(drafts, rulings)
     drafted_ids = {draft.id for draft in drafts}
@@ -993,6 +1016,7 @@ def _ruling_view(
             {"index": bad.index, "reason": bad.reason}
         )
     views = []
+    excerpted: set[str] = set()
     for draft in drafts:
         view = draft.model_dump(
             mode="json",
@@ -1032,15 +1056,25 @@ def _ruling_view(
         if text := type(draft).unit_text(draft):
             view["unit_text"] = text
         # Computed: each applied Control that reaches this draft, with the rows
-        # on its unit and the service's copy of each evidence file (ADR 0126).
+        # on its unit and the service's copy of each evidence file. The copy's
+        # text rides on the first draft that shows the file (ADR 0126).
         if shown := shown_controls(draft, package, controls):
-            view["controls"] = [_control_entry(control, package) for control in shown]
+            view["controls"] = [
+                _control_entry(control, package, excerpted) for control in shown
+            ]
         views.append(view)
     return views
 
 
-def _control_entry(control: AppliedControl, package: FrameworkPackage) -> dict:
-    """One applied Control as a draft's ``controls`` key shows it."""
+def _control_entry(
+    control: AppliedControl, package: FrameworkPackage, excerpted: set[str]
+) -> dict:
+    """One applied Control as a draft's ``controls`` key shows it.
+
+    ``excerpted`` holds the digest of each file an earlier draft of the view
+    carries the text of. A file in it is named by its digest alone, so one
+    view holds each text once; this adds the rest to it.
+    """
     return {
         "control": control.id,
         "name": control.name,
@@ -1052,16 +1086,18 @@ def _control_entry(control: AppliedControl, package: FrameworkPackage) -> dict:
             {"unit": row.unit, "label": package.record.text_of_unit(row.unit)}
             for row in control.rows
         ],
-        "evidence": [
-            {
-                "label": file.name,
-                "class": file.evidence_class,
-                "sha256": file.sha256,
-                "excerpt": file.text,
-            }
-            for file in control.evidence
-        ],
+        "evidence": [_evidence_entry(file, excerpted) for file in control.evidence],
     }
+
+
+def _evidence_entry(file: CopiedEvidence, excerpted: set[str]) -> dict:
+    """One evidence file of a ``controls`` entry, with its text where no
+    earlier draft of the view carries it."""
+    entry = {"label": file.name, "class": file.evidence_class, "sha256": file.sha256}
+    if file.sha256 not in excerpted:
+        excerpted.add(file.sha256)
+        entry["excerpt"] = file.text
+    return entry
 
 
 def _assertion_rows(draft: Claim, assertions: AssertionCatalog | None) -> list[dict]:
