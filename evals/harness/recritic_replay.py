@@ -13,7 +13,7 @@ one fault of one shape (:data:`FaultShape`) on one draft:
 * ``row-on-other-step`` — the shown row sits in ``control_row`` on a ruling
   that is not rejected for ``control``;
 * ``control-row-missing`` and ``control-row-not-shown`` — the draft's ruling is
-  rejected for ``control`` on its shown row, and then names no
+  rejected for ``control`` on its first shown row, and then names no
   ``control_row``, or also refuses a row the draft was not shown;
 * ``dropped`` — the draft has no ruling;
 * ``invented`` — a copy of the draft's ruling stands under an ID no lane
@@ -113,7 +113,8 @@ FaultShape = Literal[
 
 #: The problems the round's check must name for each shape, in its order, each
 #: on the faulted ID. One fault can give two sentences: a ``control`` rejection
-#: with no ``control_row`` names no row and leaves its one shown row unanswered.
+#: with no ``control_row`` names no row and leaves the row it was rejected on
+#: unanswered.
 PROBLEMS_BY_SHAPE: Mapping[FaultShape, tuple[UnreconciledKind, ...]] = MappingProxyType(
     {
         "row-unanswered": ("control-row",),
@@ -213,15 +214,23 @@ def _rejected_for_control(ruling: Ruling, faults: FaultSet) -> Ruling:
         raise EvalRunError(
             f"the fault set's control_reasons give no reason for {ruling.id}"
         )
-    first, *rest = faults.refused[ruling.id]
-    return _with(
+    return _first_refusal_as_control_row(
         ruling,
+        faults.refused[ruling.id],
         rejected_because="control",
         reason=reason,
         related_unknowns=[],
-        control_row=ControlRowRef(control=first.control, unit=first.unit),
-        refused_controls=rest,
     )
+
+
+def _first_refusal_as_control_row(
+    ruling: Ruling, refused: list[RefusedControl], **fields: Any
+) -> Ruling:
+    """``ruling`` with the first of ``refused`` as its ``control_row``, the rest
+    refused, and ``fields``."""
+    first, *rest = refused
+    row = ControlRowRef(control=first.control, unit=first.unit)
+    return _with(ruling, control_row=row, refused_controls=rest, **fields)
 
 
 def _unshown_row(
@@ -292,8 +301,7 @@ def inject(
         extra = _unshown_row(faults, shown, draft_id)
         changed = [_with(ruling, refused_controls=[*refused, extra])]
     elif shape == "row-on-other-step":
-        row = ControlRowRef(control=refused[0].control, unit=refused[0].unit)
-        changed = [_with(ruling, control_row=row, refused_controls=refused[1:])]
+        changed = [_first_refusal_as_control_row(ruling, refused)]
     elif shape == "control-row-missing":
         changed = [_with(ruling, control_row=None)]
     elif shape == "dropped":

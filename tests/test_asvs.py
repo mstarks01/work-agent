@@ -1186,8 +1186,6 @@ class TestThisPackageCarriesNoActionVerb:
 
 def test_the_unit_of_a_draft_is_its_requirement():
     """The fan-in refuses a draft on a ruled-out unit through this hook (#443)."""
-    from analysis_service.frameworks.asvs.record import DraftRequirementRuling
-
     assert DraftRequirementRuling.unit_of(asvs_draft()) == "V6.2.1"
 
 
