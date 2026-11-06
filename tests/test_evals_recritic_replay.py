@@ -93,8 +93,7 @@ def archived(recorded, case):  # noqa: F811
 
 @pytest.fixture
 def open_facts(monkeypatch, archived):
-    """Every archived ruling also names one open fact, an element's attribute,
-    and a reason.
+    """Give every archived ruling one open fact and a reason.
 
     The scripted sweep confirms each draft with no reason, and a
     ``verdict-shape`` or an ``unresolved-unknown`` fault needs a ruling that

@@ -45,7 +45,13 @@ from analysis_service.job_controls import (
 )
 from analysis_service.sources import text_digest
 from analysis_service.system_model import SystemModel
-from tests.factories import sample_analysis, sample_draft, sample_threat, valid_model
+from tests.factories import (
+    asvs_draft,
+    sample_analysis,
+    sample_draft,
+    sample_threat,
+    valid_model,
+)
 
 DB_CONTROL = "control-" + "d" * 32
 APP_CONTROL = "control-" + "a" * 32
@@ -102,22 +108,10 @@ def _applied(*copies: CopiedControl, model: SystemModel | None = None):
 def _asvs_draft(requirement: str, *elements: str) -> DraftRequirementRuling:
     chapter, section, item = requirement.removeprefix("V").split(".")
     lane = {"11": "cryptography", "6": "authentication"}[chapter]
-    return DraftRequirementRuling.model_validate(
-        {
-            **sample_draft("S-01").model_dump(
-                exclude={
-                    "category",
-                    "verb",
-                    "attacker_position",
-                    "severity",
-                    "mitigations",
-                    "affected_element_ids",
-                }
-            ),
-            "id": f"v5.0.0-{chapter}.{section}.{item}",
-            "chapter": lane,
-            "affected_element_ids": list(elements),
-        }
+    return asvs_draft(
+        id=f"v5.0.0-{chapter}.{section}.{item}",
+        chapter=lane,
+        affected_element_ids=list(elements),
     )
 
 

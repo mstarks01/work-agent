@@ -93,10 +93,9 @@ from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, refuse_holdout
 from evals.harness.run_record import loaded, run_record_for
 
-#: One fault each. The first five put a Control row fault on a ruling: three on
-#: a ruling not rejected for ``control``, and two on a ruling rejected for
-#: ``control``. The other six are the other kinds of problem the round's check
-#: names.
+#: One fault each. The shapes in :data:`ROW_SHAPES` put a Control row fault on
+#: a ruling, either rejected for ``control`` or not. The others are the other
+#: kinds of problem the round's check names.
 FaultShape = Literal[
     "row-unanswered",
     "row-not-shown",
@@ -210,7 +209,9 @@ def _rejected_for_control(ruling: Ruling, faults: FaultSet) -> Ruling:
     """``ruling`` rejected for ``control`` on the first row it refuses."""
     reason = faults.control_reasons.get(ruling.id)
     if reason is None:
-        raise EvalRunError(f"the fault set gives no reason {ruling.id} is covered")
+        raise EvalRunError(
+            f"the fault set's control_reasons give no reason for {ruling.id}"
+        )
     first, *rest = faults.refused[ruling.id]
     return _with(
         ruling,
@@ -239,7 +240,9 @@ def _unshown_row(
     )
 
 
-def _foreign_attribute(ruling: Ruling, model: SystemModel) -> list[UnknownRef]:
+def _unknowns_with_a_foreign_attribute(
+    ruling: Ruling, model: SystemModel
+) -> list[UnknownRef]:
     """The ruling's open facts, the first on an element given an attribute it lacks.
 
     The attribute is the first of every element type's attributes that this
@@ -251,7 +254,11 @@ def _foreign_attribute(ruling: Ruling, model: SystemModel) -> list[UnknownRef]:
         element = by_id.get(ref.element_id)
         if element is not None and ref.attribute:
             own = attribute_names(element)
-            foreign = next(name for name in all_attribute_names() if name not in own)
+            foreign = next(
+                (name for name in all_attribute_names() if name not in own), None
+            )
+            if foreign is None:
+                raise EvalRunError(f"element {element.id} has every attribute")
             unknowns[index] = ref.model_copy(update={"attribute": foreign})
             return unknowns
     raise EvalRunError(f"{ruling.id} names no attribute of an element")
@@ -301,6 +308,8 @@ def inject(
     elif shape == "duplicate-id":
         changed = [ruling, ruling]
     elif shape == "verdict-shape":
+        if not ruling.verdict.related_unknowns:
+            raise EvalRunError(f"{draft_id} names no open fact")
         changed = [_with(ruling, rejected_because="reasoning")]
     elif shape == "confirmed-ruled-out":
         draft = next(draft for draft in archived.drafts if draft.id == draft_id)
@@ -308,7 +317,7 @@ def inject(
             raise EvalRunError(f"{draft_id} does not rule its unit out")
         changed = [_with(ruling, rejected_because=None, related_unknowns=[])]
     elif shape == "unresolved-unknown":
-        unknowns = _foreign_attribute(ruling, archived.model)
+        unknowns = _unknowns_with_a_foreign_attribute(ruling, archived.model)
         changed = [_with(ruling, related_unknowns=unknowns)]
     else:
         assert_never(shape)
