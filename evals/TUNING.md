@@ -397,7 +397,7 @@ them the way you read critic yield — as a pair:
 | Metric | What a good change does | Trap |
 | --- | --- | --- |
 | **`rejected_rate`** (per case) | falls, or holds | A style down-vote is not this number. `poorly-written` leaves the finding in the pool, so a config that writes worse cannot flatter this one. |
-| **`pooled`** against **`unvoted`** | `pooled` rises while `unvoted` falls | `rejected_rate` reads 0.0 over a cold ledger. A low number beside a large `unvoted` count means nobody has looked, not that the tool is right. |
+| **`pooled`** against **`unvoted`** and **`stale`** | `pooled` rises while `unvoted` and `stale` fall | `rejected_rate` reads 0.0 over a cold ledger. A low number beside a large `unvoted` or `stale` count means nobody has looked at this argument, not that the tool is right. |
 | **`writing_aggregate.objection_rate`** | falls, or holds | Where a style objection lands, and the only number it moves. It is a rate over the findings people answered, so read `answered` beside it. |
 
 The votes reach the numbers with no provider call: `score` re-reads the ledger

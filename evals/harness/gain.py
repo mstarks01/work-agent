@@ -13,8 +13,8 @@ Three gates answer that. By default each reads the development cases only
   standard deviation of the repeat spread. This half works offline, and it is
   what a flooded run fails first.
 * ``reviewed`` — every unmatched finding of the candidate is answered by a
-  vote. A finding nobody judged cannot count for or against the gain, so the
-  gain waits for the votes.
+  live vote. A finding nobody judged cannot count for or against the gain, and
+  a stale vote judged an earlier argument, so the gain waits for the votes.
 * ``rejected-rate`` — the share of findings a person rejected may not rise by
   more than one standard deviation of the spread.
 
@@ -275,7 +275,7 @@ GATES: Mapping[GainGateName, GainGate] = MappingProxyType(
             limit=1.0,
         ),
         "reviewed": GainGate(
-            question="is every unmatched finding of the candidate answered?",
+            question="does a live vote answer every unmatched finding of the candidate?",
             unit="count",
             limit=0.0,
         ),

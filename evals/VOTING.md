@@ -190,8 +190,8 @@ style reason. The denominator is answers rather than findings, so a sweep that
 writes more findings cannot read as better written. `by_reason` says which
 objection people made most.
 
-Over a cold ledger `rejected_rate` reads `0.0`, beside an `unvoted` count that
-says how much of the answer still waits on a person. Read the pair. A `0.0`
+Over a cold ledger `rejected_rate` reads `0.0`, beside the `unvoted` and
+`stale` counts, which say how much of the answer still waits on a person. Read the pair. A `0.0`
 with 412 unvoted findings means nobody has looked yet, not that the tool
 produced nothing wrong.
 

@@ -2138,6 +2138,10 @@ ONE_READERS: dict[str, _OneReader] = {
                 "counts the findings nobody voted on at all, which the review"
                 " prompt asks for, and claims nothing about what was answered"
             ),
+            ("evals/harness/scorer.py", "stale_count"): (
+                "counts the findings whose votes judged an earlier argument, which"
+                " a sweep prints beside the unvoted count, and claims no total"
+            ),
         },
         "evals/",
     ),

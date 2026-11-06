@@ -355,8 +355,8 @@ class CaseScore:
 
         Human-confirmed only: the numerator is findings a person voted down
         for substance. An unvoted finding cannot raise it, so a sweep over a
-        cold ledger reads 0.0 — beside an ``unvoted`` count that says how much
-        of the answer is still waiting on a sitting.
+        cold ledger reads 0.0 — beside the ``unvoted`` and ``stale`` counts,
+        which say how much of the answer is still waiting on a sitting.
 
         **It is not a false-positive rate, and the denominator is why.** It
         divides by every produced finding, while the numerator can only come
@@ -381,8 +381,16 @@ class CaseScore:
 
     @property
     def unvoted_count(self) -> int:
-        """How much of the unlisted set no person has answered yet."""
+        """How much of the unlisted set nobody voted on at all.
+
+        A ``stale`` finding is unanswered too: see :attr:`stale_count`.
+        """
         return self.status_counts["unvoted"]
+
+    @property
+    def stale_count(self) -> int:
+        """How much of the unlisted set has votes only on an earlier argument."""
+        return self.status_counts["stale"]
 
     @property
     def severity_exact_rate(self) -> float:
@@ -769,7 +777,7 @@ def _find_lane_errors(
             rationale=rationales[reference_index, position],
         )
         for reference_index, position in sorted(
-            assignment.items(), key=lambda pair: pair[1]
+            assignment.items(), key=lambda pair: produced[pair[1]].id
         )
     )
 
@@ -983,6 +991,7 @@ def render(scores: Sequence[CaseScore]) -> None:
             f"  element {score.element_agreement:.2f}"
             f"  rejected {score.rejected_rate:.2f}"
             f"  unvoted {score.unvoted_count}"
+            f"  stale {score.stale_count}"
             + (f"  foreign {len(score.foreign)}" if score.foreign else "")
         )
     if scores:

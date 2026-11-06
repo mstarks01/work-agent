@@ -1175,10 +1175,12 @@ def command_run(args: argparse.Namespace) -> int:
     if mode_run.runs:
         by_series = _scored_sweep(sweep, ran, mode_run.runs, votes, table)
         sweep = by_series[standings.PRIMARY]
-        unvoted = sum(score.unvoted_count for score in sweep.scores)
-        if unvoted:
+        unanswered = sum(
+            score.unvoted_count + score.stale_count for score in sweep.scores
+        )
+        if unanswered:
             print(
-                f"{unvoted} unlisted finding(s) have no vote; run"
+                f"{unanswered} unlisted finding(s) have no live vote; run"
                 " `python -m evals.harness.run review <artifact> --voter <you>`"
                 " to see them"
             )
