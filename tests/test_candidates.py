@@ -407,14 +407,13 @@ class TestFiring:
         assert hits[0].facts["source_zone_kind"] == "tenant"
         assert hits[0].facts["destination_zone_kind"] == "tenant"
 
-    def test_an_undecidable_crossing_raises_a_lead_and_not_a_transition(self, model):
-        """ADR 0039 rules 3 and 4, in the one place they differ.
+    def test_an_unplaced_privilege_zone_raises_no_lead(self, model):
+        """ADR 0039 rules 3 and 4, where the zone the rule names has no kind.
 
         A rule whose premise is the crossing fires on an undecidable one and
         says so, because the flow is still eligible for analysis. The privilege
-        rule's premise is what the two zones *are*, and an unplaced endpoint has
-        no kind to read — firing there would assert the authority change an
-        undecidable crossing cannot establish.
+        rule reads the kind of the zone it names, and an unplaced destination
+        has none.
         """
         for element in model.zoned_elements():
             if element.id == "process:admin":
@@ -428,6 +427,36 @@ class TestFiring:
         assert all(hit.facts["crossing_decided"] is True for hit in privilege), (
             "no privilege transition rests on a zone nobody stated"
         )
+
+    def test_an_unplaced_source_entering_a_privilege_zone_raises_a_lead(self, model):
+        """ADR 0128: the destination's kind is stated, so the flow is a lead.
+
+        The crossing stays undecided in the facts, so the lead confers
+        eligibility for analysis and no transition (ADR 0039 rule 4).
+        """
+        for element in model.zoned_elements():
+            if element.id == "process:api":
+                element.trust_zone = UNKNOWN
+
+        (hit,) = fired(model, "elevation-of-privilege-privilege-zone-crossing")
+
+        assert hit.element_ids == (
+            "flow:process:api>process:admin>escalate",
+            "boundary:privileged",
+        )
+        assert hit.facts["direction"] == "into"
+        assert hit.facts["destination_zone_kind"] == "privilege"
+        assert hit.facts["source_zone_kind"] == ""
+        assert hit.facts["crossing_decided"] is False
+
+    def test_leaving_a_tenant_zone_for_an_unplaced_destination_raises_no_lead(self):
+        """The destination may sit in the same tenant zone, so nothing is left."""
+        model = zoned_pair("tenant", "network")
+        for element in model.zoned_elements():
+            if element.id == "process:ours":
+                element.trust_zone = UNKNOWN
+
+        assert fired(model, "elevation-of-privilege-privilege-zone-crossing") == []
 
     def test_exposed_process_authority_needs_a_crossing(self, model):
         hits = fired(model, "elevation-of-privilege-inbound-from-exposed-process")

@@ -124,11 +124,12 @@ charged against the reference's own `unknown` as a wrong claim. It now needs
 none.
 
 **One reading this decision did not spell out.** Rule 3 says a rule keyed on a
-crossing fires on an undecidable one. Four of the five crossing-keyed rules do.
-The fifth, STRIDE's privilege-zone transition, does not: its premise is what the
-two zones *are*, and an unplaced endpoint has no kind to read, so firing there
-would assert the authority change rule 4 says an undecidable crossing cannot
-establish. The rule skips it and says why.
+crossing fires on an undecidable one. STRIDE's privilege-zone transition reads
+the kind of the zone it names, so it fires where that zone is placed: a flow
+into a placed privilege or tenant zone fires when no source places the other
+endpoint, and a flow out of a tenant zone fires only on a decided crossing.
+[ADR 0128](0128-an-unplaced-source-entering-a-privilege-zone-is-a-lead.md)
+states the rule.
 
 ## Where rule 4 is written down
 
