@@ -31,6 +31,7 @@ from analysis_service.frameworks.asvs.record import (
     RequirementProposals,
 )
 from analysis_service.job_controls import (
+    MIN_PART_WORDS,
     AppliedControl,
     ControlFact,
     ControlFacts,
@@ -53,6 +54,7 @@ from tests.factories import (
     sample_threat,
     valid_model,
 )
+from tests.source_tree import REPO_ROOT
 
 DB_CONTROL = "control-" + "d" * 32
 APP_CONTROL = "control-" + "a" * 32
@@ -113,6 +115,15 @@ def _asvs_draft(requirement: str, *elements: str) -> DraftRequirementRuling:
         id=f"v5.0.0-{chapter}.{section}.{item}",
         chapter=lane,
         affected_element_ids=list(elements),
+    )
+
+
+def _with_evidence(line: str) -> AppliedControl:
+    """The Orders DB Control, applied, with ``line`` as its one evidence line."""
+    [control] = _applied(_db(_row("V11")))
+    [file] = control.evidence
+    return control.model_copy(
+        update={"evidence": [file.model_copy(update={"text": f"{line}\n"})]}
     )
 
 
@@ -401,13 +412,27 @@ class TestTheReviewSeam:
         ids=["a line with straight quotes", "a line with aligned spaces"],
     )
     def test_a_whole_line_quotes_the_control(self, line, reason):
-        [control] = _applied(_db(_row("V11")))
-        [file] = control.evidence
-        control = control.model_copy(
-            update={"evidence": [file.model_copy(update={"text": f"{line}\n"})]}
-        )
+        assert quotes_control(reason, _with_evidence(line))
 
-        assert quotes_control(reason, control)
+    def test_a_sentence_of_a_long_line_quotes_the_control(self):
+        line = (
+            "The security team reviews each release. Each order change writes an"
+            " append-only audit event with the caller's identity."
+        )
+        reason = 'policy.md: "Each order change writes an append-only audit event"'
+
+        assert quotes_control(reason, _with_evidence(line))
+
+    def test_a_short_part_of_a_line_does_not_quote_the_control(self):
+        reason = 'rds.tf: "= true"'
+
+        assert not quotes_control(reason, _with_evidence("storage_encrypted = true"))
+
+    def test_the_prompt_states_the_fewest_words_of_a_part(self):
+        words = {5: "five"}[MIN_PART_WORDS]
+        step = " ".join((REPO_ROOT / "prompts" / "critic.md").read_text().split())
+
+        assert f"or at least {words} words of it" in step
 
     @pytest.mark.parametrize(
         "reason",

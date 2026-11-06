@@ -1010,16 +1010,27 @@ _QUOTATION = re.compile(r"“([^”]+)”|\"([^\"]+)\"|‘(.+?)’(?!\w)|`([^`]+
 
 
 #: The widest straight-quoted span on one line of a reason, so a quotation of
-#: a line that itself holds a straight double quote is read whole.
+#: a line that itself holds a straight double quote is read whole. On a line
+#: with two quotations it also spans the text between them, which quotes a
+#: line only where :func:`_quotes` admits it.
 _WIDEST_STRAIGHT_QUOTATION = re.compile(r'"(.+)"')
 
 
+#: The fewest words a quotation holds to quote part of a line: a phrase of a
+#: long line, such as one sentence of a paragraph, and not a word or a value.
+MIN_PART_WORDS = 5
+
+
 def _quotes(line: str, quotation: str) -> bool:
-    """Whether ``quotation`` quotes ``line``: the shorter of the two stands in
-    the longer, and is at least three quarters as long, where each run of
-    spaces counts as one space."""
-    short, long = sorted((" ".join(line.split()), " ".join(quotation.split())), key=len)
-    return short in long and 4 * len(short) >= 3 * len(long)
+    """Whether ``quotation`` quotes ``line``, where each run of spaces counts
+    as one space: the shorter of the two stands in the longer and is at least
+    three quarters as long, or the quotation stands in the line and holds at
+    least :data:`MIN_PART_WORDS` words."""
+    line, quotation = " ".join(line.split()), " ".join(quotation.split())
+    short, long = sorted((line, quotation), key=len)
+    whole = short in long and 4 * len(short) >= 3 * len(long)
+    part = quotation in line and len(quotation.split()) >= MIN_PART_WORDS
+    return whole or part
 
 
 def _quotations(reason: str) -> list[str]:
