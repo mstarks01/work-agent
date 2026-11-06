@@ -36,6 +36,9 @@ for artifact in sys.argv[3:]:
     extracted = extractions_from_reports(load_artifact(Path(artifact)), [case])[
         case.id
     ].extracted
+    if extracted is None:
+        print("  ", Path(artifact).name, "no model")
+        continue
     produced = align(case, extracted).produced_of
     print(
         "  ",
