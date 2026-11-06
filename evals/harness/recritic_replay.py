@@ -172,7 +172,7 @@ class FaultView:
 
     draft_id: str
     #: The ID the fault names: ``draft_id``, or the invented ID.
-    faulted: str
+    faulted_id: str
     critic_round: CriticRound
     #: The first pass before the fault, accepted and assembled.
     clean: Accepted
@@ -286,7 +286,7 @@ def inject(
     refused = list(ruling.verdict.refused_controls)
     if shape == "row-unanswered":
         changed = [_with(ruling, refused_controls=refused[1:])]
-    elif shape == "row-not-shown":
+    elif shape == "row-not-shown" or shape == "control-row-not-shown":
         extra = _unshown_row(faults, shown, draft_id)
         changed = [_with(ruling, refused_controls=[*refused, extra])]
     elif shape == "row-on-other-step":
@@ -294,17 +294,14 @@ def inject(
         changed = [_with(ruling, control_row=row, refused_controls=refused[1:])]
     elif shape == "control-row-missing":
         changed = [_with(ruling, control_row=None)]
-    elif shape == "control-row-not-shown":
-        extra = _unshown_row(faults, shown, draft_id)
-        changed = [_with(ruling, refused_controls=[*refused, extra])]
     elif shape == "dropped":
         changed = []
     elif shape == "invented":
         faulted = f"{draft_id}a"
         if faulted in {draft.id for draft in archived.drafts}:
             raise EvalRunError(f"a lane drafted {faulted}, so it is not invented")
-        copy = _with(ruling, control_row=None, refused_controls=[])
-        changed = [ruling, copy.model_copy(update={"id": faulted})]
+        invented_ruling = _with(ruling, control_row=None, refused_controls=[])
+        changed = [ruling, invented_ruling.model_copy(update={"id": faulted})]
     elif shape == "duplicate-id":
         changed = [ruling, ruling]
     elif shape == "verdict-shape":
@@ -545,12 +542,19 @@ def command_recritic_replay(args: argparse.Namespace) -> int:
     )
     result = asyncio.run(replay(archived, view, call, package_loader, prompt_loader))
     if args.out is not None:
-        payload = {"record": record, "draft": args.draft, "fault": args.fault, **result}
+        payload = {
+            "record": record,
+            "draft": args.draft,
+            "fault": args.fault,
+            "faulted_id": view.faulted_id,
+            **result,
+        }
         args.out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     if result["schema_error"] is not None:
         print(f"the answer was not read: {result['schema_error']}")
     print(
-        f"{args.draft} {args.fault}: {len(result['remaining'])} problems remain,"
+        f"{args.draft} {args.fault} on {view.faulted_id}:"
+        f" {len(result['remaining'])} problems remain,"
         f" {len(result['unbriefed'])} unbriefed changes; status"
         f" {result['status']['answered']} -> {result['status']['repaired']}"
     )

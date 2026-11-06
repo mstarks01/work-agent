@@ -17,7 +17,14 @@ from typing import cast, get_args
 import pytest
 
 from analysis_service import graph
-from analysis_service.claims import ProposedVerdict, RefusedControl, Ruling, UnknownRef
+from analysis_service.claims import (
+    ARCHIVED_UNRECONCILED_KINDS,
+    ProposedVerdict,
+    RefusedControl,
+    Ruling,
+    UnknownRef,
+    UnreconciledKind,
+)
 from analysis_service.critic import review_issues
 from analysis_service.frameworks import PACKAGES
 from analysis_service.markdown_loader import MarkdownLoader
@@ -122,6 +129,13 @@ def test_each_shape_states_its_problems():
     assert set(recritic_replay.EXPECTED) == set(SHAPES) == set(WORDS)
 
 
+def test_the_shapes_cover_each_kind_a_live_check_names():
+    """A kind the check gains needs a shape, or the replay cannot measure it."""
+    named = {kind for kinds in recritic_replay.EXPECTED.values() for kind in kinds}
+    live = set(get_args(UnreconciledKind)) - ARCHIVED_UNRECONCILED_KINDS
+    assert named == live - {"unbriefed-change"}
+
+
 @pytest.mark.parametrize("shape", STRIDE_SHAPES)
 @pytest.mark.usefixtures("open_facts")
 def test_each_fault_gives_its_problems_on_its_draft(archived, shape):
@@ -131,9 +145,9 @@ def test_each_fault_gives_its_problems_on_its_draft(archived, shape):
         view = recritic_replay.fault_view(archived, faults, draft.id, shape)
 
         assert [(each.kind, each.claim_id) for each in view.reask.problems] == [
-            (kind, view.faulted) for kind in recritic_replay.EXPECTED[shape]
+            (kind, view.faulted_id) for kind in recritic_replay.EXPECTED[shape]
         ]
-        assert (view.faulted == draft.id) is (shape != "invented")
+        assert (view.faulted_id == draft.id) is (shape != "invented")
         assert WORDS[shape] in view.reask.problems[0].message
         implicated = [] if shape in {"invented", "duplicate-id"} else [draft.id]
         assert [item["id"] for item in view.reask.unreconciled] == implicated
