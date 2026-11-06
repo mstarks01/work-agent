@@ -1,0 +1,380 @@
+NOT POOLED: 11 sweep(s) share a route, a prompt and a model but carry no rendered_sources block, so nothing records whether they read one input: 20260914T2200Z-extract-preflight-01.json, 20260914T2205Z-extract-sweep.json, 20260914T2230Z-extract-before-r2.json, 20260914T2230Z-extract-before-r3.json, 20260914T2230Z-extract-before-r4.json, 20260914T2230Z-extract-before-r5.json; 20260914T2300Z-extract-after-r1.json, 20260914T2300Z-extract-after-r2.json, 20260914T2300Z-extract-after-r3.json, 20260914T2300Z-extract-after-r4.json, 20260914T2300Z-extract-after-r5.json. Each is its own arm. To pool the sweeps that read one input, name their arm with --arm LABEL=GLOB, where GLOB matches the artifact file names.
+
+== extract@88f0740bd808 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2200Z-extract-preflight-01.json: 1 sweep(s)
+   20260914T2200Z-extract-preflight-01.json @ 116c654f2
+  1 emission(s), 0 refused by today's gate, 2 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                    5       5.0         0        1        0        2        2
+  renamed                  9       9.0         3        1        5        0        0
+  mistyped                 0       0.0         0        0        0        0        0
+  misattached              0       0.0         0        0        0        0        0
+  endpoint_unaligned       0       0.0         0        0        0        0        0
+  omitted                  0       0.0         0        0        0        0        0
+  ambiguous                0       0.0         0        0        0        0        0
+  unresolved               0       0.0         0        0        0        0        0
+  placeholder              0       0.0         0        0        0        0        0
+  renamed by: alias 2, discriminated 3, membership 1, respelled 1, sole 2
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.kind 2, entity.assets 1, flow.assets 5, flow.operations 2, process.assets 2, store.assets 2
+
+== extract@88f0740bd808 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2205Z-extract-sweep.json: 1 sweep(s)
+   20260914T2205Z-extract-sweep.json @ 116c654f2
+  13 emission(s), 0 refused by today's gate, 27 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                  100     100.0        21       18        4       28       29
+  renamed                111     111.0        16       10       76        4        5
+  mistyped                 1       1.0         0        1        0        0        0
+  misattached              0       0.0         0        0        0        0        0
+  endpoint_unaligned       4       4.0         0        0        4        0        0
+  omitted                  3       3.0         0        0        3        0        0
+  ambiguous                0       0.0         0        0        0        0        0
+  unresolved               3       3.0         0        0        2        1        0
+  placeholder              5       5.0         5        0        0        0        0
+  renamed by: alias 20, discriminated 49, label 5, membership 9, respelled 6, sole 22
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.assets 2, boundary.kind 8, entity.assets 9, entity.kind 1, flow.assets 47, flow.authentication 5, flow.encryption_in_transit 3, flow.operations 14, flow.protocol 11, process.assets 24, process.exposure 8, process.interface_kind 6, store.assets 21, store.data_classification 15, store.encryption_at_rest 1
+  targets (top 10 of 11):
+      1  02-iot-fleet-telemetry/flow:entity:fleet-operator>store:telemetry-lake>query-dashboards  (omitted 1)
+      1  08-sso-identity-broker/flow:process:identity-broker>entity:hr-system>nightly-group-pull  (omitted 1)
+      1  09-cookbook-sokify-retail/flow:process:sims>process:fax-gateway>dispatch-note  (endpoint_unaligned 1)
+      1  09-cookbook-sokify-retail/flow:process:sims>store:delivery-address-flat-file>address-write  (endpoint_unaligned 1)
+      1  09-cookbook-sokify-retail/flow:process:web-api>process:sims>order-handover  (endpoint_unaligned 1)
+      1  09-cookbook-sokify-retail/process:sims  (unresolved 1)
+      1  11-sparse-shift-scheduling/entity:payroll-system  (mistyped 1)
+      1  11-sparse-shift-scheduling/flow:entity:payroll-system>store:file-share>collect-payroll-export  (endpoint_unaligned 1)
+      1  13-dispatch-control-plane/flow:entity:duty-engineer>process:corporate-web-host>load-console  (omitted 1)
+      1  13-dispatch-control-plane/flow:process:dispatch-console>process:dispatch-api>dispatch-requests  (unresolved 1)
+
+== extract@88f0740bd808 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2230Z-extract-before-r2.json: 1 sweep(s)
+   20260914T2230Z-extract-before-r2.json @ 116c654f2
+  13 emission(s), 0 refused by today's gate, 30 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                  101     101.0        20       21        3       29       28
+  renamed                108     108.0        15        7       77        3        6
+  mistyped                 0       0.0         0        0        0        0        0
+  misattached              0       0.0         0        0        0        0        0
+  endpoint_unaligned       4       4.0         0        0        4        0        0
+  omitted                  5       5.0         0        1        4        0        0
+  ambiguous                1       1.0         1        0        0        0        0
+  unresolved               2       2.0         0        0        1        1        0
+  placeholder              6       6.0         6        0        0        0        0
+  renamed by: alias 17, discriminated 50, label 1, membership 9, respelled 5, sole 26
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.assets 1, boundary.kind 7, entity.assets 8, entity.kind 1, flow.assets 41, flow.authentication 4, flow.encryption_in_transit 3, flow.operations 16, flow.protocol 13, process.assets 26, process.exposure 2, process.interface_kind 5, store.assets 15, store.data_classification 12, store.encryption_at_rest 1
+  targets (top 10 of 12):
+      1  02-iot-fleet-telemetry/flow:entity:fleet-operator>store:telemetry-lake>query-dashboards  (omitted 1)
+      1  02-iot-fleet-telemetry/flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings  (omitted 1)
+      1  07-cicd-store-deploy/entity:public-package-registry  (omitted 1)
+      1  07-cicd-store-deploy/flow:process:build-runner>entity:public-package-registry>resolve-dependencies  (endpoint_unaligned 1)
+      1  08-sso-identity-broker/flow:process:identity-broker>entity:hr-system>nightly-group-pull  (omitted 1)
+      1  09-cookbook-sokify-retail/boundary:marketing-office  (ambiguous 1)
+      1  09-cookbook-sokify-retail/flow:process:sims>process:fax-gateway>dispatch-note  (endpoint_unaligned 1)
+      1  09-cookbook-sokify-retail/flow:process:sims>store:delivery-address-flat-file>address-write  (endpoint_unaligned 1)
+      1  09-cookbook-sokify-retail/flow:process:web-api>process:sims>order-handover  (endpoint_unaligned 1)
+      1  09-cookbook-sokify-retail/process:sims  (unresolved 1)
+
+== extract@88f0740bd808 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2230Z-extract-before-r3.json: 1 sweep(s)
+   20260914T2230Z-extract-before-r3.json @ 116c654f2
+  11 emission(s), 0 refused by today's gate, 19 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                   96      96.0        17       19        9       25       26
+  renamed                 85      85.0        14        5       61        2        3
+  mistyped                 0       0.0         0        0        0        0        0
+  misattached              1       1.0         0        0        1        0        0
+  endpoint_unaligned       0       0.0         0        0        0        0        0
+  omitted                  4       4.0         0        0        4        0        0
+  ambiguous                0       0.0         0        0        0        0        0
+  unresolved               0       0.0         0        0        0        0        0
+  placeholder              4       4.0         4        0        0        0        0
+  renamed by: alias 15, discriminated 33, label 3, membership 7, respelled 2, sole 25
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.kind 5, entity.assets 8, flow.assets 47, flow.authentication 2, flow.encryption_in_transit 1, flow.operations 17, flow.protocol 12, process.assets 19, process.exposure 4, process.interface_kind 7, store.assets 17, store.data_classification 10
+  targets (top 10 of 5):
+      1  02-iot-fleet-telemetry/flow:entity:fleet-operator>store:telemetry-lake>query-dashboards  (omitted 1)
+      1  02-iot-fleet-telemetry/flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings  (omitted 1)
+      1  06-cookbook-online-game/flow:entity:player>process:game-client>launch-and-play  (omitted 1)
+      1  08-sso-identity-broker/flow:entity:colleague>process:identity-broker>sign-in  (misattached 1)
+      1  08-sso-identity-broker/flow:entity:colleague>process:store-admin-console>change-prices-and-void  (omitted 1)
+
+== extract@88f0740bd808 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2230Z-extract-before-r4.json: 1 sweep(s)
+   20260914T2230Z-extract-before-r4.json @ 116c654f2
+  11 emission(s), 0 refused by today's gate, 16 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                   89      89.0        15       17        6       25       26
+  renamed                 95      95.0        20        7       63        2        3
+  mistyped                 1       1.0         0        0        0        0        1
+  misattached              0       0.0         0        0        0        0        0
+  endpoint_unaligned       3       3.0         0        0        3        0        0
+  omitted                  5       5.0         0        0        4        1        0
+  ambiguous                0       0.0         0        0        0        0        0
+  unresolved               0       0.0         0        0        0        0        0
+  placeholder              1       1.0         1        0        0        0        0
+  renamed by: alias 16, discriminated 40, membership 13, respelled 3, sole 23
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.kind 8, entity.assets 6, flow.assets 37, flow.authentication 3, flow.encryption_in_transit 3, flow.operations 13, flow.protocol 12, process.assets 19, process.exposure 2, process.interface_kind 8, store.assets 16, store.data_classification 11, store.encryption_at_rest 1
+  targets (top 10 of 9):
+      1  02-iot-fleet-telemetry/flow:entity:fleet-operator>store:telemetry-lake>query-dashboards  (omitted 1)
+      1  02-iot-fleet-telemetry/flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings  (omitted 1)
+      1  06-cookbook-online-game/flow:entity:player>process:game-client>launch-and-play  (omitted 1)
+      1  07-cicd-store-deploy/flow:entity:developer>store:git-server>push-branches  (endpoint_unaligned 1)
+      1  07-cicd-store-deploy/flow:process:build-runner>store:git-server>fetch-source  (endpoint_unaligned 1)
+      1  07-cicd-store-deploy/store:git-server  (mistyped 1)
+      1  08-sso-identity-broker/flow:entity:colleague>process:store-admin-console>change-prices-and-void  (omitted 1)
+      1  09-cookbook-sokify-retail/flow:process:catalogue-spreadsheet>process:web-api>sql-statements  (endpoint_unaligned 1)
+      1  09-cookbook-sokify-retail/process:catalogue-spreadsheet  (omitted 1)
+
+== extract@88f0740bd808 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2230Z-extract-before-r5.json: 1 sweep(s)
+   20260914T2230Z-extract-before-r5.json @ 116c654f2
+  13 emission(s), 0 refused by today's gate, 24 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                  113     113.0        21       22       10       30       30
+  renamed                105     105.0        18        7       73        3        4
+  mistyped                 0       0.0         0        0        0        0        0
+  misattached              0       0.0         0        0        0        0        0
+  endpoint_unaligned       0       0.0         0        0        0        0        0
+  omitted                  4       4.0         0        0        4        0        0
+  ambiguous                0       0.0         0        0        0        0        0
+  unresolved               2       2.0         0        0        2        0        0
+  placeholder              3       3.0         3        0        0        0        0
+  renamed by: alias 15, discriminated 50, membership 12, respelled 5, sole 23
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.assets 1, boundary.kind 7, entity.assets 12, flow.assets 56, flow.authentication 4, flow.encryption_in_transit 2, flow.operations 15, flow.protocol 12, process.assets 25, process.exposure 4, process.interface_kind 4, store.assets 24, store.data_classification 14, store.encryption_at_rest 1
+  targets (top 10 of 6):
+      1  02-iot-fleet-telemetry/flow:entity:fleet-operator>store:telemetry-lake>query-dashboards  (omitted 1)
+      1  08-sso-identity-broker/flow:process:identity-broker>entity:hr-system>nightly-group-pull  (omitted 1)
+      1  08-sso-identity-broker/flow:process:store-admin-console>process:identity-broker>fetch-public-key  (omitted 1)
+      1  12-overclaiming-supplier-portal/flow:process:supplier-portal>store:document-store>store-documents  (omitted 1)
+      1  13-dispatch-control-plane/flow:process:dispatch-console>process:dispatch-api>dispatch-requests  (unresolved 1)
+      1  13-dispatch-control-plane/flow:process:dispatch-console>process:dispatch-api>live-job-status  (unresolved 1)
+
+== extract@36699beb0981 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2300Z-extract-after-r1.json: 1 sweep(s)
+   20260914T2300Z-extract-after-r1.json @ 116c654f2 (dirty tree)
+  13 emission(s), 0 refused by today's gate, 29 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                  119     119.0        22       18       20       30       29
+  renamed                 97      97.0        15       11       63        3        5
+  mistyped                 0       0.0         0        0        0        0        0
+  misattached              1       1.0         0        0        1        0        0
+  endpoint_unaligned       0       0.0         0        0        0        0        0
+  omitted                  5       5.0         0        0        5        0        0
+  ambiguous                1       1.0         1        0        0        0        0
+  unresolved               0       0.0         0        0        0        0        0
+  placeholder              4       4.0         4        0        0        0        0
+  renamed by: alias 19, discriminated 36, label 6, membership 9, respelled 7, sole 20
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.assets 1, boundary.kind 7, entity.assets 7, entity.kind 1, flow.assets 53, flow.authentication 5, flow.operations 17, flow.protocol 12, process.assets 26, process.exposure 9, process.interface_kind 5, store.assets 20, store.data_classification 13
+  targets (top 10 of 7):
+      1  02-iot-fleet-telemetry/flow:entity:fleet-operator>store:telemetry-lake>query-dashboards  (omitted 1)
+      1  02-iot-fleet-telemetry/flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings  (misattached 1)
+      1  08-sso-identity-broker/flow:process:identity-broker>entity:hr-system>nightly-group-pull  (omitted 1)
+      1  08-sso-identity-broker/flow:process:identity-broker>store:directory>read-write-directory  (omitted 1)
+      1  09-cookbook-sokify-retail/boundary:marketing-office  (ambiguous 1)
+      1  12-overclaiming-supplier-portal/flow:process:supplier-portal>store:document-store>store-documents  (omitted 1)
+      1  13-dispatch-control-plane/flow:entity:duty-engineer>process:corporate-web-host>load-console  (omitted 1)
+
+== extract@36699beb0981 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2300Z-extract-after-r2.json: 1 sweep(s)
+   20260914T2300Z-extract-after-r2.json @ 116c654f2 (dirty tree)
+  13 emission(s), 0 refused by today's gate, 21 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                  125     125.0        22       23       22       29       29
+  renamed                 89      89.0        17        5       59        3        5
+  mistyped                 1       1.0         0        1        0        0        0
+  misattached              3       3.0         0        0        3        0        0
+  endpoint_unaligned       2       2.0         0        0        2        0        0
+  omitted                  5       5.0         1        0        3        1        0
+  ambiguous                0       0.0         0        0        0        0        0
+  unresolved               0       0.0         0        0        0        0        0
+  placeholder              2       2.0         2        0        0        0        0
+  renamed by: alias 19, discriminated 37, label 3, membership 11, respelled 1, sole 18
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.assets 1, boundary.kind 8, entity.assets 12, entity.kind 1, flow.assets 49, flow.authentication 4, flow.encryption_in_transit 3, flow.operations 14, flow.protocol 15, process.assets 24, process.exposure 4, process.interface_kind 3, store.assets 16, store.data_classification 13, store.encryption_at_rest 2
+  targets (top 10 of 11):
+      1  02-iot-fleet-telemetry/flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings  (misattached 1)
+      1  07-cicd-store-deploy/entity:public-package-registry  (mistyped 1)
+      1  07-cicd-store-deploy/flow:process:build-runner>entity:public-package-registry>resolve-dependencies  (endpoint_unaligned 1)
+      1  07-cicd-store-deploy/flow:process:build-runner>store:git-server>fetch-source  (misattached 1)
+      1  08-sso-identity-broker/flow:process:store-admin-console>process:identity-broker>fetch-public-key  (misattached 1)
+      1  09-cookbook-sokify-retail/boundary:marketing-office  (omitted 1)
+      1  09-cookbook-sokify-retail/flow:process:catalogue-spreadsheet>process:web-api>sql-statements  (endpoint_unaligned 1)
+      1  09-cookbook-sokify-retail/process:catalogue-spreadsheet  (omitted 1)
+      1  10-cookbook-generic-cms/flow:process:web-server>store:mysql-database>cms-data  (omitted 1)
+      1  12-overclaiming-supplier-portal/flow:process:supplier-portal>store:document-store>store-documents  (omitted 1)
+
+== extract@36699beb0981 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2300Z-extract-after-r3.json: 1 sweep(s)
+   20260914T2300Z-extract-after-r3.json @ 116c654f2 (dirty tree)
+  13 emission(s), 0 refused by today's gate, 32 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                  122     122.0        22       21       20       30       29
+  renamed                 93      93.0        18        6       62        3        4
+  mistyped                 2       2.0         0        2        0        0        0
+  misattached              1       1.0         0        0        1        0        0
+  endpoint_unaligned       4       4.0         0        0        4        0        0
+  omitted                  2       2.0         0        0        2        0        0
+  ambiguous                0       0.0         0        0        0        0        0
+  unresolved               1       1.0         0        0        0        0        1
+  placeholder              2       2.0         2        0        0        0        0
+  renamed by: alias 20, discriminated 41, label 2, membership 11, respelled 1, sole 18
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.assets 1, boundary.kind 10, entity.assets 9, entity.kind 1, flow.assets 46, flow.authentication 4, flow.encryption_in_transit 3, flow.operations 17, flow.protocol 12, process.assets 25, process.exposure 4, process.interface_kind 6, store.assets 19, store.data_classification 11, store.encryption_at_rest 1
+  targets (top 10 of 10):
+      1  02-iot-fleet-telemetry/flow:entity:fleet-operator>store:telemetry-lake>query-dashboards  (omitted 1)
+      1  02-iot-fleet-telemetry/flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings  (misattached 1)
+      1  07-cicd-store-deploy/flow:entity:developer>store:git-server>push-branches  (endpoint_unaligned 1)
+      1  07-cicd-store-deploy/flow:process:build-runner>store:git-server>fetch-source  (endpoint_unaligned 1)
+      1  07-cicd-store-deploy/store:git-server  (unresolved 1)
+      1  08-sso-identity-broker/entity:hr-system  (mistyped 1)
+      1  08-sso-identity-broker/flow:process:identity-broker>entity:hr-system>nightly-group-pull  (endpoint_unaligned 1)
+      1  11-sparse-shift-scheduling/entity:payroll-system  (mistyped 1)
+      1  11-sparse-shift-scheduling/flow:entity:payroll-system>store:file-share>collect-payroll-export  (endpoint_unaligned 1)
+      1  13-dispatch-control-plane/flow:entity:duty-engineer>process:dispatch-console>open-console  (omitted 1)
+
+== extract@36699beb0981 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2300Z-extract-after-r4.json: 1 sweep(s)
+   20260914T2300Z-extract-after-r4.json @ 116c654f2 (dirty tree)
+  13 emission(s), 0 refused by today's gate, 25 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                  121     121.0        22       21       21       28       29
+  renamed                 97      97.0        16        8       63        5        5
+  mistyped                 0       0.0         0        0        0        0        0
+  misattached              1       1.0         0        0        1        0        0
+  endpoint_unaligned       0       0.0         0        0        0        0        0
+  omitted                  3       3.0         0        0        3        0        0
+  ambiguous                0       0.0         0        0        0        0        0
+  unresolved               1       1.0         0        0        1        0        0
+  placeholder              4       4.0         4        0        0        0        0
+  renamed by: alias 23, discriminated 38, label 4, membership 9, respelled 3, sole 20
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.assets 2, boundary.kind 8, entity.assets 10, entity.kind 1, flow.assets 51, flow.authentication 4, flow.encryption_in_transit 4, flow.operations 13, flow.protocol 14, process.assets 22, process.exposure 4, process.interface_kind 4, store.assets 17, store.data_classification 9, store.encryption_at_rest 1
+  targets (top 10 of 5):
+      1  02-iot-fleet-telemetry/flow:entity:fleet-operator>store:telemetry-lake>query-dashboards  (omitted 1)
+      1  02-iot-fleet-telemetry/flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings  (misattached 1)
+      1  08-sso-identity-broker/flow:process:identity-broker>entity:hr-system>nightly-group-pull  (omitted 1)
+      1  13-dispatch-control-plane/flow:entity:duty-engineer>process:corporate-web-host>load-console  (omitted 1)
+      1  13-dispatch-control-plane/flow:process:dispatch-console>process:dispatch-api>live-job-status  (unresolved 1)
+
+== extract@36699beb0981 on openrouter/openai/gpt-5.6-luna, only evals/emissions/20260914T2300Z-extract-after-r5.json: 1 sweep(s)
+   20260914T2300Z-extract-after-r5.json @ 116c654f2 (dirty tree)
+  13 emission(s), 0 refused by today's gate, 33 extra element(s) unreviewed
+  fate                 total per sweep  boundary   entity     flow  process    store
+  found                  125     125.0        21       21       22       30       31
+  renamed                 90      90.0        18        6       60        3        3
+  mistyped                 2       2.0         0        2        0        0        0
+  misattached              1       1.0         0        0        1        0        0
+  endpoint_unaligned       2       2.0         0        0        2        0        0
+  omitted                  4       4.0         0        0        4        0        0
+  ambiguous                0       0.0         0        0        0        0        0
+  unresolved               0       0.0         0        0        0        0        0
+  placeholder              3       3.0         3        0        0        0        0
+  renamed by: alias 20, discriminated 36, label 1, membership 11, sole 22
+  spread: sd of the per-sweep count over the 1 sweep(s) that ran every case; a ceiling inside it gets no run
+  found                              -         -        -        -        -        -
+  renamed                            -         -        -        -        -        -
+  mistyped                           -         -        -        -        -        -
+  misattached                        -         -        -        -        -        -
+  endpoint_unaligned                 -         -        -        -        -        -
+  omitted                            -         -        -        -        -        -
+  ambiguous                          -         -        -        -        -        -
+  unresolved                         -         -        -        -        -        -
+  placeholder                        -         -        -        -        -        -
+  wrong facts on paired elements: boundary.assets 1, boundary.kind 9, entity.assets 11, flow.assets 46, flow.authentication 5, flow.encryption_in_transit 2, flow.operations 19, flow.protocol 12, process.assets 23, process.exposure 4, process.interface_kind 4, store.assets 19, store.data_classification 15, store.encryption_at_rest 1
+  targets (top 10 of 9):
+      1  02-iot-fleet-telemetry/flow:entity:fleet-operator>store:telemetry-lake>query-dashboards  (omitted 1)
+      1  02-iot-fleet-telemetry/flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings  (misattached 1)
+      1  08-sso-identity-broker/entity:hr-system  (mistyped 1)
+      1  08-sso-identity-broker/flow:process:identity-broker>entity:hr-system>nightly-group-pull  (endpoint_unaligned 1)
+      1  11-sparse-shift-scheduling/entity:payroll-system  (mistyped 1)
+      1  11-sparse-shift-scheduling/flow:entity:payroll-system>store:file-share>collect-payroll-export  (endpoint_unaligned 1)
+      1  12-overclaiming-supplier-portal/flow:process:supplier-portal>store:document-store>store-documents  (omitted 1)
+      1  13-dispatch-control-plane/flow:entity:duty-engineer>process:corporate-web-host>load-console  (omitted 1)
+      1  13-dispatch-control-plane/flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed  (omitted 1)
+
+replay written to /tmp/claude-1000/-home-me-work-agent/37d623de-836a-47f2-ae96-2f5c8806ea49/scratchpad/qa/replay.json

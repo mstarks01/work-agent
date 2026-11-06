@@ -1,0 +1,15 @@
+01-payments-checkout: facts.json holds 25 rows, 0 unsigned, 0 disputed, 6 alias ruling(s), 0 unsigned, 0 unheld
+02-iot-fleet-telemetry: facts.json holds 22 rows, 0 unsigned, 0 disputed, 0 alias ruling(s), 0 unsigned, 0 unheld
+03-batch-data-pipeline: facts.json holds 21 rows, 0 unsigned, 0 disputed, 0 alias ruling(s), 0 unsigned, 0 unheld
+04-ml-inference-service: facts.json holds 23 rows, 0 unsigned, 0 disputed, 4 alias ruling(s), 0 unsigned, 0 unheld
+05-cookbook-queue-webapp: facts.json holds 16 rows, 0 unsigned, 0 disputed, 0 alias ruling(s), 0 unsigned, 0 unheld
+06-cookbook-online-game: facts.json holds 17 rows, 0 unsigned, 0 disputed, 0 alias ruling(s), 0 unsigned, 0 unheld
+07-cicd-store-deploy: facts.json holds 18 rows, 0 unsigned, 0 disputed, 0 alias ruling(s), 0 unsigned, 0 unheld
+08-sso-identity-broker: facts.json holds 21 rows, 0 unsigned, 0 disputed, 0 alias ruling(s), 0 unsigned, 1 unheld
+09-cookbook-sokify-retail: facts.json holds 17 rows, 0 unsigned, 0 disputed, 0 alias ruling(s), 0 unsigned, 0 unheld
+10-cookbook-generic-cms: facts.json holds 13 rows, 0 unsigned, 1 disputed, 0 alias ruling(s), 0 unsigned, 0 unheld
+11-sparse-shift-scheduling: facts.json holds 24 rows, 0 unsigned, 0 disputed, 5 alias ruling(s), 0 unsigned, 0 unheld
+12-overclaiming-supplier-portal: facts.json holds 11 rows, 0 unsigned, 1 disputed, 0 alias ruling(s), 0 unsigned, 0 unheld
+13-dispatch-control-plane: facts.json holds 24 rows, 0 unsigned, 0 disputed, 3 alias ruling(s), 0 unsigned, 0 unheld
+16-library-lending-interview: facts.json holds 20 rows, 0 unsigned, 0 disputed, 0 alias ruling(s), 0 unsigned, 0 unheld
+16 cases checked, 0 problems
