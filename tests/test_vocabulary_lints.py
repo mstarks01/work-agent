@@ -150,9 +150,9 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the fault shapes on a ruling rejected for control, which is fewer than"
         " the shapes that exist"
     ),
-    ("evals.harness.recritic_replay", "ROW_SHAPES"): (
-        "the fault shapes that move a shown Control row, which is fewer than"
-        " the shapes that exist"
+    ("evals.harness.recritic_replay", "NEEDS_A_REFUSED_ROW"): (
+        "the fault shapes that need a draft shown a row it refuses, which is"
+        " fewer than the shapes that exist"
     ),
     ("analysis_service.sources", "KIND_FORMATS"): (
         "the kinds that an upload allows, so a kind that only the page or the"

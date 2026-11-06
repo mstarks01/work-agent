@@ -26,7 +26,7 @@ one fault of one shape (:data:`FaultShape`) on one draft:
 * ``unresolved-unknown`` — an open fact names an attribute its element does
   not have.
 
-The round's own check must name exactly the problems :data:`EXPECTED` gives
+The round's own check must name exactly the problems :data:`PROBLEMS_BY_SHAPE` gives
 the shape, or the command refuses the view before the call. The re-ask request
 is :func:`~analysis_service.critic_round.recritic_request` over the round's
 :class:`~analysis_service.critic_round.Reask`, and the answer is merged and
@@ -93,7 +93,7 @@ from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, refuse_holdout
 from evals.harness.run_record import loaded, run_record_for
 
-#: One fault each. The shapes in :data:`ROW_SHAPES` put a Control row fault on
+#: One fault each. The shapes in :data:`NEEDS_A_REFUSED_ROW` put a Control row fault on
 #: a ruling, either rejected for ``control`` or not. The others are the other
 #: kinds of problem the round's check names.
 FaultShape = Literal[
@@ -113,7 +113,7 @@ FaultShape = Literal[
 #: The problems the round's check must name for each shape, in its order, each
 #: on the faulted ID. One fault can give two sentences: a ``control`` rejection
 #: with no ``control_row`` names no row and leaves its one shown row unanswered.
-EXPECTED: Mapping[FaultShape, tuple[UnreconciledKind, ...]] = MappingProxyType(
+PROBLEMS_BY_SHAPE: Mapping[FaultShape, tuple[UnreconciledKind, ...]] = MappingProxyType(
     {
         "row-unanswered": ("control-row",),
         "row-not-shown": ("control-row",),
@@ -134,8 +134,8 @@ ON_A_CONTROL_REJECTION: frozenset[FaultShape] = frozenset(
     {"control-row-missing", "control-row-not-shown"}
 )
 
-#: The shapes that move a row the draft was shown, so the draft needs one.
-ROW_SHAPES: frozenset[FaultShape] = ON_A_CONTROL_REJECTION | {
+#: The shapes that need a draft shown a row whose ruling refuses it.
+NEEDS_A_REFUSED_ROW: frozenset[FaultShape] = ON_A_CONTROL_REJECTION | {
     "row-unanswered",
     "row-not-shown",
     "row-on-other-step",
@@ -327,8 +327,8 @@ def fault_view(
     """The re-ask one injected fault routes to, or a refusal.
 
     Refused where the first pass before the fault does not reconcile, where a
-    shape in :data:`ROW_SHAPES` meets a draft shown no row or refusing none,
-    or where the check names anything but the problems :data:`EXPECTED` gives
+    shape in :data:`NEEDS_A_REFUSED_ROW` meets a draft shown no row or refusing none,
+    or where the check names anything but the problems :data:`PROBLEMS_BY_SHAPE` gives
     the shape, on the faulted ID.
     """
     if draft_id not in {draft.id for draft in archived.drafts}:
@@ -336,7 +336,7 @@ def fault_view(
     critic_round = round_of(archived, [faults.control])
     rulings = answered_first_pass(archived, faults)
     shown = critic_round.shown().get(draft_id, frozenset())
-    if shape in ROW_SHAPES:
+    if shape in NEEDS_A_REFUSED_ROW:
         if not shown:
             raise EvalRunError(f"{draft_id} was shown no row of {faults.control.id}")
         if not faults.refused.get(draft_id):
@@ -357,10 +357,10 @@ def fault_view(
     if isinstance(outcome, Accepted):
         raise EvalRunError(f"the {shape} fault on {draft_id} gives no problem")
     named = [(problem.kind, problem.claim_id) for problem in outcome.problems]
-    if named != [(kind, faulted) for kind in EXPECTED[shape]]:
+    if named != [(kind, faulted) for kind in PROBLEMS_BY_SHAPE[shape]]:
         raise EvalRunError(
             f"the {shape} fault on {draft_id} does not give the"
-            f" {', '.join(EXPECTED[shape])} problems on {faulted}: {outcome.messages}"
+            f" {', '.join(PROBLEMS_BY_SHAPE[shape])} problems on {faulted}: {outcome.messages}"
         )
     return FaultView(draft_id, faulted, critic_round, clean, outcome)
 

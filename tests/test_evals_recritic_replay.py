@@ -1,7 +1,7 @@
 """The re-ask replay injects one fault and rebuilds the re-ask.
 
 Two claims are tested offline. The round's check names exactly the injected
-fault, the problems ``EXPECTED`` gives the shape on the faulted ID, for each
+fault, the problems ``PROBLEMS_BY_SHAPE`` gives the shape on the faulted ID, for each
 shape. And the re-ask request rebuilt from an archive equals the one a scripted
 graph run sent, instruction and user turn, byte for byte.
 """
@@ -92,6 +92,15 @@ def faults_for(archived, refused_by=None) -> recritic_replay.FaultSet:
     )
 
 
+def sent_and_rebuilt(seen, archived, reask):
+    """The user turns a node sent with the rebuilt re-ask instruction, or None,
+    and the rebuilt user turn."""
+    instruction, turn = asyncio.run(
+        recritic_replay.compose(archived, reask, PACKAGE_LOADER, PROMPT_LOADER)
+    )
+    return dict(seen).get(instruction), turn
+
+
 @pytest.fixture
 def archived(recorded, case):  # noqa: F811
     out, _ = recorded
@@ -126,12 +135,14 @@ def open_facts(monkeypatch, archived):
 
 
 def test_each_shape_states_its_problems():
-    assert set(recritic_replay.EXPECTED) == set(SHAPES) == set(WORDS)
+    assert set(recritic_replay.PROBLEMS_BY_SHAPE) == set(SHAPES) == set(WORDS)
 
 
 def test_the_shapes_cover_each_kind_a_live_check_names():
     """A kind the check gains needs a shape, or the replay cannot measure it."""
-    named = {kind for kinds in recritic_replay.EXPECTED.values() for kind in kinds}
+    named = {
+        kind for kinds in recritic_replay.PROBLEMS_BY_SHAPE.values() for kind in kinds
+    }
     live = set(get_args(UnreconciledKind)) - ARCHIVED_UNRECONCILED_KINDS
     assert named == live - {"unbriefed-change"}
 
@@ -145,7 +156,7 @@ def test_each_fault_gives_its_problems_on_its_draft(archived, shape):
         view = recritic_replay.fault_view(archived, faults, draft.id, shape)
 
         assert [(each.kind, each.claim_id) for each in view.reask.problems] == [
-            (kind, view.faulted_id) for kind in recritic_replay.EXPECTED[shape]
+            (kind, view.faulted_id) for kind in recritic_replay.PROBLEMS_BY_SHAPE[shape]
         ]
         assert (view.faulted_id == draft.id) is (shape != "invented")
         assert WORDS[shape] in view.reask.problems[0].message
@@ -231,12 +242,8 @@ def test_each_fault_view_sends_the_graphs_re_ask(
         critic_first=[json.dumps({"claims": view.reask.emitted})],
     )
 
-    instruction, turn = asyncio.run(
-        recritic_replay.compose(archived, view.reask, PACKAGE_LOADER, PROMPT_LOADER)
-    )
-    sent = {text: contents for text, contents in seen}
-    assert instruction in sent, "no node sent this re-ask instruction"
-    assert sent[instruction] == [turn]
+    sent, turn = sent_and_rebuilt(seen, archived, view.reask)
+    assert sent == [turn], "no node sent this re-ask"
 
 
 def test_a_first_pass_that_leaves_a_shown_row_unanswered_is_refused(archived):
@@ -357,16 +364,12 @@ def test_the_re_ask_request_is_rebuilt_byte_for_byte(
     )
     reask = critic_replay.round_of(archived, ()).first(emitted)
 
-    instruction, turn = asyncio.run(
-        recritic_replay.compose(archived, reask, PACKAGE_LOADER, PROMPT_LOADER)
-    )
+    sent, turn = sent_and_rebuilt(seen, archived, reask)
 
-    sent = {text: contents for text, contents in seen}
     if not as_stored:
-        assert instruction not in sent
+        assert sent is None
         return
-    assert instruction in sent, "no node sent this re-ask instruction"
-    assert sent[instruction] == [turn]
+    assert sent == [turn], "no node sent this re-ask"
 
 
 def test_a_fault_set_that_names_no_draft_is_refused(archived):
