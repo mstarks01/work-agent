@@ -193,11 +193,12 @@ def test_a_surviving_claim_at_the_place_with_another_verb_is_a_verb_loss(case, f
     [("storage-copy", "position"), (None, "unstated"), ("in-component", None)],
     ids=["another", "unstated", "same"],
 )
-def test_a_claim_with_the_action_and_another_position_is_a_position_loss(
+def test_a_claim_with_the_action_and_another_position_is_a_position_or_unstated_loss(
     case, flows, stated, cause
 ):
     """The scorer's position gate refuses the claim, and the row names the gate,
-    or says the claim states no position at all."""
+    or says that the claim states no position at all.
+    """
     reference = case.stride_claims()[0]
     draft = at(case, reference, 1, reference.verb).model_copy(
         update={"attacker_position": stated}
@@ -277,7 +278,7 @@ def _ruled_at_zero(case):
     [("storage-copy", "position"), (None, "unstated"), ("in-component", "critic")],
     ids=["another", "unstated", "same"],
 )
-def test_a_killed_draft_with_another_position_is_a_position_loss(
+def test_a_killed_draft_with_another_position_is_a_position_or_unstated_loss(
     case, flows, stated, cause
 ):
     """A critic fix cannot recover a draft the scorer's gate would refuse."""
@@ -1050,7 +1051,7 @@ class TestAFanInDrop:
         [(None, "unstated"), ("storage-copy", "position"), ("in-component", "fan-in")],
         ids=["unstated", "another", "same"],
     )
-    def test_a_lost_proposal_with_another_position_is_a_position_loss(
+    def test_a_lost_proposal_with_another_position_is_a_position_or_unstated_loss(
         self, case, flows, stated, cause
     ):
         """A fan-in fix cannot recover a proposal the scorer's gate would refuse."""

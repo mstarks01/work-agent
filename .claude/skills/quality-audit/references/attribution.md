@@ -86,10 +86,11 @@ A scored artifact carries both, and they are where a ceiling comes from.
 **`losses`** is STRIDE's, and charges each missed reference to one of nine
 causes, decided in this order: `verb` (a claim cites the same place with
 another action), `position` (the action against another attacker than the one
-a person ruled), `unstated` (as `position`, but no draft there states a
-position, because a run wrote it before the field existed), `merged`, `misfiled` (right finding, wrong lane), `critic` (a
-draft cited it and was rejected), `place` (a rule led there, nothing was
-drafted), `unled` (nothing sent the lane there). `fan-in` sits between
+a person ruled), `unstated` (as `position`, but no draft or proposal there
+states a position, because a run wrote it before the field existed),
+`merged`, `misfiled` (right finding, wrong lane), `critic` (a draft cited it
+and was rejected), `place` (a rule led there, nothing was drafted), `unled`
+(nothing sent the lane there). `fan-in` sits between
 `critic` and `place`: the lane proposed the finding, and the fan-in removed it
 or narrowed its elements off the place. See `evals/harness/losses.py`.
 

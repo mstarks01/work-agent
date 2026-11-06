@@ -97,8 +97,8 @@ from evals.harness.triggers import case_trigger_recall
 from evals.harness.verbs import same_action
 
 #: The causes a miss is charged to, in the order of the stages that decide
-#: them. ``position`` can come from the surviving-claim, ``critic`` or
-#: ``fan-in`` stage.
+#: them. ``position`` and ``unstated`` can come from the surviving-claim,
+#: ``critic`` or ``fan-in`` stage.
 Cause = Literal[
     "verb",
     "position",
@@ -352,7 +352,8 @@ def _holding(
     A reference with no ruled position takes any position, so every item holds.
     Where a person ruled one, only an item that states it can answer the
     reference, because the scorer's gate refuses every other: an empty result
-    is a ``position`` loss at whichever stage found the action at the place.
+    is a ``position`` or ``unstated`` loss (see :func:`_refused`) at whichever
+    stage found the action at the place.
     """
     return [item for item in items if holds_position(position, position_of(item))]
 
