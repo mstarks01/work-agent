@@ -163,6 +163,11 @@ DECLARED: dict[str, str] = {
         "This code is that framework's. It counts the matches on the must-finds"
         " that carry an attacker position, and only that package's drafts state one."
     ),
+    "evals/experiments/QA-2026-11-06-01/control_view_size.py": (
+        "This code is that framework's measurement case. It builds drafts of"
+        " one package whose units nest, so one Control row on a chapter reaches"
+        " several drafts. The view code it measures reads no package field."
+    ),
     "evals/experiments/QA-2026-11-03-01/score_stage.py": (
         "This code is that framework's. It reads the attacker position that"
         " only that package's drafts state, against its ruled references."
