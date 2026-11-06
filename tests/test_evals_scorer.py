@@ -25,6 +25,7 @@ from evals.harness.scorer import (
     candidate_claim,
     exemplar_delta,
     holds_position,
+    position_fate,
     score_case,
     unlisted_for_promotion,
 )
@@ -618,6 +619,21 @@ def test_recall_and_artifact_over_the_whole_labelled_set(
     )
     assert len(artifact["rulings"]) == len(asked) + refused
     assert all(ruling["rationale"] for ruling in artifact["rulings"])
+
+
+@pytest.mark.parametrize(
+    ("ruled", "stated", "fate"),
+    [
+        (None, None, "holds"),
+        (None, "storage-copy", "holds"),
+        ("in-component", "in-component", "holds"),
+        ("in-component", "storage-copy", "other"),
+        ("in-component", None, "unstated"),
+    ],
+)
+def test_position_fate_tells_another_position_from_none(ruled, stated, fate):
+    assert position_fate(ruled, stated) == fate
+    assert holds_position(ruled, stated) is (fate == "holds")
 
 
 def test_exemplar_delta_is_reported_near_minus_far(case):

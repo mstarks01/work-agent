@@ -190,13 +190,15 @@ def test_a_surviving_claim_at_the_place_with_another_verb_is_a_verb_loss(case, f
 
 @pytest.mark.parametrize(
     ("stated", "cause"),
-    [("storage-copy", "position"), (None, "position"), ("in-component", None)],
+    [("storage-copy", "position"), (None, "unstated"), ("in-component", None)],
     ids=["another", "unstated", "same"],
 )
-def test_a_claim_with_the_action_and_another_position_is_a_position_loss(
+def test_a_claim_with_the_action_and_another_position_is_a_position_or_unstated_loss(
     case, flows, stated, cause
 ):
-    """The scorer's position gate refuses the claim, and the row names the gate."""
+    """The scorer's position gate refuses the claim, and the row names the gate,
+    or says that the claim states no position at all.
+    """
     reference = case.stride_claims()[0]
     draft = at(case, reference, 1, reference.verb).model_copy(
         update={"attacker_position": stated}
@@ -206,6 +208,22 @@ def test_a_claim_with_the_action_and_another_position_is_a_position_loss(
     charged = by_index(charge(ruled, flows, [draft], [promote(draft)]))
 
     assert (charged[0].cause if 0 in charged else None) == cause
+
+
+def test_a_claim_that_states_another_position_beside_one_that_states_none_is_a_position_loss(
+    case, flows
+):
+    """One item that states another position makes the stage a lane's choice."""
+    reference = case.stride_claims()[0]
+    drafts = [
+        at(case, reference, sequence, reference.verb).model_copy(
+            update={"attacker_position": stated}
+        )
+        for sequence, stated in ((1, None), (2, "storage-copy"))
+    ]
+    charged = charge(_ruled_at_zero(case), flows, drafts, [promote(d) for d in drafts])
+
+    assert by_index(charged)[0].cause == "position"
 
 
 def test_two_references_at_one_place_under_one_verb_leave_one_merged(
@@ -257,10 +275,10 @@ def _ruled_at_zero(case):
 
 @pytest.mark.parametrize(
     ("stated", "cause"),
-    [("storage-copy", "position"), ("in-component", "critic")],
-    ids=["another", "same"],
+    [("storage-copy", "position"), (None, "unstated"), ("in-component", "critic")],
+    ids=["another", "unstated", "same"],
 )
-def test_a_killed_draft_with_another_position_is_a_position_loss(
+def test_a_killed_draft_with_another_position_is_a_position_or_unstated_loss(
     case, flows, stated, cause
 ):
     """A critic fix cannot recover a draft the scorer's gate would refuse."""
@@ -1030,10 +1048,10 @@ class TestAFanInDrop:
 
     @pytest.mark.parametrize(
         ("stated", "cause"),
-        [(None, "position"), ("in-component", "fan-in")],
-        ids=["unstated", "same"],
+        [(None, "unstated"), ("storage-copy", "position"), ("in-component", "fan-in")],
+        ids=["unstated", "another", "same"],
     )
-    def test_a_lost_proposal_with_another_position_is_a_position_loss(
+    def test_a_lost_proposal_with_another_position_is_a_position_or_unstated_loss(
         self, case, flows, stated, cause
     ):
         """A fan-in fix cannot recover a proposal the scorer's gate would refuse."""

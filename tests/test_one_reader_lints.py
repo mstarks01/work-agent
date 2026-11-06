@@ -1059,8 +1059,8 @@ def test_the_reason_a_claim_rests_on_has_one_writer():
 
 
 #: The names a comparison of an attacker position uses: the parameters of
-#: ``scorer.holds_position``, the reader ``losses._holding`` takes, and the loss
-#: report's two position readers.
+#: ``scorer.position_fate``, the reader ``losses._holding`` and
+#: ``losses._refused`` take, and the loss report's two position readers.
 _POSITION_NAMES = frozenset(
     {
         "ruled_position",
@@ -1094,7 +1094,7 @@ def _names_a_position(side: ast.AST) -> bool:
 def _compares_a_position(node: ast.AST) -> bool:
     """Whether ``node`` compares an attacker position: a draft's
     ``attacker_position``, a value read from ``ruled_positions``, a call to a
-    position reader, or a parameter of ``holds_position``. A local name that
+    position reader, or a parameter of ``position_fate``. A local name that
     holds a position, or a position reader, under another name is not seen."""
     return isinstance(node, ast.Compare) and any(
         _names_a_position(side) for side in (node.left, *node.comparators)
@@ -2096,7 +2096,7 @@ class _OneReader:
 ONE_READERS: dict[str, _OneReader] = {
     "the position rule": _OneReader(
         _compares_a_position,
-        ("evals/harness/scorer.py", "holds_position"),
+        ("evals/harness/scorer.py", "position_fate"),
         {},
         "",
     ),

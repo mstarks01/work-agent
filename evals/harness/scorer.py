@@ -564,15 +564,30 @@ def _match_in_lane(
     return own, ruled
 
 
-def holds_position(ruled_position: str | None, stated_position: object) -> bool:
-    """Whether a draft that states one position can answer a reference ruled one.
+#: How a draft's stated position stands to a reference's ruled one. ``holds``:
+#: the draft can answer the reference. ``other``: it states another position.
+#: ``unstated``: it states none, because a run wrote it before
+#: ``attacker_position`` existed.
+PositionFate = Literal["holds", "other", "unstated"]
+
+
+def position_fate(ruled_position: str | None, stated_position: object) -> PositionFate:
+    """How a draft that states one position stands to a reference ruled one.
 
     **The one reader of the position rule.** A reference with no ruled position
     takes any draft. A ruled one takes only a draft that states that position,
     so a draft that states another one, or none, cannot answer it. The scorer's
-    gate and the loss report both call this.
+    gate reads it through :func:`holds_position`, and the loss report reads it
+    to tell a draft that states another position from one that states none.
     """
-    return ruled_position is None or stated_position == ruled_position
+    if ruled_position is None or stated_position == ruled_position:
+        return "holds"
+    return "unstated" if stated_position is None else "other"
+
+
+def holds_position(ruled_position: str | None, stated_position: object) -> bool:
+    """Whether a draft that states one position can answer a reference ruled one."""
+    return position_fate(ruled_position, stated_position) == "holds"
 
 
 def _rule(

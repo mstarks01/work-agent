@@ -83,12 +83,14 @@ leakage controls and the table that says what each result supports.
 
 A scored artifact carries both, and they are where a ceiling comes from.
 
-**`losses`** is STRIDE's, and charges each missed reference to one of eight
+**`losses`** is STRIDE's, and charges each missed reference to one of nine
 causes, decided in this order: `verb` (a claim cites the same place with
 another action), `position` (the action against another attacker than the one
-a person ruled), `merged`, `misfiled` (right finding, wrong lane), `critic` (a
-draft cited it and was rejected), `place` (a rule led there, nothing was
-drafted), `unled` (nothing sent the lane there). `fan-in` sits between
+a person ruled), `unstated` (as `position`, but no draft or proposal there
+states a position, because a run wrote it before the field existed),
+`merged`, `misfiled` (right finding, wrong lane), `critic` (a draft cited it
+and was rejected), `place` (a rule led there, nothing was drafted), `unled`
+(nothing sent the lane there). `fan-in` sits between
 `critic` and `place`: the lane proposed the finding, and the fan-in removed it
 or narrowed its elements off the place. See `evals/harness/losses.py`.
 
@@ -112,6 +114,7 @@ those against the re-ask.
 | `critic` | a critic prompt or an evidence change | the `critic` rows, split by `re_ask` |
 | `misfiled` | a routing fix | the `misfiled` rows |
 | `position` | a prompt that states the attacker, or a corpus ruling | the `position` rows |
+| `unstated` | no fix: a sweep on today's code states a position | nothing; the archive cannot read the rule |
 | `merged` | a corpus ruling, not a lane fix | the corpus |
 
 Read `evals/TUNING.md` step 3 before pricing anything. Do not price a targeted

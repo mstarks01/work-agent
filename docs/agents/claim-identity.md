@@ -293,9 +293,10 @@ stated control reaches the mechanism through its row (ADR 0062).
 A draft's **Attacker Position** is not part of the key or the mechanism. Two
 drafts at one key with two positions are one finding to a vote unless their
 mechanisms are apart. The position rule has one reader in the evals,
-`scorer.holds_position`. The scorer gate calls it to match a reference with a
-ruled position only to a draft that states it, and the loss report calls it to
-charge a miss to `position`. A `ONE_READERS` row in
+`scorer.position_fate`. The scorer gate calls it through `holds_position` to
+match a reference with a ruled position only to a draft that states it. The
+loss report calls it to charge a miss to `position`, or to `unstated` where no
+draft at the place states a position. A `ONE_READERS` row in
 `tests/test_one_reader_lints.py` refuses a comparison of a draft's position, a
 ruled position or a position reader in any other function; a local name that
 holds a position, or a position reader, under another name is not seen.
