@@ -25,7 +25,7 @@ Run everything from the repository root, under `uv run`.
 | `python -m evals.harness.run calibrate` | how far the identity rule agrees with the calibration labels |
 | `python -m evals.harness.run review --voter <login> <artifacts>` | what a reviewer has waiting over a finished sweep |
 | `python -m evals.harness.run near-misses <artifact> --out ballot.csv` | the missed must-finds a free same-lane draft may state with another verb or place, as a ballot a person answers; `near-miss-rulings` records the answers in `rulings.json` |
-| `python -m evals.harness.run gain <baseline> <candidate> --framework <name> --spread spread.json` | whether a coverage gain rests on supported output: unmatched volume, unvoted findings and rejected rate, on development cases |
+| `python -m evals.harness.run gain <baseline> <candidate> --framework <name> --spread spread.json` | whether a coverage gain rests on supported output: unmatched volume, findings no live vote answers, and rejected rate, on development cases |
 | `python -m evals.harness.run gain <baseline> <candidate> --framework <name> --held-out` | rung 5, held-out confirmation: the same gates on the held-out cases alone. It costs no money but uses one read of each held-out case, refuses an exhausted case, and names each case to record in `holdout_reads` |
 | `python -m evals.harness.run experiments` | what a prior audit already tested, and whether the tree moved under it |
 | `python -m evals.harness.run phases` | the six phases and the graph nodes each owns; `--node` answers for one node |

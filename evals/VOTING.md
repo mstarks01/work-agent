@@ -160,7 +160,7 @@ critic's yield and the writing numbers. Grounds, coverage and provenance are
 facts about the run that no later vote changes, so they stay as the sweep wrote
 them. Pass `--out` to write a second file instead of rewriting the first.
 
-Every finding that matches no reference claim gets one of four vote statuses,
+Every finding that matches no reference claim gets one of five vote statuses,
 stored under the key `standing`, and the artifact counts them per case:
 
 | Vote status | What it means | What it does |
@@ -169,6 +169,7 @@ stored under the key `standing`, and the artifact counts them per case:
 | `pooled` | somebody says it is real | It joins the reference pool and feeds `unlisted_for_promotion`. |
 | `open` | somebody answered `unsure` or `needs-evidence` | Nothing. It waits for a better sitting. |
 | `unvoted` | nobody answered it | Nothing. It is visible in the counts and never counts against the tool. |
+| `stale` | every vote on it judged an earlier argument | Nothing. It is visible in the counts, and the queue asks the voter again. |
 
 Both answers behind `open` move no number, and they part company in your queue.
 `unsure` is a final answer: you judged the finding and it stays judged. Needing
@@ -191,8 +192,8 @@ writes more findings cannot read as better written. `by_reason` says which
 objection people made most.
 
 Over a cold ledger `rejected_rate` reads `0.0`, beside the `unvoted` and
-`stale` counts, which say how much of the answer still waits on a person. Read the pair. A `0.0`
-with 412 unvoted findings means nobody has looked yet, not that the tool
+`stale` counts, which say how much of the answer still waits on a person. Read
+them together. A `0.0` with 412 unvoted findings means nobody has looked yet, not that the tool
 produced nothing wrong.
 
 ## Step 4 — Promote what a reviewer confirmed

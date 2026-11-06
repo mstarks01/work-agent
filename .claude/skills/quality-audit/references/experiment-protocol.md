@@ -54,7 +54,7 @@ against the baseline. The command refuses a pair whose figures do not compare:
 a different scoring corpus, artifact version, identity version or mode.
 Re-score both artifacts on one corpus with `run.py score` first. A run can raise coverage by saying more, because an
 unlisted finding is not counted wrong. The `volume` gate catches that offline,
-and the `reviewed` and `rejected-rate` gates wait for votes on what the
+and the `reviewed` and `rejected-rate` gates wait for live votes on what the
 candidate added. A gate that reads `inconclusive` leaves the gain unconfirmed.
 
 Each rung-5 reading uses one of the holdout's `HOLDOUT_READS`, so confirm

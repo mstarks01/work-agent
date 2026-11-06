@@ -655,7 +655,8 @@ the next sitting, and only the rate over it is a score.
   reference set, how many did a person vote down for substance? The one "extra
   threat" standing that counts against the tool. It reads 0.0 over a cold
   ledger, beside the **unvoted** and **stale** counts, which say how much of
-  the answer still waits on a review sitting — a plausible, grounded extra never gates.
+  the answer still waits on a review sitting — a plausible, grounded extra
+  never gates.
 
   **It is not a false-positive rate, and the denominator is why.** It divides
   by every threat produced, while only an unmatched, in-lane threat citing a
