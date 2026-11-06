@@ -193,8 +193,8 @@ objection people made most.
 
 Over a cold ledger `rejected_rate` reads `0.0`, beside the `unvoted` and
 `stale` counts, which say how much of the answer still waits on a person. Read
-them together. A `0.0` with 412 unvoted findings means nobody has looked yet, not that the tool
-produced nothing wrong.
+them together. A `0.0` with 412 unvoted findings means nobody has looked yet,
+not that the tool produced nothing wrong.
 
 ## Step 4 — Promote what a reviewer confirmed
 
